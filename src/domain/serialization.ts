@@ -1,13 +1,14 @@
 import type { Node, Edge } from "@xyflow/react";
-import type { ArchNodeData, ArchEdgeData } from "./types";
+import type { ArchNodeData, ArchEdgeData, Scenario } from "./types";
 
-export const SCHEMA_VERSION = "0.1";
+export const SCHEMA_VERSION = "0.2";
 
 export interface DiagramFile {
   schemaVersion: string;
   title: string;
   nodes: Node<ArchNodeData>[];
   edges: Edge<ArchEdgeData>[];
+  scenarios: Scenario[];
   metadata: {
     updatedAt: string;
   };
@@ -16,13 +17,15 @@ export interface DiagramFile {
 export function toDiagramFile(
   title: string,
   nodes: Node<ArchNodeData>[],
-  edges: Edge<ArchEdgeData>[]
+  edges: Edge<ArchEdgeData>[],
+  scenarios: Scenario[]
 ): DiagramFile {
   return {
     schemaVersion: SCHEMA_VERSION,
     title,
     nodes,
     edges,
+    scenarios,
     metadata: { updatedAt: new Date().toISOString() },
   };
 }
@@ -41,7 +44,11 @@ export function downloadDiagram(file: DiagramFile): void {
   URL.revokeObjectURL(url);
 }
 
-/** Parses and lightly validates a diagram file loaded from disk. */
+/**
+ * Parses and lightly validates a diagram file loaded from disk.
+ * `scenarios` defaults to [] so files saved before this feature existed
+ * (schemaVersion 0.1) still open without error.
+ */
 export function parseDiagramFile(raw: string): DiagramFile {
   const parsed = JSON.parse(raw);
   if (!Array.isArray(parsed?.nodes) || !Array.isArray(parsed?.edges)) {
@@ -52,6 +59,7 @@ export function parseDiagramFile(raw: string): DiagramFile {
     title: parsed.title ?? "Untitled Diagram",
     nodes: parsed.nodes,
     edges: parsed.edges,
+    scenarios: Array.isArray(parsed.scenarios) ? parsed.scenarios : [],
     metadata: parsed.metadata ?? { updatedAt: new Date().toISOString() },
   };
 }

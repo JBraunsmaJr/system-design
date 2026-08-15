@@ -54,3 +54,21 @@ export interface ArchEdgeData extends Record<string, unknown> {
   label?: string;
   properties: Record<string, string>;
 }
+
+/** A single point in a Scenario's walkthrough - see ScenarioPanel/Presentation. */
+export interface ScenarioStep {
+  id: string;
+  title: string;
+  narration?: string;
+  /** Node/group ids highlighted for this step; everything else dims. */
+  focusNodeIds: string[];
+  /** Edge ids highlighted for this step. */
+  focusEdgeIds: string[];
+}
+
+/** A named, ordered walkthrough attached to the diagram. */
+export interface Scenario {
+  id: string;
+  title: string;
+  steps: ScenarioStep[];
+}
