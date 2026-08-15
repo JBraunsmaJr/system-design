@@ -70,11 +70,11 @@ changes needed.
 
 Roughly following the phased roadmap in the design doc:
 
-- [ ] Groups/boundaries (VPC, bounded context, trust boundary...) that visually
+- [x] Groups/boundaries (VPC, bounded context, trust boundary...) that visually
       contain nodes
-- [ ] Scenario walkthroughs + Presentation Mode (step through a diagram like
+- [x] Scenario walkthroughs + Presentation Mode (step through a diagram like
       a slideshow, highlighting the relevant nodes/edges per step)
 - [ ] Autosave to browser storage + File System Access API for in-place save
-- [ ] PNG/SVG export
+- [x] PNG/SVG export
 - [ ] Optional GitHub-backed open/save (repo or Gist), for version history and
       sharing without a custom backend
