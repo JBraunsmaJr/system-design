@@ -5,6 +5,7 @@ import {
   BackgroundVariant,
   Controls,
   MiniMap,
+  MarkerType,
   useReactFlow,
   type Node,
   type Edge,
@@ -121,6 +122,7 @@ export function Canvas({
     const focusIds = new Set(presentation.step.focusEdgeIds);
     return edges.map((e) => ({
       ...e,
+      animated: focusIds.has(e.id),
       style: { ...e.style, opacity: focusIds.has(e.id) ? 1 : DIMMED_EDGE_OPACITY },
     }));
   }, [edges, presentation]);
@@ -151,7 +153,11 @@ export function Canvas({
         onConnect={onConnect}
         onSelectionChange={onSelectionChange}
         onNodeDragStop={onNodeDragStop}
-        defaultEdgeOptions={{ type: "typed" }}
+        defaultEdgeOptions={{
+          type: "typed",
+          markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16, color: "#98a2b3" },
+          markerStart: { type: MarkerType.ArrowClosed, width: 16, height: 16, color: "#98a2b3" },
+        }}
         deleteKeyCode={null}
         nodesDraggable={!isPresenting}
         nodesConnectable={!isPresenting}

@@ -1,3 +1,5 @@
+import { ExportMenu } from "./ExportMenu";
+
 interface ToolbarProps {
   title: string;
   onTitleChange: (title: string) => void;
@@ -6,6 +8,9 @@ interface ToolbarProps {
   onLoadClick: () => void;
   isScenarioPanelOpen: boolean;
   onToggleScenarioPanel: () => void;
+  onExportPng: () => void;
+  onExportSvg: () => void;
+  canExport: boolean;
 }
 
 export function Toolbar({
@@ -16,6 +21,9 @@ export function Toolbar({
   onLoadClick,
   isScenarioPanelOpen,
   onToggleScenarioPanel,
+  onExportPng,
+  onExportSvg,
+  canExport,
 }: ToolbarProps) {
   return (
     <header className="toolbar">
@@ -37,6 +45,7 @@ export function Toolbar({
         >
           Scenarios
         </button>
+        <ExportMenu onExportPng={onExportPng} onExportSvg={onExportSvg} disabled={!canExport} />
         <button type="button" onClick={onNew}>
           New
         </button>

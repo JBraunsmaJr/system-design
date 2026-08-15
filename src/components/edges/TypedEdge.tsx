@@ -4,6 +4,12 @@ import type { ArchEdgeData } from "../../domain/types";
 
 type TypedEdgeType = Edge<ArchEdgeData, "typed">;
 
+// Fallback dash pattern used only while animating a normally-solid (sync)
+// edge, so there's something for the flow animation to actually move.
+// Edges that already have their own dash pattern (async/data/file types)
+// keep using it - it already supports the same marching effect.
+const FLOW_FALLBACK_DASH = "8 6";
+
 export function TypedEdge({
   id,
   sourceX,
@@ -14,10 +20,13 @@ export function TypedEdge({
   targetPosition,
   data,
   markerEnd,
+  markerStart,
   selected,
   style,
+  animated,
 }: EdgeProps<TypedEdgeType>) {
   const def = getEdgeType(data?.edgeType ?? "generic");
+  const direction = data?.direction ?? "forward";
   const [path, labelX, labelY] = getSmoothStepPath({
     sourceX,
     sourceY,
@@ -29,21 +38,27 @@ export function TypedEdge({
   });
 
   const shownLabel = data?.label?.trim() ? data.label : def.label;
-  // `style` is how Canvas.tsx applies Presentation Mode dimming (opacity) to
-  // edges - unlike nodes, React Flow doesn't apply it automatically for
-  // custom edge components, so it has to be merged in here explicitly.
+  // `style.opacity` is how Canvas.tsx applies Presentation Mode dimming;
+  // `animated` (also set by Canvas.tsx, only for the current step's focus
+  // edges) drives the directional flow animation below.
   const opacity = style?.opacity;
+  const flowClass = animated ? ` typed-edge--flow-${direction}` : "";
 
   return (
     <>
       <BaseEdge
         id={id}
         path={path}
-        markerEnd={markerEnd}
+        // A "reverse" edge shows its arrowhead at the source end instead of
+        // the target end, indicating the real traffic direction runs
+        // opposite to how the edge happens to be drawn.
+        markerEnd={direction === "reverse" ? undefined : markerEnd}
+        markerStart={direction === "reverse" ? markerStart : undefined}
+        className={`typed-edge${flowClass}`}
         style={{
           stroke: def.color,
           strokeWidth: selected ? 2.5 : 1.75,
-          strokeDasharray: def.dash,
+          strokeDasharray: animated ? def.dash ?? FLOW_FALLBACK_DASH : def.dash,
           opacity,
         }}
       />

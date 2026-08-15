@@ -19,6 +19,7 @@ import { NODE_TYPES } from "./domain/nodeRegistry";
 import { GROUP_TYPES } from "./domain/groupRegistry";
 import { reorderWithGroupsFirst, toAbsolutePosition } from "./domain/graphUtils";
 import { toDiagramFile, downloadDiagram, parseDiagramFile } from "./domain/serialization";
+import { exportDiagramAsPng, exportDiagramAsSvg } from "./domain/imageExport";
 import type { ArchNodeData, ArchEdgeData, Scenario, ScenarioStep } from "./domain/types";
 import "./App.css";
 
@@ -47,7 +48,7 @@ function App() {
             ...connection,
             id: nextId("edge"),
             type: "typed",
-            data: { edgeType: "generic", label: "", properties: {} },
+            data: { edgeType: "generic", label: "", direction: "forward", properties: {} },
           },
           eds
         )
@@ -332,6 +333,14 @@ function App() {
     downloadDiagram(toDiagramFile(title, nodes, edges, scenarios));
   }, [title, nodes, edges, scenarios]);
 
+  const onExportPng = useCallback(() => {
+    exportDiagramAsPng(nodes, title).catch((err) => window.alert((err as Error).message));
+  }, [nodes, title]);
+
+  const onExportSvg = useCallback(() => {
+    exportDiagramAsSvg(nodes, title).catch((err) => window.alert((err as Error).message));
+  }, [nodes, title]);
+
   const onLoadClick = useCallback(() => fileInputRef.current?.click(), []);
 
   const onFileSelected = useCallback(
@@ -373,6 +382,9 @@ function App() {
           onLoadClick={onLoadClick}
           isScenarioPanelOpen={isScenarioPanelOpen}
           onToggleScenarioPanel={() => setIsScenarioPanelOpen((v) => !v)}
+          onExportPng={onExportPng}
+          onExportSvg={onExportSvg}
+          canExport={nodes.length > 0}
         />
       )}
       <input

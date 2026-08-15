@@ -790,3 +790,75 @@
   line-height: 1.5;
   max-width: 420px;
 }
+
+/* ---------- Edge flow animation (Presentation Mode) ---------- */
+
+.typed-edge--flow-forward,
+.typed-edge--flow-reverse {
+  animation-duration: 0.9s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.typed-edge--flow-forward {
+  animation-name: typed-edge-flow-forward;
+}
+
+.typed-edge--flow-reverse {
+  animation-name: typed-edge-flow-reverse;
+}
+
+@keyframes typed-edge-flow-forward {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+
+@keyframes typed-edge-flow-reverse {
+  to {
+    stroke-dashoffset: 20;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .typed-edge--flow-forward,
+  .typed-edge--flow-reverse {
+    animation: none;
+  }
+}
+
+/* ---------- Export menu ---------- */
+
+.export-menu {
+  position: relative;
+}
+
+.export-menu__dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-width: 150px;
+  background: var(--node-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  padding: 4px;
+}
+
+.export-menu__dropdown button {
+  background: transparent;
+  border: none;
+  color: var(--chrome-text);
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.export-menu__dropdown button:hover {
+  background: var(--chrome-bg-raised);
+}

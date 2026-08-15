@@ -47,11 +47,16 @@ export interface ArchNodeData extends Record<string, unknown> {
 
 /**
  * Per-instance data stored on a React Flow edge.
- * `edgeType` points back into the EDGE_TYPES registry.
+ * `edgeType` points back into the EDGE_TYPES registry. `direction` lets an
+ * edge's animated flow (Presentation Mode only) run against its drawn
+ * source->target arrow - e.g. a reply/response or a replica pulling from a
+ * primary. Defaults to "forward" when unset, for backward compatibility
+ * with diagrams saved before this field existed.
  */
 export interface ArchEdgeData extends Record<string, unknown> {
   edgeType: string;
   label?: string;
+  direction?: "forward" | "reverse";
   properties: Record<string, string>;
 }
 

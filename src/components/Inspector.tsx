@@ -93,6 +93,20 @@ export function Inspector({
         </select>
       </Field>
 
+      <Field label="Direction">
+        <select
+          value={data.direction ?? "forward"}
+          onChange={(e) => onUpdateEdge(edge.id, { direction: e.target.value as "forward" | "reverse" })}
+        >
+          <option value="forward">Forward (source → target)</option>
+          <option value="reverse">Reverse (target → source)</option>
+        </select>
+      </Field>
+      <p className="inspector__hint" style={{ marginTop: -8 }}>
+        Controls which way the arrowhead points, and which way this edge flows when it's animated
+        in a scenario step.
+      </p>
+
       <Field label="Label override">
         <input
           value={data.label ?? ""}
