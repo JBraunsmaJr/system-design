@@ -1,75 +1,80 @@
-# React + TypeScript + Vite
+# System Design Editor
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A node-based diagramming tool purpose-built for software architects — typed
+components (microservices, databases, gateways, queues...) connected by typed
+traffic (HTTP, gRPC, TCP, webhooks...), not generic boxes and lines.
 
-Currently, two official plugins are available:
+Ships as a fully static site. No backend, no database — runs entirely in the
+browser and deploys straight to GitHub Pages.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Stack
 
-## React Compiler
+- React 19 + TypeScript, built with Vite
+- [React Flow](https://reactflow.dev/) (`@xyflow/react`) for the canvas
+- [lucide-react](https://lucide.dev/) for icons
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Running locally
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Building
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+```bash
+npm run build   # outputs to dist/
+npm run preview # serve the production build locally
+```
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Pushing to `main` automatically builds and deploys to GitHub Pages via
+`../.github/workflows/deploy.yml`. First-time setup: in the repo's **Settings →
+Pages**, set the source to **GitHub Actions**.
+
+> The Vite `base` in `vite.config.ts` is set to `/system-design/` to match
+> this repo's name. If you rename the repo, update that value too.
+
+## How it's structured
 
 ```
+src/
+  domain/
+    types.ts            # NodeTypeDefinition, EdgeTypeDefinition, and the
+                         # per-instance data shapes stored on each node/edge
+    nodeRegistry.ts      # the extensible catalog of node types (add here)
+    edgeRegistry.ts      # the extensible catalog of traffic/edge types (add here)
+    serialization.ts     # save/open a diagram as a local .json file
+  components/
+    nodes/TypedNode.tsx  # renders a node using its registry definition
+    edges/TypedEdge.tsx  # renders an edge using its registry definition
+    Palette.tsx          # left sidebar - drag a type onto the canvas
+    Inspector.tsx        # right sidebar - edit label/description/properties/tags
+    Toolbar.tsx          # New / Open / Save
+    Canvas.tsx           # the React Flow canvas itself
+  App.tsx                # wires state + layout together
+```
+
+Everything is **type-registry driven**: to add a new node or edge type, add
+one entry to `nodeRegistry.ts` or `edgeRegistry.ts` — no component code
+changes needed.
+
+## What's here (v0.1)
+
+- Drag-and-drop typed nodes from a categorized palette
+- Connect nodes with typed, styled edges (sync/async/data/file/generic)
+- Label, describe, and attach free-form key/value properties + tags to any
+  node or edge
+- Save/open diagrams as local `.json` files
+
+## What's next
+
+Roughly following the phased roadmap in the design doc:
+
+- [ ] Groups/boundaries (VPC, bounded context, trust boundary...) that visually
+      contain nodes
+- [ ] Scenario walkthroughs + Presentation Mode (step through a diagram like
+      a slideshow, highlighting the relevant nodes/edges per step)
+- [ ] Autosave to browser storage + File System Access API for in-place save
+- [ ] PNG/SVG export
+- [ ] Optional GitHub-backed open/save (repo or Gist), for version history and
+      sharing without a custom backend
