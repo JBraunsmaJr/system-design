@@ -1,10 +1,12 @@
 import * as Icons from "lucide-react";
 import { NODE_TYPES, CATEGORY_LABELS, CATEGORY_COLORS } from "../domain/nodeRegistry";
+import { GROUP_TYPES } from "../domain/groupRegistry";
 import type { NodeCategory } from "../domain/types";
 
 const CATEGORY_ORDER = Object.keys(CATEGORY_LABELS) as NodeCategory[];
 
 export const DRAG_MIME_TYPE = "application/x-archnode";
+export const GROUP_DRAG_MIME_TYPE = "application/x-archgroup";
 
 export function Palette() {
   return (
@@ -40,8 +42,31 @@ export function Palette() {
             </div>
           );
         })}
+
+        <div className="palette__group">
+          <div className="palette__group-label" style={{ color: "#8b90a0" }}>
+            Boundaries
+          </div>
+          {GROUP_TYPES.map((group) => (
+            <div
+              key={group.id}
+              className="palette__item"
+              draggable
+              onDragStart={(event) => {
+                event.dataTransfer.setData(GROUP_DRAG_MIME_TYPE, group.id);
+                event.dataTransfer.effectAllowed = "move";
+              }}
+            >
+              <Icons.SquareDashed size={15} style={{ color: "#8b90a0" }} />
+              <span>{group.label}</span>
+            </div>
+          ))}
+        </div>
       </div>
-      <p className="palette__hint">Drag a component onto the canvas to place it.</p>
+      <p className="palette__hint">
+        Drag a component onto the canvas to place it. Drag a component into a boundary to group
+        it - drag it back out to release.
+      </p>
     </aside>
   );
 }

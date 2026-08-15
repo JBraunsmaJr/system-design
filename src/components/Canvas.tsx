@@ -12,14 +12,17 @@ import {
   type OnEdgesChange,
   type OnConnect,
   type OnSelectionChangeFunc,
+  type OnNodeDrag,
 } from "@xyflow/react";
 import { TypedNode } from "./nodes/TypedNode";
 import { TypedEdge } from "./edges/TypedEdge";
+import { GroupNode } from "./nodes/GroupNode";
 import { NODE_TYPES } from "../domain/nodeRegistry";
-import { DRAG_MIME_TYPE } from "./Palette";
+import { GROUP_TYPES } from "../domain/groupRegistry";
+import { DRAG_MIME_TYPE, GROUP_DRAG_MIME_TYPE } from "./Palette";
 import type { ArchNodeData, ArchEdgeData } from "../domain/types";
 
-const nodeTypes = { typed: TypedNode };
+const nodeTypes = { typed: TypedNode, group: GroupNode };
 const edgeTypes = { typed: TypedEdge };
 
 interface CanvasProps {
@@ -30,6 +33,8 @@ interface CanvasProps {
   onConnect: OnConnect;
   onSelectionChange: OnSelectionChangeFunc;
   onAddNode: (typeId: string, position: { x: number; y: number }) => void;
+  onAddGroup: (typeId: string, position: { x: number; y: number }) => void;
+  onReparentNode: (nodeId: string, newParentId: string | null) => void;
 }
 
 export function Canvas({
@@ -40,8 +45,10 @@ export function Canvas({
   onConnect,
   onSelectionChange,
   onAddNode,
+  onAddGroup,
+  onReparentNode,
 }: CanvasProps) {
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, getIntersectingNodes } = useReactFlow<Node<ArchNodeData>>();
 
   const onDragOver = useCallback((event: DragEvent) => {
     event.preventDefault();
@@ -51,12 +58,32 @@ export function Canvas({
   const onDrop = useCallback(
     (event: DragEvent) => {
       event.preventDefault();
-      const typeId = event.dataTransfer.getData(DRAG_MIME_TYPE);
-      if (!typeId || !NODE_TYPES.some((n) => n.id === typeId)) return;
       const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
-      onAddNode(typeId, position);
+
+      const nodeTypeId = event.dataTransfer.getData(DRAG_MIME_TYPE);
+      if (nodeTypeId && NODE_TYPES.some((n) => n.id === nodeTypeId)) {
+        onAddNode(nodeTypeId, position);
+        return;
+      }
+
+      const groupTypeId = event.dataTransfer.getData(GROUP_DRAG_MIME_TYPE);
+      if (groupTypeId && GROUP_TYPES.some((g) => g.id === groupTypeId)) {
+        onAddGroup(groupTypeId, position);
+      }
     },
-    [screenToFlowPosition, onAddNode]
+    [screenToFlowPosition, onAddNode, onAddGroup]
+  );
+
+  // Dropping (or dragging) a regular node so it overlaps a group/boundary
+  // makes it a child of that group - it then moves with the group. Dragging
+  // it back out releases it. See App.tsx's onReparentNode for the state math.
+  const onNodeDragStop = useCallback<OnNodeDrag<Node<ArchNodeData>>>(
+    (_event, draggedNode) => {
+      if (draggedNode.type === "group") return;
+      const intersectingGroup = getIntersectingNodes(draggedNode).find((n) => n.type === "group");
+      onReparentNode(draggedNode.id, intersectingGroup ? intersectingGroup.id : null);
+    },
+    [getIntersectingNodes, onReparentNode]
   );
 
   return (
@@ -70,12 +97,20 @@ export function Canvas({
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onSelectionChange={onSelectionChange}
+        onNodeDragStop={onNodeDragStop}
         defaultEdgeOptions={{ type: "typed" }}
+        deleteKeyCode={null}
         fitView
         proOptions={{ hideAttribution: true }}
       >
-        <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="#d6d9e0" />
-        <MiniMap pannable zoomable className="canvas__minimap" />
+        <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="rgba(255, 255, 255, 0.07)" />
+        <MiniMap
+          pannable
+          zoomable
+          className="canvas__minimap"
+          nodeColor="#3a3f4f"
+          maskColor="rgba(15, 17, 23, 0.65)"
+        />
         <Controls />
       </ReactFlow>
     </div>

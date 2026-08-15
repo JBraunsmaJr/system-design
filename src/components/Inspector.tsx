@@ -1,5 +1,6 @@
 import type { Node, Edge } from "@xyflow/react";
 import { getNodeType } from "../domain/nodeRegistry";
+import { getGroupType } from "../domain/groupRegistry";
 import { EDGE_TYPES } from "../domain/edgeRegistry";
 import type { ArchNodeData, ArchEdgeData } from "../domain/types";
 
@@ -8,9 +9,18 @@ interface InspectorProps {
   selectedEdge: Edge<ArchEdgeData> | null;
   onUpdateNode: (id: string, patch: Partial<ArchNodeData>) => void;
   onUpdateEdge: (id: string, patch: Partial<ArchEdgeData>) => void;
+  onDeleteNode: (id: string) => void;
+  onDeleteEdge: (id: string) => void;
 }
 
-export function Inspector({ selectedNode, selectedEdge, onUpdateNode, onUpdateEdge }: InspectorProps) {
+export function Inspector({
+  selectedNode,
+  selectedEdge,
+  onUpdateNode,
+  onUpdateEdge,
+  onDeleteNode,
+  onDeleteEdge,
+}: InspectorProps) {
   if (!selectedNode && !selectedEdge) {
     return (
       <aside className="inspector">
@@ -24,10 +34,14 @@ export function Inspector({ selectedNode, selectedEdge, onUpdateNode, onUpdateEd
 
   if (selectedNode) {
     const data = selectedNode.data;
-    const def = getNodeType(data.nodeType);
+    const isGroup = selectedNode.type === "group";
+    const nodeDef = !isGroup ? getNodeType(data.nodeType) : undefined;
+    const groupDef = isGroup ? getGroupType(data.nodeType) : undefined;
+    const headerLabel = nodeDef?.label ?? groupDef?.label ?? data.nodeType;
+
     return (
       <aside className="inspector">
-        <div className="panel-header">{def?.label ?? data.nodeType}</div>
+        <div className="panel-header">{headerLabel}</div>
 
         <Field label="Label">
           <input value={data.label} onChange={(e) => onUpdateNode(selectedNode.id, { label: e.target.value })} />
@@ -47,6 +61,15 @@ export function Inspector({ selectedNode, selectedEdge, onUpdateNode, onUpdateEd
         />
 
         <TagEditor tags={data.tags} onChange={(tags) => onUpdateNode(selectedNode.id, { tags })} />
+
+        <button type="button" className="inspector__delete" onClick={() => onDeleteNode(selectedNode.id)}>
+          {isGroup ? "Delete boundary" : "Delete node"}
+        </button>
+        {isGroup && (
+          <p className="inspector__hint">
+            Deleting a boundary keeps the nodes inside it - they're released, not deleted.
+          </p>
+        )}
       </aside>
     );
   }
@@ -82,6 +105,10 @@ export function Inspector({ selectedNode, selectedEdge, onUpdateNode, onUpdateEd
         properties={data.properties}
         onChange={(properties) => onUpdateEdge(edge.id, { properties })}
       />
+
+      <button type="button" className="inspector__delete" onClick={() => onDeleteEdge(edge.id)}>
+        Delete edge
+      </button>
     </aside>
   );
 }

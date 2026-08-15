@@ -8,8 +8,12 @@
   --chrome-text: #e7e9ee;
   --chrome-text-dim: #8b90a0;
 
-  /* Canvas - light, so exported diagrams read cleanly on white */
-  --canvas-bg: #f7f7f5;
+  /* Canvas - dark work surface, sits slightly below the chrome for depth */
+  --canvas-bg: #0f1117;
+
+  /* Node / edge-label surfaces on the canvas */
+  --node-bg: #1c1f28;
+  --node-border: #2c3140;
 
   --accent: #5b7cfa;
   --accent-text: #ffffff;
