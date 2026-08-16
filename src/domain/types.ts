@@ -18,6 +18,8 @@ export type NodeCategory =
 export interface NodeTypeDefinition {
   id: string;
   category: NodeCategory;
+  /** Optional sub-grouping within the category, for palette display only (e.g. "Flow Control" within "logic"). Doesn't affect color or any data matching. */
+  subcategory?: string;
   label: string;
   /** lucide-react icon component name, e.g. "Server" */
   icon: string;

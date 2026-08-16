@@ -20,6 +20,17 @@ export const CATEGORY_COLORS: Record<NodeCategory, string> = {
   logic: "#22B8CF",
 };
 
+/** Display order for the "logic" category's subcategory groupings in the Code palette tab. */
+export const LOGIC_SUBCATEGORY_ORDER = [
+  "Entry / Exit",
+  "Flow Control",
+  "Data & Persistence",
+  "Integration & Messaging",
+  "Security",
+  "Error Handling",
+  "Annotations",
+];
+
 /**
  * Starter taxonomy. This is intentionally a subset of the full SDD taxonomy -
  * add more entries here (or load them from a JSON config at runtime later)
@@ -59,48 +70,146 @@ export const NODE_TYPES: NodeTypeDefinition[] = [
   // system topology. Meant to be used inside a node's sub-diagram (e.g.
   // drilling into a microservice to lay out what happens for an incoming
   // request), but nothing stops using them at the top level too.
+  // `subcategory` only affects how the Code palette groups these - it's
+  // still one flat "logic" category for color/matching purposes.
+
+  // Entry / Exit
   {
     id: "endpoint",
     category: "logic",
+    subcategory: "Entry / Exit",
     label: "Endpoint",
     icon: "Route",
     color: CATEGORY_COLORS.logic,
     defaultProperties: { method: "POST", path: "/resource" },
   },
-  { id: "step", category: "logic", label: "Step", icon: "ArrowRightCircle", color: CATEGORY_COLORS.logic },
+  {
+    id: "return",
+    category: "logic",
+    subcategory: "Entry / Exit",
+    label: "Return",
+    icon: "CornerUpLeft",
+    color: CATEGORY_COLORS.logic,
+    defaultProperties: { status: "200" },
+  },
+
+  // Flow Control
+  { id: "step", category: "logic", subcategory: "Flow Control", label: "Step", icon: "ArrowRightCircle", color: CATEGORY_COLORS.logic },
   {
     id: "decision",
     category: "logic",
+    subcategory: "Flow Control",
     label: "Decision",
     icon: "GitFork",
     color: CATEGORY_COLORS.logic,
     defaultProperties: { condition: "isValid?" },
   },
   {
+    id: "switch",
+    category: "logic",
+    subcategory: "Flow Control",
+    label: "Switch / Case",
+    icon: "ListTree",
+    color: CATEGORY_COLORS.logic,
+    defaultProperties: { on: "value" },
+  },
+  {
     id: "loop",
     category: "logic",
+    subcategory: "Flow Control",
     label: "Loop",
     icon: "Repeat",
     color: CATEGORY_COLORS.logic,
     defaultProperties: { iterate: "each item" },
   },
-  { id: "try-catch", category: "logic", label: "Try / Catch", icon: "ShieldAlert", color: CATEGORY_COLORS.logic },
+  { id: "parallel", category: "logic", subcategory: "Flow Control", label: "Parallel", icon: "SplitSquareHorizontal", color: CATEGORY_COLORS.logic },
+  { id: "join", category: "logic", subcategory: "Flow Control", label: "Join / Wait", icon: "Merge", color: CATEGORY_COLORS.logic },
+
+  // Data & Persistence
+  { id: "validate", category: "logic", subcategory: "Data & Persistence", label: "Validate", icon: "CheckCircle2", color: CATEGORY_COLORS.logic },
+  {
+    id: "query",
+    category: "logic",
+    subcategory: "Data & Persistence",
+    label: "Query",
+    icon: "FileSearch",
+    color: CATEGORY_COLORS.logic,
+    defaultProperties: { source: "table_or_index" },
+  },
+  {
+    id: "persist",
+    category: "logic",
+    subcategory: "Data & Persistence",
+    label: "Persist",
+    icon: "Save",
+    color: CATEGORY_COLORS.logic,
+    defaultProperties: { target: "table_or_index" },
+  },
+  {
+    id: "cache-check",
+    category: "logic",
+    subcategory: "Data & Persistence",
+    label: "Cache Check",
+    icon: "Gauge",
+    color: CATEGORY_COLORS.logic,
+    defaultProperties: { key: "cache:key" },
+  },
+
+  // Integration & Messaging
   {
     id: "external-call",
     category: "logic",
+    subcategory: "Integration & Messaging",
     label: "External Call",
     icon: "ArrowUpRight",
     color: CATEGORY_COLORS.logic,
     defaultProperties: { target: "service.method()" },
   },
   {
-    id: "return",
+    id: "publish-event",
     category: "logic",
-    label: "Return",
-    icon: "CornerUpLeft",
+    subcategory: "Integration & Messaging",
+    label: "Publish Event",
+    icon: "Radio",
     color: CATEGORY_COLORS.logic,
-    defaultProperties: { status: "200" },
+    defaultProperties: { event: "EventName" },
   },
+  {
+    id: "enqueue-job",
+    category: "logic",
+    subcategory: "Integration & Messaging",
+    label: "Enqueue Job",
+    icon: "ListPlus",
+    color: CATEGORY_COLORS.logic,
+    defaultProperties: { job: "JobName" },
+  },
+
+  // Security
+  { id: "authenticate", category: "logic", subcategory: "Security", label: "Authenticate", icon: "Fingerprint", color: CATEGORY_COLORS.logic },
+  {
+    id: "authorize",
+    category: "logic",
+    subcategory: "Security",
+    label: "Authorize",
+    icon: "Lock",
+    color: CATEGORY_COLORS.logic,
+    defaultProperties: { permission: "resource:action" },
+  },
+
+  // Error Handling
+  { id: "try-catch", category: "logic", subcategory: "Error Handling", label: "Try / Catch", icon: "ShieldAlert", color: CATEGORY_COLORS.logic },
+  {
+    id: "throw-error",
+    category: "logic",
+    subcategory: "Error Handling",
+    label: "Throw Error",
+    icon: "OctagonAlert",
+    color: CATEGORY_COLORS.logic,
+    defaultProperties: { status: "400", message: "Bad Request" },
+  },
+
+  // Annotations
+  { id: "note", category: "logic", subcategory: "Annotations", label: "Note", icon: "StickyNote", color: CATEGORY_COLORS.logic },
 ];
 
 export function getNodeType(id: string): NodeTypeDefinition | undefined {

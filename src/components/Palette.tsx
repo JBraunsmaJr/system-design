@@ -1,8 +1,13 @@
-import { useState } from "react";
+import { useState, type DragEvent } from "react";
 import * as Icons from "lucide-react";
-import { NODE_TYPES, CATEGORY_LABELS, CATEGORY_COLORS } from "../domain/nodeRegistry";
+import {
+  NODE_TYPES,
+  CATEGORY_LABELS,
+  CATEGORY_COLORS,
+  LOGIC_SUBCATEGORY_ORDER,
+} from "../domain/nodeRegistry";
 import { GROUP_TYPES } from "../domain/groupRegistry";
-import type { NodeCategory } from "../domain/types";
+import type { NodeCategory, NodeTypeDefinition } from "../domain/types";
 
 const SYSTEM_CATEGORIES: NodeCategory[] = [
   "compute",
@@ -12,7 +17,6 @@ const SYSTEM_CATEGORIES: NodeCategory[] = [
   "external",
   "observability",
 ];
-const CODE_CATEGORIES: NodeCategory[] = ["logic"];
 
 export const DRAG_MIME_TYPE = "application/x-archnode";
 export const GROUP_DRAG_MIME_TYPE = "application/x-archgroup";
@@ -21,7 +25,6 @@ type PaletteMode = "system" | "code";
 
 export function Palette() {
   const [mode, setMode] = useState<PaletteMode>("system");
-  const categories = mode === "system" ? SYSTEM_CATEGORIES : CODE_CATEGORIES;
 
   return (
     <aside className="palette">
@@ -50,60 +53,74 @@ export function Palette() {
           </p>
         )}
 
-        {categories.map((category) => {
-          const items = NODE_TYPES.filter((n) => n.category === category);
-          if (!items.length) return null;
-          return (
-            <div className="palette__group" key={category}>
-              <div className="palette__group-label" style={{ color: CATEGORY_COLORS[category] }}>
-                {CATEGORY_LABELS[category]}
-              </div>
-              {items.map((item) => {
-                const IconComponent =
-                  (Icons[item.icon as keyof typeof Icons] as Icons.LucideIcon) || Icons.Box;
-                return (
-                  <div
-                    key={item.id}
-                    className="palette__item"
-                    draggable
-                    onDragStart={(event) => {
-                      event.dataTransfer.setData(DRAG_MIME_TYPE, item.id);
-                      event.dataTransfer.effectAllowed = "move";
-                    }}
-                  >
-                    <IconComponent size={15} style={{ color: item.color }} />
-                    <span>{item.label}</span>
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })}
+        {mode === "system"
+          ? SYSTEM_CATEGORIES.map((category) => (
+              <PaletteGroup
+                key={category}
+                label={CATEGORY_LABELS[category]}
+                color={CATEGORY_COLORS[category]}
+                items={NODE_TYPES.filter((n) => n.category === category)}
+              />
+            ))
+          : LOGIC_SUBCATEGORY_ORDER.map((subcategory) => (
+              <PaletteGroup
+                key={subcategory}
+                label={subcategory}
+                color="#8b90a0"
+                items={NODE_TYPES.filter((n) => n.category === "logic" && n.subcategory === subcategory)}
+              />
+            ))}
 
-        <div className="palette__group">
-          <div className="palette__group-label" style={{ color: "#8b90a0" }}>
-            Boundaries
-          </div>
-          {GROUP_TYPES.map((group) => (
-            <div
-              key={group.id}
-              className="palette__item"
-              draggable
-              onDragStart={(event) => {
-                event.dataTransfer.setData(GROUP_DRAG_MIME_TYPE, group.id);
-                event.dataTransfer.effectAllowed = "move";
-              }}
-            >
-              <Icons.SquareDashed size={15} style={{ color: "#8b90a0" }} />
-              <span>{group.label}</span>
-            </div>
-          ))}
-        </div>
+        <PaletteGroup
+          label="Boundaries"
+          color="#8b90a0"
+          items={GROUP_TYPES.map((g) => ({ id: g.id, label: g.label, icon: "SquareDashed", color: "#8b90a0" }))}
+          isGroupPalette
+        />
       </div>
       <p className="palette__hint">
         Drag a component onto the canvas to place it. Drag a component into a boundary to group
         it - drag it back out to release.
       </p>
     </aside>
+  );
+}
+
+interface PaletteGroupProps {
+  label: string;
+  color: string;
+  items: Pick<NodeTypeDefinition, "id" | "label" | "icon" | "color">[];
+  /** True for the Boundaries section, which drags groups rather than typed nodes. */
+  isGroupPalette?: boolean;
+}
+
+function PaletteGroup({ label, color, items, isGroupPalette }: PaletteGroupProps) {
+  if (!items.length) return null;
+
+  const onDragStart = (event: DragEvent, itemId: string) => {
+    event.dataTransfer.setData(isGroupPalette ? GROUP_DRAG_MIME_TYPE : DRAG_MIME_TYPE, itemId);
+    event.dataTransfer.effectAllowed = "move";
+  };
+
+  return (
+    <div className="palette__group">
+      <div className="palette__group-label" style={{ color }}>
+        {label}
+      </div>
+      {items.map((item) => {
+        const IconComponent = (Icons[item.icon as keyof typeof Icons] as Icons.LucideIcon) || Icons.Box;
+        return (
+          <div
+            key={item.id}
+            className="palette__item"
+            draggable
+            onDragStart={(event) => onDragStart(event, item.id)}
+          >
+            <IconComponent size={15} style={{ color: item.color }} />
+            <span>{item.label}</span>
+          </div>
+        );
+      })}
+    </div>
   );
 }
