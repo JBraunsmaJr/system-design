@@ -14,17 +14,19 @@ import {
   type OnConnect,
   type OnSelectionChangeFunc,
   type OnNodeDrag,
+  type NodeMouseHandler,
+  type NodeTypes,
 } from "@xyflow/react";
 import { TypedNode } from "./nodes/TypedNode";
 import { TypedEdge } from "./edges/TypedEdge";
 import { GroupNode } from "./nodes/GroupNode";
 import { PresentationOverlay } from "./PresentationOverlay";
+import { Breadcrumb } from "./Breadcrumb";
 import { NODE_TYPES } from "../domain/nodeRegistry";
 import { GROUP_TYPES } from "../domain/groupRegistry";
 import { DRAG_MIME_TYPE, GROUP_DRAG_MIME_TYPE } from "./Palette";
 import type { ArchNodeData, ArchEdgeData, Scenario, ScenarioStep } from "../domain/types";
 
-const nodeTypes = { typed: TypedNode, group: GroupNode };
 const edgeTypes = { typed: TypedEdge };
 
 const DIMMED_NODE_OPACITY = 0.15;
@@ -50,6 +52,10 @@ interface CanvasProps {
   onPresentNext: () => void;
   onPresentPrev: () => void;
   onExitPresenting: () => void;
+  breadcrumbLabels: string[];
+  onDrillInto: (nodeId: string) => void;
+  onNavigateToRoot: () => void;
+  onNavigateToPathIndex: (index: number) => void;
 }
 
 export function Canvas({
@@ -66,8 +72,27 @@ export function Canvas({
   onPresentNext,
   onPresentPrev,
   onExitPresenting,
+  breadcrumbLabels,
+  onDrillInto,
+  onNavigateToRoot,
+  onNavigateToPathIndex,
 }: CanvasProps) {
   const { screenToFlowPosition, getIntersectingNodes, fitView } = useReactFlow<Node<ArchNodeData>>();
+
+  const isPresenting = presentation !== null;
+
+  // TypedNode needs to trigger navigation but isn't rendered with any extra
+  // props by React Flow itself - wrapping it here (rather than a stable
+  // module-level `nodeTypes` constant) is the standard way to thread a
+  // callback into a custom node type. Disabled while presenting, since
+  // drilling into a node would break the locked slideshow view.
+  const nodeTypes = useMemo<NodeTypes>(
+    () => ({
+      typed: (props) => <TypedNode {...props} onDrillInto={isPresenting ? undefined : onDrillInto} />,
+      group: GroupNode,
+    }),
+    [isPresenting, onDrillInto]
+  );
 
   const onDragOver = useCallback((event: DragEvent) => {
     event.preventDefault();
@@ -105,6 +130,14 @@ export function Canvas({
     [getIntersectingNodes, onReparentNode]
   );
 
+  const onNodeDoubleClick = useCallback<NodeMouseHandler<Node<ArchNodeData>>>(
+    (_event, node) => {
+      if (isPresenting || node.type === "group") return;
+      onDrillInto(node.id);
+    },
+    [isPresenting, onDrillInto]
+  );
+
   // Presentation Mode dims everything except the current step's focus set.
   // Group nodes can be focus targets too (a step can highlight a boundary,
   // not just the things in it) since they're ordinary node ids underneath.
@@ -139,7 +172,13 @@ export function Canvas({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: see comment above
   }, [stepId, fitView]);
 
-  const isPresenting = presentation !== null;
+  // The current level's contents change (drilling in/out swaps to a
+  // completely different set of nodes), so re-frame the camera whenever the
+  // breadcrumb path changes rather than leaving the previous level's pan/zoom.
+  const pathKey = breadcrumbLabels.join(">");
+  useEffect(() => {
+    fitView({ padding: 0.2, duration: 300 });
+  }, [pathKey, fitView]);
 
   return (
     <div className="canvas" onDragOver={onDragOver} onDrop={onDrop}>
@@ -153,6 +192,7 @@ export function Canvas({
         onConnect={onConnect}
         onSelectionChange={onSelectionChange}
         onNodeDragStop={onNodeDragStop}
+        onNodeDoubleClick={onNodeDoubleClick}
         defaultEdgeOptions={{
           type: "typed",
           markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16, color: "#98a2b3" },
@@ -176,6 +216,13 @@ export function Canvas({
           />
         )}
         {!isPresenting && <Controls />}
+        {!isPresenting && (
+          <Breadcrumb
+            labels={breadcrumbLabels}
+            onNavigateToRoot={onNavigateToRoot}
+            onNavigateToIndex={onNavigateToPathIndex}
+          />
+        )}
         {presentation && (
           <PresentationOverlay
             scenario={presentation.scenario}

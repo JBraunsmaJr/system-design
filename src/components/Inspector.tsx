@@ -1,3 +1,4 @@
+import { useState, type KeyboardEvent } from "react";
 import type { Node, Edge } from "@xyflow/react";
 import { getNodeType } from "../domain/nodeRegistry";
 import { getGroupType } from "../domain/groupRegistry";
@@ -11,6 +12,7 @@ interface InspectorProps {
   onUpdateEdge: (id: string, patch: Partial<ArchEdgeData>) => void;
   onDeleteNode: (id: string) => void;
   onDeleteEdge: (id: string) => void;
+  onDrillInto: (id: string) => void;
 }
 
 export function Inspector({
@@ -20,6 +22,7 @@ export function Inspector({
   onUpdateEdge,
   onDeleteNode,
   onDeleteEdge,
+  onDrillInto,
 }: InspectorProps) {
   if (!selectedNode && !selectedEdge) {
     return (
@@ -38,6 +41,7 @@ export function Inspector({
     const nodeDef = !isGroup ? getNodeType(data.nodeType) : undefined;
     const groupDef = isGroup ? getGroupType(data.nodeType) : undefined;
     const headerLabel = nodeDef?.label ?? groupDef?.label ?? data.nodeType;
+    const subCount = data.subDiagram?.nodes.length ?? 0;
 
     return (
       <aside className="inspector">
@@ -62,12 +66,23 @@ export function Inspector({
 
         <TagEditor tags={data.tags} onChange={(tags) => onUpdateNode(selectedNode.id, { tags })} />
 
+        {!isGroup && (
+          <button type="button" className="inspector__drill" onClick={() => onDrillInto(selectedNode.id)}>
+            {subCount > 0 ? `Open sub-diagram (${subCount})` : "Create sub-diagram"} →
+          </button>
+        )}
+
         <button type="button" className="inspector__delete" onClick={() => onDeleteNode(selectedNode.id)}>
           {isGroup ? "Delete boundary" : "Delete node"}
         </button>
         {isGroup && (
           <p className="inspector__hint">
             Deleting a boundary keeps the nodes inside it - they're released, not deleted.
+          </p>
+        )}
+        {!isGroup && subCount > 0 && (
+          <p className="inspector__hint">
+            Deleting this node also deletes its sub-diagram ({subCount} node{subCount === 1 ? "" : "s"} inside).
           </p>
         )}
       </aside>
@@ -190,21 +205,56 @@ function PropertyEditor({
   );
 }
 
+// Chip-style tag editor. This is a fully *controlled* component (chips are
+// rendered directly from the `tags` prop on every render) - the previous
+// version used an uncontrolled `defaultValue` input, which only reads its
+// initial value once and then never updates, so it kept showing whatever
+// you'd last typed no matter which node/edge you had selected. That's what
+// made tags look "global" - it was a stale-input bug, not a shared-data bug.
 function TagEditor({ tags, onChange }: { tags: string[]; onChange: (tags: string[]) => void }) {
+  const [draft, setDraft] = useState("");
+
+  const commit = () => {
+    const value = draft.trim();
+    if (value && !tags.includes(value)) {
+      onChange([...tags, value]);
+    }
+    setDraft("");
+  };
+
+  const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter" || event.key === ",") {
+      event.preventDefault();
+      commit();
+    } else if (event.key === "Backspace" && draft === "" && tags.length > 0) {
+      onChange(tags.slice(0, -1));
+    }
+  };
+
   return (
     <Field label="Tags">
-      <input
-        placeholder="env:prod, team:payments"
-        defaultValue={tags.join(", ")}
-        onBlur={(e) =>
-          onChange(
-            e.target.value
-              .split(",")
-              .map((t) => t.trim())
-              .filter(Boolean)
-          )
-        }
-      />
+      <div className="tag-editor">
+        {tags.map((tag) => (
+          <span className="tag-chip" key={tag}>
+            {tag}
+            <button
+              type="button"
+              onClick={() => onChange(tags.filter((t) => t !== tag))}
+              aria-label={`Remove tag ${tag}`}
+            >
+              ×
+            </button>
+          </span>
+        ))}
+        <input
+          className="tag-editor__input"
+          value={draft}
+          placeholder={tags.length === 0 ? "env:prod, team:payments..." : "Add tag..."}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={onKeyDown}
+          onBlur={commit}
+        />
+      </div>
     </Field>
   );
 }

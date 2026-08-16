@@ -8,6 +8,7 @@ interface ToolbarProps {
   onLoadClick: () => void;
   isScenarioPanelOpen: boolean;
   onToggleScenarioPanel: () => void;
+  scenariosDisabled: boolean;
   onExportPng: () => void;
   onExportSvg: () => void;
   canExport: boolean;
@@ -21,6 +22,7 @@ export function Toolbar({
   onLoadClick,
   isScenarioPanelOpen,
   onToggleScenarioPanel,
+  scenariosDisabled,
   onExportPng,
   onExportSvg,
   canExport,
@@ -41,6 +43,8 @@ export function Toolbar({
         <button
           type="button"
           className={isScenarioPanelOpen ? "active" : undefined}
+          disabled={scenariosDisabled}
+          title={scenariosDisabled ? "Go back to the top level to manage scenarios" : undefined}
           onClick={onToggleScenarioPanel}
         >
           Scenarios

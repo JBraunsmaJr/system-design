@@ -1,15 +1,25 @@
 import { Handle, Position, type NodeProps, type Node } from "@xyflow/react";
+import { Maximize2 } from "lucide-react";
 import * as Icons from "lucide-react";
 import { getNodeType, CATEGORY_LABELS } from "../../domain/nodeRegistry";
 import type { ArchNodeData } from "../../domain/types";
 
 type TypedNodeType = Node<ArchNodeData, "typed">;
 
-export function TypedNode({ data, selected }: NodeProps<TypedNodeType>) {
+interface TypedNodeProps extends NodeProps<TypedNodeType> {
+  // Not part of NodeProps - injected via the nodeTypes factory in Canvas.tsx
+  // so this component can trigger navigation without needing its own
+  // ReactFlow-context plumbing. Absent (and the button hidden) while
+  // presenting, since editing/navigation are locked in that mode.
+  onDrillInto?: (nodeId: string) => void;
+}
+
+export function TypedNode({ id, data, selected, onDrillInto }: TypedNodeProps) {
   const def = getNodeType(data.nodeType);
   const IconComponent =
     (def && (Icons[def.icon as keyof typeof Icons] as Icons.LucideIcon)) || Icons.Box;
   const accent = def?.color ?? "#98A2B3";
+  const hasSubDiagram = (data.subDiagram?.nodes.length ?? 0) > 0;
 
   return (
     <div
@@ -32,6 +42,21 @@ export function TypedNode({ data, selected }: NodeProps<TypedNodeType>) {
           </div>
         </div>
       </div>
+
+      {onDrillInto && (
+        <button
+          type="button"
+          className={`typed-node__drill${hasSubDiagram ? " has-content" : ""}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            onDrillInto(id);
+          }}
+          title={hasSubDiagram ? "Open sub-diagram" : "Create a sub-diagram inside this node"}
+          aria-label="Drill into sub-diagram"
+        >
+          <Maximize2 size={11} />
+        </button>
+      )}
 
       <Handle id="source-right" type="source" position={Position.Right} />
       <Handle id="source-bottom" type="source" position={Position.Bottom} />

@@ -1,11 +1,17 @@
 import type { Node, Edge } from "@xyflow/react";
 import type { ArchNodeData, ArchEdgeData, Scenario } from "./types";
 
-export const SCHEMA_VERSION = "0.2";
+export const SCHEMA_VERSION = "0.3";
 
 export interface DiagramFile {
   schemaVersion: string;
   title: string;
+  /**
+   * Always the FULL top-level tree - any of these nodes may carry a nested
+   * `data.subDiagram` (itself possibly nested further), so this one array
+   * captures the entire diagram at every drill-down level in a single file.
+   * See domain/subDiagramTree.ts for how the app navigates this structure.
+   */
   nodes: Node<ArchNodeData>[];
   edges: Edge<ArchEdgeData>[];
   scenarios: Scenario[];

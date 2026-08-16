@@ -1,3 +1,5 @@
+import type { Node, Edge } from "@xyflow/react";
+
 // Core domain types for the system-design editor.
 // These mirror the taxonomy described in the project's Requirements & Software
 // Design Document: nodes and edges are *typed* against an extensible registry
@@ -35,7 +37,13 @@ export interface EdgeTypeDefinition {
 
 /**
  * Per-instance data stored on a React Flow node.
- * `nodeType` points back into the NODE_TYPES registry.
+ * `nodeType` points back into the NODE_TYPES registry. `subDiagram`, if
+ * present, is a fully independent nested canvas "inside" this node - drilled
+ * into via double-click or the Inspector. It's just a regular field on the
+ * node's own data, so the whole nested tree serializes as part of the same
+ * single JSON file rather than needing separate files per level. A node's
+ * subDiagram can itself contain nodes with their own subDiagram, recursively,
+ * with no fixed depth limit.
  */
 export interface ArchNodeData extends Record<string, unknown> {
   nodeType: string;
@@ -43,6 +51,7 @@ export interface ArchNodeData extends Record<string, unknown> {
   description?: string;
   properties: Record<string, string>;
   tags: string[];
+  subDiagram?: SubDiagram;
 }
 
 /**
@@ -58,6 +67,17 @@ export interface ArchEdgeData extends Record<string, unknown> {
   label?: string;
   direction?: "forward" | "reverse";
   properties: Record<string, string>;
+}
+
+/**
+ * An independent set of nodes/edges nested inside a parent node. Scenarios
+ * are intentionally NOT part of this - they stay scoped to the top-level
+ * diagram for now (see App.tsx), since a scenario step's focus ids only ever
+ * make sense against one specific level of the tree.
+ */
+export interface SubDiagram {
+  nodes: Node<ArchNodeData>[];
+  edges: Edge<ArchEdgeData>[];
 }
 
 /** A single point in a Scenario's walkthrough - see ScenarioPanel/Presentation. */

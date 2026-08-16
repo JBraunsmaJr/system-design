@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import {
   ReactFlowProvider,
-  useNodesState,
-  useEdgesState,
+  applyNodeChanges,
+  applyEdgeChanges,
   addEdge,
   type Node,
   type Edge,
   type Connection,
+  type OnNodesChange,
+  type OnEdgesChange,
   type OnSelectionChangeFunc,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -18,18 +20,61 @@ import { ScenarioPanel } from "./components/ScenarioPanel";
 import { NODE_TYPES } from "./domain/nodeRegistry";
 import { GROUP_TYPES } from "./domain/groupRegistry";
 import { reorderWithGroupsFirst, toAbsolutePosition } from "./domain/graphUtils";
+import {
+  getSubDiagramAtPath,
+  updateSubDiagramAtPath,
+  getBreadcrumbLabels,
+  type DiagramPath,
+} from "./domain/subDiagramTree";
 import { toDiagramFile, downloadDiagram, parseDiagramFile } from "./domain/serialization";
 import { exportDiagramAsPng, exportDiagramAsSvg } from "./domain/imageExport";
-import type { ArchNodeData, ArchEdgeData, Scenario, ScenarioStep } from "./domain/types";
+import type { ArchNodeData, ArchEdgeData, Scenario, ScenarioStep, SubDiagram } from "./domain/types";
 import "./App.css";
 
 let idSeed = 0;
 const nextId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${idSeed++}`;
 
+const EMPTY_DIAGRAM: SubDiagram = { nodes: [], edges: [] };
+
 function App() {
   const [title, setTitle] = useState("Untitled Diagram");
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node<ArchNodeData>>([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge<ArchEdgeData>>([]);
+
+  // `root` is the ENTIRE diagram tree - every node's data can carry its own
+  // nested subDiagram, recursively, all within this one object (and so all
+  // within one JSON file on save/load - see serialization.ts). `path` is how
+  // deep the user has drilled in; the canvas only ever sees the nodes/edges
+  // at that one level, derived below. See domain/subDiagramTree.ts for the
+  // (get/update)SubDiagramAtPath mechanics this all rests on.
+  const [root, setRoot] = useState<SubDiagram>(EMPTY_DIAGRAM);
+  const [path, setPath] = useState<DiagramPath>([]);
+
+  const { nodes, edges } = useMemo(() => getSubDiagramAtPath(root, path), [root, path]);
+  const breadcrumbLabels = useMemo(() => getBreadcrumbLabels(root, path), [root, path]);
+
+  const setCurrentNodes = useCallback(
+    (updater: (nodes: Node<ArchNodeData>[]) => Node<ArchNodeData>[]) => {
+      setRoot((r) => updateSubDiagramAtPath(r, path, (sd) => ({ ...sd, nodes: updater(sd.nodes) })));
+    },
+    [path]
+  );
+
+  const setCurrentEdges = useCallback(
+    (updater: (edges: Edge<ArchEdgeData>[]) => Edge<ArchEdgeData>[]) => {
+      setRoot((r) => updateSubDiagramAtPath(r, path, (sd) => ({ ...sd, edges: updater(sd.edges) })));
+    },
+    [path]
+  );
+
+  const onNodesChange = useCallback<OnNodesChange<Node<ArchNodeData>>>(
+    (changes) => setCurrentNodes((nds) => applyNodeChanges(changes, nds)),
+    [setCurrentNodes]
+  );
+
+  const onEdgesChange = useCallback<OnEdgesChange<Edge<ArchEdgeData>>>(
+    (changes) => setCurrentEdges((eds) => applyEdgeChanges(changes, eds)),
+    [setCurrentEdges]
+  );
+
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
   const [selectedEdgeIds, setSelectedEdgeIds] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -42,7 +87,7 @@ function App() {
 
   const onConnect = useCallback<(connection: Connection) => void>(
     (connection) => {
-      setEdges((eds) =>
+      setCurrentEdges((eds) =>
         addEdge<Edge<ArchEdgeData>>(
           {
             ...connection,
@@ -54,7 +99,7 @@ function App() {
         )
       );
     },
-    [setEdges]
+    [setCurrentEdges]
   );
 
   const onAddNode = useCallback(
@@ -67,9 +112,9 @@ function App() {
         position,
         data: { nodeType: typeId, label: def.label, description: "", properties: {}, tags: [] },
       };
-      setNodes((nds) => [...nds, node]);
+      setCurrentNodes((nds) => [...nds, node]);
     },
-    [setNodes]
+    [setCurrentNodes]
   );
 
   const onAddGroup = useCallback(
@@ -84,9 +129,9 @@ function App() {
         height: 220,
         data: { nodeType: typeId, label: def.label, description: "", properties: {}, tags: [] },
       };
-      setNodes((nds) => reorderWithGroupsFirst([...nds, node]));
+      setCurrentNodes((nds) => reorderWithGroupsFirst([...nds, node]));
     },
-    [setNodes]
+    [setCurrentNodes]
   );
 
   // Called after dragging a regular node - see Canvas.tsx's onNodeDragStop.
@@ -95,7 +140,7 @@ function App() {
   // node visually stays where the user dropped it.
   const onReparentNode = useCallback(
     (nodeId: string, newParentId: string | null) => {
-      setNodes((nds) => {
+      setCurrentNodes((nds) => {
         const node = nds.find((n) => n.id === nodeId);
         if (!node) return nds;
         const currentParentId = node.parentId ?? null;
@@ -113,7 +158,7 @@ function App() {
         return reorderWithGroupsFirst(updated);
       });
     },
-    [setNodes]
+    [setCurrentNodes]
   );
 
   const onSelectionChange = useCallback<OnSelectionChangeFunc>(({ nodes: selNodes, edges: selEdges }) => {
@@ -123,28 +168,38 @@ function App() {
 
   const onUpdateNode = useCallback(
     (id: string, patch: Partial<ArchNodeData>) => {
-      setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...patch } } : n)));
+      setCurrentNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...patch } } : n)));
     },
-    [setNodes]
+    [setCurrentNodes]
   );
 
   const onUpdateEdge = useCallback(
     (id: string, patch: Partial<ArchEdgeData>) => {
-      setEdges((eds) =>
+      setCurrentEdges((eds) =>
         eds.map((e) => (e.id === id ? { ...e, data: { ...(e.data as ArchEdgeData), ...patch } } : e))
       );
     },
-    [setEdges]
+    [setCurrentEdges]
   );
 
   // Deleting a node also drops any edges attached to it. Deleting a group
   // releases the nodes inside it (converted back to absolute position)
-  // rather than deleting them - see the hint text in Inspector.tsx.
+  // rather than deleting them - see the hint text in Inspector.tsx. Deleting
+  // a node that has a populated sub-diagram asks for confirmation first,
+  // since that would take everything nested inside it along with it.
   const onDeleteNode = useCallback(
     (id: string) => {
-      setNodes((nds) => {
-        const target = nds.find((n) => n.id === id);
-        if (!target) return nds;
+      const target = nodes.find((n) => n.id === id);
+      const nestedCount = target?.data.subDiagram?.nodes.length ?? 0;
+      if (nestedCount > 0) {
+        const ok = window.confirm(
+          `"${target?.data.label}" contains a sub-diagram with ${nestedCount} node${nestedCount === 1 ? "" : "s"} inside. Delete it and everything inside?`
+        );
+        if (!ok) return;
+      }
+      setCurrentNodes((nds) => {
+        const removedTarget = nds.find((n) => n.id === id);
+        if (!removedTarget) return nds;
         const released = nds
           .filter((n) => n.id !== id)
           .map((n) => {
@@ -154,18 +209,18 @@ function App() {
           });
         return reorderWithGroupsFirst(released);
       });
-      setEdges((eds) => eds.filter((e) => e.source !== id && e.target !== id));
+      setCurrentEdges((eds) => eds.filter((e) => e.source !== id && e.target !== id));
       setSelectedNodeIds((cur) => cur.filter((n) => n !== id));
     },
-    [setNodes, setEdges]
+    [nodes, setCurrentNodes, setCurrentEdges]
   );
 
   const onDeleteEdge = useCallback(
     (id: string) => {
-      setEdges((eds) => eds.filter((e) => e.id !== id));
+      setCurrentEdges((eds) => eds.filter((e) => e.id !== id));
       setSelectedEdgeIds((cur) => cur.filter((e) => e !== id));
     },
-    [setEdges]
+    [setCurrentEdges]
   );
 
   const onDeleteSelection = useCallback(() => {
@@ -173,7 +228,31 @@ function App() {
     selectedNodeIds.forEach(onDeleteNode);
   }, [selectedNodeIds, selectedEdgeIds, onDeleteNode, onDeleteEdge]);
 
-  // --- Scenarios ---------------------------------------------------------
+  // --- Sub-diagram navigation ---------------------------------------------
+
+  const onDrillInto = useCallback(
+    (nodeId: string) => {
+      if (isPresenting) return;
+      setPath((p) => [...p, nodeId]);
+      setSelectedNodeIds([]);
+      setSelectedEdgeIds([]);
+    },
+    [isPresenting]
+  );
+
+  const onNavigateToRoot = useCallback(() => {
+    setPath([]);
+    setSelectedNodeIds([]);
+    setSelectedEdgeIds([]);
+  }, []);
+
+  const onNavigateToPathIndex = useCallback((index: number) => {
+    setPath((p) => p.slice(0, index + 1));
+    setSelectedNodeIds([]);
+    setSelectedEdgeIds([]);
+  }, []);
+
+  // --- Scenarios (root-level only - see SubDiagram's doc comment) --------
 
   const onCreateScenario = useCallback(() => {
     const id = nextId("scenario");
@@ -314,25 +393,31 @@ function App() {
     return () => window.removeEventListener("keydown", handler);
   }, [isPresenting, onPresentNext, onPresentPrev, onExitPresenting]);
 
-  // --- File / diagram lifecycle ------------------------------------------
+  // --- File / diagram lifecycle -------------------------------------------
 
   const onNew = useCallback(() => {
-    if (nodes.length > 0 && !window.confirm("Clear the current diagram? Unsaved changes will be lost.")) {
+    if (root.nodes.length > 0 && !window.confirm("Clear the current diagram? Unsaved changes will be lost.")) {
       return;
     }
-    setNodes([]);
-    setEdges([]);
+    setRoot(EMPTY_DIAGRAM);
+    setPath([]);
     setScenarios([]);
     setActiveScenarioId(null);
     setActiveStepIndex(0);
     setIsPresenting(false);
     setTitle("Untitled Diagram");
-  }, [nodes.length, setNodes, setEdges]);
+  }, [root.nodes.length]);
 
+  // Always saves the full tree from the root, regardless of which level
+  // you're currently viewing - a save from inside a drilled-down sub-diagram
+  // must not lose everything above/beside it.
   const onSave = useCallback(() => {
-    downloadDiagram(toDiagramFile(title, nodes, edges, scenarios));
-  }, [title, nodes, edges, scenarios]);
+    downloadDiagram(toDiagramFile(title, root.nodes, root.edges, scenarios));
+  }, [title, root, scenarios]);
 
+  // Exports export the CURRENT view (whatever level you're looking at),
+  // unlike Save - drilling into a node and exporting just that sub-diagram
+  // as its own image is a reasonable, likely common thing to want.
   const onExportPng = useCallback(() => {
     exportDiagramAsPng(nodes, title).catch((err) => window.alert((err as Error).message));
   }, [nodes, title]);
@@ -343,33 +428,31 @@ function App() {
 
   const onLoadClick = useCallback(() => fileInputRef.current?.click(), []);
 
-  const onFileSelected = useCallback(
-    async (event: ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      event.target.value = "";
-      if (!file) return;
-      try {
-        const text = await file.text();
-        const diagram = parseDiagramFile(text);
-        setNodes(diagram.nodes);
-        setEdges(diagram.edges);
-        setScenarios(diagram.scenarios);
-        setActiveScenarioId(null);
-        setActiveStepIndex(0);
-        setIsPresenting(false);
-        setTitle(diagram.title);
-      } catch (err) {
-        window.alert(`Couldn't open that file: ${(err as Error).message}`);
-      }
-    },
-    [setNodes, setEdges]
-  );
+  const onFileSelected = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const diagram = parseDiagramFile(text);
+      setRoot({ nodes: diagram.nodes, edges: diagram.edges });
+      setPath([]);
+      setScenarios(diagram.scenarios);
+      setActiveScenarioId(null);
+      setActiveStepIndex(0);
+      setIsPresenting(false);
+      setTitle(diagram.title);
+    } catch (err) {
+      window.alert(`Couldn't open that file: ${(err as Error).message}`);
+    }
+  }, []);
 
   const selectedNodeId = selectedNodeIds[0] ?? null;
   const selectedEdgeId = selectedEdgeIds[0] ?? null;
   const selectedNode = nodes.find((n) => n.id === selectedNodeId) ?? null;
   const selectedEdge = edges.find((e) => e.id === selectedEdgeId) ?? null;
   const canAddStep = selectedNodeIds.length > 0 || selectedEdgeIds.length > 0;
+  const atRoot = path.length === 0;
 
   return (
     <div className="app">
@@ -382,6 +465,7 @@ function App() {
           onLoadClick={onLoadClick}
           isScenarioPanelOpen={isScenarioPanelOpen}
           onToggleScenarioPanel={() => setIsScenarioPanelOpen((v) => !v)}
+          scenariosDisabled={!atRoot}
           onExportPng={onExportPng}
           onExportSvg={onExportSvg}
           canExport={nodes.length > 0}
@@ -412,9 +496,13 @@ function App() {
               onPresentNext={onPresentNext}
               onPresentPrev={onPresentPrev}
               onExitPresenting={onExitPresenting}
+              breadcrumbLabels={breadcrumbLabels}
+              onDrillInto={onDrillInto}
+              onNavigateToRoot={onNavigateToRoot}
+              onNavigateToPathIndex={onNavigateToPathIndex}
             />
           </ReactFlowProvider>
-          {!isPresenting && isScenarioPanelOpen && (
+          {!isPresenting && isScenarioPanelOpen && atRoot && (
             <ScenarioPanel
               scenarios={scenarios}
               activeScenarioId={activeScenarioId}
@@ -440,6 +528,7 @@ function App() {
             onUpdateEdge={onUpdateEdge}
             onDeleteNode={onDeleteNode}
             onDeleteEdge={onDeleteEdge}
+            onDrillInto={onDrillInto}
           />
         )}
       </div>
