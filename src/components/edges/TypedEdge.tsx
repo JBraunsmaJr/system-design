@@ -38,10 +38,13 @@ export function TypedEdge({
   });
 
   const shownLabel = data?.label?.trim() ? data.label : def.label;
-  // `style.opacity` is how Canvas.tsx applies Presentation Mode dimming;
-  // `animated` (also set by Canvas.tsx, only for the current step's focus
-  // edges) drives the directional flow animation below.
+  // `style.opacity` is how Canvas.tsx applies Presentation Mode / step-preview
+  // dimming - unlike nodes, React Flow doesn't apply it automatically for
+  // custom edge components, so it has to be merged in here explicitly.
+  // Checking `=== 1` (not just truthy) distinguishes "explicitly focused
+  // right now" from normal editing, where opacity is simply unset.
   const opacity = style?.opacity;
+  const isFocused = opacity === 1;
   const flowClass = animated ? ` typed-edge--flow-${direction}` : "";
 
   return (
@@ -57,9 +60,10 @@ export function TypedEdge({
         className={`typed-edge${flowClass}`}
         style={{
           stroke: def.color,
-          strokeWidth: selected ? 2.5 : 1.75,
+          strokeWidth: selected || isFocused ? 2.5 : 1.75,
           strokeDasharray: animated ? def.dash ?? FLOW_FALLBACK_DASH : def.dash,
           opacity,
+          filter: isFocused ? `drop-shadow(0 0 5px ${def.color})` : undefined,
         }}
       />
       <EdgeLabelRenderer>
@@ -71,6 +75,7 @@ export function TypedEdge({
             borderColor: def.color,
             color: def.color,
             opacity,
+            boxShadow: isFocused ? `0 0 8px ${def.color}99` : undefined,
           }}
         >
           {shownLabel}

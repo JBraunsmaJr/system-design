@@ -20,6 +20,7 @@ const SYSTEM_CATEGORIES: NodeCategory[] = [
 
 export const DRAG_MIME_TYPE = "application/x-archnode";
 export const GROUP_DRAG_MIME_TYPE = "application/x-archgroup";
+export const TEXT_DRAG_MIME_TYPE = "application/x-archtext";
 
 type PaletteMode = "system" | "code";
 
@@ -59,6 +60,7 @@ export function Palette() {
                 key={category}
                 label={CATEGORY_LABELS[category]}
                 color={CATEGORY_COLORS[category]}
+                dragMimeType={DRAG_MIME_TYPE}
                 items={NODE_TYPES.filter((n) => n.category === category)}
               />
             ))
@@ -67,6 +69,7 @@ export function Palette() {
                 key={subcategory}
                 label={subcategory}
                 color="#8b90a0"
+                dragMimeType={DRAG_MIME_TYPE}
                 items={NODE_TYPES.filter((n) => n.category === "logic" && n.subcategory === subcategory)}
               />
             ))}
@@ -74,13 +77,20 @@ export function Palette() {
         <PaletteGroup
           label="Boundaries"
           color="#8b90a0"
-          items={GROUP_TYPES.map((g) => ({ id: g.id, label: g.label, icon: "SquareDashed", color: "#8b90a0" }))}
-          isGroupPalette
+          dragMimeType={GROUP_DRAG_MIME_TYPE}
+          items={GROUP_TYPES.map((g) => ({ id: g.id, label: g.label, icon: g.icon, color: g.color }))}
+        />
+
+        <PaletteGroup
+          label="Annotations"
+          color="#8b90a0"
+          dragMimeType={TEXT_DRAG_MIME_TYPE}
+          items={[{ id: "text", label: "Text", icon: "Type", color: "#8b90a0" }]}
         />
       </div>
       <p className="palette__hint">
-        Drag a component onto the canvas to place it. Drag a component into a boundary to group
-        it - drag it back out to release.
+        Drag a component onto the canvas to place it. Drag a boundary over existing nodes (or
+        nodes into a boundary) to group them - drag either back out to release.
       </p>
     </aside>
   );
@@ -90,15 +100,14 @@ interface PaletteGroupProps {
   label: string;
   color: string;
   items: Pick<NodeTypeDefinition, "id" | "label" | "icon" | "color">[];
-  /** True for the Boundaries section, which drags groups rather than typed nodes. */
-  isGroupPalette?: boolean;
+  dragMimeType: string;
 }
 
-function PaletteGroup({ label, color, items, isGroupPalette }: PaletteGroupProps) {
+function PaletteGroup({ label, color, items, dragMimeType }: PaletteGroupProps) {
   if (!items.length) return null;
 
   const onDragStart = (event: DragEvent, itemId: string) => {
-    event.dataTransfer.setData(isGroupPalette ? GROUP_DRAG_MIME_TYPE : DRAG_MIME_TYPE, itemId);
+    event.dataTransfer.setData(dragMimeType, itemId);
     event.dataTransfer.effectAllowed = "move";
   };
 

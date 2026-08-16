@@ -84,6 +84,9 @@ function App() {
   const [activeStepIndex, setActiveStepIndex] = useState(0);
   const [isPresenting, setIsPresenting] = useState(false);
   const [isScenarioPanelOpen, setIsScenarioPanelOpen] = useState(false);
+  // Which step (if any) is being previewed from ScenarioPanel without
+  // actually entering full Presentation Mode - see onTogglePreviewStep.
+  const [previewStepId, setPreviewStepId] = useState<string | null>(null);
 
   const onConnect = useCallback<(connection: Connection) => void>(
     (connection) => {
@@ -146,6 +149,27 @@ function App() {
     [setCurrentNodes]
   );
 
+  const onAddText = useCallback(
+    (position: { x: number; y: number }) => {
+      const node: Node<ArchNodeData> = {
+        id: nextId("text"),
+        type: "text",
+        position,
+        data: {
+          nodeType: "text",
+          label: "Text",
+          description: "",
+          properties: {},
+          tags: [],
+          textColor: "#e7e9ee",
+          fontSize: 16,
+        },
+      };
+      setCurrentNodes((nds) => [...nds, node]);
+    },
+    [setCurrentNodes]
+  );
+
   // Called after dragging a regular node - see Canvas.tsx's onNodeDragStop.
   // newParentId is the group it now overlaps, or null if it's no longer over
   // any group. Converts position to/from parent-relative coordinates so the
@@ -167,6 +191,29 @@ function App() {
         const updated = nds.map((n) =>
           n.id === nodeId ? { ...n, parentId: newParentId ?? undefined, position: nextPosition } : n
         );
+        return reorderWithGroupsFirst(updated);
+      });
+    },
+    [setCurrentNodes]
+  );
+
+  // Called after dragging a *boundary* - see Canvas.tsx's onNodeDragStop.
+  // `nodeIds` are whichever nodes now fall fully inside it and aren't
+  // already its children. Any node already parented to a different group
+  // gets moved over (its position is re-derived relative to the new parent,
+  // same math as onReparentNode).
+  const onAdoptIntoGroup = useCallback(
+    (groupId: string, nodeIds: string[]) => {
+      setCurrentNodes((nds) => {
+        const group = nds.find((n) => n.id === groupId);
+        if (!group) return nds;
+        const idsToAdopt = new Set(nodeIds);
+        const updated = nds.map((n) => {
+          if (!idsToAdopt.has(n.id) || n.id === groupId) return n;
+          const absolute = toAbsolutePosition(n, nds, n.parentId);
+          const relative = { x: absolute.x - group.position.x, y: absolute.y - group.position.y };
+          return { ...n, parentId: groupId, position: relative };
+        });
         return reorderWithGroupsFirst(updated);
       });
     },
@@ -248,6 +295,7 @@ function App() {
       setPath((p) => [...p, nodeId]);
       setSelectedNodeIds([]);
       setSelectedEdgeIds([]);
+      setPreviewStepId(null);
     },
     [isPresenting]
   );
@@ -256,12 +304,14 @@ function App() {
     setPath([]);
     setSelectedNodeIds([]);
     setSelectedEdgeIds([]);
+    setPreviewStepId(null);
   }, []);
 
   const onNavigateToPathIndex = useCallback((index: number) => {
     setPath((p) => p.slice(0, index + 1));
     setSelectedNodeIds([]);
     setSelectedEdgeIds([]);
+    setPreviewStepId(null);
   }, []);
 
   // --- Scenarios (root-level only - see SubDiagram's doc comment) --------
@@ -279,6 +329,17 @@ function App() {
   const onDeleteScenario = useCallback((id: string) => {
     setScenarios((s) => s.filter((sc) => sc.id !== id));
     setActiveScenarioId((cur) => (cur === id ? null : cur));
+  }, []);
+
+  const onSelectScenario = useCallback((id: string) => {
+    setActiveScenarioId(id);
+    setPreviewStepId(null);
+  }, []);
+
+  // Toggling the same step again turns preview off; picking a different
+  // step switches straight to it.
+  const onTogglePreviewStep = useCallback((stepId: string) => {
+    setPreviewStepId((cur) => (cur === stepId ? null : stepId));
   }, []);
 
   // Captures whatever's currently selected on the canvas as a new step.
@@ -316,6 +377,7 @@ function App() {
     setScenarios((s) =>
       s.map((sc) => (sc.id === scenarioId ? { ...sc, steps: sc.steps.filter((st) => st.id !== stepId) } : sc))
     );
+    setPreviewStepId((cur) => (cur === stepId ? null : cur));
   }, []);
 
   const onMoveStep = useCallback((scenarioId: string, stepId: string, direction: "up" | "down") => {
@@ -332,10 +394,24 @@ function App() {
     );
   }, []);
 
+  // Falls back to the first scenario when nothing's been explicitly picked
+  // yet (e.g. right after loading a file, or before ever touching the
+  // dropdown) - this MUST match whatever ScenarioPanel displays, or the
+  // preview toggle silently does nothing while the panel looks fine. See
+  // the activeScenarioId prop passed to ScenarioPanel below - it receives
+  // this already-resolved id rather than the raw state, so there's only one
+  // place deciding the fallback.
   const activeScenario = useMemo(
-    () => scenarios.find((s) => s.id === activeScenarioId) ?? null,
+    () => scenarios.find((s) => s.id === activeScenarioId) ?? scenarios[0] ?? null,
     [scenarios, activeScenarioId]
   );
+
+  const previewFocus = useMemo(() => {
+    if (!previewStepId || !activeScenario) return null;
+    const step = activeScenario.steps.find((st) => st.id === previewStepId);
+    if (!step) return null;
+    return { nodeIds: step.focusNodeIds, edgeIds: step.focusEdgeIds };
+  }, [previewStepId, activeScenario]);
 
   const onStartPresenting = useCallback(
     (scenarioId: string) => {
@@ -345,6 +421,7 @@ function App() {
       setActiveStepIndex(0);
       setSelectedNodeIds([]);
       setSelectedEdgeIds([]);
+      setPreviewStepId(null);
       setIsPresenting(true);
     },
     [scenarios]
@@ -503,8 +580,11 @@ function App() {
               onSelectionChange={onSelectionChange}
               onAddNode={onAddNode}
               onAddGroup={onAddGroup}
+              onAddText={onAddText}
               onReparentNode={onReparentNode}
+              onAdoptIntoGroup={onAdoptIntoGroup}
               presentation={presentation}
+              previewFocus={previewFocus}
               onPresentNext={onPresentNext}
               onPresentPrev={onPresentPrev}
               onExitPresenting={onExitPresenting}
@@ -517,8 +597,8 @@ function App() {
           {!isPresenting && isScenarioPanelOpen && atRoot && (
             <ScenarioPanel
               scenarios={scenarios}
-              activeScenarioId={activeScenarioId}
-              onSelectScenario={setActiveScenarioId}
+              activeScenarioId={activeScenario?.id ?? null}
+              onSelectScenario={onSelectScenario}
               onCreateScenario={onCreateScenario}
               onRenameScenario={onRenameScenario}
               onDeleteScenario={onDeleteScenario}
@@ -528,7 +608,12 @@ function App() {
               onMoveStep={onMoveStep}
               onPresent={onStartPresenting}
               canAddStep={canAddStep}
-              onClose={() => setIsScenarioPanelOpen(false)}
+              previewStepId={previewStepId}
+              onTogglePreviewStep={onTogglePreviewStep}
+              onClose={() => {
+                setIsScenarioPanelOpen(false);
+                setPreviewStepId(null);
+              }}
             />
           )}
         </div>

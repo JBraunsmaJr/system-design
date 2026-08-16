@@ -57,6 +57,9 @@ export interface ArchNodeData extends Record<string, unknown> {
   properties: Record<string, string>;
   tags: string[];
   subDiagram?: SubDiagram;
+  /** Only used by type:"text" nodes (freeform canvas annotations). */
+  textColor?: string;
+  fontSize?: number;
 }
 
 /**

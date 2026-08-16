@@ -1,3 +1,4 @@
+import { Eye, EyeOff } from "lucide-react";
 import type { Scenario, ScenarioStep } from "../domain/types";
 
 interface ScenarioPanelProps {
@@ -13,6 +14,8 @@ interface ScenarioPanelProps {
   onMoveStep: (scenarioId: string, stepId: string, direction: "up" | "down") => void;
   onPresent: (scenarioId: string) => void;
   canAddStep: boolean;
+  previewStepId: string | null;
+  onTogglePreviewStep: (stepId: string) => void;
   onClose: () => void;
 }
 
@@ -29,9 +32,15 @@ export function ScenarioPanel({
   onMoveStep,
   onPresent,
   canAddStep,
+  previewStepId,
+  onTogglePreviewStep,
   onClose,
 }: ScenarioPanelProps) {
-  const active = scenarios.find((s) => s.id === activeScenarioId) ?? scenarios[0] ?? null;
+  // activeScenarioId is already resolved by App.tsx (including its "default
+  // to the first scenario" fallback) before it gets here - this file
+  // shouldn't re-implement that decision, since having it in two places is
+  // exactly what let them drift out of sync before.
+  const active = scenarios.find((s) => s.id === activeScenarioId) ?? null;
 
   return (
     <div className="scenario-panel">
@@ -95,10 +104,20 @@ export function ScenarioPanel({
           <div className="scenario-panel__steps">
             {active.steps.map((step, index) => {
               const count = step.focusNodeIds.length + step.focusEdgeIds.length;
+              const isPreviewing = previewStepId === step.id;
               return (
-                <div className="step-card" key={step.id}>
+                <div className={`step-card${isPreviewing ? " is-previewing" : ""}`} key={step.id}>
                   <div className="step-card__header">
                     <span className="step-card__number">{index + 1}</span>
+                    <button
+                      type="button"
+                      className={`step-card__preview${isPreviewing ? " is-active" : ""}`}
+                      onClick={() => onTogglePreviewStep(step.id)}
+                      title={isPreviewing ? "Stop previewing this step" : "Preview this step's highlight on the canvas"}
+                      aria-label={isPreviewing ? "Stop previewing this step" : "Preview this step on the canvas"}
+                    >
+                      {isPreviewing ? <Eye size={13} /> : <EyeOff size={13} />}
+                    </button>
                     <div className="step-card__move">
                       <button
                         type="button"

@@ -39,6 +39,50 @@ export function Inspector({
 
   if (selectedNode) {
     const data = selectedNode.data;
+
+    if (selectedNode.type === "text") {
+      const color = data.textColor ?? "#e7e9ee";
+      const fontSize = data.fontSize ?? 16;
+      return (
+        <aside className="inspector">
+          <div className="panel-header">Text</div>
+
+          <Field label="Text">
+            <textarea
+              rows={4}
+              value={data.label}
+              onChange={(e) => onUpdateNode(selectedNode.id, { label: e.target.value })}
+            />
+          </Field>
+
+          <Field label="Color">
+            <input
+              type="color"
+              value={color}
+              onChange={(e) => onUpdateNode(selectedNode.id, { textColor: e.target.value })}
+            />
+          </Field>
+
+          <Field label="Size">
+            <select
+              value={fontSize}
+              onChange={(e) => onUpdateNode(selectedNode.id, { fontSize: Number(e.target.value) })}
+            >
+              <option value={12}>Small</option>
+              <option value={16}>Medium</option>
+              <option value={20}>Large</option>
+              <option value={28}>X-Large</option>
+              <option value={40}>Huge</option>
+            </select>
+          </Field>
+
+          <button type="button" className="inspector__delete" onClick={() => onDeleteNode(selectedNode.id)}>
+            Delete text
+          </button>
+        </aside>
+      );
+    }
+
     const isGroup = selectedNode.type === "group";
     const nodeDef = !isGroup ? getNodeType(data.nodeType) : undefined;
     const groupDef = isGroup ? getGroupType(data.nodeType) : undefined;
