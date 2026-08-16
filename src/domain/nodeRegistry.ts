@@ -7,6 +7,7 @@ export const CATEGORY_LABELS: Record<NodeCategory, string> = {
   messaging: "Messaging",
   external: "External",
   observability: "Observability",
+  logic: "Logic / Flow",
 };
 
 export const CATEGORY_COLORS: Record<NodeCategory, string> = {
@@ -16,6 +17,7 @@ export const CATEGORY_COLORS: Record<NodeCategory, string> = {
   messaging: "#F2994A",
   external: "#F0578C",
   observability: "#7C8598",
+  logic: "#22B8CF",
 };
 
 /**
@@ -52,6 +54,53 @@ export const NODE_TYPES: NodeTypeDefinition[] = [
 
   { id: "monitoring", category: "observability", label: "Monitoring", icon: "Activity", color: CATEGORY_COLORS.observability },
   { id: "logging", category: "observability", label: "Logging", icon: "FileText", color: CATEGORY_COLORS.observability },
+
+  // "Code mode" - modeling pseudo-code/request-handling logic rather than
+  // system topology. Meant to be used inside a node's sub-diagram (e.g.
+  // drilling into a microservice to lay out what happens for an incoming
+  // request), but nothing stops using them at the top level too.
+  {
+    id: "endpoint",
+    category: "logic",
+    label: "Endpoint",
+    icon: "Route",
+    color: CATEGORY_COLORS.logic,
+    defaultProperties: { method: "POST", path: "/resource" },
+  },
+  { id: "step", category: "logic", label: "Step", icon: "ArrowRightCircle", color: CATEGORY_COLORS.logic },
+  {
+    id: "decision",
+    category: "logic",
+    label: "Decision",
+    icon: "GitFork",
+    color: CATEGORY_COLORS.logic,
+    defaultProperties: { condition: "isValid?" },
+  },
+  {
+    id: "loop",
+    category: "logic",
+    label: "Loop",
+    icon: "Repeat",
+    color: CATEGORY_COLORS.logic,
+    defaultProperties: { iterate: "each item" },
+  },
+  { id: "try-catch", category: "logic", label: "Try / Catch", icon: "ShieldAlert", color: CATEGORY_COLORS.logic },
+  {
+    id: "external-call",
+    category: "logic",
+    label: "External Call",
+    icon: "ArrowUpRight",
+    color: CATEGORY_COLORS.logic,
+    defaultProperties: { target: "service.method()" },
+  },
+  {
+    id: "return",
+    category: "logic",
+    label: "Return",
+    icon: "CornerUpLeft",
+    color: CATEGORY_COLORS.logic,
+    defaultProperties: { status: "200" },
+  },
 ];
 
 export function getNodeType(id: string): NodeTypeDefinition | undefined {

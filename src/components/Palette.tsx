@@ -1,19 +1,56 @@
+import { useState } from "react";
 import * as Icons from "lucide-react";
 import { NODE_TYPES, CATEGORY_LABELS, CATEGORY_COLORS } from "../domain/nodeRegistry";
 import { GROUP_TYPES } from "../domain/groupRegistry";
 import type { NodeCategory } from "../domain/types";
 
-const CATEGORY_ORDER = Object.keys(CATEGORY_LABELS) as NodeCategory[];
+const SYSTEM_CATEGORIES: NodeCategory[] = [
+  "compute",
+  "data",
+  "networking",
+  "messaging",
+  "external",
+  "observability",
+];
+const CODE_CATEGORIES: NodeCategory[] = ["logic"];
 
 export const DRAG_MIME_TYPE = "application/x-archnode";
 export const GROUP_DRAG_MIME_TYPE = "application/x-archgroup";
 
+type PaletteMode = "system" | "code";
+
 export function Palette() {
+  const [mode, setMode] = useState<PaletteMode>("system");
+  const categories = mode === "system" ? SYSTEM_CATEGORIES : CODE_CATEGORIES;
+
   return (
     <aside className="palette">
-      <div className="panel-header">Components</div>
+      <div className="palette__tabs">
+        <button
+          type="button"
+          className={mode === "system" ? "is-active" : undefined}
+          onClick={() => setMode("system")}
+        >
+          System
+        </button>
+        <button
+          type="button"
+          className={mode === "code" ? "is-active" : undefined}
+          onClick={() => setMode("code")}
+        >
+          Code
+        </button>
+      </div>
+
       <div className="palette__list">
-        {CATEGORY_ORDER.map((category) => {
+        {mode === "code" && (
+          <p className="palette__mode-hint">
+            Endpoints and pseudo-code steps for modeling request-handling logic - most useful
+            inside a node's sub-diagram (double-click a node to drill in).
+          </p>
+        )}
+
+        {categories.map((category) => {
           const items = NODE_TYPES.filter((n) => n.category === category);
           if (!items.length) return null;
           return (

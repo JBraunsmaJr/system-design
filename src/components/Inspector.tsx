@@ -2,8 +2,10 @@ import { useState, type KeyboardEvent } from "react";
 import type { Node, Edge } from "@xyflow/react";
 import { getNodeType } from "../domain/nodeRegistry";
 import { getGroupType } from "../domain/groupRegistry";
-import { EDGE_TYPES } from "../domain/edgeRegistry";
+import { EDGE_TYPES, STYLE_GROUP_LABELS } from "../domain/edgeRegistry";
 import type { ArchNodeData, ArchEdgeData } from "../domain/types";
+
+const EDGE_STYLE_GROUP_ORDER = ["sync", "async", "control", "data", "file", "generic"] as const;
 
 interface InspectorProps {
   selectedNode: Node<ArchNodeData> | null;
@@ -95,16 +97,24 @@ export function Inspector({
     <aside className="inspector">
       <div className="panel-header">Edge</div>
 
-      <Field label="Traffic type">
+      <Field label="Type">
         <select
           value={data.edgeType}
           onChange={(e) => onUpdateEdge(edge.id, { edgeType: e.target.value })}
         >
-          {EDGE_TYPES.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.label}
-            </option>
-          ))}
+          {EDGE_STYLE_GROUP_ORDER.map((group) => {
+            const options = EDGE_TYPES.filter((t) => t.styleGroup === group);
+            if (!options.length) return null;
+            return (
+              <optgroup key={group} label={STYLE_GROUP_LABELS[group]}>
+                {options.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.label}
+                  </option>
+                ))}
+              </optgroup>
+            );
+          })}
         </select>
       </Field>
 

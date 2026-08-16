@@ -17,7 +17,7 @@ import { Palette } from "./components/Palette";
 import { Canvas } from "./components/Canvas";
 import { Inspector } from "./components/Inspector";
 import { ScenarioPanel } from "./components/ScenarioPanel";
-import { NODE_TYPES } from "./domain/nodeRegistry";
+import { NODE_TYPES, getNodeType } from "./domain/nodeRegistry";
 import { GROUP_TYPES } from "./domain/groupRegistry";
 import { reorderWithGroupsFirst, toAbsolutePosition } from "./domain/graphUtils";
 import {
@@ -87,19 +87,25 @@ function App() {
 
   const onConnect = useCallback<(connection: Connection) => void>(
     (connection) => {
+      const sourceNode = nodes.find((n) => n.id === connection.source);
+      const targetNode = nodes.find((n) => n.id === connection.target);
+      const sourceCategory = getNodeType(sourceNode?.data.nodeType ?? "")?.category;
+      const targetCategory = getNodeType(targetNode?.data.nodeType ?? "")?.category;
+      const defaultEdgeType = sourceCategory === "logic" || targetCategory === "logic" ? "next" : "generic";
+
       setCurrentEdges((eds) =>
         addEdge<Edge<ArchEdgeData>>(
           {
             ...connection,
             id: nextId("edge"),
             type: "typed",
-            data: { edgeType: "generic", label: "", direction: "forward", properties: {} },
+            data: { edgeType: defaultEdgeType, label: "", direction: "forward", properties: {} },
           },
           eds
         )
       );
     },
-    [setCurrentEdges]
+    [nodes, setCurrentEdges]
   );
 
   const onAddNode = useCallback(
@@ -110,7 +116,13 @@ function App() {
         id: nextId("node"),
         type: "typed",
         position,
-        data: { nodeType: typeId, label: def.label, description: "", properties: {}, tags: [] },
+        data: {
+          nodeType: typeId,
+          label: def.label,
+          description: "",
+          properties: { ...(def.defaultProperties ?? {}) },
+          tags: [],
+        },
       };
       setCurrentNodes((nds) => [...nds, node]);
     },

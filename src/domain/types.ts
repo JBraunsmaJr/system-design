@@ -11,7 +11,8 @@ export type NodeCategory =
   | "networking"
   | "messaging"
   | "external"
-  | "observability";
+  | "observability"
+  | "logic";
 
 /** A node type as it appears in the palette (e.g. "microservice", "database"). */
 export interface NodeTypeDefinition {
@@ -21,9 +22,11 @@ export interface NodeTypeDefinition {
   /** lucide-react icon component name, e.g. "Server" */
   icon: string;
   color: string;
+  /** Pre-filled properties a new instance starts with, e.g. an Endpoint's method/path. */
+  defaultProperties?: Record<string, string>;
 }
 
-export type EdgeStyleGroup = "sync" | "async" | "data" | "file" | "generic";
+export type EdgeStyleGroup = "sync" | "async" | "data" | "file" | "control" | "generic";
 
 /** An edge/traffic type as it appears in the inspector (e.g. "grpc", "webhook"). */
 export interface EdgeTypeDefinition {

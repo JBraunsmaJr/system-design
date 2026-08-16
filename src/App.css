@@ -1041,3 +1041,42 @@
   text-overflow: ellipsis;
   max-width: 200px;
 }
+
+/* ---------- Palette mode tabs ---------- */
+
+.palette__tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+  padding: 3px;
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+}
+
+.palette__tabs button {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  padding: 6px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--chrome-text-dim);
+}
+
+.palette__tabs button:hover {
+  color: var(--chrome-text);
+}
+
+.palette__tabs button.is-active {
+  background: var(--chrome-bg-raised);
+  color: var(--accent);
+}
+
+.palette__mode-hint {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--chrome-text-dim);
+  margin: 0 0 12px;
+}

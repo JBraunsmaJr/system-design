@@ -5,6 +5,7 @@ export const STYLE_GROUP_LABELS: Record<string, string> = {
   async: "Asynchronous",
   data: "Data layer",
   file: "File / bulk",
+  control: "Control flow",
   generic: "Generic",
 };
 
@@ -23,6 +24,14 @@ export const EDGE_TYPES: EdgeTypeDefinition[] = [
   { id: "replication", styleGroup: "data", label: "Replication", color: "#7048E8", dash: "2 3" },
 
   { id: "file-transfer", styleGroup: "file", label: "File Transfer / SFTP", color: "#7C8598", dash: "8 3 2 3" },
+
+  // Code mode - pairs with the "logic" node category (Endpoint, Step,
+  // Decision, etc.) for laying out pseudo-code / request-handling flow.
+  { id: "next", styleGroup: "control", label: "Next", color: "#22B8CF" },
+  { id: "true", styleGroup: "control", label: "True", color: "#40C057" },
+  { id: "false", styleGroup: "control", label: "False", color: "#E03131" },
+  { id: "on-error", styleGroup: "control", label: "On Error", color: "#E8590C", dash: "4 3" },
+  { id: "loop-back", styleGroup: "control", label: "Loop Back", color: "#22B8CF", dash: "2 4" },
 
   { id: "generic", styleGroup: "generic", label: "Generic / Other", color: "#98A2B3" },
 ];
