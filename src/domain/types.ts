@@ -12,7 +12,8 @@ export type NodeCategory =
   | "messaging"
   | "external"
   | "observability"
-  | "logic";
+  | "logic"
+  | "vcs";
 
 /** A node type as it appears in the palette (e.g. "microservice", "database"). */
 export interface NodeTypeDefinition {
@@ -28,7 +29,7 @@ export interface NodeTypeDefinition {
   defaultProperties?: Record<string, string>;
 }
 
-export type EdgeStyleGroup = "sync" | "async" | "data" | "file" | "control" | "generic";
+export type EdgeStyleGroup = "sync" | "async" | "data" | "file" | "control" | "vcs" | "generic";
 
 /** An edge/traffic type as it appears in the inspector (e.g. "grpc", "webhook"). */
 export interface EdgeTypeDefinition {

@@ -6,6 +6,7 @@ export const STYLE_GROUP_LABELS: Record<string, string> = {
   data: "Data layer",
   file: "File / bulk",
   control: "Control flow",
+  vcs: "Version control",
   generic: "Generic",
 };
 
@@ -32,6 +33,13 @@ export const EDGE_TYPES: EdgeTypeDefinition[] = [
   { id: "false", styleGroup: "control", label: "False", color: "#E03131" },
   { id: "on-error", styleGroup: "control", label: "On Error", color: "#E8590C", dash: "4 3" },
   { id: "loop-back", styleGroup: "control", label: "Loop Back", color: "#22B8CF", dash: "2 4" },
+
+  // Git mode - pairs with the "vcs" node category (Branch, Merge, Tag, etc.)
+  { id: "branches-from", styleGroup: "vcs", label: "Branches From", color: "#C2255C" },
+  { id: "merges-into", styleGroup: "vcs", label: "Merges Into", color: "#A61E4D" },
+  { id: "cherry-picked", styleGroup: "vcs", label: "Cherry-Picked", color: "#C2255C", dash: "4 3" },
+  { id: "tags", styleGroup: "vcs", label: "Tags", color: "#C2255C", dash: "1 3" },
+  { id: "deploys-to", styleGroup: "vcs", label: "Deploys To", color: "#C2255C", dash: "6 3" },
 
   { id: "generic", styleGroup: "generic", label: "Generic / Other", color: "#98A2B3" },
 ];

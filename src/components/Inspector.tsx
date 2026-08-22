@@ -5,7 +5,7 @@ import { getGroupType } from "../domain/groupRegistry";
 import { EDGE_TYPES, STYLE_GROUP_LABELS } from "../domain/edgeRegistry";
 import type { ArchNodeData, ArchEdgeData } from "../domain/types";
 
-const EDGE_STYLE_GROUP_ORDER = ["sync", "async", "control", "data", "file", "generic"] as const;
+const EDGE_STYLE_GROUP_ORDER = ["sync", "async", "control", "vcs", "data", "file", "generic"] as const;
 
 interface InspectorProps {
   selectedNode: Node<ArchNodeData> | null;

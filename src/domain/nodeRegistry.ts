@@ -8,6 +8,7 @@ export const CATEGORY_LABELS: Record<NodeCategory, string> = {
   external: "External",
   observability: "Observability",
   logic: "Logic / Flow",
+  vcs: "Version Control",
 };
 
 export const CATEGORY_COLORS: Record<NodeCategory, string> = {
@@ -18,6 +19,7 @@ export const CATEGORY_COLORS: Record<NodeCategory, string> = {
   external: "#F0578C",
   observability: "#7C8598",
   logic: "#22B8CF",
+  vcs: "#C2255C",
 };
 
 /** Display order for the "logic" category's subcategory groupings in the Code palette tab. */
@@ -30,6 +32,9 @@ export const LOGIC_SUBCATEGORY_ORDER = [
   "Error Handling",
   "Annotations",
 ];
+
+/** Display order for the "vcs" category's subcategory groupings in the Git palette tab. */
+export const VCS_SUBCATEGORY_ORDER = ["Branching & History", "Review & Release", "CI/CD Pipeline"];
 
 /**
  * Starter taxonomy. This is intentionally a subset of the full SDD taxonomy -
@@ -210,6 +215,33 @@ export const NODE_TYPES: NodeTypeDefinition[] = [
 
   // Annotations
   { id: "note", category: "logic", subcategory: "Annotations", label: "Note", icon: "StickyNote", color: CATEGORY_COLORS.logic },
+
+  // "Git mode" - branching/merge/release workflow, not runtime topology or
+  // request-handling logic. Useful for diagramming a branching strategy
+  // (git-flow, trunk-based, etc.) or a release/CI pipeline alongside it.
+
+  // Branching & History
+  { id: "branch", category: "vcs", subcategory: "Branching & History", label: "Branch", icon: "GitBranch", color: CATEGORY_COLORS.vcs, defaultProperties: { name: "feature/name" } },
+  { id: "fork", category: "vcs", subcategory: "Branching & History", label: "Fork", icon: "GitFork", color: CATEGORY_COLORS.vcs },
+  { id: "commit", category: "vcs", subcategory: "Branching & History", label: "Commit", icon: "CircleDot", color: CATEGORY_COLORS.vcs, defaultProperties: { message: "commit message" } },
+  { id: "merge", category: "vcs", subcategory: "Branching & History", label: "Merge", icon: "GitMerge", color: CATEGORY_COLORS.vcs },
+  { id: "rebase", category: "vcs", subcategory: "Branching & History", label: "Rebase", icon: "GitCompareArrows", color: CATEGORY_COLORS.vcs },
+  { id: "cherry-pick", category: "vcs", subcategory: "Branching & History", label: "Cherry Pick", icon: "Cherry", color: CATEGORY_COLORS.vcs },
+
+  // Review & Release
+  { id: "pull-request", category: "vcs", subcategory: "Review & Release", label: "Pull Request", icon: "GitPullRequest", color: CATEGORY_COLORS.vcs, defaultProperties: { status: "open" } },
+  { id: "code-review", category: "vcs", subcategory: "Review & Release", label: "Code Review", icon: "MessagesSquare", color: CATEGORY_COLORS.vcs },
+  { id: "tag", category: "vcs", subcategory: "Review & Release", label: "Tag / Release", icon: "Tag", color: CATEGORY_COLORS.vcs, defaultProperties: { version: "v1.0.0" } },
+  { id: "changelog", category: "vcs", subcategory: "Review & Release", label: "Changelog", icon: "ScrollText", color: CATEGORY_COLORS.vcs },
+
+  // CI/CD Pipeline
+  { id: "build", category: "vcs", subcategory: "CI/CD Pipeline", label: "Build", icon: "Hammer", color: CATEGORY_COLORS.vcs },
+  { id: "ci-test", category: "vcs", subcategory: "CI/CD Pipeline", label: "Test / CI Check", icon: "FlaskConical", color: CATEGORY_COLORS.vcs },
+  { id: "deploy", category: "vcs", subcategory: "CI/CD Pipeline", label: "Deploy", icon: "Rocket", color: CATEGORY_COLORS.vcs, defaultProperties: { environment: "staging" } },
+  { id: "environment", category: "vcs", subcategory: "CI/CD Pipeline", label: "Environment", icon: "Cloud", color: CATEGORY_COLORS.vcs, defaultProperties: { name: "production" } },
+  { id: "feature-flag", category: "vcs", subcategory: "CI/CD Pipeline", label: "Feature Flag", icon: "ToggleLeft", color: CATEGORY_COLORS.vcs, defaultProperties: { flag: "flag-name" } },
+  { id: "canary-release", category: "vcs", subcategory: "CI/CD Pipeline", label: "Canary Release", icon: "Bird", color: CATEGORY_COLORS.vcs, defaultProperties: { traffic: "5%" } },
+  { id: "rollback", category: "vcs", subcategory: "CI/CD Pipeline", label: "Rollback", icon: "Undo2", color: CATEGORY_COLORS.vcs },
 ];
 
 export function getNodeType(id: string): NodeTypeDefinition | undefined {

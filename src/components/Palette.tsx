@@ -5,6 +5,7 @@ import {
   CATEGORY_LABELS,
   CATEGORY_COLORS,
   LOGIC_SUBCATEGORY_ORDER,
+  VCS_SUBCATEGORY_ORDER,
 } from "../domain/nodeRegistry";
 import { GROUP_TYPES } from "../domain/groupRegistry";
 import type { NodeCategory, NodeTypeDefinition } from "../domain/types";
@@ -22,7 +23,13 @@ export const DRAG_MIME_TYPE = "application/x-archnode";
 export const GROUP_DRAG_MIME_TYPE = "application/x-archgroup";
 export const TEXT_DRAG_MIME_TYPE = "application/x-archtext";
 
-type PaletteMode = "system" | "code";
+type PaletteMode = "system" | "code" | "git";
+
+const MODE_HINTS: Record<PaletteMode, string | null> = {
+  system: null,
+  code: "Endpoints and pseudo-code steps for modeling request-handling logic - most useful inside a node's sub-diagram (double-click a node to drill in).",
+  git: "Branching strategy and release/CI pipeline concepts - handy for a repo's own sub-diagram, or a standalone diagram of your workflow.",
+};
 
 export function Palette() {
   const [mode, setMode] = useState<PaletteMode>("system");
@@ -44,35 +51,50 @@ export function Palette() {
         >
           Code
         </button>
+        <button
+          type="button"
+          className={mode === "git" ? "is-active" : undefined}
+          onClick={() => setMode("git")}
+        >
+          Git
+        </button>
       </div>
 
       <div className="palette__list">
-        {mode === "code" && (
-          <p className="palette__mode-hint">
-            Endpoints and pseudo-code steps for modeling request-handling logic - most useful
-            inside a node's sub-diagram (double-click a node to drill in).
-          </p>
-        )}
+        {MODE_HINTS[mode] && <p className="palette__mode-hint">{MODE_HINTS[mode]}</p>}
 
-        {mode === "system"
-          ? SYSTEM_CATEGORIES.map((category) => (
-              <PaletteGroup
-                key={category}
-                label={CATEGORY_LABELS[category]}
-                color={CATEGORY_COLORS[category]}
-                dragMimeType={DRAG_MIME_TYPE}
-                items={NODE_TYPES.filter((n) => n.category === category)}
-              />
-            ))
-          : LOGIC_SUBCATEGORY_ORDER.map((subcategory) => (
-              <PaletteGroup
-                key={subcategory}
-                label={subcategory}
-                color="#8b90a0"
-                dragMimeType={DRAG_MIME_TYPE}
-                items={NODE_TYPES.filter((n) => n.category === "logic" && n.subcategory === subcategory)}
-              />
-            ))}
+        {mode === "system" &&
+          SYSTEM_CATEGORIES.map((category) => (
+            <PaletteGroup
+              key={category}
+              label={CATEGORY_LABELS[category]}
+              color={CATEGORY_COLORS[category]}
+              dragMimeType={DRAG_MIME_TYPE}
+              items={NODE_TYPES.filter((n) => n.category === category)}
+            />
+          ))}
+
+        {mode === "code" &&
+          LOGIC_SUBCATEGORY_ORDER.map((subcategory) => (
+            <PaletteGroup
+              key={subcategory}
+              label={subcategory}
+              color="#8b90a0"
+              dragMimeType={DRAG_MIME_TYPE}
+              items={NODE_TYPES.filter((n) => n.category === "logic" && n.subcategory === subcategory)}
+            />
+          ))}
+
+        {mode === "git" &&
+          VCS_SUBCATEGORY_ORDER.map((subcategory) => (
+            <PaletteGroup
+              key={subcategory}
+              label={subcategory}
+              color="#8b90a0"
+              dragMimeType={DRAG_MIME_TYPE}
+              items={NODE_TYPES.filter((n) => n.category === "vcs" && n.subcategory === subcategory)}
+            />
+          ))}
 
         <PaletteGroup
           label="Boundaries"
