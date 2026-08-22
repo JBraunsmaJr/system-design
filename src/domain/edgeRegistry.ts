@@ -7,6 +7,7 @@ export const STYLE_GROUP_LABELS: Record<string, string> = {
   file: "File / bulk",
   control: "Control flow",
   vcs: "Version control",
+  blank: "Unlabeled",
   generic: "Generic",
 };
 
@@ -40,6 +41,10 @@ export const EDGE_TYPES: EdgeTypeDefinition[] = [
   { id: "cherry-picked", styleGroup: "vcs", label: "Cherry-Picked", color: "#C2255C", dash: "4 3" },
   { id: "tags", styleGroup: "vcs", label: "Tags", color: "#C2255C", dash: "1 3" },
   { id: "deploys-to", styleGroup: "vcs", label: "Deploys To", color: "#C2255C", dash: "6 3" },
+
+  { id: "blank-solid", styleGroup: "blank", label: "", menuLabel: "Blank (Solid)", color: "#98A2B3" },
+  { id: "blank-dashed", styleGroup: "blank", label: "", menuLabel: "Blank (Dashed)", color: "#98A2B3", dash: "6 4" },
+  { id: "blank-dotted", styleGroup: "blank", label: "", menuLabel: "Blank (Dotted)", color: "#98A2B3", dash: "2 3" },
 
   { id: "generic", styleGroup: "generic", label: "Generic / Other", color: "#98A2B3" },
 ];

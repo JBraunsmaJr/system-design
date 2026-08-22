@@ -5,7 +5,7 @@ import { getGroupType } from "../domain/groupRegistry";
 import { EDGE_TYPES, STYLE_GROUP_LABELS } from "../domain/edgeRegistry";
 import type { ArchNodeData, ArchEdgeData } from "../domain/types";
 
-const EDGE_STYLE_GROUP_ORDER = ["sync", "async", "control", "vcs", "data", "file", "generic"] as const;
+const EDGE_STYLE_GROUP_ORDER = ["sync", "async", "control", "vcs", "blank", "data", "file", "generic"] as const;
 
 interface InspectorProps {
   selectedNode: Node<ArchNodeData> | null;
@@ -153,7 +153,7 @@ export function Inspector({
               <optgroup key={group} label={STYLE_GROUP_LABELS[group]}>
                 {options.map((t) => (
                   <option key={t.id} value={t.id}>
-                    {t.label}
+                    {t.menuLabel ?? t.label}
                   </option>
                 ))}
               </optgroup>
@@ -183,6 +183,15 @@ export function Inspector({
           onChange={(e) => onUpdateEdge(edge.id, { label: e.target.value })}
         />
       </Field>
+
+      <label className="inspector__checkbox">
+        <input
+          type="checkbox"
+          checked={data.hideLabel ?? false}
+          onChange={(e) => onUpdateEdge(edge.id, { hideLabel: e.target.checked })}
+        />
+        <span>Hide label on canvas</span>
+      </label>
 
       <PropertyEditor
         properties={data.properties}

@@ -37,7 +37,7 @@ export function TypedEdge({
     borderRadius: 10,
   });
 
-  const shownLabel = data?.label?.trim() ? data.label : def.label;
+  const shownLabel = data?.hideLabel ? "" : data?.label?.trim() ? data.label : def.label;
   // `style.opacity` is how Canvas.tsx applies Presentation Mode / step-preview
   // dimming - unlike nodes, React Flow doesn't apply it automatically for
   // custom edge components, so it has to be merged in here explicitly.
@@ -66,21 +66,23 @@ export function TypedEdge({
           filter: isFocused ? `drop-shadow(0 0 5px ${def.color})` : undefined,
         }}
       />
-      <EdgeLabelRenderer>
-        <div
-          className={`typed-edge__label${selected ? " is-selected" : ""}`}
-          style={{
-            position: "absolute",
-            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-            borderColor: def.color,
-            color: def.color,
-            opacity,
-            boxShadow: isFocused ? `0 0 8px ${def.color}99` : undefined,
-          }}
-        >
-          {shownLabel}
-        </div>
-      </EdgeLabelRenderer>
+      {shownLabel && (
+        <EdgeLabelRenderer>
+          <div
+            className={`typed-edge__label${selected ? " is-selected" : ""}`}
+            style={{
+              position: "absolute",
+              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+              borderColor: def.color,
+              color: def.color,
+              opacity,
+              boxShadow: isFocused ? `0 0 8px ${def.color}99` : undefined,
+            }}
+          >
+            {shownLabel}
+          </div>
+        </EdgeLabelRenderer>
+      )}
     </>
   );
 }

@@ -29,13 +29,16 @@ export interface NodeTypeDefinition {
   defaultProperties?: Record<string, string>;
 }
 
-export type EdgeStyleGroup = "sync" | "async" | "data" | "file" | "control" | "vcs" | "generic";
+export type EdgeStyleGroup = "sync" | "async" | "data" | "file" | "control" | "vcs" | "blank" | "generic";
 
 /** An edge/traffic type as it appears in the inspector (e.g. "grpc", "webhook"). */
 export interface EdgeTypeDefinition {
   id: string;
   styleGroup: EdgeStyleGroup;
+  /** Shown on the canvas as the edge's fallback label when no custom label is set. Can be empty for a genuinely blank edge - see menuLabel for how it's picked from the dropdown in that case. */
   label: string;
+  /** What shows in the Inspector's type dropdown; falls back to `label` when omitted. Only needed when `label` is empty (an empty dropdown row would be unselectable in practice). */
+  menuLabel?: string;
   color: string;
   /** SVG stroke-dasharray, omitted for solid lines */
   dash?: string;
@@ -75,6 +78,8 @@ export interface ArchEdgeData extends Record<string, unknown> {
   edgeType: string;
   label?: string;
   direction?: "forward" | "reverse";
+  /** Forces the label pill off even if a custom label or the type's default label would otherwise show. */
+  hideLabel?: boolean;
   properties: Record<string, string>;
 }
 
