@@ -8,7 +8,6 @@ interface ToolbarProps {
   onLoadClick: () => void;
   isScenarioPanelOpen: boolean;
   onToggleScenarioPanel: () => void;
-  scenariosDisabled: boolean;
   onExportPng: () => void;
   onExportSvg: () => void;
   canExport: boolean;
@@ -22,7 +21,6 @@ export function Toolbar({
   onLoadClick,
   isScenarioPanelOpen,
   onToggleScenarioPanel,
-  scenariosDisabled,
   onExportPng,
   onExportSvg,
   canExport,
@@ -40,13 +38,7 @@ export function Toolbar({
         aria-label="Diagram title"
       />
       <div className="toolbar__actions">
-        <button
-          type="button"
-          className={isScenarioPanelOpen ? "active" : undefined}
-          disabled={scenariosDisabled}
-          title={scenariosDisabled ? "Go back to the top level to manage scenarios" : undefined}
-          onClick={onToggleScenarioPanel}
-        >
+        <button type="button" className={isScenarioPanelOpen ? "active" : undefined} onClick={onToggleScenarioPanel}>
           Scenarios
         </button>
         <ExportMenu onExportPng={onExportPng} onExportSvg={onExportSvg} disabled={!canExport} />

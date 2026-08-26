@@ -150,14 +150,15 @@ function App() {
   );
 
   const onAddText = useCallback(
-    (position: { x: number; y: number }) => {
+    (position: { x: number; y: number }): string => {
+      const id = nextId("text");
       const node: Node<ArchNodeData> = {
-        id: nextId("text"),
+        id,
         type: "text",
         position,
         data: {
           nodeType: "text",
-          label: "Text",
+          label: "",
           description: "",
           properties: {},
           tags: [],
@@ -166,6 +167,7 @@ function App() {
         },
       };
       setCurrentNodes((nds) => [...nds, node]);
+      return id;
     },
     [setCurrentNodes]
   );
@@ -314,7 +316,7 @@ function App() {
     setPreviewStepId(null);
   }, []);
 
-  // --- Scenarios (root-level only - see SubDiagram's doc comment) --------
+  // --- Scenarios (can now span multiple diagram levels - see path below) --
 
   const onCreateScenario = useCallback(() => {
     const id = nextId("scenario");
@@ -342,7 +344,11 @@ function App() {
     setPreviewStepId((cur) => (cur === stepId ? null : stepId));
   }, []);
 
-  // Captures whatever's currently selected on the canvas as a new step.
+  // Captures whatever's currently selected on the canvas - AND which level
+  // of the tree you're currently drilled into - as a new step. That's what
+  // lets a single scenario walk through several nested diagrams: advancing
+  // through steps with different `path`s auto-navigates between them (see
+  // the presentation-path-sync effect below).
   const onAddStep = useCallback(
     (scenarioId: string) => {
       if (selectedNodeIds.length === 0 && selectedEdgeIds.length === 0) return;
@@ -353,6 +359,7 @@ function App() {
             id: nextId("step"),
             title: `Step ${sc.steps.length + 1}`,
             narration: "",
+            path: [...path],
             focusNodeIds: [...selectedNodeIds],
             focusEdgeIds: [...selectedEdgeIds],
           };
@@ -360,7 +367,7 @@ function App() {
         })
       );
     },
-    [selectedNodeIds, selectedEdgeIds]
+    [selectedNodeIds, selectedEdgeIds, path]
   );
 
   const onUpdateStep = useCallback((scenarioId: string, stepId: string, patch: Partial<ScenarioStep>) => {
@@ -419,6 +426,7 @@ function App() {
       if (!scenario || scenario.steps.length === 0) return;
       setActiveScenarioId(scenarioId);
       setActiveStepIndex(0);
+      setPath(scenario.steps[0].path);
       setSelectedNodeIds([]);
       setSelectedEdgeIds([]);
       setPreviewStepId(null);
@@ -429,16 +437,25 @@ function App() {
 
   const onExitPresenting = useCallback(() => setIsPresenting(false), []);
 
+  // Cross-diagram scenarios: each step carries its own `path`, so advancing
+  // sets both the step index AND (when it differs) navigates there directly -
+  // right here in the handler that causes the change, rather than reacting
+  // to the mismatch after the fact in an effect.
   const onPresentNext = useCallback(() => {
-    setActiveStepIndex((i) => {
-      const total = activeScenario?.steps.length ?? 0;
-      return Math.min(i + 1, Math.max(total - 1, 0));
-    });
-  }, [activeScenario]);
+    const steps = activeScenario?.steps ?? [];
+    const nextIndex = Math.min(activeStepIndex + 1, Math.max(steps.length - 1, 0));
+    const nextStep = steps[nextIndex];
+    if (nextStep) setPath(nextStep.path);
+    setActiveStepIndex(nextIndex);
+  }, [activeScenario, activeStepIndex]);
 
   const onPresentPrev = useCallback(() => {
-    setActiveStepIndex((i) => Math.max(i - 1, 0));
-  }, []);
+    const prevIndex = Math.max(activeStepIndex - 1, 0);
+    const steps = activeScenario?.steps ?? [];
+    const prevStep = steps[prevIndex];
+    if (prevStep) setPath(prevStep.path);
+    setActiveStepIndex(prevIndex);
+  }, [activeScenario, activeStepIndex]);
 
   const presentation = useMemo(() => {
     if (!isPresenting || !activeScenario) return null;
@@ -526,7 +543,15 @@ function App() {
       const diagram = parseDiagramFile(text);
       setRoot({ nodes: diagram.nodes, edges: diagram.edges });
       setPath([]);
-      setScenarios(diagram.scenarios);
+      // Diagrams saved before cross-diagram scenarios existed won't have a
+      // `path` on their steps at all - default those to root so old files
+      // keep working rather than crashing on a missing field.
+      setScenarios(
+        diagram.scenarios.map((sc) => ({
+          ...sc,
+          steps: sc.steps.map((st) => ({ ...st, path: st.path ?? [] })),
+        }))
+      );
       setActiveScenarioId(null);
       setActiveStepIndex(0);
       setIsPresenting(false);
@@ -541,7 +566,6 @@ function App() {
   const selectedNode = nodes.find((n) => n.id === selectedNodeId) ?? null;
   const selectedEdge = edges.find((e) => e.id === selectedEdgeId) ?? null;
   const canAddStep = selectedNodeIds.length > 0 || selectedEdgeIds.length > 0;
-  const atRoot = path.length === 0;
 
   return (
     <div className="app">
@@ -554,7 +578,6 @@ function App() {
           onLoadClick={onLoadClick}
           isScenarioPanelOpen={isScenarioPanelOpen}
           onToggleScenarioPanel={() => setIsScenarioPanelOpen((v) => !v)}
-          scenariosDisabled={!atRoot}
           onExportPng={onExportPng}
           onExportSvg={onExportSvg}
           canExport={nodes.length > 0}
@@ -581,6 +604,7 @@ function App() {
               onAddNode={onAddNode}
               onAddGroup={onAddGroup}
               onAddText={onAddText}
+              onUpdateNode={onUpdateNode}
               onReparentNode={onReparentNode}
               onAdoptIntoGroup={onAdoptIntoGroup}
               presentation={presentation}
@@ -594,7 +618,7 @@ function App() {
               onNavigateToPathIndex={onNavigateToPathIndex}
             />
           </ReactFlowProvider>
-          {!isPresenting && isScenarioPanelOpen && atRoot && (
+          {!isPresenting && isScenarioPanelOpen && (
             <ScenarioPanel
               scenarios={scenarios}
               activeScenarioId={activeScenario?.id ?? null}
@@ -610,6 +634,8 @@ function App() {
               canAddStep={canAddStep}
               previewStepId={previewStepId}
               onTogglePreviewStep={onTogglePreviewStep}
+              root={root}
+              currentPath={path}
               onClose={() => {
                 setIsScenarioPanelOpen(false);
                 setPreviewStepId(null);

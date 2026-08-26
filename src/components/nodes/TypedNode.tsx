@@ -14,12 +14,18 @@ interface TypedNodeProps extends NodeProps<TypedNodeType> {
   onDrillInto?: (nodeId: string) => void;
 }
 
+const VISIBLE_PROPERTY_CHIPS = 2;
+
 export function TypedNode({ id, data, selected, onDrillInto }: TypedNodeProps) {
   const def = getNodeType(data.nodeType);
   const IconComponent =
     (def && (Icons[def.icon as keyof typeof Icons] as Icons.LucideIcon)) || Icons.Box;
   const accent = def?.color ?? "#98A2B3";
   const hasSubDiagram = (data.subDiagram?.nodes.length ?? 0) > 0;
+
+  const properties = Object.entries(data.properties).filter(([key]) => key.trim() !== "");
+  const visibleProperties = properties.slice(0, VISIBLE_PROPERTY_CHIPS);
+  const hiddenCount = properties.length - visibleProperties.length;
 
   return (
     <div
@@ -42,6 +48,28 @@ export function TypedNode({ id, data, selected, onDrillInto }: TypedNodeProps) {
           </div>
         </div>
       </div>
+
+      {properties.length > 0 && (
+        <div className="typed-node__chips">
+          {visibleProperties.map(([key, value]) => (
+            <span className="prop-chip" key={key} title={`${key}: ${value}`}>
+              {key}: {value}
+            </span>
+          ))}
+          {hiddenCount > 0 && (
+            <span className="prop-chip prop-chip--more">
+              +{hiddenCount}
+              <div className="prop-chip__tooltip nodrag">
+                {properties.map(([key, value]) => (
+                  <div key={key} className="prop-chip__tooltip-row">
+                    <strong>{key}:</strong> {value}
+                  </div>
+                ))}
+              </div>
+            </span>
+          )}
+        </div>
+      )}
 
       {onDrillInto && (
         <button

@@ -1,5 +1,6 @@
-import { Eye, EyeOff } from "lucide-react";
-import type { Scenario, ScenarioStep } from "../domain/types";
+import { Eye, EyeOff, MapPin } from "lucide-react";
+import { getBreadcrumbLabels } from "../domain/subDiagramTree";
+import type { Scenario, ScenarioStep, SubDiagram } from "../domain/types";
 
 interface ScenarioPanelProps {
   scenarios: Scenario[];
@@ -16,7 +17,21 @@ interface ScenarioPanelProps {
   canAddStep: boolean;
   previewStepId: string | null;
   onTogglePreviewStep: (stepId: string) => void;
+  /** Full diagram tree and current drill-down path - used to resolve each
+   * step's own level into a readable label, and to tell whether a step's
+   * level matches where you're currently looking (which gates preview). */
+  root: SubDiagram;
+  currentPath: string[];
   onClose: () => void;
+}
+
+function pathsEqual(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((id, i) => id === b[i]);
+}
+
+function levelLabel(root: SubDiagram, path: string[]): string {
+  const labels = getBreadcrumbLabels(root, path);
+  return labels.length === 0 ? "Root" : labels.join(" › ");
 }
 
 export function ScenarioPanel({
@@ -34,6 +49,8 @@ export function ScenarioPanel({
   canAddStep,
   previewStepId,
   onTogglePreviewStep,
+  root,
+  currentPath,
   onClose,
 }: ScenarioPanelProps) {
   // activeScenarioId is already resolved by App.tsx (including its "default
@@ -41,6 +58,7 @@ export function ScenarioPanel({
   // shouldn't re-implement that decision, since having it in two places is
   // exactly what let them drift out of sync before.
   const active = scenarios.find((s) => s.id === activeScenarioId) ?? null;
+  const currentLevelLabel = levelLabel(root, currentPath);
 
   return (
     <div className="scenario-panel">
@@ -82,6 +100,11 @@ export function ScenarioPanel({
           </>
         )}
 
+        <span className="scenario-panel__level" title="New steps are anchored to whichever diagram you're currently viewing">
+          <MapPin size={11} />
+          {currentLevelLabel}
+        </span>
+
         <button type="button" className="scenario-panel__close" onClick={onClose} aria-label="Close scenarios panel">
           ×
         </button>
@@ -90,6 +113,8 @@ export function ScenarioPanel({
       {!active && (
         <p className="scenario-panel__empty">
           No scenarios yet. Create one, then select nodes/edges on the canvas and add them as a step below.
+          You can drill into a sub-diagram and keep adding steps there too - a scenario can span
+          multiple diagrams.
         </p>
       )}
 
@@ -105,6 +130,8 @@ export function ScenarioPanel({
             {active.steps.map((step, index) => {
               const count = step.focusNodeIds.length + step.focusEdgeIds.length;
               const isPreviewing = previewStepId === step.id;
+              const stepLevel = levelLabel(root, step.path);
+              const previewAvailable = pathsEqual(step.path, currentPath);
               return (
                 <div className={`step-card${isPreviewing ? " is-previewing" : ""}`} key={step.id}>
                   <div className="step-card__header">
@@ -113,7 +140,14 @@ export function ScenarioPanel({
                       type="button"
                       className={`step-card__preview${isPreviewing ? " is-active" : ""}`}
                       onClick={() => onTogglePreviewStep(step.id)}
-                      title={isPreviewing ? "Stop previewing this step" : "Preview this step's highlight on the canvas"}
+                      disabled={!previewAvailable}
+                      title={
+                        !previewAvailable
+                          ? `This step is on a different diagram (${stepLevel}). Navigate there to preview it.`
+                          : isPreviewing
+                            ? "Stop previewing this step"
+                            : "Preview this step's highlight on the canvas"
+                      }
                       aria-label={isPreviewing ? "Stop previewing this step" : "Preview this step on the canvas"}
                     >
                       {isPreviewing ? <Eye size={13} /> : <EyeOff size={13} />}
@@ -145,6 +179,10 @@ export function ScenarioPanel({
                       ×
                     </button>
                   </div>
+                  <div className="step-card__level" title={stepLevel}>
+                    <MapPin size={10} />
+                    <span>{stepLevel}</span>
+                  </div>
                   <input
                     className="step-card__title"
                     value={step.title}
@@ -153,7 +191,7 @@ export function ScenarioPanel({
                   <textarea
                     className="step-card__narration"
                     placeholder="Narration / speaker notes..."
-                    rows={3}
+                    rows={2}
                     value={step.narration ?? ""}
                     onChange={(e) => onUpdateStep(active.id, step.id, { narration: e.target.value })}
                   />
@@ -171,7 +209,7 @@ export function ScenarioPanel({
               onClick={() => onAddStep(active.id)}
               title={
                 canAddStep
-                  ? "Add the current canvas selection as a new step"
+                  ? `Add the current canvas selection as a new step (at: ${currentLevelLabel})`
                   : "Select one or more nodes/edges on the canvas first"
               }
             >

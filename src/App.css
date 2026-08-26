@@ -1099,6 +1099,33 @@
   background: rgba(91, 124, 250, 0.08);
 }
 
+.text-node__placeholder {
+  opacity: 0.4;
+  font-weight: 400;
+  font-style: italic;
+}
+
+/* Editing mode swaps the div for a textarea. Height auto-grows to fit
+   content (see TextNode.tsx), but width stays fixed - a truly auto-width
+   textarea needs a hidden-mirror-element trick that isn't worth the
+   complexity here, so the box may visibly snap to a tighter width once you
+   finish editing if your text is narrower than this. */
+.text-node--editing {
+  display: block;
+  width: 220px;
+  min-height: 24px;
+  background: var(--chrome-bg-raised);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  resize: none;
+  overflow: hidden;
+  font-family: var(--sans);
+  font-weight: 600;
+  line-height: 1.35;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(91, 124, 250, 0.2);
+}
+
 /* ---------- Presentation / preview focus glow ---------- */
 
 .is-presentation-focus .typed-node,
@@ -1168,4 +1195,108 @@
   height: 14px;
   accent-color: var(--accent);
   cursor: pointer;
+}
+
+/* ---------- Node property chips ---------- */
+
+.typed-node__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 7px;
+}
+
+.prop-chip {
+  background: var(--chrome-bg);
+  border: 1px solid var(--node-border);
+  border-radius: 999px;
+  padding: 2px 7px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  color: var(--chrome-text-dim);
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prop-chip--more {
+  position: relative;
+  color: var(--chrome-text);
+  font-weight: 600;
+  cursor: default;
+  max-width: none;
+}
+
+.prop-chip__tooltip {
+  display: none;
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  z-index: 50;
+  min-width: 150px;
+  max-width: 240px;
+  background: var(--node-bg);
+  border: 1px solid var(--node-border);
+  border-radius: 6px;
+  padding: 7px 9px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  cursor: default;
+}
+
+.prop-chip--more:hover .prop-chip__tooltip {
+  display: block;
+}
+
+.prop-chip__tooltip-row {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--chrome-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 2px 0;
+}
+
+.prop-chip__tooltip-row strong {
+  color: var(--chrome-text-dim);
+  font-weight: 500;
+  margin-right: 3px;
+}
+
+/* ---------- Scenario panel: level indicators ---------- */
+
+.scenario-panel__level {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 4px 9px;
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--chrome-text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+.step-card__level {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--chrome-text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.step-card__preview:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
 }

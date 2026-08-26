@@ -99,6 +99,16 @@ export interface ScenarioStep {
   id: string;
   title: string;
   narration?: string;
+  /**
+   * Which level of the sub-diagram tree this step's focus applies to -
+   * a stack of node ids, same shape as App.tsx's own navigation `path`.
+   * Empty array means the root/top-level diagram. Captured automatically
+   * from wherever you're currently drilled into when you add the step, so
+   * a single scenario can walk through several nested diagrams in sequence -
+   * advancing to a step whose path differs from the current one
+   * auto-navigates there (see the presentation-path-sync effect in App.tsx).
+   */
+  path: string[];
   /** Node/group ids highlighted for this step; everything else dims. */
   focusNodeIds: string[];
   /** Edge ids highlighted for this step. */

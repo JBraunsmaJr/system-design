@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, type DragEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type DragEvent, type MouseEvent as ReactMouseEvent } from "react";
 import {
   ReactFlow,
   Background,
@@ -57,7 +57,9 @@ interface CanvasProps {
   onSelectionChange: OnSelectionChangeFunc;
   onAddNode: (typeId: string, position: { x: number; y: number }) => void;
   onAddGroup: (typeId: string, position: { x: number; y: number }) => void;
-  onAddText: (position: { x: number; y: number }) => void;
+  /** Creates a text annotation and returns its id, so the caller can immediately put it into edit mode. */
+  onAddText: (position: { x: number; y: number }) => string;
+  onUpdateNode: (id: string, patch: Partial<ArchNodeData>) => void;
   onReparentNode: (nodeId: string, newParentId: string | null) => void;
   onAdoptIntoGroup: (groupId: string, nodeIds: string[]) => void;
   presentation: PresentationState | null;
@@ -81,6 +83,7 @@ export function Canvas({
   onAddNode,
   onAddGroup,
   onAddText,
+  onUpdateNode,
   onReparentNode,
   onAdoptIntoGroup,
   presentation,
@@ -107,19 +110,39 @@ export function Canvas({
     [presentation, previewFocus]
   );
 
-  // TypedNode needs to trigger navigation but isn't rendered with any extra
-  // props by React Flow itself - wrapping it here (rather than a stable
-  // module-level `nodeTypes` constant) is the standard way to thread a
-  // callback into a custom node type. Disabled while presenting, since
-  // drilling into a node would break the locked slideshow view.
+  // Which text node (if any) is being edited inline right now - local to
+  // Canvas since it's purely transient UI state, not something App.tsx or
+  // saved data needs to know about.
+  const [editingTextNodeId, setEditingTextNodeId] = useState<string | null>(null);
+
+  const onChangeTextNode = useCallback(
+    (nodeId: string, text: string) => onUpdateNode(nodeId, { label: text }),
+    [onUpdateNode]
+  );
+
+  // TypedNode/TextNode need extra callbacks that aren't part of React Flow's
+  // own NodeProps - wrapping them here (rather than a stable module-level
+  // `nodeTypes` constant) is the standard way to thread those in. Both are
+  // disabled while presenting, since drilling in or editing text would break
+  // the locked slideshow view.
   const nodeTypes = useMemo<NodeTypes>(
     () => ({
       typed: (props) => <TypedNode {...props} onDrillInto={isPresenting ? undefined : onDrillInto} />,
       group: GroupNode,
-      text: TextNode,
+      text: (props) => (
+        <TextNode
+          {...props}
+          isEditing={editingTextNodeId === props.id}
+          onStartEditing={isPresenting ? undefined : setEditingTextNodeId}
+          onFinishEditing={() => setEditingTextNodeId(null)}
+          onChangeText={onChangeTextNode}
+        />
+      ),
     }),
-    [isPresenting, onDrillInto]
+    [isPresenting, onDrillInto, editingTextNodeId, onChangeTextNode]
   );
+
+  const pathKey = breadcrumbLabels.join(">");
 
   const onDragOver = useCallback((event: DragEvent) => {
     event.preventDefault();
@@ -144,10 +167,26 @@ export function Canvas({
       }
 
       if (event.dataTransfer.getData(TEXT_DRAG_MIME_TYPE)) {
-        onAddText(position);
+        setEditingTextNodeId(onAddText(position));
       }
     },
     [screenToFlowPosition, onAddNode, onAddGroup, onAddText]
+  );
+
+  // Double-clicking truly empty canvas creates a text annotation right
+  // there and drops straight into editing it - checking that the event
+  // target is the pane element itself (not bubbled from a node, edge, or
+  // overlay control) is what keeps this from firing on top of, say,
+  // double-clicking a node to drill into it.
+  const onCanvasDoubleClick = useCallback(
+    (event: ReactMouseEvent) => {
+      if (isPresenting) return;
+      const target = event.target as HTMLElement;
+      if (!target.classList.contains("react-flow__pane")) return;
+      const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+      setEditingTextNodeId(onAddText(position));
+    },
+    [isPresenting, screenToFlowPosition, onAddText]
   );
 
   // Two symmetric cases here:
@@ -224,14 +263,21 @@ export function Canvas({
 
   // The current level's contents change (drilling in/out swaps to a
   // completely different set of nodes), so re-frame the camera whenever the
-  // breadcrumb path changes rather than leaving the previous level's pan/zoom.
-  const pathKey = breadcrumbLabels.join(">");
+  // breadcrumb path changes - UNLESS there's an active focus (presenting or
+  // previewing), in which case the focus-based effect above already frames
+  // the right thing; without this guard, a scenario step that both changes
+  // level AND focuses specific elements would fire two competing fitView
+  // calls back to back.
   useEffect(() => {
+    if (activeFocus) return;
     fitView({ padding: 0.2, duration: 300 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: see comment above
   }, [pathKey, fitView]);
 
+  const levelLabel = breadcrumbLabels.length === 0 ? "Root" : breadcrumbLabels.join(" › ");
+
   return (
-    <div className="canvas" onDragOver={onDragOver} onDrop={onDrop}>
+    <div className="canvas" onDragOver={onDragOver} onDrop={onDrop} onDoubleClick={onCanvasDoubleClick}>
       <ReactFlow
         nodes={displayNodes}
         edges={displayEdges}
@@ -278,6 +324,7 @@ export function Canvas({
             scenario={presentation.scenario}
             step={presentation.step}
             stepIndex={presentation.stepIndex}
+            levelLabel={levelLabel}
             onNext={onPresentNext}
             onPrev={onPresentPrev}
             onExit={onExitPresenting}
