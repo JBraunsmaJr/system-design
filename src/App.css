@@ -1309,14 +1309,45 @@
   border: 2px solid;
   border-radius: 4px;
   box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
 }
 
 .shape-node.is-circle {
   border-radius: 50%;
+  /* Extra padding keeps text within the circle's inscribed "safe" area
+     rather than right up against the curved edge. */
+  padding: 18px;
 }
 
 .shape-node.is-selected {
   box-shadow: 0 0 0 2px rgba(91, 124, 250, 0.3);
+}
+
+.shape-node__text {
+  color: var(--chrome-text);
+  font-family: var(--sans);
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.3;
+  word-break: break-word;
+  pointer-events: none;
+}
+
+.shape-node__text-input {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: none;
+  color: var(--chrome-text);
+  font-family: var(--sans);
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.3;
 }
 
 /* ---------- Inspector: color field with reset ---------- */

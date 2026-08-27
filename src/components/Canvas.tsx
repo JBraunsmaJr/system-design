@@ -114,37 +114,46 @@ export function Canvas({
     [presentation, previewFocus]
   );
 
-  // Which text node (if any) is being edited inline right now - local to
-  // Canvas since it's purely transient UI state, not something App.tsx or
-  // saved data needs to know about.
-  const [editingTextNodeId, setEditingTextNodeId] = useState<string | null>(null);
+  // Which node (text annotation or shape) is being label-edited inline right
+  // now - local to Canvas since it's purely transient UI state, not
+  // something App.tsx or saved data needs to know about. Shared between
+  // both node kinds since the editing mechanism is identical for each.
+  const [editingLabelNodeId, setEditingLabelNodeId] = useState<string | null>(null);
 
   const onChangeTextNode = useCallback(
     (nodeId: string, text: string) => onUpdateNode(nodeId, { label: text }),
     [onUpdateNode]
   );
 
-  // TypedNode/TextNode need extra callbacks that aren't part of React Flow's
-  // own NodeProps - wrapping them here (rather than a stable module-level
-  // `nodeTypes` constant) is the standard way to thread those in. Both are
-  // disabled while presenting, since drilling in or editing text would break
-  // the locked slideshow view.
+  // TypedNode/TextNode/ShapeNode need extra callbacks that aren't part of
+  // React Flow's own NodeProps - wrapping them here (rather than a stable
+  // module-level `nodeTypes` constant) is the standard way to thread those
+  // in. All disabled while presenting, since drilling in or editing text
+  // would break the locked slideshow view.
   const nodeTypes = useMemo<NodeTypes>(
     () => ({
       typed: (props) => <TypedNode {...props} onDrillInto={isPresenting ? undefined : onDrillInto} />,
       group: GroupNode,
-      shape: ShapeNode,
+      shape: (props) => (
+        <ShapeNode
+          {...props}
+          isEditing={editingLabelNodeId === props.id}
+          onStartEditing={isPresenting ? undefined : setEditingLabelNodeId}
+          onFinishEditing={() => setEditingLabelNodeId(null)}
+          onChangeText={onChangeTextNode}
+        />
+      ),
       text: (props) => (
         <TextNode
           {...props}
-          isEditing={editingTextNodeId === props.id}
-          onStartEditing={isPresenting ? undefined : setEditingTextNodeId}
-          onFinishEditing={() => setEditingTextNodeId(null)}
+          isEditing={editingLabelNodeId === props.id}
+          onStartEditing={isPresenting ? undefined : setEditingLabelNodeId}
+          onFinishEditing={() => setEditingLabelNodeId(null)}
           onChangeText={onChangeTextNode}
         />
       ),
     }),
-    [isPresenting, onDrillInto, editingTextNodeId, onChangeTextNode]
+    [isPresenting, onDrillInto, editingLabelNodeId, onChangeTextNode]
   );
 
   const pathKey = breadcrumbLabels.join(">");
@@ -178,7 +187,7 @@ export function Canvas({
       }
 
       if (event.dataTransfer.getData(TEXT_DRAG_MIME_TYPE)) {
-        setEditingTextNodeId(onAddText(position));
+        setEditingLabelNodeId(onAddText(position));
       }
     },
     [screenToFlowPosition, onAddNode, onAddGroup, onAddShape, onAddText]
@@ -195,7 +204,7 @@ export function Canvas({
       const target = event.target as HTMLElement;
       if (!target.classList.contains("react-flow__pane")) return;
       const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
-      setEditingTextNodeId(onAddText(position));
+      setEditingLabelNodeId(onAddText(position));
     },
     [isPresenting, screenToFlowPosition, onAddText]
   );

@@ -90,15 +90,41 @@ export function Inspector({
 
     if (selectedNode.type === "shape") {
       const shapeDef = getShapeType(data.nodeType);
+      const fontSize = data.fontSize ?? 16;
       return (
         <aside className="inspector">
           <div className="panel-header">{shapeDef?.label ?? "Shape"}</div>
+
+          <Field label="Text">
+            <textarea
+              rows={2}
+              placeholder="(optional label inside the shape)"
+              value={data.label}
+              onChange={(e) => onUpdateNode(selectedNode.id, { label: e.target.value })}
+            />
+          </Field>
+
+          <Field label="Text size">
+            <select
+              value={fontSize}
+              onChange={(e) => onUpdateNode(selectedNode.id, { fontSize: Number(e.target.value) })}
+            >
+              <option value={12}>Small</option>
+              <option value={16}>Medium</option>
+              <option value={20}>Large</option>
+              <option value={28}>X-Large</option>
+            </select>
+          </Field>
 
           <ColorField
             value={data.color}
             defaultValue={shapeDef?.color ?? "#5B7CFA"}
             onChange={(color) => onUpdateNode(selectedNode.id, { color })}
           />
+
+          <p className="inspector__hint" style={{ marginTop: -8 }}>
+            Double-click the shape on the canvas to edit its text directly.
+          </p>
 
           <button type="button" className="inspector__delete" onClick={() => onDeleteNode(selectedNode.id)}>
             Delete shape
