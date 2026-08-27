@@ -512,11 +512,11 @@
   white-space: nowrap;
 }
 
-.group-node__resize-line {
+.node-resize-line {
   border-color: var(--accent) !important;
 }
 
-.group-node__resize-handle {
+.node-resize-handle {
   background: var(--accent) !important;
   border: 1.5px solid var(--chrome-bg) !important;
   width: 8px !important;
@@ -1299,4 +1299,43 @@
 .step-card__preview:disabled {
   opacity: 0.3;
   cursor: not-allowed;
+}
+
+/* ---------- Drawn shapes (Circle/Square/Rectangle) ---------- */
+
+.shape-node {
+  width: 100%;
+  height: 100%;
+  border: 2px solid;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+.shape-node.is-circle {
+  border-radius: 50%;
+}
+
+.shape-node.is-selected {
+  box-shadow: 0 0 0 2px rgba(91, 124, 250, 0.3);
+}
+
+/* ---------- Inspector: color field with reset ---------- */
+
+.color-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.color-field__reset {
+  background: transparent;
+  border: none;
+  color: var(--chrome-text-dim);
+  font-size: 11px;
+  text-decoration: underline;
+  padding: 0;
+}
+
+.color-field__reset:hover {
+  color: var(--chrome-text);
 }

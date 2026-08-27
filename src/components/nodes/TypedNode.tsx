@@ -20,7 +20,7 @@ export function TypedNode({ id, data, selected, onDrillInto }: TypedNodeProps) {
   const def = getNodeType(data.nodeType);
   const IconComponent =
     (def && (Icons[def.icon as keyof typeof Icons] as Icons.LucideIcon)) || Icons.Box;
-  const accent = def?.color ?? "#98A2B3";
+  const accent = data.color ?? def?.color ?? "#98A2B3";
   const hasSubDiagram = (data.subDiagram?.nodes.length ?? 0) > 0;
 
   const properties = Object.entries(data.properties).filter(([key]) => key.trim() !== "");

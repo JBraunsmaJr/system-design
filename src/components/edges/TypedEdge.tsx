@@ -26,6 +26,7 @@ export function TypedEdge({
   animated,
 }: EdgeProps<TypedEdgeType>) {
   const def = getEdgeType(data?.edgeType ?? "generic");
+  const color = data?.color ?? def.color;
   const direction = data?.direction ?? "forward";
   const [path, labelX, labelY] = getSmoothStepPath({
     sourceX,
@@ -59,11 +60,11 @@ export function TypedEdge({
         markerStart={direction === "reverse" ? markerStart : undefined}
         className={`typed-edge${flowClass}`}
         style={{
-          stroke: def.color,
+          stroke: color,
           strokeWidth: selected || isFocused ? 2.5 : 1.75,
           strokeDasharray: animated ? def.dash ?? FLOW_FALLBACK_DASH : def.dash,
           opacity,
-          filter: isFocused ? `drop-shadow(0 0 5px ${def.color})` : undefined,
+          filter: isFocused ? `drop-shadow(0 0 5px ${color})` : undefined,
         }}
       />
       {shownLabel && (
@@ -73,10 +74,10 @@ export function TypedEdge({
             style={{
               position: "absolute",
               transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-              borderColor: def.color,
-              color: def.color,
+              borderColor: color,
+              color,
               opacity,
-              boxShadow: isFocused ? `0 0 8px ${def.color}99` : undefined,
+              boxShadow: isFocused ? `0 0 8px ${color}99` : undefined,
             }}
           >
             {shownLabel}

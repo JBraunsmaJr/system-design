@@ -21,11 +21,13 @@ import { TypedNode } from "./nodes/TypedNode";
 import { TypedEdge } from "./edges/TypedEdge";
 import { GroupNode } from "./nodes/GroupNode";
 import { TextNode } from "./nodes/TextNode";
+import { ShapeNode } from "./nodes/ShapeNode";
 import { PresentationOverlay } from "./PresentationOverlay";
 import { Breadcrumb } from "./Breadcrumb";
 import { NODE_TYPES } from "../domain/nodeRegistry";
 import { GROUP_TYPES } from "../domain/groupRegistry";
-import { DRAG_MIME_TYPE, GROUP_DRAG_MIME_TYPE, TEXT_DRAG_MIME_TYPE } from "./Palette";
+import { SHAPE_TYPES } from "../domain/shapeRegistry";
+import { DRAG_MIME_TYPE, GROUP_DRAG_MIME_TYPE, TEXT_DRAG_MIME_TYPE, SHAPE_DRAG_MIME_TYPE } from "./Palette";
 import type { ArchNodeData, ArchEdgeData, Scenario, ScenarioStep } from "../domain/types";
 
 const edgeTypes = { typed: TypedEdge };
@@ -59,6 +61,7 @@ interface CanvasProps {
   onAddGroup: (typeId: string, position: { x: number; y: number }) => void;
   /** Creates a text annotation and returns its id, so the caller can immediately put it into edit mode. */
   onAddText: (position: { x: number; y: number }) => string;
+  onAddShape: (typeId: string, position: { x: number; y: number }) => void;
   onUpdateNode: (id: string, patch: Partial<ArchNodeData>) => void;
   onReparentNode: (nodeId: string, newParentId: string | null) => void;
   onAdoptIntoGroup: (groupId: string, nodeIds: string[]) => void;
@@ -83,6 +86,7 @@ export function Canvas({
   onAddNode,
   onAddGroup,
   onAddText,
+  onAddShape,
   onUpdateNode,
   onReparentNode,
   onAdoptIntoGroup,
@@ -129,6 +133,7 @@ export function Canvas({
     () => ({
       typed: (props) => <TypedNode {...props} onDrillInto={isPresenting ? undefined : onDrillInto} />,
       group: GroupNode,
+      shape: ShapeNode,
       text: (props) => (
         <TextNode
           {...props}
@@ -166,11 +171,17 @@ export function Canvas({
         return;
       }
 
+      const shapeTypeId = event.dataTransfer.getData(SHAPE_DRAG_MIME_TYPE);
+      if (shapeTypeId && SHAPE_TYPES.some((s) => s.id === shapeTypeId)) {
+        onAddShape(shapeTypeId, position);
+        return;
+      }
+
       if (event.dataTransfer.getData(TEXT_DRAG_MIME_TYPE)) {
         setEditingTextNodeId(onAddText(position));
       }
     },
-    [screenToFlowPosition, onAddNode, onAddGroup, onAddText]
+    [screenToFlowPosition, onAddNode, onAddGroup, onAddShape, onAddText]
   );
 
   // Double-clicking truly empty canvas creates a text annotation right
@@ -219,7 +230,7 @@ export function Canvas({
 
   const onNodeDoubleClick = useCallback<NodeMouseHandler<Node<ArchNodeData>>>(
     (_event, node) => {
-      if (isPresenting || node.type === "group" || node.type === "text") return;
+      if (isPresenting || node.type === "group" || node.type === "text" || node.type === "shape") return;
       onDrillInto(node.id);
     },
     [isPresenting, onDrillInto]

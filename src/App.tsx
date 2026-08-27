@@ -19,6 +19,7 @@ import { Inspector } from "./components/Inspector";
 import { ScenarioPanel } from "./components/ScenarioPanel";
 import { NODE_TYPES, getNodeType } from "./domain/nodeRegistry";
 import { GROUP_TYPES } from "./domain/groupRegistry";
+import { SHAPE_TYPES } from "./domain/shapeRegistry";
 import { reorderWithGroupsFirst, toAbsolutePosition } from "./domain/graphUtils";
 import {
   getSubDiagramAtPath,
@@ -168,6 +169,23 @@ function App() {
       };
       setCurrentNodes((nds) => [...nds, node]);
       return id;
+    },
+    [setCurrentNodes]
+  );
+
+  const onAddShape = useCallback(
+    (typeId: string, position: { x: number; y: number }) => {
+      const def = SHAPE_TYPES.find((s) => s.id === typeId);
+      if (!def) return;
+      const node: Node<ArchNodeData> = {
+        id: nextId("shape"),
+        type: "shape",
+        position,
+        width: def.defaultWidth,
+        height: def.defaultHeight,
+        data: { nodeType: typeId, label: "", description: "", properties: {}, tags: [] },
+      };
+      setCurrentNodes((nds) => [...nds, node]);
     },
     [setCurrentNodes]
   );
@@ -604,6 +622,7 @@ function App() {
               onAddNode={onAddNode}
               onAddGroup={onAddGroup}
               onAddText={onAddText}
+              onAddShape={onAddShape}
               onUpdateNode={onUpdateNode}
               onReparentNode={onReparentNode}
               onAdoptIntoGroup={onAdoptIntoGroup}

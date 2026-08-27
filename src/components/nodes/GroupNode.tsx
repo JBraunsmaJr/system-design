@@ -16,7 +16,7 @@ type GroupNodeType = Node<ArchNodeData, "group">;
  */
 export function GroupNode({ data, selected }: NodeProps<GroupNodeType>) {
   const def = getGroupType(data.nodeType);
-  const accent = def?.color ?? "#7C8598";
+  const accent = data.color ?? def?.color ?? "#7C8598";
   const IconComponent =
     (def && (Icons[def.icon as keyof typeof Icons] as Icons.LucideIcon)) || Icons.SquareDashed;
   const borderStyle = def?.borderStyle ?? "dashed";
@@ -35,8 +35,8 @@ export function GroupNode({ data, selected }: NodeProps<GroupNodeType>) {
         isVisible={selected}
         minWidth={220}
         minHeight={140}
-        lineClassName="group-node__resize-line"
-        handleClassName="group-node__resize-handle"
+        lineClassName="node-resize-line"
+        handleClassName="node-resize-handle"
       />
       <div
         className="group-node__label"

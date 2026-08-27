@@ -2,6 +2,7 @@ import { useState, type KeyboardEvent } from "react";
 import type { Node, Edge } from "@xyflow/react";
 import { getNodeType } from "../domain/nodeRegistry";
 import { getGroupType } from "../domain/groupRegistry";
+import { getShapeType } from "../domain/shapeRegistry";
 import { EDGE_TYPES, STYLE_GROUP_LABELS } from "../domain/edgeRegistry";
 import type { ArchNodeData, ArchEdgeData } from "../domain/types";
 
@@ -75,9 +76,32 @@ export function Inspector({
               <option value={40}>Huge</option>
             </select>
           </Field>
+          <p className="inspector__hint" style={{ marginTop: -8 }}>
+            Drag a corner handle on the selected annotation to resize its box - text wraps to
+            fit once resized, instead of auto-sizing to fit the text.
+          </p>
 
           <button type="button" className="inspector__delete" onClick={() => onDeleteNode(selectedNode.id)}>
             Delete text
+          </button>
+        </aside>
+      );
+    }
+
+    if (selectedNode.type === "shape") {
+      const shapeDef = getShapeType(data.nodeType);
+      return (
+        <aside className="inspector">
+          <div className="panel-header">{shapeDef?.label ?? "Shape"}</div>
+
+          <ColorField
+            value={data.color}
+            defaultValue={shapeDef?.color ?? "#5B7CFA"}
+            onChange={(color) => onUpdateNode(selectedNode.id, { color })}
+          />
+
+          <button type="button" className="inspector__delete" onClick={() => onDeleteNode(selectedNode.id)}>
+            Delete shape
           </button>
         </aside>
       );
@@ -87,6 +111,7 @@ export function Inspector({
     const nodeDef = !isGroup ? getNodeType(data.nodeType) : undefined;
     const groupDef = isGroup ? getGroupType(data.nodeType) : undefined;
     const headerLabel = nodeDef?.label ?? groupDef?.label ?? data.nodeType;
+    const defaultColor = nodeDef?.color ?? groupDef?.color ?? "#98A2B3";
     const subCount = data.subDiagram?.nodes.length ?? 0;
 
     return (
@@ -104,6 +129,12 @@ export function Inspector({
             onChange={(e) => onUpdateNode(selectedNode.id, { description: e.target.value })}
           />
         </Field>
+
+        <ColorField
+          value={data.color}
+          defaultValue={defaultColor}
+          onChange={(color) => onUpdateNode(selectedNode.id, { color })}
+        />
 
         <PropertyEditor
           properties={data.properties}
@@ -137,6 +168,7 @@ export function Inspector({
 
   const edge = selectedEdge!;
   const data = edge.data as ArchEdgeData;
+  const edgeTypeDef = EDGE_TYPES.find((t) => t.id === data.edgeType);
   return (
     <aside className="inspector">
       <div className="panel-header">Edge</div>
@@ -162,6 +194,12 @@ export function Inspector({
         </select>
       </Field>
 
+      <ColorField
+        value={data.color}
+        defaultValue={edgeTypeDef?.color ?? "#98A2B3"}
+        onChange={(color) => onUpdateEdge(edge.id, { color })}
+      />
+
       <Field label="Direction">
         <select
           value={data.direction ?? "forward"}
@@ -179,7 +217,7 @@ export function Inspector({
       <Field label="Label override">
         <input
           value={data.label ?? ""}
-          placeholder={EDGE_TYPES.find((t) => t.id === data.edgeType)?.label}
+          placeholder={edgeTypeDef?.label}
           onChange={(e) => onUpdateEdge(edge.id, { label: e.target.value })}
         />
       </Field>
@@ -211,6 +249,33 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <span>{label}</span>
       {children}
     </label>
+  );
+}
+
+// Shared by typed/group nodes, edges, and shapes - a color override with a
+// "Reset" link that only appears once an override is actually set, so
+// there's a clear way back to "just use the type's default color" without
+// needing to manually match the exact default hex value.
+function ColorField({
+  value,
+  defaultValue,
+  onChange,
+}: {
+  value: string | undefined;
+  defaultValue: string;
+  onChange: (color: string | undefined) => void;
+}) {
+  return (
+    <Field label="Color">
+      <div className="color-field">
+        <input type="color" value={value ?? defaultValue} onChange={(e) => onChange(e.target.value)} />
+        {value && (
+          <button type="button" className="color-field__reset" onClick={() => onChange(undefined)}>
+            Reset
+          </button>
+        )}
+      </div>
+    </Field>
   );
 }
 

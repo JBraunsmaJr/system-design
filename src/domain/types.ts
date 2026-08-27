@@ -64,6 +64,10 @@ export interface ArchNodeData extends Record<string, unknown> {
   /** Only used by type:"text" nodes (freeform canvas annotations). */
   textColor?: string;
   fontSize?: number;
+  /** Per-instance color override, applying to typed/group/shape nodes alike -
+   * overrides whatever the node/boundary/shape TYPE's own default color would
+   * otherwise be. Undefined means "use the type default". */
+  color?: string;
 }
 
 /**
@@ -80,6 +84,8 @@ export interface ArchEdgeData extends Record<string, unknown> {
   direction?: "forward" | "reverse";
   /** Forces the label pill off even if a custom label or the type's default label would otherwise show. */
   hideLabel?: boolean;
+  /** Per-instance color override - overrides the edge type's own default stroke/label color. Undefined means "use the type default". */
+  color?: string;
   properties: Record<string, string>;
 }
 

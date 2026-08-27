@@ -8,6 +8,7 @@ import {
   VCS_SUBCATEGORY_ORDER,
 } from "../domain/nodeRegistry";
 import { GROUP_TYPES } from "../domain/groupRegistry";
+import { SHAPE_TYPES } from "../domain/shapeRegistry";
 import type { NodeCategory, NodeTypeDefinition } from "../domain/types";
 
 const SYSTEM_CATEGORIES: NodeCategory[] = [
@@ -22,6 +23,7 @@ const SYSTEM_CATEGORIES: NodeCategory[] = [
 export const DRAG_MIME_TYPE = "application/x-archnode";
 export const GROUP_DRAG_MIME_TYPE = "application/x-archgroup";
 export const TEXT_DRAG_MIME_TYPE = "application/x-archtext";
+export const SHAPE_DRAG_MIME_TYPE = "application/x-archshape";
 
 type PaletteMode = "system" | "code" | "git";
 
@@ -101,6 +103,13 @@ export function Palette() {
           color="#8b90a0"
           dragMimeType={GROUP_DRAG_MIME_TYPE}
           items={GROUP_TYPES.map((g) => ({ id: g.id, label: g.label, icon: g.icon, color: g.color }))}
+        />
+
+        <PaletteGroup
+          label="Shapes"
+          color="#8b90a0"
+          dragMimeType={SHAPE_DRAG_MIME_TYPE}
+          items={SHAPE_TYPES.map((s) => ({ id: s.id, label: s.label, icon: s.icon, color: s.color }))}
         />
 
         <PaletteGroup
