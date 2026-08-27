@@ -17,7 +17,7 @@ import { Palette } from "./components/Palette";
 import { Canvas } from "./components/Canvas";
 import { Inspector } from "./components/Inspector";
 import { ScenarioPanel } from "./components/ScenarioPanel";
-import { NODE_TYPES, getNodeType } from "./domain/nodeRegistry";
+import { NODE_TYPES } from "./domain/nodeRegistry";
 import { GROUP_TYPES } from "./domain/groupRegistry";
 import { SHAPE_TYPES } from "./domain/shapeRegistry";
 import { reorderWithGroupsFirst, toAbsolutePosition } from "./domain/graphUtils";
@@ -95,27 +95,25 @@ function App() {
   // key. Toggled from a button in Canvas.tsx's Controls cluster.
   const [isSelectMode, setIsSelectMode] = useState(false);
 
+  // Every new connection starts as a plain solid, unlabeled line -
+  // "blank-solid" - regardless of what kinds of nodes it connects. The type
+  // (HTTP, gRPC, Next, etc.) is something you pick afterward in the
+  // Inspector if you want it, not something guessed at connect-time.
   const onConnect = useCallback<(connection: Connection) => void>(
     (connection) => {
-      const sourceNode = nodes.find((n) => n.id === connection.source);
-      const targetNode = nodes.find((n) => n.id === connection.target);
-      const sourceCategory = getNodeType(sourceNode?.data.nodeType ?? "")?.category;
-      const targetCategory = getNodeType(targetNode?.data.nodeType ?? "")?.category;
-      const defaultEdgeType = sourceCategory === "logic" || targetCategory === "logic" ? "next" : "generic";
-
       setCurrentEdges((eds) =>
         addEdge<Edge<ArchEdgeData>>(
           {
             ...connection,
             id: nextId("edge"),
             type: "typed",
-            data: { edgeType: defaultEdgeType, label: "", direction: "forward", properties: {} },
+            data: { edgeType: "blank-solid", label: "", direction: "forward", properties: {} },
           },
           eds
         )
       );
     },
-    [nodes, setCurrentEdges]
+    [setCurrentEdges]
   );
 
   const onAddNode = useCallback(

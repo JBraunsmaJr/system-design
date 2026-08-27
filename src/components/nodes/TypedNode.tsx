@@ -23,6 +23,11 @@ export function TypedNode({ id, data, selected, onDrillInto }: TypedNodeProps) {
     (iconName && (Icons[iconName as keyof typeof Icons] as Icons.LucideIcon)) || Icons.Box;
   const accent = data.color ?? def?.color ?? "#98A2B3";
   const hasSubDiagram = (data.subDiagram?.nodes.length ?? 0) > 0;
+  // The "Custom" type's category label and its own type label are both
+  // literally "Custom", so the usual "Category · Type" subtitle would read
+  // as "Custom · Custom" - show the description there instead, since that's
+  // the more useful thing a fully generic node actually has to say about
+  // itself.
   const isCustom = data.nodeType === "custom";
 
   const properties = Object.entries(data.properties).filter(([key]) => key.trim() !== "");
@@ -34,8 +39,26 @@ export function TypedNode({ id, data, selected, onDrillInto }: TypedNodeProps) {
       className={`typed-node${selected ? " is-selected" : ""}`}
       style={{ borderLeftColor: accent }}
     >
+      {/* One source + one target handle stacked at each side, rather than
+          fixing "top/left = target only, right/bottom = source only" -
+          that fixed layout meant which side you happened to grab dictated
+          the edge's source/target, not which node you actually dragged
+          from. Canvas.tsx's handleConnect corrects the rare cases where
+          React Flow's own type-based resolution still doesn't match actual
+          drag direction, but having both types available everywhere is
+          what makes dragging from any side work naturally in the first
+          place. The original 4 ids (target-top/target-left/source-right/
+          source-bottom) are kept as-is rather than renamed, since existing
+          saved diagrams have edges referencing those exact handle ids -
+          only the 4 complementary ones are new. */}
       <Handle id="target-top" type="target" position={Position.Top} />
+      <Handle id="source-top" type="source" position={Position.Top} />
       <Handle id="target-left" type="target" position={Position.Left} />
+      <Handle id="source-left" type="source" position={Position.Left} />
+      <Handle id="target-right" type="target" position={Position.Right} />
+      <Handle id="source-right" type="source" position={Position.Right} />
+      <Handle id="target-bottom" type="target" position={Position.Bottom} />
+      <Handle id="source-bottom" type="source" position={Position.Bottom} />
 
       <div className="typed-node__body">
         <div className="typed-node__icon" style={{ background: `${accent}1a`, color: accent }}>
@@ -90,8 +113,6 @@ export function TypedNode({ id, data, selected, onDrillInto }: TypedNodeProps) {
         </button>
       )}
 
-      <Handle id="source-right" type="source" position={Position.Right} />
-      <Handle id="source-bottom" type="source" position={Position.Bottom} />
     </div>
   );
 }

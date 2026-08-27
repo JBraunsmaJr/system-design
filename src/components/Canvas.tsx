@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useState, type DragEvent, type MouseEvent as ReactMouseEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import {
   ReactFlow,
   Background,
@@ -11,9 +19,11 @@ import {
   useReactFlow,
   type Node,
   type Edge,
+  type Connection,
   type OnNodesChange,
   type OnEdgesChange,
   type OnConnect,
+  type OnConnectStart,
   type OnSelectionChangeFunc,
   type OnNodeDrag,
   type NodeMouseHandler,
@@ -164,6 +174,39 @@ export function Canvas({
   );
 
   const pathKey = breadcrumbLabels.join(">");
+
+  // Each node has both a source-type and a target-type handle stacked at
+  // every position (see TypedNode.tsx), so a connection can be dragged
+  // starting from either end. React Flow decides a resulting connection's
+  // source/target based on which HANDLE TYPE is on each side, not which one
+  // the drag actually started from - with overlapping handles at every
+  // position that can silently produce an edge running opposite to the
+  // direction you actually dragged. This tracks the node the drag genuinely
+  // started from and, if React Flow's own result doesn't match it, swaps
+  // source/target (and their handles) back before the edge is created.
+  const connectStartNodeId = useRef<string | null>(null);
+
+  const onConnectStart = useCallback<OnConnectStart>((_event, { nodeId }) => {
+    connectStartNodeId.current = nodeId;
+  }, []);
+
+  const handleConnect = useCallback<OnConnect>(
+    (connection: Connection) => {
+      const startId = connectStartNodeId.current;
+      connectStartNodeId.current = null;
+      if (startId && startId === connection.target && startId !== connection.source) {
+        onConnect({
+          source: connection.target,
+          sourceHandle: connection.targetHandle,
+          target: connection.source,
+          targetHandle: connection.sourceHandle,
+        });
+        return;
+      }
+      onConnect(connection);
+    },
+    [onConnect]
+  );
 
   const onDragOver = useCallback((event: DragEvent) => {
     event.preventDefault();
@@ -317,7 +360,8 @@ export function Canvas({
         edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
+        onConnect={handleConnect}
+        onConnectStart={onConnectStart}
         onSelectionChange={onSelectionChange}
         onNodeDragStop={onNodeDragStop}
         onNodeDoubleClick={onNodeDoubleClick}
