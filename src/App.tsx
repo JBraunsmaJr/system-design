@@ -21,6 +21,7 @@ import { NODE_TYPES, getNodeType } from "./domain/nodeRegistry";
 import { GROUP_TYPES } from "./domain/groupRegistry";
 import { SHAPE_TYPES } from "./domain/shapeRegistry";
 import { reorderWithGroupsFirst, toAbsolutePosition } from "./domain/graphUtils";
+import { cloneNodesAndEdges } from "./domain/cloneNodes";
 import {
   getSubDiagramAtPath,
   updateSubDiagramAtPath,
@@ -88,6 +89,11 @@ function App() {
   // Which step (if any) is being previewed from ScenarioPanel without
   // actually entering full Presentation Mode - see onTogglePreviewStep.
   const [previewStepId, setPreviewStepId] = useState<string | null>(null);
+  // false (default) = dragging empty canvas pans the view, matching prior
+  // behavior. true = dragging draws a marquee selection box instead, for
+  // easily grabbing several nodes/edges at once without holding a modifier
+  // key. Toggled from a button in Canvas.tsx's Controls cluster.
+  const [isSelectMode, setIsSelectMode] = useState(false);
 
   const onConnect = useCallback<(connection: Connection) => void>(
     (connection) => {
@@ -307,6 +313,74 @@ function App() {
     selectedNodeIds.forEach(onDeleteNode);
   }, [selectedNodeIds, selectedEdgeIds, onDeleteNode, onDeleteEdge]);
 
+  // --- Copy / paste --------------------------------------------------------
+
+  // Clipboard lives in app state (not the OS clipboard) - simpler, and
+  // avoids the Clipboard API's permission prompts for something that only
+  // needs to work within this tab. Deliberately NOT cleared on navigation:
+  // copying something at one diagram level and pasting it after drilling
+  // into another is a reasonable, useful thing to do, given everything here
+  // is one tree.
+  const [clipboard, setClipboard] = useState<{
+    nodes: Node<ArchNodeData>[];
+    edges: Edge<ArchEdgeData>[];
+  } | null>(null);
+  // Each consecutive paste (without re-copying) offsets a bit further, so
+  // repeated pastes cascade diagonally instead of stacking exactly on top
+  // of each other.
+  const [pasteOffset, setPasteOffset] = useState(0);
+
+  const onCopy = useCallback(() => {
+    if (selectedNodeIds.length === 0) return;
+    const selectedSet = new Set(selectedNodeIds);
+    // Copying a boundary brings its contents along, even if they weren't
+    // individually selected - an empty duplicated boundary would feel broken.
+    const groupIds = new Set(nodes.filter((n) => selectedSet.has(n.id) && n.type === "group").map((n) => n.id));
+    const childNodes = nodes.filter((n) => n.parentId && groupIds.has(n.parentId) && !selectedSet.has(n.id));
+    const toCopy = [...nodes.filter((n) => selectedSet.has(n.id)), ...childNodes];
+    const copiedIds = new Set(toCopy.map((n) => n.id));
+
+    // A node whose parent ISN'T also being copied (e.g. copying one child
+    // without its boundary) becomes a root item in the clipboard - convert
+    // its position to absolute first, since relative-to-parent coordinates
+    // are meaningless without that parent coming along.
+    const normalized = toCopy.map((n) => {
+      if (n.parentId && !copiedIds.has(n.parentId)) {
+        const absolute = toAbsolutePosition(n, nodes, n.parentId);
+        return { ...n, parentId: undefined, position: absolute };
+      }
+      return n;
+    });
+
+    const edgesToCopy = edges.filter((e) => copiedIds.has(e.source) && copiedIds.has(e.target));
+    setClipboard({ nodes: normalized, edges: edgesToCopy });
+    setPasteOffset(0);
+  }, [nodes, edges, selectedNodeIds]);
+
+  const onPaste = useCallback(() => {
+    if (!clipboard || clipboard.nodes.length === 0) return;
+    const offset = 40 + pasteOffset;
+    const { nodes: clonedNodes, edges: clonedEdges } = cloneNodesAndEdges(clipboard.nodes, clipboard.edges, {
+      nextNodeId: (prefix) => nextId(prefix),
+      nextEdgeId: () => nextId("edge"),
+    });
+    // Only root items (no parentId within the pasted set) need the position
+    // offset - children are positioned relative to their (also being
+    // pasted, also shifted) parent, so they move along automatically. Every
+    // pasted node still gets marked selected, root or child, so the visual
+    // highlight matches what selectedNodeIds claims below.
+    const offsetNodes = clonedNodes.map((n) =>
+      n.parentId
+        ? { ...n, selected: true }
+        : { ...n, position: { x: n.position.x + offset, y: n.position.y + offset }, selected: true }
+    );
+    setCurrentNodes((nds) => reorderWithGroupsFirst([...nds, ...offsetNodes]));
+    setCurrentEdges((eds) => [...eds, ...clonedEdges.map((e) => ({ ...e, selected: true }))]);
+    setSelectedNodeIds(offsetNodes.map((n) => n.id));
+    setSelectedEdgeIds(clonedEdges.map((e) => e.id));
+    setPasteOffset((p) => p + 40);
+  }, [clipboard, pasteOffset, setCurrentNodes, setCurrentEdges]);
+
   // --- Sub-diagram navigation ---------------------------------------------
 
   const onDrillInto = useCallback(
@@ -499,6 +573,28 @@ function App() {
     return () => window.removeEventListener("keydown", handler);
   }, [isPresenting, selectedNodeIds, selectedEdgeIds, onDeleteSelection]);
 
+  // Copy/paste: Ctrl+C / Cmd+C and Ctrl+V / Cmd+V, same guards as delete -
+  // never while presenting, never while typing in a field (so normal text
+  // copy/paste inside the Inspector's inputs is completely unaffected).
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if (isPresenting) return;
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) return;
+      const key = event.key.toLowerCase();
+      if ((event.ctrlKey || event.metaKey) && key === "c") {
+        event.preventDefault();
+        onCopy();
+      } else if ((event.ctrlKey || event.metaKey) && key === "v") {
+        event.preventDefault();
+        onPaste();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [isPresenting, onCopy, onPaste]);
+
   // Presentation navigation: arrow keys / space / escape.
   useEffect(() => {
     if (!isPresenting) return;
@@ -635,6 +731,8 @@ function App() {
               onDrillInto={onDrillInto}
               onNavigateToRoot={onNavigateToRoot}
               onNavigateToPathIndex={onNavigateToPathIndex}
+              isSelectMode={isSelectMode}
+              onToggleSelectMode={() => setIsSelectMode((v) => !v)}
             />
           </ReactFlowProvider>
           {!isPresenting && isScenarioPanelOpen && (

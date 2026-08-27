@@ -4,8 +4,10 @@ import {
   Background,
   BackgroundVariant,
   Controls,
+  ControlButton,
   MiniMap,
   MarkerType,
+  SelectionMode,
   useReactFlow,
   type Node,
   type Edge,
@@ -17,6 +19,7 @@ import {
   type NodeMouseHandler,
   type NodeTypes,
 } from "@xyflow/react";
+import { MousePointer2 } from "lucide-react";
 import { TypedNode } from "./nodes/TypedNode";
 import { TypedEdge } from "./edges/TypedEdge";
 import { GroupNode } from "./nodes/GroupNode";
@@ -74,6 +77,8 @@ interface CanvasProps {
   onDrillInto: (nodeId: string) => void;
   onNavigateToRoot: () => void;
   onNavigateToPathIndex: (index: number) => void;
+  isSelectMode: boolean;
+  onToggleSelectMode: () => void;
 }
 
 export function Canvas({
@@ -99,6 +104,8 @@ export function Canvas({
   onDrillInto,
   onNavigateToRoot,
   onNavigateToPathIndex,
+  isSelectMode,
+  onToggleSelectMode,
 }: CanvasProps) {
   const { screenToFlowPosition, getIntersectingNodes, fitView } = useReactFlow<Node<ArchNodeData>>();
 
@@ -297,7 +304,12 @@ export function Canvas({
   const levelLabel = breadcrumbLabels.length === 0 ? "Root" : breadcrumbLabels.join(" › ");
 
   return (
-    <div className="canvas" onDragOver={onDragOver} onDrop={onDrop} onDoubleClick={onCanvasDoubleClick}>
+    <div
+      className={`canvas${isSelectMode ? " is-select-mode" : ""}`}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      onDoubleClick={onCanvasDoubleClick}
+    >
       <ReactFlow
         nodes={displayNodes}
         edges={displayEdges}
@@ -318,6 +330,9 @@ export function Canvas({
         nodesDraggable={!isPresenting}
         nodesConnectable={!isPresenting}
         elementsSelectable={!isPresenting}
+        panOnDrag={!isSelectMode}
+        selectionOnDrag={isSelectMode}
+        selectionMode={SelectionMode.Partial}
         fitView
         proOptions={{ hideAttribution: true }}
       >
@@ -331,7 +346,21 @@ export function Canvas({
             maskColor="rgba(15, 17, 23, 0.65)"
           />
         )}
-        {!isPresenting && <Controls />}
+        {!isPresenting && (
+          <Controls>
+            <ControlButton
+              onClick={onToggleSelectMode}
+              className={isSelectMode ? "is-active" : undefined}
+              title={
+                isSelectMode
+                  ? "Select mode - drag to marquee-select. Click to switch back to pan."
+                  : "Pan mode - drag to move the canvas. Click to switch to select mode."
+              }
+            >
+              <MousePointer2 size={13} />
+            </ControlButton>
+          </Controls>
+        )}
         {!isPresenting && (
           <Breadcrumb
             labels={breadcrumbLabels}

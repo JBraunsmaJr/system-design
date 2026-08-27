@@ -219,6 +219,7 @@
   border: none;
   border-bottom: 1px solid var(--chrome-border);
   fill: var(--chrome-text);
+  color: var(--chrome-text);
 }
 
 .react-flow__controls-button:hover {
@@ -227,6 +228,15 @@
 
 .react-flow__controls-button svg {
   fill: var(--chrome-text);
+}
+
+.react-flow__controls-button.is-active {
+  background: var(--accent);
+  color: white;
+}
+
+.react-flow__controls-button.is-active:hover {
+  filter: brightness(1.08);
 }
 
 /* ---------- Inspector ---------- */
@@ -1369,4 +1379,10 @@
 
 .color-field__reset:hover {
   color: var(--chrome-text);
+}
+
+/* ---------- Select mode cursor ---------- */
+
+.canvas.is-select-mode .react-flow__pane {
+  cursor: crosshair;
 }
