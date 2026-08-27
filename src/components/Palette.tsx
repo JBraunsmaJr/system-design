@@ -99,6 +99,13 @@ export function Palette() {
           ))}
 
         <PaletteGroup
+          label="Custom"
+          color={CATEGORY_COLORS.custom}
+          dragMimeType={DRAG_MIME_TYPE}
+          items={NODE_TYPES.filter((n) => n.category === "custom")}
+        />
+
+        <PaletteGroup
           label="Boundaries"
           color="#8b90a0"
           dragMimeType={GROUP_DRAG_MIME_TYPE}

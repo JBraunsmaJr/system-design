@@ -9,6 +9,7 @@ export const CATEGORY_LABELS: Record<NodeCategory, string> = {
   observability: "Observability",
   logic: "Logic / Flow",
   vcs: "Version Control",
+  custom: "Custom",
 };
 
 export const CATEGORY_COLORS: Record<NodeCategory, string> = {
@@ -20,6 +21,7 @@ export const CATEGORY_COLORS: Record<NodeCategory, string> = {
   observability: "#7C8598",
   logic: "#22B8CF",
   vcs: "#C2255C",
+  custom: "#98A2B3",
 };
 
 /** Display order for the "logic" category's subcategory groupings in the Code palette tab. */
@@ -242,6 +244,13 @@ export const NODE_TYPES: NodeTypeDefinition[] = [
   { id: "feature-flag", category: "vcs", subcategory: "CI/CD Pipeline", label: "Feature Flag", icon: "ToggleLeft", color: CATEGORY_COLORS.vcs, defaultProperties: { flag: "flag-name" } },
   { id: "canary-release", category: "vcs", subcategory: "CI/CD Pipeline", label: "Canary Release", icon: "Bird", color: CATEGORY_COLORS.vcs, defaultProperties: { traffic: "5%" } },
   { id: "rollback", category: "vcs", subcategory: "CI/CD Pipeline", label: "Rollback", icon: "Undo2", color: CATEGORY_COLORS.vcs },
+
+  // Fully generic node - fills in for anything the built-in taxonomy
+  // doesn't cover. Its icon/color/label/description are entirely up to
+  // whoever creates it (see the Icon and Color fields in Inspector.tsx);
+  // this entry just supplies the starting defaults. Shown in its own
+  // always-visible palette section, not gated behind System/Code/Git.
+  { id: "custom", category: "custom", label: "Custom", icon: "Box", color: CATEGORY_COLORS.custom },
 ];
 
 export function getNodeType(id: string): NodeTypeDefinition | undefined {

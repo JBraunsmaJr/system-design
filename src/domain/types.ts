@@ -13,7 +13,8 @@ export type NodeCategory =
   | "external"
   | "observability"
   | "logic"
-  | "vcs";
+  | "vcs"
+  | "custom";
 
 /** A node type as it appears in the palette (e.g. "microservice", "database"). */
 export interface NodeTypeDefinition {
@@ -68,6 +69,11 @@ export interface ArchNodeData extends Record<string, unknown> {
    * overrides whatever the node/boundary/shape TYPE's own default color would
    * otherwise be. Undefined means "use the type default". */
   color?: string;
+  /** Per-instance icon override (lucide-react icon name) - overrides the
+   * node type's own default icon. This is what makes the "Custom" node
+   * type work (it has no fixed icon of its own to fall back to, so this is
+   * always set for those), but any typed node can use it. */
+  icon?: string;
 }
 
 /**

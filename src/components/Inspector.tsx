@@ -4,6 +4,7 @@ import { getNodeType } from "../domain/nodeRegistry";
 import { getGroupType } from "../domain/groupRegistry";
 import { getShapeType } from "../domain/shapeRegistry";
 import { EDGE_TYPES, STYLE_GROUP_LABELS } from "../domain/edgeRegistry";
+import { IconPicker } from "./IconPicker";
 import type { ArchNodeData, ArchEdgeData } from "../domain/types";
 
 const EDGE_STYLE_GROUP_ORDER = ["sync", "async", "control", "vcs", "blank", "data", "file", "generic"] as const;
@@ -155,6 +156,14 @@ export function Inspector({
             onChange={(e) => onUpdateNode(selectedNode.id, { description: e.target.value })}
           />
         </Field>
+
+        {!isGroup && (
+          <IconPicker
+            value={data.icon}
+            defaultValue={nodeDef?.icon ?? "Box"}
+            onChange={(icon) => onUpdateNode(selectedNode.id, { icon })}
+          />
+        )}
 
         <ColorField
           value={data.color}

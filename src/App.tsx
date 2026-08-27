@@ -366,18 +366,22 @@ function App() {
     });
     // Only root items (no parentId within the pasted set) need the position
     // offset - children are positioned relative to their (also being
-    // pasted, also shifted) parent, so they move along automatically. Every
-    // pasted node still gets marked selected, root or child, so the visual
-    // highlight matches what selectedNodeIds claims below.
+    // pasted, also shifted) parent, so they move along automatically.
+    // Pasted nodes are NOT marked selected - nothing should be selected
+    // after a paste. That also means clearing `selected` on whatever was
+    // still selected from the copy itself, which the previous version
+    // missed: copying doesn't clear selection, so the ORIGINAL nodes kept
+    // their own `.selected: true` the entire time, which is what made both
+    // the originals and the paste appear selected together.
     const offsetNodes = clonedNodes.map((n) =>
-      n.parentId
-        ? { ...n, selected: true }
-        : { ...n, position: { x: n.position.x + offset, y: n.position.y + offset }, selected: true }
+      n.parentId ? n : { ...n, position: { x: n.position.x + offset, y: n.position.y + offset } }
     );
-    setCurrentNodes((nds) => reorderWithGroupsFirst([...nds, ...offsetNodes]));
-    setCurrentEdges((eds) => [...eds, ...clonedEdges.map((e) => ({ ...e, selected: true }))]);
-    setSelectedNodeIds(offsetNodes.map((n) => n.id));
-    setSelectedEdgeIds(clonedEdges.map((e) => e.id));
+    setCurrentNodes((nds) =>
+      reorderWithGroupsFirst([...nds.map((n) => (n.selected ? { ...n, selected: false } : n)), ...offsetNodes])
+    );
+    setCurrentEdges((eds) => [...eds.map((e) => (e.selected ? { ...e, selected: false } : e)), ...clonedEdges]);
+    setSelectedNodeIds([]);
+    setSelectedEdgeIds([]);
     setPasteOffset((p) => p + 40);
   }, [clipboard, pasteOffset, setCurrentNodes, setCurrentEdges]);
 
