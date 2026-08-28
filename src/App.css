@@ -514,7 +514,50 @@
   border-radius: var(--radius-md);
   /* border-color/style/width and background are set per-instance inline
      (see GroupNode.tsx) based on the boundary's kind (Region, VPC, Trust
-     Boundary, etc.) so different kinds are visually distinguishable. */
+     Boundary, etc.) so different kinds are visually distinguishable.
+     Interior is click-through - only the edge-hit strips and the label
+     below re-enable pointer-events, so clicks meant for a child node or an
+     edge passing through this area aren't intercepted by the boundary. */
+  pointer-events: none;
+}
+
+/* Thin invisible strips along each side, thicker than the visible border
+   for an easier click target - these are the ONLY parts of the boundary's
+   interior area that are actually clickable, so selecting/dragging the
+   boundary requires grabbing an edge (or the label below), not the middle. */
+.group-node__edge-hit {
+  position: absolute;
+  pointer-events: auto;
+}
+
+.group-node__edge-hit--top,
+.group-node__edge-hit--bottom {
+  left: 0;
+  right: 0;
+  height: 10px;
+}
+
+.group-node__edge-hit--top {
+  top: -5px;
+}
+
+.group-node__edge-hit--bottom {
+  bottom: -5px;
+}
+
+.group-node__edge-hit--left,
+.group-node__edge-hit--right {
+  top: 0;
+  bottom: 0;
+  width: 10px;
+}
+
+.group-node__edge-hit--left {
+  left: -5px;
+}
+
+.group-node__edge-hit--right {
+  right: -5px;
 }
 
 .group-node__label {
@@ -532,6 +575,7 @@
   font-size: 10.5px;
   font-weight: 500;
   white-space: nowrap;
+  pointer-events: auto;
 }
 
 .node-resize-line {
