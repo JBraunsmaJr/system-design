@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { NodeResizer, type NodeProps, type Node } from "@xyflow/react";
 import { getShapeType } from "../../domain/shapeRegistry";
+import { BidirectionalHandles } from "./BidirectionalHandles";
 import type { ArchNodeData } from "../../domain/types";
 
 type ShapeNodeType = Node<ArchNodeData, "shape">;
@@ -16,10 +17,13 @@ interface ShapeNodeProps extends NodeProps<ShapeNodeType> {
 }
 
 /**
- * A plain drawn shape (Circle/Square/Rectangle) - purely visual, like Text
- * annotations, but can optionally hold a short centered label (double-click
- * to edit). No properties/tags/sub-diagram. Circle and Square keep a 1:1
- * aspect ratio while resizing; Rectangle resizes freely.
+ * A drawn shape (Circle/Square/Rectangle) - like Text annotations, it can
+ * optionally hold a short centered label (double-click to edit), but no
+ * properties/tags/sub-diagram. Circle and Square keep a 1:1 aspect ratio
+ * while resizing; Rectangle resizes freely. Connectable the same way a
+ * regular component node is (see BidirectionalHandles) - the resize
+ * handles only appear when selected, so they don't fight the always-present
+ * connection points for the same screen space in the common case.
  */
 export function ShapeNode({
   id,
@@ -50,6 +54,7 @@ export function ShapeNode({
         lineClassName="node-resize-line"
         handleClassName="node-resize-handle"
       />
+      <BidirectionalHandles />
       <div
         className={`shape-node${isCircle ? " is-circle" : ""}${selected ? " is-selected" : ""}`}
         style={{

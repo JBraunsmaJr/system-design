@@ -92,6 +92,19 @@ export interface ArchEdgeData extends Record<string, unknown> {
   hideLabel?: boolean;
   /** Per-instance color override - overrides the edge type's own default stroke/label color. Undefined means "use the type default". */
   color?: string;
+  /**
+   * Where the label sits, expressed relative to the edge's OWN path
+   * geometry rather than a raw pixel position - this is what keeps it
+   * correctly attached to the line as nodes move and the path reshapes.
+   * `labelAnchorT` is a fraction (0-1) along the path's length (0.5 =
+   * default/middle); `labelOffsetX/Y` is a small pixel nudge FROM that
+   * anchor point, for pulling the label slightly off the line for
+   * readability. All three undefined means "centered on the path,
+   * no offset" - the original (only) behavior before this existed.
+   */
+  labelAnchorT?: number;
+  labelOffsetX?: number;
+  labelOffsetY?: number;
   properties: Record<string, string>;
 }
 

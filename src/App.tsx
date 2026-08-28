@@ -722,6 +722,7 @@ function App() {
               onAddText={onAddText}
               onAddShape={onAddShape}
               onUpdateNode={onUpdateNode}
+              onUpdateEdge={onUpdateEdge}
               onReparentNode={onReparentNode}
               onAdoptIntoGroup={onAdoptIntoGroup}
               presentation={presentation}

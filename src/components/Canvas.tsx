@@ -28,6 +28,7 @@ import {
   type OnNodeDrag,
   type NodeMouseHandler,
   type NodeTypes,
+  type EdgeTypes,
 } from "@xyflow/react";
 import { MousePointer2 } from "lucide-react";
 import { TypedNode } from "./nodes/TypedNode";
@@ -43,7 +44,8 @@ import { SHAPE_TYPES } from "../domain/shapeRegistry";
 import { DRAG_MIME_TYPE, GROUP_DRAG_MIME_TYPE, TEXT_DRAG_MIME_TYPE, SHAPE_DRAG_MIME_TYPE } from "./Palette";
 import type { ArchNodeData, ArchEdgeData, Scenario, ScenarioStep } from "../domain/types";
 
-const edgeTypes = { typed: TypedEdge };
+// edgeTypes now built inside the component via useMemo, so TypedEdge can
+// receive onUpdateEdge - see the factory near nodeTypes below.
 
 const DIMMED_NODE_OPACITY = 0.15;
 const DIMMED_EDGE_OPACITY = 0.12;
@@ -76,6 +78,7 @@ interface CanvasProps {
   onAddText: (position: { x: number; y: number }) => string;
   onAddShape: (typeId: string, position: { x: number; y: number }) => void;
   onUpdateNode: (id: string, patch: Partial<ArchNodeData>) => void;
+  onUpdateEdge: (id: string, patch: Partial<ArchEdgeData>) => void;
   onReparentNode: (nodeId: string, newParentId: string | null) => void;
   onAdoptIntoGroup: (groupId: string, nodeIds: string[]) => void;
   presentation: PresentationState | null;
@@ -103,6 +106,7 @@ export function Canvas({
   onAddText,
   onAddShape,
   onUpdateNode,
+  onUpdateEdge,
   onReparentNode,
   onAdoptIntoGroup,
   presentation,
@@ -171,6 +175,16 @@ export function Canvas({
       ),
     }),
     [isPresenting, onDrillInto, editingLabelNodeId, onChangeTextNode]
+  );
+
+  // TypedEdge needs onUpdateEdge to support dragging its label - disabled
+  // (label becomes non-draggable, falls back to the fixed anchor) while
+  // presenting, same as everything else that mutates the diagram.
+  const edgeTypes = useMemo<EdgeTypes>(
+    () => ({
+      typed: (props) => <TypedEdge {...props} onUpdateEdge={isPresenting ? undefined : onUpdateEdge} />,
+    }),
+    [isPresenting, onUpdateEdge]
   );
 
   const pathKey = breadcrumbLabels.join(">");

@@ -266,6 +266,30 @@ export function Inspector({
         <span>Hide label on canvas</span>
       </label>
 
+      {(data.labelOffsetX || data.labelOffsetY) && (
+        <button
+          type="button"
+          className="color-field__reset"
+          style={{ marginBottom: 16 }}
+          onClick={() => onUpdateEdge(edge.id, { labelOffsetX: undefined, labelOffsetY: undefined })}
+        >
+          Reset label position
+        </button>
+      )}
+
+      {(data.labelAnchorT !== undefined || data.labelOffsetX || data.labelOffsetY) && (
+        <button
+          type="button"
+          className="color-field__reset"
+          style={{ marginBottom: 16 }}
+          onClick={() =>
+            onUpdateEdge(edge.id, { labelAnchorT: undefined, labelOffsetX: undefined, labelOffsetY: undefined })
+          }
+        >
+          Reset label position
+        </button>
+      )}
+
       <PropertyEditor
         properties={data.properties}
         onChange={(properties) => onUpdateEdge(edge.id, { properties })}

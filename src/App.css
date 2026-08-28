@@ -557,10 +557,29 @@
   font-weight: 500;
   white-space: nowrap;
   pointer-events: all;
+  cursor: grab;
+  touch-action: none;
+}
+
+.typed-edge__label:active {
+  cursor: grabbing;
 }
 
 .typed-edge__label.is-selected {
   box-shadow: 0 0 0 2px rgba(91, 124, 250, 0.3);
+}
+
+/* The small marker showing where the label is anchored ON the line -
+   matches draw.io's convention of a yellow anchor point, only visible
+   while the edge is selected (i.e. "while editing the line"). */
+.typed-edge__anchor-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #fbbf24;
+  border: 1.5px solid #78350f;
+  pointer-events: none;
+  z-index: 4;
 }
 
 /* ---------- Scenario panel ---------- */
