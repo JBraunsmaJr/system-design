@@ -629,7 +629,7 @@
 /* ---------- Scenario panel ---------- */
 
 .scenario-panel {
-  height: 236px;
+  height: 380px;
   flex-shrink: 0;
   background: var(--chrome-bg-raised);
   border-top: 1px solid var(--chrome-border);
@@ -738,33 +738,48 @@
   outline: none;
 }
 
-.scenario-panel__steps {
+.scenario-panel__body {
   flex: 1;
   display: flex;
-  gap: 10px;
-  overflow-x: auto;
-  padding-bottom: 4px;
+  gap: 14px;
+  overflow: hidden;
 }
 
-.step-card {
+/* ---------- Compact vertical step list ---------- */
+
+.scenario-step-list {
+  width: 220px;
   flex-shrink: 0;
-  width: 210px;
-  background: var(--node-bg);
-  border: 1px solid var(--node-border);
-  border-radius: var(--radius-md);
-  padding: 8px 10px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
-.step-card__header {
+.scenario-step-row {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  background: var(--node-bg);
+  border: 1px solid var(--node-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  cursor: pointer;
+  flex-shrink: 0;
 }
 
-.step-card__number {
+.scenario-step-row:hover {
+  border-color: var(--chrome-text-dim);
+}
+
+.scenario-step-row.is-active {
+  border-color: var(--accent);
+  background: rgba(91, 124, 250, 0.12);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.scenario-step-row__number {
   width: 18px;
   height: 18px;
   border-radius: 50%;
@@ -778,102 +793,187 @@
   flex-shrink: 0;
 }
 
-.step-card__move {
-  display: flex;
-  gap: 2px;
-  margin-left: auto;
+.scenario-step-row__title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--chrome-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
 }
 
-.step-card__move button {
+.scenario-step-row__count {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  color: var(--chrome-text-dim);
+  flex-shrink: 0;
+}
+
+.scenario-step-row__move {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.scenario-step-row__move button {
   background: transparent;
   border: 1px solid var(--chrome-border);
   border-radius: 4px;
   color: var(--chrome-text-dim);
-  width: 20px;
-  height: 20px;
-  font-size: 11px;
+  width: 18px;
+  height: 18px;
+  font-size: 10px;
   line-height: 1;
 }
 
-.step-card__move button:hover:not(:disabled) {
+.scenario-step-row__move button:hover:not(:disabled) {
   color: var(--chrome-text);
   border-color: var(--accent);
 }
 
-.step-card__move button:disabled {
+.scenario-step-row__move button:disabled {
   opacity: 0.3;
 }
 
-.step-card__delete {
+.scenario-step-row__delete {
   background: transparent;
   border: none;
   color: var(--chrome-text-dim);
   font-size: 15px;
   line-height: 1;
   padding: 0 2px;
+  flex-shrink: 0;
 }
 
-.step-card__delete:hover {
+.scenario-step-row__delete:hover {
   color: var(--danger);
 }
 
-.step-card__title {
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  padding: 3px 4px;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--chrome-text);
-}
-
-.step-card__title:hover,
-.step-card__title:focus {
-  border-color: var(--chrome-border);
-  background: var(--chrome-bg);
-  outline: none;
-}
-
-.step-card__narration {
-  background: var(--chrome-bg);
-  border: 1px solid var(--chrome-border);
-  border-radius: 4px;
-  padding: 5px 6px;
-  font-size: 11.5px;
-  color: var(--chrome-text);
-  resize: none;
-  flex: 1;
-}
-
-.step-card__count {
-  font-family: var(--mono);
-  font-size: 9.5px;
-  color: var(--chrome-text-dim);
-}
-
-.step-card--add {
-  align-items: center;
-  justify-content: center;
+.scenario-step-list__add {
+  flex-shrink: 0;
   border: 1px dashed var(--chrome-border);
   background: transparent;
   color: var(--chrome-text-dim);
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 500;
+  padding: 8px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
 }
 
-.step-card--add span {
-  font-size: 10.5px;
-  font-weight: 400;
-  margin-top: 2px;
-}
-
-.step-card--add:hover:not(:disabled) {
+.scenario-step-list__add:hover:not(:disabled) {
   border-color: var(--accent);
   color: var(--chrome-text);
 }
 
-.step-card--add:disabled {
+.scenario-step-list__add:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ---------- Step editor - the active step's full detail view ---------- */
+
+.scenario-step-editor {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+.scenario-step-editor__empty {
+  font-size: 12.5px;
+  color: var(--chrome-text-dim);
+  line-height: 1.6;
+  max-width: 420px;
+}
+
+.scenario-step-editor__heading {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--chrome-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.scenario-step-editor__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.scenario-step-editor__field > span {
+  font-size: 11px;
+  color: var(--chrome-text-dim);
+  font-weight: 500;
+}
+
+.scenario-step-editor__field input,
+.scenario-step-editor__field textarea {
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  padding: 7px 9px;
+  font-size: 13px;
+  color: var(--chrome-text);
+  font-family: var(--sans);
+}
+
+.scenario-step-editor__field input:focus,
+.scenario-step-editor__field textarea:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.scenario-step-editor__field--grow {
+  flex: 1;
+  min-height: 0;
+}
+
+.scenario-step-editor__field--grow textarea {
+  flex: 1;
+  resize: none;
+  line-height: 1.5;
+}
+
+.scenario-step-editor__selection {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-top: 8px;
+  border-top: 1px solid var(--chrome-border);
+  font-size: 11.5px;
+  color: var(--chrome-text-dim);
+}
+
+.scenario-step-editor__selection-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.scenario-step-editor__selection-actions button {
+  background: transparent;
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  padding: 5px 10px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--chrome-text);
+  white-space: nowrap;
+}
+
+.scenario-step-editor__selection-actions button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.scenario-step-editor__selection-actions button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
@@ -923,43 +1023,64 @@
 
 .presentation-bottombar {
   display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 10px 16px;
-  max-width: 560px;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 22px;
+  max-width: 640px;
+  min-width: 400px;
 }
 
-.presentation-bottombar button {
+.presentation-bottombar__content {
+  text-align: center;
+}
+
+.presentation-bottombar__title {
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.presentation-bottombar__narration {
+  font-size: 13.5px;
+  color: var(--chrome-text);
+  margin-top: 8px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.presentation-bottombar__narration--empty {
+  color: var(--chrome-text-dim);
+  font-style: italic;
+}
+
+.presentation-bottombar__nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.presentation-bottombar__nav button {
   background: var(--accent);
   border: none;
   color: white;
   border-radius: var(--radius-sm);
-  padding: 8px 14px;
+  padding: 8px 16px;
   font-size: 12.5px;
   font-weight: 600;
   flex-shrink: 0;
 }
 
-.presentation-bottombar button:disabled {
+.presentation-bottombar__nav button:disabled {
   opacity: 0.35;
   cursor: not-allowed;
 }
 
-.presentation-bottombar__text {
-  text-align: center;
-}
-
-.presentation-bottombar__title {
-  font-weight: 600;
-  font-size: 13px;
-}
-
-.presentation-bottombar__narration {
-  font-size: 11.5px;
+.presentation-bottombar__counter {
+  font-family: var(--mono);
+  font-size: 11px;
   color: var(--chrome-text-dim);
-  margin-top: 3px;
-  line-height: 1.5;
-  max-width: 420px;
+  min-width: 40px;
+  text-align: center;
 }
 
 /* ---------- Edge flow animation (Presentation Mode) ---------- */
@@ -1230,37 +1351,6 @@
   cursor: pointer;
 }
 
-/* ---------- Scenario panel: step preview toggle ---------- */
-
-.step-card.is-previewing {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(91, 124, 250, 0.25);
-}
-
-.step-card__preview {
-  background: transparent;
-  border: 1px solid var(--chrome-border);
-  border-radius: 4px;
-  width: 22px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--chrome-text-dim);
-  margin-left: 4px;
-}
-
-.step-card__preview:hover {
-  color: var(--chrome-text);
-  border-color: var(--accent);
-}
-
-.step-card__preview.is-active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: white;
-}
-
 /* ---------- Inspector: checkbox field ---------- */
 
 .inspector__checkbox {
@@ -1367,23 +1457,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 200px;
-}
-
-.step-card__level {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  font-family: var(--mono);
-  font-size: 9px;
-  color: var(--chrome-text-dim);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.step-card__preview:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
 }
 
 /* ---------- Drawn shapes (Circle/Square/Rectangle) ---------- */

@@ -41,12 +41,6 @@ const EMPTY_DIAGRAM: SubDiagram = { nodes: [], edges: [] };
 function App() {
   const [title, setTitle] = useState("Untitled Diagram");
 
-  // `root` is the ENTIRE diagram tree - every node's data can carry its own
-  // nested subDiagram, recursively, all within this one object (and so all
-  // within one JSON file on save/load - see serialization.ts). `path` is how
-  // deep the user has drilled in; the canvas only ever sees the nodes/edges
-  // at that one level, derived below. See domain/subDiagramTree.ts for the
-  // (get/update)SubDiagramAtPath mechanics this all rests on.
   const [root, setRoot] = useState<SubDiagram>(EMPTY_DIAGRAM);
   const [path, setPath] = useState<DiagramPath>([]);
 
@@ -86,19 +80,9 @@ function App() {
   const [activeStepIndex, setActiveStepIndex] = useState(0);
   const [isPresenting, setIsPresenting] = useState(false);
   const [isScenarioPanelOpen, setIsScenarioPanelOpen] = useState(false);
-  // Which step (if any) is being previewed from ScenarioPanel without
-  // actually entering full Presentation Mode - see onTogglePreviewStep.
-  const [previewStepId, setPreviewStepId] = useState<string | null>(null);
-  // false (default) = dragging empty canvas pans the view, matching prior
-  // behavior. true = dragging draws a marquee selection box instead, for
-  // easily grabbing several nodes/edges at once without holding a modifier
-  // key. Toggled from a button in Canvas.tsx's Controls cluster.
+  const [activeStepId, setActiveStepId] = useState<string | null>(null);
   const [isSelectMode, setIsSelectMode] = useState(false);
 
-  // Every new connection starts as a plain solid, unlabeled line -
-  // "blank-solid" - regardless of what kinds of nodes it connects. The type
-  // (HTTP, gRPC, Next, etc.) is something you pick afterward in the
-  // Inspector if you want it, not something guessed at connect-time.
   const onConnect = useCallback<(connection: Connection) => void>(
     (connection) => {
       setCurrentEdges((eds) =>
@@ -391,7 +375,7 @@ function App() {
       setPath((p) => [...p, nodeId]);
       setSelectedNodeIds([]);
       setSelectedEdgeIds([]);
-      setPreviewStepId(null);
+      setActiveStepId(null);
     },
     [isPresenting]
   );
@@ -400,14 +384,14 @@ function App() {
     setPath([]);
     setSelectedNodeIds([]);
     setSelectedEdgeIds([]);
-    setPreviewStepId(null);
+    setActiveStepId(null);
   }, []);
 
   const onNavigateToPathIndex = useCallback((index: number) => {
     setPath((p) => p.slice(0, index + 1));
     setSelectedNodeIds([]);
     setSelectedEdgeIds([]);
-    setPreviewStepId(null);
+    setActiveStepId(null);
   }, []);
 
   // --- Scenarios (can now span multiple diagram levels - see path below) --
@@ -429,28 +413,32 @@ function App() {
 
   const onSelectScenario = useCallback((id: string) => {
     setActiveScenarioId(id);
-    setPreviewStepId(null);
+    setActiveStepId(null);
   }, []);
 
-  // Toggling the same step again turns preview off; picking a different
-  // step switches straight to it.
-  const onTogglePreviewStep = useCallback((stepId: string) => {
-    setPreviewStepId((cur) => (cur === stepId ? null : stepId));
+  // Selecting a step in the list makes it both the editor's subject AND the
+  // canvas preview target at once - clicking the same one again deselects,
+  // which is how you get back to seeing the undimmed diagram without
+  // closing the panel.
+  const onSelectStep = useCallback((stepId: string) => {
+    setActiveStepId((cur) => (cur === stepId ? null : stepId));
   }, []);
 
   // Captures whatever's currently selected on the canvas - AND which level
   // of the tree you're currently drilled into - as a new step. That's what
   // lets a single scenario walk through several nested diagrams: advancing
   // through steps with different `path`s auto-navigates between them (see
-  // the presentation-path-sync effect below).
+  // the presentation-path-sync effect below). The new step becomes active
+  // immediately, so you can start writing its narration without a second click.
   const onAddStep = useCallback(
     (scenarioId: string) => {
       if (selectedNodeIds.length === 0 && selectedEdgeIds.length === 0) return;
+      const newStepId = nextId("step");
       setScenarios((s) =>
         s.map((sc) => {
           if (sc.id !== scenarioId) return sc;
           const step: ScenarioStep = {
-            id: nextId("step"),
+            id: newStepId,
             title: `Step ${sc.steps.length + 1}`,
             narration: "",
             path: [...path],
@@ -460,8 +448,65 @@ function App() {
           return { ...sc, steps: [...sc.steps, step] };
         })
       );
+      setActiveStepId(newStepId);
     },
     [selectedNodeIds, selectedEdgeIds, path]
+  );
+
+  // Adds/removes the current canvas selection to/from an EXISTING step's
+  // focus set, rather than requiring you to delete and recreate the whole
+  // step to change what it highlights. Both are unions/differences against
+  // whatever's already there, not a wholesale replace.
+  const onAddSelectionToStep = useCallback(
+    (scenarioId: string, stepId: string) => {
+      if (selectedNodeIds.length === 0 && selectedEdgeIds.length === 0) return;
+      setScenarios((s) =>
+        s.map((sc) =>
+          sc.id !== scenarioId
+            ? sc
+            : {
+                ...sc,
+                steps: sc.steps.map((st) =>
+                  st.id !== stepId
+                    ? st
+                    : {
+                        ...st,
+                        focusNodeIds: Array.from(new Set([...st.focusNodeIds, ...selectedNodeIds])),
+                        focusEdgeIds: Array.from(new Set([...st.focusEdgeIds, ...selectedEdgeIds])),
+                      }
+                ),
+              }
+        )
+      );
+    },
+    [selectedNodeIds, selectedEdgeIds]
+  );
+
+  const onRemoveSelectionFromStep = useCallback(
+    (scenarioId: string, stepId: string) => {
+      if (selectedNodeIds.length === 0 && selectedEdgeIds.length === 0) return;
+      const removeNodes = new Set(selectedNodeIds);
+      const removeEdges = new Set(selectedEdgeIds);
+      setScenarios((s) =>
+        s.map((sc) =>
+          sc.id !== scenarioId
+            ? sc
+            : {
+                ...sc,
+                steps: sc.steps.map((st) =>
+                  st.id !== stepId
+                    ? st
+                    : {
+                        ...st,
+                        focusNodeIds: st.focusNodeIds.filter((nid) => !removeNodes.has(nid)),
+                        focusEdgeIds: st.focusEdgeIds.filter((eid) => !removeEdges.has(eid)),
+                      }
+                ),
+              }
+        )
+      );
+    },
+    [selectedNodeIds, selectedEdgeIds]
   );
 
   const onUpdateStep = useCallback((scenarioId: string, stepId: string, patch: Partial<ScenarioStep>) => {
@@ -478,7 +523,7 @@ function App() {
     setScenarios((s) =>
       s.map((sc) => (sc.id === scenarioId ? { ...sc, steps: sc.steps.filter((st) => st.id !== stepId) } : sc))
     );
-    setPreviewStepId((cur) => (cur === stepId ? null : cur));
+    setActiveStepId((cur) => (cur === stepId ? null : cur));
   }, []);
 
   const onMoveStep = useCallback((scenarioId: string, stepId: string, direction: "up" | "down") => {
@@ -508,11 +553,11 @@ function App() {
   );
 
   const previewFocus = useMemo(() => {
-    if (!previewStepId || !activeScenario) return null;
-    const step = activeScenario.steps.find((st) => st.id === previewStepId);
+    if (!activeStepId || !activeScenario) return null;
+    const step = activeScenario.steps.find((st) => st.id === activeStepId);
     if (!step) return null;
     return { nodeIds: step.focusNodeIds, edgeIds: step.focusEdgeIds };
-  }, [previewStepId, activeScenario]);
+  }, [activeStepId, activeScenario]);
 
   const onStartPresenting = useCallback(
     (scenarioId: string) => {
@@ -523,7 +568,7 @@ function App() {
       setPath(scenario.steps[0].path);
       setSelectedNodeIds([]);
       setSelectedEdgeIds([]);
-      setPreviewStepId(null);
+      setActiveStepId(null);
       setIsPresenting(true);
     },
     [scenarios]
@@ -747,18 +792,20 @@ function App() {
               onRenameScenario={onRenameScenario}
               onDeleteScenario={onDeleteScenario}
               onAddStep={onAddStep}
+              onAddSelectionToStep={onAddSelectionToStep}
+              onRemoveSelectionFromStep={onRemoveSelectionFromStep}
               onUpdateStep={onUpdateStep}
               onDeleteStep={onDeleteStep}
               onMoveStep={onMoveStep}
               onPresent={onStartPresenting}
               canAddStep={canAddStep}
-              previewStepId={previewStepId}
-              onTogglePreviewStep={onTogglePreviewStep}
+              activeStepId={activeStepId}
+              onSelectStep={onSelectStep}
               root={root}
               currentPath={path}
               onClose={() => {
                 setIsScenarioPanelOpen(false);
-                setPreviewStepId(null);
+                setActiveStepId(null);
               }}
             />
           )}

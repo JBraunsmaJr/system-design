@@ -79,7 +79,7 @@ export function TypedEdge({
   animated,
   onUpdateEdge,
 }: TypedEdgeProps) {
-  const { getViewport, screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition } = useReactFlow();
   const def = getEdgeType(data?.edgeType ?? "generic");
   const color = data?.color ?? def.color;
   const direction = data?.direction ?? "forward";
@@ -129,49 +129,54 @@ export function TypedEdge({
   const labelX = anchorPoint.x + offsetX;
   const labelY = anchorPoint.y + offsetY;
 
-  const dragMoved = useRef(false);
-
+  // Drag state lives in a ref + document-level listeners, NOT React state
+  // or element-level pointer capture. The label's position updates on every
+  // pointermove via onUpdateEdge, which re-renders this component - if the
+  // drag were tracked via setPointerCapture on the label div itself (the
+  // previous approach), there's a real risk of that capture not reliably
+  // surviving the rapid re-renders a continuous drag triggers. Document
+  // listeners sidestep that entirely: they're attached to an element that
+  // never re-renders or unmounts.
   const onLabelPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
       if (!onUpdateEdge) return;
       event.stopPropagation();
-      event.currentTarget.setPointerCapture(event.pointerId);
-      dragMoved.current = false;
+      event.preventDefault();
+
+      let moved = false;
+      const startClientX = event.clientX;
+      const startClientY = event.clientY;
+
+      const handleMove = (moveEvent: PointerEvent) => {
+        const pathEl = measurePathRef.current;
+        if (!pathEl) return;
+
+        if (!moved) {
+          const dx = moveEvent.clientX - startClientX;
+          const dy = moveEvent.clientY - startClientY;
+          if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+          moved = true;
+        }
+
+        const flowPoint = screenToFlowPosition({ x: moveEvent.clientX, y: moveEvent.clientY });
+        const closest = findClosestPointOnPath(pathEl, flowPoint.x, flowPoint.y);
+        onUpdateEdge(id, {
+          labelAnchorT: closest.t,
+          labelOffsetX: flowPoint.x - closest.x,
+          labelOffsetY: flowPoint.y - closest.y,
+        });
+      };
+
+      const handleUp = () => {
+        document.removeEventListener("pointermove", handleMove);
+        document.removeEventListener("pointerup", handleUp);
+      };
+
+      document.addEventListener("pointermove", handleMove);
+      document.addEventListener("pointerup", handleUp);
     },
-    [onUpdateEdge]
+    [id, onUpdateEdge, screenToFlowPosition]
   );
-
-  const onLabelPointerMove = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      if (!event.currentTarget.hasPointerCapture(event.pointerId) || !onUpdateEdge) return;
-      const pathEl = measurePathRef.current;
-      if (!pathEl) return;
-
-      const flowPoint = screenToFlowPosition({ x: event.clientX, y: event.clientY });
-
-      if (!dragMoved.current) {
-        const zoom = getViewport().zoom || 1;
-        const dxScreen = (flowPoint.x - labelX) * zoom;
-        const dyScreen = (flowPoint.y - labelY) * zoom;
-        if (Math.hypot(dxScreen, dyScreen) < DRAG_THRESHOLD) return;
-        dragMoved.current = true;
-      }
-
-      const closest = findClosestPointOnPath(pathEl, flowPoint.x, flowPoint.y);
-      onUpdateEdge(id, {
-        labelAnchorT: closest.t,
-        labelOffsetX: flowPoint.x - closest.x,
-        labelOffsetY: flowPoint.y - closest.y,
-      });
-    },
-    [id, onUpdateEdge, screenToFlowPosition, getViewport, labelX, labelY]
-  );
-
-  const onLabelPointerUp = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-  }, []);
 
   const onLabelDoubleClick = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -240,8 +245,6 @@ export function TypedEdge({
               boxShadow: isFocused ? `0 0 8px ${color}99` : undefined,
             }}
             onPointerDown={onLabelPointerDown}
-            onPointerMove={onLabelPointerMove}
-            onPointerUp={onLabelPointerUp}
             onDoubleClick={onLabelDoubleClick}
             title={onUpdateEdge ? "Drag to reposition, double-click to re-center" : undefined}
           >
