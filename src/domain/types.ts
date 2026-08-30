@@ -105,6 +105,18 @@ export interface ArchEdgeData extends Record<string, unknown> {
   labelAnchorT?: number;
   labelOffsetX?: number;
   labelOffsetY?: number;
+  /**
+   * Transient, display-only - true when the Scenario panel's currently
+   * active step includes this edge, so TypedEdge can draw a highlight.
+   * Unlike the fields above, this is never something the user sets or that
+   * gets saved: Canvas.tsx computes it fresh into a derived copy of the
+   * edges array on every render (see displayEdges), and the real edges
+   * array the rest of the app reads/saves never has it set. (Nodes don't
+   * need an equivalent field - React Flow applies a node's own className
+   * straight to its wrapper element, so that highlight is done in
+   * App.css via the "is-step-member" class instead of a data field.)
+   */
+  isStepMember?: boolean;
   properties: Record<string, string>;
 }
 

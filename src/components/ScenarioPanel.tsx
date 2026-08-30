@@ -1,4 +1,5 @@
-import { MapPin } from "lucide-react";
+import { useCallback, type PointerEvent as ReactPointerEvent } from "react";
+import { GripHorizontal, MapPin } from "lucide-react";
 import { getBreadcrumbLabels } from "../domain/subDiagramTree";
 import type { Scenario, ScenarioStep, SubDiagram } from "../domain/types";
 
@@ -27,6 +28,8 @@ interface ScenarioPanelProps {
   root: SubDiagram;
   currentPath: string[];
   onClose: () => void;
+  height: number;
+  onHeightChange: (height: number) => void;
 }
 
 function pathsEqual(a: string[], b: string[]): boolean {
@@ -58,6 +61,8 @@ export function ScenarioPanel({
   root,
   currentPath,
   onClose,
+  height,
+  onHeightChange,
 }: ScenarioPanelProps) {
   // activeScenarioId is already resolved by App.tsx (including its "default
   // to the first scenario" fallback) before it gets here - this file
@@ -69,8 +74,40 @@ export function ScenarioPanel({
   const activeStepIndex = active && activeStep ? active.steps.indexOf(activeStep) : -1;
   const activeStepEditable = activeStep ? pathsEqual(activeStep.path, currentPath) : false;
 
+  // Same document-level-listener drag pattern used for edge label dragging
+  // in TypedEdge.tsx (see that file's comment for why) - robust regardless
+  // of how many re-renders the continuous height updates trigger.
+  const MIN_HEIGHT = 200;
+  const onResizeStart = useCallback(
+    (event: ReactPointerEvent) => {
+      event.preventDefault();
+      const startY = event.clientY;
+      const startHeight = height;
+      const maxHeight = Math.round(window.innerHeight * 0.75);
+
+      const handleMove = (moveEvent: PointerEvent) => {
+        const dy = startY - moveEvent.clientY; // dragging up increases height
+        onHeightChange(Math.min(Math.max(startHeight + dy, MIN_HEIGHT), maxHeight));
+      };
+      const handleUp = () => {
+        document.removeEventListener("pointermove", handleMove);
+        document.removeEventListener("pointerup", handleUp);
+      };
+      document.addEventListener("pointermove", handleMove);
+      document.addEventListener("pointerup", handleUp);
+    },
+    [height, onHeightChange]
+  );
+
   return (
-    <div className="scenario-panel">
+    <div className="scenario-panel" style={{ height }}>
+      <div
+        className="scenario-panel__resize-handle"
+        onPointerDown={onResizeStart}
+        title="Drag to resize"
+      >
+        <GripHorizontal size={13} />
+      </div>
       <div className="scenario-panel__header">
         <span className="scenario-panel__heading">Scenarios</span>
 

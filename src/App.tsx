@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
   ReactFlowProvider,
   applyNodeChanges,
@@ -82,6 +83,9 @@ function App() {
   const [isScenarioPanelOpen, setIsScenarioPanelOpen] = useState(false);
   const [activeStepId, setActiveStepId] = useState<string | null>(null);
   const [isSelectMode, setIsSelectMode] = useState(false);
+  const [isPaletteCollapsed, setIsPaletteCollapsed] = useState(false);
+  const [isInspectorCollapsed, setIsInspectorCollapsed] = useState(false);
+  const [scenarioPanelHeight, setScenarioPanelHeight] = useState(380);
 
   const onConnect = useCallback<(connection: Connection) => void>(
     (connection) => {
@@ -752,7 +756,20 @@ function App() {
         onChange={onFileSelected}
       />
       <div className="app__body">
-        {!isPresenting && <Palette />}
+        {!isPresenting && (
+          <div className={`app__sidebar-wrap app__sidebar-wrap--left${isPaletteCollapsed ? " is-collapsed" : ""}`}>
+            {!isPaletteCollapsed && <Palette />}
+            <button
+              type="button"
+              className="app__sidebar-toggle app__sidebar-toggle--left"
+              onClick={() => setIsPaletteCollapsed((v) => !v)}
+              title={isPaletteCollapsed ? "Show component palette" : "Hide component palette"}
+              aria-label={isPaletteCollapsed ? "Show component palette" : "Hide component palette"}
+            >
+              {isPaletteCollapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
+            </button>
+          </div>
+        )}
         <div className="app__canvas-column">
           <ReactFlowProvider>
             <Canvas
@@ -803,6 +820,8 @@ function App() {
               onSelectStep={onSelectStep}
               root={root}
               currentPath={path}
+              height={scenarioPanelHeight}
+              onHeightChange={setScenarioPanelHeight}
               onClose={() => {
                 setIsScenarioPanelOpen(false);
                 setActiveStepId(null);
@@ -811,15 +830,30 @@ function App() {
           )}
         </div>
         {!isPresenting && (
-          <Inspector
-            selectedNode={selectedNode}
-            selectedEdge={selectedEdge}
-            onUpdateNode={onUpdateNode}
-            onUpdateEdge={onUpdateEdge}
-            onDeleteNode={onDeleteNode}
-            onDeleteEdge={onDeleteEdge}
-            onDrillInto={onDrillInto}
-          />
+          <div
+            className={`app__sidebar-wrap app__sidebar-wrap--right${isInspectorCollapsed ? " is-collapsed" : ""}`}
+          >
+            <button
+              type="button"
+              className="app__sidebar-toggle app__sidebar-toggle--right"
+              onClick={() => setIsInspectorCollapsed((v) => !v)}
+              title={isInspectorCollapsed ? "Show inspector" : "Hide inspector"}
+              aria-label={isInspectorCollapsed ? "Show inspector" : "Hide inspector"}
+            >
+              {isInspectorCollapsed ? <ChevronLeft size={13} /> : <ChevronRight size={13} />}
+            </button>
+            {!isInspectorCollapsed && (
+              <Inspector
+                selectedNode={selectedNode}
+                selectedEdge={selectedEdge}
+                onUpdateNode={onUpdateNode}
+                onUpdateEdge={onUpdateEdge}
+                onDeleteNode={onDeleteNode}
+                onDeleteEdge={onDeleteEdge}
+                onDrillInto={onDrillInto}
+              />
+            )}
+          </div>
         )}
       </div>
     </div>

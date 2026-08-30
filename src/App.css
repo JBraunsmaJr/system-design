@@ -111,6 +111,43 @@
   min-height: 0;
 }
 
+/* Collapsible sidebar wrapper for Palette (left) and Inspector (right) -
+   the toggle sits at the edge bordering the canvas either way, and the
+   wrapper's width is just whatever its flex children need: full sidebar
+   width when expanded, or the toggle's own ~18px when collapsed (the
+   sidebar itself isn't rendered at all in that case, so there's nothing
+   else to size around). */
+.app__sidebar-wrap {
+  flex-shrink: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+.app__sidebar-toggle {
+  flex-shrink: 0;
+  width: 16px;
+  background: var(--chrome-bg-raised);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--chrome-text-dim);
+  padding: 0;
+}
+
+.app__sidebar-wrap--left .app__sidebar-toggle {
+  border-left: 1px solid var(--chrome-border);
+}
+
+.app__sidebar-wrap--right .app__sidebar-toggle {
+  border-right: 1px solid var(--chrome-border);
+}
+
+.app__sidebar-toggle:hover {
+  color: var(--chrome-text);
+  background: var(--chrome-bg);
+}
+
 .app__canvas-column {
   flex: 1;
   min-width: 0;
@@ -514,11 +551,71 @@
   border-radius: var(--radius-md);
   /* border-color/style/width and background are set per-instance inline
      (see GroupNode.tsx) based on the boundary's kind (Region, VPC, Trust
-     Boundary, etc.) so different kinds are visually distinguishable.
-     Interior is click-through - only the edge-hit strips and the label
-     below re-enable pointer-events, so clicks meant for a child node or an
-     edge passing through this area aren't intercepted by the boundary. */
+     Boundary, etc.) so different kinds are visually distinguishable. */
   pointer-events: none;
+}
+
+/* The actual fix for click-through lives here, not on .group-node above.
+   React Flow's own base CSS sets `.react-flow__node { pointer-events: all }`
+   on the OUTER WRAPPER IT renders around this component - an ancestor of
+   everything above, completely unaffected by pointer-events set on my own
+   inner div. That wrapper (not my div) is what was still capturing every
+   click across the boundary's full area, including edge labels rendered
+   underneath it (EdgeLabelRenderer's own container sits earlier in the DOM
+   than the nodes layer, so nodes normally paint - and hit-test - on top of
+   labels). `react-flow__node-group` is the per-type class React Flow adds
+   to that same wrapper, giving a way to target it directly. Two class
+   selectors combined for specificity, to reliably beat the single-class
+   base rule regardless of CSS load order. */
+.react-flow__node.react-flow__node-group {
+  /* !important is required here, confirmed by reading React Flow's own
+     source (NodeWrapper): it sets `pointerEvents: hasPointerEvents ? 'all'
+     : 'none'` as an INLINE style on this exact wrapper, and a group node is
+     both selectable and draggable so that always evaluates to 'all'. An
+     inline style beats a class-based rule regardless of specificity - the
+     one exception is !important, which is what actually makes this work
+     (a plain, non-!important version of this same selector, despite
+     correctly beating React Flow's OTHER class-based rules like
+     `.draggable`, was still silently losing to this inline style every
+     time - which is exactly why the previous version of this fix visibly
+     changed nothing). */
+  pointer-events: none !important;
+}
+
+/* NodeResizer's own handles/lines don't set pointer-events themselves, so
+   they'd otherwise inherit `none` from the wrapper rule above - putting
+   this back explicitly is what keeps resizing working. */
+.react-flow__resize-control {
+  pointer-events: auto;
+}
+
+/* A second, more direct line of defense for edge labels specifically,
+   on top of the pointer-events fix above - that fix (and the same
+   reasoning) should be sufficient on its own, but it visibly wasn't:
+   edge label dragging inside a boundary remained broken even with it
+   correctly in place, confirmed via the built CSS output, so something
+   about the interaction wasn't fully understood. This takes a completely
+   different, more direct approach that doesn't depend on that nuance:
+   `.react-flow__viewport` (React Flow's own pan/zoom container) has both
+   z-index and a transform, which means it establishes its own stacking
+   context - and everything inside it, including `.react-flow__edgelabel-
+   renderer` (the shared container ALL edge labels portal into) and every
+   individual node, stacks RELATIVE TO EACH OTHER within that one context.
+   Nodes each get their own z-index (small, incrementing values) via their
+   own inline style; the labels container has none at all, so it silently
+   loses that comparison and ends up stacked BELOW nodes by default -
+   independent of pointer-events, which only controls whether an element
+   is eligible to be a hit-test target in the first place, not where it
+   sits in the stacking order once it is. Explicitly giving the labels
+   container a high z-index puts it above every node outright, so a label
+   is always the topmost, hit-testable thing at its own position - which
+   should make it unreachable for ANY node, not just boundaries, to ever
+   sit on top of again. 1000 is comfortably above typical node z-index
+   values while staying below React Flow's own in-progress connection
+   line (z-index 1001), which should stay on top of everything while
+   you're actively drawing a new connection. */
+.react-flow__edgelabel-renderer {
+  z-index: 1000;
 }
 
 /* Thin invisible strips along each side, thicker than the visible border
@@ -629,15 +726,40 @@
 /* ---------- Scenario panel ---------- */
 
 .scenario-panel {
-  height: 380px;
   flex-shrink: 0;
   background: var(--chrome-bg-raised);
   border-top: 1px solid var(--chrome-border);
-  padding: 12px 16px 14px;
+  padding: 14px 16px 14px;
   display: flex;
   flex-direction: column;
   gap: 10px;
   overflow: hidden;
+  position: relative;
+  min-height: 0;
+}
+
+.scenario-panel__resize-handle {
+  position: absolute;
+  top: -7px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 44px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--chrome-bg-raised);
+  border: 1px solid var(--chrome-border);
+  border-radius: 999px;
+  color: var(--chrome-text-dim);
+  cursor: ns-resize;
+  touch-action: none;
+  z-index: 5;
+}
+
+.scenario-panel__resize-handle:hover {
+  color: var(--chrome-text);
+  border-color: var(--accent);
 }
 
 .scenario-panel__header {
@@ -1336,10 +1458,46 @@
 
 .is-presentation-focus .typed-node,
 .is-presentation-focus .group-node,
-.is-presentation-focus .text-node {
+.is-presentation-focus .text-node,
+.is-presentation-focus .shape-node {
   box-shadow:
     0 0 0 2px rgba(91, 124, 250, 0.55),
     0 0 24px rgba(91, 124, 250, 0.35);
+}
+
+/* Scenario panel's step-editing preview - distinct from the glow above.
+   Everything stays at normal opacity/visibility (nothing dimmed) so
+   candidates are still easy to see and click while adding/removing them;
+   only members get a highlight, an accent outline rather than a glow, so
+   the two states read as visually distinct at a glance. Group nodes get an
+   inset ring instead, since .group-node fills its entire parent - a
+   regular ring would sit oddly relative to the boundary's own border. */
+.react-flow__node.is-step-member .typed-node,
+.react-flow__node.is-step-member .text-node,
+.react-flow__node.is-step-member .shape-node {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.react-flow__node.is-step-member .group-node {
+  box-shadow: 0 0 0 2px var(--accent) inset;
+}
+
+/* Selected while a step is being edited, but not (yet) part of it - a
+   distinct (dashed, amber) look from is-step-member's solid accent ring,
+   so "you could add this" reads differently at a glance from "this is
+   already in the step". Matches the same amber TypedEdge uses for the
+   equivalent edge case. */
+.react-flow__node.is-step-candidate .typed-node,
+.react-flow__node.is-step-candidate .text-node,
+.react-flow__node.is-step-candidate .shape-node {
+  outline: 2px dashed #fbbf24;
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
+}
+
+.react-flow__node.is-step-candidate .group-node {
+  outline: 2px dashed #fbbf24;
+  outline-offset: -2px;
 }
 
 /* ---------- Inspector: color input ---------- */

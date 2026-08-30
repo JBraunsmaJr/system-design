@@ -127,18 +127,27 @@ export function Canvas({
   // Full presentation always wins over a step preview if somehow both were
   // active; in practice previewFocus is only ever set while NOT presenting
   // (see App.tsx), so this is mostly a defensive fallback.
-  const activeFocus: FocusSet | null = useMemo(
+  const presentationFocus: FocusSet | null = useMemo(
     () =>
-      presentation
-        ? { nodeIds: presentation.step.focusNodeIds, edgeIds: presentation.step.focusEdgeIds }
-        : previewFocus,
-    [presentation, previewFocus]
+      presentation ? { nodeIds: presentation.step.focusNodeIds, edgeIds: presentation.step.focusEdgeIds } : null,
+    [presentation]
   );
+  /**
+   * Deliberately kept separate from presentationFocus, not merged into one
+   * "activeFocus" - the two need different visual treatments. Full
+   * Presentation Mode dims everything else for audience-facing drama; the
+   * Scenario panel's step-editing preview instead just highlights members
+   * while leaving everything ELSE at full visibility/opacity, since while
+   * you're actively adding/removing things from a step you need to clearly see
+   * (and click) the candidates, not have them all dimmed into near invisibility.
+   * Camera auto-framing (below) still treats both the same, since "zoom to
+   * what's focused" is equally useful for either
+   */
+  const activeFocus: FocusSet | null = presentationFocus ?? previewFocus;
 
-  // Which node (text annotation or shape) is being label-edited inline right
-  // now - local to Canvas since it's purely transient UI state, not
-  // something App.tsx or saved data needs to know about. Shared between
-  // both node kinds since the editing mechanism is identical for each.
+  /**
+   * Which node (text annotation or shape) is being label-edited inline right now.
+   */
   const [editingLabelNodeId, setEditingLabelNodeId] = useState<string | null>(null);
 
   const onChangeTextNode = useCallback(
@@ -315,24 +324,55 @@ export function Canvas({
   // less dim." Group nodes and text annotations can be focus targets too -
   // they're ordinary node ids underneath.
   const displayNodes = useMemo(() => {
-    if (!activeFocus) return nodes;
-    const focusIds = new Set(activeFocus.nodeIds);
-    return nodes.map((n) => ({
-      ...n,
-      className: focusIds.has(n.id) ? "is-presentation-focus" : undefined,
-      style: { ...n.style, opacity: focusIds.has(n.id) ? 1 : DIMMED_NODE_OPACITY },
-    }));
-  }, [nodes, activeFocus]);
+    if (presentationFocus) {
+      const focusIds = new Set(presentationFocus.nodeIds);
+      return nodes.map((n) => ({
+        ...n,
+        className: focusIds.has(n.id) ? "is-presentation-focus" : undefined,
+        style: { ...n.style, opacity: focusIds.has(n.id) ? 1 : DIMMED_NODE_OPACITY },
+      }));
+    }
+    if (previewFocus) {
+      const memberIds = new Set(previewFocus.nodeIds);
+      return nodes.map((n) => {
+        if (memberIds.has(n.id)) return { ...n, className: "is-step-member" };
+        // Selected while a step is being edited, but not (yet) part of it -
+        // a distinct highlight from is-step-member, signaling "you could
+        // add this" rather than "this is already included".
+        if (n.selected) return { ...n, className: "is-step-candidate" };
+        return n;
+      });
+    }
+    return nodes;
+  }, [nodes, presentationFocus, previewFocus]);
 
   const displayEdges = useMemo(() => {
-    if (!activeFocus) return edges;
-    const focusIds = new Set(activeFocus.edgeIds);
-    return edges.map((e) => ({
-      ...e,
-      animated: focusIds.has(e.id),
-      style: { ...e.style, opacity: focusIds.has(e.id) ? 1 : DIMMED_EDGE_OPACITY },
-    }));
-  }, [edges, activeFocus]);
+    if (presentationFocus) {
+      const focusIds = new Set(presentationFocus.edgeIds);
+      return edges.map((e) => ({
+        ...e,
+        animated: focusIds.has(e.id),
+        style: { ...e.style, opacity: focusIds.has(e.id) ? 1 : DIMMED_EDGE_OPACITY },
+      }));
+    }
+    if (previewFocus) {
+      /**
+       * TypedEdge reads data.isStepMember itself (see its comment on
+       * ArcheEdgeData) rather than a className, since React Flow doesn't pass
+       * an edge's className through to custom edge components the way it does
+       * for nodes. Setting it explicitly to false (not leaving it undefined)
+       * for non-members - rather than only setting it for members - is what lets
+       * TypedEdge tell a step preview is active, but this specific
+       * edge isn't part of it.
+       */
+      const memberIds = new Set(previewFocus.edgeIds);
+      return edges.map((e): Edge<ArchEdgeData> => {
+        if (!e.data) return e;
+        return { ...e, data: { ...e.data, isStepMember: memberIds.has(e.id) } };
+      });
+    }
+    return edges;
+  }, [edges, presentationFocus, previewFocus]);
 
   // Auto-frame the camera on the active focus set's nodes. Keyed off a
   // derived string (not the object itself) so this only re-fits when the

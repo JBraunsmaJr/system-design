@@ -195,6 +195,8 @@ export function TypedEdge({
   // right now" from normal editing, where opacity is simply unset.
   const opacity = style?.opacity;
   const isFocused = opacity === 1;
+  const isStepMember = data?.isStepMember === true;
+  const isStepCandidate = selected && data?.isStepMember === false;
   const flowClass = animated ? ` typed-edge--flow-${direction}` : "";
 
   return (
@@ -209,11 +211,15 @@ export function TypedEdge({
         markerStart={direction === "reverse" ? markerStart : undefined}
         className={`typed-edge${flowClass}`}
         style={{
-          stroke: color,
-          strokeWidth: selected || isFocused ? 2.5 : 1.75,
-          strokeDasharray: animated ? def.dash ?? FLOW_FALLBACK_DASH : def.dash,
+          stroke: isStepCandidate ? "#fbbf24" : color,
+          strokeWidth: selected || isFocused || isStepMember || isStepCandidate ? 2.5 : 1.75,
+          strokeDasharray: isStepCandidate ? "6 4" : animated ? def.dash ?? FLOW_FALLBACK_DASH : def.dash,
           opacity,
-          filter: isFocused ? `drop-shadow(0 0 5px ${color})` : undefined,
+          filter: isFocused
+            ? `drop-shadow(0 0 5px ${color})`
+            : isStepMember || isStepCandidate
+              ? "drop-shadow(0 0 5px #fbbf24)"
+              : undefined,
         }}
       />
 
@@ -239,10 +245,16 @@ export function TypedEdge({
             style={{
               position: "absolute",
               transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-              borderColor: color,
+              borderColor: isStepMember ? "var(--accent)" : isStepCandidate ? "#fbbf24" : color,
               color,
               opacity,
-              boxShadow: isFocused ? `0 0 8px ${color}99` : undefined,
+              boxShadow: isFocused
+                ? `0 0 8px ${color}99`
+                : isStepMember
+                  ? "0 0 0 2px var(--accent)"
+                  : isStepCandidate
+                    ? "0 0 0 2px #fbbf24"
+                    : undefined,
             }}
             onPointerDown={onLabelPointerDown}
             onDoubleClick={onLabelDoubleClick}
