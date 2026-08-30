@@ -146,17 +146,24 @@ export function ScenarioPanel({
           </>
         )}
 
-        <span
-          className="scenario-panel__level"
-          title="New steps are anchored to whichever diagram you're currently viewing"
-        >
-          <MapPin size={11} />
-          {currentLevelLabel}
-        </span>
+        <div className="scenario-panel__header-end">
+          <span
+            className="scenario-panel__level"
+            title="New steps are anchored to whichever diagram you're currently viewing"
+          >
+            <MapPin size={11} />
+            {currentLevelLabel}
+          </span>
 
-        <button type="button" className="scenario-panel__close" onClick={onClose} aria-label="Close scenarios panel">
-          ×
-        </button>
+          <button
+            type="button"
+            className="scenario-panel__close"
+            onClick={onClose}
+            aria-label="Close scenarios panel"
+          >
+            ×
+          </button>
+        </div>
       </div>
 
       {!active && (
