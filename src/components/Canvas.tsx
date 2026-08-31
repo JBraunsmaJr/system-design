@@ -44,6 +44,7 @@ import { NODE_TYPES } from "../domain/nodeRegistry";
 import { GROUP_TYPES } from "../domain/groupRegistry";
 import { SHAPE_TYPES } from "../domain/shapeRegistry";
 import { computeAlignment, type AlignBox, type AlignmentGuide } from "../domain/alignmentGuides";
+import { toAbsolutePosition } from "../domain/graphUtils";
 import { DRAG_MIME_TYPE, GROUP_DRAG_MIME_TYPE, TEXT_DRAG_MIME_TYPE, SHAPE_DRAG_MIME_TYPE, CODE_DRAG_MIME_TYPE } from "./Palette";
 import type { ArchNodeData, ArchEdgeData, Scenario, ScenarioStep } from "../domain/types";
 
@@ -160,15 +161,19 @@ export function Canvas({
   // only while actively dragging a node, cleared as soon as the drag ends.
   const [alignmentGuides, setAlignmentGuides] = useState<AlignmentGuide[]>([]);
 
+
   const toAlignBox = useCallback(
-    (n: Node<ArchNodeData>): AlignBox => ({
-      id: n.id,
-      x: n.position.x,
-      y: n.position.y,
-      width: n.width ?? n.measured?.width ?? 0,
-      height: n.height ?? n.measured?.height ?? 0,
-    }),
-    []
+    (n: Node<ArchNodeData>): AlignBox => {
+      const absolute = toAbsolutePosition(n, nodes, n.parentId);
+      return {
+        id: n.id,
+        x: absolute.x,
+        y: absolute.y,
+        width: n.width ?? n.measured?.width ?? 0,
+        height: n.height ?? n.measured?.height ?? 0,
+      };
+    },
+    [nodes]
   );
 
   const onChangeTextNode = useCallback(
@@ -322,25 +327,25 @@ export function Canvas({
     [isPresenting, screenToFlowPosition, onAddText]
   );
 
-  // Shows alignment guides live as a node is dragged, WITHOUT touching its
-  // position - React Flow's own drag tracking recomputes each frame's
-  // position as (current pointer position - the offset captured once at
-  // drag start), not from this node's current stored position, so
-  // overriding position here would just get silently overwritten by React
-  // Flow's own next-frame recalculation - fighting it every frame rather
-  // than actually snapping (confirmed by reading XYDrag's source, not
-  // assumed). The actual snap happens once, in onNodeDragStop below, after
-  // React Flow's tracking has finished and there's nothing left to fight.
+  const getAlignmentCandidates = useCallback(
+    (draggedNode: Node<ArchNodeData>) =>
+      nodes.filter((n) => {
+        if (n.id === draggedNode.id) return false;
+        if (draggedNode.type === "group" && n.parentId === draggedNode.id) return false;
+        return true;
+      }),
+    [nodes]
+  );
+
   const onNodeDrag = useCallback<OnNodeDrag<Node<ArchNodeData>>>(
     (_event, draggedNode) => {
-      const siblings = nodes.filter((n) => n.parentId === draggedNode.parentId);
-      const boxes = siblings.map(toAlignBox);
+      const boxes = [draggedNode, ...getAlignmentCandidates(draggedNode)].map(toAlignBox);
       const movingBox = boxes.find((b) => b.id === draggedNode.id);
       if (!movingBox) return;
       const { guides } = computeAlignment(movingBox, boxes);
       setAlignmentGuides(guides);
     },
-    [nodes, toAlignBox]
+    [getAlignmentCandidates, toAlignBox]
   );
 
   // Two symmetric cases here:
@@ -355,8 +360,7 @@ export function Canvas({
     (_event, draggedNode) => {
       setAlignmentGuides([]);
 
-      const siblings = nodes.filter((n) => n.parentId === draggedNode.parentId);
-      const boxes = siblings.map(toAlignBox);
+      const boxes = [draggedNode, ...getAlignmentCandidates(draggedNode)].map(toAlignBox);
       const movingBox = boxes.find((b) => b.id === draggedNode.id);
       if (movingBox) {
         const { snapDx, snapDy } = computeAlignment(movingBox, boxes);
@@ -386,7 +390,7 @@ export function Canvas({
       const intersectingGroup = getIntersectingNodes(draggedNode).find((n) => n.type === "group");
       onReparentNode(draggedNode.id, intersectingGroup ? intersectingGroup.id : null);
     },
-    [nodes, toAlignBox, onNodesChange, getIntersectingNodes, onReparentNode, onAdoptIntoGroup]
+    [getAlignmentCandidates, toAlignBox, onNodesChange, getIntersectingNodes, onReparentNode, onAdoptIntoGroup]
   );
 
   const onNodeDoubleClick = useCallback<NodeMouseHandler<Node<ArchNodeData>>>(
