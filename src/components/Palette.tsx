@@ -24,6 +24,7 @@ export const DRAG_MIME_TYPE = "application/x-archnode";
 export const GROUP_DRAG_MIME_TYPE = "application/x-archgroup";
 export const TEXT_DRAG_MIME_TYPE = "application/x-archtext";
 export const SHAPE_DRAG_MIME_TYPE = "application/x-archshape";
+export const CODE_DRAG_MIME_TYPE = "application/x-archcode";
 
 type PaletteMode = "system" | "code" | "git";
 
@@ -117,6 +118,13 @@ export function Palette() {
           color="#8b90a0"
           dragMimeType={SHAPE_DRAG_MIME_TYPE}
           items={SHAPE_TYPES.map((s) => ({ id: s.id, label: s.label, icon: s.icon, color: s.color }))}
+        />
+
+        <PaletteGroup
+          label="Code"
+          color="#22B8CF"
+          dragMimeType={CODE_DRAG_MIME_TYPE}
+          items={[{ id: "code", label: "Code Snippet", icon: "FileCode2", color: "#22B8CF" }]}
         />
 
         <PaletteGroup

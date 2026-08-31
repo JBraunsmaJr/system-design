@@ -182,6 +182,31 @@ function App() {
     [setCurrentNodes]
   );
 
+  const onAddCode = useCallback(
+    (position: { x: number; y: number }): string => {
+      const id = nextId("code");
+      const node: Node<ArchNodeData> = {
+        id,
+        type: "code",
+        position,
+        width: 320,
+        height: 220,
+        data: {
+          nodeType: "code",
+          label: "",
+          description: "",
+          properties: {},
+          tags: [],
+          codeContent: "",
+          codeLanguage: "json",
+        },
+      };
+      setCurrentNodes((nds) => [...nds, node]);
+      return id;
+    },
+    [setCurrentNodes]
+  );
+
   // Called after dragging a regular node - see Canvas.tsx's onNodeDragStop.
   // newParentId is the group it now overlaps, or null if it's no longer over
   // any group. Converts position to/from parent-relative coordinates so the
@@ -783,6 +808,7 @@ function App() {
               onAddGroup={onAddGroup}
               onAddText={onAddText}
               onAddShape={onAddShape}
+              onAddCode={onAddCode}
               onUpdateNode={onUpdateNode}
               onUpdateEdge={onUpdateEdge}
               onReparentNode={onReparentNode}

@@ -74,6 +74,11 @@ export interface ArchNodeData extends Record<string, unknown> {
    * type work (it has no fixed icon of its own to fall back to, so this is
    * always set for those), but any typed node can use it. */
   icon?: string;
+  /** Only used by type:"code" nodes. `label` doubles as an optional short
+   * title shown above the code (e.g. "Request payload") - it's fine for it
+   * to be empty, unlike other node types where it's the primary heading. */
+  codeContent?: string;
+  codeLanguage?: string;
 }
 
 /**

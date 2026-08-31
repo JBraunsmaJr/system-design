@@ -36,12 +36,13 @@ import { TypedEdge } from "./edges/TypedEdge";
 import { GroupNode } from "./nodes/GroupNode";
 import { TextNode } from "./nodes/TextNode";
 import { ShapeNode } from "./nodes/ShapeNode";
+import { CodeNode } from "./nodes/CodeNode";
 import { PresentationOverlay } from "./PresentationOverlay";
 import { Breadcrumb } from "./Breadcrumb";
 import { NODE_TYPES } from "../domain/nodeRegistry";
 import { GROUP_TYPES } from "../domain/groupRegistry";
 import { SHAPE_TYPES } from "../domain/shapeRegistry";
-import { DRAG_MIME_TYPE, GROUP_DRAG_MIME_TYPE, TEXT_DRAG_MIME_TYPE, SHAPE_DRAG_MIME_TYPE } from "./Palette";
+import { DRAG_MIME_TYPE, GROUP_DRAG_MIME_TYPE, TEXT_DRAG_MIME_TYPE, SHAPE_DRAG_MIME_TYPE, CODE_DRAG_MIME_TYPE } from "./Palette";
 import type { ArchNodeData, ArchEdgeData, Scenario, ScenarioStep } from "../domain/types";
 
 // edgeTypes now built inside the component via useMemo, so TypedEdge can
@@ -77,6 +78,8 @@ interface CanvasProps {
   /** Creates a text annotation and returns its id, so the caller can immediately put it into edit mode. */
   onAddText: (position: { x: number; y: number }) => string;
   onAddShape: (typeId: string, position: { x: number; y: number }) => void;
+  /** Creates a code snippet node and returns its id, so the caller can immediately put it into edit mode. */
+  onAddCode: (position: { x: number; y: number }) => string;
   onUpdateNode: (id: string, patch: Partial<ArchNodeData>) => void;
   onUpdateEdge: (id: string, patch: Partial<ArchEdgeData>) => void;
   onReparentNode: (nodeId: string, newParentId: string | null) => void;
@@ -105,6 +108,7 @@ export function Canvas({
   onAddGroup,
   onAddText,
   onAddShape,
+  onAddCode,
   onUpdateNode,
   onUpdateEdge,
   onReparentNode,
@@ -155,11 +159,16 @@ export function Canvas({
     [onUpdateNode]
   );
 
-  // TypedNode/TextNode/ShapeNode need extra callbacks that aren't part of
-  // React Flow's own NodeProps - wrapping them here (rather than a stable
-  // module-level `nodeTypes` constant) is the standard way to thread those
-  // in. All disabled while presenting, since drilling in or editing text
-  // would break the locked slideshow view.
+  const onChangeCodeNode = useCallback(
+    (nodeId: string, code: string) => onUpdateNode(nodeId, { codeContent: code }),
+    [onUpdateNode]
+  );
+
+  // TypedNode/TextNode/ShapeNode/CodeNode need extra callbacks that aren't
+  // part of React Flow's own NodeProps - wrapping them here (rather than a
+  // stable module-level `nodeTypes` constant) is the standard way to thread
+  // those in. All disabled while presenting, since drilling in or editing
+  // text would break the locked slideshow view.
   const nodeTypes = useMemo<NodeTypes>(
     () => ({
       typed: (props) => <TypedNode {...props} onDrillInto={isPresenting ? undefined : onDrillInto} />,
@@ -182,8 +191,17 @@ export function Canvas({
           onChangeText={onChangeTextNode}
         />
       ),
+      code: (props) => (
+        <CodeNode
+          {...props}
+          isEditing={editingLabelNodeId === props.id}
+          onStartEditing={isPresenting ? undefined : setEditingLabelNodeId}
+          onFinishEditing={() => setEditingLabelNodeId(null)}
+          onChangeCode={onChangeCodeNode}
+        />
+      ),
     }),
-    [isPresenting, onDrillInto, editingLabelNodeId, onChangeTextNode]
+    [isPresenting, onDrillInto, editingLabelNodeId, onChangeTextNode, onChangeCodeNode]
   );
 
   // TypedEdge needs onUpdateEdge to support dragging its label - disabled
@@ -259,11 +277,16 @@ export function Canvas({
         return;
       }
 
+      if (event.dataTransfer.getData(CODE_DRAG_MIME_TYPE)) {
+        setEditingLabelNodeId(onAddCode(position));
+        return;
+      }
+
       if (event.dataTransfer.getData(TEXT_DRAG_MIME_TYPE)) {
         setEditingLabelNodeId(onAddText(position));
       }
     },
-    [screenToFlowPosition, onAddNode, onAddGroup, onAddShape, onAddText]
+    [screenToFlowPosition, onAddNode, onAddGroup, onAddShape, onAddCode, onAddText]
   );
 
   // Double-clicking truly empty canvas creates a text annotation right
@@ -312,7 +335,14 @@ export function Canvas({
 
   const onNodeDoubleClick = useCallback<NodeMouseHandler<Node<ArchNodeData>>>(
     (_event, node) => {
-      if (isPresenting || node.type === "group" || node.type === "text" || node.type === "shape") return;
+      if (
+        isPresenting ||
+        node.type === "group" ||
+        node.type === "text" ||
+        node.type === "shape" ||
+        node.type === "code"
+      )
+        return;
       onDrillInto(node.id);
     },
     [isPresenting, onDrillInto]

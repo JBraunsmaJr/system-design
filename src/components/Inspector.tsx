@@ -3,6 +3,7 @@ import type { Node, Edge } from "@xyflow/react";
 import { getNodeType } from "../domain/nodeRegistry";
 import { getGroupType } from "../domain/groupRegistry";
 import { getShapeType } from "../domain/shapeRegistry";
+import { CODE_LANGUAGES } from "../domain/codeRegistry";
 import { EDGE_TYPES, STYLE_GROUP_LABELS } from "../domain/edgeRegistry";
 import { IconPicker } from "./IconPicker";
 import type { ArchNodeData, ArchEdgeData } from "../domain/types";
@@ -129,6 +130,50 @@ export function Inspector({
 
           <button type="button" className="inspector__delete" onClick={() => onDeleteNode(selectedNode.id)}>
             Delete shape
+          </button>
+        </aside>
+      );
+    }
+
+    if (selectedNode.type === "code") {
+      return (
+        <aside className="inspector">
+          <div className="panel-header">Code Snippet</div>
+
+          <Field label="Title (optional)">
+            <input
+              placeholder="e.g. Request payload"
+              value={data.label}
+              onChange={(e) => onUpdateNode(selectedNode.id, { label: e.target.value })}
+            />
+          </Field>
+
+          <Field label="Language">
+            <select
+              value={data.codeLanguage ?? "json"}
+              onChange={(e) => onUpdateNode(selectedNode.id, { codeLanguage: e.target.value })}
+            >
+              {CODE_LANGUAGES.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <ColorField
+            value={data.color}
+            defaultValue="#22B8CF"
+            onChange={(color) => onUpdateNode(selectedNode.id, { color })}
+          />
+
+          <p className="inspector__hint" style={{ marginTop: -8 }}>
+            Double-click the code on the canvas to edit it directly. Tab inserts indentation
+            instead of moving focus.
+          </p>
+
+          <button type="button" className="inspector__delete" onClick={() => onDeleteNode(selectedNode.id)}>
+            Delete code snippet
           </button>
         </aside>
       );

@@ -1465,7 +1465,8 @@
 .is-presentation-focus .typed-node,
 .is-presentation-focus .group-node,
 .is-presentation-focus .text-node,
-.is-presentation-focus .shape-node {
+.is-presentation-focus .shape-node,
+.is-presentation-focus .code-node {
   box-shadow:
     0 0 0 2px rgba(91, 124, 250, 0.55),
     0 0 24px rgba(91, 124, 250, 0.35);
@@ -1480,7 +1481,8 @@
    regular ring would sit oddly relative to the boundary's own border. */
 .react-flow__node.is-step-member .typed-node,
 .react-flow__node.is-step-member .text-node,
-.react-flow__node.is-step-member .shape-node {
+.react-flow__node.is-step-member .shape-node,
+.react-flow__node.is-step-member .code-node {
   box-shadow: 0 0 0 2px var(--accent);
 }
 
@@ -1495,7 +1497,8 @@
    equivalent edge case. */
 .react-flow__node.is-step-candidate .typed-node,
 .react-flow__node.is-step-candidate .text-node,
-.react-flow__node.is-step-candidate .shape-node {
+.react-flow__node.is-step-candidate .shape-node,
+.react-flow__node.is-step-candidate .code-node {
   outline: 2px dashed #fbbf24;
   outline-offset: 2px;
   border-radius: var(--radius-md);
@@ -1669,6 +1672,178 @@
   font-weight: 600;
   text-align: center;
   line-height: 1.3;
+}
+
+/* ---------- Code snippet node ---------- */
+
+.code-node {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--node-bg);
+  border: 1.5px solid;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.code-node.is-selected {
+  box-shadow: 0 0 0 3px rgba(91, 124, 250, 0.2);
+}
+
+.code-node__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--chrome-bg);
+  border-bottom: 1px solid var(--chrome-border);
+  flex-shrink: 0;
+}
+
+.code-node__lang {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--chrome-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.code-node__title {
+  font-family: var(--sans);
+  font-size: 11px;
+  color: var(--chrome-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-left: 6px;
+  margin-left: 2px;
+  border-left: 1px solid var(--chrome-border);
+}
+
+.code-node__display {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 10px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.55;
+  overflow: auto;
+  color: var(--chrome-text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  cursor: text;
+}
+
+/* react-simple-code-editor renders its own textarea+<pre> pair inside this
+   wrapper (see textareaClassName/preClassName below for those two layers
+   specifically) - padding is handled by the `padding` prop passed to
+   <Editor>, not set here, so it isn't applied twice. */
+/* The wrap is a relative-positioned container; the highlight <pre> and the
+   textarea are both absolutely positioned to fill it exactly, stacked on
+   top of each other. Font/padding/line-height/white-space must match
+   between the two EXACTLY, or the invisible textarea's caret and selection
+   won't line up with the highlighted character underneath it. */
+.code-node__editor-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.code-node__editor-highlight,
+.code-node__editor-textarea {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 10px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow: auto;
+  border: none;
+}
+
+.code-node__editor-highlight {
+  color: var(--chrome-text);
+  pointer-events: none;
+}
+
+.code-node__editor-textarea {
+  background: transparent;
+  color: transparent;
+  caret-color: var(--chrome-text);
+  resize: none;
+  outline: none;
+}
+
+.code-node__display code {
+  font-family: inherit;
+}
+
+.code-node__placeholder {
+  color: var(--chrome-text-dim);
+  font-style: italic;
+}
+
+/* Syntax highlighting (Prism) - themed to match the app's own palette
+   rather than importing a generic third-party theme, so a code node's
+   colors feel consistent with everything else rather than visually
+   bolted-on. Scoped to .code-node broadly (not just .code-node__display)
+   so the same colors apply whether you're looking at the read-only view
+   or actively typing - react-simple-code-editor's own highlighted layer
+   lives inside .code-node__editor-highlight, nested within .code-node either
+   way. */
+.code-node .token.comment {
+  color: var(--chrome-text-dim);
+  font-style: italic;
+}
+
+.code-node .token.property,
+.code-node .token.literal-property,
+.code-node .token.attr-name,
+.code-node .token.parameter {
+  color: #7dd3fc;
+}
+
+.code-node .token.string,
+.code-node .token.string-property,
+.code-node .token.template-string,
+.code-node .token.attr-value {
+  color: #86efac;
+}
+
+.code-node .token.number {
+  color: #fbbf24;
+}
+
+.code-node .token.boolean,
+.code-node .token.null,
+.code-node .token.keyword,
+.code-node .token.operator {
+  color: #c4b5fd;
+}
+
+.code-node .token.punctuation {
+  color: var(--chrome-text-dim);
+}
+
+.code-node .token.function,
+.code-node .token.tag {
+  color: #93c5fd;
+}
+
+.code-node .token.class-name {
+  color: #f9a8d4;
+}
+
+.code-node .token.constant,
+.code-node .token.regex {
+  color: #fca5a5;
 }
 
 /* ---------- Inspector: color field with reset ---------- */
