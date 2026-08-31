@@ -237,6 +237,19 @@
   display: none;
 }
 
+/* Alignment guide lines (draw.io/Excalidraw-style smart guides) - each
+   guide's own zero width (vertical) or zero height (horizontal) means only
+   the relevant border actually renders as a visible line, so one shared
+   class covers both orientations rather than needing two. Positioned via
+   inline style in flow coordinates - see Canvas.tsx's ViewportPortal usage. */
+.alignment-guide {
+  position: absolute;
+  pointer-events: none;
+  border-left: 1px dashed var(--accent);
+  border-top: 1px dashed var(--accent);
+  z-index: 999;
+}
+
 .canvas__minimap {
   background-color: var(--node-bg) !important;
   border: 1px solid var(--chrome-border);

@@ -16,6 +16,7 @@ import {
   MiniMap,
   MarkerType,
   SelectionMode,
+  ViewportPortal,
   useReactFlow,
   type Node,
   type Edge,
@@ -42,6 +43,7 @@ import { Breadcrumb } from "./Breadcrumb";
 import { NODE_TYPES } from "../domain/nodeRegistry";
 import { GROUP_TYPES } from "../domain/groupRegistry";
 import { SHAPE_TYPES } from "../domain/shapeRegistry";
+import { computeAlignment, type AlignBox, type AlignmentGuide } from "../domain/alignmentGuides";
 import { DRAG_MIME_TYPE, GROUP_DRAG_MIME_TYPE, TEXT_DRAG_MIME_TYPE, SHAPE_DRAG_MIME_TYPE, CODE_DRAG_MIME_TYPE } from "./Palette";
 import type { ArchNodeData, ArchEdgeData, Scenario, ScenarioStep } from "../domain/types";
 
@@ -153,6 +155,21 @@ export function Canvas({
    * Which node (text annotation or shape) is being label-edited inline right now.
    */
   const [editingLabelNodeId, setEditingLabelNodeId] = useState<string | null>(null);
+
+  // Alignment guides (draw.io/Excalidraw-style "smart guides") - visible
+  // only while actively dragging a node, cleared as soon as the drag ends.
+  const [alignmentGuides, setAlignmentGuides] = useState<AlignmentGuide[]>([]);
+
+  const toAlignBox = useCallback(
+    (n: Node<ArchNodeData>): AlignBox => ({
+      id: n.id,
+      x: n.position.x,
+      y: n.position.y,
+      width: n.width ?? n.measured?.width ?? 0,
+      height: n.height ?? n.measured?.height ?? 0,
+    }),
+    []
+  );
 
   const onChangeTextNode = useCallback(
     (nodeId: string, text: string) => onUpdateNode(nodeId, { label: text }),
@@ -305,6 +322,27 @@ export function Canvas({
     [isPresenting, screenToFlowPosition, onAddText]
   );
 
+  // Shows alignment guides live as a node is dragged, WITHOUT touching its
+  // position - React Flow's own drag tracking recomputes each frame's
+  // position as (current pointer position - the offset captured once at
+  // drag start), not from this node's current stored position, so
+  // overriding position here would just get silently overwritten by React
+  // Flow's own next-frame recalculation - fighting it every frame rather
+  // than actually snapping (confirmed by reading XYDrag's source, not
+  // assumed). The actual snap happens once, in onNodeDragStop below, after
+  // React Flow's tracking has finished and there's nothing left to fight.
+  const onNodeDrag = useCallback<OnNodeDrag<Node<ArchNodeData>>>(
+    (_event, draggedNode) => {
+      const siblings = nodes.filter((n) => n.parentId === draggedNode.parentId);
+      const boxes = siblings.map(toAlignBox);
+      const movingBox = boxes.find((b) => b.id === draggedNode.id);
+      if (!movingBox) return;
+      const { guides } = computeAlignment(movingBox, boxes);
+      setAlignmentGuides(guides);
+    },
+    [nodes, toAlignBox]
+  );
+
   // Two symmetric cases here:
   //  - dragging a regular node so it overlaps a boundary makes it a child of
   //    that boundary (moves with it from then on)
@@ -315,6 +353,24 @@ export function Canvas({
   // See App.tsx's onReparentNode/onAdoptIntoGroup for the position math.
   const onNodeDragStop = useCallback<OnNodeDrag<Node<ArchNodeData>>>(
     (_event, draggedNode) => {
+      setAlignmentGuides([]);
+
+      const siblings = nodes.filter((n) => n.parentId === draggedNode.parentId);
+      const boxes = siblings.map(toAlignBox);
+      const movingBox = boxes.find((b) => b.id === draggedNode.id);
+      if (movingBox) {
+        const { snapDx, snapDy } = computeAlignment(movingBox, boxes);
+        if (snapDx !== 0 || snapDy !== 0) {
+          onNodesChange([
+            {
+              id: draggedNode.id,
+              type: "position",
+              position: { x: draggedNode.position.x + snapDx, y: draggedNode.position.y + snapDy },
+            },
+          ]);
+        }
+      }
+
       if (draggedNode.type === "group") {
         const contained = getIntersectingNodes(draggedNode, false).filter(
           (n) => n.type !== "group" && n.parentId !== draggedNode.id
@@ -330,7 +386,7 @@ export function Canvas({
       const intersectingGroup = getIntersectingNodes(draggedNode).find((n) => n.type === "group");
       onReparentNode(draggedNode.id, intersectingGroup ? intersectingGroup.id : null);
     },
-    [getIntersectingNodes, onReparentNode, onAdoptIntoGroup]
+    [nodes, toAlignBox, onNodesChange, getIntersectingNodes, onReparentNode, onAdoptIntoGroup]
   );
 
   const onNodeDoubleClick = useCallback<NodeMouseHandler<Node<ArchNodeData>>>(
@@ -447,6 +503,7 @@ export function Canvas({
         onConnect={handleConnect}
         onConnectStart={onConnectStart}
         onSelectionChange={onSelectionChange}
+        onNodeDrag={onNodeDrag}
         onNodeDragStop={onNodeDragStop}
         onNodeDoubleClick={onNodeDoubleClick}
         defaultEdgeOptions={{
@@ -465,6 +522,21 @@ export function Canvas({
         proOptions={{ hideAttribution: true }}
       >
         <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="rgba(255, 255, 255, 0.07)" />
+        {alignmentGuides.length > 0 && (
+          <ViewportPortal>
+            {alignmentGuides.map((guide, i) => (
+              <div
+                key={i}
+                className="alignment-guide"
+                style={
+                  guide.orientation === "vertical"
+                    ? { left: guide.position, top: guide.start, width: 0, height: guide.end - guide.start }
+                    : { top: guide.position, left: guide.start, width: guide.end - guide.start, height: 0 }
+                }
+              />
+            ))}
+          </ViewportPortal>
+        )}
         {!isPresenting && (
           <MiniMap
             pannable
