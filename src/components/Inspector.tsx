@@ -6,7 +6,9 @@ import { getShapeType } from "../domain/shapeRegistry";
 import { CODE_LANGUAGES } from "../domain/codeRegistry";
 import { EDGE_TYPES, STYLE_GROUP_LABELS } from "../domain/edgeRegistry";
 import { IconPicker } from "./IconPicker";
+import { RequirementLinker } from "./requirements/RequirementLinker";
 import type { ArchNodeData, ArchEdgeData } from "../domain/types";
+import type { RequirementsDocument } from "../domain/requirementsTypes";
 
 const EDGE_STYLE_GROUP_ORDER = ["sync", "async", "control", "vcs", "blank", "data", "file", "generic"] as const;
 
@@ -18,6 +20,8 @@ interface InspectorProps {
   onDeleteNode: (id: string) => void;
   onDeleteEdge: (id: string) => void;
   onDrillInto: (id: string) => void;
+  requirements: RequirementsDocument;
+  onNavigateToRequirement: (itemId: string) => void;
 }
 
 export function Inspector({
@@ -28,6 +32,8 @@ export function Inspector({
   onDeleteNode,
   onDeleteEdge,
   onDrillInto,
+  requirements,
+  onNavigateToRequirement,
 }: InspectorProps) {
   if (!selectedNode && !selectedEdge) {
     return (
@@ -83,6 +89,14 @@ export function Inspector({
             fit once resized, instead of auto-sizing to fit the text.
           </p>
 
+          <LinkedRequirementsField
+            nodeId={selectedNode.id}
+            linkedRequirementIds={data.linkedRequirementIds}
+            onUpdateNode={onUpdateNode}
+            requirements={requirements}
+            onNavigateToRequirement={onNavigateToRequirement}
+          />
+
           <button type="button" className="inspector__delete" onClick={() => onDeleteNode(selectedNode.id)}>
             Delete text
           </button>
@@ -128,6 +142,14 @@ export function Inspector({
             Double-click the shape on the canvas to edit its text directly.
           </p>
 
+          <LinkedRequirementsField
+            nodeId={selectedNode.id}
+            linkedRequirementIds={data.linkedRequirementIds}
+            onUpdateNode={onUpdateNode}
+            requirements={requirements}
+            onNavigateToRequirement={onNavigateToRequirement}
+          />
+
           <button type="button" className="inspector__delete" onClick={() => onDeleteNode(selectedNode.id)}>
             Delete shape
           </button>
@@ -171,6 +193,14 @@ export function Inspector({
             Double-click the code on the canvas to edit it directly. Tab inserts indentation
             instead of moving focus.
           </p>
+
+          <LinkedRequirementsField
+            nodeId={selectedNode.id}
+            linkedRequirementIds={data.linkedRequirementIds}
+            onUpdateNode={onUpdateNode}
+            requirements={requirements}
+            onNavigateToRequirement={onNavigateToRequirement}
+          />
 
           <button type="button" className="inspector__delete" onClick={() => onDeleteNode(selectedNode.id)}>
             Delete code snippet
@@ -224,10 +254,18 @@ export function Inspector({
         <TagEditor tags={data.tags} onChange={(tags) => onUpdateNode(selectedNode.id, { tags })} />
 
         {!isGroup && (
-          <button type="button" className="inspector__drill" onClick={() => onDrillInto(selectedNode.id)}>
+          <button type="button" style={{ marginBottom: "16px"}} className="inspector__drill" onClick={() => onDrillInto(selectedNode.id)}>
             {subCount > 0 ? `Open sub-diagram (${subCount})` : "Create sub-diagram"} →
           </button>
         )}
+
+        <LinkedRequirementsField
+          nodeId={selectedNode.id}
+          linkedRequirementIds={data.linkedRequirementIds}
+          onUpdateNode={onUpdateNode}
+          requirements={requirements}
+          onNavigateToRequirement={onNavigateToRequirement}
+        />
 
         <button type="button" className="inspector__delete" onClick={() => onDeleteNode(selectedNode.id)}>
           {isGroup ? "Delete boundary" : "Delete node"}
@@ -353,6 +391,39 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <span>{label}</span>
       {children}
     </label>
+  );
+}
+
+// Thin wrapper so each of Inspector's node-type branches only needs to
+// pass nodeId/data/onUpdateNode, rather than repeating the same
+// linked-ids array-splice logic at all four call sites (text, shape,
+// code, and the shared typed/group branch).
+function LinkedRequirementsField({
+  nodeId,
+  linkedRequirementIds,
+  onUpdateNode,
+  requirements,
+  onNavigateToRequirement,
+}: {
+  nodeId: string;
+  linkedRequirementIds: string[] | undefined;
+  onUpdateNode: (id: string, patch: Partial<ArchNodeData>) => void;
+  requirements: RequirementsDocument;
+  onNavigateToRequirement: (itemId: string) => void;
+}) {
+  const linkedIds = linkedRequirementIds ?? [];
+  return (
+    <Field label="Linked requirements">
+      <RequirementLinker
+        linkedIds={linkedIds}
+        doc={requirements}
+        onLink={(itemId) => onUpdateNode(nodeId, { linkedRequirementIds: [...linkedIds, itemId] })}
+        onUnlink={(itemId) =>
+          onUpdateNode(nodeId, { linkedRequirementIds: linkedIds.filter((id) => id !== itemId) })
+        }
+        onNavigate={onNavigateToRequirement}
+      />
+    </Field>
   );
 }
 

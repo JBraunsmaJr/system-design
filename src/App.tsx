@@ -207,6 +207,15 @@ function App() {
   // requirements document. Deliberately NOT part of the undoable
   // DiagramSnapshot: switching pages isn't an edit to the content itself.
   const [viewMode, setViewMode] = useState<"diagram" | "requirements">("diagram");
+  // Set together with viewMode when the user clicks a linked requirement
+  // pill in the Inspector (while looking at the diagram) - see
+  // RequirementsView's focusItemId prop for how this actually triggers
+  // the scroll-and-highlight once that view mounts.
+  const [pendingRequirementFocus, setPendingRequirementFocus] = useState<string | null>(null);
+  const onNavigateToRequirement = useCallback((itemId: string) => {
+    setViewMode("requirements");
+    setPendingRequirementFocus(itemId);
+  }, []);
   const [isScenarioPanelOpen, setIsScenarioPanelOpen] = useState(false);
   const [activeStepId, setActiveStepId] = useState<string | null>(null);
   const [isSelectMode, setIsSelectMode] = useState(false);
@@ -1068,6 +1077,8 @@ function App() {
                 onDeleteNode={onDeleteNode}
                 onDeleteEdge={onDeleteEdge}
                 onDrillInto={onDrillInto}
+                requirements={requirements}
+                onNavigateToRequirement={onNavigateToRequirement}
               />
             )}
           </div>
@@ -1075,7 +1086,12 @@ function App() {
           </>
         )}
         {viewMode === "requirements" && (
-          <RequirementsView doc={requirements} onUpdateDoc={setRequirements} />
+          <RequirementsView
+            doc={requirements}
+            onUpdateDoc={setRequirements}
+            focusItemId={pendingRequirementFocus}
+            onFocusHandled={() => setPendingRequirementFocus(null)}
+          />
         )}
       </div>
     </div>

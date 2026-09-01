@@ -79,6 +79,15 @@ export interface ArchNodeData extends Record<string, unknown> {
    * to be empty, unlike other node types where it's the primary heading. */
   codeContent?: string;
   codeLanguage?: string;
+  /** IDs of requirements-document items (e.g. "REQ-1") linked to this
+   * node. Works the same for any node type, including boundaries -
+   * there's nothing type-specific about linking, just an id reference
+   * into the separate requirements document. A linked id whose item was
+   * since deleted is left in place rather than actively cleaned up (ids
+   * are never reused, so it could never later point at something else by
+   * accident) - display code is responsible for silently filtering out
+   * ids that no longer resolve to an existing item. */
+  linkedRequirementIds?: string[];
 }
 
 /**

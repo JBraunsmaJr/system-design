@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LayoutList, Plus, Settings2, Tags } from "lucide-react";
 import { createCategory, generateItemId, isPrefixTaken } from "../../domain/requirementsRegistry";
 import { RequirementCard } from "./RequirementCard";
@@ -12,6 +12,13 @@ import type {
 interface RequirementsViewProps {
   doc: RequirementsDocument;
   onUpdateDoc: (updater: (doc: RequirementsDocument) => RequirementsDocument) => void;
+  /** Set by App.tsx when the user clicks a linked requirement pill from
+   * the Inspector (while viewing the diagram) - scrolls to and briefly
+   * highlights that item once this view mounts/updates, then reports
+   * back via onFocusHandled so App.tsx can clear it (avoiding
+   * re-triggering the same scroll on an unrelated re-render). */
+  focusItemId?: string | null;
+  onFocusHandled?: () => void;
 }
 
 function nextCustomTypeId(doc: RequirementsDocument): string {
@@ -32,7 +39,7 @@ interface ItemGroup {
   items: RequirementItem[];
 }
 
-export function RequirementsView({ doc, onUpdateDoc }: RequirementsViewProps) {
+export function RequirementsView({ doc, onUpdateDoc, focusItemId, onFocusHandled }: RequirementsViewProps) {
   const [search, setSearch] = useState("");
   const [groupBy, setGroupBy] = useState<GroupBy>("type");
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
@@ -125,14 +132,31 @@ export function RequirementsView({ doc, onUpdateDoc }: RequirementsViewProps) {
     });
   };
 
-  const onNavigateToItem = (itemId: string) => {
+  const onNavigateToItem = useCallback((itemId: string) => {
     const el = document.getElementById(`requirement-${itemId}`);
     if (!el) return;
     el.scrollIntoView({ behavior: "smooth", block: "center" });
     setHighlightedId(itemId);
     if (highlightTimer.current) clearTimeout(highlightTimer.current);
     highlightTimer.current = setTimeout(() => setHighlightedId(null), HIGHLIGHT_DURATION_MS);
-  };
+  }, []);
+
+  // Responds to a navigation request from OUTSIDE this view - e.g. the
+  // user clicked a linked requirement pill in the Inspector while looking
+  // at the diagram, which switches viewMode to "requirements" (in
+  // App.tsx) and sets focusItemId at the same time. This view may be
+  // mounting fresh at that exact moment, but a plain useEffect (not
+  // useLayoutEffect) still runs after the initial render, by which point
+  // every RequirementCard's DOM element - including the one this needs to
+  // scroll to - already exists.
+  useEffect(() => {
+    if (!focusItemId) return;
+    const frame = requestAnimationFrame(() => {
+      onNavigateToItem(focusItemId);
+      onFocusHandled?.();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [focusItemId, onNavigateToItem, onFocusHandled]);
 
   const onAddCustomType = (label: string, prefix: string, color: string): boolean => {
     if (isPrefixTaken(doc, prefix)) return false;
