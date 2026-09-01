@@ -3,6 +3,7 @@ import { Trash2 } from "lucide-react";
 import { getItemType } from "../../domain/requirementsRegistry";
 import { RequirementBody } from "./RequirementBody";
 import { RequirementEditor } from "./RequirementEditor";
+import { CategoryPicker } from "./CategoryPicker";
 import type { RequirementItem, RequirementsDocument } from "../../domain/requirementsTypes";
 
 interface RequirementCardProps {
@@ -11,6 +12,7 @@ interface RequirementCardProps {
   onUpdateItem: (id: string, patch: Partial<RequirementItem>) => void;
   onDeleteItem: (id: string) => void;
   onNavigateToItem: (itemId: string) => void;
+  onCreateAndAssignCategory: (itemId: string, label: string) => void;
   /** True briefly after this item was scrolled to via a reference click,
    * so the destination is visually obvious rather than just "the page
    * moved somewhere" - cleared by the parent view after a short timeout. */
@@ -23,6 +25,7 @@ export function RequirementCard({
   onUpdateItem,
   onDeleteItem,
   onNavigateToItem,
+  onCreateAndAssignCategory,
   highlighted,
 }: RequirementCardProps) {
   const [isEditingBody, setIsEditingBody] = useState(false);
@@ -44,6 +47,13 @@ export function RequirementCard({
           value={item.title}
           placeholder="Untitled"
           onChange={(e) => onUpdateItem(item.id, { title: e.target.value })}
+        />
+        <CategoryPicker
+          doc={doc}
+          categoryId={item.categoryId}
+          onAssign={(categoryId) => onUpdateItem(item.id, { categoryId })}
+          onCreateAndAssign={(label) => onCreateAndAssignCategory(item.id, label)}
+          onClear={() => onUpdateItem(item.id, { categoryId: undefined })}
         />
         <button
           type="button"

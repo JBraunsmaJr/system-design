@@ -1,4 +1,4 @@
-import type { RequirementItemType, RequirementsDocument } from "./requirementsTypes";
+import type { RequirementCategory, RequirementItemType, RequirementsDocument } from "./requirementsTypes";
 
 export const BUILT_IN_ITEM_TYPES: RequirementItemType[] = [
   { id: "requirement", label: "Requirement", prefix: "REQ", color: "#5b7cfa", isBuiltIn: true },
@@ -34,6 +34,51 @@ export function generateItemId(
   if (!type) throw new Error(`Unknown requirement item type: ${typeId}`);
   const sequence = doc.nextSequence[typeId] ?? 1;
   return { id: `${type.prefix}-${sequence}`, nextSequence: { ...doc.nextSequence, [typeId]: sequence + 1 } };
+}
+
+export function getCategory(doc: RequirementsDocument, categoryId: string | undefined): RequirementCategory | undefined {
+  if (!categoryId) return undefined;
+  return doc.categories.find((c) => c.id === categoryId);
+}
+
+/** Cycled by category creation order rather than assigned by the user -
+ * categories are meant to be quick to create (type a name, done), and
+ * asking for a color up front on every one would add friction that item
+ * types (created far less often, and tied to id generation) can more
+ * reasonably ask for. */
+const CATEGORY_COLOR_PALETTE = ["#5b7cfa", "#0FA36B", "#F2994A", "#9061F9", "#F0578C", "#22B8CF", "#EAB308", "#84CC16"];
+
+export function nextCategoryColor(doc: RequirementsDocument): string {
+  return CATEGORY_COLOR_PALETTE[doc.categories.length % CATEGORY_COLOR_PALETTE.length];
+}
+
+function nextCategoryId(doc: RequirementsDocument): string {
+  let n = 1;
+  while (doc.categories.some((c) => c.id === `category-${n}`)) n++;
+  return `category-${n}`;
+}
+
+/** Case-insensitive match against existing category labels, since "Auth"
+ * and "auth" being treated as different categories would be a confusing
+ * way to end up with near-duplicate groups. */
+export function findCategoryByLabel(doc: RequirementsDocument, label: string): RequirementCategory | undefined {
+  const normalized = label.trim().toLowerCase();
+  return doc.categories.find((c) => c.label.toLowerCase() === normalized);
+}
+
+/** Creates a new category (or returns the existing one if `label` already
+ * matches, case-insensitively - typing an existing category's name is
+ * treated as "use that one," not "make a duplicate") and returns the
+ * updated categories array to store back onto the document. */
+export function createCategory(
+  doc: RequirementsDocument,
+  label: string
+): { category: RequirementCategory; categories: RequirementCategory[] } {
+  const trimmed = label.trim();
+  const existing = findCategoryByLabel(doc, trimmed);
+  if (existing) return { category: existing, categories: doc.categories };
+  const category: RequirementCategory = { id: nextCategoryId(doc), label: trimmed, color: nextCategoryColor(doc) };
+  return { category, categories: [...doc.categories, category] };
 }
 
 /** Matches #REQ-3 style references: a prefix starting with a letter,

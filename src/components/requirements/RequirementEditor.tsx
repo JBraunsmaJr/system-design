@@ -6,6 +6,7 @@ import {
   type ChangeEvent,
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import { getCaretPixelPosition } from "../../domain/caretPosition";
 import type { RequirementItem, RequirementsDocument } from "../../domain/requirementsTypes";
 import { ReferencePopover } from "./ReferencePopover";
@@ -60,6 +61,15 @@ export function RequirementEditor({ value, onChange, onDone, doc, autoFocus, pla
 
   const candidates = trigger ? filterCandidates(doc.items, trigger.query) : [];
 
+  // Combines the textarea's own on-screen position with the caret's offset
+  // WITHIN the textarea to get true viewport coordinates - needed because
+  // the popover is portaled (see the render below) and therefore
+  // fixed-positioned relative to the viewport, not CSS-relative to
+  // anything inside RequirementCard. A non-portaled popover here hit the
+  // exact same clipping bug CategoryPicker did: RequirementCard has
+  // `overflow: hidden` for its rounded corners, and the scrollable list
+  // above it has `overflow: auto` - either would silently cut the popover
+  // off the moment it extended past that boundary.
   const updateTriggerState = useCallback(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
@@ -68,10 +78,29 @@ export function RequirementEditor({ value, onChange, onDone, doc, autoFocus, pla
     setTrigger(active);
     setSelectedIndex(0);
     if (active) {
+      const textareaRect = textarea.getBoundingClientRect();
       const caret = getCaretPixelPosition(textarea, caretPos);
-      setPopoverPos({ top: caret.top + caret.lineHeight, left: caret.left });
+      setPopoverPos({
+        top: textareaRect.top + caret.top + caret.lineHeight,
+        left: textareaRect.left + caret.left,
+      });
     }
   }, []);
+
+  // A portaled, fixed-position popover doesn't automatically track the
+  // caret's on-screen position as the page scrolls the way an in-flow
+  // absolutely-positioned one would - recompute while the popover is open.
+  // Capture phase (the `true` third argument) catches scroll events from
+  // the nested scrollable content area, since scroll events don't bubble.
+  useEffect(() => {
+    if (!trigger) return;
+    window.addEventListener("scroll", updateTriggerState, true);
+    window.addEventListener("resize", updateTriggerState);
+    return () => {
+      window.removeEventListener("scroll", updateTriggerState, true);
+      window.removeEventListener("resize", updateTriggerState);
+    };
+  }, [trigger, updateTriggerState]);
 
   const insertReference = useCallback(
     (item: RequirementItem) => {
@@ -146,16 +175,19 @@ export function RequirementEditor({ value, onChange, onDone, doc, autoFocus, pla
           onDone();
         }}
       />
-      {trigger && candidates.length > 0 && (
-        <ReferencePopover
-          doc={doc}
-          candidates={candidates}
-          selectedIndex={selectedIndex}
-          position={popoverPos}
-          onSelect={insertReference}
-          onHoverIndex={setSelectedIndex}
-        />
-      )}
+      {trigger &&
+        candidates.length > 0 &&
+        createPortal(
+          <ReferencePopover
+            doc={doc}
+            candidates={candidates}
+            selectedIndex={selectedIndex}
+            position={popoverPos}
+            onSelect={insertReference}
+            onHoverIndex={setSelectedIndex}
+          />,
+          document.body
+        )}
     </div>
   );
 }

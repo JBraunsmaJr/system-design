@@ -60,6 +60,7 @@ function parseRequirementsDocument(raw: unknown): RequirementsDocument {
   const r = raw as Partial<RequirementsDocument>;
   return {
     itemTypes: Array.isArray(r.itemTypes) ? r.itemTypes : [],
+    categories: Array.isArray(r.categories) ? r.categories : [],
     items: Array.isArray(r.items) ? r.items : [],
     nextSequence: r.nextSequence && typeof r.nextSequence === "object" ? r.nextSequence : {},
   };

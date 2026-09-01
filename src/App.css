@@ -2185,7 +2185,6 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  margin-left: auto;
   background: transparent;
   border: 1px solid var(--chrome-border);
   border-radius: var(--radius-sm);
@@ -2423,8 +2422,14 @@
 /* ---------- Reference popover ---------- */
 
 .reference-popover {
-  position: absolute;
-  z-index: 50;
+  /* position/top/left are set inline (see RequirementEditor.tsx / this
+     component's render) - it's portaled to document.body and
+     fixed-positioned from the caret's actual on-screen coordinates, not
+     CSS-relative to any ancestor here. Same fix as CategoryPicker's
+     dropdown, for the same reason: RequirementCard's overflow:hidden and
+     the scroll container's overflow:auto would otherwise silently clip
+     this the moment it extended past either boundary. */
+  z-index: 200;
   min-width: 220px;
   max-width: 320px;
   max-height: 240px;
@@ -2594,4 +2599,155 @@
   margin: 0 16px 12px;
   color: var(--danger);
   font-size: 12px;
+}
+
+/* ---------- Category picker ---------- */
+
+.category-picker {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.category-picker__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 1px solid var(--chrome-border);
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--chrome-text);
+  white-space: nowrap;
+}
+
+.category-picker__trigger.is-empty {
+  color: var(--chrome-text-dim);
+}
+
+.category-picker__trigger:hover {
+  background: var(--chrome-bg);
+}
+
+.category-picker__dropdown {
+  /* position/top/left are set inline (see CategoryPicker.tsx) - it's
+     portaled to document.body and fixed-positioned from the trigger's
+     actual on-screen coordinates, not CSS-relative to any ancestor here. */
+  z-index: 200;
+  width: 220px;
+  background: var(--chrome-bg-raised);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  padding: 6px;
+}
+
+.category-picker__search {
+  width: 100%;
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  color: var(--chrome-text);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.category-picker__list {
+  max-height: 200px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.category-picker__option {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 12px;
+  color: var(--chrome-text);
+  text-align: left;
+  width: 100%;
+}
+
+.category-picker__option:hover {
+  background: var(--chrome-bg);
+}
+
+.category-picker__option--clear {
+  color: var(--chrome-text-dim);
+  border-bottom: 1px solid var(--chrome-border);
+  border-radius: 0;
+  margin-bottom: 3px;
+  padding-bottom: 8px;
+}
+
+.category-picker__option--create {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.category-picker__swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.category-picker__empty {
+  padding: 8px;
+  margin: 0;
+  color: var(--chrome-text-dim);
+  font-size: 11.5px;
+  text-align: center;
+}
+
+/* ---------- Group-by toggle (requirements view toolbar) ---------- */
+
+.requirements-view__right-cluster {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.requirements-view__group-toggle {
+  display: flex;
+  gap: 2px;
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  flex-shrink: 0;
+}
+
+.requirements-view__group-toggle button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  padding: 5px 10px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--chrome-text-dim);
+  white-space: nowrap;
+}
+
+.requirements-view__group-toggle button:hover {
+  color: var(--chrome-text);
+}
+
+.requirements-view__group-toggle button.active {
+  background: var(--chrome-bg-raised);
+  color: var(--chrome-text);
+  box-shadow: 0 0 0 1px var(--chrome-border);
 }

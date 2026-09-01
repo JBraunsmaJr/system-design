@@ -14,7 +14,7 @@ interface ReferencePopoverProps {
 
 export function ReferencePopover({ doc, candidates, selectedIndex, position, onSelect, onHoverIndex }: ReferencePopoverProps) {
   return (
-    <div className="reference-popover" style={{ top: position.top, left: position.left }}>
+    <div className="reference-popover" style={{ position: "fixed", top: position.top, left: position.left }}>
       {candidates.map((item, index) => {
         const type = getItemType(doc, item.typeId);
         return (
