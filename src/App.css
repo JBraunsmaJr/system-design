@@ -2416,6 +2416,39 @@
   position: relative;
 }
 
+.markdown-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 4px 6px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--chrome-border);
+}
+
+.markdown-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--chrome-text-dim);
+}
+
+.markdown-toolbar button:hover {
+  background: var(--chrome-bg);
+  color: var(--chrome-text);
+}
+
+.markdown-toolbar__divider {
+  width: 1px;
+  height: 16px;
+  background: var(--chrome-border);
+  margin: 0 4px;
+}
+
 .requirement-editor__textarea {
   width: 100%;
   min-height: 80px;

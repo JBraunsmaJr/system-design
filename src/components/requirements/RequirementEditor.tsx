@@ -10,8 +10,10 @@ import {
 import { createPortal } from "react-dom";
 import { getCaretPixelPosition } from "../../domain/caretPosition";
 import { computeFlippedPosition, type AnchorRect } from "../../domain/popoverPosition";
+import { getCurrentLineBounds, getListEnterBehavior, getListIndentBehavior } from "../../domain/markdownEditing";
 import type { RequirementItem, RequirementsDocument } from "../../domain/requirementsTypes";
 import { ReferencePopover } from "./ReferencePopover";
+import { MarkdownToolbar } from "./MarkdownToolbar";
 
 interface ActiveTrigger {
   triggerIndex: number;
@@ -159,6 +161,57 @@ export function RequirementEditor({ value, onChange, onDone, doc, autoFocus, pla
     [trigger, value, onChange]
   );
 
+  // Continues a list on Enter (same marker, incremented number for ordered
+  // lists, always-unchecked for checkbox lists) or - for an empty list
+  // item - removes the marker and stops there instead of adding a new
+  // line, so the user can break out of a list without an endless trail of
+  // empty bullets. See markdownEditing.ts's getListEnterBehavior for the
+  // actual decision logic; this just applies whichever result it returns.
+  const applyListEnter = useCallback(
+    (textarea: HTMLTextAreaElement) => {
+      const caretPos = textarea.selectionStart;
+      const behavior = getListEnterBehavior(value, caretPos);
+      if (!behavior) return false;
+      let newValue: string;
+      let newCaretPos: number;
+      if (behavior.replaceCurrentLine) {
+        newValue = value.slice(0, behavior.lineStart) + behavior.insertText + value.slice(behavior.lineEnd);
+        newCaretPos = behavior.lineStart + behavior.insertText.length;
+      } else {
+        newValue = value.slice(0, caretPos) + behavior.insertText + value.slice(caretPos);
+        newCaretPos = caretPos + behavior.insertText.length;
+      }
+      onChange(newValue);
+      requestAnimationFrame(() => {
+        textarea.focus();
+        textarea.selectionStart = textarea.selectionEnd = newCaretPos;
+      });
+      return true;
+    },
+    [value, onChange]
+  );
+
+  // Tab/Shift+Tab indents or outdents the current list item line - a
+  // no-op (returns false, so the caller falls back to normal Tab
+  // behavior) when the current line isn't a list item at all.
+  const applyListIndent = useCallback(
+    (textarea: HTMLTextAreaElement, indent: boolean) => {
+      const caretPos = textarea.selectionStart;
+      const { lineStart, lineEnd, line } = getCurrentLineBounds(value, caretPos);
+      const behavior = getListIndentBehavior(line, indent);
+      if (!behavior) return false;
+      const newValue = value.slice(0, lineStart) + behavior.newLine + value.slice(lineEnd);
+      const newCaretPos = Math.max(lineStart, caretPos + behavior.caretDelta);
+      onChange(newValue);
+      requestAnimationFrame(() => {
+        textarea.focus();
+        textarea.selectionStart = textarea.selectionEnd = newCaretPos;
+      });
+      return true;
+    },
+    [value, onChange]
+  );
+
   const onKeyDown = (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Escape") {
       if (trigger) {
@@ -186,16 +239,28 @@ export function RequirementEditor({ value, onChange, onDone, doc, autoFocus, pla
         return;
       }
     }
+    // The reference popover isn't consuming this key - check for
+    // list-editing behaviors before falling back to the browser's normal
+    // Enter (newline) / Tab (focus-shift) handling.
+    if (event.key === "Enter" && applyListEnter(event.currentTarget)) {
+      event.preventDefault();
+      return;
+    }
+    if (event.key === "Tab" && applyListIndent(event.currentTarget, !event.shiftKey)) {
+      event.preventDefault();
+      return;
+    }
   };
 
   return (
     <div className="requirement-editor">
+      <MarkdownToolbar textareaRef={textareaRef} value={value} onChange={onChange} />
       <textarea
         ref={textareaRef}
         className="requirement-editor__textarea nodrag nopan nowheel"
         value={value}
         placeholder={placeholder}
-        spellCheck={false}
+        spellCheck={true}
         onChange={(e: ChangeEvent<HTMLTextAreaElement>) => {
           onChange(e.target.value);
           requestAnimationFrame(updateTriggerState);
