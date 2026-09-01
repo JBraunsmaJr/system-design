@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Tag, X } from "lucide-react";
 import { findCategoryByLabel, getCategory } from "../../domain/requirementsRegistry";
+import { computeFlippedPosition } from "../../domain/popoverPosition";
 import type { RequirementsDocument } from "../../domain/requirementsTypes";
 
 interface CategoryPickerProps {
@@ -13,13 +14,6 @@ interface CategoryPickerProps {
 }
 
 const DROPDOWN_WIDTH = 220;
-
-/** Right-aligns the dropdown with the trigger button, clamped so it never
- * renders off the left edge of the viewport. Pure function so the
- * clamping logic itself is testable without a real DOM. */
-function computeDropdownPosition(triggerRect: { left: number; right: number; bottom: number }) {
-  return { top: triggerRect.bottom + 4, left: Math.max(8, triggerRect.right - DROPDOWN_WIDTH) };
-}
 
 /**
  * Renders its dropdown through a portal into document.body rather than as
@@ -33,6 +27,15 @@ function computeDropdownPosition(triggerRect: { left: number; right: number; bot
  * ancestor clipping entirely by rendering outside that DOM subtree, with
  * position computed from the trigger's actual on-screen location instead
  * of relying on CSS positioning context.
+ *
+ * Positioning happens in two steps: opening sets a naive "below the
+ * trigger" guess so the dropdown actually renders somewhere and becomes
+ * measurable, then a useLayoutEffect measures its real size and corrects
+ * the position - flipping above the trigger if there isn't enough room
+ * below (e.g. the trigger is near the bottom of the screen). useLayoutEffect
+ * specifically (not useEffect) is what keeps this flicker-free: it runs
+ * synchronously after the DOM commits but before the browser paints, so
+ * any correction happens invisibly rather than as a visible jump.
  */
 export function CategoryPicker({ doc, categoryId, onAssign, onCreateAndAssign, onClear }: CategoryPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -43,20 +46,55 @@ export function CategoryPicker({ doc, categoryId, onAssign, onCreateAndAssign, o
 
   const current = getCategory(doc, categoryId);
 
-  const reposition = useCallback(() => {
+  const open = () => {
     const trigger = triggerRef.current;
     if (!trigger) return;
-    setDropdownPos(computeDropdownPosition(trigger.getBoundingClientRect()));
-  }, []);
-
-  const open = () => {
-    reposition();
+    const rect = trigger.getBoundingClientRect();
+    setDropdownPos({ top: rect.bottom + 4, left: Math.max(8, rect.right - DROPDOWN_WIDTH) });
     setIsOpen(true);
   };
   const close = () => {
     setIsOpen(false);
     setQuery("");
   };
+
+  // Measures the dropdown's real rendered size (only possible once it's
+  // actually in the DOM, which is why `open` above uses a naive guess
+  // first) and flips it above the trigger if it doesn't fit below.
+  // Re-runs when `query` changes too, since filtering the category list
+  // changes the dropdown's height.
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    const trigger = triggerRef.current;
+    const dropdown = dropdownRef.current;
+    if (!trigger || !dropdown) return;
+    const triggerRect = trigger.getBoundingClientRect();
+    const dropdownRect = dropdown.getBoundingClientRect();
+    const next = computeFlippedPosition(
+      triggerRect,
+      { width: dropdownRect.width, height: dropdownRect.height },
+      { width: window.innerWidth, height: window.innerHeight }
+    );
+    setDropdownPos((prev) => (prev && prev.top === next.top && prev.left === next.left ? prev : next));
+  }, [isOpen, query]);
+
+  // Same measure-and-flip logic, reused for scroll/resize while open -
+  // the dropdown is already rendered by this point, so there's no need
+  // for the naive-guess step `open` uses.
+  const reposition = useCallback(() => {
+    const trigger = triggerRef.current;
+    const dropdown = dropdownRef.current;
+    if (!trigger || !dropdown) return;
+    const triggerRect = trigger.getBoundingClientRect();
+    const dropdownRect = dropdown.getBoundingClientRect();
+    setDropdownPos(
+      computeFlippedPosition(
+        triggerRect,
+        { width: dropdownRect.width, height: dropdownRect.height },
+        { width: window.innerWidth, height: window.innerHeight }
+      )
+    );
+  }, []);
 
   // Click-outside-to-close needs to check both the trigger AND the
   // portaled dropdown - they're no longer DOM siblings under one wrapper

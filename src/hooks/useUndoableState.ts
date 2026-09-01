@@ -34,7 +34,7 @@ const DEBOUNCE_MS = 500;
  * immediate-undo, and the stale-redo edge case - was verified with a
  * standalone test mirroring this exact logic before writing this file.
  */
-export function useUndoableState<T>(initial: T): UndoableState<T> {
+export function useUndoableState<T>(initial: T | (() => T)): UndoableState<T> {
   const [present, setPresentState] = useState<T>(initial);
   const past = useRef<T[]>([]);
   const future = useRef<T[]>([]);

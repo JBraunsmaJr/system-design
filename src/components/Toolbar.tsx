@@ -1,4 +1,4 @@
-import { ListChecks, Redo2, Undo2, Workflow } from "lucide-react";
+import { Check, ListChecks, Redo2, Undo2, Workflow } from "lucide-react";
 import { ExportMenu } from "./ExportMenu";
 
 interface ToolbarProps {
@@ -20,6 +20,7 @@ interface ToolbarProps {
   onSetViewMode: (mode: "diagram" | "requirements") => void;
   onExportRequirementsMarkdown: () => void;
   canExportRequirements: boolean;
+  hasAutosaved: boolean;
 }
 
 export function Toolbar({
@@ -41,6 +42,7 @@ export function Toolbar({
   onSetViewMode,
   onExportRequirementsMarkdown,
   canExportRequirements,
+  hasAutosaved,
 }: ToolbarProps) {
   return (
     <header className="toolbar">
@@ -72,6 +74,12 @@ export function Toolbar({
         onChange={(e) => onTitleChange(e.target.value)}
         aria-label="Diagram title"
       />
+      {hasAutosaved && (
+        <span className="toolbar__autosave-indicator" title="Your work is automatically saved in this browser">
+          <Check size={12} />
+          Autosaved
+        </span>
+      )}
       <div className="toolbar__actions">
         <button
           type="button"

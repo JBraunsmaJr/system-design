@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { getItemType } from "../../domain/requirementsRegistry";
 import type { RequirementItem, RequirementsDocument } from "../../domain/requirementsTypes";
 
@@ -5,16 +6,22 @@ interface ReferencePopoverProps {
   doc: RequirementsDocument;
   candidates: RequirementItem[];
   selectedIndex: number;
-  /** Top/left in pixels, relative to the positioned ancestor (the editor
-   * wrapper) - see RequirementEditor's caret-tracking. */
+  /** Fixed-position viewport coordinates - see RequirementEditor's
+   * caret-tracking and flip-positioning logic. */
   position: { top: number; left: number };
   onSelect: (item: RequirementItem) => void;
   onHoverIndex: (index: number) => void;
 }
 
-export function ReferencePopover({ doc, candidates, selectedIndex, position, onSelect, onHoverIndex }: ReferencePopoverProps) {
+// forwardRef so RequirementEditor can measure this popover's actual
+// rendered size (via getBoundingClientRect) to decide whether it needs to
+// flip above the caret instead of below - see the useLayoutEffect there.
+export const ReferencePopover = forwardRef<HTMLDivElement, ReferencePopoverProps>(function ReferencePopover(
+  { doc, candidates, selectedIndex, position, onSelect, onHoverIndex },
+  ref
+) {
   return (
-    <div className="reference-popover" style={{ position: "fixed", top: position.top, left: position.left }}>
+    <div ref={ref} className="reference-popover" style={{ position: "fixed", top: position.top, left: position.left }}>
       {candidates.map((item, index) => {
         const type = getItemType(doc, item.typeId);
         return (
@@ -41,4 +48,4 @@ export function ReferencePopover({ doc, candidates, selectedIndex, position, onS
       })}
     </div>
   );
-}
+});

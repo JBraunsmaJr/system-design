@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ChangeEvent,
@@ -8,6 +9,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { getCaretPixelPosition } from "../../domain/caretPosition";
+import { computeFlippedPosition, type AnchorRect } from "../../domain/popoverPosition";
 import type { RequirementItem, RequirementsDocument } from "../../domain/requirementsTypes";
 import { ReferencePopover } from "./ReferencePopover";
 
@@ -39,6 +41,11 @@ function filterCandidates(items: RequirementItem[], query: string, limit = 8): R
 }
 
 const NON_RETRIGGER_KEYS = new Set(["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"]);
+// Used only for the naive initial position guess (left-clamping) before
+// the popover has actually rendered and can be measured - the real
+// rendered width (CSS min/max-width: 220-320px) is what the layout effect
+// below uses once available, so this only has to be a reasonable estimate.
+const ESTIMATED_POPOVER_WIDTH = 260;
 
 interface RequirementEditorProps {
   value: string;
@@ -51,6 +58,8 @@ interface RequirementEditorProps {
 
 export function RequirementEditor({ value, onChange, onDone, doc, autoFocus, placeholder }: RequirementEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const anchorRef = useRef<AnchorRect | null>(null);
   const [trigger, setTrigger] = useState<ActiveTrigger | null>(null);
   const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0 });
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -70,6 +79,11 @@ export function RequirementEditor({ value, onChange, onDone, doc, autoFocus, pla
   // `overflow: hidden` for its rounded corners, and the scrollable list
   // above it has `overflow: auto` - either would silently cut the popover
   // off the moment it extended past that boundary.
+  //
+  // This sets a naive "below the caret line" guess - the layout effect
+  // below corrects it to "above" if there isn't enough room (e.g. typing
+  // a reference near the bottom of the screen), once the popover has
+  // actually rendered and its real size can be measured.
   const updateTriggerState = useCallback(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
@@ -80,12 +94,33 @@ export function RequirementEditor({ value, onChange, onDone, doc, autoFocus, pla
     if (active) {
       const textareaRect = textarea.getBoundingClientRect();
       const caret = getCaretPixelPosition(textarea, caretPos);
-      setPopoverPos({
-        top: textareaRect.top + caret.top + caret.lineHeight,
-        left: textareaRect.left + caret.left,
-      });
+      const anchorTop = textareaRect.top + caret.top;
+      const anchorRight = textareaRect.left + caret.left;
+      const anchor: AnchorRect = { top: anchorTop, bottom: anchorTop + caret.lineHeight, right: anchorRight };
+      anchorRef.current = anchor;
+      setPopoverPos({ top: anchor.bottom + 4, left: Math.max(8, anchor.right - ESTIMATED_POPOVER_WIDTH) });
     }
   }, []);
+
+  // Once the popover has actually rendered (so its real size can be
+  // measured), checks whether the naive "below the caret" guess actually
+  // fits in the viewport and flips it above if not - synchronously before
+  // paint (useLayoutEffect, not useEffect), so any correction is invisible
+  // rather than a visible jump. Re-runs when the candidate list changes
+  // (filtering by query changes the popover's height).
+  useLayoutEffect(() => {
+    if (!trigger) return;
+    const anchor = anchorRef.current;
+    const popover = popoverRef.current;
+    if (!anchor || !popover) return;
+    const rect = popover.getBoundingClientRect();
+    const next = computeFlippedPosition(
+      anchor,
+      { width: rect.width, height: rect.height },
+      { width: window.innerWidth, height: window.innerHeight }
+    );
+    setPopoverPos((prev) => (prev.top === next.top && prev.left === next.left ? prev : next));
+  }, [trigger, candidates.length]);
 
   // A portaled, fixed-position popover doesn't automatically track the
   // caret's on-screen position as the page scrolls the way an in-flow
@@ -179,6 +214,7 @@ export function RequirementEditor({ value, onChange, onDone, doc, autoFocus, pla
         candidates.length > 0 &&
         createPortal(
           <ReferencePopover
+            ref={popoverRef}
             doc={doc}
             candidates={candidates}
             selectedIndex={selectedIndex}

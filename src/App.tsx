@@ -32,6 +32,7 @@ import {
   type DiagramPath,
 } from "./domain/subDiagramTree";
 import { toDiagramFile, downloadDiagram, parseDiagramFile } from "./domain/serialization";
+import { loadAutosave, saveAutosave } from "./domain/autosave";
 import { downloadRequirementsMarkdown } from "./domain/requirementsExport";
 import { exportDiagramAsPng, exportDiagramAsSvg } from "./domain/imageExport";
 import type { ArchNodeData, ArchEdgeData, Scenario, ScenarioStep, SubDiagram } from "./domain/types";
@@ -55,6 +56,44 @@ interface DiagramSnapshot {
   requirements: RequirementsDocument;
 }
 
+/**
+ * Converts a raw parsed DiagramFile (from a loaded .json file OR a
+ * restored localStorage autosave - both go through parseDiagramFile, so
+ * both land here) into a normalized DiagramSnapshot ready to become app
+ * state. Shared by onFileSelected and the autosave-restore lazy
+ * initializer specifically so the two paths can't drift out of sync with
+ * each other over time.
+ */
+function diagramFileToSnapshot(file: ReturnType<typeof parseDiagramFile>): DiagramSnapshot {
+  // Diagrams saved before cross-diagram scenarios existed won't have a
+  // `path` on their steps at all - default those to root so old files
+  // keep working rather than crashing on a missing field.
+  const normalizedScenarios = file.scenarios.map((sc) => ({
+    ...sc,
+    steps: sc.steps.map((st) => ({ ...st, path: st.path ?? [] })),
+  }));
+  // Similarly, files saved before requirements existed at all (or that
+  // otherwise ended up with no item types) still need the built-in types
+  // populated, or "Add item" would have nothing to offer.
+  const normalizedRequirements =
+    file.requirements.itemTypes.length > 0
+      ? file.requirements
+      : { ...file.requirements, itemTypes: BUILT_IN_ITEM_TYPES };
+  return {
+    title: file.title,
+    root: { nodes: file.nodes, edges: file.edges },
+    scenarios: normalizedScenarios,
+    requirements: normalizedRequirements,
+  };
+}
+
+const DEFAULT_SNAPSHOT: DiagramSnapshot = {
+  title: "Untitled Diagram",
+  root: EMPTY_DIAGRAM,
+  scenarios: [],
+  requirements: { ...EMPTY_REQUIREMENTS_DOCUMENT, itemTypes: BUILT_IN_ITEM_TYPES },
+};
+
 function App() {
   const {
     present: diagram,
@@ -64,11 +103,13 @@ function App() {
     resetHistory: resetDiagramHistory,
     canUndo,
     canRedo,
-  } = useUndoableState<DiagramSnapshot>({
-    title: "Untitled Diagram",
-    root: EMPTY_DIAGRAM,
-    scenarios: [],
-    requirements: { ...EMPTY_REQUIREMENTS_DOCUMENT, itemTypes: BUILT_IN_ITEM_TYPES },
+  } = useUndoableState<DiagramSnapshot>(() => {
+    // Lazy init (a function, not a direct value) so this - including the
+    // localStorage read - only ever runs once, on the very first render,
+    // rather than on every render the way a plain object literal argument
+    // would be recomputed (even though only the first one is ever used).
+    const autosave = loadAutosave();
+    return autosave ? diagramFileToSnapshot(autosave) : DEFAULT_SNAPSHOT;
   });
   const { title, root, scenarios, requirements } = diagram;
 
@@ -107,6 +148,24 @@ function App() {
       setDiagram((prev) => ({ ...prev, requirements: updater(prev.requirements) })),
     [setDiagram]
   );
+
+  // Auto-saves the current diagram to localStorage so a refresh, an
+  // accidental tab close, or a crash doesn't lose work - separate from
+  // (and in addition to) the explicit Save button, which downloads a real
+  // .json file. Debounced the same way undo history is, so a burst of
+  // rapid edits (a drag, a typing session) results in one write once
+  // things settle rather than one write per change. Once the first
+  // autosave has happened, the indicator stays showing "Autosaved" for
+  // the rest of the session - there's no real value in a live-ticking
+  // "saved 3s ago" here, just confidence that it's happening at all.
+  const [hasAutosaved, setHasAutosaved] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      saveAutosave(toDiagramFile(diagram.title, diagram.root.nodes, diagram.root.edges, diagram.scenarios, diagram.requirements));
+      setHasAutosaved(true);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [diagram]);
 
   const [path, setPath] = useState<DiagramPath>([]);
 
@@ -821,12 +880,7 @@ function App() {
     if (root.nodes.length > 0 && !window.confirm("Clear the current diagram? Unsaved changes will be lost.")) {
       return;
     }
-    resetDiagramHistory({
-      title: "Untitled Diagram",
-      root: EMPTY_DIAGRAM,
-      scenarios: [],
-      requirements: { ...EMPTY_REQUIREMENTS_DOCUMENT, itemTypes: BUILT_IN_ITEM_TYPES },
-    });
+    resetDiagramHistory(DEFAULT_SNAPSHOT);
     setPath([]);
     setActiveScenarioId(null);
     setActiveStepIndex(0);
@@ -865,27 +919,7 @@ function App() {
       try {
         const text = await file.text();
         const parsed = parseDiagramFile(text);
-        // Diagrams saved before cross-diagram scenarios existed won't have a
-        // `path` on their steps at all - default those to root so old files
-        // keep working rather than crashing on a missing field.
-        const normalizedScenarios = parsed.scenarios.map((sc) => ({
-          ...sc,
-          steps: sc.steps.map((st) => ({ ...st, path: st.path ?? [] })),
-        }));
-        // Similarly, files saved before requirements existed at all (or
-        // that otherwise ended up with no item types) still need the
-        // built-in types populated, or "Add item" would have nothing to
-        // offer.
-        const normalizedRequirements =
-          parsed.requirements.itemTypes.length > 0
-            ? parsed.requirements
-            : { ...parsed.requirements, itemTypes: BUILT_IN_ITEM_TYPES };
-        resetDiagramHistory({
-          title: parsed.title,
-          root: { nodes: parsed.nodes, edges: parsed.edges },
-          scenarios: normalizedScenarios,
-          requirements: normalizedRequirements,
-        });
+        resetDiagramHistory(diagramFileToSnapshot(parsed));
         setPath([]);
         setActiveScenarioId(null);
         setActiveStepIndex(0);
@@ -925,6 +959,7 @@ function App() {
           onSetViewMode={setViewMode}
           onExportRequirementsMarkdown={onExportRequirementsMarkdown}
           canExportRequirements={requirements.items.length > 0}
+          hasAutosaved={hasAutosaved}
         />
       )}
       <input

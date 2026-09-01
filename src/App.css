@@ -91,6 +91,20 @@
   outline: none;
 }
 
+.toolbar__autosave-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--chrome-text-dim);
+  font-size: 11.5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.toolbar__autosave-indicator svg {
+  color: #0fa36b;
+}
+
 .toolbar__actions {
   display: flex;
   gap: 8px;
