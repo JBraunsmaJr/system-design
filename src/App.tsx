@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useUndoableState } from "./hooks/useUndoableState";
 import {
   ReactFlowProvider,
   applyNodeChanges,
@@ -18,6 +19,7 @@ import { Palette } from "./components/Palette";
 import { Canvas } from "./components/Canvas";
 import { Inspector } from "./components/Inspector";
 import { ScenarioPanel } from "./components/ScenarioPanel";
+import { RequirementsView } from "./components/requirements/RequirementsView";
 import { NODE_TYPES } from "./domain/nodeRegistry";
 import { GROUP_TYPES } from "./domain/groupRegistry";
 import { SHAPE_TYPES } from "./domain/shapeRegistry";
@@ -30,8 +32,12 @@ import {
   type DiagramPath,
 } from "./domain/subDiagramTree";
 import { toDiagramFile, downloadDiagram, parseDiagramFile } from "./domain/serialization";
+import { downloadRequirementsMarkdown } from "./domain/requirementsExport";
 import { exportDiagramAsPng, exportDiagramAsSvg } from "./domain/imageExport";
 import type { ArchNodeData, ArchEdgeData, Scenario, ScenarioStep, SubDiagram } from "./domain/types";
+import type { RequirementsDocument } from "./domain/requirementsTypes";
+import { EMPTY_REQUIREMENTS_DOCUMENT } from "./domain/requirementsTypes";
+import { BUILT_IN_ITEM_TYPES } from "./domain/requirementsRegistry";
 import "./App.css";
 
 let idSeed = 0;
@@ -39,10 +45,69 @@ const nextId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${idSee
 
 const EMPTY_DIAGRAM: SubDiagram = { nodes: [], edges: [] };
 
-function App() {
-  const [title, setTitle] = useState("Untitled Diagram");
+/** The undoable "document" - everything a user would think of as "my
+ * content", as opposed to transient UI state like which panel is open or
+ * what's currently selected (neither of which belongs in undo history). */
+interface DiagramSnapshot {
+  title: string;
+  root: SubDiagram;
+  scenarios: Scenario[];
+  requirements: RequirementsDocument;
+}
 
-  const [root, setRoot] = useState<SubDiagram>(EMPTY_DIAGRAM);
+function App() {
+  const {
+    present: diagram,
+    set: setDiagram,
+    undo: undoDiagram,
+    redo: redoDiagram,
+    resetHistory: resetDiagramHistory,
+    canUndo,
+    canRedo,
+  } = useUndoableState<DiagramSnapshot>({
+    title: "Untitled Diagram",
+    root: EMPTY_DIAGRAM,
+    scenarios: [],
+    requirements: { ...EMPTY_REQUIREMENTS_DOCUMENT, itemTypes: BUILT_IN_ITEM_TYPES },
+  });
+  const { title, root, scenarios, requirements } = diagram;
+
+  // Thin wrappers matching the exact shape of the plain useState setters
+  // they replace (value OR updater-function), so every existing call site
+  // below - setTitle(...), setRoot(...), setScenarios(...) - keeps working
+  // completely unchanged; only how these three pieces of state are STORED
+  // changed (one combined, undoable container instead of three separate
+  // useState calls), not how anything calls into them.
+  const setTitle = useCallback(
+    (updater: string | ((prev: string) => string)) =>
+      setDiagram((prev) => ({
+        ...prev,
+        title: typeof updater === "function" ? (updater as (p: string) => string)(prev.title) : updater,
+      })),
+    [setDiagram]
+  );
+  const setRoot = useCallback(
+    (updater: SubDiagram | ((prev: SubDiagram) => SubDiagram)) =>
+      setDiagram((prev) => ({
+        ...prev,
+        root: typeof updater === "function" ? (updater as (p: SubDiagram) => SubDiagram)(prev.root) : updater,
+      })),
+    [setDiagram]
+  );
+  const setScenarios = useCallback(
+    (updater: Scenario[] | ((prev: Scenario[]) => Scenario[])) =>
+      setDiagram((prev) => ({
+        ...prev,
+        scenarios: typeof updater === "function" ? (updater as (p: Scenario[]) => Scenario[])(prev.scenarios) : updater,
+      })),
+    [setDiagram]
+  );
+  const setRequirements = useCallback(
+    (updater: (prev: RequirementsDocument) => RequirementsDocument) =>
+      setDiagram((prev) => ({ ...prev, requirements: updater(prev.requirements) })),
+    [setDiagram]
+  );
+
   const [path, setPath] = useState<DiagramPath>([]);
 
   const { nodes, edges } = useMemo(() => getSubDiagramAtPath(root, path), [root, path]);
@@ -52,14 +117,14 @@ function App() {
     (updater: (nodes: Node<ArchNodeData>[]) => Node<ArchNodeData>[]) => {
       setRoot((r) => updateSubDiagramAtPath(r, path, (sd) => ({ ...sd, nodes: updater(sd.nodes) })));
     },
-    [path]
+    [path, setRoot]
   );
 
   const setCurrentEdges = useCallback(
     (updater: (edges: Edge<ArchEdgeData>[]) => Edge<ArchEdgeData>[]) => {
       setRoot((r) => updateSubDiagramAtPath(r, path, (sd) => ({ ...sd, edges: updater(sd.edges) })));
     },
-    [path]
+    [path, setRoot]
   );
 
   const onNodesChange = useCallback<OnNodesChange<Node<ArchNodeData>>>(
@@ -76,10 +141,13 @@ function App() {
   const [selectedEdgeIds, setSelectedEdgeIds] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [activeScenarioId, setActiveScenarioId] = useState<string | null>(null);
   const [activeStepIndex, setActiveStepIndex] = useState(0);
   const [isPresenting, setIsPresenting] = useState(false);
+  // Which top-level page is showing - the diagram canvas or the
+  // requirements document. Deliberately NOT part of the undoable
+  // DiagramSnapshot: switching pages isn't an edit to the content itself.
+  const [viewMode, setViewMode] = useState<"diagram" | "requirements">("diagram");
   const [isScenarioPanelOpen, setIsScenarioPanelOpen] = useState(false);
   const [activeStepId, setActiveStepId] = useState<string | null>(null);
   const [isSelectMode, setIsSelectMode] = useState(false);
@@ -429,16 +497,22 @@ function App() {
     const id = nextId("scenario");
     setScenarios((s) => [...s, { id, title: `Scenario ${s.length + 1}`, steps: [] }]);
     setActiveScenarioId(id);
-  }, []);
+  }, [setScenarios]);
 
-  const onRenameScenario = useCallback((id: string, newTitle: string) => {
-    setScenarios((s) => s.map((sc) => (sc.id === id ? { ...sc, title: newTitle } : sc)));
-  }, []);
+  const onRenameScenario = useCallback(
+    (id: string, newTitle: string) => {
+      setScenarios((s) => s.map((sc) => (sc.id === id ? { ...sc, title: newTitle } : sc)));
+    },
+    [setScenarios]
+  );
 
-  const onDeleteScenario = useCallback((id: string) => {
-    setScenarios((s) => s.filter((sc) => sc.id !== id));
-    setActiveScenarioId((cur) => (cur === id ? null : cur));
-  }, []);
+  const onDeleteScenario = useCallback(
+    (id: string) => {
+      setScenarios((s) => s.filter((sc) => sc.id !== id));
+      setActiveScenarioId((cur) => (cur === id ? null : cur));
+    },
+    [setScenarios]
+  );
 
   const onSelectScenario = useCallback((id: string) => {
     setActiveScenarioId(id);
@@ -479,7 +553,7 @@ function App() {
       );
       setActiveStepId(newStepId);
     },
-    [selectedNodeIds, selectedEdgeIds, path]
+    [selectedNodeIds, selectedEdgeIds, path, setScenarios]
   );
 
   // Adds/removes the current canvas selection to/from an EXISTING step's
@@ -508,7 +582,7 @@ function App() {
         )
       );
     },
-    [selectedNodeIds, selectedEdgeIds]
+    [selectedNodeIds, selectedEdgeIds, setScenarios]
   );
 
   const onRemoveSelectionFromStep = useCallback(
@@ -535,39 +609,48 @@ function App() {
         )
       );
     },
-    [selectedNodeIds, selectedEdgeIds]
+    [selectedNodeIds, selectedEdgeIds, setScenarios]
   );
 
-  const onUpdateStep = useCallback((scenarioId: string, stepId: string, patch: Partial<ScenarioStep>) => {
-    setScenarios((s) =>
-      s.map((sc) =>
-        sc.id === scenarioId
-          ? { ...sc, steps: sc.steps.map((st) => (st.id === stepId ? { ...st, ...patch } : st)) }
-          : sc
-      )
-    );
-  }, []);
+  const onUpdateStep = useCallback(
+    (scenarioId: string, stepId: string, patch: Partial<ScenarioStep>) => {
+      setScenarios((s) =>
+        s.map((sc) =>
+          sc.id === scenarioId
+            ? { ...sc, steps: sc.steps.map((st) => (st.id === stepId ? { ...st, ...patch } : st)) }
+            : sc
+        )
+      );
+    },
+    [setScenarios]
+  );
 
-  const onDeleteStep = useCallback((scenarioId: string, stepId: string) => {
-    setScenarios((s) =>
-      s.map((sc) => (sc.id === scenarioId ? { ...sc, steps: sc.steps.filter((st) => st.id !== stepId) } : sc))
-    );
-    setActiveStepId((cur) => (cur === stepId ? null : cur));
-  }, []);
+  const onDeleteStep = useCallback(
+    (scenarioId: string, stepId: string) => {
+      setScenarios((s) =>
+        s.map((sc) => (sc.id === scenarioId ? { ...sc, steps: sc.steps.filter((st) => st.id !== stepId) } : sc))
+      );
+      setActiveStepId((cur) => (cur === stepId ? null : cur));
+    },
+    [setScenarios]
+  );
 
-  const onMoveStep = useCallback((scenarioId: string, stepId: string, direction: "up" | "down") => {
-    setScenarios((s) =>
-      s.map((sc) => {
-        if (sc.id !== scenarioId) return sc;
-        const index = sc.steps.findIndex((st) => st.id === stepId);
-        const swapWith = direction === "up" ? index - 1 : index + 1;
-        if (index === -1 || swapWith < 0 || swapWith >= sc.steps.length) return sc;
-        const steps = [...sc.steps];
-        [steps[index], steps[swapWith]] = [steps[swapWith], steps[index]];
-        return { ...sc, steps };
-      })
-    );
-  }, []);
+  const onMoveStep = useCallback(
+    (scenarioId: string, stepId: string, direction: "up" | "down") => {
+      setScenarios((s) =>
+        s.map((sc) => {
+          if (sc.id !== scenarioId) return sc;
+          const index = sc.steps.findIndex((st) => st.id === stepId);
+          const swapWith = direction === "up" ? index - 1 : index + 1;
+          if (index === -1 || swapWith < 0 || swapWith >= sc.steps.length) return sc;
+          const steps = [...sc.steps];
+          [steps[index], steps[swapWith]] = [steps[swapWith], steps[index]];
+          return { ...sc, steps };
+        })
+      );
+    },
+    [setScenarios]
+  );
 
   // Falls back to the first scenario when nothing's been explicitly picked
   // yet (e.g. right after loading a file, or before ever touching the
@@ -649,6 +732,20 @@ function App() {
     return () => window.removeEventListener("keydown", handler);
   }, [isPresenting, selectedNodeIds, selectedEdgeIds, onDeleteSelection]);
 
+  const onUndo = useCallback(() => {
+    if (isPresenting) return;
+    undoDiagram();
+    setSelectedNodeIds([]);
+    setSelectedEdgeIds([]);
+  }, [isPresenting, undoDiagram]);
+
+  const onRedo = useCallback(() => {
+    if (isPresenting) return;
+    redoDiagram();
+    setSelectedNodeIds([]);
+    setSelectedEdgeIds([]);
+  }, [isPresenting, redoDiagram]);
+
   // Copy/paste: Ctrl+C / Cmd+C and Ctrl+V / Cmd+V, same guards as delete -
   // never while presenting, never while typing in a field (so normal text
   // copy/paste inside the Inspector's inputs is completely unaffected).
@@ -670,6 +767,35 @@ function App() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [isPresenting, onCopy, onPaste]);
+
+  // Undo/redo: Ctrl+Z / Cmd+Z, and BOTH common redo conventions - Ctrl+Y
+  // (Windows-style) and Ctrl+Shift+Z (Mac/many web apps) - same guards as
+  // copy/paste. Deliberately a separate effect from copy/paste above rather
+  // than folded into it, since the redo-key handling (checking shiftKey,
+  // supporting two different keys) is its own bit of complexity worth
+  // keeping visually separate from the simpler copy/paste block.
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if (isPresenting) return;
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) return;
+      if (!(event.ctrlKey || event.metaKey)) return;
+      const key = event.key.toLowerCase();
+      if (key === "z" && event.shiftKey) {
+        event.preventDefault();
+        onRedo();
+      } else if (key === "z") {
+        event.preventDefault();
+        onUndo();
+      } else if (key === "y") {
+        event.preventDefault();
+        onRedo();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [isPresenting, onUndo, onRedo]);
 
   // Presentation navigation: arrow keys / space / escape.
   useEffect(() => {
@@ -695,21 +821,24 @@ function App() {
     if (root.nodes.length > 0 && !window.confirm("Clear the current diagram? Unsaved changes will be lost.")) {
       return;
     }
-    setRoot(EMPTY_DIAGRAM);
+    resetDiagramHistory({
+      title: "Untitled Diagram",
+      root: EMPTY_DIAGRAM,
+      scenarios: [],
+      requirements: { ...EMPTY_REQUIREMENTS_DOCUMENT, itemTypes: BUILT_IN_ITEM_TYPES },
+    });
     setPath([]);
-    setScenarios([]);
     setActiveScenarioId(null);
     setActiveStepIndex(0);
     setIsPresenting(false);
-    setTitle("Untitled Diagram");
-  }, [root.nodes.length]);
+  }, [root.nodes.length, resetDiagramHistory]);
 
   // Always saves the full tree from the root, regardless of which level
   // you're currently viewing - a save from inside a drilled-down sub-diagram
   // must not lose everything above/beside it.
   const onSave = useCallback(() => {
-    downloadDiagram(toDiagramFile(title, root.nodes, root.edges, scenarios));
-  }, [title, root, scenarios]);
+    downloadDiagram(toDiagramFile(title, root.nodes, root.edges, scenarios, requirements));
+  }, [title, root, scenarios, requirements]);
 
   // Exports export the CURRENT view (whatever level you're looking at),
   // unlike Save - drilling into a node and exporting just that sub-diagram
@@ -722,34 +851,51 @@ function App() {
     exportDiagramAsSvg(nodes, title).catch((err) => window.alert((err as Error).message));
   }, [nodes, title]);
 
+  const onExportRequirementsMarkdown = useCallback(() => {
+    downloadRequirementsMarkdown(title, requirements);
+  }, [title, requirements]);
+
   const onLoadClick = useCallback(() => fileInputRef.current?.click(), []);
 
-  const onFileSelected = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-    try {
-      const text = await file.text();
-      const diagram = parseDiagramFile(text);
-      setRoot({ nodes: diagram.nodes, edges: diagram.edges });
-      setPath([]);
-      // Diagrams saved before cross-diagram scenarios existed won't have a
-      // `path` on their steps at all - default those to root so old files
-      // keep working rather than crashing on a missing field.
-      setScenarios(
-        diagram.scenarios.map((sc) => ({
+  const onFileSelected = useCallback(
+    async (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      event.target.value = "";
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const parsed = parseDiagramFile(text);
+        // Diagrams saved before cross-diagram scenarios existed won't have a
+        // `path` on their steps at all - default those to root so old files
+        // keep working rather than crashing on a missing field.
+        const normalizedScenarios = parsed.scenarios.map((sc) => ({
           ...sc,
           steps: sc.steps.map((st) => ({ ...st, path: st.path ?? [] })),
-        }))
-      );
-      setActiveScenarioId(null);
-      setActiveStepIndex(0);
-      setIsPresenting(false);
-      setTitle(diagram.title);
-    } catch (err) {
-      window.alert(`Couldn't open that file: ${(err as Error).message}`);
-    }
-  }, []);
+        }));
+        // Similarly, files saved before requirements existed at all (or
+        // that otherwise ended up with no item types) still need the
+        // built-in types populated, or "Add item" would have nothing to
+        // offer.
+        const normalizedRequirements =
+          parsed.requirements.itemTypes.length > 0
+            ? parsed.requirements
+            : { ...parsed.requirements, itemTypes: BUILT_IN_ITEM_TYPES };
+        resetDiagramHistory({
+          title: parsed.title,
+          root: { nodes: parsed.nodes, edges: parsed.edges },
+          scenarios: normalizedScenarios,
+          requirements: normalizedRequirements,
+        });
+        setPath([]);
+        setActiveScenarioId(null);
+        setActiveStepIndex(0);
+        setIsPresenting(false);
+      } catch (err) {
+        window.alert(`Couldn't open that file: ${(err as Error).message}`);
+      }
+    },
+    [resetDiagramHistory]
+  );
 
   const selectedNodeId = selectedNodeIds[0] ?? null;
   const selectedEdgeId = selectedEdgeIds[0] ?? null;
@@ -771,6 +917,14 @@ function App() {
           onExportPng={onExportPng}
           onExportSvg={onExportSvg}
           canExport={nodes.length > 0}
+          onUndo={onUndo}
+          onRedo={onRedo}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          viewMode={viewMode}
+          onSetViewMode={setViewMode}
+          onExportRequirementsMarkdown={onExportRequirementsMarkdown}
+          canExportRequirements={requirements.items.length > 0}
         />
       )}
       <input
@@ -781,6 +935,8 @@ function App() {
         onChange={onFileSelected}
       />
       <div className="app__body">
+        {viewMode === "diagram" && (
+          <>
         {!isPresenting && (
           <div className={`app__sidebar-wrap app__sidebar-wrap--left${isPaletteCollapsed ? " is-collapsed" : ""}`}>
             {!isPaletteCollapsed && <Palette />}
@@ -880,6 +1036,11 @@ function App() {
               />
             )}
           </div>
+        )}
+          </>
+        )}
+        {viewMode === "requirements" && (
+          <RequirementsView doc={requirements} onUpdateDoc={setRequirements} />
         )}
       </div>
     </div>

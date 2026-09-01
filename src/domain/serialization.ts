@@ -1,7 +1,9 @@
 import type { Node, Edge } from "@xyflow/react";
 import type { ArchNodeData, ArchEdgeData, Scenario } from "./types";
+import type { RequirementsDocument } from "./requirementsTypes";
+import { EMPTY_REQUIREMENTS_DOCUMENT } from "./requirementsTypes";
 
-export const SCHEMA_VERSION = "0.3";
+export const SCHEMA_VERSION = "0.4";
 
 export interface DiagramFile {
   schemaVersion: string;
@@ -15,6 +17,7 @@ export interface DiagramFile {
   nodes: Node<ArchNodeData>[];
   edges: Edge<ArchEdgeData>[];
   scenarios: Scenario[];
+  requirements: RequirementsDocument;
   metadata: {
     updatedAt: string;
   };
@@ -24,7 +27,8 @@ export function toDiagramFile(
   title: string,
   nodes: Node<ArchNodeData>[],
   edges: Edge<ArchEdgeData>[],
-  scenarios: Scenario[]
+  scenarios: Scenario[],
+  requirements: RequirementsDocument
 ): DiagramFile {
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -32,6 +36,7 @@ export function toDiagramFile(
     nodes,
     edges,
     scenarios,
+    requirements,
     metadata: { updatedAt: new Date().toISOString() },
   };
 }
@@ -50,10 +55,23 @@ export function downloadDiagram(file: DiagramFile): void {
   URL.revokeObjectURL(url);
 }
 
+function parseRequirementsDocument(raw: unknown): RequirementsDocument {
+  if (!raw || typeof raw !== "object") return EMPTY_REQUIREMENTS_DOCUMENT;
+  const r = raw as Partial<RequirementsDocument>;
+  return {
+    itemTypes: Array.isArray(r.itemTypes) ? r.itemTypes : [],
+    items: Array.isArray(r.items) ? r.items : [],
+    nextSequence: r.nextSequence && typeof r.nextSequence === "object" ? r.nextSequence : {},
+  };
+}
+
 /**
  * Parses and lightly validates a diagram file loaded from disk.
- * `scenarios` defaults to [] so files saved before this feature existed
- * (schemaVersion 0.1) still open without error.
+ * `scenarios` defaults to [] and `requirements` defaults to an empty
+ * document so files saved before those features existed still open
+ * without error - App.tsx's onFileSelected is responsible for further
+ * normalizing an empty requirements document to include the built-in item
+ * types, same as it already does for scenario steps missing a `path`.
  */
 export function parseDiagramFile(raw: string): DiagramFile {
   const parsed = JSON.parse(raw);
@@ -66,6 +84,7 @@ export function parseDiagramFile(raw: string): DiagramFile {
     nodes: parsed.nodes,
     edges: parsed.edges,
     scenarios: Array.isArray(parsed.scenarios) ? parsed.scenarios : [],
+    requirements: parseRequirementsDocument(parsed.requirements),
     metadata: parsed.metadata ?? { updatedAt: new Date().toISOString() },
   };
 }
