@@ -1120,6 +1120,7 @@ function App() {
             onUpdateProgramIncrements={setProgramIncrements}
             requirements={requirements}
             onUpdateRequirements={setRequirements}
+            onNavigateToRequirement={onNavigateToRequirement}
           />
         )}
       </div>

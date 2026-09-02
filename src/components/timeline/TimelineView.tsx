@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { CalendarRange, ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
 import {
   computeSprintDateRanges,
@@ -7,13 +7,16 @@ import {
   type ProgramIncrement,
   type Sprint,
 } from "../../domain/programIncrements";
-import type { RequirementsDocument } from "../../domain/requirementsTypes";
+import { getItemType } from "../../domain/requirementsRegistry";
+import type { RequirementItem, RequirementsDocument } from "../../domain/requirementsTypes";
+import { RequirementDetailModal } from "./RequirementDetailModal";
 
 interface TimelineViewProps {
   programIncrements: ProgramIncrement[];
   onUpdateProgramIncrements: (updater: (pis: ProgramIncrement[]) => ProgramIncrement[]) => void;
   requirements: RequirementsDocument;
   onUpdateRequirements: (updater: (doc: RequirementsDocument) => RequirementsDocument) => void;
+  onNavigateToRequirement?: (itemId: string) => void;
 }
 
 let idCounter = 0;
@@ -29,7 +32,16 @@ function todayISO(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function TimelineView({ programIncrements, onUpdateProgramIncrements, requirements, onUpdateRequirements }: TimelineViewProps) {
+export function TimelineView({
+  programIncrements,
+  onUpdateProgramIncrements,
+  requirements,
+  onUpdateRequirements,
+  onNavigateToRequirement,
+}: TimelineViewProps) {
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
+
   const onAddPI = () => {
     const newPI: ProgramIncrement = {
       id: nextId("pi"),
@@ -116,14 +128,66 @@ export function TimelineView({ programIncrements, onUpdateProgramIncrements, req
     );
   };
 
-  // Counted once per render rather than filtered separately inside every
-  // SprintRow - a single pass over requirements.items builds a lookup all
-  // sprint rows share, instead of each one re-scanning the full item list.
-  const itemCountBySprintId = new Map<string, number>();
+  const onUpdateItem = (id: string, patch: Partial<RequirementItem>) => {
+    onUpdateRequirements((doc) => ({
+      ...doc,
+      items: doc.items.map((item) => (item.id === id ? { ...item, ...patch } : item)),
+    }));
+  };
+
+  const onDeleteItem = (id: string) => {
+    onUpdateRequirements((doc) => ({
+      ...doc,
+      items: doc.items.filter((item) => item.id !== id),
+    }));
+  };
+
+  const onCreateAndAssignCategory = (itemId: string, label: string) => {
+    const trimmed = label.trim();
+    if (!trimmed) return;
+    onUpdateRequirements((doc) => {
+      const existing = doc.categories.find((c) => c.label.toLowerCase() === trimmed.toLowerCase());
+      if (existing) {
+        return {
+          ...doc,
+          items: doc.items.map((item) => (item.id === itemId ? { ...item, categoryId: existing.id } : item)),
+        };
+      }
+      const newCategory = {
+        id: `cat-${Date.now().toString(36)}`,
+        label: trimmed,
+        color: "#22B8CF",
+      };
+      return {
+        ...doc,
+        categories: [...doc.categories, newCategory],
+        items: doc.items.map((item) => (item.id === itemId ? { ...item, categoryId: newCategory.id } : item)),
+      };
+    });
+  };
+
+  const onMoveItemToSprint = (itemId: string, targetSprintId: string) => {
+    onUpdateRequirements((doc) => ({
+      ...doc,
+      items: doc.items.map((item) => (item.id === itemId ? { ...item, sprintId: targetSprintId } : item)),
+    }));
+  };
+
+  // Grouped once per render for both count badges and the visual board
+  // columns - a single pass over requirements.items builds a lookup all
+  // sprint rows and board columns share.
+  const itemsBySprintId = new Map<string, RequirementItem[]>();
   for (const item of requirements.items) {
     if (!item.sprintId) continue;
-    itemCountBySprintId.set(item.sprintId, (itemCountBySprintId.get(item.sprintId) ?? 0) + 1);
+    const list = itemsBySprintId.get(item.sprintId);
+    if (list) {
+      list.push(item);
+    } else {
+      itemsBySprintId.set(item.sprintId, [item]);
+    }
   }
+
+  const selectedItem = selectedItemId ? requirements.items.find((it) => it.id === selectedItemId) : null;
 
   return (
     <div className="timeline-view">
@@ -144,7 +208,13 @@ export function TimelineView({ programIncrements, onUpdateProgramIncrements, req
             <ProgramIncrementCard
               key={pi.id}
               pi={pi}
-              itemCountBySprintId={itemCountBySprintId}
+              requirements={requirements}
+              itemsBySprintId={itemsBySprintId}
+              draggedItemId={draggedItemId}
+              onSelectItem={(id) => setSelectedItemId(id)}
+              onDragStartItem={(id) => setDraggedItemId(id)}
+              onDragEndItem={() => setDraggedItemId(null)}
+              onDropItem={onMoveItemToSprint}
               onUpdateName={(name) => onUpdatePIName(pi.id, name)}
               onUpdateStart={(startDate) => onUpdatePIStart(pi.id, startDate)}
               onDelete={() => onDeletePI(pi.id)}
@@ -157,13 +227,33 @@ export function TimelineView({ programIncrements, onUpdateProgramIncrements, req
           ))
         )}
       </div>
+
+      {selectedItem && (
+        <RequirementDetailModal
+          item={selectedItem}
+          doc={requirements}
+          programIncrements={programIncrements}
+          onClose={() => setSelectedItemId(null)}
+          onUpdateItem={onUpdateItem}
+          onDeleteItem={onDeleteItem}
+          onNavigateToRequirement={onNavigateToRequirement}
+          onSelectItem={(id) => setSelectedItemId(id)}
+          onCreateAndAssignCategory={onCreateAndAssignCategory}
+        />
+      )}
     </div>
   );
 }
 
 interface ProgramIncrementCardProps {
   pi: ProgramIncrement;
-  itemCountBySprintId: Map<string, number>;
+  requirements: RequirementsDocument;
+  itemsBySprintId: Map<string, RequirementItem[]>;
+  draggedItemId: string | null;
+  onSelectItem: (itemId: string) => void;
+  onDragStartItem: (itemId: string) => void;
+  onDragEndItem: () => void;
+  onDropItem: (itemId: string, sprintId: string) => void;
   onUpdateName: (name: string) => void;
   onUpdateStart: (startDate: string) => void;
   onDelete: () => void;
@@ -176,7 +266,13 @@ interface ProgramIncrementCardProps {
 
 function ProgramIncrementCard({
   pi,
-  itemCountBySprintId,
+  requirements,
+  itemsBySprintId,
+  draggedItemId,
+  onSelectItem,
+  onDragStartItem,
+  onDragEndItem,
+  onDropItem,
   onUpdateName,
   onUpdateStart,
   onDelete,
@@ -233,7 +329,7 @@ function ProgramIncrementCard({
             key={sprint.id}
             sprint={sprint}
             range={rangeBySprintId.get(sprint.id)}
-            itemCount={itemCountBySprintId.get(sprint.id) ?? 0}
+            itemCount={itemsBySprintId.get(sprint.id)?.length ?? 0}
             isFirst={index === 0}
             isLast={index === pi.sprints.length - 1}
             onUpdateName={(name) => onUpdateSprintName(sprint.id, name)}
@@ -249,7 +345,181 @@ function ProgramIncrementCard({
         <Plus size={12} />
         Sprint
       </button>
+
+      {pi.sprints.length > 0 && (
+        <div className="pi-card__board">
+          <div className="pi-card__board-header">
+            <span className="pi-card__board-title">Sprint Timeline Board</span>
+          </div>
+          <div className="pi-card__board-columns">
+            {pi.sprints.map((sprint) => (
+              <SprintBoardColumn
+                key={sprint.id}
+                sprint={sprint}
+                range={rangeBySprintId.get(sprint.id)}
+                items={itemsBySprintId.get(sprint.id) ?? []}
+                requirements={requirements}
+                draggedItemId={draggedItemId}
+                onSelectItem={onSelectItem}
+                onDragStartItem={onDragStartItem}
+                onDragEndItem={onDragEndItem}
+                onDropItem={onDropItem}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </section>
+  );
+}
+
+interface SprintBoardColumnProps {
+  sprint: Sprint;
+  range?: { startDate: string; endDate: string };
+  items: RequirementItem[];
+  requirements: RequirementsDocument;
+  draggedItemId: string | null;
+  onSelectItem: (id: string) => void;
+  onDragStartItem: (id: string) => void;
+  onDragEndItem: () => void;
+  onDropItem: (itemId: string, sprintId: string) => void;
+}
+
+function SprintBoardColumn({
+  sprint,
+  range,
+  items,
+  requirements,
+  draggedItemId,
+  onSelectItem,
+  onDragStartItem,
+  onDragEndItem,
+  onDropItem,
+}: SprintBoardColumnProps) {
+  const [isDragOver, setIsDragOver] = useState(false);
+  const dragCounter = useRef(0);
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounter.current += 1;
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounter.current -= 1;
+    if (dragCounter.current <= 0) {
+      dragCounter.current = 0;
+      setIsDragOver(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounter.current = 0;
+    setIsDragOver(false);
+    const itemId = e.dataTransfer.getData("text/plain") || draggedItemId;
+    if (itemId) {
+      onDropItem(itemId, sprint.id);
+    }
+  };
+
+  return (
+    <div
+      className={`pi-board-column${isDragOver ? " is-drag-over" : ""}`}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      <div className="pi-board-column__header">
+        <div className="pi-board-column__name-row">
+          <span className="pi-board-column__name">{sprint.name}</span>
+          <span
+            className="pi-board-column__count"
+            title={`${items.length} requirement item${items.length === 1 ? "" : "s"} assigned`}
+          >
+            {items.length}
+          </span>
+        </div>
+        <div className="pi-board-column__meta">
+          <span className="pi-board-column__dates">
+            {range ? `${range.startDate} → ${range.endDate}` : "—"}
+          </span>
+          <span className="pi-board-column__duration">{sprint.durationDays}d</span>
+        </div>
+      </div>
+      <div className="pi-board-column__items">
+        {items.length === 0 ? (
+          <div className="pi-board-column__empty">
+            {isDragOver ? "Drop to assign to sprint" : "No requirements assigned"}
+          </div>
+        ) : (
+          items.map((item) => {
+            const type = getItemType(requirements, item.typeId);
+            const category = item.categoryId
+              ? requirements.categories.find((c) => c.id === item.categoryId)
+              : undefined;
+            const isDragging = draggedItemId === item.id;
+            return (
+              <div
+                key={item.id}
+                className={`pi-board-item${isDragging ? " is-dragging" : ""}`}
+                draggable={true}
+                onDragStart={(e) => {
+                  e.dataTransfer.setData("text/plain", item.id);
+                  e.dataTransfer.effectAllowed = "move";
+                  onDragStartItem(item.id);
+                }}
+                onDragEnd={() => {
+                  onDragEndItem();
+                }}
+                onClick={() => onSelectItem(item.id)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onSelectItem(item.id);
+                  }
+                }}
+                title={`Click to view description • Drag to move to another sprint`}
+              >
+                <div className="pi-board-item__header">
+                  <span
+                    className="pi-board-item__id"
+                    style={{
+                      color: type?.color ?? "var(--chrome-text-dim)",
+                      borderColor: `${type?.color ?? "var(--chrome-border)"}66`,
+                    }}
+                  >
+                    {item.id}
+                  </span>
+                  {category && (
+                    <span
+                      className="pi-board-item__category"
+                      style={{
+                        color: category.color,
+                        borderColor: `${category.color}44`,
+                        background: `${category.color}18`,
+                      }}
+                    >
+                      {category.label}
+                    </span>
+                  )}
+                </div>
+                <div className="pi-board-item__title">{item.title || "Untitled"}</div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
   );
 }
 
