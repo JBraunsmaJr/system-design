@@ -474,7 +474,9 @@ function SprintBoardColumn({
                 onDragStart={(e) => {
                   e.dataTransfer.setData("text/plain", item.id);
                   e.dataTransfer.effectAllowed = "move";
-                  onDragStartItem(item.id);
+                  requestAnimationFrame(() => {
+                    onDragStartItem(item.id);
+                  });
                 }}
                 onDragEnd={() => {
                   onDragEndItem();
