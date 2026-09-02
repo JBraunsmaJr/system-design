@@ -1109,6 +1109,7 @@ function App() {
           <RequirementsView
             doc={requirements}
             onUpdateDoc={setRequirements}
+            programIncrements={programIncrements}
             focusItemId={pendingRequirementFocus}
             onFocusHandled={() => setPendingRequirementFocus(null)}
           />
@@ -1117,6 +1118,7 @@ function App() {
           <TimelineView
             programIncrements={programIncrements}
             onUpdateProgramIncrements={setProgramIncrements}
+            requirements={requirements}
             onUpdateRequirements={setRequirements}
           />
         )}

@@ -4,11 +4,14 @@ import { getItemType } from "../../domain/requirementsRegistry";
 import { RequirementBody } from "./RequirementBody";
 import { RequirementEditor } from "./RequirementEditor";
 import { CategoryPicker } from "./CategoryPicker";
+import { SprintPicker } from "./SprintPicker";
 import type { RequirementItem, RequirementsDocument } from "../../domain/requirementsTypes";
+import type { ProgramIncrement } from "../../domain/programIncrements";
 
 interface RequirementCardProps {
   item: RequirementItem;
   doc: RequirementsDocument;
+  programIncrements: ProgramIncrement[];
   onUpdateItem: (id: string, patch: Partial<RequirementItem>) => void;
   onDeleteItem: (id: string) => void;
   onNavigateToItem: (itemId: string) => void;
@@ -22,6 +25,7 @@ interface RequirementCardProps {
 export function RequirementCard({
   item,
   doc,
+  programIncrements,
   onUpdateItem,
   onDeleteItem,
   onNavigateToItem,
@@ -49,6 +53,12 @@ export function RequirementCard({
             onAssign={(categoryId) => onUpdateItem(item.id, { categoryId })}
             onCreateAndAssign={(label) => onCreateAndAssignCategory(item.id, label)}
             onClear={() => onUpdateItem(item.id, { categoryId: undefined })}
+          />
+          <SprintPicker
+            programIncrements={programIncrements}
+            sprintId={item.sprintId}
+            onAssign={(sprintId) => onUpdateItem(item.id, { sprintId })}
+            onClear={() => onUpdateItem(item.id, { sprintId: undefined })}
           />
           <button
             type="button"

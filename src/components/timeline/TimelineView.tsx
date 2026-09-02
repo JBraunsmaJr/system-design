@@ -12,6 +12,7 @@ import type { RequirementsDocument } from "../../domain/requirementsTypes";
 interface TimelineViewProps {
   programIncrements: ProgramIncrement[];
   onUpdateProgramIncrements: (updater: (pis: ProgramIncrement[]) => ProgramIncrement[]) => void;
+  requirements: RequirementsDocument;
   onUpdateRequirements: (updater: (doc: RequirementsDocument) => RequirementsDocument) => void;
 }
 
@@ -28,7 +29,7 @@ function todayISO(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function TimelineView({ programIncrements, onUpdateProgramIncrements, onUpdateRequirements }: TimelineViewProps) {
+export function TimelineView({ programIncrements, onUpdateProgramIncrements, requirements, onUpdateRequirements }: TimelineViewProps) {
   const onAddPI = () => {
     const newPI: ProgramIncrement = {
       id: nextId("pi"),
@@ -115,6 +116,15 @@ export function TimelineView({ programIncrements, onUpdateProgramIncrements, onU
     );
   };
 
+  // Counted once per render rather than filtered separately inside every
+  // SprintRow - a single pass over requirements.items builds a lookup all
+  // sprint rows share, instead of each one re-scanning the full item list.
+  const itemCountBySprintId = new Map<string, number>();
+  for (const item of requirements.items) {
+    if (!item.sprintId) continue;
+    itemCountBySprintId.set(item.sprintId, (itemCountBySprintId.get(item.sprintId) ?? 0) + 1);
+  }
+
   return (
     <div className="timeline-view">
       <div className="timeline-view__toolbar">
@@ -134,6 +144,7 @@ export function TimelineView({ programIncrements, onUpdateProgramIncrements, onU
             <ProgramIncrementCard
               key={pi.id}
               pi={pi}
+              itemCountBySprintId={itemCountBySprintId}
               onUpdateName={(name) => onUpdatePIName(pi.id, name)}
               onUpdateStart={(startDate) => onUpdatePIStart(pi.id, startDate)}
               onDelete={() => onDeletePI(pi.id)}
@@ -152,6 +163,7 @@ export function TimelineView({ programIncrements, onUpdateProgramIncrements, onU
 
 interface ProgramIncrementCardProps {
   pi: ProgramIncrement;
+  itemCountBySprintId: Map<string, number>;
   onUpdateName: (name: string) => void;
   onUpdateStart: (startDate: string) => void;
   onDelete: () => void;
@@ -164,6 +176,7 @@ interface ProgramIncrementCardProps {
 
 function ProgramIncrementCard({
   pi,
+  itemCountBySprintId,
   onUpdateName,
   onUpdateStart,
   onDelete,
@@ -220,6 +233,7 @@ function ProgramIncrementCard({
             key={sprint.id}
             sprint={sprint}
             range={rangeBySprintId.get(sprint.id)}
+            itemCount={itemCountBySprintId.get(sprint.id) ?? 0}
             isFirst={index === 0}
             isLast={index === pi.sprints.length - 1}
             onUpdateName={(name) => onUpdateSprintName(sprint.id, name)}
@@ -242,6 +256,7 @@ function ProgramIncrementCard({
 interface SprintRowProps {
   sprint: Sprint;
   range: { startDate: string; endDate: string } | undefined;
+  itemCount: number;
   isFirst: boolean;
   isLast: boolean;
   onUpdateName: (name: string) => void;
@@ -251,7 +266,7 @@ interface SprintRowProps {
   onMoveDown: () => void;
 }
 
-function SprintRow({ sprint, range, isFirst, isLast, onUpdateName, onUpdateEnd, onDelete, onMoveUp, onMoveDown }: SprintRowProps) {
+function SprintRow({ sprint, range, itemCount, isFirst, isLast, onUpdateName, onUpdateEnd, onDelete, onMoveUp, onMoveDown }: SprintRowProps) {
   return (
     <div className="sprint-row">
       <div className="sprint-row__reorder">
@@ -274,6 +289,11 @@ function SprintRow({ sprint, range, isFirst, isLast, onUpdateName, onUpdateEnd, 
         onChange={(e) => onUpdateEnd(e.target.value)}
       />
       <span className="sprint-row__duration">{sprint.durationDays}d</span>
+      {itemCount > 0 && (
+        <span className="sprint-row__item-count" title={`${itemCount} requirement item${itemCount === 1 ? "" : "s"} assigned`}>
+          {itemCount}
+        </span>
+      )}
       <button type="button" className="sprint-row__delete" onClick={onDelete} aria-label={`Delete ${sprint.name}`}>
         <Trash2 size={12} />
       </button>
