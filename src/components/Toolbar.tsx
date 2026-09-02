@@ -1,4 +1,4 @@
-import { Check, ListChecks, Redo2, Undo2, Workflow } from "lucide-react";
+import { Check, ListChecks, CalendarRange, Redo2, Undo2, Workflow } from "lucide-react";
 import { ExportMenu } from "./ExportMenu";
 
 interface ToolbarProps {
@@ -16,8 +16,8 @@ interface ToolbarProps {
   onRedo: () => void;
   canUndo: boolean;
   canRedo: boolean;
-  viewMode: "diagram" | "requirements";
-  onSetViewMode: (mode: "diagram" | "requirements") => void;
+  viewMode: "diagram" | "requirements" | "timeline";
+  onSetViewMode: (mode: "diagram" | "requirements" | "timeline") => void;
   onExportRequirementsMarkdown: () => void;
   canExportRequirements: boolean;
   hasAutosaved: boolean;
@@ -66,6 +66,14 @@ export function Toolbar({
         >
           <ListChecks size={13} />
           Requirements
+        </button>
+        <button
+          type="button"
+          className={viewMode === "timeline" ? "active" : undefined}
+          onClick={() => onSetViewMode("timeline")}
+        >
+          <CalendarRange size={13} />
+          Timeline
         </button>
       </div>
       <input

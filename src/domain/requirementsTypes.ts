@@ -38,6 +38,10 @@ export interface RequirementItem {
    * which is a normal, valid state (categorizing everything up front
    * shouldn't be required to start writing). */
   categoryId?: string;
+  /** References a ProgramIncrements Sprint.id - undefined means
+   * unassigned/backlog, same "not everything has to be scheduled up
+   * front" reasoning as categoryId. */
+  sprintId?: string;
 }
 
 export interface RequirementsDocument {

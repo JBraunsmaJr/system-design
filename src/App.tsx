@@ -20,6 +20,7 @@ import { Canvas } from "./components/Canvas";
 import { Inspector } from "./components/Inspector";
 import { ScenarioPanel } from "./components/ScenarioPanel";
 import { RequirementsView } from "./components/requirements/RequirementsView";
+import { TimelineView } from "./components/timeline/TimelineView";
 import { NODE_TYPES } from "./domain/nodeRegistry";
 import { GROUP_TYPES } from "./domain/groupRegistry";
 import { SHAPE_TYPES } from "./domain/shapeRegistry";
@@ -39,6 +40,7 @@ import type { ArchNodeData, ArchEdgeData, Scenario, ScenarioStep, SubDiagram } f
 import type { RequirementsDocument } from "./domain/requirementsTypes";
 import { EMPTY_REQUIREMENTS_DOCUMENT } from "./domain/requirementsTypes";
 import { BUILT_IN_ITEM_TYPES } from "./domain/requirementsRegistry";
+import type { ProgramIncrement } from "./domain/programIncrements";
 import "./App.css";
 
 let idSeed = 0;
@@ -54,6 +56,7 @@ interface DiagramSnapshot {
   root: SubDiagram;
   scenarios: Scenario[];
   requirements: RequirementsDocument;
+  programIncrements: ProgramIncrement[];
 }
 
 /**
@@ -84,6 +87,7 @@ function diagramFileToSnapshot(file: ReturnType<typeof parseDiagramFile>): Diagr
     root: { nodes: file.nodes, edges: file.edges },
     scenarios: normalizedScenarios,
     requirements: normalizedRequirements,
+    programIncrements: file.programIncrements,
   };
 }
 
@@ -92,6 +96,7 @@ const DEFAULT_SNAPSHOT: DiagramSnapshot = {
   root: EMPTY_DIAGRAM,
   scenarios: [],
   requirements: { ...EMPTY_REQUIREMENTS_DOCUMENT, itemTypes: BUILT_IN_ITEM_TYPES },
+  programIncrements: [],
 };
 
 function App() {
@@ -111,7 +116,7 @@ function App() {
     const autosave = loadAutosave();
     return autosave ? diagramFileToSnapshot(autosave) : DEFAULT_SNAPSHOT;
   });
-  const { title, root, scenarios, requirements } = diagram;
+  const { title, root, scenarios, requirements, programIncrements } = diagram;
 
   // Thin wrappers matching the exact shape of the plain useState setters
   // they replace (value OR updater-function), so every existing call site
@@ -149,6 +154,12 @@ function App() {
     [setDiagram]
   );
 
+  const setProgramIncrements = useCallback(
+    (updater: (prev: ProgramIncrement[]) => ProgramIncrement[]) =>
+      setDiagram((prev) => ({ ...prev, programIncrements: updater(prev.programIncrements) })),
+    [setDiagram]
+  );
+
   // Auto-saves the current diagram to localStorage so a refresh, an
   // accidental tab close, or a crash doesn't lose work - separate from
   // (and in addition to) the explicit Save button, which downloads a real
@@ -161,7 +172,16 @@ function App() {
   const [hasAutosaved, setHasAutosaved] = useState(false);
   useEffect(() => {
     const timer = setTimeout(() => {
-      saveAutosave(toDiagramFile(diagram.title, diagram.root.nodes, diagram.root.edges, diagram.scenarios, diagram.requirements));
+      saveAutosave(
+        toDiagramFile(
+          diagram.title,
+          diagram.root.nodes,
+          diagram.root.edges,
+          diagram.scenarios,
+          diagram.requirements,
+          diagram.programIncrements
+        )
+      );
       setHasAutosaved(true);
     }, 1000);
     return () => clearTimeout(timer);
@@ -206,7 +226,7 @@ function App() {
   // Which top-level page is showing - the diagram canvas or the
   // requirements document. Deliberately NOT part of the undoable
   // DiagramSnapshot: switching pages isn't an edit to the content itself.
-  const [viewMode, setViewMode] = useState<"diagram" | "requirements">("diagram");
+  const [viewMode, setViewMode] = useState<"diagram" | "requirements" | "timeline">("diagram");
   // Set together with viewMode when the user clicks a linked requirement
   // pill in the Inspector (while looking at the diagram) - see
   // RequirementsView's focusItemId prop for how this actually triggers
@@ -900,8 +920,8 @@ function App() {
   // you're currently viewing - a save from inside a drilled-down sub-diagram
   // must not lose everything above/beside it.
   const onSave = useCallback(() => {
-    downloadDiagram(toDiagramFile(title, root.nodes, root.edges, scenarios, requirements));
-  }, [title, root, scenarios, requirements]);
+    downloadDiagram(toDiagramFile(title, root.nodes, root.edges, scenarios, requirements, programIncrements));
+  }, [title, root, scenarios, requirements, programIncrements]);
 
   // Exports export the CURRENT view (whatever level you're looking at),
   // unlike Save - drilling into a node and exporting just that sub-diagram
@@ -1091,6 +1111,13 @@ function App() {
             onUpdateDoc={setRequirements}
             focusItemId={pendingRequirementFocus}
             onFocusHandled={() => setPendingRequirementFocus(null)}
+          />
+        )}
+        {viewMode === "timeline" && (
+          <TimelineView
+            programIncrements={programIncrements}
+            onUpdateProgramIncrements={setProgramIncrements}
+            onUpdateRequirements={setRequirements}
           />
         )}
       </div>

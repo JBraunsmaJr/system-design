@@ -2,8 +2,9 @@ import type { Node, Edge } from "@xyflow/react";
 import type { ArchNodeData, ArchEdgeData, Scenario } from "./types";
 import type { RequirementsDocument } from "./requirementsTypes";
 import { EMPTY_REQUIREMENTS_DOCUMENT } from "./requirementsTypes";
+import type { ProgramIncrement } from "./programIncrements";
 
-export const SCHEMA_VERSION = "0.4";
+export const SCHEMA_VERSION = "0.5";
 
 export interface DiagramFile {
   schemaVersion: string;
@@ -18,6 +19,7 @@ export interface DiagramFile {
   edges: Edge<ArchEdgeData>[];
   scenarios: Scenario[];
   requirements: RequirementsDocument;
+  programIncrements: ProgramIncrement[];
   metadata: {
     updatedAt: string;
   };
@@ -28,7 +30,8 @@ export function toDiagramFile(
   nodes: Node<ArchNodeData>[],
   edges: Edge<ArchEdgeData>[],
   scenarios: Scenario[],
-  requirements: RequirementsDocument
+  requirements: RequirementsDocument,
+  programIncrements: ProgramIncrement[]
 ): DiagramFile {
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -37,6 +40,7 @@ export function toDiagramFile(
     edges,
     scenarios,
     requirements,
+    programIncrements,
     metadata: { updatedAt: new Date().toISOString() },
   };
 }
@@ -66,13 +70,34 @@ function parseRequirementsDocument(raw: unknown): RequirementsDocument {
   };
 }
 
+/** A malformed individual PI (missing fields, sprints not an array, etc.)
+ * is dropped from the list entirely rather than throwing and blocking the
+ * whole file from loading - one corrupted PI shouldn't take down
+ * everything else in the document. */
+function parseProgramIncrements(raw: unknown): ProgramIncrement[] {
+  if (!Array.isArray(raw)) return [];
+  const result: ProgramIncrement[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object") continue;
+    const pi = entry as Partial<ProgramIncrement>;
+    if (typeof pi.id !== "string" || typeof pi.name !== "string" || typeof pi.startDate !== "string") continue;
+    if (!Array.isArray(pi.sprints)) continue;
+    const sprints = pi.sprints.filter(
+      (s): s is ProgramIncrement["sprints"][number] =>
+        !!s && typeof s === "object" && typeof s.id === "string" && typeof s.name === "string" && typeof s.durationDays === "number"
+    );
+    result.push({ id: pi.id, name: pi.name, startDate: pi.startDate, sprints });
+  }
+  return result;
+}
+
 /**
  * Parses and lightly validates a diagram file loaded from disk.
- * `scenarios` defaults to [] and `requirements` defaults to an empty
- * document so files saved before those features existed still open
- * without error - App.tsx's onFileSelected is responsible for further
- * normalizing an empty requirements document to include the built-in item
- * types, same as it already does for scenario steps missing a `path`.
+ * `scenarios`/`requirements`/`programIncrements` all default to an empty
+ * state so files saved before those features existed still open without
+ * error - App.tsx's onFileSelected is responsible for further normalizing
+ * an empty requirements document to include the built-in item types, same
+ * as it already does for scenario steps missing a `path`.
  */
 export function parseDiagramFile(raw: string): DiagramFile {
   const parsed = JSON.parse(raw);
@@ -86,6 +111,7 @@ export function parseDiagramFile(raw: string): DiagramFile {
     edges: parsed.edges,
     scenarios: Array.isArray(parsed.scenarios) ? parsed.scenarios : [],
     requirements: parseRequirementsDocument(parsed.requirements),
+    programIncrements: parseProgramIncrements(parsed.programIncrements),
     metadata: parsed.metadata ?? { updatedAt: new Date().toISOString() },
   };
 }
