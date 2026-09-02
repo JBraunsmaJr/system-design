@@ -1,5 +1,7 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
-
+/* Inter and JetBrains Mono are self-hosted via @fontsource (imported in
+   main.tsx, bundled at build time) rather than fetched from
+   fonts.googleapis.com at runtime - this app needs to keep working with
+   no internet access once deployed. */
 :root {
   /* Tool chrome (toolbar / palette / inspector) - dark, quiet, out of the way */
   --chrome-bg: #14161c;
