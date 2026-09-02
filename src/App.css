@@ -2262,10 +2262,16 @@
 
 .requirement-card__header {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 6px;
   padding: 10px 12px;
   border-bottom: 1px solid var(--chrome-border);
+}
+
+.requirement-card__header-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .requirement-card__id {
@@ -2276,8 +2282,7 @@
 }
 
 .requirement-card__title {
-  flex: 1;
-  min-width: 0;
+  width: 100%;
   background: transparent;
   border: none;
   outline: none;
@@ -2285,6 +2290,7 @@
   font-family: var(--sans);
   font-size: 13.5px;
   font-weight: 600;
+  text-overflow: ellipsis;
 }
 
 .requirement-card__delete {
@@ -2294,6 +2300,7 @@
   padding: 4px;
   border-radius: var(--radius-sm);
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 .requirement-card__delete:hover {

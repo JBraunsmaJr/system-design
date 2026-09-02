@@ -39,31 +39,34 @@ export function RequirementCard({
       className={`requirement-card${highlighted ? " is-highlighted" : ""}`}
     >
       <div className="requirement-card__header">
-        <span className="requirement-card__id" style={{ color: type?.color ?? "var(--chrome-text-dim)" }}>
-          {item.id}
-        </span>
+        <div className="requirement-card__header-row">
+          <span className="requirement-card__id" style={{ color: type?.color ?? "var(--chrome-text-dim)" }}>
+            {item.id}
+          </span>
+          <CategoryPicker
+            doc={doc}
+            categoryId={item.categoryId}
+            onAssign={(categoryId) => onUpdateItem(item.id, { categoryId })}
+            onCreateAndAssign={(label) => onCreateAndAssignCategory(item.id, label)}
+            onClear={() => onUpdateItem(item.id, { categoryId: undefined })}
+          />
+          <button
+            type="button"
+            className="requirement-card__delete"
+            onClick={() => onDeleteItem(item.id)}
+            aria-label={`Delete ${item.id}`}
+            title={`Delete ${item.id}`}
+          >
+            <Trash2 size={13} />
+          </button>
+        </div>
         <input
           className="requirement-card__title"
           value={item.title}
           placeholder="Untitled"
+          title={item.title || undefined}
           onChange={(e) => onUpdateItem(item.id, { title: e.target.value })}
         />
-        <CategoryPicker
-          doc={doc}
-          categoryId={item.categoryId}
-          onAssign={(categoryId) => onUpdateItem(item.id, { categoryId })}
-          onCreateAndAssign={(label) => onCreateAndAssignCategory(item.id, label)}
-          onClear={() => onUpdateItem(item.id, { categoryId: undefined })}
-        />
-        <button
-          type="button"
-          className="requirement-card__delete"
-          onClick={() => onDeleteItem(item.id)}
-          aria-label={`Delete ${item.id}`}
-          title={`Delete ${item.id}`}
-        >
-          <Trash2 size={13} />
-        </button>
       </div>
       {isEditingBody ? (
         <RequirementEditor
