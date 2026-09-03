@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { X, ExternalLink, Calendar, Edit3, Check, Trash2 } from "lucide-react";
-import { getItemType } from "../../domain/requirementsRegistry";
+import { getItemType, isItemWorkable } from "../../domain/requirementsRegistry";
 import { computeSprintDateRanges, type ProgramIncrement } from "../../domain/programIncrements";
 import type { RequirementItem, RequirementsDocument } from "../../domain/requirementsTypes";
 import { RequirementBody } from "../requirements/RequirementBody";
 import { RequirementEditor } from "../requirements/RequirementEditor";
 import { CategoryPicker } from "../requirements/CategoryPicker";
+import { StatusPicker } from "../requirements/StatusPicker";
 import { SprintPicker } from "../requirements/SprintPicker";
 import { RelationshipManager } from "../requirements/RelationshipManager";
 import { MemberPicker } from "../team/MemberPicker";
@@ -115,6 +116,9 @@ export function RequirementDetailModal({
               {item.id}
             </span>
             {type && <span className="requirement-detail-modal__type-label">{type.label}</span>}
+            {onUpdateItem && isItemWorkable(doc, item) && (
+              <StatusPicker status={item.status} onChange={(status) => onUpdateItem(item.id, { status })} />
+            )}
 
             {onUpdateItem ? (
               <CategoryPicker

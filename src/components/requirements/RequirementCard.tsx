@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
-import { getItemType } from "../../domain/requirementsRegistry";
+import { getItemType, isItemWorkable } from "../../domain/requirementsRegistry";
 import { RequirementBody } from "./RequirementBody";
 import { RequirementEditor } from "./RequirementEditor";
 import { CategoryPicker } from "./CategoryPicker";
+import { StatusPicker } from "./StatusPicker";
 import { SprintPicker } from "./SprintPicker";
 import { RelationshipManager } from "./RelationshipManager";
 import { MemberPicker } from "../team/MemberPicker";
@@ -57,6 +58,9 @@ export function RequirementCard({
           <span className="requirement-card__id" style={{ color: type?.color ?? "var(--chrome-text-dim)" }}>
             {item.id}
           </span>
+          {isItemWorkable(doc, item) && (
+            <StatusPicker status={item.status} onChange={(status) => onUpdateItem(item.id, { status })} />
+          )}
           <CategoryPicker
             doc={doc}
             categoryId={item.categoryId}

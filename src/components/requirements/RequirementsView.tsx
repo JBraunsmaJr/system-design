@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LayoutList, Search, Settings2, Tags, Waypoints, X } from "lucide-react";
-import { addRelationship, createCategory, generateItemId, isPrefixTaken } from "../../domain/requirementsRegistry";
+import { addRelationship, createCategory, defaultStatusForType, generateItemId, isPrefixTaken } from "../../domain/requirementsRegistry";
 import { RequirementCard } from "./RequirementCard";
 import { ManageTypesModal } from "./ManageTypesModal";
 import { ManageRelationshipTypesModal } from "./ManageRelationshipTypesModal";
@@ -105,7 +105,7 @@ export function RequirementsView({ doc, onUpdateDoc, programIncrements, team, fo
 
   const onAddItem = (typeId: string) => {
     const { id, nextSequence } = generateItemId(doc, typeId);
-    const newItem: RequirementItem = { id, typeId, title: "", body: "" };
+    const newItem: RequirementItem = { id, typeId, title: "", body: "", status: defaultStatusForType(doc, typeId) };
     onUpdateDoc((d) => ({ ...d, items: [...d.items, newItem], nextSequence }));
     // New items should be immediately visible even if a search is
     // narrowing the list, and land at the bottom of their group - scroll
@@ -181,7 +181,7 @@ export function RequirementsView({ doc, onUpdateDoc, programIncrements, team, fo
     return () => cancelAnimationFrame(frame);
   }, [focusItemId, onNavigateToItem, onFocusHandled]);
 
-  const onAddCustomType = (label: string, prefix: string, color: string): boolean => {
+  const onAddCustomType = (label: string, prefix: string, color: string, isWorkable: boolean): boolean => {
     if (isPrefixTaken(doc, prefix)) return false;
     const newType: RequirementItemType = {
       id: nextCustomTypeId(doc),
@@ -189,9 +189,24 @@ export function RequirementsView({ doc, onUpdateDoc, programIncrements, team, fo
       prefix: prefix.toUpperCase(),
       color,
       isBuiltIn: false,
+      isWorkable,
     };
     onUpdateDoc((d) => ({ ...d, itemTypes: [...d.itemTypes, newType] }));
     return true;
+  };
+
+  // Label, color, and isWorkable are all safe to edit after the fact for
+  // ANY type, including built-in ones - none of them are baked into
+  // already-generated item ids the way prefix is, so changing them can't
+  // create a mismatch between an item's stored id and its type's current
+  // definition. This intentionally never accepts a prefix patch (the
+  // caller can only pass these three fields, not arbitrary ones) - prefix
+  // is what actually needs to stay stable once items exist under it.
+  const onUpdateType = (
+    typeId: string,
+    patch: Partial<Pick<RequirementItemType, "label" | "color" | "isWorkable">>
+  ) => {
+    onUpdateDoc((d) => ({ ...d, itemTypes: d.itemTypes.map((t) => (t.id === typeId ? { ...t, ...patch } : t)) }));
   };
 
   const onDeleteCustomType = (typeId: string) => {
@@ -367,6 +382,7 @@ export function RequirementsView({ doc, onUpdateDoc, programIncrements, team, fo
         <ManageTypesModal
           doc={doc}
           onAddCustomType={onAddCustomType}
+          onUpdateType={onUpdateType}
           onDeleteCustomType={onDeleteCustomType}
           onClose={() => setIsManagingTypes(false)}
         />

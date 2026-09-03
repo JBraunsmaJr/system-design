@@ -67,8 +67,15 @@ export function downloadDiagram(file: DiagramFile): void {
 function parseRequirementsDocument(raw: unknown): RequirementsDocument {
   if (!raw || typeof raw !== "object") return EMPTY_REQUIREMENTS_DOCUMENT;
   const r = raw as Partial<RequirementsDocument>;
+  // Files saved before "workable" types existed won't have isWorkable at
+  // all on any of their item types - default it to false (not work)
+  // rather than leaving it undefined, so downstream code can treat the
+  // field as a real boolean instead of needing its own fallback everywhere.
+  const itemTypes = Array.isArray(r.itemTypes)
+    ? r.itemTypes.map((t) => ({ ...t, isWorkable: t.isWorkable ?? false }))
+    : [];
   return {
-    itemTypes: Array.isArray(r.itemTypes) ? r.itemTypes : [],
+    itemTypes,
     categories: Array.isArray(r.categories) ? r.categories : [],
     items: Array.isArray(r.items) ? r.items : [],
     relationshipTypes: Array.isArray(r.relationshipTypes) ? r.relationshipTypes : [],

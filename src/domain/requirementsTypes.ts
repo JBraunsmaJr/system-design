@@ -12,6 +12,14 @@ export interface RequirementItemType {
    * would silently break every existing reference using the old prefix) -
    * custom types can be freely edited/removed. */
   isBuiltIn: boolean;
+  /** Whether items of this type represent actual work to be done (like a
+   * Ticket) versus a descriptive/planning artifact (like a Requirement or
+   * Goal) that documents intent but isn't itself a task. Drives which
+   * items get a status at all, and later, which nodes appear at all in
+   * dependency-order views built on top of this - not everything in the
+   * requirements doc is "work", so not everything should compete for
+   * space in a view specifically about getting work done. */
+  isWorkable: boolean;
 }
 
 /** A user-defined grouping for organizing items by functional area (e.g.
@@ -56,6 +64,13 @@ export interface RequirementRelationship {
   toItemId: string;
 }
 
+/** Fixed, non-extensible - unlike item/relationship types, this isn't
+ * meant to be a user-configurable workflow (no custom columns, no
+ * reordering). A simple three-state model is enough to drive "is this
+ * done, in flight, or not started" without taking on the complexity of a
+ * fully custom workflow engine, which this app doesn't need yet. */
+export type RequirementStatus = "todo" | "in-progress" | "done";
+
 export interface RequirementItem {
   /** The full generated reference id, e.g. "REQ-1" - stable for the life
    * of the item, never reused even after deletion. */
@@ -76,6 +91,14 @@ export interface RequirementItem {
   assigneeId?: string;
   /** Estimated story points / effort */
   points?: number;
+  /** Only meaningful for items of a workable type (see
+   * RequirementItemType.isWorkable) - a non-workable item (a Requirement,
+   * a Goal) simply never has this set, since "status" isn't a concept
+   * that applies to a descriptive artifact. Left optional rather than
+   * defaulted at the type level so a workable item created before this
+   * field existed doesn't need a migration to remain valid - display code
+   * treats a missing status on a workable item as "todo". */
+  status?: RequirementStatus;
 }
 
 export interface RequirementsDocument {

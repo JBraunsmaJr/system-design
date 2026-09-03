@@ -40,7 +40,12 @@ import { exportDiagramAsPng, exportDiagramAsSvg } from "./domain/imageExport";
 import type { ArchNodeData, ArchEdgeData, Scenario, ScenarioStep, SubDiagram } from "./domain/types";
 import type { RequirementsDocument } from "./domain/requirementsTypes";
 import { EMPTY_REQUIREMENTS_DOCUMENT } from "./domain/requirementsTypes";
-import { BUILT_IN_ITEM_TYPES, BUILT_IN_RELATIONSHIP_TYPES } from "./domain/requirementsRegistry";
+import {
+  BUILT_IN_ITEM_TYPES,
+  BUILT_IN_RELATIONSHIP_TYPES,
+  withMissingBuiltInTypes,
+  withMissingBuiltInRelationshipTypes,
+} from "./domain/requirementsRegistry";
 import type { ProgramIncrement } from "./domain/programIncrements";
 import type { TeamDocument } from "./domain/teamTypes";
 import { EMPTY_TEAM_DOCUMENT } from "./domain/teamTypes";
@@ -79,18 +84,17 @@ function diagramFileToSnapshot(file: ReturnType<typeof parseDiagramFile>): Diagr
     ...sc,
     steps: sc.steps.map((st) => ({ ...st, path: st.path ?? [] })),
   }));
-  // Similarly, files saved before requirements existed at all (or that
-  // otherwise ended up with no item types, or predate relationship types
-  // existing) still need the built-in types populated, or "Add item" /
-  // "Add relationship" would have nothing to offer.
-  const normalizedRequirements =
-    file.requirements.itemTypes.length > 0
-      ? file.requirements
-      : { ...file.requirements, itemTypes: BUILT_IN_ITEM_TYPES };
-  const finalRequirements =
-    normalizedRequirements.relationshipTypes.length > 0
-      ? normalizedRequirements
-      : { ...normalizedRequirements, relationshipTypes: BUILT_IN_RELATIONSHIP_TYPES };
+  // Similarly, files saved before requirements existed at all need the
+  // built-in types populated from scratch, or "Add item" / "Add
+  // relationship" would have nothing to offer - and separately, a file
+  // saved after requirements existed but before some LATER built-in type
+  // was added (e.g. before "Ticket") needs that one specific type merged
+  // in, without disturbing anything else already saved.
+  const finalRequirements = {
+    ...file.requirements,
+    itemTypes: withMissingBuiltInTypes(file.requirements.itemTypes),
+    relationshipTypes: withMissingBuiltInRelationshipTypes(file.requirements.relationshipTypes),
+  };
   return {
     title: file.title,
     root: { nodes: file.nodes, edges: file.edges },
