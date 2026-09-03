@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { CalendarRange, ChevronDown, ChevronRight, ChevronUp, Inbox, Plus, Trash2 } from "lucide-react";
+import { CalendarRange, ChevronDown, ChevronRight, ChevronUp, GanttChartSquare, Inbox, Plus, Trash2 } from "lucide-react";
 import {
   computeSprintDateRanges,
   updatePIStartDate,
@@ -15,6 +15,7 @@ import { SprintCapacityBar } from "../team/SprintCapacityBar";
 import { MemberPicker } from "../team/MemberPicker";
 import { PointsPicker } from "../team/PointsPicker";
 import { RequirementDetailModal } from "./RequirementDetailModal";
+import { GanttChart } from "./GanttChart";
 import { SprintQuickAdd } from "./SprintQuickAdd";
 
 interface TimelineViewProps {
@@ -48,6 +49,7 @@ export function TimelineView({
   onNavigateToRequirement,
 }: TimelineViewProps) {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [chartMode, setChartMode] = useState<"board" | "gantt">("board");
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
 
   const onAddPI = () => {
@@ -223,8 +225,33 @@ export function TimelineView({
           <Plus size={13} />
           Program Increment
         </button>
+        <div className="timeline-view__mode-toggle">
+          <button
+            type="button"
+            className={chartMode === "board" ? "active" : undefined}
+            onClick={() => setChartMode("board")}
+          >
+            Board
+          </button>
+          <button
+            type="button"
+            className={chartMode === "gantt" ? "active" : undefined}
+            onClick={() => setChartMode("gantt")}
+          >
+            <GanttChartSquare size={12} />
+            Gantt
+          </button>
+        </div>
       </div>
 
+      {chartMode === "gantt" ? (
+        <GanttChart
+          programIncrements={programIncrements}
+          requirements={requirements}
+          onSelectItem={(id) => setSelectedItemId(id)}
+          onNavigateToRequirement={onNavigateToRequirement}
+        />
+      ) : (
       <div className="timeline-view__content">
         {backlogItems.length > 0 && (
           <BacklogSection
@@ -270,6 +297,7 @@ export function TimelineView({
           ))
         )}
       </div>
+      )}
 
       {selectedItem && (
         <RequirementDetailModal
