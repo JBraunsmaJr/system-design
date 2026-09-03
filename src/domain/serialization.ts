@@ -2,6 +2,7 @@ import type { Node, Edge } from "@xyflow/react";
 import type { ArchNodeData, ArchEdgeData, Scenario } from "./types";
 import type { RequirementsDocument } from "./requirementsTypes";
 import { EMPTY_REQUIREMENTS_DOCUMENT } from "./requirementsTypes";
+import { BUILT_IN_RELATIONSHIP_TYPES } from "./requirementsRegistry";
 import type { ProgramIncrement } from "./programIncrements";
 import type { TeamDocument } from "./teamTypes";
 import { EMPTY_TEAM_DOCUMENT, DEFAULT_TEAM_SETTINGS } from "./teamTypes";
@@ -74,11 +75,17 @@ function parseRequirementsDocument(raw: unknown): RequirementsDocument {
   const itemTypes = Array.isArray(r.itemTypes)
     ? r.itemTypes.map((t) => ({ ...t, isWorkable: t.isWorkable ?? false }))
     : [];
+  const relationshipTypes = Array.isArray(r.relationshipTypes)
+    ? r.relationshipTypes.map((t) => ({
+        ...t,
+        isBlocking: t.isBlocking ?? BUILT_IN_RELATIONSHIP_TYPES.find((b) => b.id === t.id)?.isBlocking ?? false,
+      }))
+    : [];
   return {
     itemTypes,
     categories: Array.isArray(r.categories) ? r.categories : [],
     items: Array.isArray(r.items) ? r.items : [],
-    relationshipTypes: Array.isArray(r.relationshipTypes) ? r.relationshipTypes : [],
+    relationshipTypes,
     relationships: Array.isArray(r.relationships) ? r.relationships : [],
     nextSequence: r.nextSequence && typeof r.nextSequence === "object" ? r.nextSequence : {},
   };

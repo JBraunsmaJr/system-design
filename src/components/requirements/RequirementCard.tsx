@@ -22,7 +22,7 @@ interface RequirementCardProps {
   onDeleteItem: (id: string) => void;
   onNavigateToItem: (itemId: string) => void;
   onCreateAndAssignCategory: (itemId: string, label: string) => void;
-  onAddRelationship: (typeId: string, fromItemId: string, toItemId: string) => void;
+  onAddRelationship: (typeId: string, fromItemId: string, toItemId: string) => string | null;
   onDeleteRelationship: (relationshipId: string) => void;
   /** True briefly after this item was scrolled to via a reference click,
    * so the destination is visually obvious rather than just "the page

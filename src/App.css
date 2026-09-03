@@ -4490,6 +4490,12 @@
   flex-shrink: 0;
 }
 
+.relationship-manager__error {
+  margin: 0 0 6px;
+  color: var(--danger);
+  font-size: 11.5px;
+}
+
 .relationship-manager__list {
   overflow-y: auto;
   display: flex;

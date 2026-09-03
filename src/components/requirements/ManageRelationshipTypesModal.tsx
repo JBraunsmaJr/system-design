@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { Lock, Trash2, X } from "lucide-react";
+import { GitBranch, Lock, Trash2, X } from "lucide-react";
 import type { RequirementsDocument } from "../../domain/requirementsTypes";
 
 interface ManageRelationshipTypesModalProps {
   doc: RequirementsDocument;
-  onAddCustomType: (label: string, inverseLabel: string, color: string) => void;
+  onAddCustomType: (label: string, inverseLabel: string, color: string, isBlocking: boolean) => void;
   onDeleteCustomType: (typeId: string) => void;
   onClose: () => void;
 }
@@ -20,6 +20,7 @@ export function ManageRelationshipTypesModal({
   const [label, setLabel] = useState("");
   const [inverseLabel, setInverseLabel] = useState("");
   const [color, setColor] = useState(DEFAULT_CUSTOM_COLOR);
+  const [isBlocking, setIsBlocking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const onSubmit = () => {
@@ -32,9 +33,10 @@ export function ManageRelationshipTypesModal({
       setError("A label is required.");
       return;
     }
-    onAddCustomType(trimmedLabel, trimmedInverse, color);
+    onAddCustomType(trimmedLabel, trimmedInverse, color, isBlocking);
     setLabel("");
     setInverseLabel("");
+    setIsBlocking(false);
     setError(null);
   };
 
@@ -56,6 +58,13 @@ export function ManageRelationshipTypesModal({
               <span className="manage-types-modal__prefix">
                 {type.inverseLabel !== type.label ? type.inverseLabel : "(symmetric)"}
               </span>
+              {type.isBlocking && (
+                <GitBranch
+                  size={12}
+                  className="manage-types-modal__workable"
+                  aria-label="Represents a blocking dependency"
+                />
+              )}
               {type.isBuiltIn ? (
                 <Lock size={12} className="manage-types-modal__lock" aria-label="Built-in type" />
               ) : (
@@ -91,6 +100,10 @@ export function ManageRelationshipTypesModal({
             }}
           />
           <input type="color" value={color} onChange={(e) => setColor(e.target.value)} aria-label="Type color" />
+          <label className="manage-types-modal__workable-toggle" title="Treated as an ordering constraint - checked for circular dependencies">
+            <input type="checkbox" checked={isBlocking} onChange={(e) => setIsBlocking(e.target.checked)} />
+            Blocking
+          </label>
           <button type="button" className="primary" onClick={onSubmit}>
             Add type
           </button>

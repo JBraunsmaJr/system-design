@@ -147,8 +147,11 @@ export function RequirementsView({ doc, onUpdateDoc, programIncrements, team, fo
     });
   };
 
-  const onAddRelationship = (typeId: string, fromItemId: string, toItemId: string) => {
-    onUpdateDoc((d) => ({ ...d, relationships: addRelationship(d, typeId, fromItemId, toItemId) }));
+  const onAddRelationship = (typeId: string, fromItemId: string, toItemId: string): string | null => {
+    const result = addRelationship(doc, typeId, fromItemId, toItemId);
+    if (result.error) return result.error;
+    onUpdateDoc((d) => ({ ...d, relationships: result.relationships }));
+    return null;
   };
 
   const onDeleteRelationship = (relationshipId: string) => {
@@ -233,13 +236,14 @@ export function RequirementsView({ doc, onUpdateDoc, programIncrements, team, fo
     return counts;
   }, [doc.items]);
 
-  const onAddCustomRelationshipType = (label: string, inverseLabel: string, color: string) => {
+  const onAddCustomRelationshipType = (label: string, inverseLabel: string, color: string, isBlocking: boolean) => {
     const newType: RelationshipType = {
       id: `rel-type-${Date.now().toString(36)}`,
       label,
       inverseLabel,
       color,
       isBuiltIn: false,
+      isBlocking,
     };
     onUpdateDoc((d) => ({ ...d, relationshipTypes: [...d.relationshipTypes, newType] }));
   };

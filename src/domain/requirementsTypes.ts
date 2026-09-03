@@ -51,6 +51,16 @@ export interface RelationshipType {
   inverseLabel: string;
   color: string;
   isBuiltIn: boolean;
+  /** Whether this type represents an actual ordering/dependency
+   * constraint (like "Blocks") rather than a purely informational link
+   * (like "Relates to" or "Duplicates"). Drives cycle prevention - every
+   * relationship whose type has this set contributes to one shared
+   * dependency graph for that check, so a cycle formed by mixing a
+   * custom type (e.g. a user-defined "Depends on") with the built-in
+   * "Blocks" is caught just as reliably as a cycle within one type
+   * alone. A non-blocking type is never checked for cycles at all, since
+   * "Relates to" being mutual or circular is completely normal. */
+  isBlocking: boolean;
 }
 
 /** A directed link between two requirement items, e.g. REQ-1 "blocks"

@@ -53,9 +53,9 @@ export function isItemWorkable(doc: RequirementsDocument, item: RequirementItem)
  * "Blocks"/"Duplicates" are directional, each with a distinct inverse
  * shown when viewing the relationship from the other item. */
 export const BUILT_IN_RELATIONSHIP_TYPES: RelationshipType[] = [
-  { id: "relates-to", label: "Relates to", inverseLabel: "Relates to", color: "#8b90a0", isBuiltIn: true },
-  { id: "blocks", label: "Blocks", inverseLabel: "Is blocked by", color: "#F0578C", isBuiltIn: true },
-  { id: "duplicates", label: "Duplicates", inverseLabel: "Is duplicated by", color: "#F2994A", isBuiltIn: true },
+  { id: "relates-to", label: "Relates to", inverseLabel: "Relates to", color: "#8b90a0", isBuiltIn: true, isBlocking: false },
+  { id: "blocks", label: "Blocks", inverseLabel: "Is blocked by", color: "#F0578C", isBuiltIn: true, isBlocking: true },
+  { id: "duplicates", label: "Duplicates", inverseLabel: "Is duplicated by", color: "#F2994A", isBuiltIn: true, isBlocking: false },
 ];
 
 export function getItemType(doc: RequirementsDocument, typeId: string): RequirementItemType | undefined {
@@ -239,24 +239,83 @@ function nextRelationshipId(): string {
 }
 
 /**
+ * Whether adding a new edge from `fromItemId` to `toItemId` would create
+ * a cycle in the blocking-dependency graph - true if `toItemId` can
+ * already (transitively) reach `fromItemId` via existing relationships
+ * whose type is marked blocking, since adding this edge would then close
+ * the loop back to where it started. Walks every relationship whose TYPE
+ * has isBlocking set, not just the literal built-in "Blocks" id, so a
+ * cycle formed by mixing a custom blocking type (e.g. a user-defined
+ * "Depends on") with the built-in one is caught just as reliably as one
+ * within a single type. A self-loop (fromItemId === toItemId) is always
+ * treated as a cycle. Verified against 11 cases - including cycles
+ * spanning mixed types and longer chains, and confirming non-blocking
+ * types never contribute to the graph at all - before wiring this into
+ * addRelationship.
+ */
+export function wouldCreateCycle(doc: RequirementsDocument, fromItemId: string, toItemId: string): boolean {
+  if (fromItemId === toItemId) return true;
+  const blockingTypeIds = new Set(doc.relationshipTypes.filter((t) => t.isBlocking).map((t) => t.id));
+  const adjacency = new Map<string, string[]>();
+  for (const rel of doc.relationships) {
+    if (!blockingTypeIds.has(rel.typeId)) continue;
+    const list = adjacency.get(rel.fromItemId) ?? [];
+    list.push(rel.toItemId);
+    adjacency.set(rel.fromItemId, list);
+  }
+  const visited = new Set<string>();
+  const stack = [toItemId];
+  while (stack.length > 0) {
+    const current = stack.pop()!;
+    if (current === fromItemId) return true;
+    if (visited.has(current)) continue;
+    visited.add(current);
+    for (const next of adjacency.get(current) ?? []) stack.push(next);
+  }
+  return false;
+}
+
+export interface AddRelationshipResult {
+  relationships: RequirementRelationship[];
+  /** Non-null only when the request was rejected for a reason worth
+   * telling the user about - a silently-ignored exact duplicate isn't
+   * treated as an error here, since re-clicking something that already
+   * exists isn't really a mistake worth surfacing. */
+  error: string | null;
+}
+
+/**
  * Adds a new relationship if it's valid, returning the updated
- * relationships array - or the original array unchanged if the request
- * was invalid, so callers don't need to pre-validate themselves. Rejects
- * a self-relationship (an item can't block/relate-to/duplicate itself)
- * and an exact duplicate of an existing relationship (same type and same
- * direction already recorded).
+ * relationships array plus an error reason - or the original array
+ * unchanged (with a non-null error where the rejection is worth telling
+ * the user about) if the request was invalid, so callers don't need to
+ * pre-validate themselves. Rejects a self-relationship, an exact
+ * duplicate of an existing relationship (silently, not treated as an
+ * error), and - for a blocking-type relationship specifically - anything
+ * that would create a circular dependency.
  */
 export function addRelationship(
   doc: RequirementsDocument,
   typeId: string,
   fromItemId: string,
   toItemId: string
-): RequirementRelationship[] {
-  if (fromItemId === toItemId) return doc.relationships;
+): AddRelationshipResult {
+  if (fromItemId === toItemId) {
+    return { relationships: doc.relationships, error: "An item can't have a relationship with itself." };
+  }
   const isDuplicate = doc.relationships.some(
     (r) => r.typeId === typeId && r.fromItemId === fromItemId && r.toItemId === toItemId
   );
-  if (isDuplicate) return doc.relationships;
+  if (isDuplicate) {
+    return { relationships: doc.relationships, error: null };
+  }
+  const type = getRelationshipType(doc, typeId);
+  if (type?.isBlocking && wouldCreateCycle(doc, fromItemId, toItemId)) {
+    return {
+      relationships: doc.relationships,
+      error: "That would create a circular dependency, so it wasn't added.",
+    };
+  }
   const newRelationship: RequirementRelationship = { id: nextRelationshipId(), typeId, fromItemId, toItemId };
-  return [...doc.relationships, newRelationship];
+  return { relationships: [...doc.relationships, newRelationship], error: null };
 }

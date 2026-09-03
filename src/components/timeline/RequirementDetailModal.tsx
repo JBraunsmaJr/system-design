@@ -24,7 +24,7 @@ interface RequirementDetailModalProps {
   onNavigateToRequirement?: (itemId: string) => void;
   onSelectItem?: (itemId: string) => void;
   onCreateAndAssignCategory?: (itemId: string, label: string) => void;
-  onAddRelationship?: (typeId: string, fromItemId: string, toItemId: string) => void;
+  onAddRelationship?: (typeId: string, fromItemId: string, toItemId: string) => string | null;
   onDeleteRelationship?: (relationshipId: string) => void;
 }
 

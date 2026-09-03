@@ -187,8 +187,11 @@ export function TimelineView({
     }));
   };
 
-  const onAddRelationship = (typeId: string, fromItemId: string, toItemId: string) => {
-    onUpdateRequirements((doc) => ({ ...doc, relationships: addRelationship(doc, typeId, fromItemId, toItemId) }));
+  const onAddRelationship = (typeId: string, fromItemId: string, toItemId: string): string | null => {
+    const result = addRelationship(requirements, typeId, fromItemId, toItemId);
+    if (result.error) return result.error;
+    onUpdateRequirements((doc) => ({ ...doc, relationships: result.relationships }));
+    return null;
   };
 
   const onDeleteRelationship = (relationshipId: string) => {
