@@ -5451,12 +5451,17 @@
 }
 
 .sprint-capacity-bar__breakdown {
-  border-top: 1px solid var(--chrome-border);
+  z-index: 250;
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
   padding: 8px;
-  background: rgba(0, 0, 0, 0.15);
+  background: var(--chrome-bg-raised);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
   display: flex;
   flex-direction: column;
   gap: 6px;
+  max-height: 320px;
+  overflow-y: auto;
 }
 
 .sprint-capacity-bar__breakdown-title {
@@ -5479,8 +5484,6 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-height: 190px;
-  overflow-y: auto;
 }
 
 .sprint-capacity-bar__member-item {

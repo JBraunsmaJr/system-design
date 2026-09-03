@@ -1,14 +1,36 @@
-import { useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Users, ChevronDown, ChevronUp, AlertTriangle, CheckCircle2, Calendar } from "lucide-react";
 import type { SprintCapacitySummary } from "../../domain/teamTypes";
+import { computeFlippedPosition } from "../../domain/popoverPosition";
 
 interface SprintCapacityBarProps {
   summary: SprintCapacitySummary;
   compact?: boolean;
 }
 
+/**
+ * The expanded member breakdown portals to document.body instead of
+ * expanding inline. It used to push the sprint column's item list
+ * further down the page every time it opened - with enough team members,
+ * that meant scrolling past a tall breakdown just to see the actual
+ * stories, and on a narrow viewport there wasn't a height cap that didn't
+ * eventually eat into that same problem. A capped height with its own
+ * scroll (tried first) bounds how tall the inline content gets, but the
+ * items list still has to make room for the header size, whatever it is.
+ * The only fix that keeps the items list's position completely
+ * unaffected by whether the breakdown is open is to take the breakdown
+ * out of the column's layout flow entirely - same portal + flip-
+ * positioning approach as every other dropdown in this app (see
+ * CategoryPicker for the full reasoning), which also sidesteps
+ * .pi-board-column's own overflow:hidden clipping a plain
+ * position:absolute overlay would otherwise risk for a short column.
+ */
 export function SprintCapacityBar({ summary, compact = false }: SprintCapacityBarProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [breakdownPos, setBreakdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const breakdownRef = useRef<HTMLDivElement>(null);
 
   const {
     totalCapacityPoints,
@@ -40,17 +62,84 @@ export function SprintCapacityBar({ summary, compact = false }: SprintCapacityBa
       .slice(0, 2);
   };
 
+  const open = () => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    setBreakdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+    setIsExpanded(true);
+  };
+  const close = () => setIsExpanded(false);
+
+  useLayoutEffect(() => {
+    if (!isExpanded) return;
+    const trigger = triggerRef.current;
+    const breakdown = breakdownRef.current;
+    if (!trigger || !breakdown) return;
+    const triggerRect = trigger.getBoundingClientRect();
+    const breakdownRect = breakdown.getBoundingClientRect();
+    const next = computeFlippedPosition(
+      triggerRect,
+      { width: breakdownRect.width, height: breakdownRect.height },
+      { width: window.innerWidth, height: window.innerHeight }
+    );
+    setBreakdownPos((prev) =>
+      prev && prev.top === next.top && prev.left === next.left ? prev : { ...next, width: triggerRect.width }
+    );
+  }, [isExpanded]);
+
+  const reposition = useCallback(() => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    setBreakdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+  }, []);
+
+  useEffect(() => {
+    if (!isExpanded) return;
+    const handleMouseDown = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (triggerRef.current?.contains(target)) return;
+      if (breakdownRef.current?.contains(target)) return;
+      close();
+    };
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
+    document.addEventListener("mousedown", handleMouseDown);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleMouseDown);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [isExpanded]);
+
+  useEffect(() => {
+    if (!isExpanded) return;
+    window.addEventListener("scroll", reposition, true);
+    window.addEventListener("resize", reposition);
+    return () => {
+      window.removeEventListener("scroll", reposition, true);
+      window.removeEventListener("resize", reposition);
+    };
+  }, [isExpanded, reposition]);
+
   return (
     <div className={`sprint-capacity-bar${compact ? " sprint-capacity-bar--compact" : ""}`}>
       <div
+        ref={triggerRef}
         className="sprint-capacity-bar__header"
-        onClick={() => setIsExpanded((prev) => !prev)}
+        onClick={() => (isExpanded ? close() : open())}
         role="button"
         tabIndex={0}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            setIsExpanded((prev) => !prev);
+            if (isExpanded) {
+              close();
+            } else {
+              open();
+            }
           }
         }}
         title="Click to toggle team capacity breakdown"
@@ -102,78 +191,85 @@ export function SprintCapacityBar({ summary, compact = false }: SprintCapacityBa
         </button>
       </div>
 
-      {isExpanded && (
-        <div className="sprint-capacity-bar__breakdown">
-          <div className="sprint-capacity-bar__breakdown-title">Member Capacity Breakdown</div>
-          {memberBreakdown.length === 0 ? (
-            <div className="sprint-capacity-bar__breakdown-empty">
-              No team members configured yet. Visit the Team tab to add members.
-            </div>
-          ) : (
-            <div className="sprint-capacity-bar__member-list">
-              {memberBreakdown.map((m) => {
-                const memberPercent = m.capacityPoints > 0 ? Math.round((m.assignedPoints / m.capacityPoints) * 100) : 0;
-                const memberOver = m.assignedPoints > m.capacityPoints && m.capacityPoints > 0;
-                return (
-                  <div key={m.memberId} className="sprint-capacity-bar__member-item">
-                    <div className="sprint-capacity-bar__member-top">
-                      <div className="sprint-capacity-bar__member-info">
-                        <span
-                          className="sprint-capacity-bar__member-avatar"
-                          style={{ backgroundColor: m.avatarColor ?? "#5b7cfa" }}
-                        >
-                          {getInitials(m.memberName)}
-                        </span>
-                        <div className="sprint-capacity-bar__member-names">
-                          <span className="sprint-capacity-bar__member-name">{m.memberName}</span>
-                          <span className="sprint-capacity-bar__member-sub">
-                            {m.workingDays}d work {m.ptoDays > 0 ? `(${m.ptoDays}d PTO)` : ""}
+      {isExpanded &&
+        breakdownPos &&
+        createPortal(
+          <div
+            ref={breakdownRef}
+            className="sprint-capacity-bar__breakdown"
+            style={{ position: "fixed", top: breakdownPos.top, left: breakdownPos.left, width: breakdownPos.width }}
+          >
+            <div className="sprint-capacity-bar__breakdown-title">Member Capacity Breakdown</div>
+            {memberBreakdown.length === 0 ? (
+              <div className="sprint-capacity-bar__breakdown-empty">
+                No team members configured yet. Visit the Team tab to add members.
+              </div>
+            ) : (
+              <div className="sprint-capacity-bar__member-list">
+                {memberBreakdown.map((m) => {
+                  const memberPercent = m.capacityPoints > 0 ? Math.round((m.assignedPoints / m.capacityPoints) * 100) : 0;
+                  const memberOver = m.assignedPoints > m.capacityPoints && m.capacityPoints > 0;
+                  return (
+                    <div key={m.memberId} className="sprint-capacity-bar__member-item">
+                      <div className="sprint-capacity-bar__member-top">
+                        <div className="sprint-capacity-bar__member-info">
+                          <span
+                            className="sprint-capacity-bar__member-avatar"
+                            style={{ backgroundColor: m.avatarColor ?? "#5b7cfa" }}
+                          >
+                            {getInitials(m.memberName)}
+                          </span>
+                          <div className="sprint-capacity-bar__member-names">
+                            <span className="sprint-capacity-bar__member-name">{m.memberName}</span>
+                            <span className="sprint-capacity-bar__member-sub">
+                              {m.workingDays}d work {m.ptoDays > 0 ? `(${m.ptoDays}d PTO)` : ""}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="sprint-capacity-bar__member-stats">
+                          <span className="sprint-capacity-bar__member-pts">
+                            <strong>{m.assignedPoints}</strong> / {m.capacityPoints} pts
+                          </span>
+                          <span
+                            className={`sprint-capacity-bar__member-remaining${
+                              memberOver ? " is-over" : m.remainingPoints === 0 ? " is-exact" : " is-available"
+                            }`}
+                          >
+                            {memberOver
+                              ? `${Math.abs(m.remainingPoints)} pts over`
+                              : `${m.remainingPoints} pts free`}
                           </span>
                         </div>
                       </div>
 
-                      <div className="sprint-capacity-bar__member-stats">
-                        <span className="sprint-capacity-bar__member-pts">
-                          <strong>{m.assignedPoints}</strong> / {m.capacityPoints} pts
-                        </span>
-                        <span
-                          className={`sprint-capacity-bar__member-remaining${
-                            memberOver ? " is-over" : m.remainingPoints === 0 ? " is-exact" : " is-available"
+                      <div className="sprint-capacity-bar__member-track">
+                        <div
+                          className={`sprint-capacity-bar__member-fill${
+                            memberOver
+                              ? " sprint-capacity-bar__fill--danger"
+                              : memberPercent >= 90
+                              ? " sprint-capacity-bar__fill--warning"
+                              : " sprint-capacity-bar__fill--normal"
                           }`}
-                        >
-                          {memberOver
-                            ? `${Math.abs(m.remainingPoints)} pts over`
-                            : `${m.remainingPoints} pts free`}
-                        </span>
+                          style={{ width: `${Math.min(100, memberPercent)}%` }}
+                        />
                       </div>
                     </div>
+                  );
+                })}
 
-                    <div className="sprint-capacity-bar__member-track">
-                      <div
-                        className={`sprint-capacity-bar__member-fill${
-                          memberOver
-                            ? " sprint-capacity-bar__fill--danger"
-                            : memberPercent >= 90
-                            ? " sprint-capacity-bar__fill--warning"
-                            : " sprint-capacity-bar__fill--normal"
-                        }`}
-                        style={{ width: `${Math.min(100, memberPercent)}%` }}
-                      />
-                    </div>
+                {unassignedPoints > 0 && (
+                  <div className="sprint-capacity-bar__unassigned-row">
+                    <span>Unassigned items</span>
+                    <strong>{unassignedPoints} pts</strong>
                   </div>
-                );
-              })}
-
-              {unassignedPoints > 0 && (
-                <div className="sprint-capacity-bar__unassigned-row">
-                  <span>Unassigned items</span>
-                  <strong>{unassignedPoints} pts</strong>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
+                )}
+              </div>
+            )}
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
