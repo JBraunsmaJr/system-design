@@ -8,11 +8,15 @@ import { RequirementEditor } from "../requirements/RequirementEditor";
 import { CategoryPicker } from "../requirements/CategoryPicker";
 import { SprintPicker } from "../requirements/SprintPicker";
 import { RelationshipManager } from "../requirements/RelationshipManager";
+import { MemberPicker } from "../team/MemberPicker";
+import { PointsPicker } from "../team/PointsPicker";
+import type { TeamDocument } from "../../domain/teamTypes";
 
 interface RequirementDetailModalProps {
   item: RequirementItem;
   doc: RequirementsDocument;
   programIncrements: ProgramIncrement[];
+  team?: TeamDocument;
   onClose: () => void;
   onUpdateItem?: (id: string, patch: Partial<RequirementItem>) => void;
   onDeleteItem?: (id: string) => void;
@@ -27,6 +31,7 @@ export function RequirementDetailModal({
   item,
   doc,
   programIncrements,
+  team,
   onClose,
   onUpdateItem,
   onDeleteItem,
@@ -140,6 +145,22 @@ export function RequirementDetailModal({
                 sprintId={item.sprintId}
                 onAssign={(sprintId) => onUpdateItem(item.id, { sprintId })}
                 onClear={() => onUpdateItem(item.id, { sprintId: undefined })}
+              />
+            )}
+
+            {team && onUpdateItem && (
+              <MemberPicker
+                team={team}
+                assigneeId={item.assigneeId}
+                onAssign={(assigneeId) => onUpdateItem(item.id, { assigneeId })}
+                onClear={() => onUpdateItem(item.id, { assigneeId: undefined })}
+              />
+            )}
+
+            {onUpdateItem && (
+              <PointsPicker
+                points={item.points}
+                onChange={(points) => onUpdateItem(item.id, { points })}
               />
             )}
           </div>

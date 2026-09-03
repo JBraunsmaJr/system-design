@@ -3,8 +3,10 @@ import type { ArchNodeData, ArchEdgeData, Scenario } from "./types";
 import type { RequirementsDocument } from "./requirementsTypes";
 import { EMPTY_REQUIREMENTS_DOCUMENT } from "./requirementsTypes";
 import type { ProgramIncrement } from "./programIncrements";
+import type { TeamDocument } from "./teamTypes";
+import { EMPTY_TEAM_DOCUMENT, DEFAULT_TEAM_SETTINGS } from "./teamTypes";
 
-export const SCHEMA_VERSION = "0.5";
+export const SCHEMA_VERSION = "0.6";
 
 export interface DiagramFile {
   schemaVersion: string;
@@ -20,6 +22,7 @@ export interface DiagramFile {
   scenarios: Scenario[];
   requirements: RequirementsDocument;
   programIncrements: ProgramIncrement[];
+  team: TeamDocument;
   metadata: {
     updatedAt: string;
   };
@@ -31,7 +34,8 @@ export function toDiagramFile(
   edges: Edge<ArchEdgeData>[],
   scenarios: Scenario[],
   requirements: RequirementsDocument,
-  programIncrements: ProgramIncrement[]
+  programIncrements: ProgramIncrement[],
+  team: TeamDocument
 ): DiagramFile {
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -41,6 +45,7 @@ export function toDiagramFile(
     scenarios,
     requirements,
     programIncrements,
+    team,
     metadata: { updatedAt: new Date().toISOString() },
   };
 }
@@ -93,9 +98,57 @@ function parseProgramIncrements(raw: unknown): ProgramIncrement[] {
   return result;
 }
 
+function parseTeamDocument(raw: unknown): TeamDocument {
+  if (!raw || typeof raw !== "object") return EMPTY_TEAM_DOCUMENT;
+  const t = raw as Partial<TeamDocument>;
+  const settings: TeamDocument["settings"] = {
+    defaultPointsPerDay:
+      typeof t.settings?.defaultPointsPerDay === "number" && !isNaN(t.settings.defaultPointsPerDay)
+        ? t.settings.defaultPointsPerDay
+        : DEFAULT_TEAM_SETTINGS.defaultPointsPerDay,
+    excludeUsHolidays:
+      typeof t.settings?.excludeUsHolidays === "boolean"
+        ? t.settings.excludeUsHolidays
+        : DEFAULT_TEAM_SETTINGS.excludeUsHolidays,
+    extraDaysOff: Array.isArray(t.settings?.extraDaysOff)
+      ? t.settings.extraDaysOff.filter(
+          (e): e is TeamDocument["settings"]["extraDaysOff"][number] =>
+            !!e && typeof e === "object" && typeof e.id === "string" && typeof e.date === "string" && typeof e.name === "string"
+        )
+      : [],
+  };
+
+  const members: TeamDocument["members"] = Array.isArray(t.members)
+    ? t.members
+        .filter(
+          (m): m is Partial<TeamDocument["members"][number]> =>
+            !!m && typeof m === "object" && typeof m.id === "string" && typeof m.name === "string"
+        )
+        .map((m) => ({
+          id: m.id!,
+          name: m.name!,
+          role: typeof m.role === "string" ? m.role : undefined,
+          avatarColor: typeof m.avatarColor === "string" ? m.avatarColor : undefined,
+          defaultPointsPerDay: typeof m.defaultPointsPerDay === "number" ? m.defaultPointsPerDay : undefined,
+          ptoSpans: Array.isArray(m.ptoSpans)
+            ? m.ptoSpans.filter(
+                (p): p is TeamDocument["members"][number]["ptoSpans"][number] =>
+                  !!p &&
+                  typeof p === "object" &&
+                  typeof p.id === "string" &&
+                  typeof p.startDate === "string" &&
+                  typeof p.endDate === "string"
+              )
+            : [],
+        }))
+    : [];
+
+  return { members, settings };
+}
+
 /**
  * Parses and lightly validates a diagram file loaded from disk.
- * `scenarios`/`requirements`/`programIncrements` all default to an empty
+ * `scenarios`/`requirements`/`programIncrements`/`team` all default to an empty
  * state so files saved before those features existed still open without
  * error - App.tsx's onFileSelected is responsible for further normalizing
  * an empty requirements document to include the built-in item types, same
@@ -114,6 +167,7 @@ export function parseDiagramFile(raw: string): DiagramFile {
     scenarios: Array.isArray(parsed.scenarios) ? parsed.scenarios : [],
     requirements: parseRequirementsDocument(parsed.requirements),
     programIncrements: parseProgramIncrements(parsed.programIncrements),
+    team: parseTeamDocument(parsed.team),
     metadata: parsed.metadata ?? { updatedAt: new Date().toISOString() },
   };
 }

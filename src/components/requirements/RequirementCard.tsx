@@ -6,13 +6,17 @@ import { RequirementEditor } from "./RequirementEditor";
 import { CategoryPicker } from "./CategoryPicker";
 import { SprintPicker } from "./SprintPicker";
 import { RelationshipManager } from "./RelationshipManager";
+import { MemberPicker } from "../team/MemberPicker";
+import { PointsPicker } from "../team/PointsPicker";
 import type { RequirementItem, RequirementsDocument } from "../../domain/requirementsTypes";
 import type { ProgramIncrement } from "../../domain/programIncrements";
+import type { TeamDocument } from "../../domain/teamTypes";
 
 interface RequirementCardProps {
   item: RequirementItem;
   doc: RequirementsDocument;
   programIncrements: ProgramIncrement[];
+  team?: TeamDocument;
   onUpdateItem: (id: string, patch: Partial<RequirementItem>) => void;
   onDeleteItem: (id: string) => void;
   onNavigateToItem: (itemId: string) => void;
@@ -29,6 +33,7 @@ export function RequirementCard({
   item,
   doc,
   programIncrements,
+  team,
   onUpdateItem,
   onDeleteItem,
   onNavigateToItem,
@@ -64,6 +69,18 @@ export function RequirementCard({
             sprintId={item.sprintId}
             onAssign={(sprintId) => onUpdateItem(item.id, { sprintId })}
             onClear={() => onUpdateItem(item.id, { sprintId: undefined })}
+          />
+          {team && (
+            <MemberPicker
+              team={team}
+              assigneeId={item.assigneeId}
+              onAssign={(assigneeId) => onUpdateItem(item.id, { assigneeId })}
+              onClear={() => onUpdateItem(item.id, { assigneeId: undefined })}
+            />
+          )}
+          <PointsPicker
+            points={item.points}
+            onChange={(points) => onUpdateItem(item.id, { points })}
           />
           <button
             type="button"

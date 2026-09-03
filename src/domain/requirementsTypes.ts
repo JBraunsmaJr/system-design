@@ -72,6 +72,10 @@ export interface RequirementItem {
    * unassigned/backlog, same "not everything has to be scheduled up
    * front" reasoning as categoryId. */
   sprintId?: string;
+  /** References a TeamMember.id - undefined means unassigned */
+  assigneeId?: string;
+  /** Estimated story points / effort */
+  points?: number;
 }
 
 export interface RequirementsDocument {

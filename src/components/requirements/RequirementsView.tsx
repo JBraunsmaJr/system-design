@@ -12,11 +12,13 @@ import type {
   RelationshipType,
 } from "../../domain/requirementsTypes";
 import type { ProgramIncrement } from "../../domain/programIncrements";
+import type { TeamDocument } from "../../domain/teamTypes";
 
 interface RequirementsViewProps {
   doc: RequirementsDocument;
   onUpdateDoc: (updater: (doc: RequirementsDocument) => RequirementsDocument) => void;
   programIncrements: ProgramIncrement[];
+  team?: TeamDocument;
   /** Set by App.tsx when the user clicks a linked requirement pill from
    * the Inspector (while viewing the diagram) - scrolls to and briefly
    * highlights that item once this view mounts/updates, then reports
@@ -44,7 +46,7 @@ interface ItemGroup {
   items: RequirementItem[];
 }
 
-export function RequirementsView({ doc, onUpdateDoc, programIncrements, focusItemId, onFocusHandled }: RequirementsViewProps) {
+export function RequirementsView({ doc, onUpdateDoc, programIncrements, team, focusItemId, onFocusHandled }: RequirementsViewProps) {
   const [search, setSearch] = useState("");
   const [groupBy, setGroupBy] = useState<GroupBy>("type");
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
@@ -346,6 +348,7 @@ export function RequirementsView({ doc, onUpdateDoc, programIncrements, focusIte
                   item={item}
                   doc={doc}
                   programIncrements={programIncrements}
+                  team={team}
                   onUpdateItem={onUpdateItem}
                   onDeleteItem={onDeleteItem}
                   onNavigateToItem={onNavigateToItem}

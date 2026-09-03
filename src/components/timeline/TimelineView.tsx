@@ -9,6 +9,11 @@ import {
 } from "../../domain/programIncrements";
 import { addRelationship, getItemType } from "../../domain/requirementsRegistry";
 import type { RequirementItem, RequirementsDocument } from "../../domain/requirementsTypes";
+import type { TeamDocument } from "../../domain/teamTypes";
+import { computeSprintCapacity } from "../../domain/teamCapacity";
+import { SprintCapacityBar } from "../team/SprintCapacityBar";
+import { MemberPicker } from "../team/MemberPicker";
+import { PointsPicker } from "../team/PointsPicker";
 import { RequirementDetailModal } from "./RequirementDetailModal";
 import { SprintQuickAdd } from "./SprintQuickAdd";
 
@@ -17,6 +22,7 @@ interface TimelineViewProps {
   onUpdateProgramIncrements: (updater: (pis: ProgramIncrement[]) => ProgramIncrement[]) => void;
   requirements: RequirementsDocument;
   onUpdateRequirements: (updater: (doc: RequirementsDocument) => RequirementsDocument) => void;
+  team?: TeamDocument;
   onNavigateToRequirement?: (itemId: string) => void;
 }
 
@@ -38,6 +44,7 @@ export function TimelineView({
   onUpdateProgramIncrements,
   requirements,
   onUpdateRequirements,
+  team,
   onNavigateToRequirement,
 }: TimelineViewProps) {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -223,11 +230,13 @@ export function TimelineView({
           <BacklogSection
             items={backlogItems}
             requirements={requirements}
+            team={team}
             draggedItemId={draggedItemId}
             onSelectItem={(id) => setSelectedItemId(id)}
             onDragStartItem={(id) => setDraggedItemId(id)}
             onDragEndItem={() => setDraggedItemId(null)}
             onDropItem={onUnassignItem}
+            onUpdateItem={onUpdateItem}
           />
         )}
         {programIncrements.length === 0 ? (
@@ -240,6 +249,7 @@ export function TimelineView({
               key={pi.id}
               pi={pi}
               requirements={requirements}
+              team={team}
               itemsBySprintId={itemsBySprintId}
               backlogItems={backlogItems}
               draggedItemId={draggedItemId}
@@ -247,6 +257,7 @@ export function TimelineView({
               onDragStartItem={(id) => setDraggedItemId(id)}
               onDragEndItem={() => setDraggedItemId(null)}
               onDropItem={onMoveItemToSprint}
+              onUpdateItem={onUpdateItem}
               onUpdateName={(name) => onUpdatePIName(pi.id, name)}
               onUpdateStart={(startDate) => onUpdatePIStart(pi.id, startDate)}
               onDelete={() => onDeletePI(pi.id)}
@@ -265,6 +276,7 @@ export function TimelineView({
           item={selectedItem}
           doc={requirements}
           programIncrements={programIncrements}
+          team={team}
           onClose={() => setSelectedItemId(null)}
           onUpdateItem={onUpdateItem}
           onDeleteItem={onDeleteItem}
@@ -282,11 +294,13 @@ export function TimelineView({
 interface BacklogSectionProps {
   items: RequirementItem[];
   requirements: RequirementsDocument;
+  team?: TeamDocument;
   draggedItemId: string | null;
   onSelectItem: (itemId: string) => void;
   onDragStartItem: (itemId: string) => void;
   onDragEndItem: () => void;
   onDropItem: (itemId: string) => void;
+  onUpdateItem: (id: string, patch: Partial<RequirementItem>) => void;
 }
 
 /**
@@ -310,7 +324,17 @@ interface BacklogSectionProps {
  * past to reach the PI cards below, and collapsing alone loses the
  * at-a-glance count/reference value entirely.
  */
-function BacklogSection({ items, requirements, draggedItemId, onSelectItem, onDragStartItem, onDragEndItem, onDropItem }: BacklogSectionProps) {
+function BacklogSection({
+  items,
+  requirements,
+  team,
+  draggedItemId,
+  onSelectItem,
+  onDragStartItem,
+  onDragEndItem,
+  onDropItem,
+  onUpdateItem,
+}: BacklogSectionProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [query, setQuery] = useState("");
@@ -435,6 +459,22 @@ function BacklogSection({ items, requirements, draggedItemId, onSelectItem, onDr
                     )}
                   </div>
                   <div className="pi-board-item__title">{item.title || "Untitled"}</div>
+                  <div className="pi-board-item__footer">
+                    {team && (
+                      <MemberPicker
+                        team={team}
+                        assigneeId={item.assigneeId}
+                        compact={true}
+                        onAssign={(assigneeId) => onUpdateItem(item.id, { assigneeId })}
+                        onClear={() => onUpdateItem(item.id, { assigneeId: undefined })}
+                      />
+                    )}
+                    <PointsPicker
+                      points={item.points}
+                      compact={true}
+                      onChange={(points) => onUpdateItem(item.id, { points })}
+                    />
+                  </div>
                 </div>
               );
             })
@@ -448,6 +488,7 @@ function BacklogSection({ items, requirements, draggedItemId, onSelectItem, onDr
 interface ProgramIncrementCardProps {
   pi: ProgramIncrement;
   requirements: RequirementsDocument;
+  team?: TeamDocument;
   itemsBySprintId: Map<string, RequirementItem[]>;
   backlogItems: RequirementItem[];
   draggedItemId: string | null;
@@ -455,6 +496,7 @@ interface ProgramIncrementCardProps {
   onDragStartItem: (itemId: string) => void;
   onDragEndItem: () => void;
   onDropItem: (itemId: string, sprintId: string) => void;
+  onUpdateItem: (id: string, patch: Partial<RequirementItem>) => void;
   onUpdateName: (name: string) => void;
   onUpdateStart: (startDate: string) => void;
   onDelete: () => void;
@@ -468,6 +510,7 @@ interface ProgramIncrementCardProps {
 function ProgramIncrementCard({
   pi,
   requirements,
+  team,
   itemsBySprintId,
   backlogItems,
   draggedItemId,
@@ -475,6 +518,7 @@ function ProgramIncrementCard({
   onDragStartItem,
   onDragEndItem,
   onDropItem,
+  onUpdateItem,
   onUpdateName,
   onUpdateStart,
   onDelete,
@@ -575,12 +619,14 @@ function ProgramIncrementCard({
                 range={rangeBySprintId.get(sprint.id)}
                 items={itemsBySprintId.get(sprint.id) ?? []}
                 requirements={requirements}
+                team={team}
                 backlogItems={backlogItems}
                 draggedItemId={draggedItemId}
                 onSelectItem={onSelectItem}
                 onDragStartItem={onDragStartItem}
                 onDragEndItem={onDragEndItem}
                 onDropItem={onDropItem}
+                onUpdateItem={onUpdateItem}
               />
             ))}
           </div>
@@ -595,12 +641,14 @@ interface SprintBoardColumnProps {
   range?: { startDate: string; endDate: string };
   items: RequirementItem[];
   requirements: RequirementsDocument;
+  team?: TeamDocument;
   backlogItems: RequirementItem[];
   draggedItemId: string | null;
   onSelectItem: (id: string) => void;
   onDragStartItem: (id: string) => void;
   onDragEndItem: () => void;
   onDropItem: (itemId: string, sprintId: string) => void;
+  onUpdateItem: (id: string, patch: Partial<RequirementItem>) => void;
 }
 
 function SprintBoardColumn({
@@ -608,15 +656,19 @@ function SprintBoardColumn({
   range,
   items,
   requirements,
+  team,
   backlogItems,
   draggedItemId,
   onSelectItem,
   onDragStartItem,
   onDragEndItem,
   onDropItem,
+  onUpdateItem,
 }: SprintBoardColumnProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const dragCounter = useRef(0);
+
+  const capacitySummary = team ? computeSprintCapacity(sprint, range, team, requirements.items) : null;
 
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
@@ -677,6 +729,8 @@ function SprintBoardColumn({
           </span>
           <span className="pi-board-column__duration">{sprint.durationDays}d</span>
         </div>
+
+        {capacitySummary && <SprintCapacityBar summary={capacitySummary} compact={true} />}
       </div>
       <div className="pi-board-column__items">
         {items.length === 0 ? (
@@ -740,6 +794,22 @@ function SprintBoardColumn({
                   )}
                 </div>
                 <div className="pi-board-item__title">{item.title || "Untitled"}</div>
+                <div className="pi-board-item__footer">
+                  {team && (
+                    <MemberPicker
+                      team={team}
+                      assigneeId={item.assigneeId}
+                      compact={true}
+                      onAssign={(assigneeId) => onUpdateItem(item.id, { assigneeId })}
+                      onClear={() => onUpdateItem(item.id, { assigneeId: undefined })}
+                    />
+                  )}
+                  <PointsPicker
+                    points={item.points}
+                    compact={true}
+                    onChange={(points) => onUpdateItem(item.id, { points })}
+                  />
+                </div>
               </div>
             );
           })

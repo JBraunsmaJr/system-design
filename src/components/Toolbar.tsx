@@ -2,6 +2,7 @@ import {
   Check,
   ListChecks,
   CalendarRange,
+  Users,
   Redo2,
   Undo2,
   Workflow,
@@ -28,8 +29,8 @@ interface ToolbarProps {
   onRedo: () => void;
   canUndo: boolean;
   canRedo: boolean;
-  viewMode: "diagram" | "requirements" | "timeline";
-  onSetViewMode: (mode: "diagram" | "requirements" | "timeline") => void;
+  viewMode: "diagram" | "requirements" | "timeline" | "team";
+  onSetViewMode: (mode: "diagram" | "requirements" | "timeline" | "team") => void;
   onExportRequirementsMarkdown: () => void;
   canExportRequirements: boolean;
   hasAutosaved: boolean;
@@ -89,6 +90,15 @@ export function Toolbar({
         >
           <CalendarRange size={13} />
           <span className="toolbar__label">Timeline</span>
+        </button>
+        <button
+          type="button"
+          className={viewMode === "team" ? "active" : undefined}
+          onClick={() => onSetViewMode("team")}
+          title="Team & Capacity"
+        >
+          <Users size={13} />
+          <span className="toolbar__label">Team</span>
         </button>
       </div>
       <input
