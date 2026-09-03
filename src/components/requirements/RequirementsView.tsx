@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LayoutList, Plus, Settings2, Tags, Waypoints } from "lucide-react";
+import { LayoutList, Search, Settings2, Tags, Waypoints, X } from "lucide-react";
 import { addRelationship, createCategory, generateItemId, isPrefixTaken } from "../../domain/requirementsRegistry";
 import { RequirementCard } from "./RequirementCard";
 import { ManageTypesModal } from "./ManageTypesModal";
 import { ManageRelationshipTypesModal } from "./ManageRelationshipTypesModal";
+import { AddItemDropdown } from "./AddItemDropdown";
 import type {
   RequirementItem,
   RequirementItemType,
@@ -207,6 +208,14 @@ export function RequirementsView({ doc, onUpdateDoc, programIncrements, focusIte
     });
   };
 
+  const itemCountsByType = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const item of doc.items) {
+      counts[item.typeId] = (counts[item.typeId] ?? 0) + 1;
+    }
+    return counts;
+  }, [doc.items]);
+
   const onAddCustomRelationshipType = (label: string, inverseLabel: string, color: string) => {
     const newType: RelationshipType = {
       id: `rel-type-${Date.now().toString(36)}`,
@@ -233,59 +242,90 @@ export function RequirementsView({ doc, onUpdateDoc, programIncrements, focusIte
   return (
     <div className="requirements-view">
       <div className="requirements-view__toolbar">
-        <input
-          className="requirements-view__search"
-          placeholder="Search requirements..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <div className="requirements-view__add-menu">
-          {doc.itemTypes.map((type) => (
-            <button
-              key={type.id}
-              type="button"
-              className="requirements-view__add-button"
-              onClick={() => onAddItem(type.id)}
-              style={{ borderColor: `${type.color}66`, color: type.color }}
-            >
-              <Plus size={12} />
-              {type.label}
-            </button>
-          ))}
+        <div className="requirements-view__toolbar-left">
+          <AddItemDropdown
+            itemTypes={doc.itemTypes}
+            onAddItem={onAddItem}
+            onOpenManageTypes={() => setIsManagingTypes(true)}
+            itemCountsByType={itemCountsByType}
+          />
+          <div className="requirements-view__search-wrap">
+            <Search size={13} className="requirements-view__search-icon" />
+            <input
+              className="requirements-view__search-input"
+              placeholder="Search requirements..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            {search.length > 0 && (
+              <button
+                type="button"
+                className="requirements-view__search-clear"
+                onClick={() => setSearch("")}
+                title="Clear search"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
+          {search.trim() ? (
+            <span className="requirements-view__count-badge">
+              {filteredItems.length} of {doc.items.length}
+            </span>
+          ) : doc.items.length > 0 ? (
+            <span className="requirements-view__count-badge">
+              {doc.items.length} {doc.items.length === 1 ? "item" : "items"}
+            </span>
+          ) : null}
         </div>
-        <div className="requirements-view__right-cluster">
-          <div className="requirements-view__group-toggle">
+
+        <div className="requirements-view__toolbar-right">
+          <div className="requirements-view__group-control">
+            <span className="requirements-view__toolbar-label">Group:</span>
+            <div className="requirements-view__group-toggle">
+              <button
+                type="button"
+                className={groupBy === "type" ? "active" : undefined}
+                onClick={() => setGroupBy("type")}
+                title="Group by item type"
+              >
+                <LayoutList size={12} />
+                <span>Type</span>
+              </button>
+              <button
+                type="button"
+                className={groupBy === "category" ? "active" : undefined}
+                onClick={() => setGroupBy("category")}
+                title="Group by category"
+              >
+                <Tags size={12} />
+                <span>Category</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="requirements-view__toolbar-divider" />
+
+          <div className="requirements-view__manage-group">
             <button
               type="button"
-              className={groupBy === "type" ? "active" : undefined}
-              onClick={() => setGroupBy("type")}
-              title="Group by item type"
+              className="requirements-view__manage-btn"
+              onClick={() => setIsManagingTypes(true)}
+              title="Manage requirement types"
             >
-              <LayoutList size={12} />
-              Type
+              <Settings2 size={13} />
+              <span>Types</span>
             </button>
             <button
               type="button"
-              className={groupBy === "category" ? "active" : undefined}
-              onClick={() => setGroupBy("category")}
-              title="Group by category"
+              className="requirements-view__manage-btn"
+              onClick={() => setIsManagingRelationshipTypes(true)}
+              title="Manage relationship types"
             >
-              <Tags size={12} />
-              Category
+              <Waypoints size={13} />
+              <span>Relationships</span>
             </button>
           </div>
-          <button type="button" className="requirements-view__manage-types" onClick={() => setIsManagingTypes(true)}>
-            <Settings2 size={13} />
-            Types
-          </button>
-          <button
-            type="button"
-            className="requirements-view__manage-types"
-            onClick={() => setIsManagingRelationshipTypes(true)}
-          >
-            <Waypoints size={13} />
-            Relationships
-          </button>
         </div>
       </div>
 
