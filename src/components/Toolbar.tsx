@@ -1,4 +1,16 @@
-import { Check, ListChecks, CalendarRange, Redo2, Undo2, Workflow } from "lucide-react";
+import {
+  Check,
+  ListChecks,
+  CalendarRange,
+  Redo2,
+  Undo2,
+  Workflow,
+  FilePlus2,
+  FolderOpen,
+  Save,
+  Route,
+  FileDown,
+} from "lucide-react";
 import { ExportMenu } from "./ExportMenu";
 
 interface ToolbarProps {
@@ -48,32 +60,35 @@ export function Toolbar({
     <header className="toolbar">
       <div className="toolbar__brand">
         <span className="toolbar__brand-mark">SD</span>
-        <span>System Design Editor</span>
+        <span className="toolbar__brand-name">System Design Editor</span>
       </div>
       <div className="toolbar__view-tabs">
         <button
           type="button"
           className={viewMode === "diagram" ? "active" : undefined}
           onClick={() => onSetViewMode("diagram")}
+          title="Diagram"
         >
           <Workflow size={13} />
-          Diagram
+          <span className="toolbar__label">Diagram</span>
         </button>
         <button
           type="button"
           className={viewMode === "requirements" ? "active" : undefined}
           onClick={() => onSetViewMode("requirements")}
+          title="Requirements"
         >
           <ListChecks size={13} />
-          Requirements
+          <span className="toolbar__label">Requirements</span>
         </button>
         <button
           type="button"
           className={viewMode === "timeline" ? "active" : undefined}
           onClick={() => onSetViewMode("timeline")}
+          title="Timeline"
         >
           <CalendarRange size={13} />
-          Timeline
+          <span className="toolbar__label">Timeline</span>
         </button>
       </div>
       <input
@@ -85,7 +100,7 @@ export function Toolbar({
       {hasAutosaved && (
         <span className="toolbar__autosave-indicator" title="Your work is automatically saved in this browser">
           <Check size={12} />
-          Autosaved
+          <span className="toolbar__label">Autosaved</span>
         </span>
       )}
       <div className="toolbar__actions">
@@ -110,24 +125,34 @@ export function Toolbar({
           <Redo2 size={15} />
         </button>
         {viewMode === "diagram" && (
-          <button type="button" className={isScenarioPanelOpen ? "active" : undefined} onClick={onToggleScenarioPanel}>
-            Scenarios
+          <button
+            type="button"
+            className={isScenarioPanelOpen ? "active" : undefined}
+            onClick={onToggleScenarioPanel}
+            title="Scenarios"
+          >
+            <Route size={14} />
+            <span className="toolbar__label">Scenarios</span>
           </button>
         )}
         {viewMode === "diagram" && <ExportMenu onExportPng={onExportPng} onExportSvg={onExportSvg} disabled={!canExport} />}
         {viewMode === "requirements" && (
-          <button type="button" onClick={onExportRequirementsMarkdown} disabled={!canExportRequirements}>
-            Export Markdown
+          <button type="button" onClick={onExportRequirementsMarkdown} disabled={!canExportRequirements} title="Export Markdown">
+            <FileDown size={14} />
+            <span className="toolbar__label">Export Markdown</span>
           </button>
         )}
-        <button type="button" onClick={onNew}>
-          New
+        <button type="button" onClick={onNew} title="New">
+          <FilePlus2 size={14} />
+          <span className="toolbar__label">New</span>
         </button>
-        <button type="button" onClick={onLoadClick}>
-          Open
+        <button type="button" onClick={onLoadClick} title="Open">
+          <FolderOpen size={14} />
+          <span className="toolbar__label">Open</span>
         </button>
-        <button type="button" className="primary" onClick={onSave}>
-          Save
+        <button type="button" className="primary" onClick={onSave} title="Save">
+          <Save size={14} />
+          <span className="toolbar__label">Save</span>
         </button>
       </div>
     </header>

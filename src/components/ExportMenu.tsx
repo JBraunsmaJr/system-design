@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ChevronDown, Download } from "lucide-react";
 
 interface ExportMenuProps {
   onExportPng: () => void;
@@ -11,8 +12,10 @@ export function ExportMenu({ onExportPng, onExportSvg, disabled }: ExportMenuPro
 
   return (
     <div className="export-menu">
-      <button type="button" disabled={disabled} onClick={() => setOpen((v) => !v)}>
-        Export ▾
+      <button type="button" disabled={disabled} onClick={() => setOpen((v) => !v)} title="Export">
+        <Download size={14} />
+        <span className="toolbar__label">Export</span>
+        <ChevronDown size={12} />
       </button>
       {open && (
         <div className="export-menu__dropdown">

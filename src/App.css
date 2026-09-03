@@ -15,6 +15,14 @@
   background: var(--chrome-bg-raised);
   border-bottom: 1px solid var(--chrome-border);
   flex-shrink: 0;
+  /* Last-resort safety net: even after the responsive rules below kick
+     in, an unusually narrow window (or enough simultaneously-visible
+     buttons) can still not fit everything. Scrolling means those
+     controls are always reachable rather than silently clipped past the
+     viewport edge with no way to get to them - which was the actual bug
+     report this whole section addresses. */
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .toolbar__brand {
@@ -24,6 +32,7 @@
   font-weight: 600;
   font-size: 13px;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .toolbar__brand-mark {
@@ -47,6 +56,7 @@
   border: 1px solid var(--chrome-border);
   border-radius: var(--radius-sm);
   padding: 2px;
+  flex-shrink: 0;
 }
 
 .toolbar__view-tabs button {
@@ -74,6 +84,7 @@
 
 .toolbar__title {
   flex: 1;
+  min-width: 120px;
   max-width: 360px;
   background: transparent;
   border: 1px solid transparent;
@@ -108,9 +119,13 @@
 .toolbar__actions {
   display: flex;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .toolbar__actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   background: transparent;
   border: 1px solid var(--chrome-border);
   color: var(--chrome-text);
@@ -118,6 +133,7 @@
   padding: 7px 14px;
   font-size: 12.5px;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .toolbar__actions button:hover {
@@ -2982,7 +2998,7 @@
   border: none;
   border-radius: var(--radius-sm);
   padding: 7px 12px;
-  font-size: 12.5px;
+  font-size: 13.5px;
   font-weight: 600;
 }
 
@@ -3030,7 +3046,7 @@
   outline: none;
   color: var(--chrome-text);
   font-family: var(--sans);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
 }
 
@@ -3038,7 +3054,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--chrome-text-dim);
   flex-shrink: 0;
 }
@@ -3048,7 +3064,7 @@
   border: 1px solid var(--chrome-border);
   border-radius: 4px;
   color: var(--chrome-text);
-  font-size: 11.5px;
+  font-size: 12.5px;
   padding: 3px 6px;
   color-scheme: dark;
 }
@@ -3072,7 +3088,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--chrome-text-dim);
   white-space: nowrap;
 }
@@ -3083,7 +3099,7 @@
   border: none;
   border-radius: 4px;
   padding: 3px 8px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -3093,7 +3109,27 @@
   color: var(--chrome-text-dim);
   border-radius: 4px;
   padding: 3px 8px;
-  font-size: 11px;
+  font-size: 12px;
+}
+
+.pi-card__sprints-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-top: 1px solid var(--chrome-border);
+  padding: 8px 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--chrome-text-dim);
+  text-align: left;
+}
+
+.pi-card__sprints-toggle:hover {
+  color: var(--chrome-text);
+  background: var(--chrome-bg);
 }
 
 .pi-card__sprints {
@@ -3106,18 +3142,19 @@
   align-items: center;
   gap: 5px;
   margin: 8px 12px 10px;
-  background: transparent;
-  border: 1px dashed var(--chrome-border);
+  background: rgba(91, 124, 250, 0.1);
+  border: 1px solid var(--accent);
   border-radius: var(--radius-sm);
   padding: 6px 10px;
-  font-size: 11.5px;
-  color: var(--chrome-text-dim);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent);
   align-self: flex-start;
 }
 
 .pi-card__add-sprint:hover {
+  background: rgba(91, 124, 250, 0.18);
   color: var(--chrome-text);
-  border-color: var(--chrome-text-dim);
 }
 
 .sprint-row {
@@ -3161,13 +3198,13 @@
   border: 1px solid var(--chrome-border);
   border-radius: 4px;
   color: var(--chrome-text);
-  font-size: 12px;
+  font-size: 13px;
   padding: 4px 7px;
 }
 
 .sprint-row__start {
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--chrome-text-dim);
   width: 90px;
   flex-shrink: 0;
@@ -3183,14 +3220,14 @@
   border: 1px solid var(--chrome-border);
   border-radius: 4px;
   color: var(--chrome-text);
-  font-size: 11.5px;
+  font-size: 12.5px;
   padding: 3px 6px;
   flex-shrink: 0;
   color-scheme: dark;
 }
 
 .sprint-row__duration {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--chrome-text-dim);
   flex-shrink: 0;
   width: 28px;
@@ -3200,7 +3237,7 @@
   flex-shrink: 0;
   background: var(--accent);
   color: #0b0d12;
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
   border-radius: 999px;
   min-width: 16px;
@@ -3244,7 +3281,7 @@
 }
 
 .pi-card__board-title {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -3273,8 +3310,8 @@
 
 .pi-board-column.is-drag-over {
   border-color: var(--accent);
-  background: rgba(34, 184, 209, 0.08);
-  box-shadow: 0 0 0 2px rgba(34, 184, 209, 0.3) inset;
+  background: rgba(91, 124, 250, 0.08);
+  box-shadow: 0 0 0 2px rgba(91, 124, 250, 0.3) inset;
 }
 
 .pi-board-column__header {
@@ -3295,7 +3332,7 @@
 
 .pi-board-column__name {
   font-weight: 600;
-  font-size: 12.5px;
+  font-size: 13.5px;
   color: var(--chrome-text);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3303,7 +3340,7 @@
 }
 
 .pi-board-column__count {
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
   background: var(--accent);
   color: #0b0d12;
@@ -3321,7 +3358,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--chrome-text-dim);
 }
 
@@ -3346,7 +3383,7 @@
 
 .pi-board-column__empty {
   color: var(--chrome-text-dim);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-style: italic;
   text-align: center;
   padding: 16px 8px;
@@ -3400,7 +3437,7 @@
 
 .pi-board-item__id {
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
   border: 1px solid;
   border-radius: 4px;
@@ -3409,7 +3446,7 @@
 }
 
 .pi-board-item__category {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   border: 1px solid;
   border-radius: 999px;
@@ -3422,7 +3459,7 @@
 }
 
 .pi-board-item__title {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--chrome-text);
   line-height: 1.35;
@@ -3722,4 +3759,285 @@
   color: var(--chrome-text-dim);
   font-size: 11.5px;
   text-align: center;
+}
+
+/* ---------- Backlog section (Timeline board) ---------- */
+
+.backlog-section {
+  background: var(--chrome-bg-raised);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-md, 10px);
+  overflow: hidden;
+}
+
+.backlog-section__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--chrome-border);
+}
+
+.backlog-section__collapse-toggle {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--chrome-text-dim);
+  padding: 2px;
+  border-radius: 4px;
+}
+
+.backlog-section__collapse-toggle:hover {
+  color: var(--chrome-text);
+  background: var(--chrome-bg);
+}
+
+.backlog-section__search {
+  width: 220px;
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  padding: 5px 9px;
+  color: var(--chrome-text);
+  font-size: 12px;
+  margin-left: 8px;
+}
+
+.backlog-section__empty {
+  width: 100%;
+  color: var(--chrome-text-dim);
+  font-size: 12.5px;
+  text-align: center;
+  padding: 12px;
+  margin: 0;
+}
+
+.backlog-section__icon {
+  color: var(--chrome-text-dim);
+  flex-shrink: 0;
+}
+
+.backlog-section__title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--chrome-text);
+}
+
+.backlog-section__count {
+  font-size: 11.5px;
+  font-weight: 700;
+  background: var(--chrome-border);
+  color: var(--chrome-text);
+  border-radius: 999px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.backlog-section__hint {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--chrome-text-dim);
+  white-space: nowrap;
+}
+
+.backlog-section__items {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 8px;
+  padding: 12px;
+  min-height: 56px;
+  max-height: 280px;
+  overflow-y: auto;
+  transition: background 0.15s ease;
+}
+
+.backlog-section__items.is-drag-over {
+  background: rgba(91, 124, 250, 0.08);
+  box-shadow: 0 0 0 2px rgba(91, 124, 250, 0.3) inset;
+}
+
+.backlog-section__item {
+  width: 200px;
+  flex-shrink: 0;
+}
+
+/* ---------- Sprint quick-add (Timeline board) ---------- */
+
+.sprint-quick-add__trigger {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-left: auto;
+  background: rgba(91, 124, 250, 0.15);
+  border: 1px solid var(--accent);
+  border-radius: 50%;
+  color: var(--accent);
+}
+
+.sprint-quick-add__trigger:hover {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.sprint-quick-add__dropdown {
+  z-index: 200;
+  width: 240px;
+  max-height: 300px;
+  display: flex;
+  flex-direction: column;
+  background: var(--chrome-bg-raised);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  padding: 6px;
+}
+
+.sprint-quick-add__search {
+  width: 100%;
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  color: var(--chrome-text);
+  font-size: 12px;
+  margin-bottom: 6px;
+  flex-shrink: 0;
+}
+
+.sprint-quick-add__list {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sprint-quick-add__option {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 8px;
+  text-align: left;
+  width: 100%;
+}
+
+.sprint-quick-add__option:hover {
+  background: var(--chrome-bg);
+}
+
+.sprint-quick-add__option-id {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sprint-quick-add__option-title {
+  font-size: 12px;
+  color: var(--chrome-text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sprint-quick-add__empty {
+  padding: 8px;
+  margin: 0;
+  color: var(--chrome-text-dim);
+  font-size: 11.5px;
+  text-align: center;
+}
+
+/* ---------- Toolbar responsive breakpoints ----------
+   Investigated the actual bug before writing these: the toolbar is one
+   unwrapped flex row with no overflow handling and no responsive rules
+   anywhere in the app, so on a narrow viewport its content (brand + 3
+   view tabs + title input + autosave badge + up to 7 action buttons)
+   simply extends past the right edge with nothing to scroll to it -
+   exactly "buttons appear offscreen". The overflow-x:auto safety net
+   above means nothing is ever truly unreachable even at the narrowest
+   widths; these breakpoints exist so reaching that fallback is the
+   exception rather than the normal experience on a smaller screen. */
+
+@media (max-width: 1100px) {
+  /* Icon-only mode: every button in the toolbar has an icon plus this
+     shared label class now, so hiding the class once here covers the
+     view tabs, the autosave indicator, and every action button
+     (New/Open/Save/Scenarios/Export/Export Markdown) in a single rule.
+     Goes straight from full labels to icon-only at this one threshold
+     rather than through an intermediate "brand text hidden, button
+     labels still shown" step - that middle ground still didn't leave
+     enough room in the 900-760px range to be worth a separate tier. */
+  .toolbar {
+    gap: 10px;
+    padding: 0 12px;
+  }
+
+  .toolbar__brand-name {
+    display: none;
+  }
+
+  .toolbar__label {
+    display: none;
+  }
+
+  .toolbar__view-tabs button {
+    padding: 6px 9px;
+  }
+
+  .toolbar__actions button {
+    padding: 7px 9px;
+  }
+
+  .toolbar__title {
+    max-width: 160px;
+    min-width: 60px;
+  }
+}
+
+@media (max-width: 520px) {
+  .toolbar {
+    gap: 6px;
+    padding: 0 8px;
+  }
+
+  .toolbar__brand-mark {
+    width: 20px;
+    height: 20px;
+  }
+
+  .toolbar__view-tabs {
+    padding: 1px;
+  }
+
+  .toolbar__view-tabs button {
+    padding: 6px 7px;
+  }
+
+  .toolbar__actions {
+    gap: 5px;
+  }
+
+  .toolbar__actions button {
+    padding: 6px 7px;
+  }
+
+  .toolbar__title {
+    max-width: 90px;
+    min-width: 50px;
+  }
 }
