@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { User, UserX, Check, ChevronDown } from "lucide-react";
-import type { TeamDocument, TeamMember } from "../../domain/teamTypes";
+import type { TeamDocument } from "../../domain/teamTypes";
 
 interface MemberPickerProps {
   team: TeamDocument;

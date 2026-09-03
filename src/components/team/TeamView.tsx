@@ -2,22 +2,14 @@ import { useState, useMemo } from "react";
 import {
   Users,
   UserPlus,
-  Calendar,
   Plus,
   Trash2,
-  Edit2,
-  Check,
   X,
-  Clock,
-  Sparkles,
   Palmtree,
   Settings,
   ShieldCheck,
   ChevronDown,
   ChevronUp,
-  Sun,
-  Sunrise,
-  Sunset,
   CalendarRange,
 } from "lucide-react";
 import type {
@@ -438,7 +430,6 @@ export function TeamView({ team, onUpdateTeam, programIncrements, requirements }
               <div className="team-members-grid">
                 {team.members.map((member) => {
                   const totalPto = calculateTotalPtoDays(member);
-                  const rate = member.defaultPointsPerDay ?? team.settings.defaultPointsPerDay;
 
                   return (
                     <div key={member.id} className="team-member-card">

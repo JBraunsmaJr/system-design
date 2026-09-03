@@ -22,7 +22,6 @@ export function SprintCapacityBar({ summary, compact = false }: SprintCapacityBa
   const hasCapacity = totalCapacityPoints > 0;
   const percent = hasCapacity ? Math.round((totalAssignedPoints / totalCapacityPoints) * 100) : 0;
   const isOverCapacity = totalAssignedPoints > totalCapacityPoints && hasCapacity;
-  const isAtCapacity = totalAssignedPoints === totalCapacityPoints && hasCapacity;
 
   let barColorClass = "sprint-capacity-bar__fill--normal";
   if (isOverCapacity) {

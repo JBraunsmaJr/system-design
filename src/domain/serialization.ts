@@ -113,31 +113,31 @@ function parseTeamDocument(raw: unknown): TeamDocument {
     extraDaysOff: Array.isArray(t.settings?.extraDaysOff)
       ? t.settings.extraDaysOff.filter(
           (e): e is TeamDocument["settings"]["extraDaysOff"][number] =>
-            !!e && typeof e === "object" && typeof e.id === "string" && typeof e.date === "string" && typeof e.name === "string"
+            !!e && typeof e === "object" && typeof (e as any).id === "string" && typeof (e as any).date === "string" && typeof (e as any).name === "string"
         )
       : [],
   };
 
   const members: TeamDocument["members"] = Array.isArray(t.members)
-    ? t.members
+    ? (t.members as unknown[])
         .filter(
-          (m): m is Partial<TeamDocument["members"][number]> =>
-            !!m && typeof m === "object" && typeof m.id === "string" && typeof m.name === "string"
+          (m): m is Record<string, unknown> =>
+            !!m && typeof m === "object" && typeof (m as any).id === "string" && typeof (m as any).name === "string"
         )
         .map((m) => ({
-          id: m.id!,
-          name: m.name!,
+          id: String(m.id),
+          name: String(m.name),
           role: typeof m.role === "string" ? m.role : undefined,
           avatarColor: typeof m.avatarColor === "string" ? m.avatarColor : undefined,
           defaultPointsPerDay: typeof m.defaultPointsPerDay === "number" ? m.defaultPointsPerDay : undefined,
           ptoSpans: Array.isArray(m.ptoSpans)
-            ? m.ptoSpans.filter(
+            ? (m.ptoSpans as unknown[]).filter(
                 (p): p is TeamDocument["members"][number]["ptoSpans"][number] =>
                   !!p &&
                   typeof p === "object" &&
-                  typeof p.id === "string" &&
-                  typeof p.startDate === "string" &&
-                  typeof p.endDate === "string"
+                  typeof (p as any).id === "string" &&
+                  typeof (p as any).startDate === "string" &&
+                  typeof (p as any).endDate === "string"
               )
             : [],
         }))
