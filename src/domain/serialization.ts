@@ -111,9 +111,13 @@ function parseTeamDocument(raw: unknown): TeamDocument {
         ? t.settings.excludeUsHolidays
         : DEFAULT_TEAM_SETTINGS.excludeUsHolidays,
     extraDaysOff: Array.isArray(t.settings?.extraDaysOff)
-      ? t.settings.extraDaysOff.filter(
+      ? (t.settings.extraDaysOff as unknown[]).filter(
           (e): e is TeamDocument["settings"]["extraDaysOff"][number] =>
-            !!e && typeof e === "object" && typeof (e as any).id === "string" && typeof (e as any).date === "string" && typeof (e as any).name === "string"
+            !!e &&
+            typeof e === "object" &&
+            typeof (e as Record<string, unknown>).id === "string" &&
+            typeof (e as Record<string, unknown>).date === "string" &&
+            typeof (e as Record<string, unknown>).name === "string"
         )
       : [],
   };
@@ -122,7 +126,10 @@ function parseTeamDocument(raw: unknown): TeamDocument {
     ? (t.members as unknown[])
         .filter(
           (m): m is Record<string, unknown> =>
-            !!m && typeof m === "object" && typeof (m as any).id === "string" && typeof (m as any).name === "string"
+            !!m &&
+            typeof m === "object" &&
+            typeof (m as Record<string, unknown>).id === "string" &&
+            typeof (m as Record<string, unknown>).name === "string"
         )
         .map((m) => ({
           id: String(m.id),
@@ -135,9 +142,9 @@ function parseTeamDocument(raw: unknown): TeamDocument {
                 (p): p is TeamDocument["members"][number]["ptoSpans"][number] =>
                   !!p &&
                   typeof p === "object" &&
-                  typeof (p as any).id === "string" &&
-                  typeof (p as any).startDate === "string" &&
-                  typeof (p as any).endDate === "string"
+                  typeof (p as Record<string, unknown>).id === "string" &&
+                  typeof (p as Record<string, unknown>).startDate === "string" &&
+                  typeof (p as Record<string, unknown>).endDate === "string"
               )
             : [],
         }))

@@ -4809,11 +4809,7 @@
 }
 
 .member-picker__menu {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
   z-index: 300;
-  width: 210px;
   background: var(--chrome-bg-raised);
   border: 1px solid var(--chrome-border);
   border-radius: var(--radius-sm);
@@ -4821,6 +4817,8 @@
   padding: 6px;
   display: flex;
   flex-direction: column;
+  max-height: 320px;
+  overflow-y: auto;
 }
 
 .member-picker__menu-header {
@@ -4949,11 +4947,7 @@
 }
 
 .points-picker__popover {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
   z-index: 300;
-  width: 170px;
   background: var(--chrome-bg-raised);
   border: 1px solid var(--chrome-border);
   border-radius: var(--radius-sm);
@@ -5591,12 +5585,19 @@
   padding: 7px 9px;
   font-size: 12.5px;
   color: var(--chrome-text);
+  color-scheme: dark;
 }
 
 .member-form-field input:focus,
 .member-form-field select:focus {
   border-color: var(--accent);
   outline: none;
+}
+
+.member-form-field select:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  border-style: dashed;
 }
 
 .color-palette-picker {
