@@ -1,4 +1,4 @@
-import type { RequirementCategory, RequirementItemType, RequirementsDocument } from "./requirementsTypes";
+import type { RequirementCategory, RequirementItemType, RequirementsDocument, RelationshipType, RequirementRelationship } from "./requirementsTypes";
 
 export const BUILT_IN_ITEM_TYPES: RequirementItemType[] = [
   { id: "requirement", label: "Requirement", prefix: "REQ", color: "#5b7cfa", isBuiltIn: true },
@@ -6,6 +6,16 @@ export const BUILT_IN_ITEM_TYPES: RequirementItemType[] = [
   { id: "constraint", label: "Constraint", prefix: "CON", color: "#F2994A", isBuiltIn: true },
   { id: "assumption", label: "Assumption", prefix: "ASM", color: "#9061F9", isBuiltIn: true },
   { id: "risk", label: "Risk", prefix: "RISK", color: "#F0578C", isBuiltIn: true },
+];
+
+/** Mirrors the issue-link conventions from Jira/GitLab. "Relates to" is
+ * symmetric (label === inverseLabel, direction is not meaningful);
+ * "Blocks"/"Duplicates" are directional, each with a distinct inverse
+ * shown when viewing the relationship from the other item. */
+export const BUILT_IN_RELATIONSHIP_TYPES: RelationshipType[] = [
+  { id: "relates-to", label: "Relates to", inverseLabel: "Relates to", color: "#8b90a0", isBuiltIn: true },
+  { id: "blocks", label: "Blocks", inverseLabel: "Is blocked by", color: "#F0578C", isBuiltIn: true },
+  { id: "duplicates", label: "Duplicates", inverseLabel: "Is duplicated by", color: "#F2994A", isBuiltIn: true },
 ];
 
 export function getItemType(doc: RequirementsDocument, typeId: string): RequirementItemType | undefined {
@@ -125,4 +135,63 @@ export function resolveReferencesToMarkdownLinks(text: string, doc: Requirements
     if (!existingIds.has(id)) return fullMatch;
     return `[${fullMatch}](#ref:${id})`;
   });
+}
+
+export function getRelationshipType(doc: RequirementsDocument, typeId: string): RelationshipType | undefined {
+  return doc.relationshipTypes.find((t) => t.id === typeId);
+}
+
+/** Every relationship touching `itemId`, whether it's on the "from" or
+ * "to" side - a relationship is only ever stored once regardless of
+ * which item you're viewing it from, so callers looking at one item's
+ * card need both directions included in a single list. */
+export function getRelationshipsForItem(doc: RequirementsDocument, itemId: string): RequirementRelationship[] {
+  return doc.relationships.filter((r) => r.fromItemId === itemId || r.toItemId === itemId);
+}
+
+/** The id of the OTHER item in `relationship`, relative to `itemId` -
+ * e.g. if itemId is on the "from" side, returns the "to" id, and vice
+ * versa. Assumes itemId is actually one side of the relationship, which
+ * callers iterating getRelationshipsForItem's results always satisfy. */
+export function getOtherItemId(relationship: RequirementRelationship, itemId: string): string {
+  return relationship.fromItemId === itemId ? relationship.toItemId : relationship.fromItemId;
+}
+
+/** The direction-correct label for `relationship` as seen from `itemId`'s
+ * side - e.g. viewing a "Blocks" relationship from the blocked item
+ * returns the type's inverseLabel ("Is blocked by"), not its forward
+ * label, since that item doesn't "block", it "is blocked by". */
+export function getRelationshipLabelForItem(
+  relationship: RequirementRelationship,
+  type: RelationshipType,
+  itemId: string
+): string {
+  return relationship.fromItemId === itemId ? type.label : type.inverseLabel;
+}
+
+function nextRelationshipId(): string {
+  return `rel-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+/**
+ * Adds a new relationship if it's valid, returning the updated
+ * relationships array - or the original array unchanged if the request
+ * was invalid, so callers don't need to pre-validate themselves. Rejects
+ * a self-relationship (an item can't block/relate-to/duplicate itself)
+ * and an exact duplicate of an existing relationship (same type and same
+ * direction already recorded).
+ */
+export function addRelationship(
+  doc: RequirementsDocument,
+  typeId: string,
+  fromItemId: string,
+  toItemId: string
+): RequirementRelationship[] {
+  if (fromItemId === toItemId) return doc.relationships;
+  const isDuplicate = doc.relationships.some(
+    (r) => r.typeId === typeId && r.fromItemId === fromItemId && r.toItemId === toItemId
+  );
+  if (isDuplicate) return doc.relationships;
+  const newRelationship: RequirementRelationship = { id: nextRelationshipId(), typeId, fromItemId, toItemId };
+  return [...doc.relationships, newRelationship];
 }

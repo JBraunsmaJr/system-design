@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LayoutList, Plus, Settings2, Tags } from "lucide-react";
-import { createCategory, generateItemId, isPrefixTaken } from "../../domain/requirementsRegistry";
+import { LayoutList, Plus, Settings2, Tags, Waypoints } from "lucide-react";
+import { addRelationship, createCategory, generateItemId, isPrefixTaken } from "../../domain/requirementsRegistry";
 import { RequirementCard } from "./RequirementCard";
 import { ManageTypesModal } from "./ManageTypesModal";
+import { ManageRelationshipTypesModal } from "./ManageRelationshipTypesModal";
 import type {
   RequirementItem,
   RequirementItemType,
   RequirementsDocument,
+  RelationshipType,
 } from "../../domain/requirementsTypes";
 import type { ProgramIncrement } from "../../domain/programIncrements";
 
@@ -46,6 +48,7 @@ export function RequirementsView({ doc, onUpdateDoc, programIncrements, focusIte
   const [groupBy, setGroupBy] = useState<GroupBy>("type");
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [isManagingTypes, setIsManagingTypes] = useState(false);
+  const [isManagingRelationshipTypes, setIsManagingRelationshipTypes] = useState(false);
   const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const filteredItems = useMemo(() => {
@@ -116,7 +119,14 @@ export function RequirementsView({ doc, onUpdateDoc, programIncrements, focusIte
   };
 
   const onDeleteItem = (id: string) => {
-    onUpdateDoc((d) => ({ ...d, items: d.items.filter((i) => i.id !== id) }));
+    onUpdateDoc((d) => ({
+      ...d,
+      items: d.items.filter((i) => i.id !== id),
+      // A relationship referencing the deleted item on either side has
+      // nothing left to point at - same "orphaned reference" reasoning as
+      // clearing sprintId when a sprint is deleted elsewhere in this app.
+      relationships: d.relationships.filter((r) => r.fromItemId !== id && r.toItemId !== id),
+    }));
   };
 
   // Creating a category and assigning it to an item happen as one combined
@@ -132,6 +142,14 @@ export function RequirementsView({ doc, onUpdateDoc, programIncrements, focusIte
         items: d.items.map((i) => (i.id === itemId ? { ...i, categoryId: category.id } : i)),
       };
     });
+  };
+
+  const onAddRelationship = (typeId: string, fromItemId: string, toItemId: string) => {
+    onUpdateDoc((d) => ({ ...d, relationships: addRelationship(d, typeId, fromItemId, toItemId) }));
+  };
+
+  const onDeleteRelationship = (relationshipId: string) => {
+    onUpdateDoc((d) => ({ ...d, relationships: d.relationships.filter((r) => r.id !== relationshipId) }));
   };
 
   const onNavigateToItem = useCallback((itemId: string) => {
@@ -174,12 +192,41 @@ export function RequirementsView({ doc, onUpdateDoc, programIncrements, focusIte
   };
 
   const onDeleteCustomType = (typeId: string) => {
+    onUpdateDoc((d) => {
+      const removedIds = new Set(d.items.filter((i) => i.typeId === typeId).map((i) => i.id));
+      return {
+        ...d,
+        itemTypes: d.itemTypes.filter((t) => t.id !== typeId),
+        // Items of a deleted type have nothing left to belong to - keeping
+        // them around as orphans would just be silently-broken data.
+        items: d.items.filter((i) => i.typeId !== typeId),
+        // Any relationship touching one of those now-deleted items would
+        // otherwise be left pointing at an id that no longer exists.
+        relationships: d.relationships.filter((r) => !removedIds.has(r.fromItemId) && !removedIds.has(r.toItemId)),
+      };
+    });
+  };
+
+  const onAddCustomRelationshipType = (label: string, inverseLabel: string, color: string) => {
+    const newType: RelationshipType = {
+      id: `rel-type-${Date.now().toString(36)}`,
+      label,
+      inverseLabel,
+      color,
+      isBuiltIn: false,
+    };
+    onUpdateDoc((d) => ({ ...d, relationshipTypes: [...d.relationshipTypes, newType] }));
+  };
+
+  const onDeleteCustomRelationshipType = (typeId: string) => {
     onUpdateDoc((d) => ({
       ...d,
-      itemTypes: d.itemTypes.filter((t) => t.id !== typeId),
-      // Items of a deleted type have nothing left to belong to - keeping
-      // them around as orphans would just be silently-broken data.
-      items: d.items.filter((i) => i.typeId !== typeId),
+      relationshipTypes: d.relationshipTypes.filter((t) => t.id !== typeId),
+      // A relationship using a deleted type has nothing left to describe
+      // it - unlike deleting an item type, this does NOT touch any
+      // requirement items themselves, only the (much lighter-weight) link
+      // records between them.
+      relationships: d.relationships.filter((r) => r.typeId !== typeId),
     }));
   };
 
@@ -231,6 +278,14 @@ export function RequirementsView({ doc, onUpdateDoc, programIncrements, focusIte
             <Settings2 size={13} />
             Types
           </button>
+          <button
+            type="button"
+            className="requirements-view__manage-types"
+            onClick={() => setIsManagingRelationshipTypes(true)}
+          >
+            <Waypoints size={13} />
+            Relationships
+          </button>
         </div>
       </div>
 
@@ -255,6 +310,8 @@ export function RequirementsView({ doc, onUpdateDoc, programIncrements, focusIte
                   onDeleteItem={onDeleteItem}
                   onNavigateToItem={onNavigateToItem}
                   onCreateAndAssignCategory={onCreateAndAssignCategory}
+                  onAddRelationship={onAddRelationship}
+                  onDeleteRelationship={onDeleteRelationship}
                   highlighted={highlightedId === item.id}
                 />
               ))}
@@ -269,6 +326,14 @@ export function RequirementsView({ doc, onUpdateDoc, programIncrements, focusIte
           onAddCustomType={onAddCustomType}
           onDeleteCustomType={onDeleteCustomType}
           onClose={() => setIsManagingTypes(false)}
+        />
+      )}
+      {isManagingRelationshipTypes && (
+        <ManageRelationshipTypesModal
+          doc={doc}
+          onAddCustomType={onAddCustomRelationshipType}
+          onDeleteCustomType={onDeleteCustomRelationshipType}
+          onClose={() => setIsManagingRelationshipTypes(false)}
         />
       )}
     </div>

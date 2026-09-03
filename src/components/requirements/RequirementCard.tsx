@@ -5,6 +5,7 @@ import { RequirementBody } from "./RequirementBody";
 import { RequirementEditor } from "./RequirementEditor";
 import { CategoryPicker } from "./CategoryPicker";
 import { SprintPicker } from "./SprintPicker";
+import { RelationshipManager } from "./RelationshipManager";
 import type { RequirementItem, RequirementsDocument } from "../../domain/requirementsTypes";
 import type { ProgramIncrement } from "../../domain/programIncrements";
 
@@ -16,6 +17,8 @@ interface RequirementCardProps {
   onDeleteItem: (id: string) => void;
   onNavigateToItem: (itemId: string) => void;
   onCreateAndAssignCategory: (itemId: string, label: string) => void;
+  onAddRelationship: (typeId: string, fromItemId: string, toItemId: string) => void;
+  onDeleteRelationship: (relationshipId: string) => void;
   /** True briefly after this item was scrolled to via a reference click,
    * so the destination is visually obvious rather than just "the page
    * moved somewhere" - cleared by the parent view after a short timeout. */
@@ -30,6 +33,8 @@ export function RequirementCard({
   onDeleteItem,
   onNavigateToItem,
   onCreateAndAssignCategory,
+  onAddRelationship,
+  onDeleteRelationship,
   highlighted,
 }: RequirementCardProps) {
   const [isEditingBody, setIsEditingBody] = useState(false);
@@ -92,6 +97,13 @@ export function RequirementCard({
           <RequirementBody text={item.body} doc={doc} onNavigateToItem={onNavigateToItem} />
         </div>
       )}
+      <RelationshipManager
+        itemId={item.id}
+        doc={doc}
+        onAddRelationship={onAddRelationship}
+        onDeleteRelationship={onDeleteRelationship}
+        onNavigateToItem={onNavigateToItem}
+      />
     </div>
   );
 }

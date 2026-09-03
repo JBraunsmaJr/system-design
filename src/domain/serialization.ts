@@ -66,6 +66,8 @@ function parseRequirementsDocument(raw: unknown): RequirementsDocument {
     itemTypes: Array.isArray(r.itemTypes) ? r.itemTypes : [],
     categories: Array.isArray(r.categories) ? r.categories : [],
     items: Array.isArray(r.items) ? r.items : [],
+    relationshipTypes: Array.isArray(r.relationshipTypes) ? r.relationshipTypes : [],
+    relationships: Array.isArray(r.relationships) ? r.relationships : [],
     nextSequence: r.nextSequence && typeof r.nextSequence === "object" ? r.nextSequence : {},
   };
 }

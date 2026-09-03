@@ -7,7 +7,7 @@ import {
   type ProgramIncrement,
   type Sprint,
 } from "../../domain/programIncrements";
-import { getItemType } from "../../domain/requirementsRegistry";
+import { addRelationship, getItemType } from "../../domain/requirementsRegistry";
 import type { RequirementItem, RequirementsDocument } from "../../domain/requirementsTypes";
 import { RequirementDetailModal } from "./RequirementDetailModal";
 import { SprintQuickAdd } from "./SprintQuickAdd";
@@ -140,6 +140,10 @@ export function TimelineView({
     onUpdateRequirements((doc) => ({
       ...doc,
       items: doc.items.filter((item) => item.id !== id),
+      // Same "orphaned reference" cleanup as RequirementsView's own
+      // onDeleteItem - a relationship touching this item on either side
+      // would otherwise be left pointing at an id that no longer exists.
+      relationships: doc.relationships.filter((r) => r.fromItemId !== id && r.toItemId !== id),
     }));
   };
 
@@ -172,6 +176,14 @@ export function TimelineView({
       ...doc,
       items: doc.items.map((item) => (item.id === itemId ? { ...item, sprintId: targetSprintId } : item)),
     }));
+  };
+
+  const onAddRelationship = (typeId: string, fromItemId: string, toItemId: string) => {
+    onUpdateRequirements((doc) => ({ ...doc, relationships: addRelationship(doc, typeId, fromItemId, toItemId) }));
+  };
+
+  const onDeleteRelationship = (relationshipId: string) => {
+    onUpdateRequirements((doc) => ({ ...doc, relationships: doc.relationships.filter((r) => r.id !== relationshipId) }));
   };
 
   // Grouped once per render for both count badges and the visual board
@@ -259,6 +271,8 @@ export function TimelineView({
           onNavigateToRequirement={onNavigateToRequirement}
           onSelectItem={(id) => setSelectedItemId(id)}
           onCreateAndAssignCategory={onCreateAndAssignCategory}
+          onAddRelationship={onAddRelationship}
+          onDeleteRelationship={onDeleteRelationship}
         />
       )}
     </div>

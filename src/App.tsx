@@ -39,7 +39,7 @@ import { exportDiagramAsPng, exportDiagramAsSvg } from "./domain/imageExport";
 import type { ArchNodeData, ArchEdgeData, Scenario, ScenarioStep, SubDiagram } from "./domain/types";
 import type { RequirementsDocument } from "./domain/requirementsTypes";
 import { EMPTY_REQUIREMENTS_DOCUMENT } from "./domain/requirementsTypes";
-import { BUILT_IN_ITEM_TYPES } from "./domain/requirementsRegistry";
+import { BUILT_IN_ITEM_TYPES, BUILT_IN_RELATIONSHIP_TYPES } from "./domain/requirementsRegistry";
 import type { ProgramIncrement } from "./domain/programIncrements";
 import "./App.css";
 
@@ -76,17 +76,22 @@ function diagramFileToSnapshot(file: ReturnType<typeof parseDiagramFile>): Diagr
     steps: sc.steps.map((st) => ({ ...st, path: st.path ?? [] })),
   }));
   // Similarly, files saved before requirements existed at all (or that
-  // otherwise ended up with no item types) still need the built-in types
-  // populated, or "Add item" would have nothing to offer.
+  // otherwise ended up with no item types, or predate relationship types
+  // existing) still need the built-in types populated, or "Add item" /
+  // "Add relationship" would have nothing to offer.
   const normalizedRequirements =
     file.requirements.itemTypes.length > 0
       ? file.requirements
       : { ...file.requirements, itemTypes: BUILT_IN_ITEM_TYPES };
+  const finalRequirements =
+    normalizedRequirements.relationshipTypes.length > 0
+      ? normalizedRequirements
+      : { ...normalizedRequirements, relationshipTypes: BUILT_IN_RELATIONSHIP_TYPES };
   return {
     title: file.title,
     root: { nodes: file.nodes, edges: file.edges },
     scenarios: normalizedScenarios,
-    requirements: normalizedRequirements,
+    requirements: finalRequirements,
     programIncrements: file.programIncrements,
   };
 }
@@ -95,7 +100,11 @@ const DEFAULT_SNAPSHOT: DiagramSnapshot = {
   title: "Untitled Diagram",
   root: EMPTY_DIAGRAM,
   scenarios: [],
-  requirements: { ...EMPTY_REQUIREMENTS_DOCUMENT, itemTypes: BUILT_IN_ITEM_TYPES },
+  requirements: {
+    ...EMPTY_REQUIREMENTS_DOCUMENT,
+    itemTypes: BUILT_IN_ITEM_TYPES,
+    relationshipTypes: BUILT_IN_RELATIONSHIP_TYPES,
+  },
   programIncrements: [],
 };
 

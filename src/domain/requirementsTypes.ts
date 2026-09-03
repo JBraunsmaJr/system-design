@@ -26,6 +26,36 @@ export interface RequirementCategory {
   color: string;
 }
 
+/** A "kind" of link between two requirement items - Blocks, Relates to,
+ * Duplicates, etc., or a custom one the user defines. Extensible by
+ * design, same reasoning as RequirementItemType: the built-in set covers
+ * common cases (mirroring Jira/GitLab's issue-link conventions) but
+ * nothing about the data model assumes only these exist. */
+export interface RelationshipType {
+  id: string;
+  /** Shown when viewing this relationship from its "from" item, e.g.
+   * "Blocks". */
+  label: string;
+  /** Shown when viewing this relationship from its "to" item, e.g. "Is
+   * blocked by". For a symmetric type like "Relates to", this is
+   * identical to `label` - always populated (never optional) so display
+   * code never has to special-case a missing inverse. */
+  inverseLabel: string;
+  color: string;
+  isBuiltIn: boolean;
+}
+
+/** A directed link between two requirement items, e.g. REQ-1 "blocks"
+ * REQ-5. Stored once, in one direction - which of the type's two labels
+ * displays depends on which item you're currently viewing it from, not
+ * on storing the same fact twice in both directions. */
+export interface RequirementRelationship {
+  id: string;
+  typeId: string;
+  fromItemId: string;
+  toItemId: string;
+}
+
 export interface RequirementItem {
   /** The full generated reference id, e.g. "REQ-1" - stable for the life
    * of the item, never reused even after deletion. */
@@ -48,6 +78,8 @@ export interface RequirementsDocument {
   itemTypes: RequirementItemType[];
   categories: RequirementCategory[];
   items: RequirementItem[];
+  relationshipTypes: RelationshipType[];
+  relationships: RequirementRelationship[];
   /** Next sequence number to assign per type id. IDs are never reused
    * after a delete - matching how issue trackers like GitHub/GitLab number
    * things - so a reference already written elsewhere never silently ends
@@ -59,5 +91,7 @@ export const EMPTY_REQUIREMENTS_DOCUMENT: RequirementsDocument = {
   itemTypes: [],
   categories: [],
   items: [],
+  relationshipTypes: [],
+  relationships: [],
   nextSequence: {},
 };

@@ -7,6 +7,7 @@ import { RequirementBody } from "../requirements/RequirementBody";
 import { RequirementEditor } from "../requirements/RequirementEditor";
 import { CategoryPicker } from "../requirements/CategoryPicker";
 import { SprintPicker } from "../requirements/SprintPicker";
+import { RelationshipManager } from "../requirements/RelationshipManager";
 
 interface RequirementDetailModalProps {
   item: RequirementItem;
@@ -18,6 +19,8 @@ interface RequirementDetailModalProps {
   onNavigateToRequirement?: (itemId: string) => void;
   onSelectItem?: (itemId: string) => void;
   onCreateAndAssignCategory?: (itemId: string, label: string) => void;
+  onAddRelationship?: (typeId: string, fromItemId: string, toItemId: string) => void;
+  onDeleteRelationship?: (relationshipId: string) => void;
 }
 
 export function RequirementDetailModal({
@@ -30,6 +33,8 @@ export function RequirementDetailModal({
   onNavigateToRequirement,
   onSelectItem,
   onCreateAndAssignCategory,
+  onAddRelationship,
+  onDeleteRelationship,
 }: RequirementDetailModalProps) {
   const [isEditing, setIsEditing] = useState(false);
 
@@ -255,6 +260,19 @@ export function RequirementDetailModal({
               </div>
             )}
           </div>
+
+          {onUpdateItem && onAddRelationship && onDeleteRelationship && (
+            <div className="requirement-detail-modal__relationships">
+              <span className="requirement-detail-modal__desc-label">Relationships</span>
+              <RelationshipManager
+                itemId={item.id}
+                doc={doc}
+                onAddRelationship={onAddRelationship}
+                onDeleteRelationship={onDeleteRelationship}
+                onNavigateToItem={handleNavigateRef}
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>
