@@ -1,5 +1,5 @@
-import { useState, useRef } from "react";
-import { CalendarRange, ChevronDown, ChevronRight, ChevronUp, GanttChartSquare, Inbox, Plus, Trash2 } from "lucide-react";
+import { useMemo, useState, useRef } from "react";
+import { AlertTriangle, CalendarRange, ChevronDown, ChevronRight, ChevronUp, GanttChartSquare, Inbox, Plus, Trash2 } from "lucide-react";
 import {
   computeSprintDateRanges,
   updatePIStartDate,
@@ -7,9 +7,12 @@ import {
   type ProgramIncrement,
   type Sprint,
 } from "../../domain/programIncrements";
-import { addRelationship, getItemType } from "../../domain/requirementsRegistry";
+import { addRelationship, getItemType, isItemWorkable } from "../../domain/requirementsRegistry";
+import { findScheduleConflicts, checkScheduleConflict, findBlockingItemIds } from "../../domain/scheduleConflicts";
 import type { RequirementItem, RequirementsDocument } from "../../domain/requirementsTypes";
 import type { TeamDocument } from "../../domain/teamTypes";
+import type { SubDiagram } from "../../domain/types";
+import type { DiagramPath } from "../../domain/subDiagramTree";
 import { computeSprintCapacity } from "../../domain/teamCapacity";
 import { SprintCapacityBar } from "../team/SprintCapacityBar";
 import { MemberPicker } from "../team/MemberPicker";
@@ -24,6 +27,9 @@ interface TimelineViewProps {
   requirements: RequirementsDocument;
   onUpdateRequirements: (updater: (doc: RequirementsDocument) => RequirementsDocument) => void;
   team?: TeamDocument;
+  diagramRoot?: SubDiagram;
+  onNavigateToNode?: (path: DiagramPath, nodeId: string) => void;
+  onCreateLinkedNode?: (itemId: string, label: string) => void;
   onNavigateToRequirement?: (itemId: string) => void;
 }
 
@@ -46,6 +52,9 @@ export function TimelineView({
   requirements,
   onUpdateRequirements,
   team,
+  diagramRoot,
+  onNavigateToNode,
+  onCreateLinkedNode,
   onNavigateToRequirement,
 }: TimelineViewProps) {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -180,15 +189,35 @@ export function TimelineView({
     });
   };
 
-  const onMoveItemToSprint = (itemId: string, targetSprintId: string) => {
+  const onMoveItemToSprint = (itemId: string, targetSprintId: string): string | null => {
+    const targetRange = allSprintRangesById.get(targetSprintId);
+    if (targetRange) {
+      const conflict = checkScheduleConflict(
+        itemId,
+        targetRange,
+        requirements.items,
+        requirements.relationships,
+        requirements.relationshipTypes,
+        sprintRangesByItemId
+      );
+      if (conflict) {
+        return conflict.blockerRange
+          ? `Can't schedule here - blocked by ${conflict.blocker.id}, which isn't finished until ${conflict.blockerRange.endDate}.`
+          : `Can't schedule here - blocked by ${conflict.blocker.id}, which isn't scheduled yet.`;
+      }
+    }
     onUpdateRequirements((doc) => ({
       ...doc,
       items: doc.items.map((item) => (item.id === itemId ? { ...item, sprintId: targetSprintId } : item)),
     }));
+    return null;
   };
 
-  const onAddRelationship = (typeId: string, fromItemId: string, toItemId: string) => {
-    onUpdateRequirements((doc) => ({ ...doc, relationships: addRelationship(doc, typeId, fromItemId, toItemId) }));
+  const onAddRelationship = (typeId: string, fromItemId: string, toItemId: string): string | null => {
+    const result = addRelationship(requirements, typeId, fromItemId, toItemId);
+    if (result.error) return result.error;
+    onUpdateRequirements((doc) => ({ ...doc, relationships: result.relationships }));
+    return null;
   };
 
   const onDeleteRelationship = (relationshipId: string) => {
@@ -201,6 +230,7 @@ export function TimelineView({
   const itemsBySprintId = new Map<string, RequirementItem[]>();
   for (const item of requirements.items) {
     if (!item.sprintId) continue;
+    if (!isItemWorkable(requirements, item)) continue;
     const list = itemsBySprintId.get(item.sprintId);
     if (list) {
       list.push(item);
@@ -215,8 +245,56 @@ export function TimelineView({
   // this board - there was no way to see them or drag them into a sprint
   // without leaving for the Requirements view first. Surfacing them here
   // as a dedicated, always-a-valid-drop-target section closes that gap.
-  const backlogItems = requirements.items.filter((item) => !item.sprintId);
+  const backlogItems = requirements.items.filter((item) => !item.sprintId && isItemWorkable(requirements, item));
+
+  // Every sprint's date range, across ALL program increments - needed
+  // here (unlike within a single PICard, which only knows its own PI's
+  // sprints) because a blocker and the item it blocks can sit in sprints
+  // that belong to entirely different PIs.
+  const { allSprintRangesById, sprintRangesByItemId, conflictedItemIds } = useMemo(() => {
+    const allRanges = new Map<string, { startDate: string; endDate: string }>();
+    for (const pi of programIncrements) {
+      for (const range of computeSprintDateRanges(pi)) {
+        allRanges.set(range.sprintId, { startDate: range.startDate, endDate: range.endDate });
+      }
+    }
+    // Each currently-scheduled workable item's own sprint range - the
+    // same shape the Gantt view's conflict detector expects, built once
+    // here so both the passive "is this card currently in conflict"
+    // check and the "would assigning it here create one" pre-check share
+    // one source.
+    const byItemId = new Map<string, { startDate: string; endDate: string }>();
+    for (const item of requirements.items) {
+      if (!item.sprintId || !isItemWorkable(requirements, item)) continue;
+      const range = allRanges.get(item.sprintId);
+      if (range) byItemId.set(item.id, range);
+    }
+    // Items already on the board whose blocker won't finish in time -
+    // same detector the Gantt view uses, applied here so the board can
+    // flag these directly on their cards rather than only being visible
+    // in a separate view.
+    const conflicts = findScheduleConflicts(
+      requirements.items,
+      requirements.relationships,
+      requirements.relationshipTypes,
+      byItemId
+    );
+    return {
+      allSprintRangesById: allRanges,
+      sprintRangesByItemId: byItemId,
+      conflictedItemIds: new Set(conflicts.map((c) => c.item.id)),
+    };
+  }, [programIncrements, requirements]);
   const onUnassignItem = (itemId: string) => onUpdateItem(itemId, { sprintId: undefined });
+
+  const blockingItemIds = useMemo(() => {
+    if (!draggedItemId) return new Set<string>();
+    return findBlockingItemIds(
+      draggedItemId,
+      requirements.relationships,
+      requirements.relationshipTypes
+    );
+  }, [draggedItemId, requirements.relationships, requirements.relationshipTypes]);
 
   return (
     <div className="timeline-view">
@@ -259,6 +337,7 @@ export function TimelineView({
             requirements={requirements}
             team={team}
             draggedItemId={draggedItemId}
+            blockingItemIds={blockingItemIds}
             onSelectItem={(id) => setSelectedItemId(id)}
             onDragStartItem={(id) => setDraggedItemId(id)}
             onDragEndItem={() => setDraggedItemId(null)}
@@ -279,7 +358,10 @@ export function TimelineView({
               team={team}
               itemsBySprintId={itemsBySprintId}
               backlogItems={backlogItems}
+              conflictedItemIds={conflictedItemIds}
               draggedItemId={draggedItemId}
+              blockingItemIds={blockingItemIds}
+              sprintRangesByItemId={sprintRangesByItemId}
               onSelectItem={(id) => setSelectedItemId(id)}
               onDragStartItem={(id) => setDraggedItemId(id)}
               onDragEndItem={() => setDraggedItemId(null)}
@@ -305,6 +387,9 @@ export function TimelineView({
           doc={requirements}
           programIncrements={programIncrements}
           team={team}
+          diagramRoot={diagramRoot}
+          onNavigateToNode={onNavigateToNode}
+          onCreateLinkedNode={onCreateLinkedNode}
           onClose={() => setSelectedItemId(null)}
           onUpdateItem={onUpdateItem}
           onDeleteItem={onDeleteItem}
@@ -324,6 +409,7 @@ interface BacklogSectionProps {
   requirements: RequirementsDocument;
   team?: TeamDocument;
   draggedItemId: string | null;
+  blockingItemIds?: Set<string>;
   onSelectItem: (itemId: string) => void;
   onDragStartItem: (itemId: string) => void;
   onDragEndItem: () => void;
@@ -357,6 +443,7 @@ function BacklogSection({
   requirements,
   team,
   draggedItemId,
+  blockingItemIds,
   onSelectItem,
   onDragStartItem,
   onDragEndItem,
@@ -445,10 +532,11 @@ function BacklogSection({
               const type = getItemType(requirements, item.typeId);
               const category = item.categoryId ? requirements.categories.find((c) => c.id === item.categoryId) : undefined;
               const isDragging = draggedItemId === item.id;
+              const isBlocker = blockingItemIds?.has(item.id);
               return (
                 <div
                   key={item.id}
-                  className={`pi-board-item backlog-section__item${isDragging ? " is-dragging" : ""}`}
+                  className={`pi-board-item backlog-section__item${isDragging ? " is-dragging" : ""}${isBlocker ? " is-blocker-highlight" : ""}`}
                   draggable={true}
                   onDragStart={(e) => {
                     e.dataTransfer.setData("text/plain", item.id);
@@ -477,6 +565,14 @@ function BacklogSection({
                     >
                       {item.id}
                     </span>
+                    {isBlocker && (
+                      <span
+                        className="pi-board-item__blocker-badge"
+                        title="Blocks the item currently being dragged"
+                      >
+                        Blocker
+                      </span>
+                    )}
                     {category && (
                       <span
                         className="pi-board-item__category"
@@ -519,11 +615,14 @@ interface ProgramIncrementCardProps {
   team?: TeamDocument;
   itemsBySprintId: Map<string, RequirementItem[]>;
   backlogItems: RequirementItem[];
+  conflictedItemIds: Set<string>;
   draggedItemId: string | null;
+  blockingItemIds: Set<string>;
+  sprintRangesByItemId: Map<string, { startDate: string; endDate: string }>;
   onSelectItem: (itemId: string) => void;
   onDragStartItem: (itemId: string) => void;
   onDragEndItem: () => void;
-  onDropItem: (itemId: string, sprintId: string) => void;
+  onDropItem: (itemId: string, sprintId: string) => string | null;
   onUpdateItem: (id: string, patch: Partial<RequirementItem>) => void;
   onUpdateName: (name: string) => void;
   onUpdateStart: (startDate: string) => void;
@@ -541,7 +640,10 @@ function ProgramIncrementCard({
   team,
   itemsBySprintId,
   backlogItems,
+  conflictedItemIds,
   draggedItemId,
+  blockingItemIds,
+  sprintRangesByItemId,
   onSelectItem,
   onDragStartItem,
   onDragEndItem,
@@ -649,7 +751,10 @@ function ProgramIncrementCard({
                 requirements={requirements}
                 team={team}
                 backlogItems={backlogItems}
+                conflictedItemIds={conflictedItemIds}
                 draggedItemId={draggedItemId}
+                blockingItemIds={blockingItemIds}
+                sprintRangesByItemId={sprintRangesByItemId}
                 onSelectItem={onSelectItem}
                 onDragStartItem={onDragStartItem}
                 onDragEndItem={onDragEndItem}
@@ -671,11 +776,14 @@ interface SprintBoardColumnProps {
   requirements: RequirementsDocument;
   team?: TeamDocument;
   backlogItems: RequirementItem[];
+  conflictedItemIds: Set<string>;
   draggedItemId: string | null;
+  blockingItemIds: Set<string>;
+  sprintRangesByItemId: Map<string, { startDate: string; endDate: string }>;
   onSelectItem: (id: string) => void;
   onDragStartItem: (id: string) => void;
   onDragEndItem: () => void;
-  onDropItem: (itemId: string, sprintId: string) => void;
+  onDropItem: (itemId: string, sprintId: string) => string | null;
   onUpdateItem: (id: string, patch: Partial<RequirementItem>) => void;
 }
 
@@ -686,7 +794,10 @@ function SprintBoardColumn({
   requirements,
   team,
   backlogItems,
+  conflictedItemIds,
   draggedItemId,
+  blockingItemIds,
+  sprintRangesByItemId,
   onSelectItem,
   onDragStartItem,
   onDragEndItem,
@@ -695,8 +806,26 @@ function SprintBoardColumn({
 }: SprintBoardColumnProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const dragCounter = useRef(0);
+  const [dropError, setDropError] = useState<string | null>(null);
+  const dropErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const capacitySummary = team ? computeSprintCapacity(sprint, range, team, requirements.items) : null;
+  const capacitySummary = team
+    ? computeSprintCapacity(sprint, range, team, requirements.items.filter((i) => isItemWorkable(requirements, i)))
+    : null;
+
+  const dropConflict = useMemo(() => {
+    if (!draggedItemId || !range) return null;
+    return checkScheduleConflict(
+      draggedItemId,
+      range,
+      requirements.items,
+      requirements.relationships,
+      requirements.relationshipTypes,
+      sprintRangesByItemId
+    );
+  }, [draggedItemId, range, requirements.items, requirements.relationships, requirements.relationshipTypes, sprintRangesByItemId]);
+
+  const isBlocked = Boolean(dropConflict);
 
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
@@ -715,7 +844,11 @@ function SprintBoardColumn({
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
+    if (isBlocked) {
+      e.dataTransfer.dropEffect = "none";
+    } else {
+      e.dataTransfer.dropEffect = "move";
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -724,13 +857,18 @@ function SprintBoardColumn({
     setIsDragOver(false);
     const itemId = e.dataTransfer.getData("text/plain") || draggedItemId;
     if (itemId) {
-      onDropItem(itemId, sprint.id);
+      const error = onDropItem(itemId, sprint.id);
+      if (error) {
+        setDropError(error);
+        if (dropErrorTimer.current) clearTimeout(dropErrorTimer.current);
+        dropErrorTimer.current = setTimeout(() => setDropError(null), 4000);
+      }
     }
   };
 
   return (
     <div
-      className={`pi-board-column${isDragOver ? " is-drag-over" : ""}`}
+      className={`pi-board-column${isBlocked ? " is-blocked" : ""}${isDragOver ? (isBlocked ? " is-drag-over-blocked" : " is-drag-over") : ""}`}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
@@ -760,10 +898,32 @@ function SprintBoardColumn({
 
         {capacitySummary && <SprintCapacityBar summary={capacitySummary} compact={true} />}
       </div>
+      {dropConflict && (
+        <div
+          className="pi-board-column__blocked-banner"
+          title={
+            dropConflict.blockerRange
+              ? `Can't schedule here - blocked by ${dropConflict.blocker.id}${dropConflict.blocker.title ? ` (${dropConflict.blocker.title})` : ""}, which isn't finished until ${dropConflict.blockerRange.endDate}.`
+              : `Can't schedule here - blocked by ${dropConflict.blocker.id}${dropConflict.blocker.title ? ` (${dropConflict.blocker.title})` : ""}, which isn't scheduled yet.`
+          }
+        >
+          <AlertTriangle size={12} className="pi-board-column__blocked-icon" />
+          <span className="pi-board-column__blocked-text">
+            {dropConflict.blockerRange
+              ? `Blocked by ${dropConflict.blocker.id} (ends ${dropConflict.blockerRange.endDate})`
+              : `Blocked by ${dropConflict.blocker.id} (unscheduled)`}
+          </span>
+        </div>
+      )}
+      {dropError && <p className="pi-board-column__drop-error">{dropError}</p>}
       <div className="pi-board-column__items">
         {items.length === 0 ? (
           <div className="pi-board-column__empty">
-            {isDragOver ? "Drop to assign to sprint" : "No requirements assigned"}
+            {dropConflict
+              ? `Cannot add: blocked by ${dropConflict.blocker.id}`
+              : isDragOver
+                ? "Drop to assign to sprint"
+                : "No requirements assigned"}
           </div>
         ) : (
           items.map((item) => {
@@ -772,10 +932,12 @@ function SprintBoardColumn({
               ? requirements.categories.find((c) => c.id === item.categoryId)
               : undefined;
             const isDragging = draggedItemId === item.id;
+            const isConflicted = conflictedItemIds.has(item.id);
+            const isBlocker = blockingItemIds.has(item.id);
             return (
               <div
                 key={item.id}
-                className={`pi-board-item${isDragging ? " is-dragging" : ""}`}
+                className={`pi-board-item${isDragging ? " is-dragging" : ""}${isConflicted ? " is-conflicted" : ""}${isBlocker ? " is-blocker-highlight" : ""}`}
                 draggable={true}
                 onDragStart={(e) => {
                   e.dataTransfer.setData("text/plain", item.id);
@@ -808,6 +970,21 @@ function SprintBoardColumn({
                   >
                     {item.id}
                   </span>
+                  {isBlocker && (
+                    <span
+                      className="pi-board-item__blocker-badge"
+                      title="Blocks the item currently being dragged"
+                    >
+                      Blocker
+                    </span>
+                  )}
+                  {isConflicted && (
+                    <AlertTriangle
+                      size={12}
+                      className="pi-board-item__conflict-warning"
+                      aria-label="Blocked by unfinished work - move this or its blocker to resolve"
+                    />
+                  )}
                   {category && (
                     <span
                       className="pi-board-item__category"

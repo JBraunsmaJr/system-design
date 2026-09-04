@@ -2,6 +2,7 @@ import type { Node, Edge } from "@xyflow/react";
 import type { ArchNodeData, ArchEdgeData, Scenario } from "./types";
 import type { RequirementsDocument } from "./requirementsTypes";
 import { EMPTY_REQUIREMENTS_DOCUMENT } from "./requirementsTypes";
+import { BUILT_IN_ITEM_TYPES, BUILT_IN_RELATIONSHIP_TYPES } from "./requirementsRegistry";
 import type { ProgramIncrement } from "./programIncrements";
 import type { TeamDocument } from "./teamTypes";
 import { EMPTY_TEAM_DOCUMENT, DEFAULT_TEAM_SETTINGS } from "./teamTypes";
@@ -67,11 +68,31 @@ export function downloadDiagram(file: DiagramFile): void {
 function parseRequirementsDocument(raw: unknown): RequirementsDocument {
   if (!raw || typeof raw !== "object") return EMPTY_REQUIREMENTS_DOCUMENT;
   const r = raw as Partial<RequirementsDocument>;
+  // Files saved before "workable" types existed won't have isWorkable at
+  // all on any of their item types - fall back to the matching CURRENT
+  // built-in's value when the type is a recognized built-in (so a legacy
+  // "ticket" record correctly comes back workable, not silently excluded
+  // from the skill tree and stripped of its StatusPicker), or false for
+  // anything unrecognized (a custom type predating this field, where
+  // there's no built-in value to recover). Same reasoning as
+  // relationshipTypes' isBlocking fallback just below.
+  const itemTypes = Array.isArray(r.itemTypes)
+    ? r.itemTypes.map((t) => ({
+        ...t,
+        isWorkable: t.isWorkable ?? BUILT_IN_ITEM_TYPES.find((b) => b.id === t.id)?.isWorkable ?? false,
+      }))
+    : [];
+  const relationshipTypes = Array.isArray(r.relationshipTypes)
+    ? r.relationshipTypes.map((t) => ({
+        ...t,
+        isBlocking: t.isBlocking ?? BUILT_IN_RELATIONSHIP_TYPES.find((b) => b.id === t.id)?.isBlocking ?? false,
+      }))
+    : [];
   return {
-    itemTypes: Array.isArray(r.itemTypes) ? r.itemTypes : [],
+    itemTypes,
     categories: Array.isArray(r.categories) ? r.categories : [],
     items: Array.isArray(r.items) ? r.items : [],
-    relationshipTypes: Array.isArray(r.relationshipTypes) ? r.relationshipTypes : [],
+    relationshipTypes,
     relationships: Array.isArray(r.relationships) ? r.relationships : [],
     nextSequence: r.nextSequence && typeof r.nextSequence === "object" ? r.nextSequence : {},
   };

@@ -8,7 +8,7 @@ import type { RequirementItem, RequirementsDocument } from "../../domain/require
 interface SprintQuickAddProps {
   backlogItems: RequirementItem[];
   requirements: RequirementsDocument;
-  onAssign: (itemId: string) => void;
+  onAssign: (itemId: string) => string | null;
 }
 
 const DROPDOWN_WIDTH = 240;
@@ -28,6 +28,7 @@ const DROPDOWN_WIDTH = 240;
 export function SprintQuickAdd({ backlogItems, requirements, onAssign }: SprintQuickAddProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -42,6 +43,7 @@ export function SprintQuickAdd({ backlogItems, requirements, onAssign }: SprintQ
   const close = () => {
     setIsOpen(false);
     setQuery("");
+    setErrorMessage(null);
   };
 
   useLayoutEffect(() => {
@@ -136,11 +138,15 @@ export function SprintQuickAdd({ backlogItems, requirements, onAssign }: SprintQ
               className="sprint-quick-add__search"
               placeholder="Search backlog..."
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setErrorMessage(null);
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Escape") close();
               }}
             />
+            {errorMessage && <p className="sprint-quick-add__error">{errorMessage}</p>}
             <div className="sprint-quick-add__list">
               {candidates.map((item) => {
                 const type = getItemType(requirements, item.typeId);
@@ -151,8 +157,12 @@ export function SprintQuickAdd({ backlogItems, requirements, onAssign }: SprintQ
                     className="sprint-quick-add__option"
                     onMouseDown={(e) => {
                       e.preventDefault();
-                      onAssign(item.id);
-                      close();
+                      const error = onAssign(item.id);
+                      if (error) {
+                        setErrorMessage(error);
+                      } else {
+                        close();
+                      }
                     }}
                   >
                     <span className="sprint-quick-add__option-id" style={{ color: type?.color ?? "var(--chrome-text-dim)" }}>

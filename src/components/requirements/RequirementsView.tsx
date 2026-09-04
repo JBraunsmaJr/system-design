@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LayoutList, Search, Settings2, Tags, Waypoints, X } from "lucide-react";
-import { addRelationship, createCategory, generateItemId, isPrefixTaken } from "../../domain/requirementsRegistry";
+import { addRelationship, createCategory, defaultStatusForType, generateItemId, isPrefixTaken } from "../../domain/requirementsRegistry";
 import { RequirementCard } from "./RequirementCard";
 import { ManageTypesModal } from "./ManageTypesModal";
 import { ManageRelationshipTypesModal } from "./ManageRelationshipTypesModal";
@@ -13,12 +13,21 @@ import type {
 } from "../../domain/requirementsTypes";
 import type { ProgramIncrement } from "../../domain/programIncrements";
 import type { TeamDocument } from "../../domain/teamTypes";
+import type { SubDiagram } from "../../domain/types";
+import { findAllLinkedNodes, type DiagramPath, type LinkedNodeRef } from "../../domain/subDiagramTree";
 
 interface RequirementsViewProps {
   doc: RequirementsDocument;
   onUpdateDoc: (updater: (doc: RequirementsDocument) => RequirementsDocument) => void;
   programIncrements: ProgramIncrement[];
   team?: TeamDocument;
+  /** The full diagram tree, for finding which nodes (anywhere, at any
+   * nesting depth) link back to a given requirement item - see
+   * findLinkedNodes. Optional purely for prop-drilling convenience at
+   * call sites that don't have it handy; every real caller passes it. */
+  diagramRoot?: SubDiagram;
+  onNavigateToNode?: (path: DiagramPath, nodeId: string) => void;
+  onCreateLinkedNode?: (itemId: string, label: string) => void;
   /** Set by App.tsx when the user clicks a linked requirement pill from
    * the Inspector (while viewing the diagram) - scrolls to and briefly
    * highlights that item once this view mounts/updates, then reports
@@ -35,6 +44,12 @@ function nextCustomTypeId(doc: RequirementsDocument): string {
 }
 
 const HIGHLIGHT_DURATION_MS = 2000;
+// A single shared reference for "no linked nodes" - `linkedNodesByItemId.get(id) ?? []`
+// would otherwise allocate a brand new array on every single render for
+// every item with no links, which defeats RequirementCard's React.memo
+// comparison (a new array is never === the previous one, even though the
+// actual content - nothing - never changes).
+const EMPTY_LINKED_NODES: LinkedNodeRef[] = [];
 const UNCATEGORIZED_KEY = "__uncategorized__";
 
 type GroupBy = "type" | "category";
@@ -46,13 +61,42 @@ interface ItemGroup {
   items: RequirementItem[];
 }
 
-export function RequirementsView({ doc, onUpdateDoc, programIncrements, team, focusItemId, onFocusHandled }: RequirementsViewProps) {
+export function RequirementsView({
+  doc,
+  onUpdateDoc,
+  programIncrements,
+  team,
+  diagramRoot,
+  onNavigateToNode,
+  onCreateLinkedNode,
+  focusItemId,
+  onFocusHandled,
+}: RequirementsViewProps) {
   const [search, setSearch] = useState("");
   const [groupBy, setGroupBy] = useState<GroupBy>("type");
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [isManagingTypes, setIsManagingTypes] = useState(false);
   const [isManagingRelationshipTypes, setIsManagingRelationshipTypes] = useState(false);
   const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Kept in sync on every render so a useCallback-stabilized function can
+  // always read the CURRENT doc without needing doc in its own dependency
+  // array - see onAddRelationship below, which needs the latest doc to
+  // validate against (duplicate/cycle checks) but must stay reference-
+  // stable itself, since its callers (RequirementCard) rely on that
+  // stability to skip re-rendering when an unrelated item changes.
+  const docRef = useRef(doc);
+  useEffect(() => {
+    docRef.current = doc;
+  }, [doc]);
+
+  // Computed once for every item here, rather than each RequirementCard
+  // independently walking the whole diagram tree for just its own item -
+  // see findAllLinkedNodes's own doc comment for why that per-card
+  // approach doesn't scale with the number of items in this list.
+  const linkedNodesByItemId = useMemo(
+    () => (diagramRoot ? findAllLinkedNodes(diagramRoot) : new Map()),
+    [diagramRoot]
+  );
 
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -105,7 +149,7 @@ export function RequirementsView({ doc, onUpdateDoc, programIncrements, team, fo
 
   const onAddItem = (typeId: string) => {
     const { id, nextSequence } = generateItemId(doc, typeId);
-    const newItem: RequirementItem = { id, typeId, title: "", body: "" };
+    const newItem: RequirementItem = { id, typeId, title: "", body: "", status: defaultStatusForType(doc, typeId) };
     onUpdateDoc((d) => ({ ...d, items: [...d.items, newItem], nextSequence }));
     // New items should be immediately visible even if a search is
     // narrowing the list, and land at the bottom of their group - scroll
@@ -117,43 +161,61 @@ export function RequirementsView({ doc, onUpdateDoc, programIncrements, team, fo
     });
   };
 
-  const onUpdateItem = (id: string, patch: Partial<RequirementItem>) => {
-    onUpdateDoc((d) => ({ ...d, items: d.items.map((i) => (i.id === id ? { ...i, ...patch } : i)) }));
-  };
+  const onUpdateItem = useCallback(
+    (id: string, patch: Partial<RequirementItem>) => {
+      onUpdateDoc((d) => ({ ...d, items: d.items.map((i) => (i.id === id ? { ...i, ...patch } : i)) }));
+    },
+    [onUpdateDoc]
+  );
 
-  const onDeleteItem = (id: string) => {
-    onUpdateDoc((d) => ({
-      ...d,
-      items: d.items.filter((i) => i.id !== id),
-      // A relationship referencing the deleted item on either side has
-      // nothing left to point at - same "orphaned reference" reasoning as
-      // clearing sprintId when a sprint is deleted elsewhere in this app.
-      relationships: d.relationships.filter((r) => r.fromItemId !== id && r.toItemId !== id),
-    }));
-  };
+  const onDeleteItem = useCallback(
+    (id: string) => {
+      onUpdateDoc((d) => ({
+        ...d,
+        items: d.items.filter((i) => i.id !== id),
+        // A relationship referencing the deleted item on either side has
+        // nothing left to point at - same "orphaned reference" reasoning as
+        // clearing sprintId when a sprint is deleted elsewhere in this app.
+        relationships: d.relationships.filter((r) => r.fromItemId !== id && r.toItemId !== id),
+      }));
+    },
+    [onUpdateDoc]
+  );
 
   // Creating a category and assigning it to an item happen as one combined
   // update (not two separate onUpdateDoc calls) so they land as a single
   // undo step, and so the item is never left referencing a categoryId that
   // doesn't exist yet in an intermediate state.
-  const onCreateAndAssignCategory = (itemId: string, label: string) => {
-    onUpdateDoc((d) => {
-      const { category, categories } = createCategory(d, label);
-      return {
-        ...d,
-        categories,
-        items: d.items.map((i) => (i.id === itemId ? { ...i, categoryId: category.id } : i)),
-      };
-    });
-  };
+  const onCreateAndAssignCategory = useCallback(
+    (itemId: string, label: string) => {
+      onUpdateDoc((d) => {
+        const { category, categories } = createCategory(d, label);
+        return {
+          ...d,
+          categories,
+          items: d.items.map((i) => (i.id === itemId ? { ...i, categoryId: category.id } : i)),
+        };
+      });
+    },
+    [onUpdateDoc]
+  );
 
-  const onAddRelationship = (typeId: string, fromItemId: string, toItemId: string) => {
-    onUpdateDoc((d) => ({ ...d, relationships: addRelationship(d, typeId, fromItemId, toItemId) }));
-  };
+  const onAddRelationship = useCallback(
+    (typeId: string, fromItemId: string, toItemId: string): string | null => {
+      const result = addRelationship(docRef.current, typeId, fromItemId, toItemId);
+      if (result.error) return result.error;
+      onUpdateDoc((d) => ({ ...d, relationships: result.relationships }));
+      return null;
+    },
+    [onUpdateDoc]
+  );
 
-  const onDeleteRelationship = (relationshipId: string) => {
-    onUpdateDoc((d) => ({ ...d, relationships: d.relationships.filter((r) => r.id !== relationshipId) }));
-  };
+  const onDeleteRelationship = useCallback(
+    (relationshipId: string) => {
+      onUpdateDoc((d) => ({ ...d, relationships: d.relationships.filter((r) => r.id !== relationshipId) }));
+    },
+    [onUpdateDoc]
+  );
 
   const onNavigateToItem = useCallback((itemId: string) => {
     const el = document.getElementById(`requirement-${itemId}`);
@@ -181,7 +243,7 @@ export function RequirementsView({ doc, onUpdateDoc, programIncrements, team, fo
     return () => cancelAnimationFrame(frame);
   }, [focusItemId, onNavigateToItem, onFocusHandled]);
 
-  const onAddCustomType = (label: string, prefix: string, color: string): boolean => {
+  const onAddCustomType = (label: string, prefix: string, color: string, isWorkable: boolean): boolean => {
     if (isPrefixTaken(doc, prefix)) return false;
     const newType: RequirementItemType = {
       id: nextCustomTypeId(doc),
@@ -189,9 +251,24 @@ export function RequirementsView({ doc, onUpdateDoc, programIncrements, team, fo
       prefix: prefix.toUpperCase(),
       color,
       isBuiltIn: false,
+      isWorkable,
     };
     onUpdateDoc((d) => ({ ...d, itemTypes: [...d.itemTypes, newType] }));
     return true;
+  };
+
+  // Label, color, and isWorkable are all safe to edit after the fact for
+  // ANY type, including built-in ones - none of them are baked into
+  // already-generated item ids the way prefix is, so changing them can't
+  // create a mismatch between an item's stored id and its type's current
+  // definition. This intentionally never accepts a prefix patch (the
+  // caller can only pass these three fields, not arbitrary ones) - prefix
+  // is what actually needs to stay stable once items exist under it.
+  const onUpdateType = (
+    typeId: string,
+    patch: Partial<Pick<RequirementItemType, "label" | "color" | "isWorkable">>
+  ) => {
+    onUpdateDoc((d) => ({ ...d, itemTypes: d.itemTypes.map((t) => (t.id === typeId ? { ...t, ...patch } : t)) }));
   };
 
   const onDeleteCustomType = (typeId: string) => {
@@ -218,13 +295,14 @@ export function RequirementsView({ doc, onUpdateDoc, programIncrements, team, fo
     return counts;
   }, [doc.items]);
 
-  const onAddCustomRelationshipType = (label: string, inverseLabel: string, color: string) => {
+  const onAddCustomRelationshipType = (label: string, inverseLabel: string, color: string, isBlocking: boolean) => {
     const newType: RelationshipType = {
       id: `rel-type-${Date.now().toString(36)}`,
       label,
       inverseLabel,
       color,
       isBuiltIn: false,
+      isBlocking,
     };
     onUpdateDoc((d) => ({ ...d, relationshipTypes: [...d.relationshipTypes, newType] }));
   };
@@ -349,6 +427,10 @@ export function RequirementsView({ doc, onUpdateDoc, programIncrements, team, fo
                   doc={doc}
                   programIncrements={programIncrements}
                   team={team}
+                  diagramRoot={diagramRoot}
+                  linkedNodes={linkedNodesByItemId.get(item.id) ?? EMPTY_LINKED_NODES}
+                  onNavigateToNode={onNavigateToNode}
+                  onCreateLinkedNode={onCreateLinkedNode}
                   onUpdateItem={onUpdateItem}
                   onDeleteItem={onDeleteItem}
                   onNavigateToItem={onNavigateToItem}
@@ -367,6 +449,7 @@ export function RequirementsView({ doc, onUpdateDoc, programIncrements, team, fo
         <ManageTypesModal
           doc={doc}
           onAddCustomType={onAddCustomType}
+          onUpdateType={onUpdateType}
           onDeleteCustomType={onDeleteCustomType}
           onClose={() => setIsManagingTypes(false)}
         />

@@ -13,7 +13,7 @@ import type { RequirementsDocument } from "../../domain/requirementsTypes";
 interface RelationshipManagerProps {
   itemId: string;
   doc: RequirementsDocument;
-  onAddRelationship: (typeId: string, fromItemId: string, toItemId: string) => void;
+  onAddRelationship: (typeId: string, fromItemId: string, toItemId: string) => string | null;
   onDeleteRelationship: (relationshipId: string) => void;
   onNavigateToItem: (itemId: string) => void;
 }
@@ -65,6 +65,7 @@ export function RelationshipManager({
 }: RelationshipManagerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -85,6 +86,7 @@ export function RelationshipManager({
   const close = () => {
     setIsOpen(false);
     setQuery("");
+    setErrorMessage(null);
   };
 
   useLayoutEffect(() => {
@@ -222,7 +224,10 @@ export function RelationshipManager({
                   type="button"
                   className={`relationship-manager__verb${activeVerb === verb ? " active" : ""}`}
                   style={activeVerb === verb ? { borderColor: verb.color, color: verb.color } : undefined}
-                  onClick={() => setSelectedVerb(verb)}
+                  onClick={() => {
+                    setSelectedVerb(verb);
+                    setErrorMessage(null);
+                  }}
                 >
                   {verb.displayLabel}
                 </button>
@@ -233,11 +238,15 @@ export function RelationshipManager({
               className="relationship-manager__search"
               placeholder="Search items to relate..."
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setErrorMessage(null);
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Escape") close();
               }}
             />
+            {errorMessage && <p className="relationship-manager__error">{errorMessage}</p>}
             <div className="relationship-manager__list">
               {candidates.map((item) => (
                 <button
@@ -247,12 +256,16 @@ export function RelationshipManager({
                   onMouseDown={(e) => {
                     e.preventDefault();
                     if (!activeVerb) return;
-                    if (activeVerb.direction === "forward") {
-                      onAddRelationship(activeVerb.typeId, itemId, item.id);
+                    const result =
+                      activeVerb.direction === "forward"
+                        ? onAddRelationship(activeVerb.typeId, itemId, item.id)
+                        : onAddRelationship(activeVerb.typeId, item.id, itemId);
+                    if (result) {
+                      setErrorMessage(result);
                     } else {
-                      onAddRelationship(activeVerb.typeId, item.id, itemId);
+                      setErrorMessage(null);
+                      setQuery("");
                     }
-                    setQuery("");
                   }}
                 >
                   <span className="relationship-manager__option-id">{item.id}</span>

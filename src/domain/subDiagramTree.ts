@@ -58,3 +58,95 @@ export function getBreadcrumbLabels(root: SubDiagram, path: DiagramPath): string
   }
   return labels;
 }
+
+export interface LinkedNodeRef {
+  nodeId: string;
+  label: string;
+  /** Path to navigate TO in order to REACH the sub-diagram containing this
+   * node - i.e. setPath to this value and the node itself is then visible
+   * at that level. This is NOT the path into the node's own sub-diagram
+   * (that would be [...path, nodeId]). */
+  path: DiagramPath;
+  /** True only when the node's sub-diagram actually has content - a node
+   * that was double-clicked open once but never populated still has a
+   * subDiagram object (an empty one), which isn't "supporting
+   * documentation" worth surfacing a link to. */
+  hasSubDiagram: boolean;
+}
+
+/**
+ * Finds every node across the ENTIRE tree - root plus every nested
+ * sub-diagram, at any depth - whose linkedRequirementIds includes
+ * `itemId`. This is the reverse of what the Inspector's RequirementLinker
+ * already does (node -> requirement); there was no existing mechanism for
+ * requirement -> node, since a node can only be reached via its
+ * ancestors' path, not looked up directly by id. Verified against 10
+ * cases - including a node with an id matching a DIFFERENT item, a
+ * multi-level-deep match, and the empty-vs-populated subDiagram
+ * distinction - before wiring this into any UI.
+ */
+export function findLinkedNodes(root: SubDiagram, itemId: string): LinkedNodeRef[] {
+  const results: LinkedNodeRef[] = [];
+  function walk(sd: SubDiagram, currentPath: DiagramPath) {
+    for (const node of sd.nodes) {
+      if (node.data.linkedRequirementIds?.includes(itemId)) {
+        results.push({
+          nodeId: node.id,
+          label: node.data.label,
+          path: currentPath,
+          hasSubDiagram: (node.data.subDiagram?.nodes.length ?? 0) > 0,
+        });
+      }
+      if (node.data.subDiagram) {
+        walk(node.data.subDiagram, [...currentPath, node.id]);
+      }
+    }
+  }
+  walk(root, []);
+  return results;
+}
+
+/**
+ * Batched version of findLinkedNodes - walks the diagram tree exactly
+ * ONCE and returns every item's linked nodes in a single map, instead of
+ * each caller independently re-walking the whole tree for its own item.
+ *
+ * This exists because RequirementsView renders one RequirementCard per
+ * requirement item, and each card originally called findLinkedNodes
+ * itself - with N items and a diagram of M total nodes across every
+ * nested sub-diagram, that's O(N*M) work just to render the list once,
+ * repeated on every diagram change. RequirementDetailModal (the
+ * single-item detail modal used by Timeline and the Skill Tree) still
+ * calls findLinkedNodes directly and correctly - it only ever shows one
+ * item at a time, so there's no list-wide cost to batch away there; this
+ * function is specifically for list views with many items.
+ *
+ * An item with no linked nodes has no entry in the returned map at all
+ * (not an empty array entry) - callers already read this the same way
+ * findLinkedNodes's own empty-array result is read, via `?? []`.
+ * Verified to produce results identical to calling findLinkedNodes
+ * per-item, and to visit each sub-diagram exactly once regardless of how
+ * many items are being looked up, before wiring this in.
+ */
+export function findAllLinkedNodes(root: SubDiagram): Map<string, LinkedNodeRef[]> {
+  const result = new Map<string, LinkedNodeRef[]>();
+  function walk(sd: SubDiagram, currentPath: DiagramPath) {
+    for (const node of sd.nodes) {
+      for (const itemId of node.data.linkedRequirementIds ?? []) {
+        const list = result.get(itemId) ?? [];
+        list.push({
+          nodeId: node.id,
+          label: node.data.label,
+          path: currentPath,
+          hasSubDiagram: (node.data.subDiagram?.nodes.length ?? 0) > 0,
+        });
+        result.set(itemId, list);
+      }
+      if (node.data.subDiagram) {
+        walk(node.data.subDiagram, [...currentPath, node.id]);
+      }
+    }
+  }
+  walk(root, []);
+  return result;
+}

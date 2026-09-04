@@ -21,6 +21,7 @@ import type {
 } from "../../domain/teamTypes";
 import type { ProgramIncrement } from "../../domain/programIncrements";
 import type { RequirementsDocument } from "../../domain/requirementsTypes";
+import { isItemWorkable } from "../../domain/requirementsRegistry";
 import { computeSprintDateRanges } from "../../domain/programIncrements";
 import {
   computeSprintCapacity,
@@ -238,12 +239,17 @@ export function TeamView({ team, onUpdateTeam, programIncrements, requirements }
       const rangeMap = new Map(ranges.map((r) => [r.sprintId, r]));
       for (const sprint of pi.sprints) {
         const range = rangeMap.get(sprint.id);
-        const summary = computeSprintCapacity(sprint, range, team, requirements.items);
+        const summary = computeSprintCapacity(
+          sprint,
+          range,
+          team,
+          requirements.items.filter((i) => isItemWorkable(requirements, i))
+        );
         list.push({ pi, summary });
       }
     }
     return list;
-  }, [programIncrements, team, requirements.items]);
+  }, [programIncrements, team, requirements]);
 
   return (
     <div className="team-view">

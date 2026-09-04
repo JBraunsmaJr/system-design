@@ -22,6 +22,7 @@ import { ScenarioPanel } from "./components/ScenarioPanel";
 import { RequirementsView } from "./components/requirements/RequirementsView";
 import { TimelineView } from "./components/timeline/TimelineView";
 import { TeamView } from "./components/team/TeamView";
+import { SkillTreeView } from "./components/skilltree/SkillTreeView";
 import { NODE_TYPES } from "./domain/nodeRegistry";
 import { GROUP_TYPES } from "./domain/groupRegistry";
 import { SHAPE_TYPES } from "./domain/shapeRegistry";
@@ -40,7 +41,12 @@ import { exportDiagramAsPng, exportDiagramAsSvg } from "./domain/imageExport";
 import type { ArchNodeData, ArchEdgeData, Scenario, ScenarioStep, SubDiagram } from "./domain/types";
 import type { RequirementsDocument } from "./domain/requirementsTypes";
 import { EMPTY_REQUIREMENTS_DOCUMENT } from "./domain/requirementsTypes";
-import { BUILT_IN_ITEM_TYPES, BUILT_IN_RELATIONSHIP_TYPES } from "./domain/requirementsRegistry";
+import {
+  BUILT_IN_ITEM_TYPES,
+  BUILT_IN_RELATIONSHIP_TYPES,
+  withMissingBuiltInTypes,
+  withMissingBuiltInRelationshipTypes,
+} from "./domain/requirementsRegistry";
 import type { ProgramIncrement } from "./domain/programIncrements";
 import type { TeamDocument } from "./domain/teamTypes";
 import { EMPTY_TEAM_DOCUMENT } from "./domain/teamTypes";
@@ -79,18 +85,17 @@ function diagramFileToSnapshot(file: ReturnType<typeof parseDiagramFile>): Diagr
     ...sc,
     steps: sc.steps.map((st) => ({ ...st, path: st.path ?? [] })),
   }));
-  // Similarly, files saved before requirements existed at all (or that
-  // otherwise ended up with no item types, or predate relationship types
-  // existing) still need the built-in types populated, or "Add item" /
-  // "Add relationship" would have nothing to offer.
-  const normalizedRequirements =
-    file.requirements.itemTypes.length > 0
-      ? file.requirements
-      : { ...file.requirements, itemTypes: BUILT_IN_ITEM_TYPES };
-  const finalRequirements =
-    normalizedRequirements.relationshipTypes.length > 0
-      ? normalizedRequirements
-      : { ...normalizedRequirements, relationshipTypes: BUILT_IN_RELATIONSHIP_TYPES };
+  // Similarly, files saved before requirements existed at all need the
+  // built-in types populated from scratch, or "Add item" / "Add
+  // relationship" would have nothing to offer - and separately, a file
+  // saved after requirements existed but before some LATER built-in type
+  // was added (e.g. before "Ticket") needs that one specific type merged
+  // in, without disturbing anything else already saved.
+  const finalRequirements = {
+    ...file.requirements,
+    itemTypes: withMissingBuiltInTypes(file.requirements.itemTypes),
+    relationshipTypes: withMissingBuiltInRelationshipTypes(file.requirements.relationshipTypes),
+  };
   return {
     title: file.title,
     root: { nodes: file.nodes, edges: file.edges },
@@ -248,7 +253,7 @@ function App() {
   // Which top-level page is showing - the diagram canvas or the
   // requirements document. Deliberately NOT part of the undoable
   // DiagramSnapshot: switching pages isn't an edit to the content itself.
-  const [viewMode, setViewMode] = useState<"diagram" | "requirements" | "timeline" | "team">("diagram");
+  const [viewMode, setViewMode] = useState<"diagram" | "requirements" | "timeline" | "team" | "skill-tree">("diagram");
   // Set together with viewMode when the user clicks a linked requirement
   // pill in the Inspector (while looking at the diagram) - see
   // RequirementsView's focusItemId prop for how this actually triggers
@@ -258,6 +263,48 @@ function App() {
     setViewMode("requirements");
     setPendingRequirementFocus(itemId);
   }, []);
+  // Mirrors onNavigateToRequirement above - jumps to the diagram, drills
+  // to whichever sub-diagram level actually contains the target node
+  // (path is relative to root, see findLinkedNodes), and requests the
+  // camera focus Canvas consumes via focusNodeId/onFocusHandled.
+  const [pendingNodeFocus, setPendingNodeFocus] = useState<string | null>(null);
+  const onNavigateToNode = useCallback(
+    (nodePath: DiagramPath, nodeId: string) => {
+      setViewMode("diagram");
+      setPath(nodePath);
+      setPendingNodeFocus(nodeId);
+    },
+    []
+  );
+  /** Quick-action from a requirement's "Linked Diagrams" section - rather
+   * than making the person go create a node manually then hunt down the
+   * Inspector's requirement linker, this does both steps in one action
+   * and jumps straight there. Always creates at ROOT (path: []) rather
+   * than whatever `path` happens to currently be - the person calling
+   * this is usually looking at Requirements/Timeline, not the diagram, so
+   * there's no meaningful "current sub-diagram" to add into; root is the
+   * one predictable, always-discoverable place regardless of where they
+   * were when they clicked. */
+  const onCreateLinkedNode = useCallback((itemId: string, label: string) => {
+    const id = nextId("node");
+    const node: Node<ArchNodeData> = {
+      id,
+      type: "typed",
+      position: { x: 0, y: 0 },
+      data: {
+        nodeType: "custom",
+        label,
+        description: "",
+        properties: {},
+        tags: [],
+        linkedRequirementIds: [itemId],
+      },
+    };
+    setRoot((r) => updateSubDiagramAtPath(r, [], (sd) => ({ ...sd, nodes: [...sd.nodes, node] })));
+    setViewMode("diagram");
+    setPath([]);
+    setPendingNodeFocus(id);
+  }, [setRoot]);
   const [isScenarioPanelOpen, setIsScenarioPanelOpen] = useState(false);
   const [activeStepId, setActiveStepId] = useState<string | null>(null);
   const [isSelectMode, setIsSelectMode] = useState(false);
@@ -1057,6 +1104,8 @@ function App() {
               onAdoptIntoGroup={onAdoptIntoGroup}
               presentation={presentation}
               previewFocus={previewFocus}
+              focusNodeId={pendingNodeFocus}
+              onFocusHandled={() => setPendingNodeFocus(null)}
               onPresentNext={onPresentNext}
               onPresentPrev={onPresentPrev}
               onExitPresenting={onExitPresenting}
@@ -1133,6 +1182,9 @@ function App() {
             onUpdateDoc={setRequirements}
             programIncrements={programIncrements}
             team={team}
+            diagramRoot={root}
+            onNavigateToNode={onNavigateToNode}
+            onCreateLinkedNode={onCreateLinkedNode}
             focusItemId={pendingRequirementFocus}
             onFocusHandled={() => setPendingRequirementFocus(null)}
           />
@@ -1144,6 +1196,9 @@ function App() {
             requirements={requirements}
             onUpdateRequirements={setRequirements}
             team={team}
+            diagramRoot={root}
+            onNavigateToNode={onNavigateToNode}
+            onCreateLinkedNode={onCreateLinkedNode}
             onNavigateToRequirement={onNavigateToRequirement}
           />
         )}
@@ -1153,6 +1208,18 @@ function App() {
             onUpdateTeam={setTeam}
             programIncrements={programIncrements}
             requirements={requirements}
+          />
+        )}
+        {viewMode === "skill-tree" && (
+          <SkillTreeView
+            requirements={requirements}
+            onUpdateRequirements={setRequirements}
+            programIncrements={programIncrements}
+            team={team}
+            diagramRoot={root}
+            onNavigateToNode={onNavigateToNode}
+            onCreateLinkedNode={onCreateLinkedNode}
+            onNavigateToRequirement={onNavigateToRequirement}
           />
         )}
       </div>
