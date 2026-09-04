@@ -14,7 +14,7 @@ import type {
 import type { ProgramIncrement } from "../../domain/programIncrements";
 import type { TeamDocument } from "../../domain/teamTypes";
 import type { SubDiagram } from "../../domain/types";
-import { findAllLinkedNodes, type DiagramPath } from "../../domain/subDiagramTree";
+import { findAllLinkedNodes, type DiagramPath, type LinkedNodeRef } from "../../domain/subDiagramTree";
 
 interface RequirementsViewProps {
   doc: RequirementsDocument;
@@ -44,6 +44,12 @@ function nextCustomTypeId(doc: RequirementsDocument): string {
 }
 
 const HIGHLIGHT_DURATION_MS = 2000;
+// A single shared reference for "no linked nodes" - `linkedNodesByItemId.get(id) ?? []`
+// would otherwise allocate a brand new array on every single render for
+// every item with no links, which defeats RequirementCard's React.memo
+// comparison (a new array is never === the previous one, even though the
+// actual content - nothing - never changes).
+const EMPTY_LINKED_NODES: LinkedNodeRef[] = [];
 const UNCATEGORIZED_KEY = "__uncategorized__";
 
 type GroupBy = "type" | "category";
@@ -72,6 +78,16 @@ export function RequirementsView({
   const [isManagingTypes, setIsManagingTypes] = useState(false);
   const [isManagingRelationshipTypes, setIsManagingRelationshipTypes] = useState(false);
   const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Kept in sync on every render so a useCallback-stabilized function can
+  // always read the CURRENT doc without needing doc in its own dependency
+  // array - see onAddRelationship below, which needs the latest doc to
+  // validate against (duplicate/cycle checks) but must stay reference-
+  // stable itself, since its callers (RequirementCard) rely on that
+  // stability to skip re-rendering when an unrelated item changes.
+  const docRef = useRef(doc);
+  useEffect(() => {
+    docRef.current = doc;
+  }, [doc]);
 
   // Computed once for every item here, rather than each RequirementCard
   // independently walking the whole diagram tree for just its own item -
@@ -145,46 +161,61 @@ export function RequirementsView({
     });
   };
 
-  const onUpdateItem = (id: string, patch: Partial<RequirementItem>) => {
-    onUpdateDoc((d) => ({ ...d, items: d.items.map((i) => (i.id === id ? { ...i, ...patch } : i)) }));
-  };
+  const onUpdateItem = useCallback(
+    (id: string, patch: Partial<RequirementItem>) => {
+      onUpdateDoc((d) => ({ ...d, items: d.items.map((i) => (i.id === id ? { ...i, ...patch } : i)) }));
+    },
+    [onUpdateDoc]
+  );
 
-  const onDeleteItem = (id: string) => {
-    onUpdateDoc((d) => ({
-      ...d,
-      items: d.items.filter((i) => i.id !== id),
-      // A relationship referencing the deleted item on either side has
-      // nothing left to point at - same "orphaned reference" reasoning as
-      // clearing sprintId when a sprint is deleted elsewhere in this app.
-      relationships: d.relationships.filter((r) => r.fromItemId !== id && r.toItemId !== id),
-    }));
-  };
+  const onDeleteItem = useCallback(
+    (id: string) => {
+      onUpdateDoc((d) => ({
+        ...d,
+        items: d.items.filter((i) => i.id !== id),
+        // A relationship referencing the deleted item on either side has
+        // nothing left to point at - same "orphaned reference" reasoning as
+        // clearing sprintId when a sprint is deleted elsewhere in this app.
+        relationships: d.relationships.filter((r) => r.fromItemId !== id && r.toItemId !== id),
+      }));
+    },
+    [onUpdateDoc]
+  );
 
   // Creating a category and assigning it to an item happen as one combined
   // update (not two separate onUpdateDoc calls) so they land as a single
   // undo step, and so the item is never left referencing a categoryId that
   // doesn't exist yet in an intermediate state.
-  const onCreateAndAssignCategory = (itemId: string, label: string) => {
-    onUpdateDoc((d) => {
-      const { category, categories } = createCategory(d, label);
-      return {
-        ...d,
-        categories,
-        items: d.items.map((i) => (i.id === itemId ? { ...i, categoryId: category.id } : i)),
-      };
-    });
-  };
+  const onCreateAndAssignCategory = useCallback(
+    (itemId: string, label: string) => {
+      onUpdateDoc((d) => {
+        const { category, categories } = createCategory(d, label);
+        return {
+          ...d,
+          categories,
+          items: d.items.map((i) => (i.id === itemId ? { ...i, categoryId: category.id } : i)),
+        };
+      });
+    },
+    [onUpdateDoc]
+  );
 
-  const onAddRelationship = (typeId: string, fromItemId: string, toItemId: string): string | null => {
-    const result = addRelationship(doc, typeId, fromItemId, toItemId);
-    if (result.error) return result.error;
-    onUpdateDoc((d) => ({ ...d, relationships: result.relationships }));
-    return null;
-  };
+  const onAddRelationship = useCallback(
+    (typeId: string, fromItemId: string, toItemId: string): string | null => {
+      const result = addRelationship(docRef.current, typeId, fromItemId, toItemId);
+      if (result.error) return result.error;
+      onUpdateDoc((d) => ({ ...d, relationships: result.relationships }));
+      return null;
+    },
+    [onUpdateDoc]
+  );
 
-  const onDeleteRelationship = (relationshipId: string) => {
-    onUpdateDoc((d) => ({ ...d, relationships: d.relationships.filter((r) => r.id !== relationshipId) }));
-  };
+  const onDeleteRelationship = useCallback(
+    (relationshipId: string) => {
+      onUpdateDoc((d) => ({ ...d, relationships: d.relationships.filter((r) => r.id !== relationshipId) }));
+    },
+    [onUpdateDoc]
+  );
 
   const onNavigateToItem = useCallback((itemId: string) => {
     const el = document.getElementById(`requirement-${itemId}`);
@@ -397,7 +428,7 @@ export function RequirementsView({
                   programIncrements={programIncrements}
                   team={team}
                   diagramRoot={diagramRoot}
-                  linkedNodes={linkedNodesByItemId.get(item.id) ?? []}
+                  linkedNodes={linkedNodesByItemId.get(item.id) ?? EMPTY_LINKED_NODES}
                   onNavigateToNode={onNavigateToNode}
                   onCreateLinkedNode={onCreateLinkedNode}
                   onUpdateItem={onUpdateItem}

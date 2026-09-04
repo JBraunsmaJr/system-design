@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import { FileText, Plus, Trash2, Workflow } from "lucide-react";
 import { getItemType, isItemWorkable } from "../../domain/requirementsRegistry";
 import type { LinkedNodeRef, DiagramPath } from "../../domain/subDiagramTree";
@@ -43,7 +43,7 @@ interface RequirementCardProps {
   highlighted?: boolean;
 }
 
-export function RequirementCard({
+function RequirementCardImpl({
   item,
   doc,
   programIncrements,
@@ -183,3 +183,54 @@ export function RequirementCard({
     </div>
   );
 }
+
+/**
+ * Memoized with a custom comparator rather than the default shallow-prop
+ * check, because `doc` (the whole requirements document) changes
+ * reference on EVERY edit to ANY item - a default React.memo would still
+ * see "doc changed" for every card on every keystroke, regardless of
+ * which item was actually edited, and never skip a re-render at all.
+ *
+ * Instead this compares the specific parts of `doc` each card actually
+ * depends on for its OWN rendering (itemTypes, categories,
+ * relationshipTypes - which only change when someone edits a type/
+ * category, not on every item edit) plus `item` itself by reference,
+ * which is the key guarantee this relies on: editing item B's title
+ * produces a new items array where every OTHER item keeps its exact
+ * previous object reference (see requirementsRegistry/onUpdateDoc's
+ * `.map()` pattern) - so this card only re-renders when it's actually
+ * its own item that changed, or when a genuinely shared, rarely-changing
+ * part of the document changed.
+ *
+ * `doc.items` and `doc.relationships` as a WHOLE are deliberately not
+ * compared - RelationshipManager (rendered inside this card) uses the
+ * full doc to search all other items and show current relationships, so
+ * in principle another item's title change could leave this card's
+ * relationship search briefly stale until it next re-renders for an
+ * unrelated reason. That's an accepted, narrow trade-off: the
+ * alternative is every card re-rendering on every keystroke anywhere in
+ * the list, which is the actual performance problem this exists to fix.
+ */
+function propsAreEqual(prev: RequirementCardProps, next: RequirementCardProps): boolean {
+  return (
+    prev.item === next.item &&
+    prev.doc.itemTypes === next.doc.itemTypes &&
+    prev.doc.categories === next.doc.categories &&
+    prev.doc.relationshipTypes === next.doc.relationshipTypes &&
+    prev.programIncrements === next.programIncrements &&
+    prev.team === next.team &&
+    prev.diagramRoot === next.diagramRoot &&
+    prev.linkedNodes === next.linkedNodes &&
+    prev.highlighted === next.highlighted &&
+    prev.onNavigateToNode === next.onNavigateToNode &&
+    prev.onCreateLinkedNode === next.onCreateLinkedNode &&
+    prev.onUpdateItem === next.onUpdateItem &&
+    prev.onDeleteItem === next.onDeleteItem &&
+    prev.onNavigateToItem === next.onNavigateToItem &&
+    prev.onCreateAndAssignCategory === next.onCreateAndAssignCategory &&
+    prev.onAddRelationship === next.onAddRelationship &&
+    prev.onDeleteRelationship === next.onDeleteRelationship
+  );
+}
+
+export const RequirementCard = memo(RequirementCardImpl, propsAreEqual);
