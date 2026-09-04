@@ -8,7 +8,7 @@ import {
   type Sprint,
 } from "../../domain/programIncrements";
 import { addRelationship, getItemType, isItemWorkable } from "../../domain/requirementsRegistry";
-import { findScheduleConflicts, checkScheduleConflict, findBlockingItemIds } from "../../domain/scheduleConflicts";
+import { findScheduleConflicts, checkScheduleConflict, findBlockingItemIds, type ScheduleConflictSeverity } from "../../domain/scheduleConflicts";
 import type { RequirementItem, RequirementsDocument } from "../../domain/requirementsTypes";
 import type { TeamDocument } from "../../domain/teamTypes";
 import type { SubDiagram } from "../../domain/types";
@@ -194,13 +194,14 @@ export function TimelineView({
     if (targetRange) {
       const conflict = checkScheduleConflict(
         itemId,
+        targetSprintId,
         targetRange,
         requirements.items,
         requirements.relationships,
         requirements.relationshipTypes,
         sprintRangesByItemId
       );
-      if (conflict) {
+      if (conflict && conflict.severity === "blocked") {
         return conflict.blockerRange
           ? `Can't schedule here - blocked by ${conflict.blocker.id}, which isn't finished until ${conflict.blockerRange.endDate}.`
           : `Can't schedule here - blocked by ${conflict.blocker.id}, which isn't scheduled yet.`;
@@ -251,7 +252,7 @@ export function TimelineView({
   // here (unlike within a single PICard, which only knows its own PI's
   // sprints) because a blocker and the item it blocks can sit in sprints
   // that belong to entirely different PIs.
-  const { allSprintRangesById, sprintRangesByItemId, conflictedItemIds } = useMemo(() => {
+  const { allSprintRangesById, sprintRangesByItemId, conflictSeverityByItemId } = useMemo(() => {
     const allRanges = new Map<string, { startDate: string; endDate: string }>();
     for (const pi of programIncrements) {
       for (const range of computeSprintDateRanges(pi)) {
@@ -279,10 +280,24 @@ export function TimelineView({
       requirements.relationshipTypes,
       byItemId
     );
+    // An item can have more than one conflict at once (e.g. one blocker
+    // in the same sprint - a risk - and another entirely unscheduled - a
+    // hard block). The card should reflect the MOST severe one, so a
+    // "blocked" is never masked by a milder "risk" that happens to
+    // appear later in the conflicts list. Keeps the specific blocker too
+    // (not just the severity), so the card can name it directly rather
+    // than just flagging "something's wrong".
+    const severityById = new Map<string, { severity: ScheduleConflictSeverity; blocker: RequirementItem }>();
+    for (const c of conflicts) {
+      const existing = severityById.get(c.item.id);
+      if (!existing || existing.severity !== "blocked") {
+        severityById.set(c.item.id, { severity: c.severity, blocker: c.blocker });
+      }
+    }
     return {
       allSprintRangesById: allRanges,
       sprintRangesByItemId: byItemId,
-      conflictedItemIds: new Set(conflicts.map((c) => c.item.id)),
+      conflictSeverityByItemId: severityById,
     };
   }, [programIncrements, requirements]);
   const onUnassignItem = (itemId: string) => onUpdateItem(itemId, { sprintId: undefined });
@@ -358,7 +373,7 @@ export function TimelineView({
               team={team}
               itemsBySprintId={itemsBySprintId}
               backlogItems={backlogItems}
-              conflictedItemIds={conflictedItemIds}
+              conflictSeverityByItemId={conflictSeverityByItemId}
               draggedItemId={draggedItemId}
               blockingItemIds={blockingItemIds}
               sprintRangesByItemId={sprintRangesByItemId}
@@ -615,7 +630,7 @@ interface ProgramIncrementCardProps {
   team?: TeamDocument;
   itemsBySprintId: Map<string, RequirementItem[]>;
   backlogItems: RequirementItem[];
-  conflictedItemIds: Set<string>;
+  conflictSeverityByItemId: Map<string, { severity: ScheduleConflictSeverity; blocker: RequirementItem }>;
   draggedItemId: string | null;
   blockingItemIds: Set<string>;
   sprintRangesByItemId: Map<string, { startDate: string; endDate: string }>;
@@ -640,7 +655,7 @@ function ProgramIncrementCard({
   team,
   itemsBySprintId,
   backlogItems,
-  conflictedItemIds,
+  conflictSeverityByItemId,
   draggedItemId,
   blockingItemIds,
   sprintRangesByItemId,
@@ -751,7 +766,7 @@ function ProgramIncrementCard({
                 requirements={requirements}
                 team={team}
                 backlogItems={backlogItems}
-                conflictedItemIds={conflictedItemIds}
+                conflictSeverityByItemId={conflictSeverityByItemId}
                 draggedItemId={draggedItemId}
                 blockingItemIds={blockingItemIds}
                 sprintRangesByItemId={sprintRangesByItemId}
@@ -776,7 +791,7 @@ interface SprintBoardColumnProps {
   requirements: RequirementsDocument;
   team?: TeamDocument;
   backlogItems: RequirementItem[];
-  conflictedItemIds: Set<string>;
+  conflictSeverityByItemId: Map<string, { severity: ScheduleConflictSeverity; blocker: RequirementItem }>;
   draggedItemId: string | null;
   blockingItemIds: Set<string>;
   sprintRangesByItemId: Map<string, { startDate: string; endDate: string }>;
@@ -794,7 +809,7 @@ function SprintBoardColumn({
   requirements,
   team,
   backlogItems,
-  conflictedItemIds,
+  conflictSeverityByItemId,
   draggedItemId,
   blockingItemIds,
   sprintRangesByItemId,
@@ -817,15 +832,17 @@ function SprintBoardColumn({
     if (!draggedItemId || !range) return null;
     return checkScheduleConflict(
       draggedItemId,
+      sprint.id,
       range,
       requirements.items,
       requirements.relationships,
       requirements.relationshipTypes,
       sprintRangesByItemId
     );
-  }, [draggedItemId, range, requirements.items, requirements.relationships, requirements.relationshipTypes, sprintRangesByItemId]);
+  }, [draggedItemId, sprint.id, range, requirements.items, requirements.relationships, requirements.relationshipTypes, sprintRangesByItemId]);
 
-  const isBlocked = Boolean(dropConflict);
+  const isBlocked = dropConflict?.severity === "blocked";
+  const isAtRisk = dropConflict?.severity === "risk";
 
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
@@ -868,7 +885,7 @@ function SprintBoardColumn({
 
   return (
     <div
-      className={`pi-board-column${isBlocked ? " is-blocked" : ""}${isDragOver ? (isBlocked ? " is-drag-over-blocked" : " is-drag-over") : ""}`}
+      className={`pi-board-column${isBlocked ? " is-blocked" : ""}${isAtRisk ? " is-at-risk" : ""}${isDragOver ? (isBlocked ? " is-drag-over-blocked" : isAtRisk ? " is-drag-over-risk" : " is-drag-over") : ""}`}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
@@ -900,18 +917,22 @@ function SprintBoardColumn({
       </div>
       {dropConflict && (
         <div
-          className="pi-board-column__blocked-banner"
+          className={`pi-board-column__blocked-banner${isAtRisk ? " is-risk" : ""}`}
           title={
-            dropConflict.blockerRange
-              ? `Can't schedule here - blocked by ${dropConflict.blocker.id}${dropConflict.blocker.title ? ` (${dropConflict.blocker.title})` : ""}, which isn't finished until ${dropConflict.blockerRange.endDate}.`
-              : `Can't schedule here - blocked by ${dropConflict.blocker.id}${dropConflict.blocker.title ? ` (${dropConflict.blocker.title})` : ""}, which isn't scheduled yet.`
+            isAtRisk
+              ? `Same sprint as its blocker ${dropConflict.blocker.id}${dropConflict.blocker.title ? ` (${dropConflict.blocker.title})` : ""} - allowed, but make sure ${dropConflict.blocker.id} is done first.`
+              : dropConflict.blockerRange
+                ? `Can't schedule here - blocked by ${dropConflict.blocker.id}${dropConflict.blocker.title ? ` (${dropConflict.blocker.title})` : ""}, which isn't finished until ${dropConflict.blockerRange.endDate}.`
+                : `Can't schedule here - blocked by ${dropConflict.blocker.id}${dropConflict.blocker.title ? ` (${dropConflict.blocker.title})` : ""}, which isn't scheduled yet.`
           }
         >
           <AlertTriangle size={12} className="pi-board-column__blocked-icon" />
           <span className="pi-board-column__blocked-text">
-            {dropConflict.blockerRange
-              ? `Blocked by ${dropConflict.blocker.id} (ends ${dropConflict.blockerRange.endDate})`
-              : `Blocked by ${dropConflict.blocker.id} (unscheduled)`}
+            {isAtRisk
+              ? `Same sprint as blocker ${dropConflict.blocker.id} - do that first`
+              : dropConflict.blockerRange
+                ? `Blocked by ${dropConflict.blocker.id} (ends ${dropConflict.blockerRange.endDate})`
+                : `Blocked by ${dropConflict.blocker.id} (unscheduled)`}
           </span>
         </div>
       )}
@@ -919,8 +940,8 @@ function SprintBoardColumn({
       <div className="pi-board-column__items">
         {items.length === 0 ? (
           <div className="pi-board-column__empty">
-            {dropConflict
-              ? `Cannot add: blocked by ${dropConflict.blocker.id}`
+            {isBlocked
+              ? `Cannot add: blocked by ${dropConflict?.blocker.id}`
               : isDragOver
                 ? "Drop to assign to sprint"
                 : "No requirements assigned"}
@@ -932,12 +953,14 @@ function SprintBoardColumn({
               ? requirements.categories.find((c) => c.id === item.categoryId)
               : undefined;
             const isDragging = draggedItemId === item.id;
-            const isConflicted = conflictedItemIds.has(item.id);
+            const conflictInfo = conflictSeverityByItemId.get(item.id);
+            const isConflicted = conflictInfo?.severity === "blocked";
+            const isAtRisk = conflictInfo?.severity === "risk";
             const isBlocker = blockingItemIds.has(item.id);
             return (
               <div
                 key={item.id}
-                className={`pi-board-item${isDragging ? " is-dragging" : ""}${isConflicted ? " is-conflicted" : ""}${isBlocker ? " is-blocker-highlight" : ""}`}
+                className={`pi-board-item${isDragging ? " is-dragging" : ""}${isConflicted ? " is-conflicted" : ""}${isAtRisk ? " is-at-risk" : ""}${isBlocker ? " is-blocker-highlight" : ""}`}
                 draggable={true}
                 onDragStart={(e) => {
                   e.dataTransfer.setData("text/plain", item.id);
@@ -982,7 +1005,14 @@ function SprintBoardColumn({
                     <AlertTriangle
                       size={12}
                       className="pi-board-item__conflict-warning"
-                      aria-label="Blocked by unfinished work - move this or its blocker to resolve"
+                      aria-label={`Blocked by ${conflictInfo?.blocker.id}${conflictInfo?.blocker.title ? ` (${conflictInfo.blocker.title})` : ""} - move this or its blocker to a different sprint to resolve`}
+                    />
+                  )}
+                  {isAtRisk && (
+                    <AlertTriangle
+                      size={12}
+                      className="pi-board-item__risk-warning"
+                      aria-label={`Same sprint as its blocker ${conflictInfo?.blocker.id}${conflictInfo?.blocker.title ? ` (${conflictInfo.blocker.title})` : ""} - make sure that's done first`}
                     />
                   )}
                   {category && (

@@ -7375,3 +7375,66 @@
   font-size: 11px;
   line-height: 1.4;
 }
+
+/* ---------- Sprint board & Gantt: same-sprint "risk" (distinct from a hard "blocked") ---------- */
+
+.pi-board-column.is-at-risk {
+  border-color: rgba(242, 153, 74, 0.45);
+  background: rgba(242, 153, 74, 0.05);
+}
+
+.pi-board-column.is-at-risk .pi-board-column__header {
+  background: rgba(242, 153, 74, 0.08);
+  border-bottom-color: rgba(242, 153, 74, 0.25);
+}
+
+.pi-board-column.is-drag-over-risk,
+.pi-board-column.is-at-risk.is-drag-over {
+  border-color: #f2994a;
+  background: rgba(242, 153, 74, 0.15);
+  box-shadow: 0 0 0 1px #f2994a, inset 0 0 16px rgba(242, 153, 74, 0.12);
+}
+
+.pi-board-column__blocked-banner.is-risk {
+  background: rgba(242, 153, 74, 0.15);
+  border-bottom-color: rgba(242, 153, 74, 0.35);
+  color: #f5b06e;
+}
+
+.pi-board-column__blocked-banner.is-risk .pi-board-column__blocked-icon {
+  color: #f2994a;
+}
+
+.pi-board-item.is-at-risk {
+  border-color: #f2994a;
+  box-shadow: 0 0 0 1px rgba(242, 153, 74, 0.35);
+}
+
+.pi-board-item__risk-warning {
+  color: #f2994a;
+  flex-shrink: 0;
+}
+
+.gantt-conflicts.is-risk-only {
+  background: rgba(242, 153, 74, 0.06);
+  border-bottom-color: rgba(242, 153, 74, 0.3);
+}
+
+.gantt-conflicts.is-risk-only .gantt-conflicts__header {
+  color: #f2994a;
+}
+
+.gantt-conflicts__item.is-risk {
+  border-left: 2px solid #f2994a;
+}
+
+.gantt-chart__label-risk {
+  flex-shrink: 0;
+  color: #f2994a;
+}
+
+.gantt-chart__bar.is-at-risk {
+  border-color: #f2994a;
+  border-left-width: 3px;
+  box-shadow: 0 0 0 1px rgba(242, 153, 74, 0.4);
+}

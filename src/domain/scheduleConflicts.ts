@@ -1,32 +1,52 @@
 import type { RequirementItem, RequirementRelationship, RelationshipType } from "./requirementsTypes";
 
+/**
+ * "blocked" - the blocker's own timing genuinely can't be sequenced ahead
+ * of this item: it isn't scheduled at all, or it's scheduled in a
+ * DIFFERENT sprint that doesn't finish before this item's sprint starts.
+ * There's no shared window in which "do the blocker first" is something
+ * the team can just decide to do - the schedules themselves conflict.
+ *
+ * "risk" - the blocker is scheduled in the exact SAME sprint as this
+ * item. Both could genuinely be completed within that one sprint (e.g. a
+ * 3-point item blocking a 5-point item, both well within a team's
+ * capacity) - this isn't a scheduling contradiction, it's an ordering
+ * dependency the team needs to actually respect *within* the sprint, so
+ * it's surfaced rather than hidden, but it doesn't prevent the
+ * assignment the way "blocked" does.
+ */
+export type ScheduleConflictSeverity = "blocked" | "risk";
+
 export interface ScheduleConflict {
   id: string;
   item: RequirementItem;
   blocker: RequirementItem;
   relationshipId: string;
   itemRange: { startDate: string; endDate: string };
-  /** Null when the blocker has no sprint assignment at all - a different
-   * (arguably more urgent) case than a blocker whose sprint just doesn't
-   * finish in time, since there's no schedule to point at yet. */
+  /** Null when the blocker has no sprint assignment at all - always
+   * "blocked" severity in that case, since there's no schedule to point
+   * at yet, let alone confirm it's the same sprint. */
   blockerRange: { startDate: string; endDate: string } | null;
+  severity: ScheduleConflictSeverity;
 }
 
 /**
  * Finds every case where a scheduled item is blocked by another item that
  * won't be finished in time - either because the blocker has no sprint
  * assignment at all, or because the blocker's sprint doesn't end before
- * the blocked item's sprint begins (including the same sprint, since
- * there's no guarantee of within-sprint ordering, and overlapping sprints
- * across different program increments).
+ * the blocked item's sprint begins. A blocker in the exact SAME sprint is
+ * reported too, but as "risk" rather than "blocked" - see
+ * ScheduleConflictSeverity's own doc comment for why that distinction
+ * matters. Same-sprint-ness is checked via the items' own sprintId
+ * fields directly (not by comparing date ranges), since two different
+ * sprints could theoretically share identical dates without being the
+ * same sprint.
  *
  * Considers every relationship whose TYPE is marked blocking (see
  * RelationshipType.isBlocking), not just the literal built-in "Blocks"
- * id - a custom type a user marks blocking (e.g. "Depends on") is now
+ * id - a custom type a user marks blocking (e.g. "Depends on") is
  * honored here too, matching how cycle prevention already treats any
- * blocking-flagged type the same way. This used to hardcode the "blocks"
- * id specifically, from before isBlocking existed as a general flag;
- * fixed to stay consistent with the rest of the app's dependency logic.
+ * blocking-flagged type the same way.
  *
  * Only direct (one-hop) blocking relationships are considered - if a
  * conflict's blocker is itself blocked by something else, that's a
@@ -61,8 +81,17 @@ export function findScheduleConflicts(
     if (!itemRange) continue;
 
     const blockerRange = sprintRangesByItemId.get(blockerId) ?? null;
-    const isConflict = !blockerRange || blockerRange.endDate >= itemRange.startDate;
-    if (!isConflict) continue;
+
+    let severity: ScheduleConflictSeverity;
+    if (!blockerRange) {
+      severity = "blocked";
+    } else if (item.sprintId && item.sprintId === blocker.sprintId) {
+      severity = "risk";
+    } else if (blockerRange.endDate >= itemRange.startDate) {
+      severity = "blocked";
+    } else {
+      continue;
+    }
 
     conflicts.push({
       id: rel.id,
@@ -71,6 +100,7 @@ export function findScheduleConflicts(
       relationshipId: rel.id,
       itemRange,
       blockerRange,
+      severity,
     });
   }
 
@@ -82,18 +112,31 @@ export interface HypotheticalScheduleConflict {
   /** Null when the blocker has no sprint assignment at all - same
    * distinction as ScheduleConflict.blockerRange. */
   blockerRange: { startDate: string; endDate: string } | null;
+  severity: ScheduleConflictSeverity;
 }
 
 /**
- * Checks whether assigning `itemId` to a sprint with `targetRange` would
- * create a scheduling conflict against its blockers - the same rule
- * findScheduleConflicts uses for items already scheduled, but evaluated
- * hypothetically BEFORE committing a new assignment, so a caller can
- * reject the assignment outright rather than only detecting the problem
- * after the fact. Returns the first conflicting blocker found (an item
- * can have several; this is enough to explain why the assignment can't
- * proceed and point at what needs to move first), or null if the
- * assignment would be conflict-free.
+ * Checks whether assigning `itemId` to `targetSprintId` (with
+ * `targetRange`) would create a scheduling conflict against its
+ * blockers - the same rule findScheduleConflicts uses for items already
+ * scheduled, evaluated hypothetically BEFORE committing a new
+ * assignment.
+ *
+ * Returns the MOST SEVERE conflict found, not just the first one
+ * encountered - a "blocked" result is returned immediately (nothing can
+ * be more severe), while a "risk" result is remembered and only returned
+ * if no "blocked" ever turns up among the item's other blockers. This
+ * matters because a caller showing a live preview (e.g. while dragging,
+ * before a drop even happens) wants to know about a same-sprint "risk"
+ * too, not just hard blocks - but a genuine "blocked" conflict must never
+ * be silently masked just because a "risk" blocker happened to be listed
+ * first in the relationships array. Verified this holds regardless of
+ * relationship iteration order before relying on it.
+ *
+ * Callers that need to REJECT an assignment (rather than just preview
+ * it) should only reject when the returned conflict's severity is
+ * "blocked" - a "risk" is meant to be allowed through; see
+ * ScheduleConflictSeverity's own doc comment for why.
  *
  * Only checks relationships where `itemId` is the BLOCKED side
  * (toItemId) - an item it blocks, rather than one that blocks it, has no
@@ -101,6 +144,7 @@ export interface HypotheticalScheduleConflict {
  */
 export function checkScheduleConflict(
   itemId: string,
+  targetSprintId: string,
   targetRange: { startDate: string; endDate: string },
   items: RequirementItem[],
   relationships: RequirementRelationship[],
@@ -109,6 +153,8 @@ export function checkScheduleConflict(
 ): HypotheticalScheduleConflict | null {
   const blockingTypeIds = new Set(relationshipTypes.filter((t) => t.isBlocking).map((t) => t.id));
   const itemById = new Map(items.map((i) => [i.id, i]));
+
+  let bestRiskSoFar: HypotheticalScheduleConflict | null = null;
 
   for (const rel of relationships) {
     if (!blockingTypeIds.has(rel.typeId)) continue;
@@ -119,12 +165,26 @@ export function checkScheduleConflict(
     if (!blocker) continue;
 
     const blockerRange = sprintRangesByItemId.get(blockerId) ?? null;
-    const isConflict = !blockerRange || blockerRange.endDate >= targetRange.startDate;
-    if (isConflict) {
-      return { blocker, blockerRange };
+
+    let severity: ScheduleConflictSeverity;
+    if (!blockerRange) {
+      severity = "blocked";
+    } else if (blocker.sprintId === targetSprintId) {
+      severity = "risk";
+    } else if (blockerRange.endDate >= targetRange.startDate) {
+      severity = "blocked";
+    } else {
+      continue;
+    }
+
+    if (severity === "blocked") {
+      return { blocker, blockerRange, severity };
+    }
+    if (!bestRiskSoFar) {
+      bestRiskSoFar = { blocker, blockerRange, severity };
     }
   }
-  return null;
+  return bestRiskSoFar;
 }
 
 /**

@@ -97,7 +97,18 @@ export function GanttChart({ programIncrements, requirements, onSelectItem, onNa
     () => findScheduleConflicts(requirements.items, requirements.relationships, requirements.relationshipTypes, sprintRangesByItemId),
     [requirements.items, requirements.relationships, requirements.relationshipTypes, sprintRangesByItemId]
   );
-  const conflictedItemIds = new Set(conflicts.map((c) => c.item.id));
+  // An item can have more than one conflict at once - the bar should
+  // reflect its MOST severe one, so a genuine "blocked" is never masked
+  // by a milder "risk" that happens to appear later in the list.
+  const conflictByItemId = new Map<string, (typeof conflicts)[number]>();
+  for (const c of conflicts) {
+    const existing = conflictByItemId.get(c.item.id);
+    if (!existing || existing.severity !== "blocked") {
+      conflictByItemId.set(c.item.id, c);
+    }
+  }
+  const blockedCount = conflicts.filter((c) => c.severity === "blocked").length;
+  const riskCount = conflicts.length - blockedCount;
 
   const rows = [...scheduledItems].sort((a, b) => {
     const ra = sprintRangesByItemId.get(a.id);
@@ -117,7 +128,7 @@ export function GanttChart({ programIncrements, requirements, onSelectItem, onNa
   return (
     <div className="gantt-chart">
       {conflicts.length > 0 && (
-        <div className="gantt-conflicts">
+        <div className={`gantt-conflicts${blockedCount === 0 ? " is-risk-only" : ""}`}>
           <button
             type="button"
             className="gantt-conflicts__header"
@@ -125,23 +136,37 @@ export function GanttChart({ programIncrements, requirements, onSelectItem, onNa
           >
             <AlertTriangle size={14} />
             <span>
-              {conflicts.length} scheduling {conflicts.length === 1 ? "conflict" : "conflicts"} detected
+              {blockedCount > 0 && `${blockedCount} blocked`}
+              {blockedCount > 0 && riskCount > 0 && ", "}
+              {riskCount > 0 && `${riskCount} at risk`}
             </span>
             {isConflictsCollapsed ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
           </button>
           {!isConflictsCollapsed && (
             <ul className="gantt-conflicts__list">
               {conflicts.map((c) => (
-                <li key={c.id} className="gantt-conflicts__item">
+                <li key={c.id} className={`gantt-conflicts__item${c.severity === "risk" ? " is-risk" : ""}`}>
                   <span className="gantt-conflicts__text">
-                    <strong>{c.item.id}</strong>
-                    {c.item.title ? `: ${c.item.title}` : ""} is scheduled starting {c.itemRange.startDate}, but
-                    it's blocked by <strong>{c.blocker.id}</strong>
-                    {c.blocker.title ? `: ${c.blocker.title}` : ""}
-                    {c.blockerRange
-                      ? `, which isn't finished until ${c.blockerRange.endDate}`
-                      : ", which isn't scheduled yet"}
-                    . Consider scheduling the blocker to finish before {c.itemRange.startDate}.
+                    {c.severity === "risk" ? (
+                      <>
+                        <strong>{c.item.id}</strong>
+                        {c.item.title ? `: ${c.item.title}` : ""} is scheduled in the same sprint as its blocker{" "}
+                        <strong>{c.blocker.id}</strong>
+                        {c.blocker.title ? `: ${c.blocker.title}` : ""}. Both can likely be completed in the sprint,
+                        but make sure {c.blocker.id} is done first.
+                      </>
+                    ) : (
+                      <>
+                        <strong>{c.item.id}</strong>
+                        {c.item.title ? `: ${c.item.title}` : ""} is scheduled starting {c.itemRange.startDate}, but
+                        it's blocked by <strong>{c.blocker.id}</strong>
+                        {c.blocker.title ? `: ${c.blocker.title}` : ""}
+                        {c.blockerRange
+                          ? `, which isn't finished until ${c.blockerRange.endDate}`
+                          : ", which isn't scheduled yet"}
+                        . Consider scheduling the blocker to finish before {c.itemRange.startDate}.
+                      </>
+                    )}
                   </span>
                   {onNavigateToRequirement && (
                     <button
@@ -192,7 +217,9 @@ export function GanttChart({ programIncrements, requirements, onSelectItem, onNa
                 const pos = rangesBySprintId.get(item.sprintId!);
                 if (!pos) return null;
                 const type = getItemType(requirements, item.typeId);
-                const isConflicted = conflictedItemIds.has(item.id);
+                const rowConflict = conflictByItemId.get(item.id);
+                const isConflicted = rowConflict?.severity === "blocked";
+                const isAtRisk = rowConflict?.severity === "risk";
                 return (
                   <div key={item.id} className="gantt-chart__row">
                     <div className="gantt-chart__label" style={{ width: LABEL_COLUMN_WIDTH }}>
@@ -204,11 +231,12 @@ export function GanttChart({ programIncrements, requirements, onSelectItem, onNa
                       </span>
                       <span className="gantt-chart__label-title">{item.title || "Untitled"}</span>
                       {isConflicted && <AlertTriangle size={11} className="gantt-chart__label-warning" />}
+                      {isAtRisk && <AlertTriangle size={11} className="gantt-chart__label-risk" />}
                     </div>
                     <div className="gantt-chart__track" style={{ width: totalWidth }}>
                       <button
                         type="button"
-                        className={`gantt-chart__bar${isConflicted ? " is-conflicted" : ""}`}
+                        className={`gantt-chart__bar${isConflicted ? " is-conflicted" : ""}${isAtRisk ? " is-at-risk" : ""}`}
                         style={{ left: pos.left, width: pos.width, borderColor: type?.color }}
                         onClick={() => onSelectItem(item.id)}
                         title={`${item.id}: ${item.title || "Untitled"} (${pos.startDate} \u2192 ${pos.endDate})`}
