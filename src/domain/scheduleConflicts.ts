@@ -1,4 +1,4 @@
-import type { RequirementItem, RequirementRelationship } from "./requirementsTypes";
+import type { RequirementItem, RequirementRelationship, RelationshipType } from "./requirementsTypes";
 
 export interface ScheduleConflict {
   id: string;
@@ -20,12 +20,13 @@ export interface ScheduleConflict {
  * there's no guarantee of within-sprint ordering, and overlapping sprints
  * across different program increments).
  *
- * Deliberately scoped to the BUILT-IN "blocks" relationship type only
- * (id === "blocks"), not any custom type a user might define - unlike
- * item types, RelationshipType has no "this represents a blocking
- * dependency" flag today, and the built-in type's id is guaranteed stable
- * since built-in types can't be renamed or deleted. Custom types (e.g. a
- * user-defined "Depends on") aren't included in conflict detection yet.
+ * Considers every relationship whose TYPE is marked blocking (see
+ * RelationshipType.isBlocking), not just the literal built-in "Blocks"
+ * id - a custom type a user marks blocking (e.g. "Depends on") is now
+ * honored here too, matching how cycle prevention already treats any
+ * blocking-flagged type the same way. This used to hardcode the "blocks"
+ * id specifically, from before isBlocking existed as a general flag;
+ * fixed to stay consistent with the rest of the app's dependency logic.
  *
  * Only direct (one-hop) blocking relationships are considered - if a
  * conflict's blocker is itself blocked by something else, that's a
@@ -39,13 +40,15 @@ export interface ScheduleConflict {
 export function findScheduleConflicts(
   items: RequirementItem[],
   relationships: RequirementRelationship[],
+  relationshipTypes: RelationshipType[],
   sprintRangesByItemId: Map<string, { startDate: string; endDate: string }>
 ): ScheduleConflict[] {
+  const blockingTypeIds = new Set(relationshipTypes.filter((t) => t.isBlocking).map((t) => t.id));
   const itemById = new Map(items.map((i) => [i.id, i]));
   const conflicts: ScheduleConflict[] = [];
 
   for (const rel of relationships) {
-    if (rel.typeId !== "blocks") continue;
+    if (!blockingTypeIds.has(rel.typeId)) continue;
     const blockerId = rel.fromItemId;
     const itemId = rel.toItemId;
     if (blockerId === itemId) continue;
@@ -72,4 +75,54 @@ export function findScheduleConflicts(
   }
 
   return conflicts;
+}
+
+export interface HypotheticalScheduleConflict {
+  blocker: RequirementItem;
+  /** Null when the blocker has no sprint assignment at all - same
+   * distinction as ScheduleConflict.blockerRange. */
+  blockerRange: { startDate: string; endDate: string } | null;
+}
+
+/**
+ * Checks whether assigning `itemId` to a sprint with `targetRange` would
+ * create a scheduling conflict against its blockers - the same rule
+ * findScheduleConflicts uses for items already scheduled, but evaluated
+ * hypothetically BEFORE committing a new assignment, so a caller can
+ * reject the assignment outright rather than only detecting the problem
+ * after the fact. Returns the first conflicting blocker found (an item
+ * can have several; this is enough to explain why the assignment can't
+ * proceed and point at what needs to move first), or null if the
+ * assignment would be conflict-free.
+ *
+ * Only checks relationships where `itemId` is the BLOCKED side
+ * (toItemId) - an item it blocks, rather than one that blocks it, has no
+ * bearing on whether this item itself can be scheduled here.
+ */
+export function checkScheduleConflict(
+  itemId: string,
+  targetRange: { startDate: string; endDate: string },
+  items: RequirementItem[],
+  relationships: RequirementRelationship[],
+  relationshipTypes: RelationshipType[],
+  sprintRangesByItemId: Map<string, { startDate: string; endDate: string }>
+): HypotheticalScheduleConflict | null {
+  const blockingTypeIds = new Set(relationshipTypes.filter((t) => t.isBlocking).map((t) => t.id));
+  const itemById = new Map(items.map((i) => [i.id, i]));
+
+  for (const rel of relationships) {
+    if (!blockingTypeIds.has(rel.typeId)) continue;
+    if (rel.toItemId !== itemId) continue;
+    const blockerId = rel.fromItemId;
+    if (blockerId === itemId) continue;
+    const blocker = itemById.get(blockerId);
+    if (!blocker) continue;
+
+    const blockerRange = sprintRangesByItemId.get(blockerId) ?? null;
+    const isConflict = !blockerRange || blockerRange.endDate >= targetRange.startDate;
+    if (isConflict) {
+      return { blocker, blockerRange };
+    }
+  }
+  return null;
 }

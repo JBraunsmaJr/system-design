@@ -85,12 +85,14 @@ function RequirementCardImpl({
             onCreateAndAssign={(label) => onCreateAndAssignCategory(item.id, label)}
             onClear={() => onUpdateItem(item.id, { categoryId: undefined })}
           />
-          <SprintPicker
-            programIncrements={programIncrements}
-            sprintId={item.sprintId}
-            onAssign={(sprintId) => onUpdateItem(item.id, { sprintId })}
-            onClear={() => onUpdateItem(item.id, { sprintId: undefined })}
-          />
+          {isItemWorkable(doc, item) && (
+            <SprintPicker
+              programIncrements={programIncrements}
+              sprintId={item.sprintId}
+              onAssign={(sprintId) => onUpdateItem(item.id, { sprintId })}
+              onClear={() => onUpdateItem(item.id, { sprintId: undefined })}
+            />
+          )}
           {team && (
             <MemberPicker
               team={team}

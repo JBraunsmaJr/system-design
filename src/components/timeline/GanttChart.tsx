@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
 import { computeSprintDateRanges, type ProgramIncrement } from "../../domain/programIncrements";
-import { getItemType } from "../../domain/requirementsRegistry";
+import { getItemType, isItemWorkable } from "../../domain/requirementsRegistry";
 import { findScheduleConflicts } from "../../domain/scheduleConflicts";
 import type { RequirementsDocument } from "../../domain/requirementsTypes";
 
@@ -80,7 +80,9 @@ export function GanttChart({ programIncrements, requirements, onSelectItem, onNa
   const [isConflictsCollapsed, setIsConflictsCollapsed] = useState(false);
   const { bands, rangesBySprintId, totalWidth } = useGanttLayout(programIncrements);
 
-  const scheduledItems = requirements.items.filter((item) => item.sprintId && rangesBySprintId.has(item.sprintId));
+  const scheduledItems = requirements.items.filter(
+    (item) => item.sprintId && rangesBySprintId.has(item.sprintId) && isItemWorkable(requirements, item)
+  );
 
   const sprintRangesByItemId = useMemo(() => {
     const map = new Map<string, { startDate: string; endDate: string }>();
@@ -92,8 +94,8 @@ export function GanttChart({ programIncrements, requirements, onSelectItem, onNa
   }, [scheduledItems, rangesBySprintId]);
 
   const conflicts = useMemo(
-    () => findScheduleConflicts(requirements.items, requirements.relationships, sprintRangesByItemId),
-    [requirements.items, requirements.relationships, sprintRangesByItemId]
+    () => findScheduleConflicts(requirements.items, requirements.relationships, requirements.relationshipTypes, sprintRangesByItemId),
+    [requirements.items, requirements.relationships, requirements.relationshipTypes, sprintRangesByItemId]
   );
   const conflictedItemIds = new Set(conflicts.map((c) => c.item.id));
 

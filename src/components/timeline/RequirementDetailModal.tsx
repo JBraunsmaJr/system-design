@@ -155,7 +155,7 @@ export function RequirementDetailModal({
               )
             )}
 
-            {onUpdateItem && (
+            {onUpdateItem && isItemWorkable(doc, item) && (
               <SprintPicker
                 programIncrements={programIncrements}
                 sprintId={item.sprintId}

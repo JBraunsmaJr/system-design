@@ -7259,3 +7259,32 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ---------- Sprint board: schedule conflict prevention/detection ---------- */
+
+.pi-board-column__drop-error {
+  margin: 0;
+  padding: 6px 10px;
+  color: var(--danger);
+  font-size: 11.5px;
+  line-height: 1.4;
+  background: rgba(240, 87, 140, 0.08);
+  border-bottom: 1px solid rgba(240, 87, 140, 0.3);
+}
+
+.pi-board-item.is-conflicted {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 1px rgba(240, 87, 140, 0.35);
+}
+
+.pi-board-item__conflict-warning {
+  color: var(--danger);
+  flex-shrink: 0;
+}
+
+.sprint-quick-add__error {
+  margin: 0 0 6px;
+  color: var(--danger);
+  font-size: 11px;
+  line-height: 1.4;
+}
