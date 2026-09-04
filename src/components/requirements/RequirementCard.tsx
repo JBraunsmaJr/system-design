@@ -195,8 +195,8 @@ function RequirementCardImpl({
  *
  * Instead this compares the specific parts of `doc` each card actually
  * depends on for its OWN rendering (itemTypes, categories,
- * relationshipTypes - which only change when someone edits a type/
- * category, not on every item edit) plus `item` itself by reference,
+ * relationshipTypes, relationships - which only change when someone edits a type,
+ * category, or relationship, not on every item edit) plus `item` itself by reference,
  * which is the key guarantee this relies on: editing item B's title
  * produces a new items array where every OTHER item keeps its exact
  * previous object reference (see requirementsRegistry/onUpdateDoc's
@@ -204,7 +204,7 @@ function RequirementCardImpl({
  * its own item that changed, or when a genuinely shared, rarely-changing
  * part of the document changed.
  *
- * `doc.items` and `doc.relationships` as a WHOLE are deliberately not
+ * `doc.items` as a WHOLE is deliberately not
  * compared - RelationshipManager (rendered inside this card) uses the
  * full doc to search all other items and show current relationships, so
  * in principle another item's title change could leave this card's
@@ -219,6 +219,7 @@ function propsAreEqual(prev: RequirementCardProps, next: RequirementCardProps): 
     prev.doc.itemTypes === next.doc.itemTypes &&
     prev.doc.categories === next.doc.categories &&
     prev.doc.relationshipTypes === next.doc.relationshipTypes &&
+    prev.doc.relationships === next.doc.relationships &&
     prev.programIncrements === next.programIncrements &&
     prev.team === next.team &&
     prev.diagramRoot === next.diagramRoot &&
