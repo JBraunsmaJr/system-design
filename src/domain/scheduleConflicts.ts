@@ -126,3 +126,36 @@ export function checkScheduleConflict(
   }
   return null;
 }
+
+/**
+ * Finds all item IDs that directly or transitively block the given item.
+ * Follows relationships where the relationship type is marked blocking
+ * (isBlocking: true) from toItemId to fromItemId.
+ */
+export function findBlockingItemIds(
+  itemId: string,
+  relationships: RequirementRelationship[],
+  relationshipTypes: RelationshipType[]
+): Set<string> {
+  const blockingTypeIds = new Set(relationshipTypes.filter((t) => t.isBlocking).map((t) => t.id));
+  const blockers = new Set<string>();
+  const queue = [itemId];
+  const visited = new Set<string>([itemId]);
+
+  while (queue.length > 0) {
+    const currentId = queue.shift()!;
+    for (const rel of relationships) {
+      if (!blockingTypeIds.has(rel.typeId)) continue;
+      if (rel.toItemId === currentId) {
+        const blockerId = rel.fromItemId;
+        if (!visited.has(blockerId)) {
+          visited.add(blockerId);
+          blockers.add(blockerId);
+          queue.push(blockerId);
+        }
+      }
+    }
+  }
+
+  return blockers;
+}
