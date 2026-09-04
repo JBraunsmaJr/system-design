@@ -262,6 +262,48 @@ function App() {
     setViewMode("requirements");
     setPendingRequirementFocus(itemId);
   }, []);
+  // Mirrors onNavigateToRequirement above - jumps to the diagram, drills
+  // to whichever sub-diagram level actually contains the target node
+  // (path is relative to root, see findLinkedNodes), and requests the
+  // camera focus Canvas consumes via focusNodeId/onFocusHandled.
+  const [pendingNodeFocus, setPendingNodeFocus] = useState<string | null>(null);
+  const onNavigateToNode = useCallback(
+    (nodePath: DiagramPath, nodeId: string) => {
+      setViewMode("diagram");
+      setPath(nodePath);
+      setPendingNodeFocus(nodeId);
+    },
+    []
+  );
+  /** Quick-action from a requirement's "Linked Diagrams" section - rather
+   * than making the person go create a node manually then hunt down the
+   * Inspector's requirement linker, this does both steps in one action
+   * and jumps straight there. Always creates at ROOT (path: []) rather
+   * than whatever `path` happens to currently be - the person calling
+   * this is usually looking at Requirements/Timeline, not the diagram, so
+   * there's no meaningful "current sub-diagram" to add into; root is the
+   * one predictable, always-discoverable place regardless of where they
+   * were when they clicked. */
+  const onCreateLinkedNode = useCallback((itemId: string, label: string) => {
+    const id = nextId("node");
+    const node: Node<ArchNodeData> = {
+      id,
+      type: "typed",
+      position: { x: 0, y: 0 },
+      data: {
+        nodeType: "custom",
+        label,
+        description: "",
+        properties: {},
+        tags: [],
+        linkedRequirementIds: [itemId],
+      },
+    };
+    setRoot((r) => updateSubDiagramAtPath(r, [], (sd) => ({ ...sd, nodes: [...sd.nodes, node] })));
+    setViewMode("diagram");
+    setPath([]);
+    setPendingNodeFocus(id);
+  }, [setRoot]);
   const [isScenarioPanelOpen, setIsScenarioPanelOpen] = useState(false);
   const [activeStepId, setActiveStepId] = useState<string | null>(null);
   const [isSelectMode, setIsSelectMode] = useState(false);
@@ -1061,6 +1103,8 @@ function App() {
               onAdoptIntoGroup={onAdoptIntoGroup}
               presentation={presentation}
               previewFocus={previewFocus}
+              focusNodeId={pendingNodeFocus}
+              onFocusHandled={() => setPendingNodeFocus(null)}
               onPresentNext={onPresentNext}
               onPresentPrev={onPresentPrev}
               onExitPresenting={onExitPresenting}
@@ -1137,6 +1181,9 @@ function App() {
             onUpdateDoc={setRequirements}
             programIncrements={programIncrements}
             team={team}
+            diagramRoot={root}
+            onNavigateToNode={onNavigateToNode}
+            onCreateLinkedNode={onCreateLinkedNode}
             focusItemId={pendingRequirementFocus}
             onFocusHandled={() => setPendingRequirementFocus(null)}
           />
@@ -1148,6 +1195,9 @@ function App() {
             requirements={requirements}
             onUpdateRequirements={setRequirements}
             team={team}
+            diagramRoot={root}
+            onNavigateToNode={onNavigateToNode}
+            onCreateLinkedNode={onCreateLinkedNode}
             onNavigateToRequirement={onNavigateToRequirement}
           />
         )}

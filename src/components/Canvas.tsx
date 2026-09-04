@@ -89,6 +89,13 @@ interface CanvasProps {
   onAdoptIntoGroup: (groupId: string, nodeIds: string[]) => void;
   presentation: PresentationState | null;
   previewFocus: FocusSet | null;
+  /** Set (once) to zoom/pan the camera onto a specific node - used for
+   * "jump to this node" navigation from a requirement's linked-nodes list,
+   * distinct from previewFocus/presentation which drive scenario-related
+   * camera framing and dimming. Cleared via onFocusHandled once consumed,
+   * same one-shot pattern as RequirementsView's focusItemId. */
+  focusNodeId?: string | null;
+  onFocusHandled?: () => void;
   onPresentNext: () => void;
   onPresentPrev: () => void;
   onExitPresenting: () => void;
@@ -118,6 +125,8 @@ export function Canvas({
   onAdoptIntoGroup,
   presentation,
   previewFocus,
+  focusNodeId,
+  onFocusHandled,
   onPresentNext,
   onPresentPrev,
   onExitPresenting,
@@ -150,7 +159,16 @@ export function Canvas({
    * Camera auto-framing (below) still treats both the same, since "zoom to
    * what's focused" is equally useful for either
    */
-  const activeFocus: FocusSet | null = presentationFocus ?? previewFocus;
+  /** A single-node focus for "jump to this node" navigation (see
+   * focusNodeId's own doc comment). Deliberately kept out of the
+   * presentationFocus/previewFocus dimming logic below (neither of those
+   * two derive from this) - navigating here should just move the camera,
+   * not dim the rest of the canvas the way an active presentation does. */
+  const navigationFocus: FocusSet | null = useMemo(
+    () => (focusNodeId ? { nodeIds: [focusNodeId], edgeIds: [] } : null),
+    [focusNodeId]
+  );
+  const activeFocus: FocusSet | null = presentationFocus ?? previewFocus ?? navigationFocus;
 
   /**
    * Which node (text annotation or shape) is being label-edited inline right now.
@@ -487,6 +505,20 @@ export function Canvas({
     fitView({ padding: 0.2, duration: 300 });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: see comment above
   }, [pathKey, fitView]);
+
+  // Clears the one-shot "jump to this node" request once it's been
+  // consumed, so navigating to the same node again later still fires -
+  // same requestAnimationFrame-deferred pattern as RequirementsView's
+  // focusItemId handling (waits a frame so this always runs after the
+  // fitView effects above, which need the just-changed path's nodes to
+  // already be rendered). Deliberately a separate effect, not folded into
+  // the fitView effects above, so it can't change their existing,
+  // already-correct coordination logic.
+  useEffect(() => {
+    if (!focusNodeId) return;
+    const frame = requestAnimationFrame(() => onFocusHandled?.());
+    return () => cancelAnimationFrame(frame);
+  }, [focusNodeId, onFocusHandled]);
 
   const levelLabel = breadcrumbLabels.length === 0 ? "Root" : breadcrumbLabels.join(" › ");
 

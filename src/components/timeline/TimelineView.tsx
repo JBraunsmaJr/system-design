@@ -10,6 +10,8 @@ import {
 import { addRelationship, getItemType } from "../../domain/requirementsRegistry";
 import type { RequirementItem, RequirementsDocument } from "../../domain/requirementsTypes";
 import type { TeamDocument } from "../../domain/teamTypes";
+import type { SubDiagram } from "../../domain/types";
+import type { DiagramPath } from "../../domain/subDiagramTree";
 import { computeSprintCapacity } from "../../domain/teamCapacity";
 import { SprintCapacityBar } from "../team/SprintCapacityBar";
 import { MemberPicker } from "../team/MemberPicker";
@@ -24,6 +26,9 @@ interface TimelineViewProps {
   requirements: RequirementsDocument;
   onUpdateRequirements: (updater: (doc: RequirementsDocument) => RequirementsDocument) => void;
   team?: TeamDocument;
+  diagramRoot?: SubDiagram;
+  onNavigateToNode?: (path: DiagramPath, nodeId: string) => void;
+  onCreateLinkedNode?: (itemId: string, label: string) => void;
   onNavigateToRequirement?: (itemId: string) => void;
 }
 
@@ -46,6 +51,9 @@ export function TimelineView({
   requirements,
   onUpdateRequirements,
   team,
+  diagramRoot,
+  onNavigateToNode,
+  onCreateLinkedNode,
   onNavigateToRequirement,
 }: TimelineViewProps) {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -308,6 +316,9 @@ export function TimelineView({
           doc={requirements}
           programIncrements={programIncrements}
           team={team}
+          diagramRoot={diagramRoot}
+          onNavigateToNode={onNavigateToNode}
+          onCreateLinkedNode={onCreateLinkedNode}
           onClose={() => setSelectedItemId(null)}
           onUpdateItem={onUpdateItem}
           onDeleteItem={onDeleteItem}

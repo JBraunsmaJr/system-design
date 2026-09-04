@@ -1,8 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
-import { X, ExternalLink, Calendar, Edit3, Check, Trash2 } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { X, ExternalLink, Calendar, Edit3, Check, Trash2, FileText, Plus, Workflow } from "lucide-react";
 import { getItemType, isItemWorkable } from "../../domain/requirementsRegistry";
+import { findLinkedNodes, type DiagramPath } from "../../domain/subDiagramTree";
 import { computeSprintDateRanges, type ProgramIncrement } from "../../domain/programIncrements";
 import type { RequirementItem, RequirementsDocument } from "../../domain/requirementsTypes";
+import type { SubDiagram } from "../../domain/types";
 import { RequirementBody } from "../requirements/RequirementBody";
 import { RequirementEditor } from "../requirements/RequirementEditor";
 import { CategoryPicker } from "../requirements/CategoryPicker";
@@ -18,6 +20,9 @@ interface RequirementDetailModalProps {
   doc: RequirementsDocument;
   programIncrements: ProgramIncrement[];
   team?: TeamDocument;
+  diagramRoot?: SubDiagram;
+  onNavigateToNode?: (path: DiagramPath, nodeId: string) => void;
+  onCreateLinkedNode?: (itemId: string, label: string) => void;
   onClose: () => void;
   onUpdateItem?: (id: string, patch: Partial<RequirementItem>) => void;
   onDeleteItem?: (id: string) => void;
@@ -33,6 +38,9 @@ export function RequirementDetailModal({
   doc,
   programIncrements,
   team,
+  diagramRoot,
+  onNavigateToNode,
+  onCreateLinkedNode,
   onClose,
   onUpdateItem,
   onDeleteItem,
@@ -60,6 +68,10 @@ export function RequirementDetailModal({
   }, [onClose, isEditing]);
 
   const type = getItemType(doc, item.typeId);
+  const linkedNodes = useMemo(
+    () => (diagramRoot ? findLinkedNodes(diagramRoot, item.id) : []),
+    [diagramRoot, item.id]
+  );
   const category = item.categoryId ? doc.categories.find((c) => c.id === item.categoryId) : undefined;
 
   // Find the PI and sprint information for this item
@@ -296,6 +308,44 @@ export function RequirementDetailModal({
                 onDeleteRelationship={onDeleteRelationship}
                 onNavigateToItem={handleNavigateRef}
               />
+            </div>
+          )}
+          {diagramRoot && (
+            <div className="requirement-card__diagrams">
+              <div className="requirement-card__diagrams-header">
+                <span>Linked Diagrams</span>
+                {onCreateLinkedNode && (
+                  <button
+                    type="button"
+                    className="requirement-card__diagrams-add"
+                    onClick={() => onCreateLinkedNode(item.id, item.title || item.id)}
+                    title="Create a new diagram node linked to this item"
+                  >
+                    <Plus size={11} /> New
+                  </button>
+                )}
+              </div>
+              {linkedNodes.length === 0 ? (
+                <p className="requirement-card__diagrams-empty">No linked diagram nodes yet.</p>
+              ) : (
+                <div className="requirement-card__diagrams-list">
+                  {linkedNodes.map((ref) => (
+                    <button
+                      key={ref.nodeId}
+                      type="button"
+                      className="requirement-card__diagram-chip"
+                      onClick={() => onNavigateToNode?.(ref.path, ref.nodeId)}
+                      title={`Go to "${ref.label || "Untitled"}" in the diagram`}
+                    >
+                      <Workflow size={11} />
+                      <span>{ref.label || "Untitled"}</span>
+                      {ref.hasSubDiagram && (
+                        <FileText size={10} className="requirement-card__diagram-chip-doc" aria-label="Has sub-diagram documentation" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

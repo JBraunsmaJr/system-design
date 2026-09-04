@@ -13,12 +13,21 @@ import type {
 } from "../../domain/requirementsTypes";
 import type { ProgramIncrement } from "../../domain/programIncrements";
 import type { TeamDocument } from "../../domain/teamTypes";
+import type { SubDiagram } from "../../domain/types";
+import type { DiagramPath } from "../../domain/subDiagramTree";
 
 interface RequirementsViewProps {
   doc: RequirementsDocument;
   onUpdateDoc: (updater: (doc: RequirementsDocument) => RequirementsDocument) => void;
   programIncrements: ProgramIncrement[];
   team?: TeamDocument;
+  /** The full diagram tree, for finding which nodes (anywhere, at any
+   * nesting depth) link back to a given requirement item - see
+   * findLinkedNodes. Optional purely for prop-drilling convenience at
+   * call sites that don't have it handy; every real caller passes it. */
+  diagramRoot?: SubDiagram;
+  onNavigateToNode?: (path: DiagramPath, nodeId: string) => void;
+  onCreateLinkedNode?: (itemId: string, label: string) => void;
   /** Set by App.tsx when the user clicks a linked requirement pill from
    * the Inspector (while viewing the diagram) - scrolls to and briefly
    * highlights that item once this view mounts/updates, then reports
@@ -46,7 +55,17 @@ interface ItemGroup {
   items: RequirementItem[];
 }
 
-export function RequirementsView({ doc, onUpdateDoc, programIncrements, team, focusItemId, onFocusHandled }: RequirementsViewProps) {
+export function RequirementsView({
+  doc,
+  onUpdateDoc,
+  programIncrements,
+  team,
+  diagramRoot,
+  onNavigateToNode,
+  onCreateLinkedNode,
+  focusItemId,
+  onFocusHandled,
+}: RequirementsViewProps) {
   const [search, setSearch] = useState("");
   const [groupBy, setGroupBy] = useState<GroupBy>("type");
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
@@ -368,6 +387,9 @@ export function RequirementsView({ doc, onUpdateDoc, programIncrements, team, fo
                   doc={doc}
                   programIncrements={programIncrements}
                   team={team}
+                  diagramRoot={diagramRoot}
+                  onNavigateToNode={onNavigateToNode}
+                  onCreateLinkedNode={onCreateLinkedNode}
                   onUpdateItem={onUpdateItem}
                   onDeleteItem={onDeleteItem}
                   onNavigateToItem={onNavigateToItem}
