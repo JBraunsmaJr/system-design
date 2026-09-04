@@ -631,7 +631,7 @@ export function TeamView({ team, onUpdateTeam, programIncrements, requirements }
                             </div>
                           </td>
                           <td>
-                            <strong>{summary.sprintBusinessDays}</strong> days
+                            <strong>{summary.sprintBusinessDays}</strong> b-days
                           </td>
                           <td>
                             <strong>{summary.totalCapacityPoints}</strong> pts

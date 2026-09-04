@@ -177,7 +177,7 @@ export function SprintCapacityBar({ summary, compact = false }: SprintCapacityBa
               )}
             </span>
             <span className="sprint-capacity-bar__days-badge">
-              <Calendar size={11} /> {sprintBusinessDays} days
+              <Calendar size={11} /> {sprintBusinessDays} b-days
             </span>
           </div>
         </div>
