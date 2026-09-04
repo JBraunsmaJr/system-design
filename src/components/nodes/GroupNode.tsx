@@ -1,6 +1,7 @@
 import { NodeResizer, type NodeProps, type Node } from "@xyflow/react";
 import * as Icons from "lucide-react";
 import { getGroupType } from "../../domain/groupRegistry";
+import { BidirectionalHandles } from "./BidirectionalHandles";
 import type { ArchNodeData } from "../../domain/types";
 
 type GroupNodeType = Node<ArchNodeData, "group">;
@@ -20,6 +21,16 @@ type GroupNodeType = Node<ArchNodeData, "group">;
  * of" edges) div was intercepting clicks meant for edges passing through
  * it, and sometimes child nodes too, whenever a click missed a child's own
  * smaller hit-box but still landed within the boundary's much larger one.
+ *
+ * A group/boundary can also be connected to other nodes directly - e.g. an
+ * edge from a "Kubernetes Cluster" boundary to a "Database" node,
+ * representing the whole subsystem rather than one specific node inside
+ * it. BidirectionalHandles is the same shared handle set TypedNode and
+ * ShapeNode already use, kept as a sibling of the click-through div below
+ * for the same reason NodeResizer is - pointer-events:none is inherited by
+ * descendants, so a handle nested inside that div would inherit it too and
+ * become undraggable; as a sibling it's unaffected regardless of the
+ * interior's click-through state.
  */
 export function GroupNode({ data, selected }: NodeProps<GroupNodeType>) {
   const def = getGroupType(data.nodeType);
@@ -34,7 +45,8 @@ export function GroupNode({ data, selected }: NodeProps<GroupNodeType>) {
       {/* Sibling, not nested inside the click-through div below - pointer-events
           is inherited by default, and NodeResizer's own handles need to stay
           fully interactive regardless of the group's interior being
-          click-through. */}
+          click-through. Same reasoning applies to BidirectionalHandles just
+          below it. */}
       <NodeResizer
         isVisible={selected}
         minWidth={220}
@@ -42,6 +54,7 @@ export function GroupNode({ data, selected }: NodeProps<GroupNodeType>) {
         lineClassName="node-resize-line"
         handleClassName="node-resize-handle"
       />
+      <BidirectionalHandles />
       <div
         className={`group-node${selected ? " is-selected" : ""}`}
         style={{
