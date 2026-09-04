@@ -88,11 +88,13 @@ export function computeSkillTree(doc: RequirementsDocument): SkillTree {
   const rank = new Map<string, number>();
   const inDegree = new Map<string, number>(workableItems.map((i) => [i.id, blockedBy.get(i.id)!.length]));
   const queue: string[] = workableItems.filter((i) => inDegree.get(i.id) === 0).map((i) => i.id);
+  let queueHead = 0;
   const processed = new Set<string>();
   for (const id of queue) rank.set(id, 0);
 
-  while (queue.length > 0) {
-    const id = queue.shift()!;
+  while (queueHead < queue.length) {
+    const id = queue[queueHead];
+    queueHead++;
     if (processed.has(id)) continue;
     processed.add(id);
     for (const nextId of blocks.get(id)!) {

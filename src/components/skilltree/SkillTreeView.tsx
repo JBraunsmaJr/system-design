@@ -88,6 +88,12 @@ export function SkillTreeView({
 
   const tree = useMemo(() => computeSkillTree(requirements), [requirements]);
   const { positions, totalWidth, totalHeight } = useSkillTreeLayout(tree.nodes);
+  // Edge rendering below needs to look up the blocked-side node's state for
+  // every edge (to color the path). Without this, tree.nodes.find(...)
+  // inside the edges.map would be a linear search per edge - O(edges *
+  // nodes) total. One map built here makes each lookup O(1), for O(nodes +
+  // edges) overall.
+  const nodeByItemId = useMemo(() => new Map(tree.nodes.map((n) => [n.item.id, n])), [tree.nodes]);
 
   const blockedDespiteProgress = tree.nodes.filter((n) => n.isBlockedDespiteProgress);
   const cycleWarnings = tree.nodes.filter((n) => n.inCycle);
@@ -181,7 +187,7 @@ export function SkillTreeView({
               const from = positions.get(edge.fromItemId);
               const to = positions.get(edge.toItemId);
               if (!from || !to) return null;
-              const blockedNode = tree.nodes.find((n) => n.item.id === edge.toItemId);
+              const blockedNode = nodeByItemId.get(edge.toItemId);
               const isActivePath = blockedNode?.state !== "locked";
               const x1 = from.x + CARD_WIDTH;
               const y1 = from.y + CARD_HEIGHT / 2 - 10;

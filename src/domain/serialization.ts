@@ -2,7 +2,7 @@ import type { Node, Edge } from "@xyflow/react";
 import type { ArchNodeData, ArchEdgeData, Scenario } from "./types";
 import type { RequirementsDocument } from "./requirementsTypes";
 import { EMPTY_REQUIREMENTS_DOCUMENT } from "./requirementsTypes";
-import { BUILT_IN_RELATIONSHIP_TYPES } from "./requirementsRegistry";
+import { BUILT_IN_ITEM_TYPES, BUILT_IN_RELATIONSHIP_TYPES } from "./requirementsRegistry";
 import type { ProgramIncrement } from "./programIncrements";
 import type { TeamDocument } from "./teamTypes";
 import { EMPTY_TEAM_DOCUMENT, DEFAULT_TEAM_SETTINGS } from "./teamTypes";
@@ -69,11 +69,18 @@ function parseRequirementsDocument(raw: unknown): RequirementsDocument {
   if (!raw || typeof raw !== "object") return EMPTY_REQUIREMENTS_DOCUMENT;
   const r = raw as Partial<RequirementsDocument>;
   // Files saved before "workable" types existed won't have isWorkable at
-  // all on any of their item types - default it to false (not work)
-  // rather than leaving it undefined, so downstream code can treat the
-  // field as a real boolean instead of needing its own fallback everywhere.
+  // all on any of their item types - fall back to the matching CURRENT
+  // built-in's value when the type is a recognized built-in (so a legacy
+  // "ticket" record correctly comes back workable, not silently excluded
+  // from the skill tree and stripped of its StatusPicker), or false for
+  // anything unrecognized (a custom type predating this field, where
+  // there's no built-in value to recover). Same reasoning as
+  // relationshipTypes' isBlocking fallback just below.
   const itemTypes = Array.isArray(r.itemTypes)
-    ? r.itemTypes.map((t) => ({ ...t, isWorkable: t.isWorkable ?? false }))
+    ? r.itemTypes.map((t) => ({
+        ...t,
+        isWorkable: t.isWorkable ?? BUILT_IN_ITEM_TYPES.find((b) => b.id === t.id)?.isWorkable ?? false,
+      }))
     : [];
   const relationshipTypes = Array.isArray(r.relationshipTypes)
     ? r.relationshipTypes.map((t) => ({
