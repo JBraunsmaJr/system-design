@@ -14,7 +14,7 @@ import type {
 import type { ProgramIncrement } from "../../domain/programIncrements";
 import type { TeamDocument } from "../../domain/teamTypes";
 import type { SubDiagram } from "../../domain/types";
-import type { DiagramPath } from "../../domain/subDiagramTree";
+import { findAllLinkedNodes, type DiagramPath } from "../../domain/subDiagramTree";
 
 interface RequirementsViewProps {
   doc: RequirementsDocument;
@@ -72,6 +72,15 @@ export function RequirementsView({
   const [isManagingTypes, setIsManagingTypes] = useState(false);
   const [isManagingRelationshipTypes, setIsManagingRelationshipTypes] = useState(false);
   const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Computed once for every item here, rather than each RequirementCard
+  // independently walking the whole diagram tree for just its own item -
+  // see findAllLinkedNodes's own doc comment for why that per-card
+  // approach doesn't scale with the number of items in this list.
+  const linkedNodesByItemId = useMemo(
+    () => (diagramRoot ? findAllLinkedNodes(diagramRoot) : new Map()),
+    [diagramRoot]
+  );
 
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -388,6 +397,7 @@ export function RequirementsView({
                   programIncrements={programIncrements}
                   team={team}
                   diagramRoot={diagramRoot}
+                  linkedNodes={linkedNodesByItemId.get(item.id) ?? []}
                   onNavigateToNode={onNavigateToNode}
                   onCreateLinkedNode={onCreateLinkedNode}
                   onUpdateItem={onUpdateItem}

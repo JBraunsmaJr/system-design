@@ -105,3 +105,48 @@ export function findLinkedNodes(root: SubDiagram, itemId: string): LinkedNodeRef
   walk(root, []);
   return results;
 }
+
+/**
+ * Batched version of findLinkedNodes - walks the diagram tree exactly
+ * ONCE and returns every item's linked nodes in a single map, instead of
+ * each caller independently re-walking the whole tree for its own item.
+ *
+ * This exists because RequirementsView renders one RequirementCard per
+ * requirement item, and each card originally called findLinkedNodes
+ * itself - with N items and a diagram of M total nodes across every
+ * nested sub-diagram, that's O(N*M) work just to render the list once,
+ * repeated on every diagram change. RequirementDetailModal (the
+ * single-item detail modal used by Timeline and the Skill Tree) still
+ * calls findLinkedNodes directly and correctly - it only ever shows one
+ * item at a time, so there's no list-wide cost to batch away there; this
+ * function is specifically for list views with many items.
+ *
+ * An item with no linked nodes has no entry in the returned map at all
+ * (not an empty array entry) - callers already read this the same way
+ * findLinkedNodes's own empty-array result is read, via `?? []`.
+ * Verified to produce results identical to calling findLinkedNodes
+ * per-item, and to visit each sub-diagram exactly once regardless of how
+ * many items are being looked up, before wiring this in.
+ */
+export function findAllLinkedNodes(root: SubDiagram): Map<string, LinkedNodeRef[]> {
+  const result = new Map<string, LinkedNodeRef[]>();
+  function walk(sd: SubDiagram, currentPath: DiagramPath) {
+    for (const node of sd.nodes) {
+      for (const itemId of node.data.linkedRequirementIds ?? []) {
+        const list = result.get(itemId) ?? [];
+        list.push({
+          nodeId: node.id,
+          label: node.data.label,
+          path: currentPath,
+          hasSubDiagram: (node.data.subDiagram?.nodes.length ?? 0) > 0,
+        });
+        result.set(itemId, list);
+      }
+      if (node.data.subDiagram) {
+        walk(node.data.subDiagram, [...currentPath, node.id]);
+      }
+    }
+  }
+  walk(root, []);
+  return result;
+}

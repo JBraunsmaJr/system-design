@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { FileText, Plus, Trash2, Workflow } from "lucide-react";
 import { getItemType, isItemWorkable } from "../../domain/requirementsRegistry";
-import { findLinkedNodes, type DiagramPath } from "../../domain/subDiagramTree";
+import type { LinkedNodeRef, DiagramPath } from "../../domain/subDiagramTree";
 import { RequirementBody } from "./RequirementBody";
 import { RequirementEditor } from "./RequirementEditor";
 import { CategoryPicker } from "./CategoryPicker";
@@ -20,11 +20,15 @@ interface RequirementCardProps {
   doc: RequirementsDocument;
   programIncrements: ProgramIncrement[];
   team?: TeamDocument;
-  /** For finding/navigating to diagram nodes that link back to this item
-   * - see findLinkedNodes. Both optional purely for prop-drilling
-   * convenience; the "Linked Diagrams" section simply doesn't render
-   * without diagramRoot. */
+  /** For finding/navigating to diagram nodes that link back to this item.
+   * Computed once for ALL items by the parent (see findAllLinkedNodes)
+   * rather than this card walking the whole diagram tree itself - with
+   * many cards rendered at once, N independent per-card tree walks scale
+   * far worse than one shared walk up front. Both optional purely for
+   * prop-drilling convenience; the "Linked Diagrams" section simply
+   * doesn't render without diagramRoot. */
   diagramRoot?: SubDiagram;
+  linkedNodes?: LinkedNodeRef[];
   onNavigateToNode?: (path: DiagramPath, nodeId: string) => void;
   onCreateLinkedNode?: (itemId: string, label: string) => void;
   onUpdateItem: (id: string, patch: Partial<RequirementItem>) => void;
@@ -45,6 +49,7 @@ export function RequirementCard({
   programIncrements,
   team,
   diagramRoot,
+  linkedNodes = [],
   onNavigateToNode,
   onCreateLinkedNode,
   onUpdateItem,
@@ -57,10 +62,6 @@ export function RequirementCard({
 }: RequirementCardProps) {
   const [isEditingBody, setIsEditingBody] = useState(false);
   const type = getItemType(doc, item.typeId);
-  const linkedNodes = useMemo(
-    () => (diagramRoot ? findLinkedNodes(diagramRoot, item.id) : []),
-    [diagramRoot, item.id]
-  );
 
   return (
     <div
