@@ -7117,3 +7117,145 @@
   flex-shrink: 0;
   color: var(--chrome-text-dim);
 }
+
+/* ---------- Skill tree ---------- */
+
+.skill-tree {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.skill-tree__empty {
+  padding: 40px;
+  text-align: center;
+  color: var(--chrome-text-dim);
+  font-size: 13px;
+}
+
+.skill-tree__warnings {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 16px;
+  background: rgba(240, 87, 140, 0.06);
+  border-bottom: 1px solid rgba(240, 87, 140, 0.3);
+}
+
+.skill-tree__warning-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--danger);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.skill-tree__warning-row svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.skill-tree__scroll {
+  flex: 1;
+  overflow: auto;
+  padding: 24px;
+}
+
+.skill-tree__canvas {
+  position: relative;
+}
+
+.skill-tree__edges {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.skill-tree__edge-path {
+  stroke: var(--chrome-border);
+  stroke-width: 1.5;
+}
+
+.skill-tree__edge-path.is-active {
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.skill-tree__card {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--chrome-bg-raised);
+  border: 1px solid var(--chrome-border);
+  border-left-width: 3px;
+  border-radius: var(--radius-md, 8px);
+  padding: 10px 12px;
+  text-align: left;
+  height: 76px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.skill-tree__card:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.skill-tree__card.is-locked {
+  opacity: 0.55;
+}
+
+.skill-tree__card.is-done {
+  opacity: 0.7;
+}
+
+.skill-tree__card.is-unlocked,
+.skill-tree__card.is-in-progress {
+  border-left-color: var(--accent);
+}
+
+.skill-tree__card-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.skill-tree__card-id {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.skill-tree__card-state-icon {
+  margin-left: auto;
+  display: inline-flex;
+  color: var(--chrome-text-dim);
+}
+
+.skill-tree__card.is-done .skill-tree__card-state-icon {
+  color: #0FA36B;
+}
+
+.skill-tree__card.is-unlocked .skill-tree__card-state-icon,
+.skill-tree__card.is-in-progress .skill-tree__card-state-icon {
+  color: var(--accent);
+}
+
+.skill-tree__card-warning {
+  color: var(--danger);
+  flex-shrink: 0;
+}
+
+.skill-tree__card-title {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--chrome-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

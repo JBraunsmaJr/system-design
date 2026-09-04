@@ -22,6 +22,7 @@ import { ScenarioPanel } from "./components/ScenarioPanel";
 import { RequirementsView } from "./components/requirements/RequirementsView";
 import { TimelineView } from "./components/timeline/TimelineView";
 import { TeamView } from "./components/team/TeamView";
+import { SkillTreeView } from "./components/skilltree/SkillTreeView";
 import { NODE_TYPES } from "./domain/nodeRegistry";
 import { GROUP_TYPES } from "./domain/groupRegistry";
 import { SHAPE_TYPES } from "./domain/shapeRegistry";
@@ -252,7 +253,7 @@ function App() {
   // Which top-level page is showing - the diagram canvas or the
   // requirements document. Deliberately NOT part of the undoable
   // DiagramSnapshot: switching pages isn't an edit to the content itself.
-  const [viewMode, setViewMode] = useState<"diagram" | "requirements" | "timeline" | "team">("diagram");
+  const [viewMode, setViewMode] = useState<"diagram" | "requirements" | "timeline" | "team" | "skill-tree">("diagram");
   // Set together with viewMode when the user clicks a linked requirement
   // pill in the Inspector (while looking at the diagram) - see
   // RequirementsView's focusItemId prop for how this actually triggers
@@ -1207,6 +1208,18 @@ function App() {
             onUpdateTeam={setTeam}
             programIncrements={programIncrements}
             requirements={requirements}
+          />
+        )}
+        {viewMode === "skill-tree" && (
+          <SkillTreeView
+            requirements={requirements}
+            onUpdateRequirements={setRequirements}
+            programIncrements={programIncrements}
+            team={team}
+            diagramRoot={root}
+            onNavigateToNode={onNavigateToNode}
+            onCreateLinkedNode={onCreateLinkedNode}
+            onNavigateToRequirement={onNavigateToRequirement}
           />
         )}
       </div>

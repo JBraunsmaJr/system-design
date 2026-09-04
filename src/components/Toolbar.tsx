@@ -3,6 +3,7 @@ import {
   ListChecks,
   CalendarRange,
   Users,
+  Network,
   Redo2,
   Undo2,
   Workflow,
@@ -29,8 +30,8 @@ interface ToolbarProps {
   onRedo: () => void;
   canUndo: boolean;
   canRedo: boolean;
-  viewMode: "diagram" | "requirements" | "timeline" | "team";
-  onSetViewMode: (mode: "diagram" | "requirements" | "timeline" | "team") => void;
+  viewMode: "diagram" | "requirements" | "timeline" | "team" | "skill-tree";
+  onSetViewMode: (mode: "diagram" | "requirements" | "timeline" | "team" | "skill-tree") => void;
   onExportRequirementsMarkdown: () => void;
   canExportRequirements: boolean;
   hasAutosaved: boolean;
@@ -99,6 +100,15 @@ export function Toolbar({
         >
           <Users size={13} />
           <span className="toolbar__label">Team</span>
+        </button>
+        <button
+          type="button"
+          className={viewMode === "skill-tree" ? "active" : undefined}
+          onClick={() => onSetViewMode("skill-tree")}
+          title="Skill Tree - see what's ready to work on"
+        >
+          <Network size={13} />
+          <span className="toolbar__label">Skill Tree</span>
         </button>
       </div>
       <input
