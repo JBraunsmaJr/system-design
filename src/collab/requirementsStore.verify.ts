@@ -164,22 +164,94 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: RequirementsStore } {
   assert(peerB.store.getSnapshot().relationships.length === 2, "both peers converge to the same two relationships");
 }
 
-// === Part 3: the KNOWN, deliberately-unsolved limitation - empirically demonstrated, not just theorized ===
+// === Part 3: the id-collision FIX - both items survive with distinct ids, zero data loss ===
 {
   const peerA = seedYjsStore();
   const peerB = forkPeer(peerA.doc);
 
   // Both peers, disconnected, create an item of the SAME type. Neither
-  // has seen the other's change - both compute the same candidate id.
+  // has seen the other's change - both still compute the same candidate
+  // display id (this part is fundamentally unavoidable for genuinely
+  // disconnected peers - see addItem's doc comment). Each also sets a
+  // distinct title on their own item, specifically so a real data-loss
+  // regression here wouldn't accidentally pass by leaving both items
+  // empty.
   const idFromA = peerA.store.addItem("requirement");
+  peerA.store.updateItem(idFromA, { title: "Written by peer A" });
   const idFromB = peerB.store.addItem("requirement");
+  peerB.store.updateItem(idFromB, { title: "Written by peer B" });
 
-  assert(idFromA === idFromB, `CONFIRMED, not just theorized: two disconnected peers creating an item of the same type independently generate the IDENTICAL id ("${idFromA}") - this is the actual mechanism behind the known id-collision limitation documented in yjsRequirementsStore.ts`);
+  assert(idFromA === idFromB, `both disconnected peers still independently compute the same candidate display id ("${idFromA}") - this part of the scenario is unavoidable and unchanged; what matters is what happens next`);
 
   sync(peerA.doc, peerB.doc);
 
-  const itemsA = peerA.store.getSnapshot().items.filter((i) => i.id === idFromA);
-  assert(itemsA.length === 2, `CONFIRMED: after sync, the collided id "${idFromA}" appears TWICE in the item list, both showing identical content - NOT one item silently vanishing as might be assumed, but a duplicate row. The underlying data itself doesn't get lost (Yjs's Y.Map merges the two peers' item data to one winner for that key), but the separate order-array entry each peer independently pushed survives from BOTH peers - Y.Array is a sequence type, so two pushes of the same string value are two distinct elements, not deduplicated. Confirmed by direct inspection before writing this assertion, not assumed.`);
+  const itemsA = peerA.store.getSnapshot().items;
+  const itemsB = peerB.store.getSnapshot().items;
+  const titlesA = itemsA.map((i) => i.title).sort();
+
+  assert(itemsA.length === 2, "BOTH items survive after sync - not one silently discarded, not a duplicate row showing one item's content twice");
+  assert(JSON.stringify(titlesA) === JSON.stringify(["Written by peer A", "Written by peer B"]), "BOTH peers' actual data (their distinct titles) survived intact - the fix separates the collision-prone display id from the collision-proof internal storage key each item actually lives under");
+  assert(new Set(itemsA.map((i) => i.id)).size === 2, "the two surviving items now have DIFFERENT display ids - the collision was automatically, deterministically repaired rather than left in place");
+  assert(
+    JSON.stringify(itemsA.map((i) => ({ id: i.id, title: i.title })).sort((a, b) => a.id.localeCompare(b.id))) ===
+      JSON.stringify(itemsB.map((i) => ({ id: i.id, title: i.title })).sort((a, b) => a.id.localeCompare(b.id))),
+    "both peers converge to the IDENTICAL final state (same two items, same ids, same titles) - the repair is deterministic, not a coin flip that could differ between peers"
+  );
+}
+
+// === Part 4: THREE-way collision - verifies the repair generalizes beyond just two colliding peers ===
+{
+  const peerA = seedYjsStore();
+  const peerB = forkPeer(peerA.doc);
+  const peerC = forkPeer(peerA.doc);
+
+  const idFromA = peerA.store.addItem("requirement");
+  peerA.store.updateItem(idFromA, { title: "A" });
+  const idFromB = peerB.store.addItem("requirement");
+  peerB.store.updateItem(idFromB, { title: "B" });
+  const idFromC = peerC.store.addItem("requirement");
+  peerC.store.updateItem(idFromC, { title: "C" });
+
+  assert(idFromA === idFromB && idFromB === idFromC, "all three disconnected peers independently compute the same candidate display id");
+
+  // Sync all three pairwise, twice, so every peer's updates propagate to
+  // every other peer regardless of merge order.
+  sync(peerA.doc, peerB.doc);
+  sync(peerB.doc, peerC.doc);
+  sync(peerA.doc, peerC.doc);
+  sync(peerA.doc, peerB.doc);
+
+  const itemsA = peerA.store.getSnapshot().items;
+  const itemsC = peerC.store.getSnapshot().items;
+  assert(itemsA.length === 3, "all THREE concurrently-created items survive a three-way collision, not just two");
+  assert(new Set(itemsA.map((i) => i.id)).size === 3, "all three end up with distinct display ids after repair");
+  assert(JSON.stringify(itemsA.map((i) => i.title).sort()) === JSON.stringify(["A", "B", "C"]), "all three peers' distinct titles survived - no data loss even with three-way contention");
+  assert(
+    JSON.stringify(itemsA.map((i) => ({ id: i.id, title: i.title })).sort((a, b) => a.id.localeCompare(b.id))) ===
+      JSON.stringify(itemsC.map((i) => ({ id: i.id, title: i.title })).sort((a, b) => a.id.localeCompare(b.id))),
+    "peer A and peer C (the two that never synced directly with each other) still converge to the identical final state"
+  );
+}
+
+// === Part 5: deleteCustomType's relationship cascade - storage keys vs display ids ===
+// A real bug this fix surfaced: once items are keyed internally by
+// storage key (not display id), a cascade that collects storage keys but
+// then compares them against relationships' fromItemId/toItemId (which
+// are always display ids) would silently never match anything.
+{
+  const store = createYjsRequirementsStore(new Y.Doc());
+  const addTypeOk = store.addCustomType("Widget", "WID", "#5b7cfa", true);
+  assert(addTypeOk, "custom type created successfully as test setup");
+  const idA = store.addItem("custom-1");
+  const idB = store.addItem("requirement");
+  const relError = store.addRelationship("blocks", idA, idB);
+  assert(relError === null, "relationship created successfully as test setup");
+
+  store.deleteCustomType("custom-1");
+
+  const snap = store.getSnapshot();
+  assert(snap.items.every((i) => i.id !== idA), "the custom type's item is actually removed");
+  assert(snap.relationships.length === 0, "the relationship referencing the deleted item's display id is correctly cleaned up - this is the case that would have silently failed if storage keys and display ids were conflated");
 }
 
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);
