@@ -15,6 +15,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { Toolbar } from "./components/Toolbar";
+import { CollabPanel } from "./components/CollabPanel";
 import { Palette } from "./components/Palette";
 import { Canvas } from "./components/Canvas";
 import { Inspector } from "./components/Inspector";
@@ -50,9 +51,17 @@ import {
 import type { ProgramIncrement } from "./domain/programIncrements";
 import type { TeamDocument } from "./domain/teamTypes";
 import { EMPTY_TEAM_DOCUMENT } from "./domain/teamTypes";
-import { createAdapterTeamStore } from "./collab/teamStore";
+import * as Y from "yjs";
+import { createAdapterTeamStore, seedTeamStore } from "./collab/teamStore";
+import { createYjsTeamStore } from "./collab/yjsTeamStore";
+import type { TeamStore } from "./collab/teamStore";
 import { createAdapterRequirementsStore } from "./collab/requirementsStore";
+import { createYjsRequirementsStore, seedYjsRequirementsDoc } from "./collab/yjsRequirementsStore";
+import type { RequirementsStore } from "./collab/requirementsStore";
 import { createAdapterProgramIncrementsStore } from "./collab/programIncrementsStore";
+import { createYjsProgramIncrementsStore, seedYjsProgramIncrementsDoc } from "./collab/yjsProgramIncrementsStore";
+import type { ProgramIncrementsStore } from "./collab/programIncrementsStore";
+import { startCollabSession, type CollabSession } from "./collab/session";
 import "./App.css";
 
 let idSeed = 0;
@@ -176,7 +185,7 @@ function App() {
       setDiagram((prev) => ({ ...prev, requirements: updater(prev.requirements) })),
     [setDiagram]
   );
-  const requirementsStore = useMemo(
+  const localRequirementsStore = useMemo(
     () => createAdapterRequirementsStore(() => requirements, setRequirements),
     [requirements, setRequirements]
   );
@@ -186,7 +195,7 @@ function App() {
       setDiagram((prev) => ({ ...prev, programIncrements: updater(prev.programIncrements) })),
     [setDiagram]
   );
-  const programIncrementsStore = useMemo(
+  const localProgramIncrementsStore = useMemo(
     () => createAdapterProgramIncrementsStore(() => programIncrements, setProgramIncrements),
     [programIncrements, setProgramIncrements]
   );
@@ -196,7 +205,117 @@ function App() {
       setDiagram((prev) => ({ ...prev, team: updater(prev.team) })),
     [setDiagram]
   );
-  const teamStore = useMemo(() => createAdapterTeamStore(() => team, setTeam), [team, setTeam]);
+  const localTeamStore = useMemo(() => createAdapterTeamStore(() => team, setTeam), [team, setTeam]);
+
+  // --- Collaborative sessions -----------------------------------------------
+  //
+  // A session only ever covers team, requirements, and program increments -
+  // the diagram (nodes/edges) has its own proven Yjs schema but no UI wiring
+  // onto it yet, so it deliberately stays local-only regardless of whether a
+  // session is active. Starting one doesn't touch the diagram at all.
+  //
+  // Undo/redo is a known, deliberate limitation while a session is active:
+  // team/requirements/programIncrements stop flowing through setTeam/
+  // setRequirements/setProgramIncrements for the duration (those calls are
+  // what feeds the undo-tracked `diagram` snapshot), so the app's own
+  // undo stack is simply frozen with respect to collaborative edits until
+  // the session ends - pressing undo won't touch anything a collaborator
+  // (or you) just changed, but it also can't corrupt anything, since
+  // nothing collaborative is being fed into that history at all. A real
+  // per-edit undo during an active session would mean adopting Yjs's own
+  // UndoManager, which the original collaboration plan already called out
+  // as a separate, later decision - not attempted here.
+  interface ActiveCollabSession {
+    doc: Y.Doc;
+    session: CollabSession;
+    roomName: string;
+    teamStore: TeamStore;
+    requirementsStore: RequirementsStore;
+    programIncrementsStore: ProgramIncrementsStore;
+  }
+  const [activeSession, setActiveSession] = useState<ActiveCollabSession | null>(null);
+
+  const signalingUrls = useMemo(() => {
+    const raw = import.meta.env.VITE_SIGNALING_URL as string | undefined;
+    return raw ? raw.split(",").map((u) => u.trim()).filter(Boolean) : [];
+  }, []);
+
+  // Starts a brand-new session, seeding it with whatever's already here so
+  // nothing is lost - the new session's initial state IS the current local
+  // state, not an empty workbook.
+  const startNewSession = useCallback(
+    () => {
+      const roomName = `session-${Math.random().toString(36).slice(2, 10)}`;
+      const doc = new Y.Doc();
+      seedYjsRequirementsDoc(doc, requirements);
+      seedYjsProgramIncrementsDoc(doc, programIncrements);
+      const teamStore = createYjsTeamStore(doc);
+      seedTeamStore(teamStore, team);
+      const requirementsStoreForSession = createYjsRequirementsStore(doc);
+      const programIncrementsStoreForSession = createYjsProgramIncrementsStore(doc);
+      const session = startCollabSession(doc, roomName, { signalingUrls });
+      setActiveSession({
+        doc,
+        session,
+        roomName,
+        teamStore,
+        requirementsStore: requirementsStoreForSession,
+        programIncrementsStore: programIncrementsStoreForSession,
+      });
+    },
+    [requirements, programIncrements, team, signalingUrls]
+  );
+
+  // Joins an existing session by room name - starts from an EMPTY doc
+  // rather than seeding local state, since the whole point of joining is
+  // to receive whatever the session already has from other peers, not to
+  // impose this browser's own local state onto it.
+  const joinSession = useCallback(
+    (roomName: string) => {
+      const doc = new Y.Doc();
+      const teamStore = createYjsTeamStore(doc);
+      const requirementsStoreForSession = createYjsRequirementsStore(doc);
+      const programIncrementsStoreForSession = createYjsProgramIncrementsStore(doc);
+      const session = startCollabSession(doc, roomName, { signalingUrls });
+      setActiveSession({
+        doc,
+        session,
+        roomName,
+        teamStore,
+        requirementsStore: requirementsStoreForSession,
+        programIncrementsStore: programIncrementsStoreForSession,
+      });
+    },
+    [signalingUrls]
+  );
+
+  // Leaving a session writes its final state back into the local,
+  // undo-tracked snapshot before disconnecting - so whatever happened
+  // during the session (your own edits, or anything synced in from
+  // collaborators) is preserved going forward, not silently discarded the
+  // moment the connection ends.
+  const leaveSession = useCallback(() => {
+    if (!activeSession) return;
+    setTeam(() => activeSession.teamStore.getSnapshot());
+    setRequirements(() => activeSession.requirementsStore.getSnapshot());
+    setProgramIncrements(() => activeSession.programIncrementsStore.getSnapshot());
+    activeSession.session.disconnect();
+    setActiveSession(null);
+  }, [activeSession, setTeam, setRequirements, setProgramIncrements]);
+
+  useEffect(() => {
+    return () => {
+      activeSession?.session.disconnect();
+    };
+    // Only ever runs on unmount - intentionally not re-running when
+    // activeSession itself changes, since that would disconnect and
+    // immediately reconnect on every session state update.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const teamStore = activeSession?.teamStore ?? localTeamStore;
+  const requirementsStore = activeSession?.requirementsStore ?? localRequirementsStore;
+  const programIncrementsStore = activeSession?.programIncrementsStore ?? localProgramIncrementsStore;
 
   // Auto-saves the current diagram to localStorage so a refresh, an
   // accidental tab close, or a crash doesn't lose work - separate from
@@ -1080,6 +1199,15 @@ function App() {
           onExportRequirementsMarkdown={onExportRequirementsMarkdown}
           canExportRequirements={requirements.items.length > 0}
           hasAutosaved={hasAutosaved}
+        />
+      )}
+      {!isPresenting && (
+        <CollabPanel
+          signalingConfigured={signalingUrls.length > 0}
+          activeSession={activeSession ? { roomName: activeSession.roomName, isSynced: () => activeSession.session.isSynced() } : null}
+          onStartSession={startNewSession}
+          onJoinSession={joinSession}
+          onLeaveSession={leaveSession}
         />
       )}
       <input
