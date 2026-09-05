@@ -1,4 +1,4 @@
-import type { RequirementCategory, RequirementItemType, RequirementsDocument, RelationshipType, RequirementRelationship, RequirementItem, RequirementStatus } from "./requirementsTypes";
+import type { RequirementCategory, RequirementItemType, RequirementsDocument, RelationshipType, RequirementRelationship, RequirementItem, RequirementStatus } from "./requirementsTypes.ts";
 
 /** "Ticket" is the only built-in type that represents actual work -
  * everything else here documents intent (a client requirement, a goal, a

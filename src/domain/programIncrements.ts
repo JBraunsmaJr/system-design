@@ -1,3 +1,18 @@
+export type CapacityReservationUnit = "percentage" | "points";
+
+export interface CapacityReservation {
+  id: string;
+  name: string;
+  unit: CapacityReservationUnit;
+  /** Value of the reservation (e.g. 20 for 20%, or 5 for 5 points) */
+  value: number;
+  /** If undefined, null, or empty string, this applies to ALL sprints in the PI.
+   * If set to a specific sprintId, applies ONLY to that sprint. */
+  sprintId?: string;
+  category?: "risk" | "bugs" | "techdebt" | "meetings" | "other" | string;
+  note?: string;
+}
+
 export interface Sprint {
   id: string;
   name: string;
@@ -22,6 +37,9 @@ export interface ProgramIncrement {
    * with a standalone test suite before writing this file. */
   startDate: string;
   sprints: Sprint[];
+  /** Optional capacity reservations (risk buffer, tech debt, bugs, meetings, etc.)
+   * defined for this PI. Can apply PI-wide to all sprints, or to specific sprints. */
+  reservations?: CapacityReservation[];
 }
 
 export interface SprintDateRange {
@@ -87,6 +105,18 @@ export function updateSprintEndDate(pi: ProgramIncrement, sprintId: string, newE
   const newDuration = daysBetweenInclusive(currentRange.startDate, newEndDate);
   if (newDuration < 1) return pi;
   return { ...pi, sprints: pi.sprints.map((s) => (s.id === sprintId ? { ...s, durationDays: newDuration } : s)) };
+}
+
+/**
+ * Filters all capacity reservations applicable to a specific sprint in a PI.
+ * Returns reservations that are PI-wide (no sprintId specified) or specifically assigned to this sprintId.
+ */
+export function getSprintActiveReservations(
+  reservations: CapacityReservation[] | undefined,
+  sprintId: string
+): CapacityReservation[] {
+  if (!reservations || !Array.isArray(reservations)) return [];
+  return reservations.filter((r) => !r.sprintId || r.sprintId.trim() === "" || r.sprintId === sprintId);
 }
 
 /** Updates the PI's own overall start date - shifts every sprint's

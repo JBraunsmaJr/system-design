@@ -8,6 +8,7 @@ import {
   Palmtree,
   Settings,
   ShieldCheck,
+  ShieldAlert,
   ChevronDown,
   ChevronUp,
   CalendarRange,
@@ -22,17 +23,19 @@ import type {
 import type { ProgramIncrement } from "../../domain/programIncrements";
 import type { RequirementsDocument } from "../../domain/requirementsTypes";
 import { isItemWorkable } from "../../domain/requirementsRegistry";
-import { computeSprintDateRanges } from "../../domain/programIncrements";
+import { computeSprintDateRanges, getSprintActiveReservations } from "../../domain/programIncrements";
 import {
   computeSprintCapacity,
   calculateTotalPtoDays,
   getUsFederalHolidays,
 } from "../../domain/teamCapacity";
+import { ManageReservationsModal } from "../timeline/ManageReservationsModal";
 
 interface TeamViewProps {
   team: TeamDocument;
   onUpdateTeam: (updater: (prev: TeamDocument) => TeamDocument) => void;
   programIncrements: ProgramIncrement[];
+  onUpdateProgramIncrements?: (updater: (prev: ProgramIncrement[]) => ProgramIncrement[]) => void;
   requirements: RequirementsDocument;
 }
 
@@ -58,13 +61,14 @@ function todayISO(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function TeamView({ team, onUpdateTeam, programIncrements, requirements }: TeamViewProps) {
+export function TeamView({ team, onUpdateTeam, programIncrements, onUpdateProgramIncrements, requirements }: TeamViewProps) {
   const [activeTab, setActiveTab] = useState<"members" | "settings" | "sprints">("members");
   const [isAddingMember, setIsAddingMember] = useState(false);
   const [newMemberName, setNewMemberName] = useState("");
   const [newMemberRole, setNewMemberRole] = useState("");
   const [newMemberColor, setNewMemberColor] = useState(AVATAR_COLORS[0]);
   const [newMemberPointsPerDay, setNewMemberPointsPerDay] = useState<string>("");
+  const [managingReservationsPI, setManagingReservationsPI] = useState<ProgramIncrement | null>(null);
 
   // PTO modal state
   const [ptoModalMemberId, setPtoModalMemberId] = useState<string | null>(null);
@@ -239,11 +243,13 @@ export function TeamView({ team, onUpdateTeam, programIncrements, requirements }
       const rangeMap = new Map(ranges.map((r) => [r.sprintId, r]));
       for (const sprint of pi.sprints) {
         const range = rangeMap.get(sprint.id);
+        const sprintReservations = getSprintActiveReservations(pi.reservations, sprint.id);
         const summary = computeSprintCapacity(
           sprint,
           range,
           team,
-          requirements.items.filter((i) => isItemWorkable(requirements, i))
+          requirements.items.filter((i) => isItemWorkable(requirements, i)),
+          sprintReservations
         );
         list.push({ pi, summary });
       }
@@ -598,9 +604,11 @@ export function TeamView({ team, onUpdateTeam, programIncrements, requirements }
                     <tr>
                       <th>Sprint & Timeline</th>
                       <th>Business Days</th>
-                      <th>Total Capacity</th>
+                      <th>Gross Capacity</th>
+                      <th>Reserved</th>
+                      <th>Net Available</th>
                       <th>Assigned Points</th>
-                      <th>Available Points</th>
+                      <th>Remaining</th>
                       <th>Utilization</th>
                       {team.members.map((m) => (
                         <th key={m.id} className="sprint-matrix-table__member-col">
@@ -623,13 +631,26 @@ export function TeamView({ team, onUpdateTeam, programIncrements, requirements }
                         summary.totalCapacityPoints > 0
                           ? Math.round((summary.totalAssignedPoints / summary.totalCapacityPoints) * 100)
                           : 0;
-                      const isOver = summary.totalAssignedPoints > summary.totalCapacityPoints;
+                      const isOver = summary.totalAssignedPoints > summary.totalCapacityPoints && summary.totalCapacityPoints > 0;
 
                       return (
                         <tr key={summary.sprintId}>
                           <td>
                             <div className="sprint-matrix-cell__sprint-info">
-                              <span className="sprint-matrix-cell__pi-badge">{pi.name}</span>
+                              <div className="sprint-matrix-cell__pi-row">
+                                <span className="sprint-matrix-cell__pi-badge">{pi.name}</span>
+                                {onUpdateProgramIncrements && (
+                                  <button
+                                    type="button"
+                                    className="sprint-matrix-cell__manage-res-btn"
+                                    onClick={() => setManagingReservationsPI(pi)}
+                                    title={`Manage Capacity Reservations for ${pi.name}`}
+                                  >
+                                    <ShieldAlert size={10} />
+                                    <span>{pi.reservations?.length ? `${pi.reservations.length} res` : "Reserve"}</span>
+                                  </button>
+                                )}
+                              </div>
                               <strong className="sprint-matrix-cell__sprint-name">{summary.sprintName}</strong>
                               <span className="sprint-matrix-cell__dates">
                                 {summary.startDate} → {summary.endDate}
@@ -638,6 +659,28 @@ export function TeamView({ team, onUpdateTeam, programIncrements, requirements }
                           </td>
                           <td>
                             <strong>{summary.sprintBusinessDays}</strong> b-days
+                          </td>
+                          <td>
+                            <strong>{summary.grossCapacityPoints}</strong> pts
+                          </td>
+                          <td>
+                            {summary.totalReservedPoints > 0 ? (
+                              <div
+                                className="sprint-matrix-cell__reserved-box"
+                                title={summary.appliedReservations
+                                  .map((r) => `${r.name}: ${r.value}${r.unit === "percentage" ? "%" : " pts"}`)
+                                  .join(", ")}
+                              >
+                                <span className="sprint-matrix-cell__reserved-pill">
+                                  <ShieldAlert size={10} /> -{summary.totalReservedPoints} pts
+                                </span>
+                                <span className="sprint-matrix-cell__reserved-count">
+                                  {summary.appliedReservations.length} active
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="sprint-matrix-cell__dim-dash">—</span>
+                            )}
                           </td>
                           <td>
                             <strong>{summary.totalCapacityPoints}</strong> pts
@@ -708,6 +751,14 @@ export function TeamView({ team, onUpdateTeam, programIncrements, requirements }
                                     {mb.ptoDays > 0 && (
                                       <span className="member-capacity-cell__pto">
                                         <Palmtree size={10} /> {mb.ptoDays}d PTO
+                                      </span>
+                                    )}
+                                    {mb.reservedPoints > 0 && (
+                                      <span
+                                        className="member-capacity-cell__res"
+                                        title={`Gross: ${mb.grossCapacityPoints} pts, Reserved: ${mb.reservedPoints} pts`}
+                                      >
+                                        -{mb.reservedPoints} res
                                       </span>
                                     )}
                                   </div>
@@ -1041,6 +1092,21 @@ export function TeamView({ team, onUpdateTeam, programIncrements, requirements }
             </form>
           </div>
         </div>
+      )}
+      {/* CAPACITY RESERVATIONS MODAL */}
+      {managingReservationsPI && onUpdateProgramIncrements && (
+        <ManageReservationsModal
+          pi={managingReservationsPI}
+          team={team}
+          requirements={requirements}
+          onUpdatePI={(updatedPI) => {
+            onUpdateProgramIncrements((pis) =>
+              pis.map((p) => (p.id === updatedPI.id ? updatedPI : p))
+            );
+            setManagingReservationsPI(updatedPI);
+          }}
+          onClose={() => setManagingReservationsPI(null)}
+        />
       )}
     </div>
   );

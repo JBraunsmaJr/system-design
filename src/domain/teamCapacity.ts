@@ -5,9 +5,10 @@ import type {
   ExtraDayOff,
   MemberSprintCapacity,
   SprintCapacitySummary,
-} from "./teamTypes";
-import type { Sprint, ProgramIncrement } from "./programIncrements";
-import type { RequirementItem } from "./requirementsTypes";
+} from "./teamTypes.ts";
+import type { Sprint, ProgramIncrement, CapacityReservation } from "./programIncrements.ts";
+import { getSprintActiveReservations } from "./programIncrements.ts";
+import type { RequirementItem } from "./requirementsTypes.ts";
 
 export interface HolidayInfo {
   date: string; // YYYY-MM-DD
@@ -179,13 +180,15 @@ export function getMemberPtoDeductionForDay(ptoSpans: PtoSpan[], currentDays: nu
 }
 
 /**
- * Calculates capacity breakdown for each team member and the sprint as a whole.
+ * Calculates capacity breakdown for each team member and the sprint as a whole,
+ * taking into account holidays, PTO, and active capacity reservations (percentage or points).
  */
 export function computeSprintCapacity(
   sprint: Sprint,
   sprintRange: { startDate: string; endDate: string } | undefined,
   team: TeamDocument,
-  items: RequirementItem[]
+  items: RequirementItem[],
+  reservations?: CapacityReservation[]
 ): SprintCapacitySummary {
   if (!sprintRange) {
     return {
@@ -193,10 +196,13 @@ export function computeSprintCapacity(
       sprintName: sprint.name,
       durationDays: sprint.durationDays,
       sprintBusinessDays: 0,
+      grossCapacityPoints: 0,
+      totalReservedPoints: 0,
       totalCapacityPoints: 0,
       totalAssignedPoints: 0,
       unassignedPoints: 0,
       remainingCapacityPoints: 0,
+      appliedReservations: reservations ? [...reservations] : [],
       memberBreakdown: [],
     };
   }
@@ -262,11 +268,8 @@ export function computeSprintCapacity(
     }
   }
 
-  const memberBreakdown: MemberSprintCapacity[] = [];
-  let totalCapacityPoints = 0;
-  let totalAssignedPoints = 0;
-
-  for (const member of team.members) {
+  // Pre-calculate working days and gross capacity for each member
+  const memberGrossCapacities = team.members.map((member) => {
     const pointsPerDay =
       typeof member.defaultPointsPerDay === "number"
         ? member.defaultPointsPerDay
@@ -287,12 +290,58 @@ export function computeSprintCapacity(
       memberWorkingDays += working;
     }
 
-    const capacityPoints = Math.round(memberWorkingDays * pointsPerDay * 10) / 10;
+    const grossCapacityPoints = Math.round(memberWorkingDays * pointsPerDay * 10) / 10;
+    return {
+      member,
+      pointsPerDay,
+      memberWorkingDays: Math.round(memberWorkingDays * 10) / 10,
+      memberPtoDays: Math.round(memberPtoDays * 10) / 10,
+      grossCapacityPoints,
+    };
+  });
+
+  const totalGrossCapacity = memberGrossCapacities.reduce((acc, m) => acc + m.grossCapacityPoints, 0);
+
+  // Filter valid active reservations for this sprint
+  const activeReservations = (reservations ?? []).filter(
+    (r) => typeof r.value === "number" && !isNaN(r.value) && r.value > 0
+  );
+
+  const totalPercentageReserved = activeReservations
+    .filter((r) => r.unit === "percentage")
+    .reduce((sum, r) => sum + r.value, 0);
+
+  const totalFixedPointsReserved = activeReservations
+    .filter((r) => r.unit === "points")
+    .reduce((sum, r) => sum + r.value, 0);
+
+  const memberBreakdown: MemberSprintCapacity[] = [];
+  let totalAssignedPoints = 0;
+
+  for (const info of memberGrossCapacities) {
+    const { member, pointsPerDay, memberWorkingDays, memberPtoDays, grossCapacityPoints } = info;
+
+    // Calculate percentage-based reservation deduction
+    const percentDeduction = grossCapacityPoints * (totalPercentageReserved / 100);
+
+    // Calculate fixed points reservation deduction (allocated proportionally by member's gross capacity)
+    const fixedPointsDeduction =
+      totalGrossCapacity > 0
+        ? totalFixedPointsReserved * (grossCapacityPoints / totalGrossCapacity)
+        : 0;
+
+    // Use ceil to ensure reserved capacity points are whole numbers and provide a safe buffer
+    const rawReservationDeduction = Math.round((percentDeduction + fixedPointsDeduction) * 1e6) / 1e6;
+    const reservedPoints = Math.min(
+      grossCapacityPoints,
+      Math.ceil(rawReservationDeduction)
+    );
+
+    const capacityPoints = Math.max(0, Math.round((grossCapacityPoints - reservedPoints) * 10) / 10);
     const assignedPts = memberAssignedPoints.get(member.id) ?? 0;
     const assignedCount = memberAssignedCount.get(member.id) ?? 0;
     const remainingPts = Math.round((capacityPoints - assignedPts) * 10) / 10;
 
-    totalCapacityPoints += capacityPoints;
     totalAssignedPoints += assignedPts;
 
     memberBreakdown.push({
@@ -302,8 +351,10 @@ export function computeSprintCapacity(
       avatarColor: member.avatarColor,
       pointsPerDay,
       sprintBusinessDays,
-      ptoDays: Math.round(memberPtoDays * 10) / 10,
-      workingDays: Math.round(memberWorkingDays * 10) / 10,
+      ptoDays: memberPtoDays,
+      workingDays: memberWorkingDays,
+      grossCapacityPoints,
+      reservedPoints,
       capacityPoints,
       assignedPoints: assignedPts,
       remainingPoints: remainingPts,
@@ -313,7 +364,12 @@ export function computeSprintCapacity(
 
   // Include unassigned points in totalAssignedPoints
   totalAssignedPoints += unassignedPoints;
-  totalCapacityPoints = Math.round(totalCapacityPoints * 10) / 10;
+  const totalGrossCapacityPoints = Math.round(totalGrossCapacity * 10) / 10;
+  const totalReservedPoints = Math.min(
+    totalGrossCapacityPoints,
+    Math.round(memberBreakdown.reduce((sum, m) => sum + m.reservedPoints, 0) * 10) / 10
+  );
+  const totalCapacityPoints = Math.max(0, Math.round((totalGrossCapacityPoints - totalReservedPoints) * 10) / 10);
   totalAssignedPoints = Math.round(totalAssignedPoints * 10) / 10;
   const remainingCapacityPoints = Math.round((totalCapacityPoints - totalAssignedPoints) * 10) / 10;
 
@@ -324,10 +380,13 @@ export function computeSprintCapacity(
     endDate: sprintRange.endDate,
     durationDays: sprint.durationDays,
     sprintBusinessDays: Math.round(sprintBusinessDays * 10) / 10,
+    grossCapacityPoints: totalGrossCapacityPoints,
+    totalReservedPoints,
     totalCapacityPoints,
     totalAssignedPoints,
     unassignedPoints,
     remainingCapacityPoints,
+    appliedReservations: activeReservations,
     memberBreakdown,
   };
 }
@@ -342,9 +401,10 @@ export function computePICapacities(
   items: RequirementItem[]
 ): SprintCapacitySummary[] {
   const rangeMap = new Map(sprintRanges.map((r) => [r.sprintId, r]));
-  return pi.sprints.map((sprint) =>
-    computeSprintCapacity(sprint, rangeMap.get(sprint.id), team, items)
-  );
+  return pi.sprints.map((sprint) => {
+    const sprintReservations = getSprintActiveReservations(pi.reservations, sprint.id);
+    return computeSprintCapacity(sprint, rangeMap.get(sprint.id), team, items, sprintReservations);
+  });
 }
 
 /**

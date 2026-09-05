@@ -1207,6 +1207,7 @@ function App() {
             team={team}
             onUpdateTeam={setTeam}
             programIncrements={programIncrements}
+            onUpdateProgramIncrements={setProgramIncrements}
             requirements={requirements}
           />
         )}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Users, ChevronDown, ChevronUp, AlertTriangle, CheckCircle2, Calendar } from "lucide-react";
+import { Users, ChevronDown, ChevronUp, AlertTriangle, CheckCircle2, Calendar, ShieldAlert } from "lucide-react";
 import type { SprintCapacitySummary } from "../../domain/teamTypes";
 import { computeFlippedPosition } from "../../domain/popoverPosition";
 
@@ -33,11 +33,14 @@ export function SprintCapacityBar({ summary, compact = false }: SprintCapacityBa
   const breakdownRef = useRef<HTMLDivElement>(null);
 
   const {
+    grossCapacityPoints = summary.totalCapacityPoints,
+    totalReservedPoints = 0,
     totalCapacityPoints,
     totalAssignedPoints,
     unassignedPoints,
     remainingCapacityPoints,
     sprintBusinessDays,
+    appliedReservations = [],
     memberBreakdown,
   } = summary;
 
@@ -152,6 +155,11 @@ export function SprintCapacityBar({ summary, compact = false }: SprintCapacityBa
             </span>
             <span className="sprint-capacity-bar__points">
               <strong>{totalAssignedPoints}</strong> / {totalCapacityPoints} pts
+              {totalReservedPoints > 0 && (
+                <span className="sprint-capacity-bar__reserved-pill" title={`Gross: ${grossCapacityPoints} pts, Reserved: ${totalReservedPoints} pts`}>
+                  <ShieldAlert size={10} /> -{totalReservedPoints} res
+                </span>
+              )}
             </span>
           </div>
 
@@ -199,7 +207,29 @@ export function SprintCapacityBar({ summary, compact = false }: SprintCapacityBa
             className="sprint-capacity-bar__breakdown"
             style={{ position: "fixed", top: breakdownPos.top, left: breakdownPos.left, width: breakdownPos.width }}
           >
-            <div className="sprint-capacity-bar__breakdown-title">Member Capacity Breakdown</div>
+            <div className="sprint-capacity-bar__breakdown-title">Sprint Capacity Breakdown</div>
+
+            {totalReservedPoints > 0 && (
+              <div className="sprint-capacity-bar__reservations-summary">
+                <div className="sprint-capacity-bar__reservations-header">
+                  <span className="sprint-capacity-bar__reservations-title">
+                    <ShieldAlert size={11} /> Active Reservations (-{totalReservedPoints} pts)
+                  </span>
+                  <span className="sprint-capacity-bar__reservations-math">
+                    {grossCapacityPoints} gross → {totalCapacityPoints} net
+                  </span>
+                </div>
+                <div className="sprint-capacity-bar__reservations-tags">
+                  {appliedReservations.map((r) => (
+                    <span key={r.id} className="sprint-capacity-bar__res-tag">
+                      {r.name}: {r.value}
+                      {r.unit === "percentage" ? "%" : " pts"}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {memberBreakdown.length === 0 ? (
               <div className="sprint-capacity-bar__breakdown-empty">
                 No team members configured yet. Visit the Team tab to add members.
@@ -223,6 +253,7 @@ export function SprintCapacityBar({ summary, compact = false }: SprintCapacityBa
                             <span className="sprint-capacity-bar__member-name">{m.memberName}</span>
                             <span className="sprint-capacity-bar__member-sub">
                               {m.workingDays}d work {m.ptoDays > 0 ? `(${m.ptoDays}d PTO)` : ""}
+                              {m.reservedPoints > 0 && ` • -${m.reservedPoints} res`}
                             </span>
                           </div>
                         </div>

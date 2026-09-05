@@ -1,3 +1,5 @@
+import type { CapacityReservation } from "./programIncrements";
+
 export type HalfDayType = "full" | "morning" | "afternoon";
 
 export interface PtoSpan {
@@ -65,7 +67,11 @@ export interface MemberSprintCapacity {
   ptoDays: number;
   /** Effective available working days in the sprint */
   workingDays: number;
-  /** Total available capacity points (workingDays * pointsPerDay) */
+  /** Gross capacity points before reserve capacity deductions (workingDays * pointsPerDay) */
+  grossCapacityPoints: number;
+  /** Reserved capacity points for this member */
+  reservedPoints: number;
+  /** Net available capacity points for assignment (grossCapacityPoints - reservedPoints) */
   capacityPoints: number;
   /** Points assigned to this member in this sprint */
   assignedPoints: number;
@@ -83,14 +89,20 @@ export interface SprintCapacitySummary {
   durationDays: number;
   /** Business days in the sprint (Mon-Fri minus US holidays and extra days off) */
   sprintBusinessDays: number;
-  /** Total team capacity in points across all members */
+  /** Total gross team capacity in points across all members before reservations */
+  grossCapacityPoints: number;
+  /** Total reserved capacity in points across all applied reservations */
+  totalReservedPoints: number;
+  /** Total net available team capacity in points across all members (gross - reserved) */
   totalCapacityPoints: number;
   /** Total assigned points across all items in the sprint (assigned + unassigned) */
   totalAssignedPoints: number;
   /** Total unassigned item points in this sprint */
   unassignedPoints: number;
-  /** Total available / remaining capacity for the team */
+  /** Total available / remaining capacity for the team (totalCapacityPoints - totalAssignedPoints) */
   remainingCapacityPoints: number;
+  /** Active capacity reservations applied to this sprint */
+  appliedReservations: CapacityReservation[];
   /** Per-member capacity and assignment breakdown */
   memberBreakdown: MemberSprintCapacity[];
 }

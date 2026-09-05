@@ -1,11 +1,11 @@
 import type { Node, Edge } from "@xyflow/react";
-import type { ArchNodeData, ArchEdgeData, Scenario } from "./types";
-import type { RequirementsDocument } from "./requirementsTypes";
-import { EMPTY_REQUIREMENTS_DOCUMENT } from "./requirementsTypes";
-import { BUILT_IN_ITEM_TYPES, BUILT_IN_RELATIONSHIP_TYPES } from "./requirementsRegistry";
-import type { ProgramIncrement } from "./programIncrements";
-import type { TeamDocument } from "./teamTypes";
-import { EMPTY_TEAM_DOCUMENT, DEFAULT_TEAM_SETTINGS } from "./teamTypes";
+import type { ArchNodeData, ArchEdgeData, Scenario } from "./types.ts";
+import type { RequirementsDocument } from "./requirementsTypes.ts";
+import { EMPTY_REQUIREMENTS_DOCUMENT } from "./requirementsTypes.ts";
+import { BUILT_IN_ITEM_TYPES, BUILT_IN_RELATIONSHIP_TYPES } from "./requirementsRegistry.ts";
+import type { ProgramIncrement } from "./programIncrements.ts";
+import type { TeamDocument } from "./teamTypes.ts";
+import { EMPTY_TEAM_DOCUMENT, DEFAULT_TEAM_SETTINGS } from "./teamTypes.ts";
 
 export const SCHEMA_VERSION = "0.6";
 
@@ -114,7 +114,35 @@ function parseProgramIncrements(raw: unknown): ProgramIncrement[] {
       (s): s is ProgramIncrement["sprints"][number] =>
         !!s && typeof s === "object" && typeof s.id === "string" && typeof s.name === "string" && typeof s.durationDays === "number"
     );
-    result.push({ id: pi.id, name: pi.name, startDate: pi.startDate, sprints });
+    const reservations = Array.isArray(pi.reservations)
+      ? (pi.reservations as unknown[])
+          .filter(
+            (r): r is NonNullable<ProgramIncrement["reservations"]>[number] =>
+              !!r &&
+              typeof r === "object" &&
+              typeof (r as Record<string, unknown>).id === "string" &&
+              typeof (r as Record<string, unknown>).name === "string" &&
+              ((r as Record<string, unknown>).unit === "percentage" || (r as Record<string, unknown>).unit === "points") &&
+              typeof (r as Record<string, unknown>).value === "number"
+          )
+          .map((r) => ({
+            id: String(r.id),
+            name: String(r.name),
+            unit: r.unit,
+            value: Number(r.value),
+            sprintId: typeof r.sprintId === "string" && r.sprintId.trim() !== "" ? r.sprintId : undefined,
+            category: typeof r.category === "string" ? r.category : undefined,
+            note: typeof r.note === "string" ? r.note : undefined,
+          }))
+      : undefined;
+
+    result.push({
+      id: pi.id,
+      name: pi.name,
+      startDate: pi.startDate,
+      sprints,
+      ...(reservations && reservations.length > 0 ? { reservations } : {}),
+    });
   }
   return result;
 }

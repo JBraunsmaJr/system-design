@@ -1,11 +1,13 @@
 import { useMemo, useState, useRef } from "react";
-import { AlertTriangle, CalendarRange, ChevronDown, ChevronRight, ChevronUp, GanttChartSquare, Inbox, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, CalendarRange, ChevronDown, ChevronRight, ChevronUp, GanttChartSquare, Inbox, Plus, Trash2, ShieldAlert } from "lucide-react";
 import {
   computeSprintDateRanges,
+  getSprintActiveReservations,
   updatePIStartDate,
   updateSprintEndDate,
   type ProgramIncrement,
   type Sprint,
+  type CapacityReservation,
 } from "../../domain/programIncrements";
 import { addRelationship, getItemType, isItemWorkable } from "../../domain/requirementsRegistry";
 import { findScheduleConflicts, checkScheduleConflict, findBlockingItemIds, type ScheduleConflictSeverity } from "../../domain/scheduleConflicts";
@@ -13,13 +15,14 @@ import type { RequirementItem, RequirementsDocument } from "../../domain/require
 import type { TeamDocument } from "../../domain/teamTypes";
 import type { SubDiagram } from "../../domain/types";
 import type { DiagramPath } from "../../domain/subDiagramTree";
-import { computeSprintCapacity } from "../../domain/teamCapacity";
+import { computeSprintCapacity, computePICapacities } from "../../domain/teamCapacity";
 import { SprintCapacityBar } from "../team/SprintCapacityBar";
 import { MemberPicker } from "../team/MemberPicker";
 import { PointsPicker } from "../team/PointsPicker";
 import { RequirementDetailModal } from "./RequirementDetailModal";
 import { GanttChart } from "./GanttChart";
 import { SprintQuickAdd } from "./SprintQuickAdd";
+import { ManageReservationsModal } from "./ManageReservationsModal";
 
 interface TimelineViewProps {
   programIncrements: ProgramIncrement[];
@@ -390,6 +393,11 @@ export function TimelineView({
               onUpdateSprintEnd={(sprintId, endDate) => onUpdateSprintEnd(pi.id, sprintId, endDate)}
               onDeleteSprint={(sprintId) => onDeleteSprint(pi.id, sprintId)}
               onMoveSprint={(sprintId, direction) => onMoveSprint(pi.id, sprintId, direction)}
+              onUpdatePI={(updatedPI) =>
+                onUpdateProgramIncrements((pis) =>
+                  pis.map((p) => (p.id === updatedPI.id ? updatedPI : p))
+                )
+              }
             />
           ))
         )}
@@ -647,6 +655,7 @@ interface ProgramIncrementCardProps {
   onUpdateSprintEnd: (sprintId: string, endDate: string) => void;
   onDeleteSprint: (sprintId: string) => void;
   onMoveSprint: (sprintId: string, direction: "up" | "down") => void;
+  onUpdatePI: (updatedPI: ProgramIncrement) => void;
 }
 
 function ProgramIncrementCard({
@@ -672,16 +681,64 @@ function ProgramIncrementCard({
   onUpdateSprintEnd,
   onDeleteSprint,
   onMoveSprint,
+  onUpdatePI,
 }: ProgramIncrementCardProps) {
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [isSprintListCollapsed, setIsSprintListCollapsed] = useState(false);
+  const [isManagingReservations, setIsManagingReservations] = useState(false);
   const ranges = computeSprintDateRanges(pi);
   const rangeBySprintId = new Map(ranges.map((r) => [r.sprintId, r]));
+
+  const reservationsCount = pi.reservations?.length ?? 0;
+
+  const piCapacitySummaries = useMemo(() => {
+    if (!team) return [];
+    const workableItems = requirements.items.filter((i) => isItemWorkable(requirements, i));
+    return computePICapacities(pi, ranges, team, workableItems);
+  }, [pi, ranges, team, requirements]);
+
+  const piCapacityTotals = useMemo(() => {
+    if (!team || piCapacitySummaries.length === 0) return null;
+    let grossCapacity = 0;
+    let totalReserved = 0;
+    let totalCapacity = 0;
+    let totalAssigned = 0;
+    let totalRemaining = 0;
+
+    for (const s of piCapacitySummaries) {
+      grossCapacity += s.grossCapacityPoints;
+      totalReserved += s.totalReservedPoints;
+      totalCapacity += s.totalCapacityPoints;
+      totalAssigned += s.totalAssignedPoints;
+      totalRemaining += s.remainingCapacityPoints;
+    }
+
+    grossCapacity = Math.round(grossCapacity * 10) / 10;
+    totalReserved = Math.round(totalReserved * 10) / 10;
+    totalCapacity = Math.round(totalCapacity * 10) / 10;
+    totalAssigned = Math.round(totalAssigned * 10) / 10;
+    totalRemaining = Math.round(totalRemaining * 10) / 10;
+
+    const hasCapacity = totalCapacity > 0;
+    const percent = hasCapacity ? Math.round((totalAssigned / totalCapacity) * 100) : 0;
+    const isOverCapacity = totalAssigned > totalCapacity && hasCapacity;
+
+    return {
+      grossCapacityPoints: grossCapacity,
+      totalReservedPoints: totalReserved,
+      totalCapacityPoints: totalCapacity,
+      totalAssignedPoints: totalAssigned,
+      remainingCapacityPoints: totalRemaining,
+      percent,
+      isOverCapacity,
+      hasCapacity,
+    };
+  }, [team, piCapacitySummaries]);
 
   return (
     <section className="pi-card">
       <div className="pi-card__header">
-        <CalendarRange size={14} className="pi-card__icon" />
+        <CalendarRange size={16} className="pi-card__icon" />
         <input className="pi-card__name" value={pi.name} onChange={(e) => onUpdateName(e.target.value)} />
         <label className="pi-card__start-label">
           Starts
@@ -692,6 +749,77 @@ function ProgramIncrementCard({
             onChange={(e) => onUpdateStart(e.target.value)}
           />
         </label>
+
+        {team && piCapacityTotals && (
+          <div
+            className="pi-card__capacity-totals"
+            title={`PI Capacity: ${piCapacityTotals.totalAssignedPoints} used / ${piCapacityTotals.totalCapacityPoints} total available (${piCapacityTotals.totalReservedPoints} reserved, ${piCapacityTotals.grossCapacityPoints} gross)`}
+          >
+            <div className="pi-card__cap-pill pi-card__cap-pill--used" title={`Used Capacity: ${piCapacityTotals.totalAssignedPoints} points`}>
+              <span className="pi-card__cap-label">Used:</span>
+              <strong className="pi-card__cap-val">{piCapacityTotals.totalAssignedPoints}</strong>
+              <span className="pi-card__cap-unit">pts</span>
+            </div>
+
+            <div className="pi-card__cap-pill pi-card__cap-pill--total" title={`Total Available Capacity: ${piCapacityTotals.totalCapacityPoints} points (Gross: ${piCapacityTotals.grossCapacityPoints} pts)`}>
+              <span className="pi-card__cap-label">Total:</span>
+              <strong className="pi-card__cap-val">{piCapacityTotals.totalCapacityPoints}</strong>
+              <span className="pi-card__cap-unit">pts</span>
+            </div>
+
+            <div
+              className={`pi-card__cap-pill pi-card__cap-pill--reserved${piCapacityTotals.totalReservedPoints === 0 ? " is-zero" : ""}`}
+              title={
+                piCapacityTotals.totalReservedPoints > 0
+                  ? `Reserved Capacity: ${piCapacityTotals.totalReservedPoints} points`
+                  : "No capacity reserved"
+              }
+            >
+              {piCapacityTotals.totalReservedPoints > 0 && <ShieldAlert size={12} />}
+              <span className="pi-card__cap-label">Reserved:</span>
+              <strong className="pi-card__cap-val">{piCapacityTotals.totalReservedPoints}</strong>
+              <span className="pi-card__cap-unit">pts</span>
+            </div>
+
+            {piCapacityTotals.hasCapacity && (
+              <div
+                className="pi-card__cap-progress-wrap"
+                title={`${piCapacityTotals.percent}% committed (${piCapacityTotals.remainingCapacityPoints} pts available)`}
+              >
+                <div className="pi-card__cap-progress-bar">
+                  <div
+                    className={`pi-card__cap-progress-fill${
+                      piCapacityTotals.isOverCapacity
+                        ? " is-danger"
+                        : piCapacityTotals.percent >= 90
+                        ? " is-warning"
+                        : " is-normal"
+                    }`}
+                    style={{ width: `${Math.min(100, piCapacityTotals.percent)}%` }}
+                  />
+                </div>
+                <span className={`pi-card__cap-progress-text${piCapacityTotals.isOverCapacity ? " is-danger" : ""}`}>
+                  {piCapacityTotals.isOverCapacity
+                    ? `+${Math.abs(piCapacityTotals.remainingCapacityPoints)} over`
+                    : `${piCapacityTotals.remainingCapacityPoints} left`}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {team && (
+          <button
+            type="button"
+            className={`pi-card__reserve-btn${reservationsCount > 0 ? " has-reservations" : ""}`}
+            onClick={() => setIsManagingReservations(true)}
+            title="Manage Capacity Reservations for this PI"
+          >
+            <ShieldAlert size={13} />
+            <span>Reserve Capacity{reservationsCount > 0 ? ` (${reservationsCount})` : ""}</span>
+          </button>
+        )}
+
         {isConfirmingDelete ? (
           <span className="pi-card__confirm-delete">
             Delete this PI and all its sprints?
@@ -770,6 +898,7 @@ function ProgramIncrementCard({
                 draggedItemId={draggedItemId}
                 blockingItemIds={blockingItemIds}
                 sprintRangesByItemId={sprintRangesByItemId}
+                reservations={pi.reservations}
                 onSelectItem={onSelectItem}
                 onDragStartItem={onDragStartItem}
                 onDragEndItem={onDragEndItem}
@@ -779,6 +908,16 @@ function ProgramIncrementCard({
             ))}
           </div>
         </div>
+      )}
+
+      {isManagingReservations && team && (
+        <ManageReservationsModal
+          pi={pi}
+          team={team}
+          requirements={requirements}
+          onUpdatePI={onUpdatePI}
+          onClose={() => setIsManagingReservations(false)}
+        />
       )}
     </section>
   );
@@ -795,6 +934,7 @@ interface SprintBoardColumnProps {
   draggedItemId: string | null;
   blockingItemIds: Set<string>;
   sprintRangesByItemId: Map<string, { startDate: string; endDate: string }>;
+  reservations?: CapacityReservation[];
   onSelectItem: (id: string) => void;
   onDragStartItem: (id: string) => void;
   onDragEndItem: () => void;
@@ -813,6 +953,7 @@ function SprintBoardColumn({
   draggedItemId,
   blockingItemIds,
   sprintRangesByItemId,
+  reservations,
   onSelectItem,
   onDragStartItem,
   onDragEndItem,
@@ -824,8 +965,16 @@ function SprintBoardColumn({
   const [dropError, setDropError] = useState<string | null>(null);
   const dropErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const activeSprintReservations = getSprintActiveReservations(reservations, sprint.id);
+
   const capacitySummary = team
-    ? computeSprintCapacity(sprint, range, team, requirements.items.filter((i) => isItemWorkable(requirements, i)))
+    ? computeSprintCapacity(
+        sprint,
+        range,
+        team,
+        requirements.items.filter((i) => isItemWorkable(requirements, i)),
+        activeSprintReservations
+      )
     : null;
 
   const dropConflict = useMemo(() => {

@@ -5,9 +5,11 @@ import {
   getDayOfWeek,
   isWeekend,
   computeSprintCapacity,
+  computePICapacities,
   calculateTotalPtoDays,
 } from "./src/domain/teamCapacity.ts";
 import { DEFAULT_TEAM_SETTINGS } from "./src/domain/teamTypes.ts";
+import { getSprintActiveReservations } from "./src/domain/programIncrements.ts";
 import { toDiagramFile, parseDiagramFile } from "./src/domain/serialization.ts";
 import { EMPTY_REQUIREMENTS_DOCUMENT } from "./src/domain/requirementsTypes.ts";
 
@@ -131,6 +133,128 @@ const parsed = parseDiagramFile(JSON.stringify(serialized));
 assert(parsed.team.members.length === 2, "Parsed file retains 2 team members");
 assert(parsed.team.settings.extraDaysOff.length === 2, "Parsed file retains 2 extra days off");
 assert(parsed.team.members[0].ptoSpans.length === 2, "Parsed file retains 2 PTO spans");
+
+console.log("\n6. Testing Capacity Reservation - Percentage Deduction (User Prompt Example):");
+// "If I have a reservation of 20%, and there are 10 points for each member in a sprint - that should equate to 8 points available for that member."
+const teamTwoMembers = {
+  settings: {
+    defaultPointsPerDay: 1.0,
+    excludeUsHolidays: false,
+    extraDaysOff: [],
+  },
+  members: [
+    { id: "u1", name: "Dev 1", defaultPointsPerDay: 1.0, ptoSpans: [] },
+    { id: "u2", name: "Dev 2", defaultPointsPerDay: 1.0, ptoSpans: [] },
+  ],
+};
+const twoWeekSprint = { id: "sprint-std", name: "Sprint 1", durationDays: 14 }; // 10 business days (Mon-Fri x 2)
+const twoWeekRange = { startDate: "2026-10-05", endDate: "2026-10-18" }; // 10 business days, no holidays
+
+const reservation20Percent = [
+  { id: "r1", name: "Risk Reserve", unit: "percentage", value: 20 },
+];
+
+const capSummary20Pct = computeSprintCapacity(twoWeekSprint, twoWeekRange, teamTwoMembers, [], reservation20Percent);
+assert(capSummary20Pct.grossCapacityPoints === 20, `Gross team capacity is 20 pts (actual: ${capSummary20Pct.grossCapacityPoints})`);
+assert(capSummary20Pct.totalReservedPoints === 4, `Total reserved capacity is 4 pts (actual: ${capSummary20Pct.totalReservedPoints})`);
+assert(capSummary20Pct.totalCapacityPoints === 16, `Total available net capacity is 16 pts (actual: ${capSummary20Pct.totalCapacityPoints})`);
+
+const u1Cap = capSummary20Pct.memberBreakdown.find((m) => m.memberId === "u1");
+const u2Cap = capSummary20Pct.memberBreakdown.find((m) => m.memberId === "u2");
+assert(u1Cap.grossCapacityPoints === 10, `Dev 1 gross is 10 pts (actual: ${u1Cap.grossCapacityPoints})`);
+assert(u1Cap.reservedPoints === 2, `Dev 1 reserved is 2 pts (actual: ${u1Cap.reservedPoints})`);
+assert(u1Cap.capacityPoints === 8, `Dev 1 available capacity is 8 pts (actual: ${u1Cap.capacityPoints})`);
+assert(u2Cap.capacityPoints === 8, `Dev 2 available capacity is 8 pts (actual: ${u2Cap.capacityPoints})`);
+
+console.log("\n7. Testing Capacity Reservation - Whole Number / Fixed Points Deduction (Ceiled):");
+const reservationFixedPoints = [
+  { id: "r2", name: "Bug Backlog", unit: "points", value: 5 },
+];
+// 5 points split between 2 members with 10 pts gross each -> 2.5 pts raw -> ceil(2.5) = 3 pts reserved each.
+// Total reserved = 6 pts, Total net capacity = 14 pts. All whole numbers!
+const capSummaryFixed = computeSprintCapacity(twoWeekSprint, twoWeekRange, teamTwoMembers, [], reservationFixedPoints);
+assert(capSummaryFixed.grossCapacityPoints === 20, `Gross team capacity is 20 pts (actual: ${capSummaryFixed.grossCapacityPoints})`);
+assert(capSummaryFixed.totalReservedPoints === 6, `Total reserved capacity is 6 pts (actual: ${capSummaryFixed.totalReservedPoints})`);
+assert(capSummaryFixed.totalCapacityPoints === 14, `Total available net capacity is 14 pts (actual: ${capSummaryFixed.totalCapacityPoints})`);
+assert(capSummaryFixed.memberBreakdown[0].reservedPoints === 3, `Member 1 reserved points is 3 pts (actual: ${capSummaryFixed.memberBreakdown[0].reservedPoints})`);
+assert(capSummaryFixed.memberBreakdown[0].capacityPoints === 7, `Member 1 available points is 7 pts (actual: ${capSummaryFixed.memberBreakdown[0].capacityPoints})`);
+
+console.log("\n7b. Testing Fractional Percentage Reservations Ceiled to Whole Points:");
+// 15% on 10 pts gross = 1.5 pts raw -> ceil(1.5) = 2 pts reserved, 8 pts available
+const reservation15Pct = [{ id: "r-15", name: "Maintenance", unit: "percentage", value: 15 }];
+const capSummary15Pct = computeSprintCapacity(twoWeekSprint, twoWeekRange, teamTwoMembers, [], reservation15Pct);
+assert(capSummary15Pct.memberBreakdown[0].reservedPoints === 2, `15% on 10 pts gives 2 pts reserved (ceil) (actual: ${capSummary15Pct.memberBreakdown[0].reservedPoints})`);
+assert(capSummary15Pct.memberBreakdown[0].capacityPoints === 8, `15% on 10 pts gives 8 pts available (actual: ${capSummary15Pct.memberBreakdown[0].capacityPoints})`);
+assert(capSummary15Pct.totalReservedPoints === 4, `Total reserved is 4 pts (actual: ${capSummary15Pct.totalReservedPoints})`);
+assert(capSummary15Pct.totalCapacityPoints === 16, `Total net is 16 pts (actual: ${capSummary15Pct.totalCapacityPoints})`);
+
+console.log("\n8. Testing Multiple Combined Reservations (Percentage + Fixed):");
+const multipleReservations = [
+  { id: "r-risk", name: "Risk Buffer", unit: "percentage", value: 10 },
+  { id: "r-tech", name: "Tech Debt", unit: "percentage", value: 10 },
+  { id: "r-ops", name: "Ops Buffer", unit: "points", value: 2 },
+];
+// Total percent = 20% (4 pts), fixed = 2 pts. Total reserved = 6 pts, Net = 14 pts.
+// Each member: 10 * 0.20 + 2 * (10/20) = 2 + 1 = 3 pts reserved -> 7 pts net.
+const capSummaryMulti = computeSprintCapacity(twoWeekSprint, twoWeekRange, teamTwoMembers, [], multipleReservations);
+assert(capSummaryMulti.grossCapacityPoints === 20, `Multi: Gross is 20 pts (actual: ${capSummaryMulti.grossCapacityPoints})`);
+assert(capSummaryMulti.totalReservedPoints === 6, `Multi: Total reserved is 6 pts (actual: ${capSummaryMulti.totalReservedPoints})`);
+assert(capSummaryMulti.totalCapacityPoints === 14, `Multi: Net available is 14 pts (actual: ${capSummaryMulti.totalCapacityPoints})`);
+assert(capSummaryMulti.memberBreakdown[0].reservedPoints === 3, `Multi: Member 1 reserved is 3 pts (actual: ${capSummaryMulti.memberBreakdown[0].reservedPoints})`);
+assert(capSummaryMulti.memberBreakdown[0].capacityPoints === 7, `Multi: Member 1 available is 7 pts (actual: ${capSummaryMulti.memberBreakdown[0].capacityPoints})`);
+
+console.log("\n9. Testing PI-level vs Granular Sprint-level Scoping:");
+const piTest = {
+  id: "pi-1",
+  name: "PI 1",
+  startDate: "2026-10-05",
+  sprints: [
+    { id: "sp-1", name: "Sprint 1", durationDays: 14 },
+    { id: "sp-2", name: "Sprint 2", durationDays: 14 },
+  ],
+  reservations: [
+    // PI-wide reservation (applies to both sprints)
+    { id: "r-pi", name: "General 10% Reserve", unit: "percentage", value: 10 },
+    // Sprint 2 specific reservation (only applies to sprint 2)
+    { id: "r-sp2", name: "Sprint 2 Hardening Buffer", unit: "points", value: 4, sprintId: "sp-2" },
+  ],
+};
+
+const sp1ActiveRes = getSprintActiveReservations(piTest.reservations, "sp-1");
+const sp2ActiveRes = getSprintActiveReservations(piTest.reservations, "sp-2");
+
+assert(sp1ActiveRes.length === 1 && sp1ActiveRes[0].id === "r-pi", "Sprint 1 gets only the PI-level reservation");
+assert(sp2ActiveRes.length === 2, "Sprint 2 gets both the PI-level and sprint-specific reservations");
+
+const piRanges = [
+  { sprintId: "sp-1", startDate: "2026-10-05", endDate: "2026-10-18" },
+  { sprintId: "sp-2", startDate: "2026-10-19", endDate: "2026-11-01" },
+];
+const piSummaries = computePICapacities(piTest, piRanges, teamTwoMembers, []);
+// Sprint 1: 20 gross, 10% (2 pts) reserved -> 18 net
+assert(piSummaries[0].grossCapacityPoints === 20 && piSummaries[0].totalReservedPoints === 2 && piSummaries[0].totalCapacityPoints === 18, `Sprint 1 capacity is 18 pts net (actual: ${piSummaries[0].totalCapacityPoints})`);
+// Sprint 2: 20 gross, 10% (2 pts) + 4 pts = 6 pts reserved -> 14 net
+assert(piSummaries[1].grossCapacityPoints === 20 && piSummaries[1].totalReservedPoints === 6 && piSummaries[1].totalCapacityPoints === 14, `Sprint 2 capacity is 14 pts net (actual: ${piSummaries[1].totalCapacityPoints})`);
+
+console.log("\n10. Testing Serialization of ProgramIncrement.reservations:");
+const diagramWithReservations = toDiagramFile("Test PI Reserves", [], [], [], EMPTY_REQUIREMENTS_DOCUMENT, [piTest], teamTwoMembers);
+const parsedDiagram = parseDiagramFile(JSON.stringify(diagramWithReservations));
+assert(parsedDiagram.programIncrements.length === 1, "Parsed diagram contains 1 PI");
+assert(parsedDiagram.programIncrements[0].reservations.length === 2, "Parsed diagram retains 2 capacity reservations");
+assert(parsedDiagram.programIncrements[0].reservations[0].name === "General 10% Reserve", "Parsed reservation retains name");
+assert(parsedDiagram.programIncrements[0].reservations[1].sprintId === "sp-2", "Parsed reservation retains sprintId");
+
+console.log("\n11. Testing PI Header Capacity Totals Aggregation:");
+// In piSummaries:
+// Sprint 1: Gross 20, Reserved 2, Total Net 18, Assigned 0
+// Sprint 2: Gross 20, Reserved 6, Total Net 14, Assigned 0
+// Total PI: Gross 40, Reserved 8, Total Net 32
+const piTotalGross = piSummaries.reduce((sum, s) => sum + s.grossCapacityPoints, 0);
+const piTotalReserved = piSummaries.reduce((sum, s) => sum + s.totalReservedPoints, 0);
+const piTotalCapacity = piSummaries.reduce((sum, s) => sum + s.totalCapacityPoints, 0);
+assert(piTotalGross === 40, `PI total gross capacity is 40 pts (actual: ${piTotalGross})`);
+assert(piTotalReserved === 8, `PI total reserved capacity is 8 pts (actual: ${piTotalReserved})`);
+assert(piTotalCapacity === 32, `PI total net available capacity is 32 pts (actual: ${piTotalCapacity})`);
 
 console.log("\n------------------------------------------------");
 console.log(`Test results: ${passed} passed, ${failed} failed.\n`);
