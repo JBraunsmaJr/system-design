@@ -6,7 +6,7 @@
  */
 import * as Y from "yjs";
 import { createLocalRequirementsStore, createAdapterRequirementsStore } from "./requirementsStore";
-import { createYjsRequirementsStore } from "./yjsRequirementsStore";
+import { createYjsRequirementsStore, seedYjsRequirementsDoc } from "./yjsRequirementsStore";
 import type { RequirementsStore } from "./requirementsStore";
 import { EMPTY_REQUIREMENTS_DOCUMENT } from "../domain/requirementsTypes";
 import { BUILT_IN_ITEM_TYPES, BUILT_IN_RELATIONSHIP_TYPES } from "../domain/requirementsRegistry";
@@ -252,6 +252,52 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: RequirementsStore } {
   const snap = store.getSnapshot();
   assert(snap.items.every((i) => i.id !== idA), "the custom type's item is actually removed");
   assert(snap.relationships.length === 0, "the relationship referencing the deleted item's display id is correctly cleaned up - this is the case that would have silently failed if storage keys and display ids were conflated");
+}
+
+// === Part 6: seedYjsRequirementsDoc - starting a session must preserve existing work exactly, not lose or mangle it ===
+{
+  // Build a realistic "existing document" - the kind of thing a person
+  // would already have before ever starting a collaborative session -
+  // using the LOCAL store, so its ids are generated exactly the way
+  // they'd be in a real, already-in-use document.
+  const existingStore = createLocalRequirementsStore(seedDoc());
+  const itemA = existingStore.addItem("requirement");
+  const itemB = existingStore.addItem("goal");
+  existingStore.updateItem(itemA, { title: "Existing item A", body: "Some body text" });
+  existingStore.createAndAssignCategory(itemA, "Auth");
+  const addTypeOk = existingStore.addCustomType("Widget", "WID", "#5b7cfa", true);
+  const itemC = existingStore.addItem("custom-1");
+  const relError = existingStore.addRelationship("blocks", itemA, itemB);
+  const existingSnapshot = existingStore.getSnapshot();
+
+  assert(addTypeOk, "custom type created successfully as test setup");
+  assert(relError === null, "relationship created successfully as test setup");
+
+  // Now seed a brand-new Y.Doc from that existing snapshot, exactly as
+  // starting a new collaborative session would.
+  const doc = new Y.Doc();
+  seedYjsRequirementsDoc(doc, existingSnapshot);
+  const seededStore = createYjsRequirementsStore(doc);
+  const seededSnapshot = seededStore.getSnapshot();
+
+  assert(
+    canonicalJSON(existingSnapshot) === canonicalJSON(seededSnapshot),
+    "seeding a fresh Y.Doc from an existing document and reading it back produces an EXACT match, including every original id (item ids like the seeded 'REQ-1', the custom type's 'custom-1', the category's 'category-1') - nothing lost, nothing renumbered"
+  );
+
+  // Cross-references specifically - the part that would silently break
+  // if seeding ever regenerated an id instead of preserving it.
+  const seededItemA = seededSnapshot.items.find((i) => i.id === itemA)!;
+  assert(seededItemA.categoryId === existingSnapshot.items.find((i) => i.id === itemA)!.categoryId, "the seeded item's categoryId still correctly references the same (preserved) category id");
+  assert(seededSnapshot.relationships.some((r) => r.fromItemId === itemA && r.toItemId === itemB), "the seeded relationship still correctly references both original item ids");
+  assert(seededSnapshot.items.some((i) => i.id === itemC && i.typeId === "custom-1"), "the item created under the custom type still correctly references the custom type's preserved id");
+
+  // Confirm the doc is NOT still empty when createYjsRequirementsStore's
+  // own "seed built-ins if empty" check runs - it should see real data
+  // already there and skip injecting its own defaults on top.
+  const builtInCount = seededSnapshot.itemTypes.filter((t) => t.isBuiltIn).length;
+  const originalBuiltInCount = existingSnapshot.itemTypes.filter((t) => t.isBuiltIn).length;
+  assert(builtInCount === originalBuiltInCount, "built-in types appear exactly once each after seeding - not duplicated by createYjsRequirementsStore's own empty-doc default-seeding logic running on top of already-seeded data");
 }
 
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);

@@ -46,6 +46,56 @@ function collisionResistantId(prefix: string): string {
  *        nesting" pattern already used for team's extraDaysOff and
  *        requirements' categories/relationshipTypes.
  */
+/**
+ * Populates a Y.Doc directly from an existing, already-populated
+ * ProgramIncrement[] - the inverse of this file's own buildSnapshot.
+ * Same purpose and reasoning as requirements' seedYjsRequirementsDoc:
+ * every public store operation (addPI, addSprint, addReservation)
+ * always generates a fresh id, which would be wrong here - a PI
+ * references its own sprints and reservations, and preserving those
+ * exact ids is what keeps the seeded document identical to the
+ * original rather than a differently-shaped copy of it.
+ *
+ * Unlike requirements' items, PI and sprint ids don't need a separate
+ * internal storage key - they're already purely internal (never
+ * displayed, never referenced outside this file's own schema - see
+ * programIncrementsStore.ts's own doc comment), so the existing id can
+ * be used directly as the Y.Map key with no split needed.
+ */
+export function seedYjsProgramIncrementsDoc(doc: Y.Doc, initial: ProgramIncrement[]): void {
+  const piOrder = doc.getArray<string>("piOrder");
+  const pis = doc.getMap<Y.Map<unknown>>("pis");
+
+  doc.transact(() => {
+    for (const pi of initial) {
+      const sprintsMap = new Y.Map<Y.Map<unknown>>();
+      const sprintOrderArr = new Y.Array<string>();
+      for (const sprint of pi.sprints) {
+        const sprintM = new Y.Map<unknown>();
+        sprintM.set("name", sprint.name);
+        sprintM.set("durationDays", sprint.durationDays);
+        sprintsMap.set(sprint.id, sprintM);
+        sprintOrderArr.push([sprint.id]);
+      }
+
+      const reservationsMap = new Y.Map<CapacityReservation>();
+      for (const reservation of pi.reservations ?? []) {
+        reservationsMap.set(reservation.id, reservation);
+      }
+
+      const piM = new Y.Map<unknown>();
+      piM.set("name", pi.name);
+      piM.set("startDate", pi.startDate);
+      piM.set("sprintOrder", sprintOrderArr);
+      piM.set("sprints", sprintsMap);
+      piM.set("reservations", reservationsMap);
+
+      pis.set(pi.id, piM);
+      piOrder.push([pi.id]);
+    }
+  });
+}
+
 export function createYjsProgramIncrementsStore(doc: Y.Doc): ProgramIncrementsStore {
   const piOrder = doc.getArray<string>("piOrder");
   const pis = doc.getMap<Y.Map<unknown>>("pis");

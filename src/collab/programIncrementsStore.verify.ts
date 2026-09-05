@@ -7,7 +7,7 @@
  */
 import * as Y from "yjs";
 import { createLocalProgramIncrementsStore, createAdapterProgramIncrementsStore } from "./programIncrementsStore";
-import { createYjsProgramIncrementsStore } from "./yjsProgramIncrementsStore";
+import { createYjsProgramIncrementsStore, seedYjsProgramIncrementsDoc } from "./yjsProgramIncrementsStore";
 import type { ProgramIncrementsStore } from "./programIncrementsStore";
 
 let failures = 0;
@@ -213,6 +213,32 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: ProgramIncrementsStore
   store.moveSprint(piId, ids[0], "up");
   const afterInvalid = store.getSnapshot()[0].sprints.map((s) => s.id);
   assert(JSON.stringify(beforeInvalid) === JSON.stringify(afterInvalid), "moving the sprint actually at the first position further up is a safe no-op, not an error or corruption");
+}
+
+// === Part 4: seedYjsProgramIncrementsDoc - starting a session must preserve existing work exactly ===
+{
+  const existingStore = createLocalProgramIncrementsStore();
+  const piId = existingStore.addPI();
+  existingStore.updatePIName(piId, "Existing PI");
+  existingStore.addSprint(piId);
+  const sprintIds = existingStore.getSnapshot().find((pi) => pi.id === piId)!.sprints.map((s) => s.id);
+  existingStore.updateSprintName(piId, sprintIds[1], "Existing Sprint Two");
+  existingStore.addReservation(piId, { name: "Existing Reservation", unit: "percentage", value: 15 });
+  const existingSnapshot = existingStore.getSnapshot();
+
+  const doc = new Y.Doc();
+  seedYjsProgramIncrementsDoc(doc, existingSnapshot);
+  const seededStore = createYjsProgramIncrementsStore(doc);
+  const seededSnapshot = seededStore.getSnapshot();
+
+  assert(
+    canonicalJSON(existingSnapshot) === canonicalJSON(seededSnapshot),
+    "seeding a fresh Y.Doc from an existing PI (with two sprints and a reservation) and reading it back produces an EXACT match, including every original PI/sprint/reservation id - nothing lost, nothing regenerated"
+  );
+
+  const seededPI = seededSnapshot.find((pi) => pi.id === piId)!;
+  assert(seededPI.sprints.map((s) => s.id).join(",") === sprintIds.join(","), "sprint order is preserved exactly, not just the same set in a different order");
+  assert(seededPI.reservations?.[0].name === "Existing Reservation", "the reservation's own id and content are both preserved");
 }
 
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);

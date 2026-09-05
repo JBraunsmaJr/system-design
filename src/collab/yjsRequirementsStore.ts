@@ -10,6 +10,15 @@ import type {
 import { defaultStatusForType, isPrefixTaken, addRelationship as addRelationshipPure, BUILT_IN_ITEM_TYPES, BUILT_IN_RELATIONSHIP_TYPES } from "../domain/requirementsRegistry";
 import type { RequirementsStore } from "./requirementsStore";
 
+/** Item storage keys are purely internal - never displayed, never
+ * referenced by anything outside this file (see this file's top doc
+ * comment on the storage-key/display-id split) - so, same reasoning as
+ * program increments' and the diagram's own ids, there's no reason not
+ * to make them fully collision-resistant from the start. */
+function collisionResistantId(prefix: string): string {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
 /**
  * Yjs-backed RequirementsStore. See requirementsStore.ts for why the
  * operations are shaped the way they are; this file is about the schema
@@ -42,6 +51,84 @@ import type { RequirementsStore } from "./requirementsStore";
  *  - "relationships": plain values, no order array - same reasoning.
  *  - "nextSequence": Y.Map<string, number> keyed by item-type id.
  */
+/**
+ * Populates a Y.Doc directly from an existing, already-populated
+ * RequirementsDocument - the inverse of this file's own buildSnapshot.
+ * Unlike every public RequirementsStore operation (addItem,
+ * addCustomType, createAndAssignCategory, etc.), which always generate
+ * a fresh id for whatever's being created, this preserves every
+ * existing id EXACTLY as it already is - essential, since items
+ * reference categories, relationships reference items, and so on
+ * throughout the whole document; regenerating any of those ids during
+ * seeding would silently break those references.
+ *
+ * Meant to be called on a brand-new, empty Y.Doc, BEFORE
+ * createYjsRequirementsStore(doc) is ever constructed against it - that
+ * constructor's own "seed built-in types if empty" check will correctly
+ * see the doc is no longer empty and skip injecting its own defaults,
+ * since this function's own item type seeding already covers built-ins
+ * (they're just regular entries in `initial.itemTypes`, same as any
+ * custom type).
+ *
+ * Items still get the same collision-resistant internal storage key
+ * every item created through the normal addItem path gets (see this
+ * file's own top-level doc comment for why that split exists) - only
+ * the human-readable "id" field is preserved from the original data,
+ * which is the only part anything else in the app actually references.
+ */
+export function seedYjsRequirementsDoc(doc: Y.Doc, initial: RequirementsDocument): void {
+  const itemTypeOrder = doc.getArray<string>("itemTypeOrder");
+  const itemTypesMap = doc.getMap<Y.Map<unknown>>("itemTypes");
+  const categoryOrder = doc.getArray<string>("categoryOrder");
+  const categoriesMap = doc.getMap<RequirementCategory>("categories");
+  const itemOrder = doc.getArray<string>("itemOrder");
+  const itemsMap = doc.getMap<Y.Map<unknown>>("items");
+  const relationshipTypesMap = doc.getMap<RelationshipType>("relationshipTypes");
+  const relationshipsMap = doc.getMap<RequirementRelationship>("relationships");
+  const nextSequenceMap = doc.getMap<number>("nextSequence");
+
+  doc.transact(() => {
+    for (const t of initial.itemTypes) {
+      const m = new Y.Map<unknown>();
+      m.set("label", t.label);
+      m.set("prefix", t.prefix);
+      m.set("color", t.color);
+      m.set("isBuiltIn", t.isBuiltIn);
+      m.set("isWorkable", t.isWorkable);
+      itemTypesMap.set(t.id, m);
+      itemTypeOrder.push([t.id]);
+    }
+    for (const c of initial.categories) {
+      categoriesMap.set(c.id, c);
+      categoryOrder.push([c.id]);
+    }
+    for (const item of initial.items) {
+      const storageKey = collisionResistantId("item");
+      const m = new Y.Map<unknown>();
+      m.set("id", item.id);
+      m.set("typeId", item.typeId);
+      m.set("title", item.title);
+      m.set("body", item.body);
+      m.set("categoryId", item.categoryId);
+      m.set("sprintId", item.sprintId);
+      m.set("assigneeId", item.assigneeId);
+      m.set("points", item.points);
+      m.set("status", item.status);
+      itemsMap.set(storageKey, m);
+      itemOrder.push([storageKey]);
+    }
+    for (const t of initial.relationshipTypes) {
+      relationshipTypesMap.set(t.id, t);
+    }
+    for (const r of initial.relationships) {
+      relationshipsMap.set(r.id, r);
+    }
+    for (const [typeId, seq] of Object.entries(initial.nextSequence)) {
+      nextSequenceMap.set(typeId, seq);
+    }
+  });
+}
+
 export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
   const itemTypeOrder = doc.getArray<string>("itemTypeOrder");
   const itemTypes = doc.getMap<Y.Map<unknown>>("itemTypes");
@@ -261,7 +348,7 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
       const typeMap = itemTypes.get(typeId);
       const type = typeMap ? itemTypeMapToPlain(typeId, typeMap) : undefined;
       const displayId = `${type?.prefix ?? typeId}-${sequence}`;
-      const storageKey = `item-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+      const storageKey = collisionResistantId("item");
       doc.transact(() => {
         const m = new Y.Map<unknown>();
         m.set("id", displayId);

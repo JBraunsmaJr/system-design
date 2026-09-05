@@ -217,3 +217,27 @@ export function createAdapterTeamStore(
     },
   };
 }
+
+/**
+ * Populates any TeamStore (in practice, always a fresh
+ * createYjsTeamStore) from an existing, already-populated TeamDocument -
+ * used when starting a collaborative session, so existing team data
+ * isn't lost. Unlike requirements' and program increments' equivalent
+ * functions, this doesn't need to bypass the public interface at all:
+ * addMember/addPtoSpan/addExtraDayOff never generate their own ids (they
+ * always take a fully-formed object as input), so calling them directly
+ * with the existing data's own ids already preserves everything
+ * correctly - confirmed in teamStore.verify.ts before relying on it as
+ * the seeding mechanism.
+ */
+export function seedTeamStore(store: TeamStore, initial: TeamDocument): void {
+  for (const member of initial.members) {
+    store.addMember({ ...member, ptoSpans: [] });
+    for (const pto of member.ptoSpans) store.addPtoSpan(member.id, pto);
+  }
+  for (const extra of initial.settings.extraDaysOff) store.addExtraDayOff(extra);
+  store.updateSettings({
+    defaultPointsPerDay: initial.settings.defaultPointsPerDay,
+    excludeUsHolidays: initial.settings.excludeUsHolidays,
+  });
+}

@@ -14,7 +14,7 @@
  * this in the repo; nothing else depends on it.
  */
 import * as Y from "yjs";
-import { createLocalTeamStore, createAdapterTeamStore } from "./teamStore";
+import { createLocalTeamStore, createAdapterTeamStore, seedTeamStore } from "./teamStore";
 import { createYjsTeamStore } from "./yjsTeamStore";
 import type { TeamStore } from "./teamStore";
 import type { TeamMember, TeamDocument } from "../domain/teamTypes";
@@ -185,6 +185,27 @@ function canonicalJSON(value: unknown): string {
   assert(
     m.id === "full" && m.name === "Full Fields" && m.role === "Role" && m.avatarColor === "#ff0000" && m.defaultPointsPerDay === 2,
     "every field of a member round-trips correctly through the Yjs Y.Map read path, not just the fields exercised by the merge tests above"
+  );
+}
+
+// === Part 4: confirming team needs NO dedicated seed function - its own public methods already preserve existing ids exactly (unlike requirements/programIncrements, which needed a bypass function since their add* operations always generate fresh ids) ===
+{
+  const existingStore = createLocalTeamStore();
+  existingStore.addMember(mkMember("existing-member-1", { name: "Alice", role: "Engineer" }));
+  existingStore.addPtoSpan("existing-member-1", { id: "existing-pto-1", startDate: "2026-09-01", endDate: "2026-09-03", startHalfDay: "full", endHalfDay: "full" });
+  existingStore.addExtraDayOff({ id: "existing-day-1", name: "Retreat", date: "2026-10-01" });
+  const existingSnapshot = existingStore.getSnapshot();
+
+  // "Seeding" here is calling seedTeamStore against a fresh Yjs store -
+  // since addMember/addPtoSpan/addExtraDayOff never generate their own
+  // ids (they always take a fully-formed object as input), this works
+  // with zero special-casing, unlike requirements/programIncrements.
+  const seededStore = createYjsTeamStore(new Y.Doc());
+  seedTeamStore(seededStore, existingSnapshot);
+
+  assert(
+    canonicalJSON(existingSnapshot) === canonicalJSON(seededStore.getSnapshot()),
+    "team's existing public methods, called directly with already-existing ids, reproduce an existing document exactly - no dedicated seed function needed for this domain"
   );
 }
 
