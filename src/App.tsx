@@ -51,6 +51,7 @@ import type { ProgramIncrement } from "./domain/programIncrements";
 import type { TeamDocument } from "./domain/teamTypes";
 import { EMPTY_TEAM_DOCUMENT } from "./domain/teamTypes";
 import { createAdapterTeamStore } from "./collab/teamStore";
+import { createAdapterRequirementsStore } from "./collab/requirementsStore";
 import "./App.css";
 
 let idSeed = 0;
@@ -173,6 +174,10 @@ function App() {
     (updater: (prev: RequirementsDocument) => RequirementsDocument) =>
       setDiagram((prev) => ({ ...prev, requirements: updater(prev.requirements) })),
     [setDiagram]
+  );
+  const requirementsStore = useMemo(
+    () => createAdapterRequirementsStore(() => requirements, setRequirements),
+    [requirements, setRequirements]
   );
 
   const setProgramIncrements = useCallback(
@@ -1190,8 +1195,7 @@ function App() {
         )}
         {viewMode === "requirements" && (
           <RequirementsView
-            doc={requirements}
-            onUpdateDoc={setRequirements}
+            requirementsStore={requirementsStore}
             programIncrements={programIncrements}
             team={team}
             diagramRoot={root}
@@ -1205,8 +1209,7 @@ function App() {
           <TimelineView
             programIncrements={programIncrements}
             onUpdateProgramIncrements={setProgramIncrements}
-            requirements={requirements}
-            onUpdateRequirements={setRequirements}
+            requirementsStore={requirementsStore}
             team={team}
             diagramRoot={root}
             onNavigateToNode={onNavigateToNode}
@@ -1224,8 +1227,7 @@ function App() {
         )}
         {viewMode === "skill-tree" && (
           <SkillTreeView
-            requirements={requirements}
-            onUpdateRequirements={setRequirements}
+            requirementsStore={requirementsStore}
             programIncrements={programIncrements}
             team={team}
             diagramRoot={root}

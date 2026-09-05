@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef } from "react";
+import { useMemo, useState, useRef, useSyncExternalStore } from "react";
 import { AlertTriangle, CalendarRange, ChevronDown, ChevronRight, ChevronUp, GanttChartSquare, Inbox, Plus, Trash2, ShieldAlert } from "lucide-react";
 import {
   computeSprintDateRanges,
@@ -9,9 +9,10 @@ import {
   type Sprint,
   type CapacityReservation,
 } from "../../domain/programIncrements";
-import { addRelationship, getItemType, isItemWorkable } from "../../domain/requirementsRegistry";
+import { getItemType, isItemWorkable } from "../../domain/requirementsRegistry";
 import { findScheduleConflicts, checkScheduleConflict, findBlockingItemIds, type ScheduleConflictSeverity } from "../../domain/scheduleConflicts";
 import type { RequirementItem, RequirementsDocument } from "../../domain/requirementsTypes";
+import type { RequirementsStore } from "../../collab/requirementsStore";
 import type { TeamDocument } from "../../domain/teamTypes";
 import type { SubDiagram } from "../../domain/types";
 import type { DiagramPath } from "../../domain/subDiagramTree";
@@ -27,8 +28,7 @@ import { ManageReservationsModal } from "./ManageReservationsModal";
 interface TimelineViewProps {
   programIncrements: ProgramIncrement[];
   onUpdateProgramIncrements: (updater: (pis: ProgramIncrement[]) => ProgramIncrement[]) => void;
-  requirements: RequirementsDocument;
-  onUpdateRequirements: (updater: (doc: RequirementsDocument) => RequirementsDocument) => void;
+  requirementsStore: RequirementsStore;
   team?: TeamDocument;
   diagramRoot?: SubDiagram;
   onNavigateToNode?: (path: DiagramPath, nodeId: string) => void;
@@ -52,14 +52,14 @@ function todayISO(): string {
 export function TimelineView({
   programIncrements,
   onUpdateProgramIncrements,
-  requirements,
-  onUpdateRequirements,
+  requirementsStore,
   team,
   diagramRoot,
   onNavigateToNode,
   onCreateLinkedNode,
   onNavigateToRequirement,
 }: TimelineViewProps) {
+  const requirements = useSyncExternalStore(requirementsStore.subscribe, requirementsStore.getSnapshot);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [chartMode, setChartMode] = useState<"board" | "gantt">("board");
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
@@ -90,12 +90,9 @@ export function TimelineView({
   const onDeletePI = (piId: string) => {
     const pi = programIncrements.find((p) => p.id === piId);
     if (!pi) return;
-    const sprintIds = new Set(pi.sprints.map((s) => s.id));
+    const sprintIds = pi.sprints.map((s) => s.id);
     onUpdateProgramIncrements((pis) => pis.filter((p) => p.id !== piId));
-    onUpdateRequirements((doc) => ({
-      ...doc,
-      items: doc.items.map((item) => (item.sprintId && sprintIds.has(item.sprintId) ? { ...item, sprintId: undefined } : item)),
-    }));
+    requirementsStore.unassignItemsFromSprints(sprintIds);
   };
 
   const onAddSprint = (piId: string) => {
@@ -130,10 +127,7 @@ export function TimelineView({
     onUpdateProgramIncrements((pis) =>
       pis.map((pi) => (pi.id === piId ? { ...pi, sprints: pi.sprints.filter((s) => s.id !== sprintId) } : pi))
     );
-    onUpdateRequirements((doc) => ({
-      ...doc,
-      items: doc.items.map((item) => (item.sprintId === sprintId ? { ...item, sprintId: undefined } : item)),
-    }));
+    requirementsStore.unassignItemsFromSprints([sprintId]);
   };
 
   const onMoveSprint = (piId: string, sprintId: string, direction: "up" | "down") => {
@@ -151,45 +145,17 @@ export function TimelineView({
   };
 
   const onUpdateItem = (id: string, patch: Partial<RequirementItem>) => {
-    onUpdateRequirements((doc) => ({
-      ...doc,
-      items: doc.items.map((item) => (item.id === id ? { ...item, ...patch } : item)),
-    }));
+    requirementsStore.updateItem(id, patch);
   };
 
   const onDeleteItem = (id: string) => {
-    onUpdateRequirements((doc) => ({
-      ...doc,
-      items: doc.items.filter((item) => item.id !== id),
-      // Same "orphaned reference" cleanup as RequirementsView's own
-      // onDeleteItem - a relationship touching this item on either side
-      // would otherwise be left pointing at an id that no longer exists.
-      relationships: doc.relationships.filter((r) => r.fromItemId !== id && r.toItemId !== id),
-    }));
+    requirementsStore.deleteItem(id);
   };
 
   const onCreateAndAssignCategory = (itemId: string, label: string) => {
     const trimmed = label.trim();
     if (!trimmed) return;
-    onUpdateRequirements((doc) => {
-      const existing = doc.categories.find((c) => c.label.toLowerCase() === trimmed.toLowerCase());
-      if (existing) {
-        return {
-          ...doc,
-          items: doc.items.map((item) => (item.id === itemId ? { ...item, categoryId: existing.id } : item)),
-        };
-      }
-      const newCategory = {
-        id: `cat-${Date.now().toString(36)}`,
-        label: trimmed,
-        color: "#22B8CF",
-      };
-      return {
-        ...doc,
-        categories: [...doc.categories, newCategory],
-        items: doc.items.map((item) => (item.id === itemId ? { ...item, categoryId: newCategory.id } : item)),
-      };
-    });
+    requirementsStore.createAndAssignCategory(itemId, trimmed);
   };
 
   const onMoveItemToSprint = (itemId: string, targetSprintId: string): string | null => {
@@ -210,22 +176,16 @@ export function TimelineView({
           : `Can't schedule here - blocked by ${conflict.blocker.id}, which isn't scheduled yet.`;
       }
     }
-    onUpdateRequirements((doc) => ({
-      ...doc,
-      items: doc.items.map((item) => (item.id === itemId ? { ...item, sprintId: targetSprintId } : item)),
-    }));
+    requirementsStore.updateItem(itemId, { sprintId: targetSprintId });
     return null;
   };
 
   const onAddRelationship = (typeId: string, fromItemId: string, toItemId: string): string | null => {
-    const result = addRelationship(requirements, typeId, fromItemId, toItemId);
-    if (result.error) return result.error;
-    onUpdateRequirements((doc) => ({ ...doc, relationships: result.relationships }));
-    return null;
+    return requirementsStore.addRelationship(typeId, fromItemId, toItemId);
   };
 
   const onDeleteRelationship = (relationshipId: string) => {
-    onUpdateRequirements((doc) => ({ ...doc, relationships: doc.relationships.filter((r) => r.id !== relationshipId) }));
+    requirementsStore.deleteRelationship(relationshipId);
   };
 
   // Grouped once per render for both count badges and the visual board

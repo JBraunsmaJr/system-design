@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { LayoutList, Search, Settings2, Tags, Waypoints, X } from "lucide-react";
-import { addRelationship, createCategory, defaultStatusForType, generateItemId, isPrefixTaken } from "../../domain/requirementsRegistry";
 import { RequirementCard } from "./RequirementCard";
 import { ManageTypesModal } from "./ManageTypesModal";
 import { ManageRelationshipTypesModal } from "./ManageRelationshipTypesModal";
@@ -8,17 +7,15 @@ import { AddItemDropdown } from "./AddItemDropdown";
 import type {
   RequirementItem,
   RequirementItemType,
-  RequirementsDocument,
-  RelationshipType,
 } from "../../domain/requirementsTypes";
 import type { ProgramIncrement } from "../../domain/programIncrements";
 import type { TeamDocument } from "../../domain/teamTypes";
 import type { SubDiagram } from "../../domain/types";
 import { findAllLinkedNodes, type DiagramPath, type LinkedNodeRef } from "../../domain/subDiagramTree";
+import type { RequirementsStore } from "../../collab/requirementsStore";
 
 interface RequirementsViewProps {
-  doc: RequirementsDocument;
-  onUpdateDoc: (updater: (doc: RequirementsDocument) => RequirementsDocument) => void;
+  requirementsStore: RequirementsStore;
   programIncrements: ProgramIncrement[];
   team?: TeamDocument;
   /** The full diagram tree, for finding which nodes (anywhere, at any
@@ -35,12 +32,6 @@ interface RequirementsViewProps {
    * re-triggering the same scroll on an unrelated re-render). */
   focusItemId?: string | null;
   onFocusHandled?: () => void;
-}
-
-function nextCustomTypeId(doc: RequirementsDocument): string {
-  let n = 1;
-  while (doc.itemTypes.some((t) => t.id === `custom-${n}`)) n++;
-  return `custom-${n}`;
 }
 
 const HIGHLIGHT_DURATION_MS = 2000;
@@ -62,8 +53,7 @@ interface ItemGroup {
 }
 
 export function RequirementsView({
-  doc,
-  onUpdateDoc,
+  requirementsStore,
   programIncrements,
   team,
   diagramRoot,
@@ -72,22 +62,26 @@ export function RequirementsView({
   focusItemId,
   onFocusHandled,
 }: RequirementsViewProps) {
+  const doc = useSyncExternalStore(requirementsStore.subscribe, requirementsStore.getSnapshot);
   const [search, setSearch] = useState("");
   const [groupBy, setGroupBy] = useState<GroupBy>("type");
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [isManagingTypes, setIsManagingTypes] = useState(false);
   const [isManagingRelationshipTypes, setIsManagingRelationshipTypes] = useState(false);
   const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Kept in sync on every render so a useCallback-stabilized function can
-  // always read the CURRENT doc without needing doc in its own dependency
-  // array - see onAddRelationship below, which needs the latest doc to
-  // validate against (duplicate/cycle checks) but must stay reference-
-  // stable itself, since its callers (RequirementCard) rely on that
-  // stability to skip re-rendering when an unrelated item changes.
-  const docRef = useRef(doc);
+  // Kept in sync on every render so useCallback-stabilized handlers can
+  // always call the CURRENT store without needing requirementsStore in
+  // their own dependency arrays - requirementsStore itself is recreated
+  // on every requirements change (see App.tsx), unlike the plain
+  // onUpdateDoc callback this replaces, which was already stable. Same
+  // reasoning as the old docRef this replaces, generalized from just
+  // onAddRelationship (the only handler that previously needed to read
+  // doc directly) to every handler below, since all of them now go
+  // through the store rather than a stable setter.
+  const requirementsStoreRef = useRef(requirementsStore);
   useEffect(() => {
-    docRef.current = doc;
-  }, [doc]);
+    requirementsStoreRef.current = requirementsStore;
+  }, [requirementsStore]);
 
   // Computed once for every item here, rather than each RequirementCard
   // independently walking the whole diagram tree for just its own item -
@@ -148,9 +142,7 @@ export function RequirementsView({
   }, [groupBy, doc.itemTypes, doc.categories, filteredItems]);
 
   const onAddItem = (typeId: string) => {
-    const { id, nextSequence } = generateItemId(doc, typeId);
-    const newItem: RequirementItem = { id, typeId, title: "", body: "", status: defaultStatusForType(doc, typeId) };
-    onUpdateDoc((d) => ({ ...d, items: [...d.items, newItem], nextSequence }));
+    const id = requirementsStoreRef.current.addItem(typeId);
     // New items should be immediately visible even if a search is
     // narrowing the list, and land at the bottom of their group - scroll
     // to it the same way a reference-click navigation would.
@@ -161,61 +153,29 @@ export function RequirementsView({
     });
   };
 
-  const onUpdateItem = useCallback(
-    (id: string, patch: Partial<RequirementItem>) => {
-      onUpdateDoc((d) => ({ ...d, items: d.items.map((i) => (i.id === id ? { ...i, ...patch } : i)) }));
-    },
-    [onUpdateDoc]
-  );
+  const onUpdateItem = useCallback((id: string, patch: Partial<RequirementItem>) => {
+    requirementsStoreRef.current.updateItem(id, patch);
+  }, []);
 
-  const onDeleteItem = useCallback(
-    (id: string) => {
-      onUpdateDoc((d) => ({
-        ...d,
-        items: d.items.filter((i) => i.id !== id),
-        // A relationship referencing the deleted item on either side has
-        // nothing left to point at - same "orphaned reference" reasoning as
-        // clearing sprintId when a sprint is deleted elsewhere in this app.
-        relationships: d.relationships.filter((r) => r.fromItemId !== id && r.toItemId !== id),
-      }));
-    },
-    [onUpdateDoc]
-  );
+  const onDeleteItem = useCallback((id: string) => {
+    requirementsStoreRef.current.deleteItem(id);
+  }, []);
 
   // Creating a category and assigning it to an item happen as one combined
-  // update (not two separate onUpdateDoc calls) so they land as a single
+  // store operation (not two separate calls) so they land as a single
   // undo step, and so the item is never left referencing a categoryId that
   // doesn't exist yet in an intermediate state.
-  const onCreateAndAssignCategory = useCallback(
-    (itemId: string, label: string) => {
-      onUpdateDoc((d) => {
-        const { category, categories } = createCategory(d, label);
-        return {
-          ...d,
-          categories,
-          items: d.items.map((i) => (i.id === itemId ? { ...i, categoryId: category.id } : i)),
-        };
-      });
-    },
-    [onUpdateDoc]
-  );
+  const onCreateAndAssignCategory = useCallback((itemId: string, label: string) => {
+    requirementsStoreRef.current.createAndAssignCategory(itemId, label);
+  }, []);
 
-  const onAddRelationship = useCallback(
-    (typeId: string, fromItemId: string, toItemId: string): string | null => {
-      const result = addRelationship(docRef.current, typeId, fromItemId, toItemId);
-      if (result.error) return result.error;
-      onUpdateDoc((d) => ({ ...d, relationships: result.relationships }));
-      return null;
-    },
-    [onUpdateDoc]
-  );
+  const onAddRelationship = useCallback((typeId: string, fromItemId: string, toItemId: string): string | null => {
+    return requirementsStoreRef.current.addRelationship(typeId, fromItemId, toItemId);
+  }, []);
 
-  const onDeleteRelationship = useCallback(
-    (relationshipId: string) => {
-      onUpdateDoc((d) => ({ ...d, relationships: d.relationships.filter((r) => r.id !== relationshipId) }));
-    },
-    [onUpdateDoc]
-  );
+  const onDeleteRelationship = useCallback((relationshipId: string) => {
+    requirementsStoreRef.current.deleteRelationship(relationshipId);
+  }, []);
 
   const onNavigateToItem = useCallback((itemId: string) => {
     const el = document.getElementById(`requirement-${itemId}`);
@@ -244,17 +204,7 @@ export function RequirementsView({
   }, [focusItemId, onNavigateToItem, onFocusHandled]);
 
   const onAddCustomType = (label: string, prefix: string, color: string, isWorkable: boolean): boolean => {
-    if (isPrefixTaken(doc, prefix)) return false;
-    const newType: RequirementItemType = {
-      id: nextCustomTypeId(doc),
-      label,
-      prefix: prefix.toUpperCase(),
-      color,
-      isBuiltIn: false,
-      isWorkable,
-    };
-    onUpdateDoc((d) => ({ ...d, itemTypes: [...d.itemTypes, newType] }));
-    return true;
+    return requirementsStoreRef.current.addCustomType(label, prefix, color, isWorkable);
   };
 
   // Label, color, and isWorkable are all safe to edit after the fact for
@@ -268,23 +218,11 @@ export function RequirementsView({
     typeId: string,
     patch: Partial<Pick<RequirementItemType, "label" | "color" | "isWorkable">>
   ) => {
-    onUpdateDoc((d) => ({ ...d, itemTypes: d.itemTypes.map((t) => (t.id === typeId ? { ...t, ...patch } : t)) }));
+    requirementsStoreRef.current.updateType(typeId, patch);
   };
 
   const onDeleteCustomType = (typeId: string) => {
-    onUpdateDoc((d) => {
-      const removedIds = new Set(d.items.filter((i) => i.typeId === typeId).map((i) => i.id));
-      return {
-        ...d,
-        itemTypes: d.itemTypes.filter((t) => t.id !== typeId),
-        // Items of a deleted type have nothing left to belong to - keeping
-        // them around as orphans would just be silently-broken data.
-        items: d.items.filter((i) => i.typeId !== typeId),
-        // Any relationship touching one of those now-deleted items would
-        // otherwise be left pointing at an id that no longer exists.
-        relationships: d.relationships.filter((r) => !removedIds.has(r.fromItemId) && !removedIds.has(r.toItemId)),
-      };
-    });
+    requirementsStoreRef.current.deleteCustomType(typeId);
   };
 
   const itemCountsByType = useMemo(() => {
@@ -296,27 +234,11 @@ export function RequirementsView({
   }, [doc.items]);
 
   const onAddCustomRelationshipType = (label: string, inverseLabel: string, color: string, isBlocking: boolean) => {
-    const newType: RelationshipType = {
-      id: `rel-type-${Date.now().toString(36)}`,
-      label,
-      inverseLabel,
-      color,
-      isBuiltIn: false,
-      isBlocking,
-    };
-    onUpdateDoc((d) => ({ ...d, relationshipTypes: [...d.relationshipTypes, newType] }));
+    requirementsStoreRef.current.addCustomRelationshipType(label, inverseLabel, color, isBlocking);
   };
 
   const onDeleteCustomRelationshipType = (typeId: string) => {
-    onUpdateDoc((d) => ({
-      ...d,
-      relationshipTypes: d.relationshipTypes.filter((t) => t.id !== typeId),
-      // A relationship using a deleted type has nothing left to describe
-      // it - unlike deleting an item type, this does NOT touch any
-      // requirement items themselves, only the (much lighter-weight) link
-      // records between them.
-      relationships: d.relationships.filter((r) => r.typeId !== typeId),
-    }));
+    requirementsStoreRef.current.deleteCustomRelationshipType(typeId);
   };
 
   return (
