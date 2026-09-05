@@ -18,12 +18,13 @@ import type { RequirementsDocument } from "../../domain/requirementsTypes";
 import { isItemWorkable } from "../../domain/requirementsRegistry";
 import { computeSprintDateRanges } from "../../domain/programIncrements";
 import { computeSprintCapacity } from "../../domain/teamCapacity";
+import type { ProgramIncrementsStore } from "../../collab/programIncrementsStore";
 
 interface ManageReservationsModalProps {
   pi: ProgramIncrement;
   team: TeamDocument;
   requirements: RequirementsDocument;
-  onUpdatePI: (updatedPI: ProgramIncrement) => void;
+  programIncrementsStore: ProgramIncrementsStore;
   onClose: () => void;
 }
 
@@ -44,15 +45,11 @@ const PRESET_RESERVATIONS = [
   { name: "Bug Buffer (5 pts)", category: "bugs", unit: "points" as CapacityReservationUnit, value: 5 },
 ];
 
-function nextId(prefix: string): string {
-  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
-}
-
 export function ManageReservationsModal({
   pi,
   team,
   requirements,
-  onUpdatePI,
+  programIncrementsStore,
   onClose,
 }: ManageReservationsModalProps) {
   const [isAdding, setIsAdding] = useState(false);
@@ -132,39 +129,30 @@ export function ManageReservationsModal({
     if (isNaN(val) || val <= 0 || !formName.trim()) return;
 
     if (editingReservationId) {
-      const updatedList = reservations.map((r) =>
-        r.id === editingReservationId
-          ? {
-              ...r,
-              name: formName.trim(),
-              category: formCategory,
-              unit: formUnit,
-              value: val,
-              sprintId: formSprintId.trim() !== "" ? formSprintId : undefined,
-              note: formNote.trim() || undefined,
-            }
-          : r
-      );
-      onUpdatePI({ ...pi, reservations: updatedList });
-    } else {
-      const newReservation: CapacityReservation = {
-        id: nextId("cres"),
+      programIncrementsStore.updateReservation(pi.id, editingReservationId, {
         name: formName.trim(),
         category: formCategory,
         unit: formUnit,
         value: val,
         sprintId: formSprintId.trim() !== "" ? formSprintId : undefined,
         note: formNote.trim() || undefined,
-      };
-      onUpdatePI({ ...pi, reservations: [...reservations, newReservation] });
+      });
+    } else {
+      programIncrementsStore.addReservation(pi.id, {
+        name: formName.trim(),
+        category: formCategory,
+        unit: formUnit,
+        value: val,
+        sprintId: formSprintId.trim() !== "" ? formSprintId : undefined,
+        note: formNote.trim() || undefined,
+      });
     }
 
     resetForm();
   };
 
   const handleDeleteReservation = (id: string) => {
-    const updatedList = reservations.filter((r) => r.id !== id);
-    onUpdatePI({ ...pi, reservations: updatedList });
+    programIncrementsStore.deleteReservation(pi.id, id);
     if (editingReservationId === id) {
       resetForm();
     }

@@ -3,8 +3,6 @@ import { AlertTriangle, CalendarRange, ChevronDown, ChevronRight, ChevronUp, Gan
 import {
   computeSprintDateRanges,
   getSprintActiveReservations,
-  updatePIStartDate,
-  updateSprintEndDate,
   type ProgramIncrement,
   type Sprint,
   type CapacityReservation,
@@ -13,6 +11,7 @@ import { getItemType, isItemWorkable } from "../../domain/requirementsRegistry";
 import { findScheduleConflicts, checkScheduleConflict, findBlockingItemIds, type ScheduleConflictSeverity } from "../../domain/scheduleConflicts";
 import type { RequirementItem, RequirementsDocument } from "../../domain/requirementsTypes";
 import type { RequirementsStore } from "../../collab/requirementsStore";
+import type { ProgramIncrementsStore } from "../../collab/programIncrementsStore";
 import type { TeamDocument } from "../../domain/teamTypes";
 import type { SubDiagram } from "../../domain/types";
 import type { DiagramPath } from "../../domain/subDiagramTree";
@@ -26,8 +25,7 @@ import { SprintQuickAdd } from "./SprintQuickAdd";
 import { ManageReservationsModal } from "./ManageReservationsModal";
 
 interface TimelineViewProps {
-  programIncrements: ProgramIncrement[];
-  onUpdateProgramIncrements: (updater: (pis: ProgramIncrement[]) => ProgramIncrement[]) => void;
+  programIncrementsStore: ProgramIncrementsStore;
   requirementsStore: RequirementsStore;
   team?: TeamDocument;
   diagramRoot?: SubDiagram;
@@ -36,22 +34,8 @@ interface TimelineViewProps {
   onNavigateToRequirement?: (itemId: string) => void;
 }
 
-let idCounter = 0;
-function nextId(prefix: string): string {
-  idCounter += 1;
-  return `${prefix}-${Date.now().toString(36)}-${idCounter}`;
-}
-
-const DEFAULT_SPRINT_DURATION_DAYS = 14;
-
-function todayISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
 export function TimelineView({
-  programIncrements,
-  onUpdateProgramIncrements,
+  programIncrementsStore,
   requirementsStore,
   team,
   diagramRoot,
@@ -59,31 +43,26 @@ export function TimelineView({
   onCreateLinkedNode,
   onNavigateToRequirement,
 }: TimelineViewProps) {
+  const programIncrements = useSyncExternalStore(programIncrementsStore.subscribe, programIncrementsStore.getSnapshot);
   const requirements = useSyncExternalStore(requirementsStore.subscribe, requirementsStore.getSnapshot);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [chartMode, setChartMode] = useState<"board" | "gantt">("board");
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
 
   const onAddPI = () => {
-    const newPI: ProgramIncrement = {
-      id: nextId("pi"),
-      name: `PI ${programIncrements.length + 1}`,
-      startDate: todayISO(),
-      sprints: [{ id: nextId("sprint"), name: "Sprint 1", durationDays: DEFAULT_SPRINT_DURATION_DAYS }],
-    };
-    onUpdateProgramIncrements((pis) => [...pis, newPI]);
+    programIncrementsStore.addPI();
   };
 
   const onUpdatePIName = (piId: string, name: string) => {
-    onUpdateProgramIncrements((pis) => pis.map((pi) => (pi.id === piId ? { ...pi, name } : pi)));
+    programIncrementsStore.updatePIName(piId, name);
   };
 
   const onUpdatePIStart = (piId: string, startDate: string) => {
-    onUpdateProgramIncrements((pis) => pis.map((pi) => (pi.id === piId ? updatePIStartDate(pi, startDate) : pi)));
+    programIncrementsStore.updatePIStart(piId, startDate);
   };
 
   // Deletes the whole PI and unassigns any requirement items that were in
-  // any of its sprints - two separate state updates (program increments,
+  // any of its sprints - two separate store calls (program increments,
   // then requirements), but both happen synchronously within this one
   // handler, well under the undo history's debounce window, so they still
   // land as a single undo step rather than two.
@@ -91,57 +70,29 @@ export function TimelineView({
     const pi = programIncrements.find((p) => p.id === piId);
     if (!pi) return;
     const sprintIds = pi.sprints.map((s) => s.id);
-    onUpdateProgramIncrements((pis) => pis.filter((p) => p.id !== piId));
+    programIncrementsStore.deletePI(piId);
     requirementsStore.unassignItemsFromSprints(sprintIds);
   };
 
   const onAddSprint = (piId: string) => {
-    onUpdateProgramIncrements((pis) =>
-      pis.map((pi) =>
-        pi.id === piId
-          ? {
-              ...pi,
-              sprints: [
-                ...pi.sprints,
-                { id: nextId("sprint"), name: `Sprint ${pi.sprints.length + 1}`, durationDays: DEFAULT_SPRINT_DURATION_DAYS },
-              ],
-            }
-          : pi
-      )
-    );
+    programIncrementsStore.addSprint(piId);
   };
 
   const onUpdateSprintName = (piId: string, sprintId: string, name: string) => {
-    onUpdateProgramIncrements((pis) =>
-      pis.map((pi) =>
-        pi.id === piId ? { ...pi, sprints: pi.sprints.map((s) => (s.id === sprintId ? { ...s, name } : s)) } : pi
-      )
-    );
+    programIncrementsStore.updateSprintName(piId, sprintId, name);
   };
 
   const onUpdateSprintEnd = (piId: string, sprintId: string, newEndDate: string) => {
-    onUpdateProgramIncrements((pis) => pis.map((pi) => (pi.id === piId ? updateSprintEndDate(pi, sprintId, newEndDate) : pi)));
+    programIncrementsStore.updateSprintEnd(piId, sprintId, newEndDate);
   };
 
   const onDeleteSprint = (piId: string, sprintId: string) => {
-    onUpdateProgramIncrements((pis) =>
-      pis.map((pi) => (pi.id === piId ? { ...pi, sprints: pi.sprints.filter((s) => s.id !== sprintId) } : pi))
-    );
+    programIncrementsStore.deleteSprint(piId, sprintId);
     requirementsStore.unassignItemsFromSprints([sprintId]);
   };
 
   const onMoveSprint = (piId: string, sprintId: string, direction: "up" | "down") => {
-    onUpdateProgramIncrements((pis) =>
-      pis.map((pi) => {
-        if (pi.id !== piId) return pi;
-        const index = pi.sprints.findIndex((s) => s.id === sprintId);
-        const swapWith = direction === "up" ? index - 1 : index + 1;
-        if (index === -1 || swapWith < 0 || swapWith >= pi.sprints.length) return pi;
-        const sprints = [...pi.sprints];
-        [sprints[index], sprints[swapWith]] = [sprints[swapWith], sprints[index]];
-        return { ...pi, sprints };
-      })
-    );
+    programIncrementsStore.moveSprint(piId, sprintId, direction);
   };
 
   const onUpdateItem = (id: string, patch: Partial<RequirementItem>) => {
@@ -353,11 +304,7 @@ export function TimelineView({
               onUpdateSprintEnd={(sprintId, endDate) => onUpdateSprintEnd(pi.id, sprintId, endDate)}
               onDeleteSprint={(sprintId) => onDeleteSprint(pi.id, sprintId)}
               onMoveSprint={(sprintId, direction) => onMoveSprint(pi.id, sprintId, direction)}
-              onUpdatePI={(updatedPI) =>
-                onUpdateProgramIncrements((pis) =>
-                  pis.map((p) => (p.id === updatedPI.id ? updatedPI : p))
-                )
-              }
+              programIncrementsStore={programIncrementsStore}
             />
           ))
         )}
@@ -615,7 +562,7 @@ interface ProgramIncrementCardProps {
   onUpdateSprintEnd: (sprintId: string, endDate: string) => void;
   onDeleteSprint: (sprintId: string) => void;
   onMoveSprint: (sprintId: string, direction: "up" | "down") => void;
-  onUpdatePI: (updatedPI: ProgramIncrement) => void;
+  programIncrementsStore: ProgramIncrementsStore;
 }
 
 function ProgramIncrementCard({
@@ -641,7 +588,7 @@ function ProgramIncrementCard({
   onUpdateSprintEnd,
   onDeleteSprint,
   onMoveSprint,
-  onUpdatePI,
+  programIncrementsStore,
 }: ProgramIncrementCardProps) {
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [isSprintListCollapsed, setIsSprintListCollapsed] = useState(false);
@@ -875,7 +822,7 @@ function ProgramIncrementCard({
           pi={pi}
           team={team}
           requirements={requirements}
-          onUpdatePI={onUpdatePI}
+          programIncrementsStore={programIncrementsStore}
           onClose={() => setIsManagingReservations(false)}
         />
       )}

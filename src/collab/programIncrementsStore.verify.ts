@@ -6,7 +6,7 @@
  *   npx tsx src/collab/programIncrementsStore.verify.ts
  */
 import * as Y from "yjs";
-import { createLocalProgramIncrementsStore } from "./programIncrementsStore";
+import { createLocalProgramIncrementsStore, createAdapterProgramIncrementsStore } from "./programIncrementsStore";
 import { createYjsProgramIncrementsStore } from "./yjsProgramIncrementsStore";
 import type { ProgramIncrementsStore } from "./programIncrementsStore";
 
@@ -58,6 +58,16 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: ProgramIncrementsStore
   const localSnap = runSequence(createLocalProgramIncrementsStore());
   const yjsSnap = runSequence(createYjsProgramIncrementsStore(new Y.Doc()));
 
+  let adapterPis: ReturnType<ProgramIncrementsStore["getSnapshot"]> = [];
+  const adapterSnap = runSequence(
+    createAdapterProgramIncrementsStore(
+      () => adapterPis,
+      (updater) => {
+        adapterPis = updater(adapterPis);
+      }
+    )
+  );
+
   // Ids themselves are collision-resistant/random and will differ between
   // implementations by design - strip them before comparing structure.
   function stripIds(pis: ReturnType<ProgramIncrementsStore["getSnapshot"]>) {
@@ -72,6 +82,10 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: ProgramIncrementsStore
   assert(
     canonicalJSON(stripIds(localSnap)) === canonicalJSON(stripIds(yjsSnap)),
     "local and Yjs stores produce structurally identical results (PI name, sprint names/order after the move, reservation) after the same sequence of operations - the Yjs implementation is a faithful drop-in for single-user use"
+  );
+  assert(
+    canonicalJSON(stripIds(localSnap)) === canonicalJSON(stripIds(adapterSnap)),
+    "the adapter store (delegating to an externally-owned setSnapshot, matching how App.tsx's undoable state works) produces a structurally identical result too"
   );
 }
 

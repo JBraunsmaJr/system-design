@@ -52,6 +52,7 @@ import type { TeamDocument } from "./domain/teamTypes";
 import { EMPTY_TEAM_DOCUMENT } from "./domain/teamTypes";
 import { createAdapterTeamStore } from "./collab/teamStore";
 import { createAdapterRequirementsStore } from "./collab/requirementsStore";
+import { createAdapterProgramIncrementsStore } from "./collab/programIncrementsStore";
 import "./App.css";
 
 let idSeed = 0;
@@ -184,6 +185,10 @@ function App() {
     (updater: (prev: ProgramIncrement[]) => ProgramIncrement[]) =>
       setDiagram((prev) => ({ ...prev, programIncrements: updater(prev.programIncrements) })),
     [setDiagram]
+  );
+  const programIncrementsStore = useMemo(
+    () => createAdapterProgramIncrementsStore(() => programIncrements, setProgramIncrements),
+    [programIncrements, setProgramIncrements]
   );
 
   const setTeam = useCallback(
@@ -1207,8 +1212,7 @@ function App() {
         )}
         {viewMode === "timeline" && (
           <TimelineView
-            programIncrements={programIncrements}
-            onUpdateProgramIncrements={setProgramIncrements}
+            programIncrementsStore={programIncrementsStore}
             requirementsStore={requirementsStore}
             team={team}
             diagramRoot={root}
@@ -1220,8 +1224,7 @@ function App() {
         {viewMode === "team" && (
           <TeamView
             teamStore={teamStore}
-            programIncrements={programIncrements}
-            onUpdateProgramIncrements={setProgramIncrements}
+            programIncrementsStore={programIncrementsStore}
             requirements={requirements}
           />
         )}

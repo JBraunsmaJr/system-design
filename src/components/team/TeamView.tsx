@@ -20,6 +20,7 @@ import type {
   HalfDayType,
 } from "../../domain/teamTypes";
 import type { ProgramIncrement } from "../../domain/programIncrements";
+import type { ProgramIncrementsStore } from "../../collab/programIncrementsStore";
 import type { RequirementsDocument } from "../../domain/requirementsTypes";
 import { isItemWorkable } from "../../domain/requirementsRegistry";
 import type { TeamStore } from "../../collab/teamStore";
@@ -33,8 +34,7 @@ import { ManageReservationsModal } from "../timeline/ManageReservationsModal";
 
 interface TeamViewProps {
   teamStore: TeamStore;
-  programIncrements: ProgramIncrement[];
-  onUpdateProgramIncrements?: (updater: (prev: ProgramIncrement[]) => ProgramIncrement[]) => void;
+  programIncrementsStore: ProgramIncrementsStore;
   requirements: RequirementsDocument;
 }
 
@@ -60,15 +60,17 @@ function todayISO(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function TeamView({ teamStore, programIncrements, onUpdateProgramIncrements, requirements }: TeamViewProps) {
+export function TeamView({ teamStore, programIncrementsStore, requirements }: TeamViewProps) {
   const team = useSyncExternalStore(teamStore.subscribe, teamStore.getSnapshot);
+  const programIncrements = useSyncExternalStore(programIncrementsStore.subscribe, programIncrementsStore.getSnapshot);
   const [activeTab, setActiveTab] = useState<"members" | "settings" | "sprints">("members");
   const [isAddingMember, setIsAddingMember] = useState(false);
   const [newMemberName, setNewMemberName] = useState("");
   const [newMemberRole, setNewMemberRole] = useState("");
   const [newMemberColor, setNewMemberColor] = useState(AVATAR_COLORS[0]);
   const [newMemberPointsPerDay, setNewMemberPointsPerDay] = useState<string>("");
-  const [managingReservationsPI, setManagingReservationsPI] = useState<ProgramIncrement | null>(null);
+  const [managingReservationsPIId, setManagingReservationsPIId] = useState<string | null>(null);
+  const managingReservationsPI = programIncrements.find((pi) => pi.id === managingReservationsPIId) ?? null;
 
   // PTO modal state
   const [ptoModalMemberId, setPtoModalMemberId] = useState<string | null>(null);
@@ -608,17 +610,15 @@ export function TeamView({ teamStore, programIncrements, onUpdateProgramIncremen
                             <div className="sprint-matrix-cell__sprint-info">
                               <div className="sprint-matrix-cell__pi-row">
                                 <span className="sprint-matrix-cell__pi-badge">{pi.name}</span>
-                                {onUpdateProgramIncrements && (
-                                  <button
-                                    type="button"
-                                    className="sprint-matrix-cell__manage-res-btn"
-                                    onClick={() => setManagingReservationsPI(pi)}
-                                    title={`Manage Capacity Reservations for ${pi.name}`}
-                                  >
-                                    <ShieldAlert size={10} />
-                                    <span>{pi.reservations?.length ? `${pi.reservations.length} res` : "Reserve"}</span>
-                                  </button>
-                                )}
+                                <button
+                                  type="button"
+                                  className="sprint-matrix-cell__manage-res-btn"
+                                  onClick={() => setManagingReservationsPIId(pi.id)}
+                                  title={`Manage Capacity Reservations for ${pi.name}`}
+                                >
+                                  <ShieldAlert size={10} />
+                                  <span>{pi.reservations?.length ? `${pi.reservations.length} res` : "Reserve"}</span>
+                                </button>
                               </div>
                               <strong className="sprint-matrix-cell__sprint-name">{summary.sprintName}</strong>
                               <span className="sprint-matrix-cell__dates">
@@ -1057,18 +1057,13 @@ export function TeamView({ teamStore, programIncrements, onUpdateProgramIncremen
         </div>
       )}
       {/* CAPACITY RESERVATIONS MODAL */}
-      {managingReservationsPI && onUpdateProgramIncrements && (
+      {managingReservationsPI && (
         <ManageReservationsModal
           pi={managingReservationsPI}
           team={team}
           requirements={requirements}
-          onUpdatePI={(updatedPI) => {
-            onUpdateProgramIncrements((pis) =>
-              pis.map((p) => (p.id === updatedPI.id ? updatedPI : p))
-            );
-            setManagingReservationsPI(updatedPI);
-          }}
-          onClose={() => setManagingReservationsPI(null)}
+          programIncrementsStore={programIncrementsStore}
+          onClose={() => setManagingReservationsPIId(null)}
         />
       )}
     </div>

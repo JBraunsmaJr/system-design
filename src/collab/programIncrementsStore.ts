@@ -195,3 +195,121 @@ export function createLocalProgramIncrementsStore(initial: ProgramIncrement[] = 
     },
   };
 }
+
+/**
+ * A ProgramIncrementsStore that owns no state of its own - same purpose
+ * and reasoning as createAdapterTeamStore/createAdapterRequirementsStore.
+ * `programIncrements` stays exactly where it already lives in App.tsx's
+ * undoable DiagramSnapshot, updated through the same setProgramIncrements
+ * function as before - only the shape of the call sites changes (named
+ * operations instead of inline transforms).
+ */
+export function createAdapterProgramIncrementsStore(
+  getSnapshot: () => ProgramIncrement[],
+  setSnapshot: (updater: (prev: ProgramIncrement[]) => ProgramIncrement[]) => void
+): ProgramIncrementsStore {
+  return {
+    getSnapshot,
+
+    subscribe: () => () => {},
+
+    addPI: () => {
+      const newPI: ProgramIncrement = {
+        id: nextId("pi"),
+        name: `PI ${getSnapshot().length + 1}`,
+        startDate: todayISO(),
+        sprints: [{ id: nextId("sprint"), name: "Sprint 1", durationDays: DEFAULT_SPRINT_DURATION_DAYS }],
+      };
+      setSnapshot((prev) => [...prev, newPI]);
+      return newPI.id;
+    },
+
+    updatePIName: (piId, name) => {
+      setSnapshot((prev) => prev.map((pi) => (pi.id === piId ? { ...pi, name } : pi)));
+    },
+
+    updatePIStart: (piId, startDate) => {
+      setSnapshot((prev) => prev.map((pi) => (pi.id === piId ? updatePIStartDate(pi, startDate) : pi)));
+    },
+
+    deletePI: (piId) => {
+      setSnapshot((prev) => prev.filter((pi) => pi.id !== piId));
+    },
+
+    addSprint: (piId) => {
+      setSnapshot((prev) =>
+        prev.map((pi) =>
+          pi.id === piId
+            ? {
+                ...pi,
+                sprints: [
+                  ...pi.sprints,
+                  { id: nextId("sprint"), name: `Sprint ${pi.sprints.length + 1}`, durationDays: DEFAULT_SPRINT_DURATION_DAYS },
+                ],
+              }
+            : pi
+        )
+      );
+    },
+
+    updateSprintName: (piId, sprintId, name) => {
+      setSnapshot((prev) =>
+        prev.map((pi) =>
+          pi.id === piId ? { ...pi, sprints: pi.sprints.map((s) => (s.id === sprintId ? { ...s, name } : s)) } : pi
+        )
+      );
+    },
+
+    updateSprintEnd: (piId, sprintId, newEndDate) => {
+      setSnapshot((prev) => prev.map((pi) => (pi.id === piId ? updateSprintEndDate(pi, sprintId, newEndDate) : pi)));
+    },
+
+    deleteSprint: (piId, sprintId) => {
+      setSnapshot((prev) =>
+        prev.map((pi) => (pi.id === piId ? { ...pi, sprints: pi.sprints.filter((s) => s.id !== sprintId) } : pi))
+      );
+    },
+
+    moveSprint: (piId, sprintId, direction) => {
+      setSnapshot((prev) =>
+        prev.map((pi) => {
+          if (pi.id !== piId) return pi;
+          const index = pi.sprints.findIndex((s) => s.id === sprintId);
+          const swapWith = direction === "up" ? index - 1 : index + 1;
+          if (index === -1 || swapWith < 0 || swapWith >= pi.sprints.length) return pi;
+          const sprints = [...pi.sprints];
+          [sprints[index], sprints[swapWith]] = [sprints[swapWith], sprints[index]];
+          return { ...pi, sprints };
+        })
+      );
+    },
+
+    addReservation: (piId, reservation) => {
+      const newReservation: CapacityReservation = { ...reservation, id: nextId("cres") };
+      setSnapshot((prev) =>
+        prev.map((pi) => (pi.id === piId ? { ...pi, reservations: [...(pi.reservations ?? []), newReservation] } : pi))
+      );
+    },
+
+    updateReservation: (piId, reservationId, patch) => {
+      setSnapshot((prev) =>
+        prev.map((pi) =>
+          pi.id === piId
+            ? {
+                ...pi,
+                reservations: (pi.reservations ?? []).map((r) => (r.id === reservationId ? { ...patch, id: r.id } : r)),
+              }
+            : pi
+        )
+      );
+    },
+
+    deleteReservation: (piId, reservationId) => {
+      setSnapshot((prev) =>
+        prev.map((pi) =>
+          pi.id === piId ? { ...pi, reservations: (pi.reservations ?? []).filter((r) => r.id !== reservationId) } : pi
+        )
+      );
+    },
+  };
+}
