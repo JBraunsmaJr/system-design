@@ -14,10 +14,11 @@
  * this in the repo; nothing else depends on it.
  */
 import * as Y from "yjs";
-import { createLocalTeamStore } from "./teamStore";
+import { createLocalTeamStore, createAdapterTeamStore } from "./teamStore";
 import { createYjsTeamStore } from "./yjsTeamStore";
 import type { TeamStore } from "./teamStore";
-import type { TeamMember } from "../domain/teamTypes";
+import type { TeamMember, TeamDocument } from "../domain/teamTypes";
+import { EMPTY_TEAM_DOCUMENT } from "../domain/teamTypes";
 
 let failures = 0;
 function assert(cond: boolean, msg: string) {
@@ -73,7 +74,18 @@ function canonicalJSON(value: unknown): string {
   const localSnap = runSequence(createLocalTeamStore());
   const yjsSnap = runSequence(createYjsTeamStore(new Y.Doc()));
 
+  let adapterDoc: TeamDocument = { ...EMPTY_TEAM_DOCUMENT, settings: { ...EMPTY_TEAM_DOCUMENT.settings } };
+  const adapterSnap = runSequence(
+    createAdapterTeamStore(
+      () => adapterDoc,
+      (updater) => {
+        adapterDoc = updater(adapterDoc);
+      }
+    )
+  );
+
   assert(canonicalJSON(localSnap) === canonicalJSON(yjsSnap), "local and Yjs stores produce an IDENTICAL snapshot after the same sequence of operations - the Yjs implementation is a faithful drop-in for single-user use");
+  assert(canonicalJSON(localSnap) === canonicalJSON(adapterSnap), "the adapter store (delegating to an externally-owned setSnapshot, matching how App.tsx's undoable state works) produces an IDENTICAL snapshot too - it's a faithful translation of the same named operations into the same inline-transform pattern TeamView used to write by hand");
 }
 
 // === Part 2: the actual point - concurrent, independent edits from different peers ===

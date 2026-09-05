@@ -124,3 +124,96 @@ export function createLocalTeamStore(initial: TeamDocument = EMPTY_TEAM_DOCUMENT
     },
   };
 }
+
+/**
+ * A TeamStore that owns no state of its own - every operation is
+ * translated into the exact same setSnapshot(prev => ({...})) transform
+ * TeamView.tsx used to write inline at each call site, applied to
+ * whatever state the caller is already managing (in practice: the
+ * `team` field of App.tsx's single undoable DiagramSnapshot).
+ *
+ * This exists specifically so wiring TeamView over to the TeamStore
+ * interface doesn't change local-mode behavior AT ALL, including undo -
+ * `team` stays exactly where it already lives, in the same combined
+ * undo history as everything else, updated through the same setTeam
+ * function as before. Only the shape of the call sites changes (named
+ * operations instead of inline transforms); nothing about how or where
+ * the data is stored does. Swapping in the real Yjs-backed store later,
+ * once a collaborative session starts, is a separate, later decision -
+ * this adapter is not that; it's what keeps local mode's existing
+ * behavior completely intact while TeamView is migrated onto the seam.
+ *
+ * subscribe() is a deliberate no-op, not an oversight: this store's
+ * "state" is really just a view onto React state the caller (App.tsx)
+ * already owns and re-renders on every change to. Any consumer using
+ * useSyncExternalStore(store.subscribe, store.getSnapshot) still gets
+ * fresh data every render regardless, because useSyncExternalStore
+ * re-invokes getSnapshot on every render pass of its own accord, not
+ * only in response to a subscribe notification - and this store's
+ * consumer WILL re-render whenever `team` changes, since a fresh
+ * getSnapshot closure (over the new value) gets created and passed down
+ * as a new prop each time. The subscribe mechanism only earns its keep
+ * for a store that can change independently of the consuming
+ * component's own render cycle - a remote peer's edit arriving with no
+ * other React state changing locally - which is exactly the case
+ * createYjsTeamStore needs it for, and this adapter never will.
+ */
+export function createAdapterTeamStore(
+  getSnapshot: () => TeamDocument,
+  setSnapshot: (updater: (prev: TeamDocument) => TeamDocument) => void
+): TeamStore {
+  return {
+    getSnapshot,
+
+    subscribe: () => () => {},
+
+    addMember: (member) => {
+      setSnapshot((prev) => ({ ...prev, members: [...prev.members, member] }));
+    },
+
+    updateMember: (memberId, patch) => {
+      setSnapshot((prev) => ({
+        ...prev,
+        members: prev.members.map((m) => (m.id === memberId ? { ...m, ...patch } : m)),
+      }));
+    },
+
+    deleteMember: (memberId) => {
+      setSnapshot((prev) => ({ ...prev, members: prev.members.filter((m) => m.id !== memberId) }));
+    },
+
+    addPtoSpan: (memberId, span) => {
+      setSnapshot((prev) => ({
+        ...prev,
+        members: prev.members.map((m) => (m.id === memberId ? { ...m, ptoSpans: [...m.ptoSpans, span] } : m)),
+      }));
+    },
+
+    deletePtoSpan: (memberId, ptoId) => {
+      setSnapshot((prev) => ({
+        ...prev,
+        members: prev.members.map((m) =>
+          m.id === memberId ? { ...m, ptoSpans: m.ptoSpans.filter((p) => p.id !== ptoId) } : m
+        ),
+      }));
+    },
+
+    addExtraDayOff: (extra) => {
+      setSnapshot((prev) => ({
+        ...prev,
+        settings: { ...prev.settings, extraDaysOff: [...prev.settings.extraDaysOff, extra] },
+      }));
+    },
+
+    deleteExtraDayOff: (extraId) => {
+      setSnapshot((prev) => ({
+        ...prev,
+        settings: { ...prev.settings, extraDaysOff: prev.settings.extraDaysOff.filter((e) => e.id !== extraId) },
+      }));
+    },
+
+    updateSettings: (patch) => {
+      setSnapshot((prev) => ({ ...prev, settings: { ...prev.settings, ...patch } }));
+    },
+  };
+}

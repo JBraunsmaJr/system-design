@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useSyncExternalStore } from "react";
 import {
   Users,
   UserPlus,
@@ -14,7 +14,6 @@ import {
   CalendarRange,
 } from "lucide-react";
 import type {
-  TeamDocument,
   TeamMember,
   PtoSpan,
   ExtraDayOff,
@@ -23,6 +22,7 @@ import type {
 import type { ProgramIncrement } from "../../domain/programIncrements";
 import type { RequirementsDocument } from "../../domain/requirementsTypes";
 import { isItemWorkable } from "../../domain/requirementsRegistry";
+import type { TeamStore } from "../../collab/teamStore";
 import { computeSprintDateRanges, getSprintActiveReservations } from "../../domain/programIncrements";
 import {
   computeSprintCapacity,
@@ -32,8 +32,7 @@ import {
 import { ManageReservationsModal } from "../timeline/ManageReservationsModal";
 
 interface TeamViewProps {
-  team: TeamDocument;
-  onUpdateTeam: (updater: (prev: TeamDocument) => TeamDocument) => void;
+  teamStore: TeamStore;
   programIncrements: ProgramIncrement[];
   onUpdateProgramIncrements?: (updater: (prev: ProgramIncrement[]) => ProgramIncrement[]) => void;
   requirements: RequirementsDocument;
@@ -61,7 +60,8 @@ function todayISO(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function TeamView({ team, onUpdateTeam, programIncrements, onUpdateProgramIncrements, requirements }: TeamViewProps) {
+export function TeamView({ teamStore, programIncrements, onUpdateProgramIncrements, requirements }: TeamViewProps) {
+  const team = useSyncExternalStore(teamStore.subscribe, teamStore.getSnapshot);
   const [activeTab, setActiveTab] = useState<"members" | "settings" | "sprints">("members");
   const [isAddingMember, setIsAddingMember] = useState(false);
   const [newMemberName, setNewMemberName] = useState("");
@@ -115,10 +115,7 @@ export function TeamView({ team, onUpdateTeam, programIncrements, onUpdateProgra
       ptoSpans: [],
     };
 
-    onUpdateTeam((prev) => ({
-      ...prev,
-      members: [...prev.members, newMember],
-    }));
+    teamStore.addMember(newMember);
 
     setNewMemberName("");
     setNewMemberRole("");
@@ -127,17 +124,11 @@ export function TeamView({ team, onUpdateTeam, programIncrements, onUpdateProgra
   };
 
   const handleUpdateMember = (memberId: string, patch: Partial<TeamMember>) => {
-    onUpdateTeam((prev) => ({
-      ...prev,
-      members: prev.members.map((m) => (m.id === memberId ? { ...m, ...patch } : m)),
-    }));
+    teamStore.updateMember(memberId, patch);
   };
 
   const handleDeleteMember = (memberId: string) => {
-    onUpdateTeam((prev) => ({
-      ...prev,
-      members: prev.members.filter((m) => m.id !== memberId),
-    }));
+    teamStore.deleteMember(memberId);
   };
 
   const handleOpenPtoModal = (memberId: string) => {
@@ -169,23 +160,13 @@ export function TeamView({ team, onUpdateTeam, programIncrements, onUpdateProgra
       note: ptoNote.trim() || undefined,
     };
 
-    onUpdateTeam((prev) => ({
-      ...prev,
-      members: prev.members.map((m) =>
-        m.id === ptoModalMemberId ? { ...m, ptoSpans: [...m.ptoSpans, newPto] } : m
-      ),
-    }));
+    teamStore.addPtoSpan(ptoModalMemberId, newPto);
 
     setPtoModalMemberId(null);
   };
 
   const handleDeletePtoSpan = (memberId: string, ptoId: string) => {
-    onUpdateTeam((prev) => ({
-      ...prev,
-      members: prev.members.map((m) =>
-        m.id === memberId ? { ...m, ptoSpans: m.ptoSpans.filter((p) => p.id !== ptoId) } : m
-      ),
-    }));
+    teamStore.deletePtoSpan(memberId, ptoId);
   };
 
   const handleAddExtraDayOff = (e: React.FormEvent) => {
@@ -200,13 +181,7 @@ export function TeamView({ team, onUpdateTeam, programIncrements, onUpdateProgra
       note: extraDayNote.trim() || undefined,
     };
 
-    onUpdateTeam((prev) => ({
-      ...prev,
-      settings: {
-        ...prev.settings,
-        extraDaysOff: [...prev.settings.extraDaysOff, newExtra],
-      },
-    }));
+    teamStore.addExtraDayOff(newExtra);
 
     setExtraDayName("");
     setExtraDayDate(todayISO());
@@ -216,13 +191,7 @@ export function TeamView({ team, onUpdateTeam, programIncrements, onUpdateProgra
   };
 
   const handleDeleteExtraDayOff = (extraId: string) => {
-    onUpdateTeam((prev) => ({
-      ...prev,
-      settings: {
-        ...prev.settings,
-        extraDaysOff: prev.settings.extraDaysOff.filter((e) => e.id !== extraId),
-      },
-    }));
+    teamStore.deleteExtraDayOff(extraId);
   };
 
   const getInitials = (name: string) => {
@@ -800,10 +769,7 @@ export function TeamView({ team, onUpdateTeam, programIncrements, onUpdateProgra
                       onChange={(e) => {
                         const val = parseFloat(e.target.value);
                         if (!isNaN(val) && val > 0) {
-                          onUpdateTeam((prev) => ({
-                            ...prev,
-                            settings: { ...prev.settings, defaultPointsPerDay: val },
-                          }));
+                          teamStore.updateSettings({ defaultPointsPerDay: val });
                         }
                       }}
                     />
@@ -828,10 +794,7 @@ export function TeamView({ team, onUpdateTeam, programIncrements, onUpdateProgra
                     checked={team.settings.excludeUsHolidays}
                     onChange={(e) => {
                       const checked = e.target.checked;
-                      onUpdateTeam((prev) => ({
-                        ...prev,
-                        settings: { ...prev.settings, excludeUsHolidays: checked },
-                      }));
+                      teamStore.updateSettings({ excludeUsHolidays: checked });
                     }}
                   />
                   <span className="toggle-slider" />

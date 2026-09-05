@@ -50,6 +50,7 @@ import {
 import type { ProgramIncrement } from "./domain/programIncrements";
 import type { TeamDocument } from "./domain/teamTypes";
 import { EMPTY_TEAM_DOCUMENT } from "./domain/teamTypes";
+import { createAdapterTeamStore } from "./collab/teamStore";
 import "./App.css";
 
 let idSeed = 0;
@@ -185,6 +186,7 @@ function App() {
       setDiagram((prev) => ({ ...prev, team: updater(prev.team) })),
     [setDiagram]
   );
+  const teamStore = useMemo(() => createAdapterTeamStore(() => team, setTeam), [team, setTeam]);
 
   // Auto-saves the current diagram to localStorage so a refresh, an
   // accidental tab close, or a crash doesn't lose work - separate from
@@ -1214,8 +1216,7 @@ function App() {
         )}
         {viewMode === "team" && (
           <TeamView
-            team={team}
-            onUpdateTeam={setTeam}
+            teamStore={teamStore}
             programIncrements={programIncrements}
             onUpdateProgramIncrements={setProgramIncrements}
             requirements={requirements}
