@@ -602,22 +602,32 @@ function App() {
     });
     // Only root items (no parentId within the pasted set) need the position
     // offset - children are positioned relative to their (also being
-    // pasted, also shifted) parent, so they move along automatically.
-    // Pasted nodes are NOT marked selected - nothing should be selected
-    // after a paste. That also means clearing `selected` on whatever was
-    // still selected from the copy itself, which the previous version
-    // missed: copying doesn't clear selection, so the ORIGINAL nodes kept
-    // their own `.selected: true` the entire time, which is what made both
-    // the originals and the paste appear selected together.
+    // pasted, also shifted) parent, so they move along automatically. The
+    // same root/child split applies to selection: only root items are
+    // marked selected, matching how a normal click or rubber-band
+    // selection already treats a group (the group itself gets selected,
+    // not each individual child), relying on React Flow's built-in
+    // parent-child dragging to move a selected group's contents together.
+    // The pasted result becomes the new selection - matches how paste
+    // behaves elsewhere (Figma, PowerPoint, etc.), letting the person
+    // immediately nudge/move what they just pasted. The ORIGINAL nodes
+    // need their `selected` explicitly cleared here too: copying doesn't
+    // touch selection, so the originals kept their own `.selected: true`
+    // the entire time, which is what made both the originals and the
+    // paste appear selected together in an earlier version of this.
     const offsetNodes = clonedNodes.map((n) =>
-      n.parentId ? n : { ...n, position: { x: n.position.x + offset, y: n.position.y + offset } }
+      n.parentId
+        ? n
+        : { ...n, position: { x: n.position.x + offset, y: n.position.y + offset }, selected: true }
     );
+    const rootPastedIds = new Set(offsetNodes.filter((n) => !n.parentId).map((n) => n.id));
+    const selectedEdges = clonedEdges.map((e) => ({ ...e, selected: true }));
     setCurrentNodes((nds) =>
       reorderWithGroupsFirst([...nds.map((n) => (n.selected ? { ...n, selected: false } : n)), ...offsetNodes])
     );
-    setCurrentEdges((eds) => [...eds.map((e) => (e.selected ? { ...e, selected: false } : e)), ...clonedEdges]);
-    setSelectedNodeIds([]);
-    setSelectedEdgeIds([]);
+    setCurrentEdges((eds) => [...eds.map((e) => (e.selected ? { ...e, selected: false } : e)), ...selectedEdges]);
+    setSelectedNodeIds([...rootPastedIds]);
+    setSelectedEdgeIds(selectedEdges.map((e) => e.id));
     setPasteOffset((p) => p + 40);
   }, [clipboard, pasteOffset, setCurrentNodes, setCurrentEdges]);
 
