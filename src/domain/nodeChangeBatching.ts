@@ -40,6 +40,14 @@ export function applySelectionChanges(changes: (NodeChange | EdgeChange)[], curr
   return result;
 }
 
+/** Minimal snapshot of a node's current geometry, used only to detect
+ * no-op changes before they're queued - see classifyNodeChanges below. */
+export interface CurrentNodeGeometry {
+  position: { x: number; y: number };
+  width?: number;
+  height?: number;
+}
+
 /**
  * Pure decision logic behind App.tsx's rAF-throttled onNodesChange -
  * separated out specifically so it's testable without a browser
@@ -53,30 +61,58 @@ export function applySelectionChanges(changes: (NodeChange | EdgeChange)[], curr
  * that map's lifetime via useRef, this function just knows how to
  * update it correctly for one batch of incoming changes.
  *
+ * `currentNodes` is looked up to skip a change ENTIRELY - never even
+ * queuing it - when the incoming value is identical to what the node
+ * already has. This is not just an optimization: a real, reported bug
+ * traced back to exactly this gap. React Flow re-measures every node's
+ * rendered dimensions via ResizeObserver and emits them through
+ * onNodesChange whenever it observes them, including when nothing
+ * actually changed - and unconditionally writing every one of those
+ * "unchanged" dimensions to the store (particularly the Yjs-backed
+ * session store, which rebuilds every node's object reference on any
+ * single write, unlike the local store's targeted-path update) forces
+ * every node component to re-render, which re-triggers ResizeObserver,
+ * which re-emits the same unchanged dimensions again - a feedback loop
+ * that needs nothing to actually change to keep running indefinitely,
+ * many times a second. Comparing against the node's actual current
+ * geometry and skipping identical values breaks that loop at its
+ * source, regardless of why React Flow keeps re-emitting them.
+ *
  * Returns whether this batch represents an ACTIVE, still-in-progress
  * gesture (dragging or resizing) as opposed to a completed drag/resize
  * (dragging/resizing explicitly false) or a standalone change with no
  * such flag at all (an arrow-key nudge, or the alignment-snap
  * correction onNodeDragStop makes after a drag already ended) - the
  * caller uses this to decide whether to wait for the next animation
- * frame or commit immediately.
+ * frame or commit immediately. A no-op change never counts toward this
+ * either - a batch of nothing-but-unchanged dimensions has nothing to
+ * flush, active gesture or not.
  */
 export function classifyNodeChanges(
   changes: NodeChange[],
-  pending: Map<string, PendingNodeUpdate>
+  pending: Map<string, PendingNodeUpdate>,
+  currentNodes: Map<string, CurrentNodeGeometry>
 ): { isActiveGesture: boolean } {
   let isActiveGesture = false;
   for (const change of changes) {
     if (change.type === "position" && change.position) {
-      pending.set(change.id, { type: "position", position: change.position });
-      if (change.dragging === true) isActiveGesture = true;
+      const current = currentNodes.get(change.id);
+      const isNoOp = !!current && current.position.x === change.position.x && current.position.y === change.position.y;
+      if (!isNoOp) {
+        pending.set(change.id, { type: "position", position: change.position });
+        if (change.dragging === true) isActiveGesture = true;
+      }
     } else if (change.type === "dimensions" && change.dimensions) {
-      pending.set(change.id, {
-        type: "dimensions",
-        width: change.dimensions.width,
-        height: change.dimensions.height,
-      });
-      if (change.resizing === true) isActiveGesture = true;
+      const current = currentNodes.get(change.id);
+      const isNoOp = !!current && current.width === change.dimensions.width && current.height === change.dimensions.height;
+      if (!isNoOp) {
+        pending.set(change.id, {
+          type: "dimensions",
+          width: change.dimensions.width,
+          height: change.dimensions.height,
+        });
+        if (change.resizing === true) isActiveGesture = true;
+      }
     }
   }
   return { isActiveGesture };

@@ -15,7 +15,7 @@
  * position being committed (a new, worse bug) - so this is tested
  * thoroughly rather than trusted from a single manual read-through.
  */
-import { classifyNodeChanges, applySelectionChanges, type PendingNodeUpdate } from "./nodeChangeBatching";
+import { classifyNodeChanges, applySelectionChanges, type PendingNodeUpdate, type CurrentNodeGeometry } from "./nodeChangeBatching";
 import type { NodeChange } from "@xyflow/react";
 
 let failures = 0;
@@ -32,7 +32,7 @@ function assert(cond: boolean, msg: string) {
 {
   const pending = new Map<string, PendingNodeUpdate>();
   const changes: NodeChange[] = [{ id: "n1", type: "position", position: { x: 10, y: 20 }, dragging: true }];
-  const { isActiveGesture } = classifyNodeChanges(changes, pending);
+  const { isActiveGesture } = classifyNodeChanges(changes, pending, new Map<string, CurrentNodeGeometry>());
 
   assert(isActiveGesture, "a position change with dragging: true is correctly reported as an active, in-progress gesture");
   assert(pending.size === 1 && pending.get("n1")?.type === "position", "the position change is queued into the pending map");
@@ -42,7 +42,7 @@ function assert(cond: boolean, msg: string) {
 {
   const pending = new Map<string, PendingNodeUpdate>();
   const changes: NodeChange[] = [{ id: "n1", type: "position", position: { x: 99, y: 99 }, dragging: false }];
-  const { isActiveGesture } = classifyNodeChanges(changes, pending);
+  const { isActiveGesture } = classifyNodeChanges(changes, pending, new Map<string, CurrentNodeGeometry>());
 
   assert(!isActiveGesture, "the drag-ending event (dragging: false) is correctly NOT treated as an active gesture - the caller should flush immediately, not wait for another frame");
   const update = pending.get("n1");
@@ -53,7 +53,7 @@ function assert(cond: boolean, msg: string) {
 {
   const pending = new Map<string, PendingNodeUpdate>();
   const changes: NodeChange[] = [{ id: "n1", type: "position", position: { x: 5, y: 5 } }]; // no `dragging` field at all
-  const { isActiveGesture } = classifyNodeChanges(changes, pending);
+  const { isActiveGesture } = classifyNodeChanges(changes, pending, new Map<string, CurrentNodeGeometry>());
 
   assert(!isActiveGesture, "a position change with no dragging flag at all (e.g. an arrow-key nudge) is treated the same as a completed gesture - commit right away, don't wait a frame for something that was never a high-frequency gesture to begin with");
 }
@@ -66,7 +66,7 @@ function assert(cond: boolean, msg: string) {
     { id: "n1", type: "position", position: { x: 2, y: 2 }, dragging: true },
     { id: "n1", type: "position", position: { x: 3, y: 3 }, dragging: true },
   ];
-  classifyNodeChanges(changes, pending);
+  classifyNodeChanges(changes, pending, new Map<string, CurrentNodeGeometry>());
 
   const update = pending.get("n1");
   assert(pending.size === 1 && update?.type === "position" && update.position.x === 3, "multiple position changes for the same node id in one batch correctly deduplicate to only the LAST one, not three separate pending entries");
@@ -80,7 +80,7 @@ function assert(cond: boolean, msg: string) {
     { id: "b", type: "position", position: { x: 20, y: 20 }, dragging: true },
     { id: "c", type: "position", position: { x: 30, y: 30 }, dragging: true },
   ];
-  const { isActiveGesture } = classifyNodeChanges(changes, pending);
+  const { isActiveGesture } = classifyNodeChanges(changes, pending, new Map<string, CurrentNodeGeometry>());
 
   assert(isActiveGesture, "a multi-node drag is correctly treated as an active gesture");
   assert(pending.size === 3, "each of the three simultaneously-dragged nodes gets its own independent pending entry, not merged or overwritten");
@@ -94,7 +94,7 @@ function assert(cond: boolean, msg: string) {
     { id: "a", type: "position", position: { x: 1, y: 1 }, dragging: false }, // this one just finished
     { id: "b", type: "position", position: { x: 2, y: 2 }, dragging: true }, // this one is still going
   ];
-  const { isActiveGesture } = classifyNodeChanges(changes, pending);
+  const { isActiveGesture } = classifyNodeChanges(changes, pending, new Map<string, CurrentNodeGeometry>());
 
   assert(isActiveGesture, "if even one change in the batch is still actively dragging, the whole batch waits for the next frame rather than committing immediately - correct, since node b's gesture is still in progress");
 }
@@ -102,18 +102,12 @@ function assert(cond: boolean, msg: string) {
 // === Part 7: dimensions/resizing follow the identical pattern to position/dragging ===
 {
   const pendingActive = new Map<string, PendingNodeUpdate>();
-  const { isActiveGesture: activeDuringResize } = classifyNodeChanges(
-    [{ id: "n1", type: "dimensions", dimensions: { width: 200, height: 150 }, resizing: true }],
-    pendingActive
-  );
+  const { isActiveGesture: activeDuringResize } = classifyNodeChanges([{ id: "n1", type: "dimensions", dimensions: { width: 200, height: 150 }, resizing: true }], pendingActive, new Map<string, CurrentNodeGeometry>());
   assert(activeDuringResize, "a dimensions change with resizing: true is correctly treated as an active gesture");
   assert(pendingActive.get("n1")?.type === "dimensions", "the dimensions change is correctly queued");
 
   const pendingDone = new Map<string, PendingNodeUpdate>();
-  const { isActiveGesture: activeAfterResize } = classifyNodeChanges(
-    [{ id: "n1", type: "dimensions", dimensions: { width: 200, height: 150 }, resizing: false }],
-    pendingDone
-  );
+  const { isActiveGesture: activeAfterResize } = classifyNodeChanges([{ id: "n1", type: "dimensions", dimensions: { width: 200, height: 150 }, resizing: false }], pendingDone, new Map<string, CurrentNodeGeometry>());
   assert(!activeAfterResize, "the resize-ending event (resizing: false) is correctly NOT treated as an active gesture");
 }
 
@@ -124,7 +118,7 @@ function assert(cond: boolean, msg: string) {
     { id: "n1", type: "select", selected: true },
     { id: "n2", type: "remove" },
   ];
-  const { isActiveGesture } = classifyNodeChanges(changes, pending);
+  const { isActiveGesture } = classifyNodeChanges(changes, pending, new Map<string, CurrentNodeGeometry>());
 
   assert(!isActiveGesture, "a batch containing only selection/removal changes is not treated as an active drag/resize gesture");
   assert(pending.size === 0, "selection and removal changes create no pending position/dimension entries at all - there's nothing for this function to do with them");
@@ -133,9 +127,9 @@ function assert(cond: boolean, msg: string) {
 // === Part 9: accumulation across multiple calls - simulating several onNodesChange invocations before a single flush, exactly as happens during a real drag ===
 {
   const pending = new Map<string, PendingNodeUpdate>();
-  classifyNodeChanges([{ id: "n1", type: "position", position: { x: 1, y: 1 }, dragging: true }], pending);
-  classifyNodeChanges([{ id: "n1", type: "position", position: { x: 2, y: 2 }, dragging: true }], pending);
-  classifyNodeChanges([{ id: "n2", type: "position", position: { x: 100, y: 100 }, dragging: true }], pending);
+  classifyNodeChanges([{ id: "n1", type: "position", position: { x: 1, y: 1 }, dragging: true }], pending, new Map<string, CurrentNodeGeometry>());
+  classifyNodeChanges([{ id: "n1", type: "position", position: { x: 2, y: 2 }, dragging: true }], pending, new Map<string, CurrentNodeGeometry>());
+  classifyNodeChanges([{ id: "n2", type: "position", position: { x: 100, y: 100 }, dragging: true }], pending, new Map<string, CurrentNodeGeometry>());
 
   assert(pending.size === 2, "three separate onNodesChange calls across two distinct nodes correctly accumulate into exactly two pending entries, not three");
   assert((pending.get("n1") as { type: "position"; position: { x: number } }).position.x === 2, "n1's pending entry reflects its most recent call, not its first");
@@ -197,6 +191,89 @@ function assert(cond: boolean, msg: string) {
   const current = ["A"];
   const result = applySelectionChanges([{ id: "n1", type: "position", position: { x: 1, y: 1 }, dragging: true }], current);
   assert(result === current, "a batch with no 'select' changes at all returns the EXACT SAME array reference, not a new (even if equal-content) one - this is what lets React's own setState bail out of an unnecessary re-render during an ordinary drag");
+}
+
+// === Part 16: a dimensions change IDENTICAL to the node's current geometry is NOT queued at all - THE ACTUAL FIX for the reported infinite loop ===
+// React Flow re-measures every node's dimensions via ResizeObserver and
+// re-emits them through onNodesChange whenever it observes them,
+// including when nothing changed. Writing every one of those unconditionally
+// to the store forced a full re-render on every emission, which
+// re-triggered ResizeObserver, which re-emitted the same values again -
+// a self-sustaining loop needing nothing to actually change to keep running.
+{
+  const pending = new Map<string, PendingNodeUpdate>();
+  const current = new Map<string, CurrentNodeGeometry>([["n1", { position: { x: 0, y: 0 }, width: 200, height: 100 }]]);
+  const changes: NodeChange[] = [{ id: "n1", type: "dimensions", dimensions: { width: 200, height: 100 } }];
+  const { isActiveGesture } = classifyNodeChanges(changes, pending, current);
+
+  assert(pending.size === 0, "a dimensions change identical to the node's current width/height is not queued at all - this is the actual fix for the reported infinite loop, where React Flow kept re-emitting unchanged dimensions and each one was previously written to the store unconditionally");
+  assert(!isActiveGesture, "a no-op dimensions change (with no resizing flag) correctly doesn't count as an active gesture either");
+}
+
+// === Part 17: a dimensions change that's genuinely DIFFERENT from current geometry is still queued normally ===
+{
+  const pending = new Map<string, PendingNodeUpdate>();
+  const current = new Map<string, CurrentNodeGeometry>([["n1", { position: { x: 0, y: 0 }, width: 200, height: 100 }]]);
+  const changes: NodeChange[] = [{ id: "n1", type: "dimensions", dimensions: { width: 250, height: 100 } }]; // width genuinely changed
+  classifyNodeChanges(changes, pending, current);
+
+  assert(pending.size === 1 && pending.get("n1")?.type === "dimensions", "a dimensions change that's genuinely different from the current value (even if only one of width/height changed) is still correctly queued - the no-op guard doesn't accidentally swallow real changes");
+}
+
+// === Part 18: the same no-op guard applies to position changes ===
+{
+  const pending = new Map<string, PendingNodeUpdate>();
+  const current = new Map<string, CurrentNodeGeometry>([["n1", { position: { x: 50, y: 75 } }]]);
+
+  const noOpChanges: NodeChange[] = [{ id: "n1", type: "position", position: { x: 50, y: 75 } }];
+  classifyNodeChanges(noOpChanges, pending, current);
+  assert(pending.size === 0, "a position change identical to the node's current position is not queued at all");
+
+  const realChanges: NodeChange[] = [{ id: "n1", type: "position", position: { x: 51, y: 75 } }]; // x genuinely moved
+  classifyNodeChanges(realChanges, pending, current);
+  assert(pending.size === 1, "a position change that's genuinely different (even by one pixel) is still correctly queued");
+}
+
+// === Part 19: a change for a node with NO entry in currentNodes at all (e.g. brand new node) is queued - there's nothing to compare against, so it can never be treated as a no-op ===
+{
+  const pending = new Map<string, PendingNodeUpdate>();
+  const current = new Map<string, CurrentNodeGeometry>(); // empty - "n1" unknown
+  const changes: NodeChange[] = [{ id: "n1", type: "dimensions", dimensions: { width: 100, height: 50 } }];
+  classifyNodeChanges(changes, pending, current);
+
+  assert(pending.size === 1, "a change for a node with no current-geometry entry at all is still queued normally - there's no known 'current' value to compare against, so it can never be mistaken for a no-op");
+}
+
+// === Part 20: THE EXACT REPORTED SCENARIO - a large batch of dimensions changes for many nodes, all identical to their current values, results in an empty pending map and no active gesture ===
+{
+  const pending = new Map<string, PendingNodeUpdate>();
+  const current = new Map<string, CurrentNodeGeometry>();
+  const changes: NodeChange[] = [];
+  for (let i = 0; i < 50; i++) {
+    const id = `node-${i}`;
+    current.set(id, { position: { x: i * 10, y: 0 }, width: 226, height: 120 });
+    changes.push({ id, type: "dimensions", dimensions: { width: 226, height: 120 } });
+  }
+  const { isActiveGesture } = classifyNodeChanges(changes, pending, current);
+
+  assert(pending.size === 0, "a batch of 50 dimensions changes, every single one identical to its node's current geometry (matching the real bug report - React Flow re-measuring an entire diagram's worth of nodes to the same, unchanged sizes), results in an EMPTY pending map - nothing gets written, so the feedback loop has nothing left to sustain it");
+  assert(!isActiveGesture, "a batch containing nothing but no-op changes is correctly not treated as an active gesture");
+}
+
+// === Part 21: a mixed batch - some no-op, some genuinely changed - only the real changes are queued ===
+{
+  const pending = new Map<string, PendingNodeUpdate>();
+  const current = new Map<string, CurrentNodeGeometry>([
+    ["unchanged", { position: { x: 0, y: 0 }, width: 100, height: 50 }],
+    ["resized", { position: { x: 0, y: 0 }, width: 100, height: 50 }],
+  ]);
+  const changes: NodeChange[] = [
+    { id: "unchanged", type: "dimensions", dimensions: { width: 100, height: 50 } }, // no-op
+    { id: "resized", type: "dimensions", dimensions: { width: 150, height: 50 } }, // real change
+  ];
+  classifyNodeChanges(changes, pending, current);
+
+  assert(pending.size === 1 && pending.has("resized") && !pending.has("unchanged"), "in a mixed batch, only the node that genuinely changed size is queued - the unchanged one is correctly filtered out without affecting the other");
 }
 
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);

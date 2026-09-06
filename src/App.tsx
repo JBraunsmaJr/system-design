@@ -61,7 +61,7 @@ import { createYjsProgramIncrementsStore, seedYjsProgramIncrementsDoc } from "./
 import type { ProgramIncrementsStore } from "./collab/programIncrementsStore";
 import { startCollabSession, type CollabSession, type PresenceInfo } from "./collab/session";
 import { loadPresenceName, savePresenceName } from "./domain/presenceIdentity";
-import { classifyNodeChanges, applySelectionChanges, type PendingNodeUpdate } from "./domain/nodeChangeBatching";
+import { classifyNodeChanges, applySelectionChanges, type PendingNodeUpdate, type CurrentNodeGeometry } from "./domain/nodeChangeBatching";
 import "./App.css";
 
 let idSeed = 0;
@@ -539,7 +539,10 @@ function App() {
       // so folding them in here one at a time is correct.
       setSelectedNodeIds((cur) => applySelectionChanges(changes, cur));
 
-      const { isActiveGesture } = classifyNodeChanges(changes, pendingNodeUpdates.current);
+      const currentNodeGeometry = new Map<string, CurrentNodeGeometry>(
+        nodes.map((n) => [n.id, { position: n.position, width: n.width, height: n.height }])
+      );
+      const { isActiveGesture } = classifyNodeChanges(changes, pendingNodeUpdates.current, currentNodeGeometry);
       if (isActiveGesture) {
         if (pendingFlushHandle.current === null) {
           pendingFlushHandle.current = requestAnimationFrame(flushPendingNodeUpdates);
@@ -558,7 +561,7 @@ function App() {
         flushPendingNodeUpdates();
       }
     },
-    [flushPendingNodeUpdates]
+    [flushPendingNodeUpdates, nodes]
   );
 
   // Edges have no position/dimensions concept, so the only thing this
@@ -1401,7 +1404,7 @@ function App() {
   const selectedNode = nodes.find((n) => n.id === selectedNodeId) ?? null;
   const selectedEdge = edges.find((e) => e.id === selectedEdgeId) ?? null;
   const canAddStep = selectedNodeIds.length > 0 || selectedEdgeIds.length > 0;
-
+  console.debug("DEBUG EDGES:", edges.length, edges);
   return (
     <div className="app">
       {!isPresenting && (
