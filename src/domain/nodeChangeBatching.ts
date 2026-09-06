@@ -1,8 +1,44 @@
-import type { NodeChange } from "@xyflow/react";
+import type { NodeChange, EdgeChange } from "@xyflow/react";
 
 export type PendingNodeUpdate =
   | { type: "position"; position: { x: number; y: number } }
   | { type: "dimensions"; width?: number; height?: number };
+
+/**
+ * Pure logic behind onNodesChange's/onEdgesChange's synchronous
+ * selection handling - separated out for the same testability reason as
+ * classifyNodeChanges below (no React state setters or hooks to
+ * exercise directly in a plain Node script).
+ *
+ * Exists because React Flow's own source (SelectionListenerInner) calls
+ * onSelectionChange from INSIDE a useEffect, one render cycle after the
+ * actual click - which produced a real, reported bug: selecting node A
+ * appeared to do nothing, and only selecting node B afterward caused A
+ * (not B) to visibly become selected, exactly the symptom of a
+ * selection update that's always one interaction behind. Handling
+ * 'select' changes here, synchronously and immediately as part of
+ * onNodesChange/onEdgesChange itself (which fire directly from the
+ * click, not from a delayed effect), closes that gap.
+ *
+ * Each 'select' change is independent and incremental - a normal click
+ * replacing the whole selection still arrives as multiple changes in
+ * the same batch (deselect whatever was selected before, select the new
+ * one), not a single "replace everything" event - so folding them into
+ * `current` one at a time, in order, is the correct way to interpret a
+ * batch, not an approximation of it.
+ */
+export function applySelectionChanges(changes: (NodeChange | EdgeChange)[], current: string[]): string[] {
+  let result = current;
+  for (const change of changes) {
+    if (change.type !== "select") continue;
+    if (change.selected) {
+      if (!result.includes(change.id)) result = [...result, change.id];
+    } else if (result.includes(change.id)) {
+      result = result.filter((id) => id !== change.id);
+    }
+  }
+  return result;
+}
 
 /**
  * Pure decision logic behind App.tsx's rAF-throttled onNodesChange -

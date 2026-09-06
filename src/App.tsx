@@ -61,7 +61,7 @@ import { createYjsProgramIncrementsStore, seedYjsProgramIncrementsDoc } from "./
 import type { ProgramIncrementsStore } from "./collab/programIncrementsStore";
 import { startCollabSession, type CollabSession, type PresenceInfo } from "./collab/session";
 import { loadPresenceName, savePresenceName } from "./domain/presenceIdentity";
-import { classifyNodeChanges, type PendingNodeUpdate } from "./domain/nodeChangeBatching";
+import { classifyNodeChanges, applySelectionChanges, type PendingNodeUpdate } from "./domain/nodeChangeBatching";
 import "./App.css";
 
 let idSeed = 0;
@@ -517,6 +517,24 @@ function App() {
 
   const onNodesChange = useCallback<OnNodesChange<Node<ArchNodeData>>>(
     (changes) => {
+      // Handled here, synchronously, rather than relying solely on
+      // onSelectionChange below: React Flow's own source
+      // (SelectionListenerInner) calls onSelectionChange from INSIDE a
+      // useEffect, one render cycle after the actual click - which
+      // doesn't match this app's own controlled-nodes-array setup (see
+      // this file's own notes on why React Flow needs the app to feed
+      // position/dimension changes back promptly for the same reason).
+      // That one-render delay was reported as a real, concrete bug:
+      // selecting node A appeared to do nothing, and only selecting
+      // node B afterward caused A (not B) to visibly become selected -
+      // exactly the symptom of a selection update that's always one
+      // interaction behind. Each 'select' change is independent and
+      // incremental (a normal click replacing the whole selection still
+      // arrives as multiple changes in the same batch - deselect the
+      // old, select the new - not a single "replace everything" event),
+      // so folding them in here one at a time is correct.
+      setSelectedNodeIds((cur) => applySelectionChanges(changes, cur));
+
       const { isActiveGesture } = classifyNodeChanges(changes, pendingNodeUpdates.current);
       if (isActiveGesture) {
         if (pendingFlushHandle.current === null) {
@@ -539,12 +557,16 @@ function App() {
     [flushPendingNodeUpdates]
   );
 
-  // Edges have no position/dimensions concept, and for the same reasons
-  // as onNodesChange above, 'select' is handled elsewhere and
-  // 'remove'/'add'/'replace' are never expected here - so there's
-  // nothing for this handler to actually do. Still required as a prop:
-  // React Flow treats an ungoverned edges array as uncontrolled without it.
-  const onEdgesChange = useCallback<OnEdgesChange<Edge<ArchEdgeData>>>(() => {}, []);
+  // Edges have no position/dimensions concept, so the only thing this
+  // needs to do is the same synchronous 'select' handling as
+  // onNodesChange above, for the identical reason (onSelectionChange's
+  // own one-render-cycle delay via React Flow's internal useEffect).
+  // 'remove'/'add'/'replace' are never expected here - see this file's
+  // other notes on why edges are always added/removed via explicit app
+  // actions, never through this path.
+  const onEdgesChange = useCallback<OnEdgesChange<Edge<ArchEdgeData>>>((changes) => {
+    setSelectedEdgeIds((cur) => applySelectionChanges(changes, cur));
+  }, []);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
 

@@ -15,7 +15,7 @@
  * position being committed (a new, worse bug) - so this is tested
  * thoroughly rather than trusted from a single manual read-through.
  */
-import { classifyNodeChanges, type PendingNodeUpdate } from "./nodeChangeBatching";
+import { classifyNodeChanges, applySelectionChanges, type PendingNodeUpdate } from "./nodeChangeBatching";
 import type { NodeChange } from "@xyflow/react";
 
 let failures = 0;
@@ -139,6 +139,64 @@ function assert(cond: boolean, msg: string) {
 
   assert(pending.size === 2, "three separate onNodesChange calls across two distinct nodes correctly accumulate into exactly two pending entries, not three");
   assert((pending.get("n1") as { type: "position"; position: { x: number } }).position.x === 2, "n1's pending entry reflects its most recent call, not its first");
+}
+
+// === Part 10: applySelectionChanges - a single select ===
+{
+  const result = applySelectionChanges([{ id: "a", type: "select", selected: true }], []);
+  assert(result.length === 1 && result[0] === "a", "a single select change correctly adds that id to an empty selection");
+}
+
+// === Part 11: applySelectionChanges - THE EXACT REPORTED BUG: selecting node A, then selecting node B, must result in B selected, not A ===
+{
+  // Click 1: select A. A real click on an unselected node with nothing
+  // else selected produces just the one 'select: true' change.
+  const afterClickA = applySelectionChanges([{ id: "A", type: "select", selected: true }], []);
+  assert(afterClickA.length === 1 && afterClickA[0] === "A", "after the first click (selecting A), A is correctly selected");
+
+  // Click 2: select B. A normal (non-shift) click replacing the
+  // selection arrives as MULTIPLE changes in the same batch - deselect
+  // whatever was selected before (A), select the new one (B) - not a
+  // single "replace everything" event.
+  const afterClickB = applySelectionChanges(
+    [
+      { id: "A", type: "select", selected: false },
+      { id: "B", type: "select", selected: true },
+    ],
+    afterClickA
+  );
+  assert(
+    afterClickB.length === 1 && afterClickB[0] === "B",
+    "after the second click (selecting B), the result is B alone - NOT A, which is the exact bug reported: selecting A appeared to do nothing, and selecting B afterward caused A (not B) to visibly become selected"
+  );
+}
+
+// === Part 12: applySelectionChanges - shift-click style multi-select (add without deselecting) ===
+{
+  const afterA = applySelectionChanges([{ id: "A", type: "select", selected: true }], []);
+  const afterShiftB = applySelectionChanges([{ id: "B", type: "select", selected: true }], afterA);
+  assert(afterShiftB.length === 2 && afterShiftB.includes("A") && afterShiftB.includes("B"), "a shift-click-style change (select B without deselecting A) correctly results in both being selected");
+}
+
+// === Part 13: applySelectionChanges - deselecting (clicking empty canvas) ===
+{
+  const afterA = applySelectionChanges([{ id: "A", type: "select", selected: true }], []);
+  const afterDeselect = applySelectionChanges([{ id: "A", type: "select", selected: false }], afterA);
+  assert(afterDeselect.length === 0, "deselecting the only selected node correctly results in an empty selection");
+}
+
+// === Part 14: applySelectionChanges - idempotency (selecting an already-selected node doesn't duplicate it) ===
+{
+  const afterA = applySelectionChanges([{ id: "A", type: "select", selected: true }], []);
+  const afterAAgain = applySelectionChanges([{ id: "A", type: "select", selected: true }], afterA);
+  assert(afterAAgain.length === 1 && afterAAgain[0] === "A", "selecting an already-selected node again doesn't add a duplicate entry");
+}
+
+// === Part 15: applySelectionChanges - non-select changes are ignored, and the SAME reference is returned when nothing selection-related changed ===
+{
+  const current = ["A"];
+  const result = applySelectionChanges([{ id: "n1", type: "position", position: { x: 1, y: 1 }, dragging: true }], current);
+  assert(result === current, "a batch with no 'select' changes at all returns the EXACT SAME array reference, not a new (even if equal-content) one - this is what lets React's own setState bail out of an unnecessary re-render during an ordinary drag");
 }
 
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);
