@@ -403,6 +403,31 @@ function App() {
   const requirementsStore = activeSession?.requirementsStore ?? localRequirementsStore;
   const programIncrementsStore = activeSession?.programIncrementsStore ?? localProgramIncrementsStore;
   const diagramStore = activeSession?.diagramStore ?? localDiagramStore;
+  // onUpdateNode/onUpdateEdge (below) read the current diagram store
+  // through this ref rather than closing over `diagramStore` directly,
+  // so THEIR OWN function identity stays permanently stable across a
+  // session starting or ending - unlike getSnapshot/subscribe (used via
+  // useSyncExternalStore below), these are pure write operations with no
+  // subscription semantics, so there's no re-subscription behavior to
+  // preserve by letting them change reference the normal way. See the
+  // note by onUpdateNode's own definition for why this matters: without
+  // it, onUpdateNode/onUpdateEdge changing reference on every session
+  // start cascaded into Canvas's nodeTypes/edgeTypes objects recomputing
+  // at that exact moment (onChangeTextNode/onChangeCodeNode depend on
+  // onUpdateNode; TypedEdge depends on onUpdateEdge directly) - which
+  // tripped React Flow's own "you've created a new nodeTypes/edgeTypes
+  // object" warning and forced a full unmount+remount of every node and
+  // edge component at the same moment the underlying data was ALSO
+  // changing (switching from local to session data) - a combination a
+  // real user reported as edges specifically failing to render right
+  // after starting a session.
+  const diagramStoreRef = useRef(diagramStore);
+  // Same justification as rootRef above: this mutation always completes
+  // before onUpdateNode/onUpdateEdge (defined later in this same
+  // function body, only ever CALLED later still, from event handlers)
+  // could read it - never during render itself.
+  // eslint-disable-next-line react-hooks/refs
+  diagramStoreRef.current = diagramStore;
 
   // Auto-saves the current diagram to localStorage so a refresh, an
   // accidental tab close, or a crash doesn't lose work - separate from
@@ -772,16 +797,16 @@ function App() {
 
   const onUpdateNode = useCallback(
     (id: string, patch: Partial<ArchNodeData>) => {
-      diagramStore.updateNode(id, patch);
+      diagramStoreRef.current.updateNode(id, patch);
     },
-    [diagramStore]
+    []
   );
 
   const onUpdateEdge = useCallback(
     (id: string, patch: Partial<ArchEdgeData>) => {
-      diagramStore.updateEdge(id, patch);
+      diagramStoreRef.current.updateEdge(id, patch);
     },
-    [diagramStore]
+    []
   );
 
   // Deleting a node also drops any edges attached to it. Deleting a group
