@@ -2,6 +2,7 @@ import type { Node, Edge } from "@xyflow/react";
 import type { ArchNodeData, ArchEdgeData, SubDiagram } from "../domain/types";
 import { updateSubDiagramAtPath } from "../domain/subDiagramTree";
 import type { DiagramStore } from "./diagramStore";
+import { flattenSubDiagramTree } from "./diagramStore";
 
 /**
  * A DiagramStore that owns no state of its own - same purpose as
@@ -44,25 +45,6 @@ export function createAdapterDiagramStore(
   getRoot: () => SubDiagram,
   setRoot: (updater: (prev: SubDiagram) => SubDiagram) => void
 ): DiagramStore {
-  function flatten(root: SubDiagram): { nodes: Node<ArchNodeData>[]; edges: Edge<ArchEdgeData>[] } {
-    const nodes: Node<ArchNodeData>[] = [];
-    const edges: Edge<ArchEdgeData>[] = [];
-    function walk(sd: SubDiagram, path: string[]) {
-      for (const node of sd.nodes) {
-        const { subDiagram, ...restData } = node.data;
-        nodes.push({
-          ...node,
-          data: { ...restData, parentPath: path } as ArchNodeData,
-        });
-        if (subDiagram) walk(subDiagram, [...path, node.id]);
-      }
-      for (const edge of sd.edges) {
-        edges.push({ ...edge, data: { ...(edge.data as ArchEdgeData), parentPath: path } as ArchEdgeData });
-      }
-    }
-    walk(root, []);
-    return { nodes, edges };
-  }
 
   /** Finds the tree path a node with the given id actually lives at,
    * along with the node itself as currently stored in the tree
@@ -98,7 +80,7 @@ export function createAdapterDiagramStore(
   }
 
   return {
-    getSnapshot: () => flatten(getRoot()),
+    getSnapshot: () => flattenSubDiagramTree(getRoot()),
 
     subscribe: () => () => {},
 
@@ -108,7 +90,7 @@ export function createAdapterDiagramStore(
       // updateSubDiagramAtPath's own target path already encodes), so
       // it's deliberately NOT stored on the node's own data field the
       // way the flattened schema stores it - re-derived on every read
-      // by flatten() instead, from whichever level the node actually
+      // by flattenSubDiagramTree instead, from whichever level the node
       // ends up nested at in the real tree.
       const newNode: Node<ArchNodeData> = { id, type, position, data };
       setRoot((root) =>

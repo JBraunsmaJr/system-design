@@ -8,10 +8,10 @@
  *   npx tsx src/collab/diagramStore.verify.ts
  */
 import * as Y from "yjs";
-import { createLocalDiagramStore, getNodesAtPath, getEdgesAtPath, hasSubDiagram } from "./diagramStore";
-import { createYjsDiagramStore } from "./yjsDiagramStore";
+import { createLocalDiagramStore, getNodesAtPath, getEdgesAtPath, hasSubDiagram, flattenSubDiagramTree, unflattenToSubDiagram } from "./diagramStore";
+import { createYjsDiagramStore, seedYjsDiagramDoc } from "./yjsDiagramStore";
 import type { DiagramStore } from "./diagramStore";
-import type { ArchNodeData, ArchEdgeData } from "../domain/types";
+import type { ArchNodeData, ArchEdgeData, SubDiagram } from "../domain/types";
 
 let failures = 0;
 function assert(cond: boolean, msg: string) {
@@ -237,6 +237,92 @@ function canonicalJSON(value: unknown): string {
   plainStore.addEdge([], c, d, mkEdgeData());
   const plainEdge = plainStore.getSnapshot().edges[0];
   assert(plainEdge.sourceHandle === undefined && plainEdge.targetHandle === undefined, "an edge created without explicit handles has no sourceHandle/targetHandle forced onto it");
+}
+
+// === Part 6: flattenSubDiagramTree / unflattenToSubDiagram round-trip - what leaveSession relies on to convert a session's final flat state back into the app's own recursive tree without losing anything ===
+{
+  // A realistic multi-level tree, built directly in the recursive shape
+  // the real app actually uses (not via the flat store), including a
+  // node with a populated sub-diagram, a group-contained child (parentId,
+  // a SAME-level concern that flattening/unflattening must leave alone),
+  // and a node with sourceHandle/targetHandle set on one of its edges.
+  const originalTree: SubDiagram = {
+    nodes: [
+      {
+        id: "root-a",
+        type: "typed",
+        position: { x: 0, y: 0 },
+        data: {
+          nodeType: "custom",
+          label: "Root A",
+          description: "Has a populated sub-diagram",
+          properties: {},
+          tags: [],
+          subDiagram: {
+            nodes: [
+              { id: "child-1", type: "typed", position: { x: 0, y: 0 }, data: mkNodeData("Child One") },
+              { id: "child-2", type: "typed", position: { x: 1, y: 1 }, data: mkNodeData("Child Two") },
+            ],
+            edges: [{ id: "child-edge", source: "child-1", target: "child-2", type: "typed", data: mkEdgeData() }],
+          },
+        },
+      },
+      { id: "root-group", type: "group", position: { x: 5, y: 5 }, width: 200, height: 150, data: mkNodeData("A Group") },
+      {
+        id: "root-b",
+        type: "typed",
+        position: { x: 10, y: 10 },
+        parentId: "root-group",
+        data: mkNodeData("Grouped Root Node"),
+      },
+    ],
+    edges: [
+      {
+        id: "root-edge",
+        source: "root-a",
+        target: "root-b",
+        sourceHandle: "source-right",
+        targetHandle: "target-left",
+        type: "typed",
+        data: mkEdgeData(),
+      },
+    ],
+  };
+
+  const { nodes, edges } = flattenSubDiagramTree(originalTree);
+  const rebuiltTree = unflattenToSubDiagram(nodes, edges);
+
+  assert(
+    canonicalJSON(originalTree) === canonicalJSON(rebuiltTree),
+    "a multi-level tree (with a populated sub-diagram, a group-contained child, and an edge with named handles) survives flatten-then-unflatten as an EXACT structural match - nothing lost, nothing rearranged"
+  );
+
+  // Confirm this isn't a vacuous pass - the flat intermediate form really
+  // did tag things with parentPath, and unflattening genuinely removed
+  // it again rather than the round-trip just happening to look right by
+  // coincidence.
+  const flatChild = nodes.find((n) => n.id === "child-1")!;
+  assert(
+    JSON.stringify((flatChild.data as ArchNodeData & { parentPath?: string[] }).parentPath) === JSON.stringify(["root-a"]),
+    "the flat intermediate form genuinely tags a nested node with its real parentPath"
+  );
+  const rebuiltChild = rebuiltTree.nodes[0].data.subDiagram!.nodes.find((n) => n.id === "child-1")!;
+  assert(
+    !("parentPath" in rebuiltChild.data),
+    "unflattening genuinely removes parentPath again, rather than the round-trip coincidentally matching some other way"
+  );
+
+  // === Part 7: seedYjsDiagramDoc - starting a session must preserve an existing diagram exactly, including nested content, group containment, and edge handles ===
+  const doc = new Y.Doc();
+  seedYjsDiagramDoc(doc, originalTree);
+  const seededStore = createYjsDiagramStore(doc);
+  const seededSnapshot = seededStore.getSnapshot();
+  const rebuiltFromSeed = unflattenToSubDiagram(seededSnapshot.nodes, seededSnapshot.edges);
+
+  assert(
+    canonicalJSON(originalTree) === canonicalJSON(rebuiltFromSeed),
+    "seeding a fresh Y.Doc from an existing tree, then reading it back through the real Yjs store and unflattening the result, reproduces the ORIGINAL tree exactly - including the nested sub-diagram, the group-contained child's parentId, and the edge's named handles - nothing lost in either direction of the round trip"
+  );
 }
 
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);

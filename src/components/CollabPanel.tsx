@@ -24,12 +24,10 @@ interface CollabPanelProps {
  * Toolbar.tsx's own props (which already has a long list) so this stays
  * fully isolated from that component's existing behavior.
  *
- * A session only ever covers team, requirements, and program increments
- * today - the diagram itself has a proven Yjs schema but no UI wiring
- * onto it yet, so starting or joining a session doesn't touch the
- * diagram canvas at all. Not mentioned in this UI directly since there's
- * no user-facing action that would surface the distinction, but worth
- * knowing if diagram edits don't seem to be shared.
+ * A session covers all four domains - team, requirements, program
+ * increments, and the diagram itself - once each got a proven Yjs
+ * schema and real UI wiring onto it. Starting or joining a session
+ * switches every one of them over together.
  */
 export function CollabPanel({
   signalingConfigured,
@@ -92,8 +90,7 @@ export function CollabPanel({
             {signalingConfigured && !activeSession && (
               <>
                 <p className="collab-panel__hint">
-                  Team, requirements, and timeline/capacity are shared live during a session. The diagram itself
-                  isn't yet - it stays local for now.
+                  Team, requirements, timeline/capacity, and the diagram are all shared live during a session.
                 </p>
                 <button type="button" className="collab-panel__primary-action" onClick={() => { onStartSession(); setIsOpen(false); }}>
                   Start a new session

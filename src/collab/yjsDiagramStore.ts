@@ -1,7 +1,8 @@
 import * as Y from "yjs";
 import type { Node, Edge } from "@xyflow/react";
-import type { ArchNodeData, ArchEdgeData } from "../domain/types";
+import type { ArchNodeData, ArchEdgeData, SubDiagram } from "../domain/types";
 import type { DiagramStore } from "./diagramStore";
+import { flattenSubDiagramTree } from "./diagramStore";
 
 /** Node and edge ids are purely internal (never displayed - React Flow
  * uses them as keys and connection endpoints, nothing more), so - same
@@ -68,6 +69,67 @@ const EDGE_DATA_FIELDS = [
  * on each edit today, so there's no existing field-level-patch operation
  * to protect with nesting.
  */
+/**
+ * Populates a Y.Doc directly from an existing, already-populated
+ * recursive SubDiagram tree (the app's own local representation - see
+ * diagramStore.ts's own doc comment on why the actual app doesn't use
+ * this flat schema natively) - the diagram-domain equivalent of
+ * seedYjsRequirementsDoc/seedYjsProgramIncrementsDoc, needed for the
+ * same reason: starting a collaborative session must carry over
+ * whatever's already there, not start from an empty canvas.
+ *
+ * Uses flattenSubDiagramTree (diagramStore.ts) to do the tree-to-flat
+ * conversion - the exact same logic createAdapterDiagramStore's own
+ * getSnapshot uses, so there's one, single source of truth for how that
+ * conversion works rather than a second copy that could drift out of
+ * sync. Every node's own id, and every group-containment parentId, is
+ * preserved exactly as it already is - node/edge ids are purely
+ * internal (see this file's own collisionResistantId comment above),
+ * but preserving them here still matters: edges reference nodes by id,
+ * and group-contained children reference their group by id, so
+ * regenerating any of them during seeding would need a full remapping
+ * pass to avoid silently breaking those references, which preserving
+ * the originals avoids needing at all.
+ */
+export function seedYjsDiagramDoc(doc: Y.Doc, root: SubDiagram): void {
+  const { nodes, edges } = flattenSubDiagramTree(root);
+  const nodeOrder = doc.getArray<string>("nodeOrder");
+  const nodesMap = doc.getMap<Y.Map<unknown>>("nodes");
+  const edgeOrder = doc.getArray<string>("edgeOrder");
+  const edgesMap = doc.getMap<Y.Map<unknown>>("edges");
+
+  doc.transact(() => {
+    for (const node of nodes) {
+      const m = new Y.Map<unknown>();
+      m.set("type", node.type);
+      m.set("position", node.position);
+      m.set("parentPath", (node.data as ArchNodeData & { parentPath?: string[] }).parentPath ?? []);
+      if (node.parentId !== undefined) m.set("parentId", node.parentId);
+      if (node.width !== undefined) m.set("width", node.width);
+      if (node.height !== undefined) m.set("height", node.height);
+      for (const field of NODE_DATA_FIELDS) {
+        m.set(field, (node.data as Record<string, unknown>)[field]);
+      }
+      nodesMap.set(node.id, m);
+      nodeOrder.push([node.id]);
+    }
+    for (const edge of edges) {
+      const m = new Y.Map<unknown>();
+      m.set("source", edge.source);
+      m.set("target", edge.target);
+      m.set("type", edge.type ?? "typed");
+      m.set("parentPath", (edge.data as ArchEdgeData & { parentPath?: string[] }).parentPath ?? []);
+      if (edge.sourceHandle !== undefined) m.set("sourceHandle", edge.sourceHandle);
+      if (edge.targetHandle !== undefined) m.set("targetHandle", edge.targetHandle);
+      for (const field of EDGE_DATA_FIELDS) {
+        m.set(field, (edge.data as Record<string, unknown>)[field]);
+      }
+      edgesMap.set(edge.id, m);
+      edgeOrder.push([edge.id]);
+    }
+  });
+}
+
 export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
   const nodeOrder = doc.getArray<string>("nodeOrder");
   const nodesMap = doc.getMap<Y.Map<unknown>>("nodes");

@@ -1,5 +1,5 @@
 import type { Node, Edge } from "@xyflow/react";
-import type { ArchNodeData, ArchEdgeData } from "../domain/types";
+import type { ArchNodeData, ArchEdgeData, SubDiagram } from "../domain/types";
 
 /**
  * DiagramStore is the same kind of seam TeamStore, RequirementsStore, and
@@ -139,6 +139,64 @@ export function getEdgesAtPath(edges: Edge<ArchEdgeData>[], path: string[]): Edg
  * needed. */
 export function hasSubDiagram(nodes: Node<ArchNodeData>[], parentPath: string[], nodeId: string): boolean {
   return getNodesAtPath(nodes, [...parentPath, nodeId]).length > 0;
+}
+
+/** Flattens a recursive SubDiagram tree - root plus every nested
+ * sub-diagram, at any depth - into the flat, parentPath-tagged shape
+ * this whole module works with. Originally written inline inside
+ * createAdapterDiagramStore's own getSnapshot; extracted here once a
+ * second caller (seedYjsDiagramDoc, used when starting a collaborative
+ * session) needed the exact same logic, so the two don't drift apart by
+ * each maintaining their own copy. */
+export function flattenSubDiagramTree(root: SubDiagram): { nodes: Node<ArchNodeData>[]; edges: Edge<ArchEdgeData>[] } {
+  const nodes: Node<ArchNodeData>[] = [];
+  const edges: Edge<ArchEdgeData>[] = [];
+  function walk(sd: SubDiagram, path: string[]) {
+    for (const node of sd.nodes) {
+      const { subDiagram, ...restData } = node.data;
+      nodes.push({ ...node, data: { ...restData, parentPath: path } as ArchNodeData });
+      if (subDiagram) walk(subDiagram, [...path, node.id]);
+    }
+    for (const edge of sd.edges) {
+      edges.push({ ...edge, data: { ...(edge.data as ArchEdgeData), parentPath: path } as ArchEdgeData });
+    }
+  }
+  walk(root, []);
+  return { nodes, edges };
+}
+
+/** The inverse of flattenSubDiagramTree - rebuilds a recursive
+ * SubDiagram tree from a flat, parentPath-tagged node/edge list. Used
+ * when leaving a collaborative session: the session's Yjs-backed
+ * DiagramStore only ever produces the flat shape, but the app's own
+ * local state (root: SubDiagram, read/written via
+ * createAdapterDiagramStore) needs the recursive shape back, so
+ * whatever happened during the session - the person's own edits, or
+ * anything synced in from collaborators - is preserved going forward
+ * rather than discarded the moment the connection ends (the same
+ * principle already applied to team/requirements/programIncrements'
+ * own leaveSession handling).
+ *
+ * parentPath itself is dropped from each node/edge's data on the way
+ * back out - it only ever existed to support the flat representation;
+ * position in the rebuilt tree is what encodes nesting once again,
+ * exactly as it does everywhere else in the app. */
+export function unflattenToSubDiagram(nodes: Node<ArchNodeData>[], edges: Edge<ArchEdgeData>[]): SubDiagram {
+  function buildLevel(path: string[]): SubDiagram {
+    const levelNodes = getNodesAtPath(nodes, path).map((n) => {
+      const restData: Record<string, unknown> = { ...(n.data as Record<string, unknown>) };
+      delete restData.parentPath;
+      const childSubDiagram = hasSubDiagram(nodes, path, n.id) ? buildLevel([...path, n.id]) : undefined;
+      return { ...n, data: { ...restData, subDiagram: childSubDiagram } as ArchNodeData };
+    });
+    const levelEdges = getEdgesAtPath(edges, path).map((e) => {
+      const restData: Record<string, unknown> = { ...(e.data as Record<string, unknown>) };
+      delete restData.parentPath;
+      return { ...e, data: restData as ArchEdgeData };
+    });
+    return { nodes: levelNodes, edges: levelEdges };
+  }
+  return buildLevel([]);
 }
 
 function arraysEqual(a: string[], b: string[]): boolean {

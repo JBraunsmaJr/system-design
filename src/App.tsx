@@ -54,7 +54,9 @@ import { createYjsRequirementsStore, seedYjsRequirementsDoc } from "./collab/yjs
 import type { RequirementsStore } from "./collab/requirementsStore";
 import { createAdapterProgramIncrementsStore } from "./collab/programIncrementsStore";
 import { createAdapterDiagramStore } from "./collab/adapterDiagramStore";
-import { getNodesAtPath, getEdgesAtPath } from "./collab/diagramStore";
+import { getNodesAtPath, getEdgesAtPath, unflattenToSubDiagram } from "./collab/diagramStore";
+import type { DiagramStore } from "./collab/diagramStore";
+import { createYjsDiagramStore, seedYjsDiagramDoc } from "./collab/yjsDiagramStore";
 import { createYjsProgramIncrementsStore, seedYjsProgramIncrementsDoc } from "./collab/yjsProgramIncrementsStore";
 import type { ProgramIncrementsStore } from "./collab/programIncrementsStore";
 import { startCollabSession, type CollabSession } from "./collab/session";
@@ -168,7 +170,7 @@ function App() {
       })),
     [setDiagram]
   );
-  const diagramStore = useMemo(() => createAdapterDiagramStore(() => root, setRoot), [root, setRoot]);
+  const localDiagramStore = useMemo(() => createAdapterDiagramStore(() => root, setRoot), [root, setRoot]);
   const setScenarios = useCallback(
     (updater: Scenario[] | ((prev: Scenario[]) => Scenario[])) =>
       setDiagram((prev) => ({
@@ -206,10 +208,12 @@ function App() {
 
   // --- Collaborative sessions -----------------------------------------------
   //
-  // A session only ever covers team, requirements, and program increments -
-  // the diagram (nodes/edges) has its own proven Yjs schema but no UI wiring
-  // onto it yet, so it deliberately stays local-only regardless of whether a
-  // session is active. Starting one doesn't touch the diagram at all.
+  // A session covers all four domains - team, requirements, program
+  // increments, and now the diagram itself, once its own DiagramStore got
+  // real UI wiring (createAdapterDiagramStore/createYjsDiagramStore).
+  // Starting or joining a session switches every one of them over
+  // together; there's no partial-session state where some domains are
+  // collaborative and others aren't.
   //
   // Undo/redo is a known, deliberate limitation while a session is active:
   // team/requirements/programIncrements stop flowing through setTeam/
@@ -229,6 +233,7 @@ function App() {
     teamStore: TeamStore;
     requirementsStore: RequirementsStore;
     programIncrementsStore: ProgramIncrementsStore;
+    diagramStore: DiagramStore;
   }
   const [activeSession, setActiveSession] = useState<ActiveCollabSession | null>(null);
 
@@ -246,10 +251,12 @@ function App() {
       const doc = new Y.Doc();
       seedYjsRequirementsDoc(doc, requirements);
       seedYjsProgramIncrementsDoc(doc, programIncrements);
+      seedYjsDiagramDoc(doc, root);
       const teamStore = createYjsTeamStore(doc);
       seedTeamStore(teamStore, team);
       const requirementsStoreForSession = createYjsRequirementsStore(doc);
       const programIncrementsStoreForSession = createYjsProgramIncrementsStore(doc);
+      const diagramStoreForSession = createYjsDiagramStore(doc);
       const session = startCollabSession(doc, roomName, { signalingUrls });
       setActiveSession({
         doc,
@@ -258,9 +265,10 @@ function App() {
         teamStore,
         requirementsStore: requirementsStoreForSession,
         programIncrementsStore: programIncrementsStoreForSession,
+        diagramStore: diagramStoreForSession,
       });
     },
-    [requirements, programIncrements, team, signalingUrls]
+    [requirements, programIncrements, team, root, signalingUrls]
   );
 
   // Joins an existing session by room name - starts from an EMPTY doc
@@ -273,6 +281,7 @@ function App() {
       const teamStore = createYjsTeamStore(doc);
       const requirementsStoreForSession = createYjsRequirementsStore(doc);
       const programIncrementsStoreForSession = createYjsProgramIncrementsStore(doc);
+      const diagramStoreForSession = createYjsDiagramStore(doc);
       const session = startCollabSession(doc, roomName, { signalingUrls });
       setActiveSession({
         doc,
@@ -281,6 +290,7 @@ function App() {
         teamStore,
         requirementsStore: requirementsStoreForSession,
         programIncrementsStore: programIncrementsStoreForSession,
+        diagramStore: diagramStoreForSession,
       });
     },
     [signalingUrls]
@@ -296,9 +306,11 @@ function App() {
     setTeam(() => activeSession.teamStore.getSnapshot());
     setRequirements(() => activeSession.requirementsStore.getSnapshot());
     setProgramIncrements(() => activeSession.programIncrementsStore.getSnapshot());
+    const finalDiagramSnapshot = activeSession.diagramStore.getSnapshot();
+    setRoot(() => unflattenToSubDiagram(finalDiagramSnapshot.nodes, finalDiagramSnapshot.edges));
     activeSession.session.disconnect();
     setActiveSession(null);
-  }, [activeSession, setTeam, setRequirements, setProgramIncrements]);
+  }, [activeSession, setTeam, setRequirements, setProgramIncrements, setRoot]);
 
   useEffect(() => {
     return () => {
@@ -313,6 +325,7 @@ function App() {
   const teamStore = activeSession?.teamStore ?? localTeamStore;
   const requirementsStore = activeSession?.requirementsStore ?? localRequirementsStore;
   const programIncrementsStore = activeSession?.programIncrementsStore ?? localProgramIncrementsStore;
+  const diagramStore = activeSession?.diagramStore ?? localDiagramStore;
 
   // Auto-saves the current diagram to localStorage so a refresh, an
   // accidental tab close, or a crash doesn't lose work - separate from
