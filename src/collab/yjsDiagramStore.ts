@@ -138,7 +138,10 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
 
   function nodeMapToPlain(id: string, m: Y.Map<unknown>): Node<ArchNodeData> {
     const data: Record<string, unknown> = { parentPath: m.get("parentPath") as string[] };
-    for (const field of NODE_DATA_FIELDS) data[field] = m.get(field);
+    for (const field of NODE_DATA_FIELDS) {
+      const value = m.get(field);
+      if (value !== undefined) data[field] = value;
+    }
     const node: Node<ArchNodeData> = {
       id,
       type: m.get("type") as string,
@@ -156,7 +159,10 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
 
   function edgeMapToPlain(id: string, m: Y.Map<unknown>): Edge<ArchEdgeData> {
     const data: Record<string, unknown> = { parentPath: m.get("parentPath") as string[] };
-    for (const field of EDGE_DATA_FIELDS) data[field] = m.get(field);
+    for (const field of EDGE_DATA_FIELDS) {
+      const value = m.get(field);
+      if (value !== undefined) data[field] = value;
+    }
     const edge: Edge<ArchEdgeData> = {
       id,
       source: m.get("source") as string,

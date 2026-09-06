@@ -325,4 +325,49 @@ function canonicalJSON(value: unknown): string {
   );
 }
 
+// === Part 8: local and Yjs stores produce data objects with the EXACT SAME SET OF KEYS, not just equal JSON - a real bug the JSON-based conformance check in Part 1 could never have caught, since JSON.stringify silently drops undefined-valued keys ===
+// The real bug this specifically catches: the Yjs store's read side used
+// to unconditionally assign every field from NODE_DATA_FIELDS/
+// EDGE_DATA_FIELDS onto the reconstructed data object regardless of
+// whether the underlying Y.Map actually had that key - producing nodes
+// and edges with several extra keys present-but-undefined (color,
+// hideLabel, labelAnchorT, labelOffsetX, labelOffsetY for edges;
+// codeContent, codeLanguage, color, fontSize, icon,
+// linkedRequirementIds, textColor for nodes) that the local/adapter
+// store's equivalent objects never had at all. {a: undefined} and {}
+// are indistinguishable to JSON.stringify (and therefore to
+// canonicalJSON, and therefore to Part 1's own conformance check above),
+// so this needed a comparison that actually inspects Object.keys()
+// directly instead.
+{
+  function buildViaStore(store: DiagramStore) {
+    const a = store.addNode([], "typed", { x: 0, y: 0 }, mkNodeData("A"));
+    const b = store.addNode([], "typed", { x: 100, y: 0 }, mkNodeData("B"));
+    store.addEdge([], a, b, mkEdgeData(), "right", "left");
+    return store.getSnapshot();
+  }
+
+  const localSnap = buildViaStore(createLocalDiagramStore());
+  const yjsSnap = buildViaStore(createYjsDiagramStore(new Y.Doc()));
+
+  const localNodeKeys = Object.keys(localSnap.nodes[0].data).sort();
+  const yjsNodeKeys = Object.keys(yjsSnap.nodes[0].data).sort();
+  assert(
+    JSON.stringify(localNodeKeys) === JSON.stringify(yjsNodeKeys),
+    `local and Yjs stores produce node data objects with the exact same set of keys, not just equal values for the keys both happen to share - local has [${localNodeKeys.join(", ")}], Yjs has [${yjsNodeKeys.join(", ")}]`
+  );
+
+  const localEdgeKeys = Object.keys(localSnap.edges[0].data ?? {}).sort();
+  const yjsEdgeKeys = Object.keys(yjsSnap.edges[0].data ?? {}).sort();
+  assert(
+    JSON.stringify(localEdgeKeys) === JSON.stringify(yjsEdgeKeys),
+    `local and Yjs stores produce edge data objects with the exact same set of keys, not just equal values for the keys both happen to share - local has [${localEdgeKeys.join(", ")}], Yjs has [${yjsEdgeKeys.join(", ")}]`
+  );
+
+  assert(
+    !("color" in (yjsSnap.edges[0].data ?? {})) && !("labelAnchorT" in (yjsSnap.edges[0].data ?? {})),
+    "specifically: an edge that never had color/labelAnchorT set doesn't have those keys present-but-undefined on the Yjs store's output at all - they're simply absent, exactly like the local store's output"
+  );
+}
+
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);
