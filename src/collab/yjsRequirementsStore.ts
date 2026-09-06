@@ -129,24 +129,34 @@ export function seedYjsRequirementsDoc(doc: Y.Doc, initial: RequirementsDocument
   });
 }
 
-export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
+/**
+ * Seeds built-in item/relationship types into `doc`, but only if it's
+ * genuinely, entirely empty of them already - matching how a fresh
+ * RequirementsDocument always starts with these (see
+ * EMPTY_REQUIREMENTS_DOCUMENT / withMissingBuiltInTypes).
+ *
+ * Deliberately NOT called automatically by createYjsRequirementsStore
+ * itself anymore - it used to be, guarded by this same "is it actually
+ * empty" check, based on the assumption that construction-time
+ * emptiness meant "a genuinely new, never-used document." That's true
+ * for real standalone/test use, but false for joinSession: it
+ * constructs this store on a deliberately empty Y.Doc BEFORE the
+ * WebRTC sync with the host has any chance to run, so the check would
+ * pass and this would fire - seeding local built-ins that then conflict
+ * with the host's own once CRDT sync actually happens (Y.Arrays don't
+ * deduplicate by value, so itemTypeOrder would end up with duplicate
+ * entries; Y.Map key collisions on the nested type objects
+ * non-deterministically discard whichever side's write didn't "win").
+ * Neither of the app's own two session-starting paths need this call at
+ * all: startNewSession already seeds built-ins as part of seeding the
+ * full local requirements state via seedYjsRequirementsDoc (which
+ * always includes them, since a real RequirementsDocument always does),
+ * and joinSession must never seed anything locally in the first place.
+ */
+export function seedBuiltInTypesIfEmpty(doc: Y.Doc): void {
   const itemTypeOrder = doc.getArray<string>("itemTypeOrder");
   const itemTypes = doc.getMap<Y.Map<unknown>>("itemTypes");
-  const categoryOrder = doc.getArray<string>("categoryOrder");
-  const categories = doc.getMap<RequirementCategory>("categories");
-  const itemOrder = doc.getArray<string>("itemOrder");
-  const items = doc.getMap<Y.Map<unknown>>("items");
   const relationshipTypes = doc.getMap<RelationshipType>("relationshipTypes");
-  const relationships = doc.getMap<RequirementRelationship>("relationships");
-  const nextSequence = doc.getMap<number>("nextSequence");
-
-  // One-time seed of built-in types, if this is a brand-new doc with
-  // nothing in it yet - matching how a fresh RequirementsDocument always
-  // starts with these (see EMPTY_REQUIREMENTS_DOCUMENT /
-  // withMissingBuiltInTypes). Guarded by a key check so joining an
-  // ALREADY-populated doc (the normal case - syncing to an existing
-  // session) never stomps on real data, same pattern as
-  // yjsTeamStore.ts's settings defaults.
   if (itemTypeOrder.length === 0 && itemTypes.size === 0) {
     doc.transact(() => {
       for (const t of BUILT_IN_ITEM_TYPES) {
@@ -164,6 +174,18 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
       }
     });
   }
+}
+
+export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
+  const itemTypeOrder = doc.getArray<string>("itemTypeOrder");
+  const itemTypes = doc.getMap<Y.Map<unknown>>("itemTypes");
+  const categoryOrder = doc.getArray<string>("categoryOrder");
+  const categories = doc.getMap<RequirementCategory>("categories");
+  const itemOrder = doc.getArray<string>("itemOrder");
+  const items = doc.getMap<Y.Map<unknown>>("items");
+  const relationshipTypes = doc.getMap<RelationshipType>("relationshipTypes");
+  const relationships = doc.getMap<RequirementRelationship>("relationships");
+  const nextSequence = doc.getMap<number>("nextSequence");
 
   function itemTypeMapToPlain(id: string, m: Y.Map<unknown>): RequirementItemType {
     return {

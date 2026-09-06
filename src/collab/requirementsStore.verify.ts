@@ -6,7 +6,7 @@
  */
 import * as Y from "yjs";
 import { createLocalRequirementsStore, createAdapterRequirementsStore } from "./requirementsStore";
-import { createYjsRequirementsStore, seedYjsRequirementsDoc } from "./yjsRequirementsStore";
+import { createYjsRequirementsStore, seedYjsRequirementsDoc, seedBuiltInTypesIfEmpty } from "./yjsRequirementsStore";
 import type { RequirementsStore } from "./requirementsStore";
 import { EMPTY_REQUIREMENTS_DOCUMENT } from "../domain/requirementsTypes";
 import { BUILT_IN_ITEM_TYPES, BUILT_IN_RELATIONSHIP_TYPES } from "../domain/requirementsRegistry";
@@ -42,6 +42,7 @@ function seedDoc() {
 
 function seedYjsStore(): { doc: Y.Doc; store: RequirementsStore } {
   const doc = new Y.Doc();
+  seedBuiltInTypesIfEmpty(doc);
   const store = createYjsRequirementsStore(doc);
   return { doc, store };
 }
@@ -239,7 +240,9 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: RequirementsStore } {
 // then compares them against relationships' fromItemId/toItemId (which
 // are always display ids) would silently never match anything.
 {
-  const store = createYjsRequirementsStore(new Y.Doc());
+  const testDoc = new Y.Doc();
+  seedBuiltInTypesIfEmpty(testDoc);
+  const store = createYjsRequirementsStore(testDoc);
   const addTypeOk = store.addCustomType("Widget", "WID", "#5b7cfa", true);
   assert(addTypeOk, "custom type created successfully as test setup");
   const idA = store.addItem("custom-1");
@@ -298,6 +301,60 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: RequirementsStore } {
   const builtInCount = seededSnapshot.itemTypes.filter((t) => t.isBuiltIn).length;
   const originalBuiltInCount = existingSnapshot.itemTypes.filter((t) => t.isBuiltIn).length;
   assert(builtInCount === originalBuiltInCount, "built-in types appear exactly once each after seeding - not duplicated by createYjsRequirementsStore's own empty-doc default-seeding logic running on top of already-seeded data");
+}
+
+// === Part 8: the exact real-world join-session scenario - a host's seeded session, a guest joining with a genuinely empty (unseeded) doc, then CRDT sync ===
+// A real bug this specifically catches: createYjsRequirementsStore used
+// to auto-seed built-in types into ANY doc that appeared empty at
+// construction time, including a guest's doc in the brief window before
+// WebRTC sync with the host has happened - meaning both sides would
+// independently create their OWN built-in type entries, which Y.Arrays
+// (itemTypeOrder) don't deduplicate by value, producing duplicate
+// entries once merged, and Y.Map key collisions on the nested type
+// objects non-deterministically discarding one side's data. This test
+// builds the exact real sequence - host store fully seeded (as
+// startNewSession does), guest store constructed on a bare, unseeded
+// Y.Doc (as joinSession does, with NO seedBuiltInTypesIfEmpty call at
+// all) - then syncs them, exactly as WebRTC would.
+{
+  const hostStore = createLocalRequirementsStore(seedDoc());
+  hostStore.addItem("requirement");
+  const hostSnapshot = hostStore.getSnapshot();
+
+  const hostDoc = new Y.Doc();
+  seedYjsRequirementsDoc(hostDoc, hostSnapshot);
+
+  // The guest's doc: bare, unseeded - exactly what joinSession actually
+  // does (no seedBuiltInTypesIfEmpty call, unlike the other tests in
+  // this file that deliberately opt into it for their own setup needs).
+  const guestDoc = new Y.Doc();
+  const guestStore = createYjsRequirementsStore(guestDoc);
+
+  const guestSnapshotBeforeSync = guestStore.getSnapshot();
+  assert(guestSnapshotBeforeSync.itemTypes.length === 0, "before any sync happens, the guest's doc is genuinely empty - no locally-seeded built-ins sitting there waiting to conflict with the host's");
+
+  // Simulate the WebRTC sync itself - the actual mechanism, not a stand-in for it.
+  Y.applyUpdate(guestDoc, Y.encodeStateAsUpdate(hostDoc));
+  Y.applyUpdate(hostDoc, Y.encodeStateAsUpdate(guestDoc));
+
+  const guestSnapshotAfterSync = guestStore.getSnapshot();
+  const builtInTypeIds = guestSnapshotAfterSync.itemTypes.filter((t) => t.isBuiltIn).map((t) => t.id);
+  const uniqueBuiltInTypeIds = new Set(builtInTypeIds);
+  assert(
+    builtInTypeIds.length === uniqueBuiltInTypeIds.size,
+    "after syncing with the host, the guest has each built-in type exactly ONCE - no duplicates from the guest having independently seeded its own copy before sync happened"
+  );
+  assert(
+    guestSnapshotAfterSync.items.some((i) => i.id === "REQ-1"),
+    "the guest correctly receives the host's actual item after sync - this is the specific, real-world symptom this bug produced: a guest seeing none of the host's data"
+  );
+
+  const hostSnapshotAfterSync = createYjsRequirementsStore(hostDoc).getSnapshot();
+  assert(
+    canonicalJSON({ itemTypes: hostSnapshotAfterSync.itemTypes, items: hostSnapshotAfterSync.items }) ===
+      canonicalJSON({ itemTypes: guestSnapshotAfterSync.itemTypes, items: guestSnapshotAfterSync.items }),
+    "host and guest converge to an IDENTICAL final state after sync - no corruption or divergence from the guest's construction-time seeding attempt"
+  );
 }
 
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);
