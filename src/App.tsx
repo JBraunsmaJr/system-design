@@ -403,6 +403,10 @@ function App() {
   const requirementsStore = activeSession?.requirementsStore ?? localRequirementsStore;
   const programIncrementsStore = activeSession?.programIncrementsStore ?? localProgramIncrementsStore;
   const diagramStore = activeSession?.diagramStore ?? localDiagramStore;
+  const diagramStoreRef = useRef(diagramStore);
+
+  // eslint-disable-next-line react-hooks/refs
+  diagramStoreRef.current = diagramStore;
 
   // Auto-saves the current diagram to localStorage so a refresh, an
   // accidental tab close, or a crash doesn't lose work - separate from
@@ -772,16 +776,16 @@ function App() {
 
   const onUpdateNode = useCallback(
     (id: string, patch: Partial<ArchNodeData>) => {
-      diagramStore.updateNode(id, patch);
+      diagramStoreRef.current.updateNode(id, patch);
     },
-    [diagramStore]
+    []
   );
 
   const onUpdateEdge = useCallback(
     (id: string, patch: Partial<ArchEdgeData>) => {
-      diagramStore.updateEdge(id, patch);
+      diagramStoreRef.current.updateEdge(id, patch);
     },
-    [diagramStore]
+    []
   );
 
   // Deleting a node also drops any edges attached to it. Deleting a group
