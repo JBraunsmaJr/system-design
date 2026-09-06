@@ -267,6 +267,14 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
     const collisions = Array.from(byDisplayId.values()).filter((keys) => keys.length > 1);
     if (collisions.length === 0) return false;
 
+    // Every currently-used display id, kept up to date as this pass
+    // hands out new ones - checked against so a freshly reassigned id
+    // can never collide with either an existing item OR another loser
+    // reassigned earlier in this SAME pass (which byDisplayId alone
+    // wouldn't catch, since it reflects the state from before this pass
+    // started, not what's being assigned as it runs).
+    const usedDisplayIds = new Set(byDisplayId.keys());
+
     doc.transact(() => {
       for (const storageKeys of collisions) {
         const [, ...losers] = [...storageKeys].sort();
@@ -276,8 +284,19 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
           const typeId = m.get("typeId") as string;
           const typeMap = itemTypes.get(typeId);
           const type = typeMap ? itemTypeMapToPlain(typeId, typeMap) : undefined;
-          const seq = (nextSequence.get(typeId) as number | undefined) ?? 1;
-          m.set("id", `${type?.prefix ?? typeId}-${seq}`);
+          const prefix = type?.prefix ?? typeId;
+          // Keep advancing past any id that's already taken, rather than
+          // assigning nextSequence's value outright and hoping it
+          // doesn't collide - see this function's own doc comment above
+          // for why that assumption doesn't always hold.
+          let seq = (nextSequence.get(typeId) as number | undefined) ?? 1;
+          let candidate = `${prefix}-${seq}`;
+          while (usedDisplayIds.has(candidate)) {
+            seq += 1;
+            candidate = `${prefix}-${seq}`;
+          }
+          m.set("id", candidate);
+          usedDisplayIds.add(candidate);
           nextSequence.set(typeId, seq + 1);
         }
       }

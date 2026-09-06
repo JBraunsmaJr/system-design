@@ -357,4 +357,87 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: RequirementsStore } {
   );
 }
 
+// === Part 9: repairDuplicateDisplayIds resolves a collision in ONE pass even when nextSequence is badly stale and many existing ids are already taken - the exact scenario a real user's large project (73+ items) hit, which looked like an infinite loop ===
+// Before this fix: repairDuplicateDisplayIds assigned nextSequence's
+// value outright without checking whether it was actually free. If
+// nextSequence was stale (lower than the highest sequence number
+// already in use for that type - however that staleness arose), the
+// "repaired" id would immediately collide with ANOTHER existing item,
+// creating a fresh collision for the NEXT observeDeep-triggered repair
+// round to find - repeating once per already-used id in sequence. For a
+// project with dozens of existing items, that cascade of many
+// back-to-back repair-triggered re-renders is exactly what a real user
+// experienced as edges never rendering: the render loop never got a
+// stable moment to actually paint anything.
+{
+  const doc = new Y.Doc();
+  const itemOrder = doc.getArray<string>("itemOrder");
+  const items = doc.getMap<Y.Map<unknown>>("items");
+  const nextSequenceMap = doc.getMap<number>("nextSequence");
+  const itemTypeOrder = doc.getArray<string>("itemTypeOrder");
+  const itemTypes = doc.getMap<Y.Map<unknown>>("itemTypes");
+
+  doc.transact(() => {
+    const typeMap = new Y.Map<unknown>();
+    typeMap.set("label", "Requirement");
+    typeMap.set("prefix", "REQ");
+    typeMap.set("color", "#000000");
+    typeMap.set("isBuiltIn", true);
+    typeMap.set("isWorkable", true);
+    itemTypes.set("requirement", typeMap);
+    itemTypeOrder.push(["requirement"]);
+
+    // 20 pre-existing items, correctly using REQ-1 through REQ-20 - no
+    // collisions among THESE on their own.
+    for (let i = 1; i <= 20; i++) {
+      const m = new Y.Map<unknown>();
+      m.set("id", `REQ-${i}`);
+      m.set("typeId", "requirement");
+      m.set("title", `Item ${i}`);
+      m.set("status", "todo");
+      m.set("categoryId", undefined);
+      m.set("properties", {});
+      items.set(`item-${i}`, m);
+      itemOrder.push([`item-${i}`]);
+    }
+
+    // A 21st item that collides with the FIRST one (both claim REQ-1) -
+    // the actual trigger for repair.
+    const colliding = new Y.Map<unknown>();
+    colliding.set("id", "REQ-1");
+    colliding.set("typeId", "requirement");
+    colliding.set("title", "Colliding item");
+    colliding.set("status", "todo");
+    colliding.set("categoryId", undefined);
+    colliding.set("properties", {});
+    items.set("item-21", colliding);
+    itemOrder.push(["item-21"]);
+
+    // The critical setup: nextSequence badly stale at 1, despite 20
+    // items already using REQ-1 through REQ-20.
+    nextSequenceMap.set("requirement", 1);
+  });
+
+  // Constructing the store runs repairDuplicateDisplayIds() once, up
+  // front (see this file's own comment on why: a collision could
+  // already be baked in from a prior session, before this store
+  // instance existed to observe anything) - if that single call doesn't
+  // fully resolve it, something is still wrong.
+  const store = createYjsRequirementsStore(doc);
+  const snapshot = store.getSnapshot();
+
+  const displayIds = snapshot.items.map((i) => i.id);
+  const uniqueDisplayIds = new Set(displayIds);
+  assert(
+    displayIds.length === uniqueDisplayIds.size,
+    `after constructing the store just once, every item has a unique display id - got [${displayIds.sort().join(", ")}]`
+  );
+
+  const repairedItem = snapshot.items.find((i) => i.title === "Colliding item");
+  assert(
+    repairedItem !== undefined && !["REQ-1", "REQ-2", "REQ-3", "REQ-4", "REQ-5"].includes(repairedItem.id),
+    `the colliding item was correctly reassigned PAST every already-used id, not just handed nextSequence's stale value outright - got "${repairedItem?.id}"`
+  );
+}
+
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);
