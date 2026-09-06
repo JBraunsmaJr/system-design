@@ -44,6 +44,11 @@ import type * as Y from "yjs";
  * what actually keeps a session private, the same way an unlisted
  * shared-link URL does.
  */
+export interface PresenceInfo {
+  name: string;
+  color: string;
+}
+
 export interface CollabSession {
   provider: WebrtcProvider;
   /** True once at least one other peer (or, on the same machine, another
@@ -53,6 +58,29 @@ export interface CollabSession {
    * being needed. */
   isSynced(): boolean;
   disconnect(): void;
+  /** Sets this peer's own presence info (name/color), visible to
+   * everyone else in the session. Safe to call again later to update it
+   * - e.g. if the person changes their display name mid-session - each
+   * call fully replaces whatever was set before, matching Awareness's
+   * own setLocalState semantics (see y-protocols' own awareness.js: a
+   * client overrides its own state wholesale, not by patching fields).
+   * This is presence, not document data - never touches the Y.Doc
+   * itself, and disappears the moment this peer disconnects (Awareness
+   * is explicitly "non-persistent data" - see y-protocols' own doc
+   * comment on the class). */
+  setLocalPresence(info: PresenceInfo): void;
+  /** Subscribes to the current set of OTHER peers' presence info - never
+   * includes this peer's own (seeing yourself in a "who else is here"
+   * list would be redundant, and every caller of this wants "who am I
+   * sharing this session with", not "everyone including me"). Fires
+   * immediately with whatever's already known, then again on every
+   * change (a peer joining, updating their info, or disconnecting).
+   * Returns an unsubscribe function. Peers who haven't called
+   * setLocalPresence yet (or ever) are silently skipped rather than
+   * appearing as a blank entry - Awareness tracks connection-level
+   * presence for anyone in the room, but this session's own notion of
+   * presence is specifically "peers who identified themselves". */
+  subscribeToPresence(callback: (peers: PresenceInfo[]) => void): () => void;
 }
 
 export interface CollabSessionOptions {
@@ -95,6 +123,26 @@ export function startCollabSession(doc: Y.Doc, roomName: string, options: Collab
     disconnect: () => {
       provider.disconnect();
       provider.destroy();
+    },
+    setLocalPresence: (info) => {
+      provider.awareness.setLocalState(info);
+    },
+    subscribeToPresence: (callback) => {
+      const getOtherPeers = (): PresenceInfo[] => {
+        const peers: PresenceInfo[] = [];
+        provider.awareness.getStates().forEach((state: unknown, clientId: number) => {
+          if (clientId === provider.awareness.clientID) return; // never include this peer's own presence
+          const candidate = state as Partial<PresenceInfo> | null;
+          if (candidate && typeof candidate.name === "string" && typeof candidate.color === "string") {
+            peers.push({ name: candidate.name, color: candidate.color });
+          }
+        });
+        return peers;
+      };
+      const handler = () => callback(getOtherPeers());
+      provider.awareness.on("change", handler);
+      callback(getOtherPeers()); // fire immediately with whatever's already known, not just on the next change
+      return () => provider.awareness.off("change", handler);
     },
   };
 }
