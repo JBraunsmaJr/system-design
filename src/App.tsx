@@ -536,6 +536,9 @@ function App() {
   // React's own state flow when setRoot changes), so this costs nothing
   // extra there - it's specifically the collaborative path this fixes.
   const diagramSnapshot = useSyncExternalStore(diagramStore.subscribe, diagramStore.getSnapshot);
+  const teamSnapshot = useSyncExternalStore(teamStore.subscribe, teamStore.getSnapshot);
+  const requirementsSnapshot = useSyncExternalStore(requirementsStore.subscribe, requirementsStore.getSnapshot);
+  const programIncrementsSnapshot = useSyncExternalStore(programIncrementsStore.subscribe, programIncrementsStore.getSnapshot);
 
   // nodes/edges are derived from diagramStore rather than stored directly -
   // selection is deliberately NOT part of that store's schema (it's
@@ -1633,7 +1636,7 @@ function App() {
                 onDeleteNode={onDeleteNode}
                 onDeleteEdge={onDeleteEdge}
                 onDrillInto={onDrillInto}
-                requirements={requirements}
+                requirements={requirementsSnapshot}
                 onNavigateToRequirement={onNavigateToRequirement}
               />
             )}
@@ -1644,8 +1647,8 @@ function App() {
         {viewMode === "requirements" && (
           <RequirementsView
             requirementsStore={requirementsStore}
-            programIncrements={programIncrements}
-            team={team}
+            programIncrements={programIncrementsSnapshot}
+            team={teamSnapshot}
             diagramRoot={root}
             onNavigateToNode={onNavigateToNode}
             onCreateLinkedNode={onCreateLinkedNode}
@@ -1657,7 +1660,7 @@ function App() {
           <TimelineView
             programIncrementsStore={programIncrementsStore}
             requirementsStore={requirementsStore}
-            team={team}
+            team={teamSnapshot}
             diagramRoot={root}
             onNavigateToNode={onNavigateToNode}
             onCreateLinkedNode={onCreateLinkedNode}
@@ -1668,14 +1671,14 @@ function App() {
           <TeamView
             teamStore={teamStore}
             programIncrementsStore={programIncrementsStore}
-            requirements={requirements}
+            requirements={requirementsSnapshot}
           />
         )}
         {viewMode === "skill-tree" && (
           <SkillTreeView
             requirementsStore={requirementsStore}
-            programIncrements={programIncrements}
-            team={team}
+            programIncrements={programIncrementsSnapshot}
+            team={teamSnapshot}
             diagramRoot={root}
             onNavigateToNode={onNavigateToNode}
             onCreateLinkedNode={onCreateLinkedNode}
