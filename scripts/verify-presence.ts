@@ -37,7 +37,7 @@
 import * as Y from "yjs";
 import { encodeAwarenessUpdate, applyAwarenessUpdate } from "y-protocols/awareness";
 import { spawn, type ChildProcess } from "child_process";
-import { startCollabSession } from "../src/collab/session";
+import { startCollabSession, parsePresenceState } from "../src/collab/session";
 
 let failures = 0;
 function assert(cond: boolean, msg: string) {
@@ -48,6 +48,43 @@ function assert(cond: boolean, msg: string) {
     console.log("ok:", msg);
   }
 }
+
+// === parsePresenceState - pure logic, no network/signaling-server needed at all ===
+{
+  const full = parsePresenceState(7, { name: "Alice", color: "#5b7cfa", cursor: { x: 10, y: 20 }, selectedNodeIds: ["n1"], selectedEdgeIds: ["e1"] });
+  assert(
+    full !== null &&
+      full.clientId === 7 &&
+      full.name === "Alice" &&
+      full.color === "#5b7cfa" &&
+      full.cursor?.x === 10 &&
+      full.cursor?.y === 20 &&
+      full.selectedNodeIds[0] === "n1" &&
+      full.selectedEdgeIds[0] === "e1",
+    "a fully-formed state parses into a PresenceInfo with every field correctly carried over, including the clientId passed in separately from the state itself"
+  );
+
+  assert(parsePresenceState(1, { color: "#5b7cfa" }) === null, "a state missing name entirely is rejected outright - there's no genuine peer identity to show without it");
+  assert(parsePresenceState(1, { name: "Alice" }) === null, "a state missing color entirely is rejected outright, for the same reason");
+  assert(parsePresenceState(1, null) === null, "a null state (no awareness entry at all) is rejected outright");
+  assert(parsePresenceState(1, { name: 123, color: "#5b7cfa" }) === null, "a name that isn't actually a string is rejected, not coerced");
+
+  const noCursorField = parsePresenceState(1, { name: "Bob", color: "#000" });
+  assert(noCursorField !== null && noCursorField.cursor === null, "a valid name/color with no cursor field at all still parses successfully, defaulting cursor to null rather than being rejected - a peer's state can be legitimately incomplete right after joining");
+
+  const malformedCursor = parsePresenceState(1, { name: "Bob", color: "#000", cursor: { x: "not a number", y: 5 } });
+  assert(malformedCursor !== null && malformedCursor.cursor === null, "a malformed cursor (x isn't actually a number) doesn't reject the whole peer - it's defaulted to null while name/color still come through correctly");
+
+  const noSelections = parsePresenceState(1, { name: "Bob", color: "#000" });
+  assert(
+    noSelections !== null && Array.isArray(noSelections.selectedNodeIds) && noSelections.selectedNodeIds.length === 0 && Array.isArray(noSelections.selectedEdgeIds) && noSelections.selectedEdgeIds.length === 0,
+    "missing selectedNodeIds/selectedEdgeIds default to empty arrays rather than being undefined or rejecting the peer"
+  );
+
+  const malformedSelections = parsePresenceState(1, { name: "Bob", color: "#000", selectedNodeIds: "not-an-array" });
+  assert(malformedSelections !== null && Array.isArray(malformedSelections.selectedNodeIds) && malformedSelections.selectedNodeIds.length === 0, "a selectedNodeIds that isn't actually an array is defaulted to empty rather than passed through as-is or rejecting the peer");
+}
+
 
 function waitFor(cond: () => boolean, timeoutMs = 3000): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -88,7 +125,7 @@ try {
   const unsubA = sessionA.subscribeToPresence((peers) => seenByA1.push(peers));
   assert(seenByA1.length === 1 && seenByA1[0].length === 0, "subscribeToPresence fires immediately with an empty list before anyone (including this peer) has set any presence");
 
-  sessionA.setLocalPresence({ name: "Alice", color: "#5b7cfa" });
+  sessionA.setLocalPresence({ name: "Alice", color: "#5b7cfa", cursor: null, selectedNodeIds: [], selectedEdgeIds: [] });
   assert(seenByA1[seenByA1.length - 1].length === 0, "setting THIS peer's own presence does not appear in ITS OWN subscribeToPresence feed - seeing yourself in a 'who else is here' list would be redundant");
   unsubA();
 
@@ -107,7 +144,7 @@ try {
   // === Cross-peer sync, using Awareness's own real sync primitives -
   // the exact mechanism y-webrtc itself uses internally, genuinely
   // exercised here rather than assumed ===
-  sessionA.setLocalPresence({ name: "Alice", color: "#5b7cfa" });
+  sessionA.setLocalPresence({ name: "Alice", color: "#5b7cfa", cursor: null, selectedNodeIds: [], selectedEdgeIds: [] });
   const updateFromA = encodeAwarenessUpdate(sessionA.provider.awareness, [sessionA.provider.awareness.clientID]);
   applyAwarenessUpdate(sessionB.provider.awareness, updateFromA, "test-sync");
 
@@ -125,7 +162,7 @@ try {
 
   // Updating presence should propagate as a fresh 'change' event, not
   // require a fresh subscription.
-  sessionA.setLocalPresence({ name: "Alice", color: "#ff0000" });
+  sessionA.setLocalPresence({ name: "Alice", color: "#ff0000", cursor: null, selectedNodeIds: [], selectedEdgeIds: [] });
   const updatedFromA = encodeAwarenessUpdate(sessionA.provider.awareness, [sessionA.provider.awareness.clientID]);
   applyAwarenessUpdate(sessionB.provider.awareness, updatedFromA, "test-sync");
   await waitFor(() => latestSeenByB.some((p) => p.color === "#ff0000"));

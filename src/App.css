@@ -318,6 +318,55 @@
   z-index: 999;
 }
 
+.peer-cursor {
+  position: absolute;
+  pointer-events: none;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  /* Offsets the icon so its tip - not its bounding-box center - lands
+     on the actual reported cursor position, matching where a real
+     cursor's own hotspot sits. */
+  transform: translate(-2px, -2px);
+  /* Smooths out the visual jump between discrete position updates -
+     these arrive at whatever rate the network delivers them, not a
+     guaranteed steady stream, so a short transition reads as fluid
+     movement rather than the cursor teleporting between points. */
+  transition: left 0.08s linear, top 0.08s linear;
+}
+
+.peer-cursor__label {
+  font-size: 11px;
+  font-weight: 600;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.peer-selection-outline {
+  position: absolute;
+  pointer-events: none;
+  z-index: 998;
+  border: 2px solid;
+  border-radius: var(--radius-sm);
+  box-sizing: border-box;
+}
+
+.peer-selection-outline__label {
+  position: absolute;
+  top: -20px;
+  left: -2px;
+  font-size: 10px;
+  font-weight: 600;
+  color: white;
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
 .canvas__minimap {
   background-color: var(--node-bg) !important;
   border: 1px solid var(--chrome-border);

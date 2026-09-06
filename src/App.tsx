@@ -59,7 +59,7 @@ import type { DiagramStore } from "./collab/diagramStore";
 import { createYjsDiagramStore, seedYjsDiagramDoc } from "./collab/yjsDiagramStore";
 import { createYjsProgramIncrementsStore, seedYjsProgramIncrementsDoc } from "./collab/yjsProgramIncrementsStore";
 import type { ProgramIncrementsStore } from "./collab/programIncrementsStore";
-import { startCollabSession, type CollabSession, type PresenceInfo } from "./collab/session";
+import { startCollabSession, type CollabSession, type PresenceInfo, type LocalPresenceInfo } from "./collab/session";
 import { loadPresenceName, savePresenceName } from "./domain/presenceIdentity";
 import { classifyNodeChanges, applySelectionChanges, type PendingNodeUpdate, type CurrentNodeGeometry } from "./domain/nodeChangeBatching";
 import "./App.css";
@@ -306,6 +306,65 @@ function App() {
     return activeSession.session.subscribeToPresence(setPresencePeers);
   }, [activeSession]);
 
+  // Holds this peer's own full presence state, rebuilt and rebroadcast
+  // as a WHOLE each time any single piece of it changes (name/color at
+  // session start, cursor position on mouse move, selection on
+  // selection change) - setLocalPresence always replaces the entire
+  // state at once (matching Awareness's own setLocalState semantics),
+  // so broadcasting only the field that changed would silently wipe out
+  // everything else that was previously set.
+  const localPresenceRef = useRef<LocalPresenceInfo>({ name: "", color: "", cursor: null, selectedNodeIds: [], selectedEdgeIds: [] });
+  // activeSessionRef lets broadcastPresence stay a permanently stable
+  // function (empty deps) while still always reaching the CURRENT
+  // session - same rootRef/diagramStoreRef pattern used elsewhere in
+  // this file, and the same justification: this mutation always
+  // completes before broadcastPresence could ever read it, since reads
+  // only happen later, from event handlers or effects, never during
+  // render itself.
+  const activeSessionRef = useRef(activeSession);
+  // eslint-disable-next-line react-hooks/refs
+  activeSessionRef.current = activeSession;
+  const broadcastPresence = useCallback((patch: Partial<PresenceInfo>) => {
+    const session = activeSessionRef.current?.session;
+    if (!session) return;
+    localPresenceRef.current = { ...localPresenceRef.current, ...patch };
+    session.setLocalPresence(localPresenceRef.current);
+  }, []);
+
+  // Rebroadcasts this peer's own selection whenever it changes - moved
+  // below, right after selectedNodeIds/selectedEdgeIds are actually
+  // declared (this file declares them much further down).
+
+  // Cursor position updates are throttled to at most once per animation
+  // frame, the same pattern (and for the same reason) as the node
+  // position/dimension throttling above - mousemove fires far more
+  // often than the screen refreshes, and every update here goes out
+  // over the network to every peer, not just into local state.
+  const pendingCursorRef = useRef<{ x: number; y: number } | null>(null);
+  const hasPendingCursorRef = useRef(false);
+  const cursorFlushHandle = useRef<number | null>(null);
+  const flushCursor = useCallback(() => {
+    cursorFlushHandle.current = null;
+    if (!hasPendingCursorRef.current) return;
+    hasPendingCursorRef.current = false;
+    broadcastPresence({ cursor: pendingCursorRef.current });
+  }, [broadcastPresence]);
+  const onCursorMove = useCallback(
+    (position: { x: number; y: number } | null) => {
+      pendingCursorRef.current = position;
+      hasPendingCursorRef.current = true;
+      if (cursorFlushHandle.current === null) {
+        cursorFlushHandle.current = requestAnimationFrame(flushCursor);
+      }
+    },
+    [flushCursor]
+  );
+  useEffect(() => {
+    return () => {
+      if (cursorFlushHandle.current !== null) cancelAnimationFrame(cursorFlushHandle.current);
+    };
+  }, []);
+
   const signalingUrls = useMemo(() => {
     const raw = import.meta.env.VITE_SIGNALING_URL as string | undefined;
     return raw ? raw.split(",").map((u) => u.trim()).filter(Boolean) : [];
@@ -327,10 +386,15 @@ function App() {
       const programIncrementsStoreForSession = createYjsProgramIncrementsStore(doc);
       const diagramStoreForSession = createYjsDiagramStore(doc);
       const session = startCollabSession(doc, roomName, { signalingUrls });
-      session.setLocalPresence({
+      const initialPresence: LocalPresenceInfo = {
         name: displayName.trim() || "Guest",
         color: PRESENCE_COLORS[Math.floor(Math.random() * PRESENCE_COLORS.length)],
-      });
+        cursor: null,
+        selectedNodeIds: [],
+        selectedEdgeIds: [],
+      };
+      localPresenceRef.current = initialPresence;
+      session.setLocalPresence(initialPresence);
       setActiveSession({
         doc,
         session,
@@ -356,10 +420,15 @@ function App() {
       const programIncrementsStoreForSession = createYjsProgramIncrementsStore(doc);
       const diagramStoreForSession = createYjsDiagramStore(doc);
       const session = startCollabSession(doc, roomName, { signalingUrls });
-      session.setLocalPresence({
+      const initialPresence: LocalPresenceInfo = {
         name: displayName.trim() || "Guest",
         color: PRESENCE_COLORS[Math.floor(Math.random() * PRESENCE_COLORS.length)],
-      });
+        cursor: null,
+        selectedNodeIds: [],
+        selectedEdgeIds: [],
+      };
+      localPresenceRef.current = initialPresence;
+      session.setLocalPresence(initialPresence);
       setActiveSession({
         doc,
         session,
@@ -442,6 +511,19 @@ function App() {
 
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
   const [selectedEdgeIds, setSelectedEdgeIds] = useState<string[]>([]);
+
+  // Rebroadcasts this peer's own selection whenever it changes, so
+  // everyone else's "someone else has this selected" indicator (see
+  // Canvas's peerSelections prop) stays current. A no-op when no
+  // session is active - broadcastPresence itself already guards on
+  // activeSessionRef, this dependency just avoids scheduling pointless
+  // work while purely-local editing changes selection constantly.
+  useEffect(() => {
+    if (!activeSession) return;
+    broadcastPresence({ selectedNodeIds, selectedEdgeIds });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSession, selectedNodeIds, selectedEdgeIds]);
+
 
   // Subscribed via useSyncExternalStore (not just a plain useMemo keyed
   // on diagramStore/path/selection) because the Yjs-backed session store
@@ -1472,6 +1554,8 @@ function App() {
               edges={edges}
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
+              peers={activeSession ? presencePeers : []}
+              onCursorMove={onCursorMove}
               onConnect={onConnect}
               onSelectionChange={onSelectionChange}
               onAddNode={onAddNode}

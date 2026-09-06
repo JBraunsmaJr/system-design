@@ -44,9 +44,36 @@ import type * as Y from "yjs";
  * what actually keeps a session private, the same way an unlisted
  * shared-link URL does.
  */
-export interface PresenceInfo {
+export interface LocalPresenceInfo {
   name: string;
   color: string;
+  /** This peer's cursor position in FLOW coordinates (the diagram's own
+   * coordinate space, not screen pixels) - null when their cursor isn't
+   * currently over the canvas at all (they're interacting with a
+   * different panel, or haven't moved their mouse over the canvas yet
+   * this session). Flow coordinates, not screen ones, because each
+   * peer's own viewport (pan/zoom) is independent - a screen-pixel
+   * position would only be meaningful on the sender's own screen. */
+  cursor: { x: number; y: number } | null;
+  /** ids of nodes/edges this peer currently has selected - used to show
+   * a "someone else is looking at/editing this" indicator, distinct
+   * from this person's own selection. */
+  selectedNodeIds: string[];
+  selectedEdgeIds: string[];
+}
+
+/** What you observe about ANOTHER peer - everything they set about
+ * themselves, plus Awareness's own per-connection identifier. clientId
+ * only makes sense on this read side: it's intrinsic to a peer's
+ * connection, assigned by the Awareness protocol itself, never
+ * something the application sets about its own local presence. */
+export interface PresenceInfo extends LocalPresenceInfo {
+  /** Stable for the lifetime of this peer's connection, and (unlike
+   * name) guaranteed unique, since two peers could otherwise
+   * coincidentally share a display name. Exists specifically so callers
+   * have something safe to use as a React key when rendering a list of
+   * peers. */
+  clientId: number;
 }
 
 export interface CollabSession {
@@ -58,7 +85,8 @@ export interface CollabSession {
    * being needed. */
   isSynced(): boolean;
   disconnect(): void;
-  /** Sets this peer's own presence info (name/color), visible to
+  /** Sets this peer's own presence info (name, color, cursor position,
+   * current selection), visible to
    * everyone else in the session. Safe to call again later to update it
    * - e.g. if the person changes their display name mid-session - each
    * call fully replaces whatever was set before, matching Awareness's
@@ -68,7 +96,7 @@ export interface CollabSession {
    * itself, and disappears the moment this peer disconnects (Awareness
    * is explicitly "non-persistent data" - see y-protocols' own doc
    * comment on the class). */
-  setLocalPresence(info: PresenceInfo): void;
+  setLocalPresence(info: LocalPresenceInfo): void;
   /** Subscribes to the current set of OTHER peers' presence info - never
    * includes this peer's own (seeing yourself in a "who else is here"
    * list would be redundant, and every caller of this wants "who am I
@@ -105,6 +133,40 @@ export interface CollabSessionOptions {
  * React's lifecycle itself; a caller (e.g. a hook) is responsible for
  * disconnecting when a session ends or a component unmounts.
  */
+/**
+ * Validates and normalizes one peer's raw Awareness state into a
+ * PresenceInfo, or returns null if it doesn't even have the minimum
+ * required fields (name, color) to be considered a genuine, identified
+ * peer at all. Fields beyond name/color are defensively defaulted
+ * rather than treated as disqualifying if missing or malformed - a
+ * peer's state can be legitimately incomplete (the brief window right
+ * after joining, before their first full setLocalPresence call
+ * establishes everything at once), and a stale or malformed cursor
+ * shouldn't hide an otherwise-valid peer's name/color/selection
+ * entirely.
+ *
+ * Exported and kept pure (no Yjs/Awareness/browser dependency) so it's
+ * directly testable - Awareness state is untyped, external input by
+ * nature (anything a peer's own client chose to broadcast), and this is
+ * the one place that decides what's trustworthy enough to surface.
+ */
+export function parsePresenceState(clientId: number, state: unknown): PresenceInfo | null {
+  const candidate = state as Partial<LocalPresenceInfo> | null;
+  if (!candidate || typeof candidate.name !== "string" || typeof candidate.color !== "string") return null;
+  const cursor =
+    candidate.cursor && typeof candidate.cursor.x === "number" && typeof candidate.cursor.y === "number"
+      ? { x: candidate.cursor.x, y: candidate.cursor.y }
+      : null;
+  return {
+    clientId,
+    name: candidate.name,
+    color: candidate.color,
+    cursor,
+    selectedNodeIds: Array.isArray(candidate.selectedNodeIds) ? candidate.selectedNodeIds : [],
+    selectedEdgeIds: Array.isArray(candidate.selectedEdgeIds) ? candidate.selectedEdgeIds : [],
+  };
+}
+
 export function startCollabSession(doc: Y.Doc, roomName: string, options: CollabSessionOptions): CollabSession {
   if (options.signalingUrls.length === 0) {
     throw new Error(
@@ -132,10 +194,8 @@ export function startCollabSession(doc: Y.Doc, roomName: string, options: Collab
         const peers: PresenceInfo[] = [];
         provider.awareness.getStates().forEach((state: unknown, clientId: number) => {
           if (clientId === provider.awareness.clientID) return; // never include this peer's own presence
-          const candidate = state as Partial<PresenceInfo> | null;
-          if (candidate && typeof candidate.name === "string" && typeof candidate.color === "string") {
-            peers.push({ name: candidate.name, color: candidate.color });
-          }
+          const peer = parsePresenceState(clientId, state);
+          if (peer) peers.push(peer);
         });
         return peers;
       };
