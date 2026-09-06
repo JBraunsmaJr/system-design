@@ -101,7 +101,22 @@ export interface DiagramStore {
    * reason to know about. */
   deleteNode(id: string): void;
 
-  addEdge(parentPath: string[], source: string, target: string, data: ArchEdgeData): string;
+  /** sourceHandle/targetHandle matter here: several node types define
+   * multiple named handles (see BidirectionalHandles.tsx), so which
+   * specific handle a connection was made from/to is real, meaningful
+   * data - not something that can be left to default to "the only
+   * handle" the way a simpler node might get away with. Only ever set
+   * at creation time (via onConnect) - nothing in the app changes them
+   * on an already-created edge afterward, so updateEdge has no
+   * equivalent need for them. */
+  addEdge(
+    parentPath: string[],
+    source: string,
+    target: string,
+    data: ArchEdgeData,
+    sourceHandle?: string | null,
+    targetHandle?: string | null
+  ): string;
   updateEdge(id: string, patch: Partial<ArchEdgeData>): void;
   deleteEdge(id: string): void;
 }
@@ -207,12 +222,14 @@ export function createLocalDiagramStore(initial?: {
       notify();
     },
 
-    addEdge: (parentPath, source, target, data) => {
+    addEdge: (parentPath, source, target, data, sourceHandle, targetHandle) => {
       const id = `edge-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
       const edge: Edge<ArchEdgeData> = {
         id,
         source,
         target,
+        sourceHandle,
+        targetHandle,
         type: "typed",
         data: { ...data, parentPath } as ArchEdgeData & { parentPath: string[] },
       };

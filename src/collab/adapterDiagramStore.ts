@@ -181,9 +181,9 @@ export function createAdapterDiagramStore(
       });
     },
 
-    addEdge: (parentPath, source, target, data) => {
+    addEdge: (parentPath, source, target, data, sourceHandle, targetHandle) => {
       const id = `edge-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-      const newEdge: Edge<ArchEdgeData> = { id, source, target, type: "typed", data };
+      const newEdge: Edge<ArchEdgeData> = { id, source, target, sourceHandle, targetHandle, type: "typed", data };
       setRoot((root) =>
         updateSubDiagramAtPath(root, parentPath, (sd) => ({ ...sd, edges: [...sd.edges, newEdge] }))
       );

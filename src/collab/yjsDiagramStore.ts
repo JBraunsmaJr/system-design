@@ -95,13 +95,18 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
   function edgeMapToPlain(id: string, m: Y.Map<unknown>): Edge<ArchEdgeData> {
     const data: Record<string, unknown> = { parentPath: m.get("parentPath") as string[] };
     for (const field of EDGE_DATA_FIELDS) data[field] = m.get(field);
-    return {
+    const edge: Edge<ArchEdgeData> = {
       id,
       source: m.get("source") as string,
       target: m.get("target") as string,
       type: m.get("type") as string,
       data: data as ArchEdgeData,
     };
+    const sourceHandle = m.get("sourceHandle") as string | null | undefined;
+    if (sourceHandle !== undefined) edge.sourceHandle = sourceHandle;
+    const targetHandle = m.get("targetHandle") as string | null | undefined;
+    if (targetHandle !== undefined) edge.targetHandle = targetHandle;
+    return edge;
   }
 
   function buildSnapshot(): { nodes: Node<ArchNodeData>[]; edges: Edge<ArchEdgeData>[] } {
@@ -229,7 +234,7 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
       });
     },
 
-    addEdge: (parentPath, source, target, data) => {
+    addEdge: (parentPath, source, target, data, sourceHandle, targetHandle) => {
       const id = collisionResistantId("edge");
       doc.transact(() => {
         const m = new Y.Map<unknown>();
@@ -237,6 +242,8 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
         m.set("target", target);
         m.set("type", "typed");
         m.set("parentPath", parentPath);
+        if (sourceHandle !== undefined) m.set("sourceHandle", sourceHandle);
+        if (targetHandle !== undefined) m.set("targetHandle", targetHandle);
         for (const field of EDGE_DATA_FIELDS) {
           m.set(field, (data as Record<string, unknown>)[field]);
         }

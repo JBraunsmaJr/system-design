@@ -213,4 +213,30 @@ function canonicalJSON(value: unknown): string {
   assert(hasSubDiagram(nodes, [], populatedNode), "a node with at least one child correctly reports having a sub-diagram - matching the real app's own existing findLinkedNodes definition exactly, not a separate invented flag");
 }
 
+// === Part 5: sourceHandle/targetHandle are preserved - real, meaningful data for nodes with multiple named handles (discovered during actual UI wiring, not something addEdge can afford to silently drop) ===
+{
+  function runSequence(store: DiagramStore) {
+    const a = store.addNode([], "typed", { x: 0, y: 0 }, mkNodeData("A"));
+    const b = store.addNode([], "typed", { x: 1, y: 1 }, mkNodeData("B"));
+    store.addEdge([], a, b, mkEdgeData(), "source-right", "target-left");
+    return store.getSnapshot().edges[0];
+  }
+
+  const localEdge = runSequence(createLocalDiagramStore());
+  const yjsEdge = runSequence(createYjsDiagramStore(new Y.Doc()));
+
+  assert(localEdge.sourceHandle === "source-right" && localEdge.targetHandle === "target-left", "the local store correctly preserves which specific named handle a connection was made from/to");
+  assert(yjsEdge.sourceHandle === "source-right" && yjsEdge.targetHandle === "target-left", "the Yjs store correctly preserves the same, round-tripping through real yjs");
+
+  // An edge created without explicit handles (the common case - most
+  // nodes only have one, default handle) shouldn't have these fields
+  // forced to some placeholder value.
+  const plainStore = createLocalDiagramStore();
+  const c = plainStore.addNode([], "typed", { x: 0, y: 0 }, mkNodeData("C"));
+  const d = plainStore.addNode([], "typed", { x: 1, y: 1 }, mkNodeData("D"));
+  plainStore.addEdge([], c, d, mkEdgeData());
+  const plainEdge = plainStore.getSnapshot().edges[0];
+  assert(plainEdge.sourceHandle === undefined && plainEdge.targetHandle === undefined, "an edge created without explicit handles has no sourceHandle/targetHandle forced onto it");
+}
+
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);

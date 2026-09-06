@@ -3,9 +3,6 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useUndoableState } from "./hooks/useUndoableState";
 import {
   ReactFlowProvider,
-  applyNodeChanges,
-  applyEdgeChanges,
-  addEdge,
   type Node,
   type Edge,
   type Connection,
@@ -28,10 +25,7 @@ import { NODE_TYPES } from "./domain/nodeRegistry";
 import { GROUP_TYPES } from "./domain/groupRegistry";
 import { SHAPE_TYPES } from "./domain/shapeRegistry";
 import { reorderWithGroupsFirst, toAbsolutePosition } from "./domain/graphUtils";
-import { cloneNodesAndEdges } from "./domain/cloneNodes";
 import {
-  getSubDiagramAtPath,
-  updateSubDiagramAtPath,
   getBreadcrumbLabels,
   type DiagramPath,
 } from "./domain/subDiagramTree";
@@ -59,6 +53,8 @@ import { createAdapterRequirementsStore } from "./collab/requirementsStore";
 import { createYjsRequirementsStore, seedYjsRequirementsDoc } from "./collab/yjsRequirementsStore";
 import type { RequirementsStore } from "./collab/requirementsStore";
 import { createAdapterProgramIncrementsStore } from "./collab/programIncrementsStore";
+import { createAdapterDiagramStore } from "./collab/adapterDiagramStore";
+import { getNodesAtPath, getEdgesAtPath } from "./collab/diagramStore";
 import { createYjsProgramIncrementsStore, seedYjsProgramIncrementsDoc } from "./collab/yjsProgramIncrementsStore";
 import type { ProgramIncrementsStore } from "./collab/programIncrementsStore";
 import { startCollabSession, type CollabSession } from "./collab/session";
@@ -172,6 +168,7 @@ function App() {
       })),
     [setDiagram]
   );
+  const diagramStore = useMemo(() => createAdapterDiagramStore(() => root, setRoot), [root, setRoot]);
   const setScenarios = useCallback(
     (updater: Scenario[] | ((prev: Scenario[]) => Scenario[])) =>
       setDiagram((prev) => ({
@@ -347,36 +344,60 @@ function App() {
 
   const [path, setPath] = useState<DiagramPath>([]);
 
-  const { nodes, edges } = useMemo(() => getSubDiagramAtPath(root, path), [root, path]);
   const breadcrumbLabels = useMemo(() => getBreadcrumbLabels(root, path), [root, path]);
-
-  const setCurrentNodes = useCallback(
-    (updater: (nodes: Node<ArchNodeData>[]) => Node<ArchNodeData>[]) => {
-      setRoot((r) => updateSubDiagramAtPath(r, path, (sd) => ({ ...sd, nodes: updater(sd.nodes) })));
-    },
-    [path, setRoot]
-  );
-
-  const setCurrentEdges = useCallback(
-    (updater: (edges: Edge<ArchEdgeData>[]) => Edge<ArchEdgeData>[]) => {
-      setRoot((r) => updateSubDiagramAtPath(r, path, (sd) => ({ ...sd, edges: updater(sd.edges) })));
-    },
-    [path, setRoot]
-  );
-
-  const onNodesChange = useCallback<OnNodesChange<Node<ArchNodeData>>>(
-    (changes) => setCurrentNodes((nds) => applyNodeChanges(changes, nds)),
-    [setCurrentNodes]
-  );
-
-  const onEdgesChange = useCallback<OnEdgesChange<Edge<ArchEdgeData>>>(
-    (changes) => setCurrentEdges((eds) => applyEdgeChanges(changes, eds)),
-    [setCurrentEdges]
-  );
 
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
   const [selectedEdgeIds, setSelectedEdgeIds] = useState<string[]>([]);
+
+  // nodes/edges are derived from diagramStore rather than stored directly -
+  // selection is deliberately NOT part of that store's schema (it's
+  // ephemeral, per-person state, not something a collaborator should see
+  // reflected in their own view), so it's combined in here on every read
+  // instead, using selectedNodeIds/selectedEdgeIds as the sole source of
+  // truth. This replaces what used to be tracked as a `.selected` field
+  // persisted directly on the node/edge objects themselves.
+  const { nodes, edges } = useMemo(() => {
+    const snapshot = diagramStore.getSnapshot();
+    const rawNodes = reorderWithGroupsFirst(getNodesAtPath(snapshot.nodes, path));
+    const rawEdges = getEdgesAtPath(snapshot.edges, path);
+    return {
+      nodes: rawNodes.map((n) => ({ ...n, selected: selectedNodeIds.includes(n.id) })),
+      edges: rawEdges.map((e) => ({ ...e, selected: selectedEdgeIds.includes(e.id) })),
+    };
+  }, [diagramStore, path, selectedNodeIds, selectedEdgeIds]);
+
+  // Only position/dimensions changes need to reach the store - selection
+  // changes are handled separately (and more robustly, since it's the
+  // full aggregate rather than an incremental diff) via onSelectionChange
+  // below. 'remove' changes are never expected here: Canvas.tsx sets
+  // deleteKeyCode={null}, so React Flow's own delete-key handling never
+  // fires through this path at all - deletion always goes through the
+  // app's own onDeleteNode/onDeleteEdge, which have additional logic
+  // (group-child release, populated-sub-diagram confirmation) a raw
+  // 'remove' change would bypass entirely. 'add'/'replace' aren't
+  // expected either: nodes are always added via explicit app actions.
+  const onNodesChange = useCallback<OnNodesChange<Node<ArchNodeData>>>(
+    (changes) => {
+      for (const change of changes) {
+        if (change.type === "position" && change.position) {
+          diagramStore.updatePosition(change.id, change.position);
+        } else if (change.type === "dimensions" && change.dimensions) {
+          diagramStore.updateDimensions(change.id, change.dimensions.width, change.dimensions.height);
+        }
+      }
+    },
+    [diagramStore]
+  );
+
+  // Edges have no position/dimensions concept, and for the same reasons
+  // as onNodesChange above, 'select' is handled elsewhere and
+  // 'remove'/'add'/'replace' are never expected here - so there's
+  // nothing for this handler to actually do. Still required as a prop:
+  // React Flow treats an ungoverned edges array as uncontrolled without it.
+  const onEdgesChange = useCallback<OnEdgesChange<Edge<ArchEdgeData>>>(() => {}, []);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+
 
   const [activeScenarioId, setActiveScenarioId] = useState<string | null>(null);
   const [activeStepIndex, setActiveStepIndex] = useState(0);
@@ -417,25 +438,18 @@ function App() {
    * one predictable, always-discoverable place regardless of where they
    * were when they clicked. */
   const onCreateLinkedNode = useCallback((itemId: string, label: string) => {
-    const id = nextId("node");
-    const node: Node<ArchNodeData> = {
-      id,
-      type: "typed",
-      position: { x: 0, y: 0 },
-      data: {
-        nodeType: "custom",
-        label,
-        description: "",
-        properties: {},
-        tags: [],
-        linkedRequirementIds: [itemId],
-      },
-    };
-    setRoot((r) => updateSubDiagramAtPath(r, [], (sd) => ({ ...sd, nodes: [...sd.nodes, node] })));
+    const id = diagramStore.addNode([], "typed", { x: 0, y: 0 }, {
+      nodeType: "custom",
+      label,
+      description: "",
+      properties: {},
+      tags: [],
+      linkedRequirementIds: [itemId],
+    });
     setViewMode("diagram");
     setPath([]);
     setPendingNodeFocus(id);
-  }, [setRoot]);
+  }, [diagramStore]);
   const [isScenarioPanelOpen, setIsScenarioPanelOpen] = useState(false);
   const [activeStepId, setActiveStepId] = useState<string | null>(null);
   const [isSelectMode, setIsSelectMode] = useState(false);
@@ -445,122 +459,95 @@ function App() {
 
   const onConnect = useCallback<(connection: Connection) => void>(
     (connection) => {
-      setCurrentEdges((eds) =>
-        addEdge<Edge<ArchEdgeData>>(
-          {
-            ...connection,
-            id: nextId("edge"),
-            type: "typed",
-            data: { edgeType: "blank-solid", label: "", direction: "forward", properties: {} },
-          },
-          eds
-        )
+      diagramStore.addEdge(
+        path,
+        connection.source,
+        connection.target,
+        { edgeType: "blank-solid", label: "", direction: "forward", properties: {} },
+        connection.sourceHandle,
+        connection.targetHandle
       );
     },
-    [setCurrentEdges]
+    [diagramStore, path]
   );
 
   const onAddNode = useCallback(
     (typeId: string, position: { x: number; y: number }) => {
       const def = NODE_TYPES.find((n) => n.id === typeId);
       if (!def) return;
-      const node: Node<ArchNodeData> = {
-        id: nextId("node"),
-        type: "typed",
-        position,
-        data: {
-          nodeType: typeId,
-          label: def.label,
-          description: "",
-          properties: { ...(def.defaultProperties ?? {}) },
-          tags: [],
-        },
-      };
-      setCurrentNodes((nds) => [...nds, node]);
+      diagramStore.addNode(path, "typed", position, {
+        nodeType: typeId,
+        label: def.label,
+        description: "",
+        properties: { ...(def.defaultProperties ?? {}) },
+        tags: [],
+      });
     },
-    [setCurrentNodes]
+    [diagramStore, path]
   );
 
   const onAddGroup = useCallback(
     (typeId: string, position: { x: number; y: number }) => {
       const def = GROUP_TYPES.find((g) => g.id === typeId);
       if (!def) return;
-      const node: Node<ArchNodeData> = {
-        id: nextId("group"),
-        type: "group",
-        position,
-        width: 320,
-        height: 220,
-        data: { nodeType: typeId, label: def.label, description: "", properties: {}, tags: [] },
-      };
-      setCurrentNodes((nds) => reorderWithGroupsFirst([...nds, node]));
+      const id = diagramStore.addNode(path, "group", position, {
+        nodeType: typeId,
+        label: def.label,
+        description: "",
+        properties: {},
+        tags: [],
+      });
+      diagramStore.updateDimensions(id, 320, 220);
     },
-    [setCurrentNodes]
+    [diagramStore, path]
   );
 
   const onAddText = useCallback(
     (position: { x: number; y: number }): string => {
-      const id = nextId("text");
-      const node: Node<ArchNodeData> = {
-        id,
-        type: "text",
-        position,
-        data: {
-          nodeType: "text",
-          label: "",
-          description: "",
-          properties: {},
-          tags: [],
-          textColor: "#e7e9ee",
-          fontSize: 16,
-        },
-      };
-      setCurrentNodes((nds) => [...nds, node]);
-      return id;
+      return diagramStore.addNode(path, "text", position, {
+        nodeType: "text",
+        label: "",
+        description: "",
+        properties: {},
+        tags: [],
+        textColor: "#e7e9ee",
+        fontSize: 16,
+      });
     },
-    [setCurrentNodes]
+    [diagramStore, path]
   );
 
   const onAddShape = useCallback(
     (typeId: string, position: { x: number; y: number }) => {
       const def = SHAPE_TYPES.find((s) => s.id === typeId);
       if (!def) return;
-      const node: Node<ArchNodeData> = {
-        id: nextId("shape"),
-        type: "shape",
-        position,
-        width: def.defaultWidth,
-        height: def.defaultHeight,
-        data: { nodeType: typeId, label: "", description: "", properties: {}, tags: [] },
-      };
-      setCurrentNodes((nds) => [...nds, node]);
+      const id = diagramStore.addNode(path, "shape", position, {
+        nodeType: typeId,
+        label: "",
+        description: "",
+        properties: {},
+        tags: [],
+      });
+      diagramStore.updateDimensions(id, def.defaultWidth, def.defaultHeight);
     },
-    [setCurrentNodes]
+    [diagramStore, path]
   );
 
   const onAddCode = useCallback(
     (position: { x: number; y: number }): string => {
-      const id = nextId("code");
-      const node: Node<ArchNodeData> = {
-        id,
-        type: "code",
-        position,
-        width: 320,
-        height: 220,
-        data: {
-          nodeType: "code",
-          label: "",
-          description: "",
-          properties: {},
-          tags: [],
-          codeContent: "",
-          codeLanguage: "json",
-        },
-      };
-      setCurrentNodes((nds) => [...nds, node]);
+      const id = diagramStore.addNode(path, "code", position, {
+        nodeType: "code",
+        label: "",
+        description: "",
+        properties: {},
+        tags: [],
+        codeContent: "",
+        codeLanguage: "json",
+      });
+      diagramStore.updateDimensions(id, 320, 220);
       return id;
     },
-    [setCurrentNodes]
+    [diagramStore, path]
   );
 
   // Called after dragging a regular node - see Canvas.tsx's onNodeDragStop.
@@ -569,25 +556,20 @@ function App() {
   // node visually stays where the user dropped it.
   const onReparentNode = useCallback(
     (nodeId: string, newParentId: string | null) => {
-      setCurrentNodes((nds) => {
-        const node = nds.find((n) => n.id === nodeId);
-        if (!node) return nds;
-        const currentParentId = node.parentId ?? null;
-        if (currentParentId === newParentId) return nds;
+      const node = nodes.find((n) => n.id === nodeId);
+      if (!node) return;
+      const currentParentId = node.parentId ?? null;
+      if (currentParentId === newParentId) return;
 
-        const absolute = toAbsolutePosition(node, nds, node.parentId);
-        const newParent = newParentId ? nds.find((n) => n.id === newParentId) : undefined;
-        const nextPosition = newParent
-          ? { x: absolute.x - newParent.position.x, y: absolute.y - newParent.position.y }
-          : absolute;
+      const absolute = toAbsolutePosition(node, nodes, node.parentId);
+      const newParent = newParentId ? nodes.find((n) => n.id === newParentId) : undefined;
+      const nextPosition = newParent
+        ? { x: absolute.x - newParent.position.x, y: absolute.y - newParent.position.y }
+        : absolute;
 
-        const updated = nds.map((n) =>
-          n.id === nodeId ? { ...n, parentId: newParentId ?? undefined, position: nextPosition } : n
-        );
-        return reorderWithGroupsFirst(updated);
-      });
+      diagramStore.updateParentId(nodeId, newParentId ?? undefined, nextPosition);
     },
-    [setCurrentNodes]
+    [nodes, diagramStore]
   );
 
   // Called after dragging a *boundary* - see Canvas.tsx's onNodeDragStop.
@@ -597,20 +579,18 @@ function App() {
   // same math as onReparentNode).
   const onAdoptIntoGroup = useCallback(
     (groupId: string, nodeIds: string[]) => {
-      setCurrentNodes((nds) => {
-        const group = nds.find((n) => n.id === groupId);
-        if (!group) return nds;
-        const idsToAdopt = new Set(nodeIds);
-        const updated = nds.map((n) => {
-          if (!idsToAdopt.has(n.id) || n.id === groupId) return n;
-          const absolute = toAbsolutePosition(n, nds, n.parentId);
-          const relative = { x: absolute.x - group.position.x, y: absolute.y - group.position.y };
-          return { ...n, parentId: groupId, position: relative };
-        });
-        return reorderWithGroupsFirst(updated);
-      });
+      const group = nodes.find((n) => n.id === groupId);
+      if (!group) return;
+      for (const nodeId of nodeIds) {
+        if (nodeId === groupId) continue;
+        const n = nodes.find((nn) => nn.id === nodeId);
+        if (!n) continue;
+        const absolute = toAbsolutePosition(n, nodes, n.parentId);
+        const relative = { x: absolute.x - group.position.x, y: absolute.y - group.position.y };
+        diagramStore.updateParentId(nodeId, groupId, relative);
+      }
     },
-    [setCurrentNodes]
+    [nodes, diagramStore]
   );
 
   const onSelectionChange = useCallback<OnSelectionChangeFunc>(({ nodes: selNodes, edges: selEdges }) => {
@@ -620,18 +600,16 @@ function App() {
 
   const onUpdateNode = useCallback(
     (id: string, patch: Partial<ArchNodeData>) => {
-      setCurrentNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...patch } } : n)));
+      diagramStore.updateNode(id, patch);
     },
-    [setCurrentNodes]
+    [diagramStore]
   );
 
   const onUpdateEdge = useCallback(
     (id: string, patch: Partial<ArchEdgeData>) => {
-      setCurrentEdges((eds) =>
-        eds.map((e) => (e.id === id ? { ...e, data: { ...(e.data as ArchEdgeData), ...patch } } : e))
-      );
+      diagramStore.updateEdge(id, patch);
     },
-    [setCurrentEdges]
+    [diagramStore]
   );
 
   // Deleting a node also drops any edges attached to it. Deleting a group
@@ -642,37 +620,36 @@ function App() {
   const onDeleteNode = useCallback(
     (id: string) => {
       const target = nodes.find((n) => n.id === id);
-      const nestedCount = target?.data.subDiagram?.nodes.length ?? 0;
+      if (!target) return;
+      const nestedCount = getNodesAtPath(diagramStore.getSnapshot().nodes, [...path, id]).length;
       if (nestedCount > 0) {
         const ok = window.confirm(
-          `"${target?.data.label}" contains a sub-diagram with ${nestedCount} node${nestedCount === 1 ? "" : "s"} inside. Delete it and everything inside?`
+          `"${target.data.label}" contains a sub-diagram with ${nestedCount} node${nestedCount === 1 ? "" : "s"} inside. Delete it and everything inside?`
         );
         if (!ok) return;
       }
-      setCurrentNodes((nds) => {
-        const removedTarget = nds.find((n) => n.id === id);
-        if (!removedTarget) return nds;
-        const released = nds
-          .filter((n) => n.id !== id)
-          .map((n) => {
-            if (n.parentId !== id) return n;
-            const absolute = toAbsolutePosition(n, nds, id);
-            return { ...n, parentId: undefined, position: absolute };
-          });
-        return reorderWithGroupsFirst(released);
-      });
-      setCurrentEdges((eds) => eds.filter((e) => e.source !== id && e.target !== id));
+      // Release any group children BEFORE deleting - deleteNode's own
+      // cascade only removes DESCENDANTS at deeper tree levels; group
+      // children (same-level, parentId containment) are a different,
+      // unrelated concept that deliberately stays the UI's job (see
+      // diagramStore.ts's own doc comment on deleteNode).
+      for (const child of nodes) {
+        if (child.parentId !== id) continue;
+        const absolute = toAbsolutePosition(child, nodes, id);
+        diagramStore.updateParentId(child.id, undefined, absolute);
+      }
+      diagramStore.deleteNode(id);
       setSelectedNodeIds((cur) => cur.filter((n) => n !== id));
     },
-    [nodes, setCurrentNodes, setCurrentEdges]
+    [nodes, path, diagramStore]
   );
 
   const onDeleteEdge = useCallback(
     (id: string) => {
-      setCurrentEdges((eds) => eds.filter((e) => e.id !== id));
+      diagramStore.deleteEdge(id);
       setSelectedEdgeIds((cur) => cur.filter((e) => e !== id));
     },
-    [setCurrentEdges]
+    [diagramStore]
   );
 
   const onDeleteSelection = useCallback(() => {
@@ -688,9 +665,21 @@ function App() {
   // copying something at one diagram level and pasting it after drilling
   // into another is a reasonable, useful thing to do, given everything here
   // is one tree.
+  //
+  // relativePath on each clipboard item is relative to the COPY
+  // operation's own root, not the diagram's global path - [] for a
+  // top-level copied item, [oldNodeId] for something one level inside a
+  // copied node's own sub-diagram, and so on. This is what lets copying
+  // a node with a populated sub-diagram bring its nested content along:
+  // the flattened nodes/edges this component reads only ever cover the
+  // CURRENTLY VIEWED level, so a copied node's own nested descendants
+  // (which live at deeper parentPath values in the global flat space,
+  // not in the node's own data field the way the old recursive-tree
+  // model kept them) have to be gathered explicitly, one level at a
+  // time, from the store's full snapshot.
   const [clipboard, setClipboard] = useState<{
-    nodes: Node<ArchNodeData>[];
-    edges: Edge<ArchEdgeData>[];
+    nodes: (Node<ArchNodeData> & { relativePath: string[] })[];
+    edges: (Edge<ArchEdgeData> & { relativePath: string[] })[];
   } | null>(null);
   // Each consecutive paste (without re-copying) offsets a bit further, so
   // repeated pastes cascade diagonally instead of stacking exactly on top
@@ -719,48 +708,109 @@ function App() {
       return n;
     });
 
-    const edgesToCopy = edges.filter((e) => copiedIds.has(e.source) && copiedIds.has(e.target));
-    setClipboard({ nodes: normalized, edges: edgesToCopy });
+    const topLevelEdges = edges.filter((e) => copiedIds.has(e.source) && copiedIds.has(e.target));
+
+    const { nodes: allNodes, edges: allEdges } = diagramStore.getSnapshot();
+    function gatherDescendants(
+      nodeId: string,
+      relativePath: string[]
+    ): { nodes: (Node<ArchNodeData> & { relativePath: string[] })[]; edges: (Edge<ArchEdgeData> & { relativePath: string[] })[] } {
+      const childPath = [...relativePath, nodeId];
+      const levelNodes = getNodesAtPath(allNodes, [...path, ...childPath]);
+      const levelEdges = getEdgesAtPath(allEdges, [...path, ...childPath]);
+      let result = {
+        nodes: levelNodes.map((n) => ({ ...n, relativePath: childPath })),
+        edges: levelEdges.map((e) => ({ ...e, relativePath: childPath })),
+      };
+      for (const child of levelNodes) {
+        const deeper = gatherDescendants(child.id, childPath);
+        result = { nodes: [...result.nodes, ...deeper.nodes], edges: [...result.edges, ...deeper.edges] };
+      }
+      return result;
+    }
+
+    let descendantNodes: (Node<ArchNodeData> & { relativePath: string[] })[] = [];
+    let descendantEdges: (Edge<ArchEdgeData> & { relativePath: string[] })[] = [];
+    for (const n of normalized) {
+      const gathered = gatherDescendants(n.id, []);
+      descendantNodes = [...descendantNodes, ...gathered.nodes];
+      descendantEdges = [...descendantEdges, ...gathered.edges];
+    }
+
+    setClipboard({
+      nodes: [...normalized.map((n) => ({ ...n, relativePath: [] })), ...descendantNodes],
+      edges: [...topLevelEdges.map((e) => ({ ...e, relativePath: [] })), ...descendantEdges],
+    });
     setPasteOffset(0);
-  }, [nodes, edges, selectedNodeIds]);
+  }, [nodes, edges, selectedNodeIds, diagramStore, path]);
 
   const onPaste = useCallback(() => {
     if (!clipboard || clipboard.nodes.length === 0) return;
     const offset = 40 + pasteOffset;
-    const { nodes: clonedNodes, edges: clonedEdges } = cloneNodesAndEdges(clipboard.nodes, clipboard.edges, {
-      nextNodeId: (prefix) => nextId(prefix),
-      nextEdgeId: () => nextId("edge"),
-    });
-    // Only root items (no parentId within the pasted set) need the position
-    // offset - children are positioned relative to their (also being
-    // pasted, also shifted) parent, so they move along automatically. The
-    // same root/child split applies to selection: only root items are
-    // marked selected, matching how a normal click or rubber-band
+
+    // A node depends on its relativePath ancestors (tree-level nesting)
+    // AND its parentId (group containment - a SAME-level dependency, one
+    // a depth-only sort can't correctly order: a group's own child could
+    // otherwise get processed before the group itself, if it happened to
+    // come first in the underlying storage order) both having their new
+    // ids assigned first. Repeatedly processing whatever's ready handles
+    // both kinds of dependency, and any depth, without needing a full
+    // topological sort. Always terminates: every parentId that survives
+    // into the clipboard is guaranteed to also be IN the clipboard -
+    // onCopy strips parentId whenever the parent isn't also being
+    // copied, and gatherDescendants always copies an entire nested level
+    // wholesale, so a node's own group (if any) at that level is never
+    // left out.
+    const remaining = [...clipboard.nodes];
+    const idMap = new Map<string, string>();
+    const remapPath = (relativePath: string[]) => relativePath.map((oldId) => idMap.get(oldId) ?? oldId);
+
+    const rootPastedIds: string[] = [];
+    while (remaining.length > 0) {
+      const readyIndex = remaining.findIndex(
+        (n) => n.relativePath.every((ancestorId) => idMap.has(ancestorId)) && (!n.parentId || idMap.has(n.parentId))
+      );
+      if (readyIndex === -1) break; // shouldn't happen - see comment above - but never hang if it somehow does
+      const [n] = remaining.splice(readyIndex, 1);
+
+      const isTopLevel = n.relativePath.length === 0;
+      const shouldOffset = isTopLevel && !n.parentId;
+      const position = shouldOffset ? { x: n.position.x + offset, y: n.position.y + offset } : n.position;
+      const newParentId = n.parentId ? idMap.get(n.parentId) : undefined;
+      const newId = diagramStore.addNode([...path, ...remapPath(n.relativePath)], n.type ?? "typed", position, n.data);
+      idMap.set(n.id, newId);
+      if (newParentId !== undefined) diagramStore.updateParentId(newId, newParentId, position);
+      if (n.width !== undefined || n.height !== undefined) diagramStore.updateDimensions(newId, n.width, n.height);
+      if (isTopLevel) rootPastedIds.push(newId);
+    }
+
+    const newEdgeIds: string[] = [];
+    for (const e of clipboard.edges) {
+      const newSource = idMap.get(e.source);
+      const newTarget = idMap.get(e.target);
+      if (!newSource || !newTarget) continue; // shouldn't happen - every edge's endpoints were copied along with it
+      const newEdgeId = diagramStore.addEdge(
+        [...path, ...remapPath(e.relativePath)],
+        newSource,
+        newTarget,
+        e.data ?? { edgeType: "blank-solid", label: "", direction: "forward", properties: {} },
+        e.sourceHandle,
+        e.targetHandle
+      );
+      newEdgeIds.push(newEdgeId);
+    }
+
+    // The pasted result becomes the new selection - matches how paste
+    // behaves elsewhere (Figma, PowerPoint, etc.), letting the person
+    // immediately nudge/move what they just pasted. Only top-level items
+    // are marked selected, matching how a normal click or rubber-band
     // selection already treats a group (the group itself gets selected,
     // not each individual child), relying on React Flow's built-in
     // parent-child dragging to move a selected group's contents together.
-    // The pasted result becomes the new selection - matches how paste
-    // behaves elsewhere (Figma, PowerPoint, etc.), letting the person
-    // immediately nudge/move what they just pasted. The ORIGINAL nodes
-    // need their `selected` explicitly cleared here too: copying doesn't
-    // touch selection, so the originals kept their own `.selected: true`
-    // the entire time, which is what made both the originals and the
-    // paste appear selected together in an earlier version of this.
-    const offsetNodes = clonedNodes.map((n) =>
-      n.parentId
-        ? n
-        : { ...n, position: { x: n.position.x + offset, y: n.position.y + offset }, selected: true }
-    );
-    const rootPastedIds = new Set(offsetNodes.filter((n) => !n.parentId).map((n) => n.id));
-    const selectedEdges = clonedEdges.map((e) => ({ ...e, selected: true }));
-    setCurrentNodes((nds) =>
-      reorderWithGroupsFirst([...nds.map((n) => (n.selected ? { ...n, selected: false } : n)), ...offsetNodes])
-    );
-    setCurrentEdges((eds) => [...eds.map((e) => (e.selected ? { ...e, selected: false } : e)), ...selectedEdges]);
-    setSelectedNodeIds([...rootPastedIds]);
-    setSelectedEdgeIds(selectedEdges.map((e) => e.id));
+    setSelectedNodeIds(rootPastedIds);
+    setSelectedEdgeIds(newEdgeIds);
     setPasteOffset((p) => p + 40);
-  }, [clipboard, pasteOffset, setCurrentNodes, setCurrentEdges]);
+  }, [clipboard, pasteOffset, diagramStore, path]);
 
   // --- Sub-diagram navigation ---------------------------------------------
 
