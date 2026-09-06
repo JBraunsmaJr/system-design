@@ -201,4 +201,44 @@ function canonicalJSON(value: unknown): string {
   );
 }
 
+// === Part 8: getSnapshot satisfies useSyncExternalStore's own contract - the exact bug a real user hit (infinite render loop, nothing rendering at all) when this didn't hold ===
+{
+  const { store } = makeAdapterStore();
+
+  const snapshotA = store.getSnapshot();
+  const snapshotB = store.getSnapshot();
+  assert(
+    snapshotA === snapshotB,
+    "calling getSnapshot() twice in a row with NOTHING having changed in between returns the exact same object reference - useSyncExternalStore calls getSnapshot on every render to check for changes, and a fresh reference every time (even with identical content) makes React conclude something changed on every single render, looping forever trying to resolve it. This is precisely the bug a real user hit: 'The result of getSnapshot should be cached' followed by 'Maximum update depth exceeded', with nothing rendering at all."
+  );
+
+  const nodeId = store.addNode([], "typed", { x: 0, y: 0 }, mkNodeData("Root"));
+  const snapshotC = store.getSnapshot();
+  assert(snapshotC !== snapshotA, "after a genuine mutation (addNode), getSnapshot() correctly returns a NEW reference - the cache must invalidate on real changes, not just always return the same frozen object");
+
+  const snapshotD = store.getSnapshot();
+  assert(snapshotC === snapshotD, "immediately after that mutation, calling getSnapshot() again (with nothing further changed) returns the SAME reference as the previous call - the cache re-stabilizes correctly after each change, not just once at the very start");
+
+  // Confirm this holds across every mutation type, not just addNode -
+  // each one needs to correctly invalidate the cache in turn.
+  let previous = snapshotD;
+  const mutations: Array<() => void> = [
+    () => store.updateNode(nodeId, { label: "Renamed" }),
+    () => store.updatePosition(nodeId, { x: 50, y: 50 }),
+    () => store.updateDimensions(nodeId, 100, 100),
+    () => store.updateParentId(nodeId, undefined, { x: 10, y: 10 }),
+    () => store.deleteNode(nodeId),
+  ];
+  let allInvalidatedCorrectly = true;
+  for (const mutate of mutations) {
+    mutate();
+    const next = store.getSnapshot();
+    if (next === previous) allInvalidatedCorrectly = false;
+    const nextAgain = store.getSnapshot();
+    if (nextAgain !== next) allInvalidatedCorrectly = false;
+    previous = next;
+  }
+  assert(allInvalidatedCorrectly, "every mutation type (updateNode, updatePosition, updateDimensions, updateParentId, deleteNode) correctly invalidates the cache exactly once - a new reference right after the change, then stable again until the next one");
+}
+
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);

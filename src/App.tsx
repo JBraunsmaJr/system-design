@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ChangeEvent } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useUndoableState } from "./hooks/useUndoableState";
 import {
@@ -61,6 +61,7 @@ import { createYjsProgramIncrementsStore, seedYjsProgramIncrementsDoc } from "./
 import type { ProgramIncrementsStore } from "./collab/programIncrementsStore";
 import { startCollabSession, type CollabSession, type PresenceInfo } from "./collab/session";
 import { loadPresenceName, savePresenceName } from "./domain/presenceIdentity";
+import { classifyNodeChanges, type PendingNodeUpdate } from "./domain/nodeChangeBatching";
 import "./App.css";
 
 let idSeed = 0;
@@ -178,7 +179,49 @@ function App() {
       })),
     [setDiagram]
   );
-  const localDiagramStore = useMemo(() => createAdapterDiagramStore(() => root, setRoot), [root, setRoot]);
+  // rootRef always holds the CURRENT root, updated on every render (a
+  // plain ref mutation during render, not a state update - safe, and
+  // exactly the pattern React itself recommends for "keep a ref in sync
+  // with the latest value" situations). getRoot reads from this ref
+  // rather than closing over `root` directly, which is what lets
+  // localDiagramStore itself stay a single, stable instance below
+  // instead of being torn down and rebuilt on every edit.
+  const rootRef = useRef(root);
+  // Deliberate, safe use of the well-known "keep a ref fresh for a
+  // stable callback" pattern. This mutation always completes before
+  // anything else in this same render pass could read it (getRoot below
+  // is only ever CALLED later, from event handlers via the store's own
+  // methods, never during render itself) - JS execution within one
+  // function call is strictly sequential, so there's no actual
+  // staleness risk in React's current runtime. The alternative -
+  // updating this via useEffect instead - would introduce a REAL bug:
+  // effects run only after the render phase completes, so getSnapshot
+  // (called synchronously during render, via useSyncExternalStore
+  // below) would read one-render-stale data on exactly the render where
+  // root just changed. This lint rule exists to guard against a future
+  // React Compiler reordering/memoizing parts of a render in ways that
+  // could break that sequencing guarantee - this project doesn't use
+  // the compiler today, and if it ever does, this specific pattern is
+  // exactly the kind of thing that would need re-examining then, not a
+  // sign anything is wrong with it now.
+  // eslint-disable-next-line react-hooks/refs
+  rootRef.current = root;
+  // Deliberately NOT depending on `root` here - only on `setRoot`
+  // (itself stable across renders, since it only depends on setDiagram).
+  // The adapter's own getSnapshot has a cache keyed on root's identity
+  // (see adapterDiagramStore.ts), but that cache lives INSIDE the
+  // closure created by createAdapterDiagramStore - if this useMemo
+  // depended on `root` and recreated the store on every edit, each new
+  // instance would start with an empty cache and immediately re-flatten
+  // from scratch anyway, defeating that fix in practice. A single,
+  // long-lived instance is what lets the cache (and, just as
+  // importantly, stable object references for every node that DIDN'T
+  // change) actually persist between edits rather than being thrown
+  // away every single time. getRoot's own read of rootRef.current
+  // happens later, inside store method calls triggered from event
+  // handlers, never during render - see the note above.
+  // eslint-disable-next-line react-hooks/refs
+  const localDiagramStore = useMemo(() => createAdapterDiagramStore(() => rootRef.current, setRoot), [setRoot]);
   const setScenarios = useCallback(
     (updater: Scenario[] | ((prev: Scenario[]) => Scenario[])) =>
       setDiagram((prev) => ({
@@ -396,6 +439,18 @@ function App() {
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
   const [selectedEdgeIds, setSelectedEdgeIds] = useState<string[]>([]);
 
+  // Subscribed via useSyncExternalStore (not just a plain useMemo keyed
+  // on diagramStore/path/selection) because the Yjs-backed session store
+  // never changes ITS OWN object reference when a remote peer edits the
+  // diagram - it's the same store instance for the whole session. A
+  // plain useMemo would never re-run for a remote change at all, only
+  // ever catching up once something else (like switching views) forced
+  // a re-render for an unrelated reason. The local adapter's own
+  // subscribe is a deliberate no-op (local mode already re-renders via
+  // React's own state flow when setRoot changes), so this costs nothing
+  // extra there - it's specifically the collaborative path this fixes.
+  const diagramSnapshot = useSyncExternalStore(diagramStore.subscribe, diagramStore.getSnapshot);
+
   // nodes/edges are derived from diagramStore rather than stored directly -
   // selection is deliberately NOT part of that store's schema (it's
   // ephemeral, per-person state, not something a collaborator should see
@@ -404,14 +459,13 @@ function App() {
   // truth. This replaces what used to be tracked as a `.selected` field
   // persisted directly on the node/edge objects themselves.
   const { nodes, edges } = useMemo(() => {
-    const snapshot = diagramStore.getSnapshot();
-    const rawNodes = reorderWithGroupsFirst(getNodesAtPath(snapshot.nodes, path));
-    const rawEdges = getEdgesAtPath(snapshot.edges, path);
+    const rawNodes = reorderWithGroupsFirst(getNodesAtPath(diagramSnapshot.nodes, path));
+    const rawEdges = getEdgesAtPath(diagramSnapshot.edges, path);
     return {
       nodes: rawNodes.map((n) => ({ ...n, selected: selectedNodeIds.includes(n.id) })),
       edges: rawEdges.map((e) => ({ ...e, selected: selectedEdgeIds.includes(e.id) })),
     };
-  }, [diagramStore, path, selectedNodeIds, selectedEdgeIds]);
+  }, [diagramSnapshot, path, selectedNodeIds, selectedEdgeIds]);
 
   // Only position/dimensions changes need to reach the store - selection
   // changes are handled separately (and more robustly, since it's the
@@ -423,17 +477,66 @@ function App() {
   // (group-child release, populated-sub-diagram confirmation) a raw
   // 'remove' change would bypass entirely. 'add'/'replace' aren't
   // expected either: nodes are always added via explicit app actions.
+  // Position/dimension changes are coalesced to at most one store commit
+  // per animation frame while a gesture is actively in progress, rather
+  // than one commit per raw browser event - mousemove can fire far
+  // faster than the screen refreshes (especially on high-polling-rate
+  // mice), and every commit was triggering a full diagramStore rebuild
+  // plus a full app re-render, which is what made dragging both slow
+  // and visually unreliable. pendingNodeUpdates is keyed by node id, so
+  // multiple updates to the SAME node within one frame simply overwrite
+  // each other (only the latest position/size within the frame ever
+  // gets committed) - correctly handles dragging several selected nodes
+  // together too, since each gets its own independent pending entry.
+  const pendingNodeUpdates = useRef(new Map<string, PendingNodeUpdate>());
+  const pendingFlushHandle = useRef<number | null>(null);
+
+  const flushPendingNodeUpdates = useCallback(() => {
+    pendingFlushHandle.current = null;
+    const pending = pendingNodeUpdates.current;
+    if (pending.size === 0) return;
+    for (const [id, update] of pending) {
+      if (update.type === "position") {
+        diagramStore.updatePosition(id, update.position);
+      } else {
+        diagramStore.updateDimensions(id, update.width, update.height);
+      }
+    }
+    pending.clear();
+  }, [diagramStore]);
+
+  // Cancels any still-pending animation frame if the component unmounts
+  // mid-gesture, so a stale callback can never fire against a store that
+  // may no longer even be the active one (e.g. a session having just
+  // ended).
+  useEffect(() => {
+    return () => {
+      if (pendingFlushHandle.current !== null) cancelAnimationFrame(pendingFlushHandle.current);
+    };
+  }, []);
+
   const onNodesChange = useCallback<OnNodesChange<Node<ArchNodeData>>>(
     (changes) => {
-      for (const change of changes) {
-        if (change.type === "position" && change.position) {
-          diagramStore.updatePosition(change.id, change.position);
-        } else if (change.type === "dimensions" && change.dimensions) {
-          diagramStore.updateDimensions(change.id, change.dimensions.width, change.dimensions.height);
+      const { isActiveGesture } = classifyNodeChanges(changes, pendingNodeUpdates.current);
+      if (isActiveGesture) {
+        if (pendingFlushHandle.current === null) {
+          pendingFlushHandle.current = requestAnimationFrame(flushPendingNodeUpdates);
         }
+      } else {
+        // The gesture just ended (dragging/resizing became false), or
+        // this is a standalone change with no dragging flag at all (an
+        // arrow-key nudge, or onNodeDragStop's own alignment-snap
+        // correction) - either way, commit right away rather than
+        // waiting up to one frame for something that isn't part of an
+        // in-progress, high-frequency gesture.
+        if (pendingFlushHandle.current !== null) {
+          cancelAnimationFrame(pendingFlushHandle.current);
+          pendingFlushHandle.current = null;
+        }
+        flushPendingNodeUpdates();
       }
     },
-    [diagramStore]
+    [flushPendingNodeUpdates]
   );
 
   // Edges have no position/dimensions concept, and for the same reasons

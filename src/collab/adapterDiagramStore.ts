@@ -45,6 +45,29 @@ export function createAdapterDiagramStore(
   getRoot: () => SubDiagram,
   setRoot: (updater: (prev: SubDiagram) => SubDiagram) => void
 ): DiagramStore {
+  // getSnapshot MUST return the exact same reference when called
+  // repeatedly with nothing having actually changed - this is
+  // useSyncExternalStore's own contract, not an optional optimization:
+  // violating it means React sees a "new" snapshot on every single
+  // render (even though the data is identical), concludes something
+  // changed, re-renders to check again, sees another "new" object from
+  // this same always-rebuild-from-scratch flatten call, and loops
+  // forever - which is exactly what happened before this cache existed.
+  // root is only ever a genuinely new reference when setRoot produced
+  // an actual change (React state updates always produce new object
+  // identities for real changes, never for no-ops), so caching on
+  // reference equality is both correct and cheap - no deep comparison
+  // needed.
+  let cachedRoot: SubDiagram | null = null;
+  let cachedSnapshot: { nodes: Node<ArchNodeData>[]; edges: Edge<ArchEdgeData>[] } | null = null;
+  function getSnapshot() {
+    const root = getRoot();
+    if (root !== cachedRoot) {
+      cachedRoot = root;
+      cachedSnapshot = flattenSubDiagramTree(root);
+    }
+    return cachedSnapshot!;
+  }
 
   /** Finds the tree path a node with the given id actually lives at,
    * along with the node itself as currently stored in the tree
@@ -80,7 +103,7 @@ export function createAdapterDiagramStore(
   }
 
   return {
-    getSnapshot: () => flattenSubDiagramTree(getRoot()),
+    getSnapshot,
 
     subscribe: () => () => {},
 
