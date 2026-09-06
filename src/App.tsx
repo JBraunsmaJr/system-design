@@ -59,7 +59,8 @@ import type { DiagramStore } from "./collab/diagramStore";
 import { createYjsDiagramStore, seedYjsDiagramDoc } from "./collab/yjsDiagramStore";
 import { createYjsProgramIncrementsStore, seedYjsProgramIncrementsDoc } from "./collab/yjsProgramIncrementsStore";
 import type { ProgramIncrementsStore } from "./collab/programIncrementsStore";
-import { startCollabSession, type CollabSession } from "./collab/session";
+import { startCollabSession, type CollabSession, type PresenceInfo } from "./collab/session";
+import { loadPresenceName, savePresenceName } from "./domain/presenceIdentity";
 import "./App.css";
 
 let idSeed = 0;
@@ -128,6 +129,13 @@ const DEFAULT_SNAPSHOT: DiagramSnapshot = {
   programIncrements: [],
   team: EMPTY_TEAM_DOCUMENT,
 };
+
+// Small, fixed palette for presence colors - not shared with team's own
+// AVATAR_COLORS (TeamView.tsx) since that's module-private and this is
+// a genuinely separate concept (a person's presence color for a
+// session, not a team member's own identity), even though the actual
+// hex values happen to match for visual consistency.
+const PRESENCE_COLORS = ["#5b7cfa", "#9061f9", "#0fa36b", "#f0578c", "#f59e0b", "#06b6d4", "#ec4899", "#8b5cf6"];
 
 function App() {
   const {
@@ -237,6 +245,24 @@ function App() {
   }
   const [activeSession, setActiveSession] = useState<ActiveCollabSession | null>(null);
 
+  const [displayName, setDisplayName] = useState(() => loadPresenceName() ?? `Guest-${Math.random().toString(36).slice(2, 6)}`);
+  const onDisplayNameChange = useCallback((name: string) => {
+    setDisplayName(name);
+    savePresenceName(name);
+  }, []);
+
+  // Deliberately no reset to [] when activeSession becomes null - the
+  // stale peer list from a just-ended session is harmless, since
+  // CollabPanel only ever reads presencePeers via activeSession itself,
+  // which is null at that point anyway. Resetting here would mean
+  // calling setState directly and unconditionally in an effect body,
+  // which is exactly the pattern React's own linting steers away from.
+  const [presencePeers, setPresencePeers] = useState<PresenceInfo[]>([]);
+  useEffect(() => {
+    if (!activeSession) return;
+    return activeSession.session.subscribeToPresence(setPresencePeers);
+  }, [activeSession]);
+
   const signalingUrls = useMemo(() => {
     const raw = import.meta.env.VITE_SIGNALING_URL as string | undefined;
     return raw ? raw.split(",").map((u) => u.trim()).filter(Boolean) : [];
@@ -258,6 +284,10 @@ function App() {
       const programIncrementsStoreForSession = createYjsProgramIncrementsStore(doc);
       const diagramStoreForSession = createYjsDiagramStore(doc);
       const session = startCollabSession(doc, roomName, { signalingUrls });
+      session.setLocalPresence({
+        name: displayName.trim() || "Guest",
+        color: PRESENCE_COLORS[Math.floor(Math.random() * PRESENCE_COLORS.length)],
+      });
       setActiveSession({
         doc,
         session,
@@ -268,7 +298,7 @@ function App() {
         diagramStore: diagramStoreForSession,
       });
     },
-    [requirements, programIncrements, team, root, signalingUrls]
+    [requirements, programIncrements, team, root, signalingUrls, displayName]
   );
 
   // Joins an existing session by room name - starts from an EMPTY doc
@@ -283,6 +313,10 @@ function App() {
       const programIncrementsStoreForSession = createYjsProgramIncrementsStore(doc);
       const diagramStoreForSession = createYjsDiagramStore(doc);
       const session = startCollabSession(doc, roomName, { signalingUrls });
+      session.setLocalPresence({
+        name: displayName.trim() || "Guest",
+        color: PRESENCE_COLORS[Math.floor(Math.random() * PRESENCE_COLORS.length)],
+      });
       setActiveSession({
         doc,
         session,
@@ -293,7 +327,7 @@ function App() {
         diagramStore: diagramStoreForSession,
       });
     },
-    [signalingUrls]
+    [signalingUrls, displayName]
   );
 
   // Leaving a session writes its final state back into the local,
@@ -1267,7 +1301,9 @@ function App() {
       {!isPresenting && (
         <CollabPanel
           signalingConfigured={signalingUrls.length > 0}
-          activeSession={activeSession ? { roomName: activeSession.roomName, isSynced: () => activeSession.session.isSynced() } : null}
+          activeSession={activeSession ? { roomName: activeSession.roomName, isSynced: () => activeSession.session.isSynced(), peers: presencePeers } : null}
+          displayName={displayName}
+          onDisplayNameChange={onDisplayNameChange}
           onStartSession={startNewSession}
           onJoinSession={joinSession}
           onLeaveSession={leaveSession}
