@@ -104,11 +104,6 @@ export interface DiagramStore {
   addEdge(parentPath: string[], source: string, target: string, data: ArchEdgeData): string;
   updateEdge(id: string, patch: Partial<ArchEdgeData>): void;
   deleteEdge(id: string): void;
-
-  /** Marks a node as having an opened sub-diagram (even if still empty)
-   * - see this file's own doc comment on why this can't be derived from
-   * whether any children currently exist. */
-  markSubDiagramOpened(id: string): void;
 }
 
 export function getNodesAtPath(nodes: Node<ArchNodeData>[], path: string[]): Node<ArchNodeData>[] {
@@ -117,6 +112,18 @@ export function getNodesAtPath(nodes: Node<ArchNodeData>[], path: string[]): Nod
 
 export function getEdgesAtPath(edges: Edge<ArchEdgeData>[], path: string[]): Edge<ArchEdgeData>[] {
   return edges.filter((e) => arraysEqual((e.data as ArchEdgeData & { parentPath?: string[] }).parentPath ?? [], path));
+}
+
+/** True if `nodeId` (itself at `parentPath`) has any node one level
+ * deeper than it - i.e. whether it has a POPULATED sub-diagram, matching
+ * the real app's own existing definition (see findLinkedNodes's
+ * `hasSubDiagram` in subDiagramTree.ts: `subDiagram?.nodes.length > 0`,
+ * not merely whether a subDiagram object exists at all). There's no
+ * separate "opened but empty" state to derive here - nothing in the app
+ * ever actually creates one, so this is the only check that's ever
+ * needed. */
+export function hasSubDiagram(nodes: Node<ArchNodeData>[], parentPath: string[], nodeId: string): boolean {
+  return getNodesAtPath(nodes, [...parentPath, nodeId]).length > 0;
 }
 
 function arraysEqual(a: string[], b: string[]): boolean {
@@ -221,11 +228,6 @@ export function createLocalDiagramStore(initial?: {
 
     deleteEdge: (id) => {
       edges = edges.filter((e) => e.id !== id);
-      notify();
-    },
-
-    markSubDiagramOpened: (id) => {
-      nodes = nodes.map((n) => (n.id === id ? { ...n, data: { ...n.data, hasOpenedSubDiagram: true } } : n));
       notify();
     },
   };

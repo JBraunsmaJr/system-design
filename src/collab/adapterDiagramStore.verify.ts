@@ -5,7 +5,7 @@
  *
  *   npx tsx src/collab/adapterDiagramStore.verify.ts
  */
-import { createLocalDiagramStore, getNodesAtPath, getEdgesAtPath } from "./diagramStore";
+import { createLocalDiagramStore, getNodesAtPath, getEdgesAtPath, hasSubDiagram } from "./diagramStore";
 import { createAdapterDiagramStore } from "./adapterDiagramStore";
 import type { DiagramStore } from "./diagramStore";
 import type { ArchNodeData, ArchEdgeData, SubDiagram } from "../domain/types";
@@ -54,7 +54,6 @@ function canonicalJSON(value: unknown): string {
 {
   function runSequence(store: DiagramStore) {
     const rootId = store.addNode([], "typed", { x: 0, y: 0 }, mkNodeData("Root Service"));
-    store.markSubDiagramOpened(rootId);
     const childId = store.addNode([rootId], "typed", { x: 10, y: 10 }, mkNodeData("Nested Worker"));
     store.updateNode(childId, { description: "Handles background jobs" });
     store.addEdge([], rootId, rootId, mkEdgeData());
@@ -68,11 +67,11 @@ function canonicalJSON(value: unknown): string {
     return {
       nodes: snap.nodes
         .map((n) => {
-          const extra = n.data as ArchNodeData & { parentPath?: string[]; hasOpenedSubDiagram?: boolean };
+          const extra = n.data as ArchNodeData & { parentPath?: string[] };
           return {
             type: n.type,
             position: n.position,
-            data: { ...n.data, parentPath: extra.parentPath?.length ?? 0, hasOpenedSubDiagram: extra.hasOpenedSubDiagram || undefined },
+            data: { ...n.data, parentPath: extra.parentPath?.length ?? 0 },
           };
         })
         .sort((a, b) => (a.data.label > b.data.label ? 1 : -1)),
@@ -91,10 +90,8 @@ function canonicalJSON(value: unknown): string {
   const { store } = makeAdapterStore();
   const rootA = store.addNode([], "typed", { x: 0, y: 0 }, mkNodeData("Service A"));
   const rootB = store.addNode([], "typed", { x: 100, y: 0 }, mkNodeData("Service B"));
-  store.markSubDiagramOpened(rootA);
   const childOfA1 = store.addNode([rootA], "typed", { x: 0, y: 0 }, mkNodeData("A's Worker"));
   const childOfA2 = store.addNode([rootA], "typed", { x: 50, y: 0 }, mkNodeData("A's Cache"));
-  store.markSubDiagramOpened(childOfA1);
   const grandchild = store.addNode([rootA, childOfA1], "typed", { x: 0, y: 0 }, mkNodeData("Deeply Nested Job"));
   store.addEdge([], rootA, rootB, mkEdgeData());
   store.addEdge([rootA], childOfA1, childOfA2, mkEdgeData());
@@ -121,9 +118,7 @@ function canonicalJSON(value: unknown): string {
 {
   const { store, getRoot } = makeAdapterStore();
   const rootId = store.addNode([], "typed", { x: 0, y: 0 }, mkNodeData("Root"));
-  store.markSubDiagramOpened(rootId);
   const level1 = store.addNode([rootId], "typed", { x: 0, y: 0 }, mkNodeData("Level 1"));
-  store.markSubDiagramOpened(level1);
   const level2 = store.addNode([rootId, level1], "typed", { x: 0, y: 0 }, mkNodeData("Level 2"));
 
   store.updateNode(level2, { description: "Updated at depth 2" });
@@ -145,9 +140,7 @@ function canonicalJSON(value: unknown): string {
   const { store } = makeAdapterStore();
   const rootId = store.addNode([], "typed", { x: 0, y: 0 }, mkNodeData("Root"));
   const otherRootId = store.addNode([], "typed", { x: 1, y: 1 }, mkNodeData("Unrelated Sibling"));
-  store.markSubDiagramOpened(rootId);
   const level1 = store.addNode([rootId], "typed", { x: 0, y: 0 }, mkNodeData("Level 1"));
-  store.markSubDiagramOpened(level1);
   const level2 = store.addNode([rootId, level1], "typed", { x: 0, y: 0 }, mkNodeData("Level 2"));
   store.addEdge([rootId], level1, level1, mkEdgeData()); // an edge nested one level in, inside what's about to be deleted
 
@@ -165,7 +158,6 @@ function canonicalJSON(value: unknown): string {
   const rootId = store.addNode([], "typed", { x: 0, y: 0 }, mkNodeData("Root"));
   const siblingA = store.addNode([], "typed", { x: 1, y: 1 }, mkNodeData("Sibling A"));
   const siblingB = store.addNode([], "typed", { x: 2, y: 2 }, mkNodeData("Sibling B"));
-  store.markSubDiagramOpened(rootId);
   store.addNode([rootId], "typed", { x: 0, y: 0 }, mkNodeData("Level 1"));
   store.addEdge([], siblingA, siblingB, mkEdgeData());
 
@@ -176,32 +168,16 @@ function canonicalJSON(value: unknown): string {
   assert(edges.length === 1 && edges[0].source === siblingA && edges[0].target === siblingB, "an edge that doesn't touch the deleted node or any of its descendants correctly survives");
 }
 
-// === Part 6: the "opened but empty" distinction, derived from the REAL subDiagram field, not a separate flag ===
+// === Part 6: hasSubDiagram against the tree-backed adapter - correctly matches the real app's own definition (at least one child) ===
 {
-  const { store, getRoot } = makeAdapterStore();
-  const neverOpened = store.addNode([], "typed", { x: 0, y: 0 }, mkNodeData("Never Opened"));
-  const openedButEmpty = store.addNode([], "typed", { x: 1, y: 1 }, mkNodeData("Opened But Empty"));
-  store.markSubDiagramOpened(openedButEmpty);
+  const { store } = makeAdapterStore();
+  const emptyNode = store.addNode([], "typed", { x: 0, y: 0 }, mkNodeData("No Children"));
+  const populatedNode = store.addNode([], "typed", { x: 1, y: 1 }, mkNodeData("Has Children"));
+  store.addNode([populatedNode], "typed", { x: 0, y: 0 }, mkNodeData("A Child"));
 
   const { nodes } = store.getSnapshot();
-  const neverOpenedNode = nodes.find((n) => n.id === neverOpened)!;
-  const openedNode = nodes.find((n) => n.id === openedButEmpty)!;
-  assert(!(neverOpenedNode.data as ArchNodeData & { hasOpenedSubDiagram?: boolean }).hasOpenedSubDiagram, "a node that's never been drilled into has no hasOpenedSubDiagram flag set");
-  assert((openedNode.data as ArchNodeData & { hasOpenedSubDiagram?: boolean }).hasOpenedSubDiagram === true, "a node explicitly marked as opened reports that, even with zero children");
-
-  // Confirm the REAL tree actually has an empty (not missing) subDiagram object - this is what the flag is derived FROM, not a separate thing that could drift out of sync with it.
-  const actualRoot = getRoot();
-  const actualOpenedNode = actualRoot.nodes.find((n) => n.id === openedButEmpty)!;
-  assert(
-    actualOpenedNode.data.subDiagram !== undefined && actualOpenedNode.data.subDiagram.nodes.length === 0,
-    "the underlying tree node genuinely has an empty (not undefined) subDiagram object, matching the app's own existing 'opened but empty' representation exactly - the flag isn't a separate, potentially-diverging concept"
-  );
-
-  // Calling markSubDiagramOpened again on an already-opened node should be a safe no-op, not overwrite any content that might already be there.
-  const populatedId = store.addNode([openedButEmpty], "typed", { x: 0, y: 0 }, mkNodeData("Already Has Content"));
-  store.markSubDiagramOpened(openedButEmpty);
-  const afterReopen = store.getSnapshot().nodes.find((n) => n.id === populatedId);
-  assert(afterReopen !== undefined, "calling markSubDiagramOpened again on an already-opened node is a safe no-op - it doesn't reset an already-populated subDiagram back to empty");
+  assert(!hasSubDiagram(nodes, [], emptyNode), "a node with no children at all correctly reports no sub-diagram, even via the tree-backed adapter");
+  assert(hasSubDiagram(nodes, [], populatedNode), "a node with at least one child correctly reports having a sub-diagram, matching the real app's own findLinkedNodes definition - not a separate flag that could drift out of sync with the actual tree");
 }
 
 // === Part 7: group containment (parentId) and dimensions are independent of tree-level nesting ===

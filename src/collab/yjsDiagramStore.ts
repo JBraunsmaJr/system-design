@@ -25,7 +25,6 @@ const NODE_DATA_FIELDS = [
   "codeContent",
   "codeLanguage",
   "linkedRequirementIds",
-  "hasOpenedSubDiagram",
 ] as const;
 
 const EDGE_DATA_FIELDS = [
@@ -263,11 +262,6 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
         const idx = edgeOrder.toArray().indexOf(id);
         if (idx !== -1) edgeOrder.delete(idx, 1);
       });
-    },
-
-    markSubDiagramOpened: (id) => {
-      const m = nodesMap.get(id);
-      if (m) m.set("hasOpenedSubDiagram", true);
     },
   };
 }

@@ -8,7 +8,7 @@
  *   npx tsx src/collab/diagramStore.verify.ts
  */
 import * as Y from "yjs";
-import { createLocalDiagramStore, getNodesAtPath, getEdgesAtPath } from "./diagramStore";
+import { createLocalDiagramStore, getNodesAtPath, getEdgesAtPath, hasSubDiagram } from "./diagramStore";
 import { createYjsDiagramStore } from "./yjsDiagramStore";
 import type { DiagramStore } from "./diagramStore";
 import type { ArchNodeData, ArchEdgeData } from "../domain/types";
@@ -57,7 +57,6 @@ function canonicalJSON(value: unknown): string {
 {
   function runSequence(store: DiagramStore) {
     const rootId = store.addNode([], "typed", { x: 0, y: 0 }, mkNodeData("Root Service"));
-    store.markSubDiagramOpened(rootId);
     const childId = store.addNode([rootId], "typed", { x: 10, y: 10 }, mkNodeData("Nested Worker"));
     store.updateNode(childId, { description: "Handles background jobs" });
     store.addEdge([], rootId, rootId, mkEdgeData()); // trivial self-edge just to exercise the path
@@ -90,10 +89,8 @@ function canonicalJSON(value: unknown): string {
   const store = createLocalDiagramStore();
   const rootA = store.addNode([], "typed", { x: 0, y: 0 }, mkNodeData("Service A"));
   const rootB = store.addNode([], "typed", { x: 100, y: 0 }, mkNodeData("Service B"));
-  store.markSubDiagramOpened(rootA);
   const childOfA1 = store.addNode([rootA], "typed", { x: 0, y: 0 }, mkNodeData("A's Worker"));
   const childOfA2 = store.addNode([rootA], "typed", { x: 50, y: 0 }, mkNodeData("A's Cache"));
-  store.markSubDiagramOpened(childOfA1);
   const grandchild = store.addNode([rootA, childOfA1], "typed", { x: 0, y: 0 }, mkNodeData("Deeply Nested Job"));
   store.addEdge([], rootA, rootB, mkEdgeData());
   store.addEdge([rootA], childOfA1, childOfA2, mkEdgeData());
@@ -204,18 +201,16 @@ function canonicalJSON(value: unknown): string {
   assert(peerB.store.getSnapshot().nodes.find((n) => n.id === nodeId) === undefined, "the delete wins on peer B too - both converge to the same outcome");
 }
 
-// === Part 4: markSubDiagramOpened - the "opened but empty" distinction ===
+// === Part 4: hasSubDiagram - correctly matches the real app's own definition (at least one child), not a separate "opened" flag ===
 {
   const store = createLocalDiagramStore();
-  const neverOpened = store.addNode([], "typed", { x: 0, y: 0 }, mkNodeData("Never Opened"));
-  const openedButEmpty = store.addNode([], "typed", { x: 1, y: 1 }, mkNodeData("Opened But Empty"));
-  store.markSubDiagramOpened(openedButEmpty);
+  const emptyNode = store.addNode([], "typed", { x: 0, y: 0 }, mkNodeData("No Children"));
+  const populatedNode = store.addNode([], "typed", { x: 1, y: 1 }, mkNodeData("Has Children"));
+  store.addNode([populatedNode], "typed", { x: 0, y: 0 }, mkNodeData("A Child"));
 
   const { nodes } = store.getSnapshot();
-  const neverOpenedNode = nodes.find((n) => n.id === neverOpened)!;
-  const openedNode = nodes.find((n) => n.id === openedButEmpty)!;
-  assert(!(neverOpenedNode.data as ArchNodeData & { hasOpenedSubDiagram?: boolean }).hasOpenedSubDiagram, "a node that's never been drilled into has no hasOpenedSubDiagram flag set");
-  assert((openedNode.data as ArchNodeData & { hasOpenedSubDiagram?: boolean }).hasOpenedSubDiagram === true, "a node explicitly marked as opened reports that, even though it has ZERO children in the flat space - this is exactly the distinction that can't be derived from 'does anything reference this as a parent', confirmed working");
+  assert(!hasSubDiagram(nodes, [], emptyNode), "a node with no children at all correctly reports no sub-diagram");
+  assert(hasSubDiagram(nodes, [], populatedNode), "a node with at least one child correctly reports having a sub-diagram - matching the real app's own existing findLinkedNodes definition exactly, not a separate invented flag");
 }
 
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);

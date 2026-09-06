@@ -28,12 +28,17 @@ import type { DiagramStore } from "./diagramStore";
  * optimized further here), then apply the change there via
  * updateSubDiagramAtPath.
  *
- * `hasOpenedSubDiagram` is derived from whether a node's own `data`
- * already has a `subDiagram` field (even an empty one) - the real,
- * existing signal the app already uses for the same "opened but empty"
- * distinction the flat schema needed its own explicit field for. This
- * adapter never needs to invent that distinction; it just surfaces
- * what's already there.
+ * Whether a node "has a sub-diagram" is never baked into the flattened
+ * data here - it's derived on demand via diagramStore.ts's own
+ * hasSubDiagram helper (itself matching the real app's existing
+ * definition in findLinkedNodes: at least one node one level deeper,
+ * not merely a subDiagram field existing). An earlier version of this
+ * file invented a separate hasOpenedSubDiagram flag for an "opened but
+ * empty" state that turned out not to exist anywhere in the real app -
+ * getSubDiagramAtPath is purely read-side and never writes an empty
+ * subDiagram back when drilling into a never-populated node, so there
+ * was nothing to actually derive that flag from correctly. Removed
+ * rather than left as unused, inaccurate scaffolding.
  */
 export function createAdapterDiagramStore(
   getRoot: () => SubDiagram,
@@ -47,11 +52,7 @@ export function createAdapterDiagramStore(
         const { subDiagram, ...restData } = node.data;
         nodes.push({
           ...node,
-          data: {
-            ...restData,
-            parentPath: path,
-            hasOpenedSubDiagram: subDiagram !== undefined,
-          } as ArchNodeData,
+          data: { ...restData, parentPath: path } as ArchNodeData,
         });
         if (subDiagram) walk(subDiagram, [...path, node.id]);
       }
@@ -205,18 +206,6 @@ export function createAdapterDiagramStore(
         const path = findEdgePath(root, id);
         if (path === null) return root;
         return updateSubDiagramAtPath(root, path, (sd) => ({ ...sd, edges: sd.edges.filter((e) => e.id !== id) }));
-      });
-    },
-
-    markSubDiagramOpened: (id) => {
-      setRoot((root) => {
-        const found = findNodePath(root, id);
-        if (!found) return root;
-        if (found.node.data.subDiagram !== undefined) return root; // already opened, no-op
-        return updateSubDiagramAtPath(root, found.path, (sd) => ({
-          ...sd,
-          nodes: sd.nodes.map((n) => (n.id === id ? { ...n, data: { ...n.data, subDiagram: { nodes: [], edges: [] } } } : n)),
-        }));
       });
     },
   };
