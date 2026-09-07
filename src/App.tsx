@@ -60,7 +60,7 @@ import { createYjsDiagramStore, seedYjsDiagramDoc } from "./collab/yjsDiagramSto
 import { createYjsProgramIncrementsStore, seedYjsProgramIncrementsDoc } from "./collab/yjsProgramIncrementsStore";
 import type { ProgramIncrementsStore } from "./collab/programIncrementsStore";
 import { startCollabSession, type CollabSession, type PresenceInfo, type LocalPresenceInfo } from "./collab/session";
-import { loadPresenceName, savePresenceName } from "./domain/presenceIdentity";
+import { loadPresenceName, savePresenceName, loadShowPeerCursors, saveShowPeerCursors } from "./domain/presenceIdentity";
 import { classifyNodeChanges, applySelectionChanges, type PendingNodeUpdate, type CurrentNodeGeometry } from "./domain/nodeChangeBatching";
 import "./App.css";
 
@@ -289,6 +289,14 @@ function App() {
   const [activeSession, setActiveSession] = useState<ActiveCollabSession | null>(null);
 
   const [displayName, setDisplayName] = useState(() => loadPresenceName() ?? `Guest-${Math.random().toString(36).slice(2, 6)}`);
+  // Purely local, display-side preference - has NO effect on what this
+  // person broadcasts about their own cursor, only on whether THEY see
+  // everyone else's. See presenceIdentity.ts's own doc comment for why.
+  const [showPeerCursors, setShowPeerCursorsState] = useState(() => loadShowPeerCursors());
+  const setShowPeerCursors = useCallback((show: boolean) => {
+    setShowPeerCursorsState(show);
+    saveShowPeerCursors(show);
+  }, []);
   const onDisplayNameChange = useCallback((name: string) => {
     setDisplayName(name);
     savePresenceName(name);
@@ -1557,6 +1565,8 @@ function App() {
           activeSession={activeSession ? { roomName: activeSession.roomName, isSynced: () => activeSession.session.isSynced(), peers: presencePeers } : null}
           displayName={displayName}
           onDisplayNameChange={onDisplayNameChange}
+          showPeerCursors={showPeerCursors}
+          onShowPeerCursorsChange={setShowPeerCursors}
           onStartSession={startNewSession}
           onJoinSession={joinSession}
           onLeaveSession={leaveSession}
@@ -1593,7 +1603,13 @@ function App() {
               edges={edges}
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
-              peers={activeSession ? presencePeers : []}
+              peers={
+                !activeSession
+                  ? []
+                  : showPeerCursors
+                    ? presencePeers
+                    : presencePeers.map((p) => (p.cursor === null ? p : { ...p, cursor: null }))
+              }
               onCursorMove={onCursorMove}
               onConnect={onConnect}
               onSelectionChange={onSelectionChange}

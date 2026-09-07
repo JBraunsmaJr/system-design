@@ -27,6 +27,12 @@ interface CollabPanelProps {
   onStartSession: () => void;
   onJoinSession: (roomName: string) => void;
   onLeaveSession: () => void;
+  /** Whether to render OTHER peers' live cursors - a purely local,
+   * display-side preference (see presenceIdentity.ts's own doc comment
+   * on loadShowPeerCursors for why). Has no effect on this person's own
+   * cursor, which keeps broadcasting to everyone else regardless. */
+  showPeerCursors: boolean;
+  onShowPeerCursorsChange: (show: boolean) => void;
 }
 
 /**
@@ -48,6 +54,8 @@ export function CollabPanel({
   onStartSession,
   onJoinSession,
   onLeaveSession,
+  showPeerCursors,
+  onShowPeerCursorsChange,
 }: CollabPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [joinRoomName, setJoinRoomName] = useState("");
@@ -155,6 +163,14 @@ export function CollabPanel({
                     ))}
                   </div>
                 )}
+                <label className="collab-panel__cursor-toggle">
+                  <input
+                    type="checkbox"
+                    checked={showPeerCursors}
+                    onChange={(e) => onShowPeerCursorsChange(e.target.checked)}
+                  />
+                  Show other people's cursors
+                </label>
                 <button
                   type="button"
                   className="collab-panel__leave-button"
