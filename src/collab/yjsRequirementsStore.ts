@@ -20,38 +20,6 @@ function collisionResistantId(prefix: string): string {
 }
 
 /**
- * Yjs-backed RequirementsStore. See requirementsStore.ts for why the
- * operations are shaped the way they are; this file is about the schema
- * and id-generation choices that make those operations merge correctly.
- *
- * Schema (all on the given Y.Doc), following the same "Y.Map keyed by
- * id, nested Y.Map per entry only where a field-patch operation exists"
- * pattern established in yjsTeamStore.ts:
- *  - "itemTypeOrder" / "itemTypes": nested (updateType patches
- *    individual fields).
- *  - "categoryOrder" / "categories": plain values - no operation ever
- *    patches an existing category's fields, only create.
- *  - "itemOrder" / "items": nested. IMPORTANT DEPARTURE from the rest of
- *    this file: "items" is keyed by an INTERNAL storage key (generated
- *    with the same collision-resistant timestamp+random scheme
- *    relationships already use), NOT by the item's own "id" field (the
- *    human-readable "REQ-6" style value the rest of the app sees). That
- *    id is stored as an ordinary field on the nested map instead, right
- *    alongside title, body, etc. See the addItem doc comment below for
- *    why this separation exists - in short, it's what makes a
- *    same-display-id collision between two disconnected peers a
- *    cosmetic, automatically-repairable problem instead of a data-loss
- *    one. This is entirely internal to this file: every other
- *    consumer - the local and adapter stores, every UI component - only
- *    ever sees the materialized RequirementItem.id field via
- *    getSnapshot(), exactly as before.
- *  - "relationshipTypes": plain values, no order array - same reasoning
- *    as team's extraDaysOff: no field-patch operation, and no
- *    meaningful order to preserve for a small, rarely-changed set.
- *  - "relationships": plain values, no order array - same reasoning.
- *  - "nextSequence": Y.Map<string, number> keyed by item-type id.
- */
-/**
  * Populates a Y.Doc directly from an existing, already-populated
  * RequirementsDocument - the inverse of this file's own buildSnapshot.
  * Unlike every public RequirementsStore operation (addItem,
@@ -176,6 +144,39 @@ export function seedBuiltInTypesIfEmpty(doc: Y.Doc): void {
   }
 }
 
+
+/**
+ * Yjs-backed RequirementsStore. See requirementsStore.ts for why the
+ * operations are shaped the way they are; this file is about the schema
+ * and id-generation choices that make those operations merge correctly.
+ *
+ * Schema (all on the given Y.Doc), following the same "Y.Map keyed by
+ * id, nested Y.Map per entry only where a field-patch operation exists"
+ * pattern established in yjsTeamStore.ts:
+ *  - "itemTypeOrder" / "itemTypes": nested (updateType patches
+ *    individual fields).
+ *  - "categoryOrder" / "categories": plain values - no operation ever
+ *    patches an existing category's fields, only create.
+ *  - "itemOrder" / "items": nested. IMPORTANT DEPARTURE from the rest of
+ *    this file: "items" is keyed by an INTERNAL storage key (generated
+ *    with the same collision-resistant timestamp+random scheme
+ *    relationships already use), NOT by the item's own "id" field (the
+ *    human-readable "REQ-6" style value the rest of the app sees). That
+ *    id is stored as an ordinary field on the nested map instead, right
+ *    alongside title, body, etc. See the addItem doc comment below for
+ *    why this separation exists - in short, it's what makes a
+ *    same-display-id collision between two disconnected peers a
+ *    cosmetic, automatically-repairable problem instead of a data-loss
+ *    one. This is entirely internal to this file: every other
+ *    consumer - the local and adapter stores, every UI component - only
+ *    ever sees the materialized RequirementItem.id field via
+ *    getSnapshot(), exactly as before.
+ *  - "relationshipTypes": plain values, no order array - same reasoning
+ *    as team's extraDaysOff: no field-patch operation, and no
+ *    meaningful order to preserve for a small, rarely-changed set.
+ *  - "relationships": plain values, no order array - same reasoning.
+ *  - "nextSequence": Y.Map<string, number> keyed by item-type id.
+ */
 export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
   const itemTypeOrder = doc.getArray<string>("itemTypeOrder");
   const itemTypes = doc.getMap<Y.Map<unknown>>("itemTypes");
@@ -212,14 +213,15 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
     };
   }
 
-  // Maps an item's DISPLAY id (the "REQ-6" style value everything outside
-  // this file sees) to its internal storage key. Rebuilt every time
-  // buildSnapshot runs - cheap, since that already walks every item once,
-  // and it's what lets updateItem/deleteItem/createAndAssignCategory (all
-  // of which receive a display id from their caller, per the public
-  // RequirementsStore contract) find the right underlying entry in O(1)
-  // instead of a linear scan on every call - including every keystroke
-  // while editing a title.
+  /**
+   * Maps an item's display id to its internal storage key. Rebuilt every
+   * time buildSnapshot runs - cheap, since that already walks every item
+   * once, and it's what lets updateItem/deleteItem/createAndAssignCategory
+   * (all of which receive a display id from their caller, per the public
+   * RequirementsStore contract) find the right underlying entry in O(1)
+   * instead of a linear scan on every call - including every keystroke
+   * while editing a title.
+   */
   let displayIdToStorageKey = new Map<string, string>();
 
   /**
@@ -267,12 +269,14 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
     const collisions = Array.from(byDisplayId.values()).filter((keys) => keys.length > 1);
     if (collisions.length === 0) return false;
 
-    // Every currently-used display id, kept up to date as this pass
-    // hands out new ones - checked against so a freshly reassigned id
-    // can never collide with either an existing item OR another loser
-    // reassigned earlier in this SAME pass (which byDisplayId alone
-    // wouldn't catch, since it reflects the state from before this pass
-    // started, not what's being assigned as it runs).
+    /**
+     * Every currently-used display id, kept up to date as this pass
+     * hands out new ones - checked against so a freshly reassigned id
+     * can never collide with either an existing item OR another loser
+     * reassigned earlier in this SAME pass (which byDisplayId alone
+     * wouldn't catch, since it reflects the state from before this pass
+     * started, not what's being assigned as it runs).
+     */
     const usedDisplayIds = new Set(byDisplayId.keys());
 
     doc.transact(() => {
@@ -285,10 +289,12 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
           const typeMap = itemTypes.get(typeId);
           const type = typeMap ? itemTypeMapToPlain(typeId, typeMap) : undefined;
           const prefix = type?.prefix ?? typeId;
-          // Keep advancing past any id that's already taken, rather than
-          // assigning nextSequence's value outright and hoping it
-          // doesn't collide - see this function's own doc comment above
-          // for why that assumption doesn't always hold.
+          /**
+           * Keep advancing past any id that's already taken, rather than
+           * assigning nextSequence's value outright and hoping it
+           * doesn't collide - see this function's own doc comment above
+           * for why that assumption doesn't always hold.
+           */
           let seq = (nextSequence.get(typeId) as number | undefined) ?? 1;
           let candidate = `${prefix}-${seq}`;
           while (usedDisplayIds.has(candidate)) {
@@ -337,10 +343,12 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
     };
   }
 
-  // Run once up front, before the first snapshot is cached - a collision
-  // could already be baked into the doc if it was inherited from a prior
-  // session's sync, before this particular store instance existed to
-  // observe anything.
+  /*
+   * Run once up front, before the first snapshot is cached - a collision
+   * could already be baked into the doc if it was inherited from a prior
+   * session's sync, before this particular store instance existed to
+   * observe anything.
+   */
   repairDuplicateDisplayIds();
 
   let cached = buildSnapshot();
@@ -384,6 +392,14 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
     // resolves it automatically and deterministically the next time
     // this store recomputes after a sync (see that function's own doc
     // comment for exactly what it does and doesn't handle).
+    /**
+     * The display id ("REQ-6") is generated as a per-type sequence counter,
+     * read-incremented-written-back. Two disconnected peers creating an item of the same
+     * type can still end up computing the same candidate id before either has seen the
+     * other's change; under normal, connected collaboration this never happens (Yj's
+     * casual ordering means one peer's write is visible to the next before it acts)
+     * @param typeId
+     */
     addItem: (typeId) => {
       const sequence = (nextSequence.get(typeId) as number | undefined) ?? 1;
       const typeMap = itemTypes.get(typeId);

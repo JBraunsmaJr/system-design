@@ -41,35 +41,6 @@ const EDGE_DATA_FIELDS = [
 ] as const;
 
 /**
- * Yjs-backed DiagramStore. See diagramStore.ts for the full rationale
- * behind the flattened schema (every node/edge across the whole
- * recursive tree in one flat, id-keyed space, tagged with a parentPath);
- * this file is just the Yjs mechanics of that same design.
- *
- * Schema (all on the given Y.Doc):
- *  - "nodeOrder": Y.Array<string> - every node's id, across the ENTIRE
- *    tree at any depth, in one flat order.
- *  - "nodes": Y.Map<string, Y.Map> - keyed by node id. Each value is a
- *    nested Y.Map (updateNode/updatePosition/updateParentId/
- *    updateDimensions are all separate, independent field-patch
- *    operations - the same "field-level patch operation exists" signal
- *    used everywhere else in this codebase to mean nesting, not a plain
- *    value, is needed) holding: type, position, parentId, width,
- *    height, parentPath (plain array value - immutable once set, see
- *    diagramStore.ts), and every ArchNodeData field (label, description,
- *    properties, tags, etc. - see NODE_DATA_FIELDS) as its own key.
- *  - "edgeOrder" / "edges": same pattern for edges - source, target,
- *    type, parentPath, plus every ArchEdgeData field (see
- *    EDGE_DATA_FIELDS).
- *
- * properties (on both nodes and edges) stays a plain Record<string,
- * string> value rather than a further-nested Y.Map, matching the same
- * reasoning already applied to team's extraDaysOff and requirements'
- * categories: the Inspector's key-value editor replaces the whole object
- * on each edit today, so there's no existing field-level-patch operation
- * to protect with nesting.
- */
-/**
  * Populates a Y.Doc directly from an existing, already-populated
  * recursive SubDiagram tree (the app's own local representation - see
  * diagramStore.ts's own doc comment on why the actual app doesn't use
@@ -130,6 +101,36 @@ export function seedYjsDiagramDoc(doc: Y.Doc, root: SubDiagram): void {
   });
 }
 
+
+/**
+ * Yjs-backed DiagramStore. See diagramStore.ts for the full rationale
+ * behind the flattened schema (every node/edge across the whole
+ * recursive tree in one flat, id-keyed space, tagged with a parentPath);
+ * this file is just the Yjs mechanics of that same design.
+ *
+ * Schema (all on the given Y.Doc):
+ *  - "nodeOrder": Y.Array<string> - every node's id, across the ENTIRE
+ *    tree at any depth, in one flat order.
+ *  - "nodes": Y.Map<string, Y.Map> - keyed by node id. Each value is a
+ *    nested Y.Map (updateNode/updatePosition/updateParentId/
+ *    updateDimensions are all separate, independent field-patch
+ *    operations - the same "field-level patch operation exists" signal
+ *    used everywhere else in this codebase to mean nesting, not a plain
+ *    value, is needed) holding: type, position, parentId, width,
+ *    height, parentPath (plain array value - immutable once set, see
+ *    diagramStore.ts), and every ArchNodeData field (label, description,
+ *    properties, tags, etc. - see NODE_DATA_FIELDS) as its own key.
+ *  - "edgeOrder" / "edges": same pattern for edges - source, target,
+ *    type, parentPath, plus every ArchEdgeData field (see
+ *    EDGE_DATA_FIELDS).
+ *
+ * properties (on both nodes and edges) stays a plain Record<string,
+ * string> value rather than a further-nested Y.Map, matching the same
+ * reasoning already applied to team's extraDaysOff and requirements'
+ * categories: the Inspector's key-value editor replaces the whole object
+ * on each edit today, so there's no existing field-level-patch operation
+ * to protect with nesting.
+ */
 export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
   const nodeOrder = doc.getArray<string>("nodeOrder");
   const nodesMap = doc.getMap<Y.Map<unknown>>("nodes");

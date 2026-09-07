@@ -8,21 +8,38 @@
 
 .toolbar {
   display: flex;
-  align-items: center;
-  gap: 16px;
-  height: 52px;
-  padding: 0 16px;
+  flex-direction: column;
   background: var(--chrome-bg-raised);
   border-bottom: 1px solid var(--chrome-border);
   flex-shrink: 0;
+}
+
+.toolbar__row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
   /* Last-resort safety net: even after the responsive rules below kick
      in, an unusually narrow window (or enough simultaneously-visible
      buttons) can still not fit everything. Scrolling means those
      controls are always reachable rather than silently clipped past the
      viewport edge with no way to get to them - which was the actual bug
-     report this whole section addresses. */
+     report this whole section addresses. Applies to both rows: the
+     tabs row can overflow on its own at a narrow enough width too, even
+     though it's a much shorter list than the primary row's. */
   overflow-x: auto;
   overflow-y: hidden;
+}
+
+.toolbar__row--primary {
+  height: 52px;
+  padding: 0 16px;
+}
+
+.toolbar__row--tabs {
+  height: 40px;
+  padding: 0 16px;
+  gap: 0;
+  border-top: 1px solid var(--chrome-border);
 }
 
 .toolbar__brand {
@@ -85,7 +102,7 @@
 .toolbar__title {
   flex: 1;
   min-width: 120px;
-  max-width: 360px;
+  max-width: 480px;
   background: transparent;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
@@ -1411,6 +1428,15 @@
 
 .export-menu__dropdown button:hover {
   background: var(--chrome-bg-raised);
+}
+
+.export-menu__dropdown button:disabled {
+  color: var(--chrome-text-dim);
+  cursor: not-allowed;
+}
+
+.export-menu__dropdown button:disabled:hover {
+  background: transparent;
 }
 
 /* ---------- Drill-in button (on typed nodes) ---------- */
@@ -4496,13 +4522,20 @@
   /* Icon-only mode: every button in the toolbar has an icon plus this
      shared label class now, so hiding the class once here covers the
      view tabs, the autosave indicator, and every action button
-     (New/Open/Save/Scenarios/Export/Export Markdown) in a single rule.
+     (File/Save/Scenarios/Export/Export Markdown) in a single rule.
      Goes straight from full labels to icon-only at this one threshold
      rather than through an intermediate "brand text hidden, button
      labels still shown" step - that middle ground still didn't leave
      enough room in the 900-760px range to be worth a separate tier. */
-  .toolbar {
+  .toolbar__row {
     gap: 10px;
+  }
+
+  .toolbar__row--primary {
+    padding: 0 12px;
+  }
+
+  .toolbar__row--tabs {
     padding: 0 12px;
   }
 
@@ -4523,14 +4556,21 @@
   }
 
   .toolbar__title {
-    max-width: 160px;
+    max-width: 220px;
     min-width: 60px;
   }
 }
 
 @media (max-width: 520px) {
-  .toolbar {
+  .toolbar__row {
     gap: 6px;
+  }
+
+  .toolbar__row--primary {
+    padding: 0 8px;
+  }
+
+  .toolbar__row--tabs {
     padding: 0 8px;
   }
 
@@ -4556,7 +4596,7 @@
   }
 
   .toolbar__title {
-    max-width: 90px;
+    max-width: 130px;
     min-width: 50px;
   }
 }

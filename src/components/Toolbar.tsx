@@ -8,13 +8,12 @@ import {
   Redo2,
   Undo2,
   Workflow,
-  FilePlus2,
-  FolderOpen,
   Save,
   Route,
   FileDown,
 } from "lucide-react";
 import { ExportMenu } from "./ExportMenu";
+import { FileMenu } from "./FileMenu";
 
 interface ToolbarProps {
   title: string;
@@ -78,121 +77,118 @@ export function Toolbar({
 }: ToolbarProps) {
   return (
     <header className="toolbar">
-      <div className="toolbar__brand">
-        <span className="toolbar__brand-mark">SD</span>
-        <span className="toolbar__brand-name">System Design Editor</span>
-      </div>
-      <div className="toolbar__view-tabs">
-        <button
-          type="button"
-          className={viewMode === "diagram" ? "active" : undefined}
-          onClick={() => onSetViewMode("diagram")}
-          title="Diagram"
-        >
-          <Workflow size={13} />
-          <span className="toolbar__label">Diagram</span>
-        </button>
-        <button
-          type="button"
-          className={viewMode === "requirements" ? "active" : undefined}
-          onClick={() => onSetViewMode("requirements")}
-          title="Requirements"
-        >
-          <ListChecks size={13} />
-          <span className="toolbar__label">Requirements</span>
-        </button>
-        <button
-          type="button"
-          className={viewMode === "timeline" ? "active" : undefined}
-          onClick={() => onSetViewMode("timeline")}
-          title="Timeline"
-        >
-          <CalendarRange size={13} />
-          <span className="toolbar__label">Timeline</span>
-        </button>
-        <button
-          type="button"
-          className={viewMode === "team" ? "active" : undefined}
-          onClick={() => onSetViewMode("team")}
-          title="Team & Capacity"
-        >
-          <Users size={13} />
-          <span className="toolbar__label">Team</span>
-        </button>
-        <button
-          type="button"
-          className={viewMode === "skill-tree" ? "active" : undefined}
-          onClick={() => onSetViewMode("skill-tree")}
-          title="Skill Tree - see what's ready to work on"
-        >
-          <Network size={13} />
-          <span className="toolbar__label">Skill Tree</span>
-        </button>
-      </div>
-      <input
-        className="toolbar__title"
-        value={title}
-        onChange={(e) => onTitleChange(e.target.value)}
-        aria-label="Diagram title"
-      />
-      {hasAutosaved && (
-        <span className="toolbar__autosave-indicator" title="Your work is automatically saved in this browser">
-          <Check size={12} />
-          <span className="toolbar__label">Autosaved</span>
-        </span>
-      )}
-      <div className="toolbar__actions">
-        <button
-          type="button"
-          className="toolbar__icon-button"
-          onClick={onUndo}
-          disabled={!canUndo}
-          title="Undo (Ctrl+Z)"
-          aria-label="Undo"
-        >
-          <Undo2 size={15} />
-        </button>
-        <button
-          type="button"
-          className="toolbar__icon-button"
-          onClick={onRedo}
-          disabled={!canRedo}
-          title="Redo (Ctrl+Shift+Z or Ctrl+Y)"
-          aria-label="Redo"
-        >
-          <Redo2 size={15} />
-        </button>
-        {viewMode === "diagram" && (
+      <div className="toolbar__row toolbar__row--primary">
+        <div className="toolbar__brand">
+          <span className="toolbar__brand-mark">SD</span>
+          <span className="toolbar__brand-name">System Design Editor</span>
+        </div>
+        <input
+          className="toolbar__title"
+          value={title}
+          onChange={(e) => onTitleChange(e.target.value)}
+          aria-label="Diagram title"
+        />
+        {hasAutosaved && (
+          <span className="toolbar__autosave-indicator" title="Your work is automatically saved in this browser">
+            <Check size={12} />
+            <span className="toolbar__label">Autosaved</span>
+          </span>
+        )}
+        <div className="toolbar__actions">
           <button
             type="button"
-            className={isScenarioPanelOpen ? "active" : undefined}
-            onClick={onToggleScenarioPanel}
-            title="Scenarios"
+            className="toolbar__icon-button"
+            onClick={onUndo}
+            disabled={!canUndo}
+            title="Undo (Ctrl+Z)"
+            aria-label="Undo"
           >
-            <Route size={14} />
-            <span className="toolbar__label">Scenarios</span>
+            <Undo2 size={15} />
           </button>
-        )}
-        {viewMode === "diagram" && <ExportMenu onExportPng={onExportPng} onExportSvg={onExportSvg} disabled={!canExport} />}
-        {viewMode === "requirements" && (
-          <button type="button" onClick={onExportRequirementsMarkdown} disabled={!canExportRequirements} title="Export Markdown">
-            <FileDown size={14} />
-            <span className="toolbar__label">Export Markdown</span>
+          <button
+            type="button"
+            className="toolbar__icon-button"
+            onClick={onRedo}
+            disabled={!canRedo}
+            title="Redo (Ctrl+Shift+Z or Ctrl+Y)"
+            aria-label="Redo"
+          >
+            <Redo2 size={15} />
           </button>
-        )}
-        <button type="button" onClick={onNew} title="New">
-          <FilePlus2 size={14} />
-          <span className="toolbar__label">New</span>
-        </button>
-        <button type="button" onClick={onLoadClick} disabled={isInSession} title={isInSession ? "Open is disabled during a collaborative session - loading a file wouldn't be visible until the session ends" : "Open"}>
-          <FolderOpen size={14} />
-          <span className="toolbar__label">Open</span>
-        </button>
-        <button type="button" className="primary" onClick={onSave} title="Save">
-          <Save size={14} />
-          <span className="toolbar__label">Save</span>
-        </button>
-        {collabPanel}
+          {viewMode === "diagram" && (
+            <button
+              type="button"
+              className={isScenarioPanelOpen ? "active" : undefined}
+              onClick={onToggleScenarioPanel}
+              title="Scenarios"
+            >
+              <Route size={14} />
+              <span className="toolbar__label">Scenarios</span>
+            </button>
+          )}
+          {viewMode === "diagram" && <ExportMenu onExportPng={onExportPng} onExportSvg={onExportSvg} disabled={!canExport} />}
+          {viewMode === "requirements" && (
+            <button type="button" onClick={onExportRequirementsMarkdown} disabled={!canExportRequirements} title="Export Markdown">
+              <FileDown size={14} />
+              <span className="toolbar__label">Export Markdown</span>
+            </button>
+          )}
+          <FileMenu onNew={onNew} onLoadClick={onLoadClick} isInSession={isInSession} />
+          <button type="button" className="primary" onClick={onSave} title="Save">
+            <Save size={14} />
+            <span className="toolbar__label">Save</span>
+          </button>
+          {collabPanel}
+        </div>
+      </div>
+      <div className="toolbar__row toolbar__row--tabs">
+        <div className="toolbar__view-tabs">
+          <button
+            type="button"
+            className={viewMode === "diagram" ? "active" : undefined}
+            onClick={() => onSetViewMode("diagram")}
+            title="Diagram"
+          >
+            <Workflow size={13} />
+            <span className="toolbar__label">Diagram</span>
+          </button>
+          <button
+            type="button"
+            className={viewMode === "requirements" ? "active" : undefined}
+            onClick={() => onSetViewMode("requirements")}
+            title="Requirements"
+          >
+            <ListChecks size={13} />
+            <span className="toolbar__label">Requirements</span>
+          </button>
+          <button
+            type="button"
+            className={viewMode === "timeline" ? "active" : undefined}
+            onClick={() => onSetViewMode("timeline")}
+            title="Timeline"
+          >
+            <CalendarRange size={13} />
+            <span className="toolbar__label">Timeline</span>
+          </button>
+          <button
+            type="button"
+            className={viewMode === "team" ? "active" : undefined}
+            onClick={() => onSetViewMode("team")}
+            title="Team & Capacity"
+          >
+            <Users size={13} />
+            <span className="toolbar__label">Team</span>
+          </button>
+          <button
+            type="button"
+            className={viewMode === "skill-tree" ? "active" : undefined}
+            onClick={() => onSetViewMode("skill-tree")}
+            title="Skill Tree - see what's ready to work on"
+          >
+            <Network size={13} />
+            <span className="toolbar__label">Skill Tree</span>
+          </button>
+        </div>
       </div>
     </header>
   );

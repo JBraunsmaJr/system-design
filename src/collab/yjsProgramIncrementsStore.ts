@@ -21,31 +21,7 @@ function collisionResistantId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
-/**
- * Yjs-backed ProgramIncrementsStore. See programIncrementsStore.ts for
- * why the operations are shaped the way they are; this file is about
- * the schema that makes them merge correctly.
- *
- * Schema (all on the given Y.Doc):
- *  - "piOrder": Y.Array<string> - PI ids, in display order.
- *  - "pis": Y.Map<string, Y.Map> - keyed by PI id. Each value is a
- *    nested Y.Map (name, startDate patch independently via
- *    updatePIName/updatePIStart - the same "separate single-field patch
- *    operations exist" signal that means members and items needed
- *    nesting) holding THREE further keys:
- *      - "sprintOrder": Y.Array<string>, sprint ids in order within
- *        this PI.
- *      - "sprints": Y.Map<string, Y.Map> - keyed by sprint id, each a
- *        further-nested Y.Map (name, durationDays - same reasoning,
- *        updateSprintName and updateSprintEnd are separate operations).
- *      - "reservations": Y.Map<string, CapacityReservation> - keyed by
- *        reservation id, PLAIN values. Unlike sprints/PIs, no operation
- *        ever patches a single field of an existing reservation -
- *        ManageReservationsModal's save handler always replaces every
- *        field together - so this follows the same "plain value, no
- *        nesting" pattern already used for team's extraDaysOff and
- *        requirements' categories/relationshipTypes.
- */
+
 /**
  * Populates a Y.Doc directly from an existing, already-populated
  * ProgramIncrement[] - the inverse of this file's own buildSnapshot.
@@ -96,6 +72,31 @@ export function seedYjsProgramIncrementsDoc(doc: Y.Doc, initial: ProgramIncremen
   });
 }
 
+/**
+ * Yjs-backed ProgramIncrementsStore. See programIncrementsStore.ts for
+ * why the operations are shaped the way they are; this file is about
+ * the schema that makes them merge correctly.
+ *
+ * Schema (all on the given Y.Doc):
+ *  - "piOrder": Y.Array<string> - PI ids, in display order.
+ *  - "pis": Y.Map<string, Y.Map> - keyed by PI id. Each value is a
+ *    nested Y.Map (name, startDate patch independently via
+ *    updatePIName/updatePIStart - the same "separate single-field patch
+ *    operations exist" signal that means members and items needed
+ *    nesting) holding THREE further keys:
+ *      - "sprintOrder": Y.Array<string>, sprint ids in order within
+ *        this PI.
+ *      - "sprints": Y.Map<string, Y.Map> - keyed by sprint id, each a
+ *        further-nested Y.Map (name, durationDays - same reasoning,
+ *        updateSprintName and updateSprintEnd are separate operations).
+ *      - "reservations": Y.Map<string, CapacityReservation> - keyed by
+ *        reservation id, PLAIN values. Unlike sprints/PIs, no operation
+ *        ever patches a single field of an existing reservation -
+ *        ManageReservationsModal's save handler always replaces every
+ *        field together - so this follows the same "plain value, no
+ *        nesting" pattern already used for team's extraDaysOff and
+ *        requirements' categories/relationshipTypes.
+ */
 export function createYjsProgramIncrementsStore(doc: Y.Doc): ProgramIncrementsStore {
   const piOrder = doc.getArray<string>("piOrder");
   const pis = doc.getMap<Y.Map<unknown>>("pis");
