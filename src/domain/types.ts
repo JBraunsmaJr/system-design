@@ -62,6 +62,18 @@ export interface ArchNodeData extends Record<string, unknown> {
   properties: Record<string, string>;
   tags: string[];
   subDiagram?: SubDiagram;
+  /** Whether this node currently has a populated sub-diagram - computed
+   * fresh by App.tsx on every render from the flat diagram store's own
+   * data (see diagramStore.ts's own hasSubDiagram function), NOT read
+   * from the subDiagram field above. subDiagram itself is only ever
+   * populated transiently by unflattenToSubDiagram's one-time
+   * conversion when leaving a collaborative session - it's never set
+   * anywhere in the actual rendering path, in either local or session
+   * mode, so a node component checking `subDiagram?.nodes.length`
+   * directly would incorrectly see nothing there. This field is what a
+   * node component should actually check to show a "has sub-diagram"
+   * indicator. */
+  hasSubDiagram?: boolean;
   /** Only used by type:"text" nodes (freeform canvas annotations). */
   textColor?: string;
   fontSize?: number;

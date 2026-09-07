@@ -73,6 +73,18 @@ export interface LocalPresenceInfo {
    * nothing specific is focused (browsing a list, or on a view/domain
    * that doesn't track this). */
   focusedItemId: string | null;
+  /** This peer's current position within the diagram's own sub-diagram
+   * nesting - the same DiagramPath (array of node ids) App.tsx tracks
+   * as `path`, joined into a single string for easy equality
+   * comparison. Cursor coordinates are only meaningful within the
+   * specific sub-diagram level they were reported from (a position
+   * inside a sub-diagram means nothing on the parent level's own
+   * canvas) - this is what lets a viewer correctly show only cursors
+   * from peers actually on the SAME level they're looking at, rather
+   * than a peer's cursor appearing to hover somewhere nonsensical on a
+   * completely different diagram level. Empty string represents the
+   * root level, matching an empty DiagramPath array. */
+  diagramPath: string;
 }
 
 /** What you observe about ANOTHER peer - everything they set about
@@ -179,6 +191,7 @@ export function parsePresenceState(clientId: number, state: unknown): PresenceIn
     selectedEdgeIds: Array.isArray(candidate.selectedEdgeIds) ? candidate.selectedEdgeIds : [],
     viewMode: typeof candidate.viewMode === "string" ? candidate.viewMode : null,
     focusedItemId: typeof candidate.focusedItemId === "string" ? candidate.focusedItemId : null,
+    diagramPath: typeof candidate.diagramPath === "string" ? candidate.diagramPath : "",
   };
 }
 

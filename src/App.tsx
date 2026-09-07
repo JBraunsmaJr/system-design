@@ -54,7 +54,7 @@ import { createYjsRequirementsStore, seedYjsRequirementsDoc } from "./collab/yjs
 import type { RequirementsStore } from "./collab/requirementsStore";
 import { createAdapterProgramIncrementsStore } from "./collab/programIncrementsStore";
 import { createAdapterDiagramStore } from "./collab/adapterDiagramStore";
-import { getNodesAtPath, getEdgesAtPath, unflattenToSubDiagram } from "./collab/diagramStore";
+import { getNodesAtPath, getEdgesAtPath, unflattenToSubDiagram, hasSubDiagram } from "./collab/diagramStore";
 import type { DiagramStore } from "./collab/diagramStore";
 import { createYjsDiagramStore, seedYjsDiagramDoc } from "./collab/yjsDiagramStore";
 import { createYjsProgramIncrementsStore, seedYjsProgramIncrementsDoc } from "./collab/yjsProgramIncrementsStore";
@@ -321,7 +321,7 @@ function App() {
   // state at once (matching Awareness's own setLocalState semantics),
   // so broadcasting only the field that changed would silently wipe out
   // everything else that was previously set.
-  const localPresenceRef = useRef<LocalPresenceInfo>({ name: "", color: "", cursor: null, selectedNodeIds: [], selectedEdgeIds: [], viewMode: null, focusedItemId: null });
+  const localPresenceRef = useRef<LocalPresenceInfo>({ name: "", color: "", cursor: null, selectedNodeIds: [], selectedEdgeIds: [], viewMode: null, focusedItemId: null, diagramPath: "" });
   // activeSessionRef lets broadcastPresence stay a permanently stable
   // function (empty deps) while still always reaching the CURRENT
   // session - same rootRef/diagramStoreRef pattern used elsewhere in
@@ -402,6 +402,7 @@ function App() {
         selectedEdgeIds: [],
         viewMode: null,
         focusedItemId: null,
+        diagramPath: "",
       };
       localPresenceRef.current = initialPresence;
       session.setLocalPresence(initialPresence);
@@ -438,6 +439,7 @@ function App() {
         selectedEdgeIds: [],
         viewMode: null,
         focusedItemId: null,
+        diagramPath: "",
       };
       localPresenceRef.current = initialPresence;
       session.setLocalPresence(initialPresence);
@@ -519,6 +521,17 @@ function App() {
 
   const [path, setPath] = useState<DiagramPath>([]);
 
+  // Rebroadcasts this peer's own diagram path whenever it changes, so
+  // peers viewing a DIFFERENT sub-diagram level correctly know not to
+  // render this person's cursor - see broadcastPresence's own cursor
+  // handling and Canvas's peer-cursor filtering for the other half of
+  // this fix.
+  useEffect(() => {
+    if (!activeSession) return;
+    broadcastPresence({ diagramPath: path.join("/") });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSession, path]);
+
   const breadcrumbLabels = useMemo(() => getBreadcrumbLabels(root, path), [root, path]);
 
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
@@ -563,7 +576,11 @@ function App() {
     const rawNodes = reorderWithGroupsFirst(getNodesAtPath(diagramSnapshot.nodes, path));
     const rawEdges = getEdgesAtPath(diagramSnapshot.edges, path);
     return {
-      nodes: rawNodes.map((n) => ({ ...n, selected: selectedNodeIds.includes(n.id) })),
+      nodes: rawNodes.map((n) => ({
+        ...n,
+        selected: selectedNodeIds.includes(n.id),
+        data: { ...n.data, hasSubDiagram: hasSubDiagram(diagramSnapshot.nodes, path, n.id) },
+      })),
       edges: rawEdges.map((e) => ({ ...e, selected: selectedEdgeIds.includes(e.id) })),
     };
   }, [diagramSnapshot, path, selectedNodeIds, selectedEdgeIds]);
@@ -1606,9 +1623,11 @@ function App() {
               peers={
                 !activeSession
                   ? []
-                  : showPeerCursors
-                    ? presencePeers
-                    : presencePeers.map((p) => (p.cursor === null ? p : { ...p, cursor: null }))
+                  : presencePeers.map((p) => {
+                      const onSamePath = p.diagramPath === path.join("/");
+                      const shouldShowCursor = showPeerCursors && onSamePath;
+                      return p.cursor === null || shouldShowCursor ? p : { ...p, cursor: null };
+                    })
               }
               onCursorMove={onCursorMove}
               onConnect={onConnect}

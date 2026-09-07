@@ -92,6 +92,15 @@ function assert(cond: boolean, msg: string) {
 
   const malformedView = parsePresenceState(1, { name: "Bob", color: "#000", viewMode: 42, focusedItemId: { not: "a string" } });
   assert(malformedView !== null && malformedView.viewMode === null && malformedView.focusedItemId === null, "a viewMode/focusedItemId that aren't actually strings are defaulted to null rather than passed through as-is or rejecting the peer");
+
+  const withPath = parsePresenceState(1, { name: "Bob", color: "#000", diagramPath: "node-a/node-b" });
+  assert(withPath !== null && withPath.diagramPath === "node-a/node-b", "diagramPath is correctly carried over when present and valid");
+
+  const noPath = parsePresenceState(1, { name: "Bob", color: "#000" });
+  assert(noPath !== null && noPath.diagramPath === "", "a missing diagramPath defaults to an empty string (root level) rather than being undefined or rejecting the peer");
+
+  const malformedPath = parsePresenceState(1, { name: "Bob", color: "#000", diagramPath: 42 });
+  assert(malformedPath !== null && malformedPath.diagramPath === "", "a diagramPath that isn't actually a string is defaulted to empty (root) rather than passed through as-is or rejecting the peer");
 }
 
 
@@ -134,7 +143,7 @@ try {
   const unsubA = sessionA.subscribeToPresence((peers) => seenByA1.push(peers));
   assert(seenByA1.length === 1 && seenByA1[0].length === 0, "subscribeToPresence fires immediately with an empty list before anyone (including this peer) has set any presence");
 
-  sessionA.setLocalPresence({ name: "Alice", color: "#5b7cfa", cursor: null, selectedNodeIds: [], selectedEdgeIds: [], viewMode: null, focusedItemId: null });
+  sessionA.setLocalPresence({ name: "Alice", color: "#5b7cfa", cursor: null, selectedNodeIds: [], selectedEdgeIds: [], viewMode: null, focusedItemId: null, diagramPath: "" });
   assert(seenByA1[seenByA1.length - 1].length === 0, "setting THIS peer's own presence does not appear in ITS OWN subscribeToPresence feed - seeing yourself in a 'who else is here' list would be redundant");
   unsubA();
 
@@ -153,7 +162,7 @@ try {
   // === Cross-peer sync, using Awareness's own real sync primitives -
   // the exact mechanism y-webrtc itself uses internally, genuinely
   // exercised here rather than assumed ===
-  sessionA.setLocalPresence({ name: "Alice", color: "#5b7cfa", cursor: null, selectedNodeIds: [], selectedEdgeIds: [], viewMode: null, focusedItemId: null });
+  sessionA.setLocalPresence({ name: "Alice", color: "#5b7cfa", cursor: null, selectedNodeIds: [], selectedEdgeIds: [], viewMode: null, focusedItemId: null, diagramPath: "" });
   const updateFromA = encodeAwarenessUpdate(sessionA.provider.awareness, [sessionA.provider.awareness.clientID]);
   applyAwarenessUpdate(sessionB.provider.awareness, updateFromA, "test-sync");
 
@@ -171,7 +180,7 @@ try {
 
   // Updating presence should propagate as a fresh 'change' event, not
   // require a fresh subscription.
-  sessionA.setLocalPresence({ name: "Alice", color: "#ff0000", cursor: null, selectedNodeIds: [], selectedEdgeIds: [], viewMode: null, focusedItemId: null });
+  sessionA.setLocalPresence({ name: "Alice", color: "#ff0000", cursor: null, selectedNodeIds: [], selectedEdgeIds: [], viewMode: null, focusedItemId: null, diagramPath: "" });
   const updatedFromA = encodeAwarenessUpdate(sessionA.provider.awareness, [sessionA.provider.awareness.clientID]);
   applyAwarenessUpdate(sessionB.provider.awareness, updatedFromA, "test-sync");
   await waitFor(() => latestSeenByB.some((p) => p.color === "#ff0000"));
