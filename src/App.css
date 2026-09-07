@@ -8481,23 +8481,22 @@
   background: rgba(56, 189, 125, 0.08);
 }
 
-.collab-panel__scrim {
-  position: fixed;
-  inset: 0;
-  z-index: 59;
-}
-
+/* Rendered through a portal onto document.body, with top/left/width set
+   inline from the trigger's own rect - the toolbar row it lives in is a
+   horizontal scroll container (overflow-y: hidden), so an absolutely
+   positioned dropdown got clipped to that row's 52px height and was
+   never visible. Matches ExportMenu/FileMenu's own established pattern.
+   The max-height keeps the taller in-session variant (peer list, cursor
+   toggle) scrollable rather than running off a short viewport. */
 .collab-panel__dropdown {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  width: 300px;
   background: var(--chrome-bg-raised);
   border: 1px solid var(--chrome-border);
   border-radius: var(--radius-md);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
   padding: 14px;
-  z-index: 61;
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  z-index: 200;
 }
 
 .collab-panel__header {

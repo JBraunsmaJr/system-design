@@ -377,21 +377,6 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
       return () => listeners.delete(listener);
     },
 
-    // The display id ("REQ-6") is generated exactly as before - a
-    // per-type sequence counter, read-incremented-written-back. Two
-    // disconnected peers creating an item of the same type can still end
-    // up computing the same candidate display id before either has seen
-    // the other's change; under normal, connected collaboration this
-    // never happens (Yjs's causal ordering means one peer's write is
-    // visible to the next before it acts). What's different from before:
-    // this id is used only as the VALUE of an "id" field on the item's
-    // own map, never as the map's storage key (see this file's top doc
-    // comment) - so a collision here can never cause one peer's item
-    // data to be silently discarded. It shows up, briefly, as two items
-    // sharing the same display id, and repairDuplicateDisplayIds
-    // resolves it automatically and deterministically the next time
-    // this store recomputes after a sync (see that function's own doc
-    // comment for exactly what it does and doesn't handle).
     /**
      * The display id ("REQ-6") is generated as a per-type sequence counter,
      * read-incremented-written-back. Two disconnected peers creating an item of the same
@@ -444,11 +429,15 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
       });
     },
 
-    // Same category-id caveat as addItem's display id (see its doc
-    // comment) - lower risk in practice since categories are created far
-    // less often than items, and not given the same storage-key
-    // treatment here since categories aren't nested maps to begin with
-    // (see this file's top doc comment).
+    /**
+     * Same category-id caveat as addItem's display id (see its doc
+     * comment) - lower risk in practice since categories are created far
+     * less often than items, and not given the same storage-key
+     * treatment here since categories aren't nested maps to begin with
+     * (see this file's top doc comment).
+     * @param itemId
+     * @param label
+     */
     createAndAssignCategory: (itemId, label) => {
       const trimmed = label.trim();
       const existing = Array.from(categories.values()).find((c) => c.label.toLowerCase() === trimmed.toLowerCase());
