@@ -209,6 +209,17 @@ export function RequirementsView({
     requirementsStoreRef.current.deleteCategory(categoryId);
   }, []);
 
+  // One instance shared by every card, rather than a fresh arrow per
+  // card per render. RequirementCard compares this by identity in its
+  // memo comparator, so a per-card closure would make that comparison
+  // always fail and defeat memoization for the whole list.
+  // onFocusedItemChange is a useState setter from App, so it's stable
+  // and this callback is too.
+  const onEditingChange = useCallback(
+    (itemId: string, isEditing: boolean) => onFocusedItemChange?.(isEditing ? itemId : null),
+    [onFocusedItemChange]
+  );
+
   const onAddRelationship = useCallback((typeId: string, fromItemId: string, toItemId: string): string | null => {
     return requirementsStoreRef.current.addRelationship(typeId, fromItemId, toItemId);
   }, []);
@@ -408,7 +419,7 @@ export function RequirementsView({
                   onDeleteRelationship={onDeleteRelationship}
                   highlighted={highlightedId === item.id}
                   peersHere={peers.length === 0 ? EMPTY_PEERS : peers.filter((p) => p.focusedItemId === item.id)}
-                  onEditingChange={(isEditing) => onFocusedItemChange?.(isEditing ? item.id : null)}
+                  onEditingChange={onEditingChange}
                 />
               ))}
             </section>

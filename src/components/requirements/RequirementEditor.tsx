@@ -11,6 +11,7 @@ import { createPortal } from "react-dom";
 import { getCaretPixelPosition } from "../../domain/caretPosition";
 import { computeFlippedPosition, type AnchorRect } from "../../domain/popoverPosition";
 import { getCurrentLineBounds, getListEnterBehavior, getListIndentBehavior } from "../../domain/markdownEditing";
+import { fitHeightToContent } from "../../domain/autoSizeTextarea";
 import type { RequirementItem, RequirementsDocument } from "../../domain/requirementsTypes";
 import { ReferencePopover } from "./ReferencePopover";
 import { MarkdownToolbar } from "./MarkdownToolbar";
@@ -60,6 +61,56 @@ interface RequirementEditorProps {
 
 export function RequirementEditor({ value, onChange, onDone, doc, autoFocus, placeholder }: RequirementEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  /**
+   * Grows the textarea to fit its content, so a 15-line description
+   * opens showing 15 lines instead of a fixed 80px window the reader
+   * has to drag open before they can see what they're editing.
+   *
+   * Driven off `value` rather than the onChange handler because the
+   * textarea is fully controlled, and its content changes through
+   * several paths that never touch onChange directly: the markdown
+   * toolbar's insertions, the reference popover completing a #REQ-3,
+   * the list-continuation behavior on Enter, and the initial mount with
+   * existing text. Keying on the value covers all of them at once.
+   *
+   * useLayoutEffect, not useEffect: this runs after the DOM has the new
+   * text but before the browser paints, so the textarea is never
+   * visibly the wrong size for a frame.
+   */
+  const fitToContent = useCallback(() => {
+    const el = textareaRef.current;
+    if (el) fitHeightToContent(el);
+  }, []);
+
+  useLayoutEffect(fitToContent, [value, fitToContent]);
+
+  /**
+   * Re-fit when the textarea's WIDTH changes - narrowing the pane or
+   * the window re-wraps the text into more lines, which changes the
+   * height needed even though `value` hasn't changed at all.
+   *
+   * The width guard is what keeps this from feeding on itself: fitting
+   * writes a new height, which resizes the observed element, which
+   * fires the observer again. Ignoring callbacks where the width is
+   * unchanged breaks that cycle at the source rather than relying on it
+   * settling after a round trip (which is also what produces the
+   * "ResizeObserver loop completed with undelivered notifications"
+   * console error).
+   */
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    let lastWidth = el.clientWidth;
+    const observer = new ResizeObserver(() => {
+      const width = el.clientWidth;
+      if (width === lastWidth) return;
+      lastWidth = width;
+      fitToContent();
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [fitToContent]);
+
   const popoverRef = useRef<HTMLDivElement>(null);
   const anchorRef = useRef<AnchorRect | null>(null);
   const [trigger, setTrigger] = useState<ActiveTrigger | null>(null);

@@ -2823,10 +2823,24 @@
 .requirement-editor__textarea {
   width: 100%;
   min-height: 80px;
+  /* The height itself is set inline, from the content - see
+     RequirementEditor's fitToContent. These two are the bounds it works
+     within: min-height keeps a near-empty description from collapsing to
+     a sliver, and max-height stops a very long one from growing taller
+     than the viewport and burying the rest of the list. Past that
+     ceiling the textarea scrolls internally, which is the same reading
+     experience as before but only for descriptions long enough to
+     genuinely need it.
+
+     resize is off because the height is now derived: a manual drag would
+     be silently overwritten on the next keystroke, which is worse than
+     not offering the handle at all. */
+  max-height: 60vh;
+  overflow-y: auto;
   background: transparent;
   border: none;
   outline: none;
-  resize: vertical;
+  resize: none;
   color: var(--chrome-text);
   font-family: var(--sans);
   font-size: 13px;

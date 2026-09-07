@@ -3,6 +3,7 @@ import { Trash2 } from "lucide-react";
 import { getItemType, isItemWorkable } from "../../domain/requirementsRegistry";
 import type { LinkedNodeRef, DiagramPath } from "../../domain/subDiagramTree";
 import { RequirementBody } from "./RequirementBody";
+import { peerBadgesAreEqual } from "../../domain/presenceComparison";
 import { LinkedDiagramsSection } from "./LinkedDiagramsSection";
 import { RequirementEditor } from "./RequirementEditor";
 import { CategoryPicker } from "./CategoryPicker";
@@ -51,7 +52,12 @@ interface RequirementCardProps {
   /** Reports whenever this card's own editing state changes, so the
    * parent view can broadcast "I'm now editing item X" (or "no longer
    * editing anything") via presence. */
-  onEditingChange?: (isEditing: boolean) => void;
+  /** Takes the item id so the parent can define ONE stable callback for
+   * the whole list rather than a per-card closure over item.id. That
+   * matters directly for propsAreEqual below: a per-card arrow is a new
+   * function identity on every render, so comparing it would disable
+   * memoization for every card, permanently. */
+  onEditingChange?: (itemId: string, isEditing: boolean) => void;
 }
 
 function RequirementCardImpl({
@@ -84,7 +90,7 @@ function RequirementCardImpl({
       isFirstRender.current = false;
       return;
     }
-    onEditingChange?.(isEditingBody);
+    onEditingChange?.(item.id, isEditingBody);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditingBody]);
   const type = getItemType(doc, item.typeId);
@@ -240,7 +246,13 @@ function propsAreEqual(prev: RequirementCardProps, next: RequirementCardProps): 
     prev.onCreateAndAssignCategory === next.onCreateAndAssignCategory &&
     prev.onDeleteCategory === next.onDeleteCategory &&
     prev.onAddRelationship === next.onAddRelationship &&
-    prev.onDeleteRelationship === next.onDeleteRelationship
+    prev.onDeleteRelationship === next.onDeleteRelationship &&
+    prev.onEditingChange === next.onEditingChange &&
+    // Not identity: peersHere is rebuilt by a filter on every parent
+    // render, and its elements are rebuilt on every presence update -
+    // including cursor movement, which no badge here renders. See
+    // peerBadgesAreEqual for why both of those rule out ===.
+    peerBadgesAreEqual(prev.peersHere, next.peersHere)
   );
 }
 
