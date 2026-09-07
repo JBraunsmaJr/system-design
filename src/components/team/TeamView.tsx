@@ -473,7 +473,7 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
                           <span className="team-member-card__rate-unit">pts/day</span>
                         </div>
                         <span className="team-member-card__pto-total-badge" title="Total PTO days across all spans">
-                          <Palmtree size={12} /> {totalPto}d PTO
+                          <Palmtree size={12} /> {totalPto}
                         </span>
                       </div>
 
