@@ -13,6 +13,7 @@ import type { TeamDocument } from "../../domain/teamTypes";
 import type { SubDiagram } from "../../domain/types";
 import { findAllLinkedNodes, type DiagramPath, type LinkedNodeRef } from "../../domain/subDiagramTree";
 import type { RequirementsStore } from "../../collab/requirementsStore";
+import type { PresenceInfo } from "../../collab/session";
 
 interface RequirementsViewProps {
   requirementsStore: RequirementsStore;
@@ -32,6 +33,14 @@ interface RequirementsViewProps {
    * re-triggering the same scroll on an unrelated re-render). */
   focusItemId?: string | null;
   onFocusHandled?: () => void;
+  /** Other people currently on this same view, in a collaborative
+   * session - already filtered by the caller to just those actually on
+   * "requirements" (never includes peers on a different view). Empty
+   * outside of a session. */
+  peers?: PresenceInfo[];
+  /** Reports which item this person currently has open for editing, for
+   * presence broadcasting - null when nothing's being edited. */
+  onFocusedItemChange?: (itemId: string | null) => void;
 }
 
 const HIGHLIGHT_DURATION_MS = 2000;
@@ -41,6 +50,10 @@ const HIGHLIGHT_DURATION_MS = 2000;
 // comparison (a new array is never === the previous one, even though the
 // actual content - nothing - never changes).
 const EMPTY_LINKED_NODES: LinkedNodeRef[] = [];
+// Same reasoning as EMPTY_LINKED_NODES above: a fresh [] every render
+// for every item with no one else looking at it would defeat
+// RequirementCard's own React.memo comparison just as surely.
+const EMPTY_PEERS: PresenceInfo[] = [];
 const UNCATEGORIZED_KEY = "__uncategorized__";
 
 type GroupBy = "type" | "category";
@@ -61,6 +74,8 @@ export function RequirementsView({
   onCreateLinkedNode,
   focusItemId,
   onFocusHandled,
+  peers = [],
+  onFocusedItemChange,
 }: RequirementsViewProps) {
   const doc = useSyncExternalStore(requirementsStore.subscribe, requirementsStore.getSnapshot);
   const [search, setSearch] = useState("");
@@ -360,6 +375,8 @@ export function RequirementsView({
                   onAddRelationship={onAddRelationship}
                   onDeleteRelationship={onDeleteRelationship}
                   highlighted={highlightedId === item.id}
+                  peersHere={peers.length === 0 ? EMPTY_PEERS : peers.filter((p) => p.focusedItemId === item.id)}
+                  onEditingChange={(isEditing) => onFocusedItemChange?.(isEditing ? item.id : null)}
                 />
               ))}
             </section>

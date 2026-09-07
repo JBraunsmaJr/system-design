@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useRef, useSyncExternalStore } from "react";
 import { AlertTriangle, CalendarRange, ChevronDown, ChevronRight, ChevronUp, GanttChartSquare, Inbox, Plus, Trash2, ShieldAlert } from "lucide-react";
 import {
   computeSprintDateRanges,
@@ -15,6 +15,7 @@ import type { ProgramIncrementsStore } from "../../collab/programIncrementsStore
 import type { TeamDocument } from "../../domain/teamTypes";
 import type { SubDiagram } from "../../domain/types";
 import type { DiagramPath } from "../../domain/subDiagramTree";
+import type { PresenceInfo } from "../../collab/session";
 import { computeSprintCapacity, computePICapacities } from "../../domain/teamCapacity";
 import { SprintCapacityBar } from "../team/SprintCapacityBar";
 import { MemberPicker } from "../team/MemberPicker";
@@ -32,6 +33,14 @@ interface TimelineViewProps {
   onNavigateToNode?: (path: DiagramPath, nodeId: string) => void;
   onCreateLinkedNode?: (itemId: string, label: string) => void;
   onNavigateToRequirement?: (itemId: string) => void;
+  /** Other people currently on this same view, in a collaborative
+   * session - already filtered by the caller to just those actually on
+   * "timeline" (never includes peers on a different view). Empty
+   * outside of a session. */
+  peers?: PresenceInfo[];
+  /** Reports which item this person currently has open, for presence
+   * broadcasting - null when nothing's selected. */
+  onFocusedItemChange?: (itemId: string | null) => void;
 }
 
 export function TimelineView({
@@ -42,12 +51,22 @@ export function TimelineView({
   onNavigateToNode,
   onCreateLinkedNode,
   onNavigateToRequirement,
+  peers = [],
+  onFocusedItemChange,
 }: TimelineViewProps) {
   const programIncrements = useSyncExternalStore(programIncrementsStore.subscribe, programIncrementsStore.getSnapshot);
   const requirements = useSyncExternalStore(requirementsStore.subscribe, requirementsStore.getSnapshot);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [chartMode, setChartMode] = useState<"board" | "gantt">("board");
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
+
+  // Rebroadcasts this peer's own selection so others' "someone else has
+  // this item open" indicator (see ItemCard's peersHere prop) stays
+  // current - selectedItemId is exactly "which item this person has
+  // open" already, nothing extra to track for that purpose.
+  useEffect(() => {
+    onFocusedItemChange?.(selectedItemId);
+  }, [selectedItemId, onFocusedItemChange]);
 
   const onAddPI = () => {
     programIncrementsStore.addPI();
@@ -250,6 +269,21 @@ export function TimelineView({
           </button>
         </div>
       </div>
+
+      {peers.length > 0 && (
+        <div className="timeline-view__presence-bar">
+          {peers.map((p) => {
+            const focusedItem = p.focusedItemId ? requirements.items.find((it) => it.id === p.focusedItemId) : null;
+            return (
+              <span key={p.clientId} className="timeline-view__presence-chip">
+                <span className="timeline-view__presence-dot" style={{ backgroundColor: p.color }} />
+                <strong>{p.name}</strong>
+                {focusedItem ? <> — viewing {focusedItem.id}: {focusedItem.title}</> : " — browsing"}
+              </span>
+            );
+          })}
+        </div>
+      )}
 
       {chartMode === "gantt" ? (
         <GanttChart

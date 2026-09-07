@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { FileText, Plus, Trash2, Workflow } from "lucide-react";
 import { getItemType, isItemWorkable } from "../../domain/requirementsRegistry";
 import type { LinkedNodeRef, DiagramPath } from "../../domain/subDiagramTree";
@@ -14,6 +14,7 @@ import type { RequirementItem, RequirementsDocument } from "../../domain/require
 import type { ProgramIncrement } from "../../domain/programIncrements";
 import type { TeamDocument } from "../../domain/teamTypes";
 import type { SubDiagram } from "../../domain/types";
+import type { PresenceInfo } from "../../collab/session";
 
 interface RequirementCardProps {
   item: RequirementItem;
@@ -41,6 +42,14 @@ interface RequirementCardProps {
    * so the destination is visually obvious rather than just "the page
    * moved somewhere" - cleared by the parent view after a short timeout. */
   highlighted?: boolean;
+  /** Other people in a collaborative session currently editing THIS
+   * specific item - already filtered by the parent view. Empty outside
+   * of a session, or when no one else has this item open. */
+  peersHere?: PresenceInfo[];
+  /** Reports whenever this card's own editing state changes, so the
+   * parent view can broadcast "I'm now editing item X" (or "no longer
+   * editing anything") via presence. */
+  onEditingChange?: (isEditing: boolean) => void;
 }
 
 function RequirementCardImpl({
@@ -59,8 +68,22 @@ function RequirementCardImpl({
   onAddRelationship,
   onDeleteRelationship,
   highlighted,
+  peersHere = [],
+  onEditingChange,
 }: RequirementCardProps) {
   const [isEditingBody, setIsEditingBody] = useState(false);
+  // Reports every genuine transition, not the initial mount - a card
+  // that's never been edited shouldn't fire a spurious "not editing"
+  // the moment it renders, since nothing changed yet.
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    onEditingChange?.(isEditingBody);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditingBody]);
   const type = getItemType(doc, item.typeId);
 
   return (
@@ -75,6 +98,15 @@ function RequirementCardImpl({
           <span className="requirement-card__id" style={{ color: type?.color ?? "var(--chrome-text-dim)" }}>
             {item.id}
           </span>
+          {peersHere.length > 0 && (
+            <span className="requirement-card__peers" title={`${peersHere.map((p) => p.name).join(", ")} ${peersHere.length === 1 ? "is" : "are"} editing this`}>
+              {peersHere.map((p) => (
+                <span key={p.clientId} className="requirement-card__peer-dot" style={{ backgroundColor: p.color }}>
+                  {p.name.charAt(0).toUpperCase()}
+                </span>
+              ))}
+            </span>
+          )}
           {isItemWorkable(doc, item) && (
             <StatusPicker status={item.status} onChange={(status) => onUpdateItem(item.id, { status })} />
           )}

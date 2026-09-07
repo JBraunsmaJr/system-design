@@ -83,6 +83,15 @@ function assert(cond: boolean, msg: string) {
 
   const malformedSelections = parsePresenceState(1, { name: "Bob", color: "#000", selectedNodeIds: "not-an-array" });
   assert(malformedSelections !== null && Array.isArray(malformedSelections.selectedNodeIds) && malformedSelections.selectedNodeIds.length === 0, "a selectedNodeIds that isn't actually an array is defaulted to empty rather than passed through as-is or rejecting the peer");
+
+  const withViewAndFocus = parsePresenceState(1, { name: "Bob", color: "#000", viewMode: "requirements", focusedItemId: "REQ-5" });
+  assert(withViewAndFocus !== null && withViewAndFocus.viewMode === "requirements" && withViewAndFocus.focusedItemId === "REQ-5", "viewMode and focusedItemId are correctly carried over when present and valid");
+
+  const noViewOrFocus = parsePresenceState(1, { name: "Bob", color: "#000" });
+  assert(noViewOrFocus !== null && noViewOrFocus.viewMode === null && noViewOrFocus.focusedItemId === null, "missing viewMode/focusedItemId default to null rather than being undefined or rejecting the peer - matches a peer on a view that doesn't track this (diagram/team/skill-tree), or the brief window before their first full broadcast");
+
+  const malformedView = parsePresenceState(1, { name: "Bob", color: "#000", viewMode: 42, focusedItemId: { not: "a string" } });
+  assert(malformedView !== null && malformedView.viewMode === null && malformedView.focusedItemId === null, "a viewMode/focusedItemId that aren't actually strings are defaulted to null rather than passed through as-is or rejecting the peer");
 }
 
 
@@ -125,7 +134,7 @@ try {
   const unsubA = sessionA.subscribeToPresence((peers) => seenByA1.push(peers));
   assert(seenByA1.length === 1 && seenByA1[0].length === 0, "subscribeToPresence fires immediately with an empty list before anyone (including this peer) has set any presence");
 
-  sessionA.setLocalPresence({ name: "Alice", color: "#5b7cfa", cursor: null, selectedNodeIds: [], selectedEdgeIds: [] });
+  sessionA.setLocalPresence({ name: "Alice", color: "#5b7cfa", cursor: null, selectedNodeIds: [], selectedEdgeIds: [], viewMode: null, focusedItemId: null });
   assert(seenByA1[seenByA1.length - 1].length === 0, "setting THIS peer's own presence does not appear in ITS OWN subscribeToPresence feed - seeing yourself in a 'who else is here' list would be redundant");
   unsubA();
 
@@ -144,7 +153,7 @@ try {
   // === Cross-peer sync, using Awareness's own real sync primitives -
   // the exact mechanism y-webrtc itself uses internally, genuinely
   // exercised here rather than assumed ===
-  sessionA.setLocalPresence({ name: "Alice", color: "#5b7cfa", cursor: null, selectedNodeIds: [], selectedEdgeIds: [] });
+  sessionA.setLocalPresence({ name: "Alice", color: "#5b7cfa", cursor: null, selectedNodeIds: [], selectedEdgeIds: [], viewMode: null, focusedItemId: null });
   const updateFromA = encodeAwarenessUpdate(sessionA.provider.awareness, [sessionA.provider.awareness.clientID]);
   applyAwarenessUpdate(sessionB.provider.awareness, updateFromA, "test-sync");
 
@@ -162,7 +171,7 @@ try {
 
   // Updating presence should propagate as a fresh 'change' event, not
   // require a fresh subscription.
-  sessionA.setLocalPresence({ name: "Alice", color: "#ff0000", cursor: null, selectedNodeIds: [], selectedEdgeIds: [] });
+  sessionA.setLocalPresence({ name: "Alice", color: "#ff0000", cursor: null, selectedNodeIds: [], selectedEdgeIds: [], viewMode: null, focusedItemId: null });
   const updatedFromA = encodeAwarenessUpdate(sessionA.provider.awareness, [sessionA.provider.awareness.clientID]);
   applyAwarenessUpdate(sessionB.provider.awareness, updatedFromA, "test-sync");
   await waitFor(() => latestSeenByB.some((p) => p.color === "#ff0000"));

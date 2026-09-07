@@ -313,7 +313,7 @@ function App() {
   // state at once (matching Awareness's own setLocalState semantics),
   // so broadcasting only the field that changed would silently wipe out
   // everything else that was previously set.
-  const localPresenceRef = useRef<LocalPresenceInfo>({ name: "", color: "", cursor: null, selectedNodeIds: [], selectedEdgeIds: [] });
+  const localPresenceRef = useRef<LocalPresenceInfo>({ name: "", color: "", cursor: null, selectedNodeIds: [], selectedEdgeIds: [], viewMode: null, focusedItemId: null });
   // activeSessionRef lets broadcastPresence stay a permanently stable
   // function (empty deps) while still always reaching the CURRENT
   // session - same rootRef/diagramStoreRef pattern used elsewhere in
@@ -392,6 +392,8 @@ function App() {
         cursor: null,
         selectedNodeIds: [],
         selectedEdgeIds: [],
+        viewMode: null,
+        focusedItemId: null,
       };
       localPresenceRef.current = initialPresence;
       session.setLocalPresence(initialPresence);
@@ -426,6 +428,8 @@ function App() {
         cursor: null,
         selectedNodeIds: [],
         selectedEdgeIds: [],
+        viewMode: null,
+        focusedItemId: null,
       };
       localPresenceRef.current = initialPresence;
       session.setLocalPresence(initialPresence);
@@ -669,7 +673,39 @@ function App() {
   // Which top-level page is showing - the diagram canvas or the
   // requirements document. Deliberately NOT part of the undoable
   // DiagramSnapshot: switching pages isn't an edit to the content itself.
-  const [viewMode, setViewMode] = useState<"diagram" | "requirements" | "timeline" | "team" | "skill-tree">("diagram");
+  const [viewMode, setViewModeRaw] = useState<"diagram" | "requirements" | "timeline" | "team" | "skill-tree">("diagram");
+
+  // Which requirements/timeline item this peer currently has open -
+  // null when browsing a list without anything specific focused, or on
+  // a view that doesn't track this at all (diagram/team/skill-tree).
+  const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
+
+  // Resets focusedItemId at the actual point viewMode changes (a real
+  // user action, via the toolbar), rather than reacting to the change
+  // afterward in an effect - calling setState synchronously inside an
+  // effect body is exactly the cascading-render pattern React's own
+  // lint rules steer away from. This way, both state updates are
+  // ordinary, sibling calls within the same event handler, which React
+  // batches together into a single render - not two.
+  const setViewMode = useCallback((mode: typeof viewMode) => {
+    setViewModeRaw(mode);
+    setFocusedItemId(null);
+  }, []);
+
+  // Rebroadcasts viewMode/focusedItemId whenever either changes - two
+  // separate effects (rather than one watching both) since they change
+  // independently far more often than together, and each only needs to
+  // send the one field that actually changed.
+  useEffect(() => {
+    if (!activeSession) return;
+    broadcastPresence({ viewMode });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSession, viewMode]);
+  useEffect(() => {
+    if (!activeSession) return;
+    broadcastPresence({ focusedItemId });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSession, focusedItemId]);
   // Set together with viewMode when the user clicks a linked requirement
   // pill in the Inspector (while looking at the diagram) - see
   // RequirementsView's focusItemId prop for how this actually triggers
@@ -678,7 +714,7 @@ function App() {
   const onNavigateToRequirement = useCallback((itemId: string) => {
     setViewMode("requirements");
     setPendingRequirementFocus(itemId);
-  }, []);
+  }, [setViewMode]);
   // Mirrors onNavigateToRequirement above - jumps to the diagram, drills
   // to whichever sub-diagram level actually contains the target node
   // (path is relative to root, see findLinkedNodes), and requests the
@@ -690,7 +726,7 @@ function App() {
       setPath(nodePath);
       setPendingNodeFocus(nodeId);
     },
-    []
+    [setViewMode]
   );
   /** Quick-action from a requirement's "Linked Diagrams" section - rather
    * than making the person go create a node manually then hunt down the
@@ -713,7 +749,7 @@ function App() {
     setViewMode("diagram");
     setPath([]);
     setPendingNodeFocus(id);
-  }, [diagramStore]);
+  }, [diagramStore, setViewMode]);
   const [isScenarioPanelOpen, setIsScenarioPanelOpen] = useState(false);
   const [activeStepId, setActiveStepId] = useState<string | null>(null);
   const [isSelectMode, setIsSelectMode] = useState(false);
@@ -1654,6 +1690,8 @@ function App() {
             onCreateLinkedNode={onCreateLinkedNode}
             focusItemId={pendingRequirementFocus}
             onFocusHandled={() => setPendingRequirementFocus(null)}
+            peers={activeSession ? presencePeers.filter((p) => p.viewMode === "requirements") : []}
+            onFocusedItemChange={setFocusedItemId}
           />
         )}
         {viewMode === "timeline" && (
@@ -1665,6 +1703,8 @@ function App() {
             onNavigateToNode={onNavigateToNode}
             onCreateLinkedNode={onCreateLinkedNode}
             onNavigateToRequirement={onNavigateToRequirement}
+            peers={activeSession ? presencePeers.filter((p) => p.viewMode === "timeline") : []}
+            onFocusedItemChange={setFocusedItemId}
           />
         )}
         {viewMode === "team" && (

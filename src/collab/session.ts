@@ -60,6 +60,19 @@ export interface LocalPresenceInfo {
    * from this person's own selection. */
   selectedNodeIds: string[];
   selectedEdgeIds: string[];
+  /** Which view this peer is currently in ("requirements", "timeline",
+   * etc. - matches this app's own viewMode values) - lets a peer on a
+   * DIFFERENT view be excluded from "who's looking at this item"
+   * scoping, even if focusedItemId happens to still hold a stale value
+   * from before they navigated away. Null covers both "on a view with
+   * no presence support" and the brief window before a session's first
+   * broadcast. */
+  viewMode: string | null;
+  /** id of the requirements item or timeline item this peer currently
+   * has open/is actively editing, scoped by viewMode above - null when
+   * nothing specific is focused (browsing a list, or on a view/domain
+   * that doesn't track this). */
+  focusedItemId: string | null;
 }
 
 /** What you observe about ANOTHER peer - everything they set about
@@ -164,6 +177,8 @@ export function parsePresenceState(clientId: number, state: unknown): PresenceIn
     cursor,
     selectedNodeIds: Array.isArray(candidate.selectedNodeIds) ? candidate.selectedNodeIds : [],
     selectedEdgeIds: Array.isArray(candidate.selectedEdgeIds) ? candidate.selectedEdgeIds : [],
+    viewMode: typeof candidate.viewMode === "string" ? candidate.viewMode : null,
+    focusedItemId: typeof candidate.focusedItemId === "string" ? candidate.focusedItemId : null,
   };
 }
 
