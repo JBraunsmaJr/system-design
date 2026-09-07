@@ -62,6 +62,18 @@ export interface ArchNodeData extends Record<string, unknown> {
   properties: Record<string, string>;
   tags: string[];
   subDiagram?: SubDiagram;
+  /** Whether this node currently has a populated sub-diagram - computed
+   * fresh by App.tsx on every render from the flat diagram store's own
+   * data (see diagramStore.ts's own hasSubDiagram function), NOT read
+   * from the subDiagram field above. subDiagram itself is only ever
+   * populated transiently by unflattenToSubDiagram's one-time
+   * conversion when leaving a collaborative session - it's never set
+   * anywhere in the actual rendering path, in either local or session
+   * mode, so a node component checking `subDiagram?.nodes.length`
+   * directly would incorrectly see nothing there. This field is what a
+   * node component should actually check to show a "has sub-diagram"
+   * indicator. */
+  hasSubDiagram?: boolean;
   /** Only used by type:"text" nodes (freeform canvas annotations). */
   textColor?: string;
   fontSize?: number;
@@ -101,7 +113,12 @@ export interface ArchNodeData extends Record<string, unknown> {
 export interface ArchEdgeData extends Record<string, unknown> {
   edgeType: string;
   label?: string;
-  direction?: "forward" | "reverse";
+  /** Which end(s) of the edge carry an arrowhead. "forward" (the
+   * default) points at the target, "reverse" points back at the source
+   * for when the real traffic runs opposite to how the edge was drawn,
+   * and "both" puts an arrowhead on each end for a genuinely
+   * bi-directional relationship. */
+  direction?: "forward" | "reverse" | "both";
   /** Forces the label pill off even if a custom label or the type's default label would otherwise show. */
   hideLabel?: boolean;
   /** Per-instance color override - overrides the edge type's own default stroke/label color. Undefined means "use the type default". */

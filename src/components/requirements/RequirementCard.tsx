@@ -1,8 +1,10 @@
-import { memo, useState } from "react";
-import { FileText, Plus, Trash2, Workflow } from "lucide-react";
+import { memo, useEffect, useRef, useState } from "react";
+import { Trash2 } from "lucide-react";
 import { getItemType, isItemWorkable } from "../../domain/requirementsRegistry";
 import type { LinkedNodeRef, DiagramPath } from "../../domain/subDiagramTree";
 import { RequirementBody } from "./RequirementBody";
+import { peerBadgesAreEqual } from "../../domain/presenceComparison";
+import { LinkedDiagramsSection } from "./LinkedDiagramsSection";
 import { RequirementEditor } from "./RequirementEditor";
 import { CategoryPicker } from "./CategoryPicker";
 import { StatusPicker } from "./StatusPicker";
@@ -14,6 +16,7 @@ import type { RequirementItem, RequirementsDocument } from "../../domain/require
 import type { ProgramIncrement } from "../../domain/programIncrements";
 import type { TeamDocument } from "../../domain/teamTypes";
 import type { SubDiagram } from "../../domain/types";
+import type { PresenceInfo } from "../../collab/session";
 
 interface RequirementCardProps {
   item: RequirementItem;
@@ -35,12 +38,26 @@ interface RequirementCardProps {
   onDeleteItem: (id: string) => void;
   onNavigateToItem: (itemId: string) => void;
   onCreateAndAssignCategory: (itemId: string, label: string) => void;
+  onDeleteCategory: (categoryId: string) => void;
   onAddRelationship: (typeId: string, fromItemId: string, toItemId: string) => string | null;
   onDeleteRelationship: (relationshipId: string) => void;
   /** True briefly after this item was scrolled to via a reference click,
    * so the destination is visually obvious rather than just "the page
    * moved somewhere" - cleared by the parent view after a short timeout. */
   highlighted?: boolean;
+  /** Other people in a collaborative session currently editing THIS
+   * specific item - already filtered by the parent view. Empty outside
+   * of a session, or when no one else has this item open. */
+  peersHere?: PresenceInfo[];
+  /** Reports whenever this card's own editing state changes, so the
+   * parent view can broadcast "I'm now editing item X" (or "no longer
+   * editing anything") via presence. */
+  /** Takes the item id so the parent can define ONE stable callback for
+   * the whole list rather than a per-card closure over item.id. That
+   * matters directly for propsAreEqual below: a per-card arrow is a new
+   * function identity on every render, so comparing it would disable
+   * memoization for every card, permanently. */
+  onEditingChange?: (itemId: string, isEditing: boolean) => void;
 }
 
 function RequirementCardImpl({
@@ -56,11 +73,26 @@ function RequirementCardImpl({
   onDeleteItem,
   onNavigateToItem,
   onCreateAndAssignCategory,
+  onDeleteCategory,
   onAddRelationship,
   onDeleteRelationship,
   highlighted,
+  peersHere = [],
+  onEditingChange,
 }: RequirementCardProps) {
   const [isEditingBody, setIsEditingBody] = useState(false);
+  // Reports every genuine transition, not the initial mount - a card
+  // that's never been edited shouldn't fire a spurious "not editing"
+  // the moment it renders, since nothing changed yet.
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    onEditingChange?.(item.id, isEditingBody);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditingBody]);
   const type = getItemType(doc, item.typeId);
 
   return (
@@ -75,6 +107,15 @@ function RequirementCardImpl({
           <span className="requirement-card__id" style={{ color: type?.color ?? "var(--chrome-text-dim)" }}>
             {item.id}
           </span>
+          {peersHere.length > 0 && (
+            <span className="requirement-card__peers" title={`${peersHere.map((p) => p.name).join(", ")} ${peersHere.length === 1 ? "is" : "are"} editing this`}>
+              {peersHere.map((p) => (
+                <span key={p.clientId} className="requirement-card__peer-dot" style={{ backgroundColor: p.color }}>
+                  {p.name.charAt(0).toUpperCase()}
+                </span>
+              ))}
+            </span>
+          )}
           {isItemWorkable(doc, item) && (
             <StatusPicker status={item.status} onChange={(status) => onUpdateItem(item.id, { status })} />
           )}
@@ -84,6 +125,7 @@ function RequirementCardImpl({
             onAssign={(categoryId) => onUpdateItem(item.id, { categoryId })}
             onCreateAndAssign={(label) => onCreateAndAssignCategory(item.id, label)}
             onClear={() => onUpdateItem(item.id, { categoryId: undefined })}
+            onDelete={onDeleteCategory}
           />
           {isItemWorkable(doc, item) && (
             <SprintPicker
@@ -145,42 +187,13 @@ function RequirementCardImpl({
         onNavigateToItem={onNavigateToItem}
       />
       {diagramRoot && (
-        <div className="requirement-card__diagrams">
-          <div className="requirement-card__diagrams-header">
-            <span>Linked Diagrams</span>
-            {onCreateLinkedNode && (
-              <button
-                type="button"
-                className="requirement-card__diagrams-add"
-                onClick={() => onCreateLinkedNode(item.id, item.title || item.id)}
-                title="Create a new diagram node linked to this item"
-              >
-                <Plus size={11} /> New
-              </button>
-            )}
-          </div>
-          {linkedNodes.length === 0 ? (
-            <p className="requirement-card__diagrams-empty">No linked diagram nodes yet.</p>
-          ) : (
-            <div className="requirement-card__diagrams-list">
-              {linkedNodes.map((ref) => (
-                <button
-                  key={ref.nodeId}
-                  type="button"
-                  className="requirement-card__diagram-chip"
-                  onClick={() => onNavigateToNode?.(ref.path, ref.nodeId)}
-                  title={`Go to "${ref.label || "Untitled"}" in the diagram`}
-                >
-                  <Workflow size={11} />
-                  <span>{ref.label || "Untitled"}</span>
-                  {ref.hasSubDiagram && (
-                    <FileText size={10} className="requirement-card__diagram-chip-doc" aria-label="Has sub-diagram documentation" />
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <LinkedDiagramsSection
+          itemId={item.id}
+          itemTitle={item.title}
+          linkedNodes={linkedNodes}
+          onNavigateToNode={onNavigateToNode}
+          onCreateLinkedNode={onCreateLinkedNode}
+        />
       )}
     </div>
   );
@@ -231,8 +244,15 @@ function propsAreEqual(prev: RequirementCardProps, next: RequirementCardProps): 
     prev.onDeleteItem === next.onDeleteItem &&
     prev.onNavigateToItem === next.onNavigateToItem &&
     prev.onCreateAndAssignCategory === next.onCreateAndAssignCategory &&
+    prev.onDeleteCategory === next.onDeleteCategory &&
     prev.onAddRelationship === next.onAddRelationship &&
-    prev.onDeleteRelationship === next.onDeleteRelationship
+    prev.onDeleteRelationship === next.onDeleteRelationship &&
+    prev.onEditingChange === next.onEditingChange &&
+    // Not identity: peersHere is rebuilt by a filter on every parent
+    // render, and its elements are rebuilt on every presence update -
+    // including cursor movement, which no badge here renders. See
+    // peerBadgesAreEqual for why both of those rule out ===.
+    peerBadgesAreEqual(prev.peersHere, next.peersHere)
   );
 }
 

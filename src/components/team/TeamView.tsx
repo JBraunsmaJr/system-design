@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useSyncExternalStore } from "react";
 import {
   Users,
   UserPlus,
@@ -14,15 +14,16 @@ import {
   CalendarRange,
 } from "lucide-react";
 import type {
-  TeamDocument,
   TeamMember,
   PtoSpan,
   ExtraDayOff,
   HalfDayType,
 } from "../../domain/teamTypes";
 import type { ProgramIncrement } from "../../domain/programIncrements";
+import type { ProgramIncrementsStore } from "../../collab/programIncrementsStore";
 import type { RequirementsDocument } from "../../domain/requirementsTypes";
 import { isItemWorkable } from "../../domain/requirementsRegistry";
+import type { TeamStore } from "../../collab/teamStore";
 import { computeSprintDateRanges, getSprintActiveReservations } from "../../domain/programIncrements";
 import {
   computeSprintCapacity,
@@ -32,10 +33,8 @@ import {
 import { ManageReservationsModal } from "../timeline/ManageReservationsModal";
 
 interface TeamViewProps {
-  team: TeamDocument;
-  onUpdateTeam: (updater: (prev: TeamDocument) => TeamDocument) => void;
-  programIncrements: ProgramIncrement[];
-  onUpdateProgramIncrements?: (updater: (prev: ProgramIncrement[]) => ProgramIncrement[]) => void;
+  teamStore: TeamStore;
+  programIncrementsStore: ProgramIncrementsStore;
   requirements: RequirementsDocument;
 }
 
@@ -61,14 +60,17 @@ function todayISO(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function TeamView({ team, onUpdateTeam, programIncrements, onUpdateProgramIncrements, requirements }: TeamViewProps) {
+export function TeamView({ teamStore, programIncrementsStore, requirements }: TeamViewProps) {
+  const team = useSyncExternalStore(teamStore.subscribe, teamStore.getSnapshot);
+  const programIncrements = useSyncExternalStore(programIncrementsStore.subscribe, programIncrementsStore.getSnapshot);
   const [activeTab, setActiveTab] = useState<"members" | "settings" | "sprints">("members");
   const [isAddingMember, setIsAddingMember] = useState(false);
   const [newMemberName, setNewMemberName] = useState("");
   const [newMemberRole, setNewMemberRole] = useState("");
   const [newMemberColor, setNewMemberColor] = useState(AVATAR_COLORS[0]);
   const [newMemberPointsPerDay, setNewMemberPointsPerDay] = useState<string>("");
-  const [managingReservationsPI, setManagingReservationsPI] = useState<ProgramIncrement | null>(null);
+  const [managingReservationsPIId, setManagingReservationsPIId] = useState<string | null>(null);
+  const managingReservationsPI = programIncrements.find((pi) => pi.id === managingReservationsPIId) ?? null;
 
   // PTO modal state
   const [ptoModalMemberId, setPtoModalMemberId] = useState<string | null>(null);
@@ -115,10 +117,7 @@ export function TeamView({ team, onUpdateTeam, programIncrements, onUpdateProgra
       ptoSpans: [],
     };
 
-    onUpdateTeam((prev) => ({
-      ...prev,
-      members: [...prev.members, newMember],
-    }));
+    teamStore.addMember(newMember);
 
     setNewMemberName("");
     setNewMemberRole("");
@@ -127,17 +126,11 @@ export function TeamView({ team, onUpdateTeam, programIncrements, onUpdateProgra
   };
 
   const handleUpdateMember = (memberId: string, patch: Partial<TeamMember>) => {
-    onUpdateTeam((prev) => ({
-      ...prev,
-      members: prev.members.map((m) => (m.id === memberId ? { ...m, ...patch } : m)),
-    }));
+    teamStore.updateMember(memberId, patch);
   };
 
   const handleDeleteMember = (memberId: string) => {
-    onUpdateTeam((prev) => ({
-      ...prev,
-      members: prev.members.filter((m) => m.id !== memberId),
-    }));
+    teamStore.deleteMember(memberId);
   };
 
   const handleOpenPtoModal = (memberId: string) => {
@@ -169,23 +162,13 @@ export function TeamView({ team, onUpdateTeam, programIncrements, onUpdateProgra
       note: ptoNote.trim() || undefined,
     };
 
-    onUpdateTeam((prev) => ({
-      ...prev,
-      members: prev.members.map((m) =>
-        m.id === ptoModalMemberId ? { ...m, ptoSpans: [...m.ptoSpans, newPto] } : m
-      ),
-    }));
+    teamStore.addPtoSpan(ptoModalMemberId, newPto);
 
     setPtoModalMemberId(null);
   };
 
   const handleDeletePtoSpan = (memberId: string, ptoId: string) => {
-    onUpdateTeam((prev) => ({
-      ...prev,
-      members: prev.members.map((m) =>
-        m.id === memberId ? { ...m, ptoSpans: m.ptoSpans.filter((p) => p.id !== ptoId) } : m
-      ),
-    }));
+    teamStore.deletePtoSpan(memberId, ptoId);
   };
 
   const handleAddExtraDayOff = (e: React.FormEvent) => {
@@ -200,13 +183,7 @@ export function TeamView({ team, onUpdateTeam, programIncrements, onUpdateProgra
       note: extraDayNote.trim() || undefined,
     };
 
-    onUpdateTeam((prev) => ({
-      ...prev,
-      settings: {
-        ...prev.settings,
-        extraDaysOff: [...prev.settings.extraDaysOff, newExtra],
-      },
-    }));
+    teamStore.addExtraDayOff(newExtra);
 
     setExtraDayName("");
     setExtraDayDate(todayISO());
@@ -216,13 +193,7 @@ export function TeamView({ team, onUpdateTeam, programIncrements, onUpdateProgra
   };
 
   const handleDeleteExtraDayOff = (extraId: string) => {
-    onUpdateTeam((prev) => ({
-      ...prev,
-      settings: {
-        ...prev.settings,
-        extraDaysOff: prev.settings.extraDaysOff.filter((e) => e.id !== extraId),
-      },
-    }));
+    teamStore.deleteExtraDayOff(extraId);
   };
 
   const getInitials = (name: string) => {
@@ -502,7 +473,7 @@ export function TeamView({ team, onUpdateTeam, programIncrements, onUpdateProgra
                           <span className="team-member-card__rate-unit">pts/day</span>
                         </div>
                         <span className="team-member-card__pto-total-badge" title="Total PTO days across all spans">
-                          <Palmtree size={12} /> {totalPto}d PTO
+                          <Palmtree size={12} /> {totalPto}
                         </span>
                       </div>
 
@@ -639,17 +610,15 @@ export function TeamView({ team, onUpdateTeam, programIncrements, onUpdateProgra
                             <div className="sprint-matrix-cell__sprint-info">
                               <div className="sprint-matrix-cell__pi-row">
                                 <span className="sprint-matrix-cell__pi-badge">{pi.name}</span>
-                                {onUpdateProgramIncrements && (
-                                  <button
-                                    type="button"
-                                    className="sprint-matrix-cell__manage-res-btn"
-                                    onClick={() => setManagingReservationsPI(pi)}
-                                    title={`Manage Capacity Reservations for ${pi.name}`}
-                                  >
-                                    <ShieldAlert size={10} />
-                                    <span>{pi.reservations?.length ? `${pi.reservations.length} res` : "Reserve"}</span>
-                                  </button>
-                                )}
+                                <button
+                                  type="button"
+                                  className="sprint-matrix-cell__manage-res-btn"
+                                  onClick={() => setManagingReservationsPIId(pi.id)}
+                                  title={`Manage Capacity Reservations for ${pi.name}`}
+                                >
+                                  <ShieldAlert size={10} />
+                                  <span>{pi.reservations?.length ? `${pi.reservations.length} res` : "Reserve"}</span>
+                                </button>
                               </div>
                               <strong className="sprint-matrix-cell__sprint-name">{summary.sprintName}</strong>
                               <span className="sprint-matrix-cell__dates">
@@ -800,10 +769,7 @@ export function TeamView({ team, onUpdateTeam, programIncrements, onUpdateProgra
                       onChange={(e) => {
                         const val = parseFloat(e.target.value);
                         if (!isNaN(val) && val > 0) {
-                          onUpdateTeam((prev) => ({
-                            ...prev,
-                            settings: { ...prev.settings, defaultPointsPerDay: val },
-                          }));
+                          teamStore.updateSettings({ defaultPointsPerDay: val });
                         }
                       }}
                     />
@@ -828,10 +794,7 @@ export function TeamView({ team, onUpdateTeam, programIncrements, onUpdateProgra
                     checked={team.settings.excludeUsHolidays}
                     onChange={(e) => {
                       const checked = e.target.checked;
-                      onUpdateTeam((prev) => ({
-                        ...prev,
-                        settings: { ...prev.settings, excludeUsHolidays: checked },
-                      }));
+                      teamStore.updateSettings({ excludeUsHolidays: checked });
                     }}
                   />
                   <span className="toggle-slider" />
@@ -1094,18 +1057,13 @@ export function TeamView({ team, onUpdateTeam, programIncrements, onUpdateProgra
         </div>
       )}
       {/* CAPACITY RESERVATIONS MODAL */}
-      {managingReservationsPI && onUpdateProgramIncrements && (
+      {managingReservationsPI && (
         <ManageReservationsModal
           pi={managingReservationsPI}
           team={team}
           requirements={requirements}
-          onUpdatePI={(updatedPI) => {
-            onUpdateProgramIncrements((pis) =>
-              pis.map((p) => (p.id === updatedPI.id ? updatedPI : p))
-            );
-            setManagingReservationsPI(updatedPI);
-          }}
-          onClose={() => setManagingReservationsPI(null)}
+          programIncrementsStore={programIncrementsStore}
+          onClose={() => setManagingReservationsPIId(null)}
         />
       )}
     </div>

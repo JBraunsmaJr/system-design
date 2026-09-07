@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { X, ExternalLink, Calendar, Edit3, Check, Trash2, FileText, Plus, Workflow } from "lucide-react";
+import { X, ExternalLink, Calendar, Edit3, Check, Trash2 } from "lucide-react";
 import { getItemType, isItemWorkable } from "../../domain/requirementsRegistry";
 import { findLinkedNodes, type DiagramPath } from "../../domain/subDiagramTree";
 import { computeSprintDateRanges, type ProgramIncrement } from "../../domain/programIncrements";
 import type { RequirementItem, RequirementsDocument } from "../../domain/requirementsTypes";
 import type { SubDiagram } from "../../domain/types";
 import { RequirementBody } from "../requirements/RequirementBody";
+import { LinkedDiagramsSection } from "../requirements/LinkedDiagramsSection";
 import { RequirementEditor } from "../requirements/RequirementEditor";
 import { CategoryPicker } from "../requirements/CategoryPicker";
 import { StatusPicker } from "../requirements/StatusPicker";
@@ -29,6 +30,7 @@ interface RequirementDetailModalProps {
   onNavigateToRequirement?: (itemId: string) => void;
   onSelectItem?: (itemId: string) => void;
   onCreateAndAssignCategory?: (itemId: string, label: string) => void;
+  onDeleteCategory?: (categoryId: string) => void;
   onAddRelationship?: (typeId: string, fromItemId: string, toItemId: string) => string | null;
   onDeleteRelationship?: (relationshipId: string) => void;
 }
@@ -47,6 +49,7 @@ export function RequirementDetailModal({
   onNavigateToRequirement,
   onSelectItem,
   onCreateAndAssignCategory,
+  onDeleteCategory,
   onAddRelationship,
   onDeleteRelationship,
 }: RequirementDetailModalProps) {
@@ -139,6 +142,7 @@ export function RequirementDetailModal({
                 onAssign={(categoryId) => onUpdateItem(item.id, { categoryId })}
                 onCreateAndAssign={(label) => onCreateAndAssignCategory?.(item.id, label)}
                 onClear={() => onUpdateItem(item.id, { categoryId: undefined })}
+                onDelete={onDeleteCategory}
               />
             ) : (
               category && (
@@ -311,42 +315,13 @@ export function RequirementDetailModal({
             </div>
           )}
           {diagramRoot && (
-            <div className="requirement-card__diagrams">
-              <div className="requirement-card__diagrams-header">
-                <span>Linked Diagrams</span>
-                {onCreateLinkedNode && (
-                  <button
-                    type="button"
-                    className="requirement-card__diagrams-add"
-                    onClick={() => onCreateLinkedNode(item.id, item.title || item.id)}
-                    title="Create a new diagram node linked to this item"
-                  >
-                    <Plus size={11} /> New
-                  </button>
-                )}
-              </div>
-              {linkedNodes.length === 0 ? (
-                <p className="requirement-card__diagrams-empty">No linked diagram nodes yet.</p>
-              ) : (
-                <div className="requirement-card__diagrams-list">
-                  {linkedNodes.map((ref) => (
-                    <button
-                      key={ref.nodeId}
-                      type="button"
-                      className="requirement-card__diagram-chip"
-                      onClick={() => onNavigateToNode?.(ref.path, ref.nodeId)}
-                      title={`Go to "${ref.label || "Untitled"}" in the diagram`}
-                    >
-                      <Workflow size={11} />
-                      <span>{ref.label || "Untitled"}</span>
-                      {ref.hasSubDiagram && (
-                        <FileText size={10} className="requirement-card__diagram-chip-doc" aria-label="Has sub-diagram documentation" />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <LinkedDiagramsSection
+              itemId={item.id}
+              itemTitle={item.title}
+              linkedNodes={linkedNodes}
+              onNavigateToNode={onNavigateToNode}
+              onCreateLinkedNode={onCreateLinkedNode}
+            />
           )}
         </div>
       </div>

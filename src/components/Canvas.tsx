@@ -18,6 +18,7 @@ import {
   SelectionMode,
   ViewportPortal,
   useReactFlow,
+  useUpdateNodeInternals,
   type Node,
   type Edge,
   type Connection,
@@ -47,6 +48,7 @@ import { computeAlignment, type AlignBox, type AlignmentGuide } from "../domain/
 import { toAbsolutePosition } from "../domain/graphUtils";
 import { DRAG_MIME_TYPE, GROUP_DRAG_MIME_TYPE, TEXT_DRAG_MIME_TYPE, SHAPE_DRAG_MIME_TYPE, CODE_DRAG_MIME_TYPE } from "./Palette";
 import type { ArchNodeData, ArchEdgeData, Scenario, ScenarioStep } from "../domain/types";
+import type { PresenceInfo } from "../collab/session";
 
 // edgeTypes now built inside the component via useMemo, so TypedEdge can
 // receive onUpdateEdge - see the factory near nodeTypes below.
@@ -105,6 +107,16 @@ interface CanvasProps {
   onNavigateToPathIndex: (index: number) => void;
   isSelectMode: boolean;
   onToggleSelectMode: () => void;
+  /** Other people currently in this collaborative session - empty
+   * outside of one. Used to render their live cursors and to show a
+   * "someone else has this selected" indicator on nodes/edges. */
+  peers: PresenceInfo[];
+  /** Reports this person's own cursor position in flow coordinates
+   * whenever it moves over the canvas, or null when it leaves the
+   * canvas entirely - fed straight into presence broadcasting. Flow
+   * coordinates (not screen pixels) because every peer's own viewport
+   * (pan/zoom) is independent. */
+  onCursorMove: (position: { x: number; y: number } | null) => void;
 }
 
 export function Canvas({
@@ -136,8 +148,26 @@ export function Canvas({
   onNavigateToPathIndex,
   isSelectMode,
   onToggleSelectMode,
+  peers,
+  onCursorMove,
 }: CanvasProps) {
   const { screenToFlowPosition, getIntersectingNodes, fitView } = useReactFlow<Node<ArchNodeData>>();
+  const updateNodeInternals = useUpdateNodeInternals();
+  const measuredNodeIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const newIds = nodes.filter((n) => !measuredNodeIdsRef.current.has(n.id)).map((n) => n.id);
+    if (newIds.length === 0) return;
+    for (const id of newIds) measuredNodeIdsRef.current.add(id);
+    // Deferred one frame, not called synchronously - the point is
+    // specifically to double-check the measurement AFTER React Flow's
+    // own initial one has had a chance to run and the browser has had a
+    // chance to finish laying out the node's actual content (text wrap
+    // included), not to race it.
+    const frame = requestAnimationFrame(() => {
+      updateNodeInternals(newIds);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [nodes, updateNodeInternals]);
 
   const isPresenting = presentation !== null;
   // Full presentation always wins over a step preview if somehow both were
@@ -522,6 +552,16 @@ export function Canvas({
 
   const levelLabel = breadcrumbLabels.length === 0 ? "Root" : breadcrumbLabels.join(" › ");
 
+  const handlePaneMouseMove = useCallback(
+    (event: ReactMouseEvent) => {
+      onCursorMove(screenToFlowPosition({ x: event.clientX, y: event.clientY }));
+    },
+    [screenToFlowPosition, onCursorMove]
+  );
+  const handlePaneMouseLeave = useCallback(() => {
+    onCursorMove(null);
+  }, [onCursorMove]);
+
   return (
     <div
       className={`canvas${isSelectMode ? " is-select-mode" : ""}`}
@@ -542,6 +582,8 @@ export function Canvas({
         onNodeDrag={onNodeDrag}
         onNodeDragStop={onNodeDragStop}
         onNodeDoubleClick={onNodeDoubleClick}
+        onPaneMouseMove={handlePaneMouseMove}
+        onPaneMouseLeave={handlePaneMouseLeave}
         defaultEdgeOptions={{
           type: "typed",
           markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16, color: "#98a2b3" },
@@ -558,6 +600,56 @@ export function Canvas({
         proOptions={{ hideAttribution: true }}
       >
         <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="rgba(255, 255, 255, 0.07)" />
+        {!isPresenting && peers.length > 0 && (
+          <ViewportPortal>
+            {peers.flatMap((peer) =>
+              displayNodes
+                .filter((n) => peer.selectedNodeIds.includes(n.id))
+                .map((n) => {
+                  // Same geometry the alignment guides already use (see
+                  // toAlignBox): ViewportPortal renders into the
+                  // viewport's own coordinate space, so a node inside a
+                  // group needs its ABSOLUTE position - n.position is
+                  // relative to its parent - and a content-sized node
+                  // has no explicit width/height at all, only a
+                  // measured one, so `n.width ?? 0` collapsed those
+                  // outlines to nothing.
+                  const box = toAlignBox(n);
+                  return (
+                    <div
+                      key={`${peer.clientId}-${n.id}`}
+                      className="peer-selection-outline"
+                      style={{
+                        left: box.x,
+                        top: box.y,
+                        width: box.width,
+                        height: box.height,
+                        borderColor: peer.color,
+                      }}
+                    >
+                      <span className="peer-selection-outline__label" style={{ backgroundColor: peer.color }}>
+                        {peer.name}
+                      </span>
+                    </div>
+                  );
+                })
+            )}
+            {peers
+              .filter((peer) => peer.cursor !== null)
+              .map((peer) => (
+                <div
+                  key={peer.clientId}
+                  className="peer-cursor"
+                  style={{ left: peer.cursor!.x, top: peer.cursor!.y }}
+                >
+                  <MousePointer2 size={16} color={peer.color} fill={peer.color} />
+                  <span className="peer-cursor__label" style={{ backgroundColor: peer.color }}>
+                    {peer.name}
+                  </span>
+                </div>
+              ))}
+          </ViewportPortal>
+        )}
         {alignmentGuides.length > 0 && (
           <ViewportPortal>
             {alignmentGuides.map((guide, i) => (

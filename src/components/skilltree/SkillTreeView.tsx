@@ -1,17 +1,17 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import { AlertTriangle, CheckCircle2, CircleDot, Lock, Unlock } from "lucide-react";
 import { computeSkillTree, type SkillTreeNode } from "../../domain/skillTree";
-import { getItemType, addRelationship } from "../../domain/requirementsRegistry";
+import { getItemType } from "../../domain/requirementsRegistry";
 import { RequirementDetailModal } from "../timeline/RequirementDetailModal";
-import type { RequirementItem, RequirementsDocument } from "../../domain/requirementsTypes";
+import type { RequirementItem } from "../../domain/requirementsTypes";
 import type { ProgramIncrement } from "../../domain/programIncrements";
 import type { TeamDocument } from "../../domain/teamTypes";
 import type { SubDiagram } from "../../domain/types";
 import type { DiagramPath } from "../../domain/subDiagramTree";
+import type { RequirementsStore } from "../../collab/requirementsStore";
 
 interface SkillTreeViewProps {
-  requirements: RequirementsDocument;
-  onUpdateRequirements: (updater: (doc: RequirementsDocument) => RequirementsDocument) => void;
+  requirementsStore: RequirementsStore;
   programIncrements: ProgramIncrement[];
   team?: TeamDocument;
   diagramRoot?: SubDiagram;
@@ -75,8 +75,7 @@ function useSkillTreeLayout(nodes: SkillTreeNode[]) {
  * this component already has.
  */
 export function SkillTreeView({
-  requirements,
-  onUpdateRequirements,
+  requirementsStore,
   programIncrements,
   team,
   diagramRoot,
@@ -84,6 +83,7 @@ export function SkillTreeView({
   onCreateLinkedNode,
   onNavigateToRequirement,
 }: SkillTreeViewProps) {
+  const requirements = useSyncExternalStore(requirementsStore.subscribe, requirementsStore.getSnapshot);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 
   const tree = useMemo(() => computeSkillTree(requirements), [requirements]);
@@ -99,47 +99,26 @@ export function SkillTreeView({
   const cycleWarnings = tree.nodes.filter((n) => n.inCycle);
 
   const onUpdateItem = (id: string, patch: Partial<RequirementItem>) => {
-    onUpdateRequirements((doc) => ({
-      ...doc,
-      items: doc.items.map((item) => (item.id === id ? { ...item, ...patch } : item)),
-    }));
+    requirementsStore.updateItem(id, patch);
   };
 
   const onDeleteItem = (id: string) => {
-    onUpdateRequirements((doc) => ({
-      ...doc,
-      items: doc.items.filter((item) => item.id !== id),
-      relationships: doc.relationships.filter((r) => r.fromItemId !== id && r.toItemId !== id),
-    }));
+    requirementsStore.deleteItem(id);
     setSelectedItemId(null);
   };
 
   const onCreateAndAssignCategory = (itemId: string, label: string) => {
     const trimmed = label.trim();
     if (!trimmed) return;
-    onUpdateRequirements((doc) => {
-      const existing = doc.categories.find((c) => c.label.toLowerCase() === trimmed.toLowerCase());
-      if (existing) {
-        return { ...doc, items: doc.items.map((item) => (item.id === itemId ? { ...item, categoryId: existing.id } : item)) };
-      }
-      const newCategory = { id: `cat-${Date.now().toString(36)}`, label: trimmed, color: "#22B8CF" };
-      return {
-        ...doc,
-        categories: [...doc.categories, newCategory],
-        items: doc.items.map((item) => (item.id === itemId ? { ...item, categoryId: newCategory.id } : item)),
-      };
-    });
+    requirementsStore.createAndAssignCategory(itemId, trimmed);
   };
 
   const onAddRelationship = (typeId: string, fromItemId: string, toItemId: string): string | null => {
-    const result = addRelationship(requirements, typeId, fromItemId, toItemId);
-    if (result.error) return result.error;
-    onUpdateRequirements((doc) => ({ ...doc, relationships: result.relationships }));
-    return null;
+    return requirementsStore.addRelationship(typeId, fromItemId, toItemId);
   };
 
   const onDeleteRelationship = (relationshipId: string) => {
-    onUpdateRequirements((doc) => ({ ...doc, relationships: doc.relationships.filter((r) => r.id !== relationshipId) }));
+    requirementsStore.deleteRelationship(relationshipId);
   };
 
   const selectedItem = selectedItemId ? requirements.items.find((i) => i.id === selectedItemId) : null;

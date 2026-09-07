@@ -8,21 +8,38 @@
 
 .toolbar {
   display: flex;
-  align-items: center;
-  gap: 16px;
-  height: 52px;
-  padding: 0 16px;
+  flex-direction: column;
   background: var(--chrome-bg-raised);
   border-bottom: 1px solid var(--chrome-border);
   flex-shrink: 0;
+}
+
+.toolbar__row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
   /* Last-resort safety net: even after the responsive rules below kick
      in, an unusually narrow window (or enough simultaneously-visible
      buttons) can still not fit everything. Scrolling means those
      controls are always reachable rather than silently clipped past the
      viewport edge with no way to get to them - which was the actual bug
-     report this whole section addresses. */
+     report this whole section addresses. Applies to both rows: the
+     tabs row can overflow on its own at a narrow enough width too, even
+     though it's a much shorter list than the primary row's. */
   overflow-x: auto;
   overflow-y: hidden;
+}
+
+.toolbar__row--primary {
+  height: 52px;
+  padding: 0 16px;
+}
+
+.toolbar__row--tabs {
+  height: 40px;
+  padding: 0 16px;
+  gap: 0;
+  border-top: 1px solid var(--chrome-border);
 }
 
 .toolbar__brand {
@@ -85,7 +102,7 @@
 .toolbar__title {
   flex: 1;
   min-width: 120px;
-  max-width: 360px;
+  max-width: 480px;
   background: transparent;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
@@ -316,6 +333,55 @@
   border-left: 1px dashed var(--accent);
   border-top: 1px dashed var(--accent);
   z-index: 999;
+}
+
+.peer-cursor {
+  position: absolute;
+  pointer-events: none;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  /* Offsets the icon so its tip - not its bounding-box center - lands
+     on the actual reported cursor position, matching where a real
+     cursor's own hotspot sits. */
+  transform: translate(-2px, -2px);
+  /* Smooths out the visual jump between discrete position updates -
+     these arrive at whatever rate the network delivers them, not a
+     guaranteed steady stream, so a short transition reads as fluid
+     movement rather than the cursor teleporting between points. */
+  transition: left 0.08s linear, top 0.08s linear;
+}
+
+.peer-cursor__label {
+  font-size: 11px;
+  font-weight: 600;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.peer-selection-outline {
+  position: absolute;
+  pointer-events: none;
+  z-index: 998;
+  border: 2px solid;
+  border-radius: var(--radius-sm);
+  box-sizing: border-box;
+}
+
+.peer-selection-outline__label {
+  position: absolute;
+  top: -20px;
+  left: -2px;
+  font-size: 10px;
+  font-weight: 600;
+  color: white;
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
 }
 
 .canvas__minimap {
@@ -1298,7 +1364,8 @@
 /* ---------- Edge flow animation (Presentation Mode) ---------- */
 
 .typed-edge--flow-forward,
-.typed-edge--flow-reverse {
+.typed-edge--flow-reverse,
+.typed-edge--flow-both {
   animation-duration: 0.9s;
   animation-timing-function: linear;
   animation-iteration-count: infinite;
@@ -1310,6 +1377,18 @@
 
 .typed-edge--flow-reverse {
   animation-name: typed-edge-flow-reverse;
+}
+
+/* A bi-directional edge has no single direction to flow in, so it reuses
+   the forward keyframes with animation-direction: alternate - the dashes
+   travel one way, then back. Animating dashoffset specifically (rather
+   than, say, pulsing opacity) matters because opacity and stroke-width
+   are both set inline by TypedEdge for the focused/step-member states,
+   and keyframes outrank inline styles in the cascade - a pulse would
+   quietly fight the focus highlight. Nothing sets dashoffset inline. */
+.typed-edge--flow-both {
+  animation-name: typed-edge-flow-forward;
+  animation-direction: alternate;
 }
 
 @keyframes typed-edge-flow-forward {
@@ -1326,7 +1405,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .typed-edge--flow-forward,
-  .typed-edge--flow-reverse {
+  .typed-edge--flow-reverse,
+  .typed-edge--flow-both {
     animation: none;
   }
 }
@@ -1362,6 +1442,15 @@
 
 .export-menu__dropdown button:hover {
   background: var(--chrome-bg-raised);
+}
+
+.export-menu__dropdown button:disabled {
+  color: var(--chrome-text-dim);
+  cursor: not-allowed;
+}
+
+.export-menu__dropdown button:disabled:hover {
+  background: transparent;
 }
 
 /* ---------- Drill-in button (on typed nodes) ---------- */
@@ -2537,6 +2626,25 @@
   white-space: nowrap;
 }
 
+.requirement-card__peers {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.requirement-card__peer-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  color: white;
+  font-size: 9px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
 .requirement-card__title {
   width: 100%;
   background: transparent;
@@ -2715,10 +2823,24 @@
 .requirement-editor__textarea {
   width: 100%;
   min-height: 80px;
+  /* The height itself is set inline, from the content - see
+     RequirementEditor's fitToContent. These two are the bounds it works
+     within: min-height keeps a near-empty description from collapsing to
+     a sliver, and max-height stops a very long one from growing taller
+     than the viewport and burying the rest of the list. Past that
+     ceiling the textarea scrolls internally, which is the same reading
+     experience as before but only for descriptions long enough to
+     genuinely need it.
+
+     resize is off because the height is now derived: a manual drag would
+     be silently overwritten on the next keystroke, which is worse than
+     not offering the handle at all. */
+  max-height: 60vh;
+  overflow-y: auto;
   background: transparent;
   border: none;
   outline: none;
-  resize: vertical;
+  resize: none;
   color: var(--chrome-text);
   font-family: var(--sans);
   font-size: 13px;
@@ -2876,6 +2998,27 @@
   background: rgba(240, 87, 140, 0.1);
 }
 
+.manage-types-modal__delete:disabled {
+  color: var(--chrome-text-dim);
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Deliberately not :disabled-aware - a disabled control that gives no
+   reason for being disabled is what produced the report this whole
+   change answers, so the count stays visible rather than living only in
+   a tooltip nobody hovers. */
+.manage-types-modal__delete:disabled:hover {
+  color: var(--chrome-text-dim);
+  background: transparent;
+}
+
+.manage-types-modal__in-use {
+  font-size: 11px;
+  color: var(--chrome-text-dim);
+  white-space: nowrap;
+}
+
 .manage-types-modal__form {
   display: flex;
   gap: 6px;
@@ -2970,6 +3113,93 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
+}
+
+/* The select-this-category button and its delete affordance share a row.
+   The delete button stays hidden until the row is hovered or the button
+   itself is focused, so browsing the list still reads as a plain picker
+   and a destructive control never sits under the cursor by default -
+   but it remains keyboard-reachable, which display:none would break. */
+.category-picker__row {
+  display: flex;
+  align-items: center;
+  border-radius: 4px;
+}
+
+.category-picker__row:hover {
+  background: var(--chrome-bg-raised);
+}
+
+.category-picker__delete {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  padding: 4px;
+  margin-right: 4px;
+  color: var(--chrome-text-dim);
+}
+
+/* Gated on hover being available at all: on a touch device there is no
+   hover state to reveal this with, so an unconditional opacity: 0 would
+   make deleting a category simply impossible there. */
+@media (hover: hover) {
+  .category-picker__delete {
+    opacity: 0;
+  }
+
+  .category-picker__row:hover .category-picker__delete,
+  .category-picker__delete:focus-visible {
+    opacity: 1;
+  }
+}
+
+.category-picker__delete:hover {
+  color: var(--danger);
+  background: rgba(240, 87, 140, 0.1);
+}
+
+.category-picker__confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 4px;
+  background: var(--chrome-bg-raised);
+  border: 1px solid var(--chrome-border);
+}
+
+.category-picker__confirm-text {
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--chrome-text);
+}
+
+.category-picker__confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.category-picker__confirm-cancel,
+.category-picker__confirm-delete {
+  border: 1px solid var(--chrome-border);
+  border-radius: 4px;
+  padding: 3px 9px;
+  font-size: 11.5px;
+  background: transparent;
+  color: var(--chrome-text);
+}
+
+.category-picker__confirm-delete {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.category-picker__confirm-delete:hover {
+  background: rgba(240, 87, 140, 0.12);
 }
 
 .category-picker__option {
@@ -3297,12 +3527,38 @@
   border-bottom: 1px solid var(--chrome-border);
 }
 
+.timeline-view__presence-bar {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--chrome-bg-raised);
+  border-bottom: 1px solid var(--chrome-border);
+  font-size: 12px;
+  color: var(--chrome-text-dim);
+}
+
+.timeline-view__presence-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.timeline-view__presence-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
 .timeline-view__add-pi {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   background: var(--accent);
-  color: #0b0d12;
+  color: var(--accent-text);
   border: none;
   border-radius: var(--radius-sm);
   padding: 7px 12px;
@@ -4402,13 +4658,20 @@
   /* Icon-only mode: every button in the toolbar has an icon plus this
      shared label class now, so hiding the class once here covers the
      view tabs, the autosave indicator, and every action button
-     (New/Open/Save/Scenarios/Export/Export Markdown) in a single rule.
+     (File/Save/Scenarios/Export/Export Markdown) in a single rule.
      Goes straight from full labels to icon-only at this one threshold
      rather than through an intermediate "brand text hidden, button
      labels still shown" step - that middle ground still didn't leave
      enough room in the 900-760px range to be worth a separate tier. */
-  .toolbar {
+  .toolbar__row {
     gap: 10px;
+  }
+
+  .toolbar__row--primary {
+    padding: 0 12px;
+  }
+
+  .toolbar__row--tabs {
     padding: 0 12px;
   }
 
@@ -4429,14 +4692,21 @@
   }
 
   .toolbar__title {
-    max-width: 160px;
+    max-width: 220px;
     min-width: 60px;
   }
 }
 
 @media (max-width: 520px) {
-  .toolbar {
+  .toolbar__row {
     gap: 6px;
+  }
+
+  .toolbar__row--primary {
+    padding: 0 8px;
+  }
+
+  .toolbar__row--tabs {
     padding: 0 8px;
   }
 
@@ -4462,203 +4732,13 @@
   }
 
   .toolbar__title {
-    max-width: 90px;
+    max-width: 130px;
     min-width: 50px;
   }
 }
 
 /* ---------- Relationship manager (Requirements) ---------- */
 
-.relationship-manager {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 4px;
-}
-
-.relationship-manager__pills {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.relationship-manager__pill {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid var(--chrome-border);
-  border-radius: var(--radius-sm);
-  padding: 4px 4px 4px 8px;
-  background: var(--chrome-bg);
-}
-
-.relationship-manager__pill-verb {
-  flex-shrink: 0;
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.relationship-manager__pill-target {
-  flex: 1;
-  min-width: 0;
-  background: transparent;
-  border: none;
-  text-align: left;
-  font-size: 11.5px;
-  font-family: var(--mono);
-  color: var(--chrome-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.relationship-manager__pill-target:hover {
-  text-decoration: underline;
-}
-
-.relationship-manager__pill-remove {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  background: transparent;
-  border: none;
-  border-radius: 4px;
-  color: var(--chrome-text-dim);
-}
-
-.relationship-manager__pill-remove:hover {
-  color: var(--danger);
-  background: rgba(240, 87, 140, 0.1);
-}
-
-.relationship-manager__add {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  align-self: flex-start;
-  background: transparent;
-  border: 1px solid var(--chrome-border);
-  border-radius: var(--radius-sm);
-  padding: 5px 9px;
-  font-size: 11.5px;
-  font-weight: 500;
-  color: var(--chrome-text-dim);
-}
-
-.relationship-manager__add:hover {
-  background: var(--chrome-bg);
-  color: var(--chrome-text);
-}
-
-.relationship-manager__dropdown {
-  z-index: 200;
-  width: 260px;
-  max-height: 340px;
-  display: flex;
-  flex-direction: column;
-  background: var(--chrome-bg-raised);
-  border: 1px solid var(--chrome-border);
-  border-radius: var(--radius-sm);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  padding: 6px;
-}
-
-.relationship-manager__verbs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding-bottom: 6px;
-  margin-bottom: 6px;
-  border-bottom: 1px solid var(--chrome-border);
-}
-
-.relationship-manager__verb {
-  background: transparent;
-  border: 1px solid var(--chrome-border);
-  border-radius: 999px;
-  padding: 3px 8px;
-  font-size: 10.5px;
-  font-weight: 500;
-  color: var(--chrome-text-dim);
-}
-
-.relationship-manager__verb:hover {
-  color: var(--chrome-text);
-}
-
-.relationship-manager__verb.active {
-  background: var(--chrome-bg);
-  font-weight: 600;
-}
-
-.relationship-manager__search {
-  width: 100%;
-  background: var(--chrome-bg);
-  border: 1px solid var(--chrome-border);
-  border-radius: var(--radius-sm);
-  padding: 6px 8px;
-  color: var(--chrome-text);
-  font-size: 12px;
-  margin-bottom: 6px;
-  flex-shrink: 0;
-}
-
-.relationship-manager__error {
-  margin: 0 0 6px;
-  color: var(--danger);
-  font-size: 11.5px;
-}
-
-.relationship-manager__list {
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.relationship-manager__option {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  background: transparent;
-  border: none;
-  border-radius: 4px;
-  padding: 6px 8px;
-  text-align: left;
-  width: 100%;
-}
-
-.relationship-manager__option:hover {
-  background: var(--chrome-bg);
-}
-
-.relationship-manager__option-id {
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--chrome-text-dim);
-  white-space: nowrap;
-}
-
-.relationship-manager__option-title {
-  font-size: 12px;
-  color: var(--chrome-text-dim);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.relationship-manager__empty {
-  padding: 8px;
-  margin: 0;
-  color: var(--chrome-text-dim);
-  font-size: 11.5px;
-  text-align: center;
-}
 
 /* ---------- Timeline view mode toggle (Board / Gantt) ---------- */
 
@@ -4947,61 +5027,92 @@
   margin-top: 4px;
 }
 
-.relationship-manager__pills {
+/* Grouped layout: one row per verb, with that verb's targets wrapping
+   inside it. The previous layout was one full-width row per relationship,
+   so ten relationships meant ten rows of mostly-repeated verb labels. */
+.relationship-manager__groups {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-}
-
-.relationship-manager__pill {
-  display: flex;
-  align-items: center;
   gap: 6px;
-  border: 1px solid var(--chrome-border);
-  border-radius: var(--radius-sm);
-  padding: 4px 4px 4px 8px;
-  background: var(--chrome-bg);
 }
 
-.relationship-manager__pill-verb {
-  flex-shrink: 0;
+.relationship-manager__group {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-left: 8px;
+  border-bottom: 1px solid var(--chrome-border);
+  padding: 4px 0px;
+}
+
+/* Fixed-ish column so the verbs line up down the left edge and the target
+   chips all start at the same x, which is what makes the grouped version
+   scannable rather than just denser. max-width keeps an unusually long
+   custom verb from eating the row. */
+.relationship-manager__group-verb {
+  flex: 0 0 auto;
+  min-width: 84px;
+  max-width: 140px;
   font-size: 12px;
   font-weight: 600;
-  white-space: nowrap;
-}
-
-.relationship-manager__pill-target {
-  flex: 1;
-  min-width: 0;
-  background: transparent;
-  border: none;
-  text-align: left;
-  font-size: 12.5px;
-  font-family: var(--mono);
-  color: var(--chrome-text);
+  line-height: 1.5;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.relationship-manager__pill-target:hover {
-  text-decoration: underline;
+.relationship-manager__group-targets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+  padding-bottom: 8px;
 }
 
-.relationship-manager__pill-remove {
-  flex-shrink: 0;
+.relationship-manager__chip {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
+  gap: 2px;
+  max-width: 100%;
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  padding: 1px 2px 1px 6px;
+  background: var(--chrome-bg);
+}
+
+/* Truncated rather than wrapped: a single long requirement title would
+   otherwise force the chip to full width and undo the grouping. The full
+   text is still available via the title attribute and on the item itself. */
+.relationship-manager__chip-target {
+  min-width: 0;
+  max-width: 260px;
   background: transparent;
   border: none;
-  border-radius: 4px;
+  padding: 1px 0;
+  font-size: 12px;
+  color: var(--chrome-text);
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.relationship-manager__chip-target:hover {
+  color: var(--accent);
+}
+
+.relationship-manager__chip-remove {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  padding: 2px;
   color: var(--chrome-text-dim);
 }
 
-.relationship-manager__pill-remove:hover {
+.relationship-manager__chip-remove:hover {
   color: var(--danger);
   background: rgba(240, 87, 140, 0.1);
 }
@@ -5015,6 +5126,7 @@
   border: 1px solid var(--chrome-border);
   border-radius: var(--radius-sm);
   padding: 5px 9px;
+  margin-left: 8px;
   font-size: 12.5px;
   font-weight: 500;
   color: var(--chrome-text-dim);
@@ -5076,6 +5188,12 @@
   font-size: 13px;
   margin-bottom: 6px;
   flex-shrink: 0;
+}
+
+.relationship-manager__error {
+  margin: 0 0 6px;
+  color: var(--danger);
+  font-size: 11.5px;
 }
 
 .relationship-manager__list {
@@ -5562,6 +5680,10 @@
   align-items: center;
   gap: 3px;
   color: var(--chrome-text-dim);
+}
+
+.sprint-capacity-bar__b-days {
+  padding-top: 3px;
 }
 
 .sprint-capacity-bar__toggle-btn {
@@ -7159,7 +7281,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 0 12px 10px;
+  padding: 8px 12px 10px;
 }
 
 .requirement-card__diagrams-header {
@@ -7217,6 +7339,24 @@
   font-weight: 500;
   color: var(--chrome-text);
   max-width: 220px;
+}
+
+/* Deliberately distinct from a diagram chip - it's a control, not a
+   destination, and a person scanning the row shouldn't have to read it
+   to work out it won't navigate anywhere. */
+.requirement-card__diagrams-toggle {
+  align-self: center;
+  background: transparent;
+  border: none;
+  padding: 4px 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--chrome-text-dim);
+}
+
+.requirement-card__diagrams-toggle:hover {
+  color: var(--accent);
+  text-decoration: underline;
 }
 
 .requirement-card__diagram-chip:hover {
@@ -8309,4 +8449,295 @@
 
 .manage-reservations-modal__done-btn:hover {
   background: #4a6ee0;
+}
+
+/* ---------- Collaborative session panel ---------- */
+
+.collab-panel {
+  position: relative;
+}
+
+.collab-panel__trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  color: var(--chrome-text-dim);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.collab-panel__trigger:hover {
+  border-color: var(--accent);
+  color: var(--chrome-text);
+}
+
+.collab-panel__trigger.is-active {
+  border-color: #38bd7d;
+  color: #38bd7d;
+  background: rgba(56, 189, 125, 0.08);
+}
+
+/* Rendered through a portal onto document.body, with top/left/width set
+   inline from the trigger's own rect - the toolbar row it lives in is a
+   horizontal scroll container (overflow-y: hidden), so an absolutely
+   positioned dropdown got clipped to that row's 52px height and was
+   never visible. Matches ExportMenu/FileMenu's own established pattern.
+   The max-height keeps the taller in-session variant (peer list, cursor
+   toggle) scrollable rather than running off a short viewport. */
+.collab-panel__dropdown {
+  background: var(--chrome-bg-raised);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+  padding: 14px;
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  z-index: 200;
+}
+
+.collab-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--chrome-text);
+  margin-bottom: 10px;
+}
+
+.collab-panel__close {
+  background: none;
+  border: none;
+  color: var(--chrome-text-dim);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+}
+
+.collab-panel__close:hover {
+  color: var(--chrome-text);
+}
+
+.collab-panel__notice,
+.collab-panel__hint {
+  margin: 0 0 12px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--chrome-text-dim);
+}
+
+.collab-panel__primary-action {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.collab-panel__primary-action:hover {
+  filter: brightness(1.1);
+}
+
+.collab-panel__divider {
+  text-align: center;
+  font-size: 10.5px;
+  color: var(--chrome-text-dim);
+  margin: 12px 0;
+  position: relative;
+}
+
+.collab-panel__divider::before,
+.collab-panel__divider::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 38%;
+  border-top: 1px solid var(--chrome-border);
+}
+
+.collab-panel__divider::before {
+  left: 0;
+}
+
+.collab-panel__divider::after {
+  right: 0;
+}
+
+.collab-panel__join-form {
+  display: flex;
+  gap: 6px;
+}
+
+.collab-panel__join-input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  color: var(--chrome-text);
+  font-size: 12px;
+}
+
+.collab-panel__join-button {
+  padding: 7px 12px;
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  color: var(--chrome-text);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.collab-panel__join-button:not(:disabled):hover {
+  border-color: var(--accent);
+}
+
+.collab-panel__join-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.collab-panel__room-code {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 12px;
+}
+
+.collab-panel__room-code code {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  color: var(--chrome-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.collab-panel__copy-button {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--chrome-text-dim);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+}
+
+.collab-panel__copy-button:hover {
+  color: var(--accent);
+}
+
+.collab-panel__leave-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-sm);
+  color: var(--danger);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.collab-panel__leave-button:hover {
+  background: rgba(240, 87, 140, 0.1);
+}
+
+.collab-panel__field-label {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--chrome-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 5px;
+}
+
+.collab-panel__name-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  color: var(--chrome-text);
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+.collab-panel__reset-signaling {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: -6px 0 10px;
+  color: var(--accent);
+  font-size: 11px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.collab-panel__peers {
+  margin-bottom: 12px;
+}
+
+.collab-panel__peers-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--chrome-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 6px;
+}
+
+.collab-panel__peer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 2px;
+}
+
+.collab-panel__peer-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.collab-panel__peer-name {
+  font-size: 12.5px;
+  color: var(--chrome-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.collab-panel__cursor-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--chrome-text-dim);
+  margin-bottom: 12px;
+  cursor: pointer;
 }

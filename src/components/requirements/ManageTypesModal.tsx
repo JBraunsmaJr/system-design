@@ -1,13 +1,18 @@
 import { useState } from "react";
 import { Briefcase, Check, Lock, Pencil, Trash2, X } from "lucide-react";
-import { isPrefixTaken } from "../../domain/requirementsRegistry";
+import { countItemsUsingType, isPrefixTaken } from "../../domain/requirementsRegistry";
 import type { RequirementItemType, RequirementsDocument } from "../../domain/requirementsTypes";
 
 interface ManageTypesModalProps {
   doc: RequirementsDocument;
   onAddCustomType: (label: string, prefix: string, color: string, isWorkable: boolean) => boolean;
   onUpdateType: (typeId: string, patch: Partial<Pick<RequirementItemType, "label" | "color" | "isWorkable">>) => void;
-  onDeleteCustomType: (typeId: string) => void;
+  /** Returns false if the store refused because the type is still in
+   * use - see RequirementsStore.deleteCustomType. The disabled button
+   * below makes that outcome rare, but a collaborator can add an item
+   * of this type between render and click, so the refusal still needs
+   * somewhere to surface. */
+  onDeleteCustomType: (typeId: string) => boolean;
   onClose: () => void;
 }
 
@@ -141,6 +146,9 @@ export function ManageTypesModal({ doc, onAddCustomType, onUpdateType, onDeleteC
                 {type.isWorkable && (
                   <Briefcase size={12} className="manage-types-modal__workable" aria-label="Represents workable tasks" />
                 )}
+                {!type.isBuiltIn && countItemsUsingType(doc, type.id) > 0 && (
+                  <span className="manage-types-modal__in-use">{countItemsUsingType(doc, type.id)} in use</span>
+                )}
                 <button
                   type="button"
                   className="manage-types-modal__edit"
@@ -153,15 +161,29 @@ export function ManageTypesModal({ doc, onAddCustomType, onUpdateType, onDeleteC
                 {type.isBuiltIn ? (
                   <Lock size={12} className="manage-types-modal__lock" aria-label="Built-in type - prefix is locked" />
                 ) : (
-                  <button
-                    type="button"
-                    className="manage-types-modal__delete"
-                    onClick={() => onDeleteCustomType(type.id)}
-                    aria-label={`Delete ${type.label} type`}
-                    title="Delete this type (and any items using it)"
-                  >
-                    <Trash2 size={12} />
-                  </button>
+                  (() => {
+                    const inUse = countItemsUsingType(doc, type.id);
+                    return (
+                      <button
+                        type="button"
+                        className="manage-types-modal__delete"
+                        disabled={inUse > 0}
+                        onClick={() => {
+                          if (!onDeleteCustomType(type.id)) {
+                            setError(`"${type.label}" is now in use and can no longer be deleted.`);
+                          }
+                        }}
+                        aria-label={`Delete ${type.label} type`}
+                        title={
+                          inUse > 0
+                            ? `In use by ${inUse} item${inUse === 1 ? "" : "s"} - reassign or delete ${inUse === 1 ? "it" : "them"} first`
+                            : "Delete this type"
+                        }
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    );
+                  })()
                 )}
               </div>
             )

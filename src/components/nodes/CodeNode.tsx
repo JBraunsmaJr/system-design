@@ -1,4 +1,4 @@
-import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type UIEvent as ReactUIEvent } from "react";
+import { useEffect, useMemo, useRef, type KeyboardEvent as ReactKeyboardEvent, type UIEvent as ReactUIEvent } from "react";
 import { NodeResizer, type NodeProps, type Node } from "@xyflow/react";
 import * as Icons from "lucide-react";
 import { getCodeLanguage } from "../../domain/codeRegistry";
@@ -59,6 +59,15 @@ export function CodeNode({
   const lang = getCodeLanguage(languageId);
   const code = data.codeContent ?? "";
   const accent = data.color ?? "#22B8CF";
+  // Prism's syntax highlighting is genuinely expensive (several ms for a
+  // realistic snippet) and was previously called directly inline,
+  // recomputing on every single render regardless of whether THIS
+  // node's own code/language had actually changed - including on every
+  // unrelated edit anywhere else in the diagram, since the whole nodes
+  // array gets new object references on every mutation today. Memoizing
+  // here means the highlight only re-runs when what it actually depends
+  // on (code, languageId) changes, not on every incidental re-render.
+  const highlightedHtml = useMemo(() => highlightCode(code, languageId), [code, languageId]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const highlightRef = useRef<HTMLPreElement>(null);
 
@@ -124,7 +133,7 @@ export function CodeNode({
               // is safe. Trailing newline keeps the last line's height
               // consistent with the textarea's own (which always renders
               // at least one trailing empty line's worth of space).
-              dangerouslySetInnerHTML={{ __html: highlightCode(code, languageId) + "\n" }}
+              dangerouslySetInnerHTML={{ __html: highlightedHtml + "\n" }}
             />
             <textarea
               ref={textareaRef}
@@ -146,7 +155,7 @@ export function CodeNode({
             }}
           >
             {code ? (
-              <code dangerouslySetInnerHTML={{ __html: highlightCode(code, languageId) }} />
+              <code dangerouslySetInnerHTML={{ __html: highlightedHtml }} />
             ) : (
               <span className="code-node__placeholder">Double-click to edit</span>
             )}

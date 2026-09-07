@@ -131,6 +131,21 @@ export function getListIndentBehavior(line: string, indent: boolean): IndentResu
  * the placeholder itself selected, so the user can either type over it
  * immediately or click past it to keep the markers empty.
  */
+/**
+ * Wraps the current selection in `before`/`after`, or inserts
+ * `placeholder` wrapped when nothing is selected.
+ *
+ * Any leading or trailing whitespace in the selection is deliberately
+ * left OUTSIDE the delimiters. CommonMark decides whether `**` opens or
+ * closes emphasis from what sits immediately next to it: an opening run
+ * must not be followed by whitespace, and a closing run must not be
+ * preceded by it. So wrapping a selection verbatim turns "bold " into
+ * `**bold **`, which is not emphasis at all - it renders as literal
+ * asterisks. Double-clicking a word includes the trailing space in most
+ * browsers, so the naive version worked or didn't depending on how the
+ * text happened to be selected, which is exactly as confusing as it
+ * sounds. Hoisting the whitespace out produces `**bold** `, which parses.
+ */
 export function wrapSelection(
   text: string,
   selStart: number,
@@ -140,9 +155,17 @@ export function wrapSelection(
   placeholder: string
 ): { newText: string; newSelStart: number; newSelEnd: number } {
   const selected = text.slice(selStart, selEnd);
-  const inner = selected || placeholder;
-  const newText = text.slice(0, selStart) + before + inner + after + text.slice(selEnd);
-  const newSelStart = selStart + before.length;
+  const leading = /^\s*/.exec(selected)![0];
+  const rest = selected.slice(leading.length);
+  const trailing = /\s*$/.exec(rest)![0];
+  const core = rest.slice(0, rest.length - trailing.length);
+  // An all-whitespace selection has no core to emphasize, so it's
+  // treated the same as no selection at all - the whitespace is kept and
+  // the placeholder is wrapped after it.
+  const inner = core || placeholder;
+  const newText =
+    text.slice(0, selStart) + leading + before + inner + after + trailing + text.slice(selEnd);
+  const newSelStart = selStart + leading.length + before.length;
   return { newText, newSelStart, newSelEnd: newSelStart + inner.length };
 }
 

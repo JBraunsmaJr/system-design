@@ -23,7 +23,7 @@ export function TypedNode({ id, data, selected, onDrillInto }: TypedNodeProps) {
   const IconComponent =
     (iconName && (Icons[iconName as keyof typeof Icons] as Icons.LucideIcon)) || Icons.Box;
   const accent = data.color ?? def?.color ?? "#98A2B3";
-  const hasSubDiagram = (data.subDiagram?.nodes.length ?? 0) > 0;
+  const hasSubDiagram = data.hasSubDiagram ?? false;
   // The "Custom" type's category label and its own type label are both
   // literally "Custom", so the usual "Category · Type" subtitle would read
   // as "Custom · Custom" - show the description there instead, since that's

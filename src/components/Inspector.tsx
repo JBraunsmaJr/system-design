@@ -321,15 +321,17 @@ export function Inspector({
       <Field label="Direction">
         <select
           value={data.direction ?? "forward"}
-          onChange={(e) => onUpdateEdge(edge.id, { direction: e.target.value as "forward" | "reverse" })}
+          onChange={(e) => onUpdateEdge(edge.id, { direction: e.target.value as ArchEdgeData["direction"] })}
         >
           <option value="forward">Forward (source → target)</option>
           <option value="reverse">Reverse (target → source)</option>
+          <option value="both">Bi-directional (source ↔ target)</option>
         </select>
       </Field>
       <p className="inspector__hint" style={{ marginTop: -8 }}>
-        Controls which way the arrowhead points, and which way this edge flows when it's animated
-        in a scenario step.
+        Controls which end(s) carry an arrowhead, and which way this edge flows when it's animated
+        in a scenario step. A bi-directional edge has no single flow direction, so it animates back
+        and forth instead.
       </p>
 
       <Field label="Label override">

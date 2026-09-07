@@ -74,7 +74,7 @@ export function RelationshipManager({
   const [selectedVerb, setSelectedVerb] = useState<VerbOption | null>(null);
   const activeVerb = selectedVerb ?? verbOptions[0] ?? null;
 
-  const existingRelationships = getRelationshipsForItem(doc, itemId);
+  const existingRelationships = useMemo(() => getRelationshipsForItem(doc, itemId), [doc, itemId]);
 
   const open = () => {
     const trigger = triggerRef.current;
@@ -160,41 +160,79 @@ export function RelationshipManager({
     .filter((item) => q === "" || item.id.toLowerCase().includes(q) || item.title.toLowerCase().includes(q))
     .slice(0, 20);
 
+  // Grouped by the direction-correct verb rather than rendered one row
+  // per relationship. A card with ten relationships was ten full-width
+  // rows, most of them repeating the same verb; grouping collapses that
+  // to one row per distinct verb with the targets wrapping inside it,
+  // which is usually two or three rows for the same content. Insertion
+  // order is preserved (Map keeps it) so relationships don't reshuffle
+  // as they're added.
+  const groupedRelationships = useMemo(() => {
+    const groups = new Map<
+      string,
+      { label: string; color: string; entries: { relationshipId: string; itemId: string; text: string }[] }
+    >();
+    for (const relationship of existingRelationships) {
+      const type = getRelationshipType(doc, relationship.typeId);
+      const otherId = getOtherItemId(relationship, itemId);
+      const otherItem = doc.items.find((i) => i.id === otherId);
+      if (!type || !otherItem) continue;
+      const label = getRelationshipLabelForItem(relationship, type, itemId);
+      // Keyed by type AND label, not label alone: two different types can
+      // share a label, and the same type reads differently from each side
+      // ("Blocks" vs "Is blocked by"), which are genuinely separate groups.
+      const key = `${relationship.typeId}::${label}`;
+      let group = groups.get(key);
+      if (!group) {
+        group = { label, color: type.color, entries: [] };
+        groups.set(key, group);
+      }
+      group.entries.push({
+        relationshipId: relationship.id,
+        itemId: otherItem.id,
+        text: otherItem.title ? `${otherItem.id}: ${otherItem.title}` : otherItem.id,
+      });
+    }
+    return [...groups.values()];
+  }, [existingRelationships, doc, itemId]);
+
   return (
     <div className="relationship-manager">
-      {existingRelationships.length > 0 && (
-        <div className="relationship-manager__pills">
-          {existingRelationships.map((relationship) => {
-            const type = getRelationshipType(doc, relationship.typeId);
-            const otherId = getOtherItemId(relationship, itemId);
-            const otherItem = doc.items.find((i) => i.id === otherId);
-            if (!type || !otherItem) return null;
-            const label = getRelationshipLabelForItem(relationship, type, itemId);
-            return (
-              <span key={relationship.id} className="relationship-manager__pill" style={{ borderColor: `${type.color}66` }}>
-                <span className="relationship-manager__pill-verb" style={{ color: type.color }}>
-                  {label}
-                </span>
-                <button
-                  type="button"
-                  className="relationship-manager__pill-target"
-                  onClick={() => onNavigateToItem(otherItem.id)}
-                  title={`Go to ${otherItem.id}`}
-                >
-                  {otherItem.id}
-                  {otherItem.title ? `: ${otherItem.title}` : ""}
-                </button>
-                <button
-                  type="button"
-                  className="relationship-manager__pill-remove"
-                  onClick={() => onDeleteRelationship(relationship.id)}
-                  aria-label={`Remove relationship to ${otherItem.id}`}
-                >
-                  <X size={10} />
-                </button>
+      {groupedRelationships.length > 0 && (
+        <div className="relationship-manager__groups">
+          {groupedRelationships.map((group) => (
+            <div key={`${group.label}-${group.color}`} className="relationship-manager__group">
+              <span className="relationship-manager__group-verb" style={{ color: group.color }}>
+                {group.label}
               </span>
-            );
-          })}
+              <div className="relationship-manager__group-targets">
+                {group.entries.map((entry) => (
+                  <span
+                    key={entry.relationshipId}
+                    className="relationship-manager__chip"
+                    style={{ borderColor: `${group.color}66` }}
+                  >
+                    <button
+                      type="button"
+                      className="relationship-manager__chip-target"
+                      onClick={() => onNavigateToItem(entry.itemId)}
+                      title={`Go to ${entry.text}`}
+                    >
+                      {entry.text}
+                    </button>
+                    <button
+                      type="button"
+                      className="relationship-manager__chip-remove"
+                      onClick={() => onDeleteRelationship(entry.relationshipId)}
+                      aria-label={`Remove relationship to ${entry.itemId}`}
+                    >
+                      <X size={10} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
