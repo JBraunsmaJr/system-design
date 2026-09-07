@@ -14,6 +14,7 @@ import type { SubDiagram } from "../../domain/types";
 import { findAllLinkedNodes, type DiagramPath, type LinkedNodeRef } from "../../domain/subDiagramTree";
 import type { RequirementsStore } from "../../collab/requirementsStore";
 import type { PresenceInfo } from "../../collab/session";
+import plur from "plur";
 
 interface RequirementsViewProps {
   requirementsStore: RequirementsStore;
@@ -43,35 +44,21 @@ interface RequirementsViewProps {
   onFocusedItemChange?: (itemId: string | null) => void;
 }
 
-function pluralizeText(text: string): string {
-  const lowered = text.toLowerCase()
-
-  if(lowered.endsWith("ies") || lowered.endsWith("es") || (!lowered.endsWith("us") && lowered.endsWith("s"))) {
-    return text
-  }
-
-  if(lowered.endsWith("y") && !lowered.endsWith("ay")) {
-    return text.substring(0, text.length -1) + "ies"
-  }
-
-  if(text.endsWith("us")) {
-    return text + "es"
-  }
-
-  return text + "s"
-}
-
-
 const HIGHLIGHT_DURATION_MS = 2000;
-// A single shared reference for "no linked nodes" - `linkedNodesByItemId.get(id) ?? []`
-// would otherwise allocate a brand new array on every single render for
-// every item with no links, which defeats RequirementCard's React.memo
-// comparison (a new array is never === the previous one, even though the
-// actual content - nothing - never changes).
+
+/**
+ * A single shared reference for "no linked nodes" - `linkedNodesByItemId.get(id) ?? []`
+ * would otherwise allocate a brand new array on every single render for
+ * every item with no links, which defeats RequirementCard's React.memo
+ * comparison (a new array is never === the previous one, even though the
+ * actual content - nothing - never changes).
+ */
 const EMPTY_LINKED_NODES: LinkedNodeRef[] = [];
-// Same reasoning as EMPTY_LINKED_NODES above: a fresh [] every render
-// for every item with no one else looking at it would defeat
-// RequirementCard's own React.memo comparison just as surely.
+/**
+ * Same reasoning as EMPTY_LINKED_NODES above: a fresh [] every render
+ * for every item with no one else looking at it would defeat
+ * RequirementCard's own React.memo comparison just as surely.
+ */
 const EMPTY_PEERS: PresenceInfo[] = [];
 const UNCATEGORIZED_KEY = "__uncategorized__";
 
@@ -103,24 +90,28 @@ export function RequirementsView({
   const [isManagingTypes, setIsManagingTypes] = useState(false);
   const [isManagingRelationshipTypes, setIsManagingRelationshipTypes] = useState(false);
   const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Kept in sync on every render so useCallback-stabilized handlers can
-  // always call the CURRENT store without needing requirementsStore in
-  // their own dependency arrays - requirementsStore itself is recreated
-  // on every requirements change (see App.tsx), unlike the plain
-  // onUpdateDoc callback this replaces, which was already stable. Same
-  // reasoning as the old docRef this replaces, generalized from just
-  // onAddRelationship (the only handler that previously needed to read
-  // doc directly) to every handler below, since all of them now go
-  // through the store rather than a stable setter.
+  /**
+   * Keep in sync on every render so useCallback-stabilized handlers can
+   * always call the CURRENT store without needing requirementsStore in
+   * their own dependency arrays - requirementsStore itself is recreated
+   * on every requirements change (see App.tsx), unlike the plain
+   * onUpdateDoc callback this replaces, which was already stable. Same
+   * reasoning as the old docRef this replaces, generalized from just
+   * onAddRelationship (the only handler that previously needed to read
+   * doc directly) to every handler below, since all of them now go
+   * through the store rather than a stable setter.
+   */
   const requirementsStoreRef = useRef(requirementsStore);
   useEffect(() => {
     requirementsStoreRef.current = requirementsStore;
   }, [requirementsStore]);
 
-  // Computed once for every item here, rather than each RequirementCard
-  // independently walking the whole diagram tree for just its own item -
-  // see findAllLinkedNodes's own doc comment for why that per-card
-  // approach doesn't scale with the number of items in this list.
+  /**
+   * Computed once for every item here, rather than each RequirementCard
+   * independently walking the whole diagram tree for just its own item -
+   * see findAllLinkedNodes's own doc comment for why that per-card
+   * approach doesn't scale with the number of items in this list.
+   */
   const linkedNodesByItemId = useMemo(
     () => (diagramRoot ? findAllLinkedNodes(diagramRoot) : new Map()),
     [diagramRoot]
@@ -138,16 +129,18 @@ export function RequirementsView({
     });
   }, [doc.items, doc.categories, search]);
 
-  // Grouping is computed generically for both modes into the same shape,
-  // so the render below is a single loop rather than duplicated markup per
-  // mode - "group by category" is just a different recipe for the same
-  // {key, label, color, items} structure "group by type" already produces.
+  /**
+   * Grouping is computed generically for both modes into the same shape,
+   * so the render below is a single loop rather than duplicated markup per
+   * mode - "group by category" is just a different recipe for the same
+   * {key, label, color, items} structure "group by type" already produces.
+   */
   const groups = useMemo<ItemGroup[]>(() => {
     if (groupBy === "type") {
       return doc.itemTypes
         .map((type) => ({
           key: type.id,
-          label: pluralizeText(type.label),
+          label: plur(type.label, 2),
           color: type.color,
           items: filteredItems.filter((i) => i.typeId === type.id),
         }))
@@ -177,9 +170,11 @@ export function RequirementsView({
 
   const onAddItem = (typeId: string) => {
     const id = requirementsStoreRef.current.addItem(typeId);
-    // New items should be immediately visible even if a search is
-    // narrowing the list, and land at the bottom of their group - scroll
-    // to it the same way a reference-click navigation would.
+    /*
+     * New items should be immediately visible even if a search is
+     * narrowing the list, and land at the bottom of their group - scroll
+     * to it the same way a reference-click navigation would.
+     */
     setSearch("");
     requestAnimationFrame(() => {
       const el = document.getElementById(`requirement-${id}`);
@@ -195,18 +190,21 @@ export function RequirementsView({
     requirementsStoreRef.current.deleteItem(id);
   }, []);
 
-  // Creating a category and assigning it to an item happen as one combined
-  // store operation (not two separate calls) so they land as a single
-  // undo step, and so the item is never left referencing a categoryId that
-  // doesn't exist yet in an intermediate state.
+  /**
+   * Creating a category and assigning it to an item happen as one combined
+   * store operation (not two separate calls) so they land as a single
+   * undo step, and so the item is never left referencing a categoryId that
+   * doesn't exist yet in an intermediate state.
+   */
   const onCreateAndAssignCategory = useCallback((itemId: string, label: string) => {
     requirementsStoreRef.current.createAndAssignCategory(itemId, label);
   }, []);
 
-  // Categories are created ad hoc from any card's picker, so they're
-  // deleted from there too - that's where issue #7's reporter went
-  // looking for it. The store clears categoryId on every item that
-  // referenced it, so nothing is left dangling.
+  /**
+   * Categories are created ad hoc from any card's picker, so they're
+   * deleted from there too. The store clears categoryId on every item
+   * that referenced it, so nothing is left dangling
+   */
   const onDeleteCategory = useCallback((categoryId: string) => {
     requirementsStoreRef.current.deleteCategory(categoryId);
   }, []);
@@ -228,14 +226,16 @@ export function RequirementsView({
     highlightTimer.current = setTimeout(() => setHighlightedId(null), HIGHLIGHT_DURATION_MS);
   }, []);
 
-  // Responds to a navigation request from OUTSIDE this view - e.g. the
-  // user clicked a linked requirement pill in the Inspector while looking
-  // at the diagram, which switches viewMode to "requirements" (in
-  // App.tsx) and sets focusItemId at the same time. This view may be
-  // mounting fresh at that exact moment, but a plain useEffect (not
-  // useLayoutEffect) still runs after the initial render, by which point
-  // every RequirementCard's DOM element - including the one this needs to
-  // scroll to - already exists.
+  /*
+   * Responds to a navigation request from OUTSIDE this view - e.g. the
+   * user clicked a linked requirement pill in the Inspector while looking
+   * at the diagram, which switches viewMode to "requirements" (in
+   * App.tsx) and sets focusItemId at the same time. This view may be
+   * mounting fresh at that exact moment, but a plain useEffect (not
+   * useLayoutEffect) still runs after the initial render, by which point
+   * every RequirementCard's DOM element - including the one this needs to
+   * scroll to - already exists.
+   */
   useEffect(() => {
     if (!focusItemId) return;
     const frame = requestAnimationFrame(() => {
@@ -249,13 +249,17 @@ export function RequirementsView({
     return requirementsStoreRef.current.addCustomType(label, prefix, color, isWorkable);
   };
 
-  // Label, color, and isWorkable are all safe to edit after the fact for
-  // ANY type, including built-in ones - none of them are baked into
-  // already-generated item ids the way prefix is, so changing them can't
-  // create a mismatch between an item's stored id and its type's current
-  // definition. This intentionally never accepts a prefix patch (the
-  // caller can only pass these three fields, not arbitrary ones) - prefix
-  // is what actually needs to stay stable once items exist under it.
+  /**
+   * Label, color, and isWorkable are all safe to edit after the fact for
+   * ANY type, including built-in ones - none of them are baked into
+   * already-generated item ids the way prefix is, so changing them can't create
+   * a mismatch between an item's stored id and its type's current definition.
+   * This intentionally never accepts a prefix patch (the
+   * caller can only pass these three fields, not arbitrary ones) - prefix
+   * is what actually needs to stay stable once items exist under it.
+   * @param typeId
+   * @param patch
+   */
   const onUpdateType = (
     typeId: string,
     patch: Partial<Pick<RequirementItemType, "label" | "color" | "isWorkable">>
