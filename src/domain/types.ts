@@ -113,7 +113,12 @@ export interface ArchNodeData extends Record<string, unknown> {
 export interface ArchEdgeData extends Record<string, unknown> {
   edgeType: string;
   label?: string;
-  direction?: "forward" | "reverse";
+  /** Which end(s) of the edge carry an arrowhead. "forward" (the
+   * default) points at the target, "reverse" points back at the source
+   * for when the real traffic runs opposite to how the edge was drawn,
+   * and "both" puts an arrowhead on each end for a genuinely
+   * bi-directional relationship. */
+  direction?: "forward" | "reverse" | "both";
   /** Forces the label pill off even if a custom label or the type's default label would otherwise show. */
   hideLabel?: boolean;
   /** Per-instance color override - overrides the edge type's own default stroke/label color. Undefined means "use the type default". */

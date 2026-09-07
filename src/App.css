@@ -1364,7 +1364,8 @@
 /* ---------- Edge flow animation (Presentation Mode) ---------- */
 
 .typed-edge--flow-forward,
-.typed-edge--flow-reverse {
+.typed-edge--flow-reverse,
+.typed-edge--flow-both {
   animation-duration: 0.9s;
   animation-timing-function: linear;
   animation-iteration-count: infinite;
@@ -1376,6 +1377,18 @@
 
 .typed-edge--flow-reverse {
   animation-name: typed-edge-flow-reverse;
+}
+
+/* A bi-directional edge has no single direction to flow in, so it reuses
+   the forward keyframes with animation-direction: alternate - the dashes
+   travel one way, then back. Animating dashoffset specifically (rather
+   than, say, pulsing opacity) matters because opacity and stroke-width
+   are both set inline by TypedEdge for the focused/step-member states,
+   and keyframes outrank inline styles in the cascade - a pulse would
+   quietly fight the focus highlight. Nothing sets dashoffset inline. */
+.typed-edge--flow-both {
+  animation-name: typed-edge-flow-forward;
+  animation-direction: alternate;
 }
 
 @keyframes typed-edge-flow-forward {
@@ -1392,7 +1405,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .typed-edge--flow-forward,
-  .typed-edge--flow-reverse {
+  .typed-edge--flow-reverse,
+  .typed-edge--flow-both {
     animation: none;
   }
 }
@@ -4711,196 +4725,6 @@
 
 /* ---------- Relationship manager (Requirements) ---------- */
 
-.relationship-manager {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 4px;
-}
-
-.relationship-manager__pills {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.relationship-manager__pill {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid var(--chrome-border);
-  border-radius: var(--radius-sm);
-  padding: 4px 4px 4px 8px;
-  background: var(--chrome-bg);
-}
-
-.relationship-manager__pill-verb {
-  flex-shrink: 0;
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.relationship-manager__pill-target {
-  flex: 1;
-  min-width: 0;
-  background: transparent;
-  border: none;
-  text-align: left;
-  font-size: 11.5px;
-  font-family: var(--mono);
-  color: var(--chrome-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.relationship-manager__pill-target:hover {
-  text-decoration: underline;
-}
-
-.relationship-manager__pill-remove {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  background: transparent;
-  border: none;
-  border-radius: 4px;
-  color: var(--chrome-text-dim);
-}
-
-.relationship-manager__pill-remove:hover {
-  color: var(--danger);
-  background: rgba(240, 87, 140, 0.1);
-}
-
-.relationship-manager__add {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  align-self: flex-start;
-  background: transparent;
-  border: 1px solid var(--chrome-border);
-  border-radius: var(--radius-sm);
-  padding: 5px 9px;
-  font-size: 11.5px;
-  font-weight: 500;
-  color: var(--chrome-text-dim);
-}
-
-.relationship-manager__add:hover {
-  background: var(--chrome-bg);
-  color: var(--chrome-text);
-}
-
-.relationship-manager__dropdown {
-  z-index: 200;
-  width: 260px;
-  max-height: 340px;
-  display: flex;
-  flex-direction: column;
-  background: var(--chrome-bg-raised);
-  border: 1px solid var(--chrome-border);
-  border-radius: var(--radius-sm);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  padding: 6px;
-}
-
-.relationship-manager__verbs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding-bottom: 6px;
-  margin-bottom: 6px;
-  border-bottom: 1px solid var(--chrome-border);
-}
-
-.relationship-manager__verb {
-  background: transparent;
-  border: 1px solid var(--chrome-border);
-  border-radius: 999px;
-  padding: 3px 8px;
-  font-size: 10.5px;
-  font-weight: 500;
-  color: var(--chrome-text-dim);
-}
-
-.relationship-manager__verb:hover {
-  color: var(--chrome-text);
-}
-
-.relationship-manager__verb.active {
-  background: var(--chrome-bg);
-  font-weight: 600;
-}
-
-.relationship-manager__search {
-  width: 100%;
-  background: var(--chrome-bg);
-  border: 1px solid var(--chrome-border);
-  border-radius: var(--radius-sm);
-  padding: 6px 8px;
-  color: var(--chrome-text);
-  font-size: 12px;
-  margin-bottom: 6px;
-  flex-shrink: 0;
-}
-
-.relationship-manager__error {
-  margin: 0 0 6px;
-  color: var(--danger);
-  font-size: 11.5px;
-}
-
-.relationship-manager__list {
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.relationship-manager__option {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  background: transparent;
-  border: none;
-  border-radius: 4px;
-  padding: 6px 8px;
-  text-align: left;
-  width: 100%;
-}
-
-.relationship-manager__option:hover {
-  background: var(--chrome-bg);
-}
-
-.relationship-manager__option-id {
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--chrome-text-dim);
-  white-space: nowrap;
-}
-
-.relationship-manager__option-title {
-  font-size: 12px;
-  color: var(--chrome-text-dim);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.relationship-manager__empty {
-  padding: 8px;
-  margin: 0;
-  color: var(--chrome-text-dim);
-  font-size: 11.5px;
-  text-align: center;
-}
 
 /* ---------- Timeline view mode toggle (Board / Gantt) ---------- */
 
@@ -5189,61 +5013,92 @@
   margin-top: 4px;
 }
 
-.relationship-manager__pills {
+/* Grouped layout: one row per verb, with that verb's targets wrapping
+   inside it. The previous layout was one full-width row per relationship,
+   so ten relationships meant ten rows of mostly-repeated verb labels. */
+.relationship-manager__groups {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-}
-
-.relationship-manager__pill {
-  display: flex;
-  align-items: center;
   gap: 6px;
-  border: 1px solid var(--chrome-border);
-  border-radius: var(--radius-sm);
-  padding: 4px 4px 4px 8px;
-  background: var(--chrome-bg);
 }
 
-.relationship-manager__pill-verb {
-  flex-shrink: 0;
+.relationship-manager__group {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-left: 8px;
+  border-bottom: 1px solid var(--chrome-border);
+  padding: 4px 0px;
+}
+
+/* Fixed-ish column so the verbs line up down the left edge and the target
+   chips all start at the same x, which is what makes the grouped version
+   scannable rather than just denser. max-width keeps an unusually long
+   custom verb from eating the row. */
+.relationship-manager__group-verb {
+  flex: 0 0 auto;
+  min-width: 84px;
+  max-width: 140px;
   font-size: 12px;
   font-weight: 600;
-  white-space: nowrap;
-}
-
-.relationship-manager__pill-target {
-  flex: 1;
-  min-width: 0;
-  background: transparent;
-  border: none;
-  text-align: left;
-  font-size: 12.5px;
-  font-family: var(--mono);
-  color: var(--chrome-text);
+  line-height: 1.5;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.relationship-manager__pill-target:hover {
-  text-decoration: underline;
+.relationship-manager__group-targets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+  padding-bottom: 8px;
 }
 
-.relationship-manager__pill-remove {
-  flex-shrink: 0;
+.relationship-manager__chip {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
+  gap: 2px;
+  max-width: 100%;
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  padding: 1px 2px 1px 6px;
+  background: var(--chrome-bg);
+}
+
+/* Truncated rather than wrapped: a single long requirement title would
+   otherwise force the chip to full width and undo the grouping. The full
+   text is still available via the title attribute and on the item itself. */
+.relationship-manager__chip-target {
+  min-width: 0;
+  max-width: 260px;
   background: transparent;
   border: none;
-  border-radius: 4px;
+  padding: 1px 0;
+  font-size: 12px;
+  color: var(--chrome-text);
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.relationship-manager__chip-target:hover {
+  color: var(--accent);
+}
+
+.relationship-manager__chip-remove {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  padding: 2px;
   color: var(--chrome-text-dim);
 }
 
-.relationship-manager__pill-remove:hover {
+.relationship-manager__chip-remove:hover {
   color: var(--danger);
   background: rgba(240, 87, 140, 0.1);
 }
@@ -5257,6 +5112,7 @@
   border: 1px solid var(--chrome-border);
   border-radius: var(--radius-sm);
   padding: 5px 9px;
+  margin-left: 8px;
   font-size: 12.5px;
   font-weight: 500;
   color: var(--chrome-text-dim);
@@ -5318,6 +5174,12 @@
   font-size: 13px;
   margin-bottom: 6px;
   flex-shrink: 0;
+}
+
+.relationship-manager__error {
+  margin: 0 0 6px;
+  color: var(--danger);
+  font-size: 11.5px;
 }
 
 .relationship-manager__list {
@@ -7405,7 +7267,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 0 12px 10px;
+  padding: 8px 12px 10px;
 }
 
 .requirement-card__diagrams-header {
@@ -7463,6 +7325,24 @@
   font-weight: 500;
   color: var(--chrome-text);
   max-width: 220px;
+}
+
+/* Deliberately distinct from a diagram chip - it's a control, not a
+   destination, and a person scanning the row shouldn't have to read it
+   to work out it won't navigate anywhere. */
+.requirement-card__diagrams-toggle {
+  align-self: center;
+  background: transparent;
+  border: none;
+  padding: 4px 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--chrome-text-dim);
+}
+
+.requirement-card__diagrams-toggle:hover {
+  color: var(--accent);
+  text-decoration: underline;
 }
 
 .requirement-card__diagram-chip:hover {

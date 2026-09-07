@@ -35,7 +35,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v7
         with:
-          context: .
+          context: docker/signaling
           push: true
           tags: |
             ${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.date_tag }}

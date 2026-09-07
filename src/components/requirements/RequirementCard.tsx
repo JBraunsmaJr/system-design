@@ -1,8 +1,9 @@
 import { memo, useEffect, useRef, useState } from "react";
-import { FileText, Plus, Trash2, Workflow } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { getItemType, isItemWorkable } from "../../domain/requirementsRegistry";
 import type { LinkedNodeRef, DiagramPath } from "../../domain/subDiagramTree";
 import { RequirementBody } from "./RequirementBody";
+import { LinkedDiagramsSection } from "./LinkedDiagramsSection";
 import { RequirementEditor } from "./RequirementEditor";
 import { CategoryPicker } from "./CategoryPicker";
 import { StatusPicker } from "./StatusPicker";
@@ -180,42 +181,13 @@ function RequirementCardImpl({
         onNavigateToItem={onNavigateToItem}
       />
       {diagramRoot && (
-        <div className="requirement-card__diagrams">
-          <div className="requirement-card__diagrams-header">
-            <span>Linked Diagrams</span>
-            {onCreateLinkedNode && (
-              <button
-                type="button"
-                className="requirement-card__diagrams-add"
-                onClick={() => onCreateLinkedNode(item.id, item.title || item.id)}
-                title="Create a new diagram node linked to this item"
-              >
-                <Plus size={11} /> New
-              </button>
-            )}
-          </div>
-          {linkedNodes.length === 0 ? (
-            <p className="requirement-card__diagrams-empty">No linked diagram nodes yet.</p>
-          ) : (
-            <div className="requirement-card__diagrams-list">
-              {linkedNodes.map((ref) => (
-                <button
-                  key={ref.nodeId}
-                  type="button"
-                  className="requirement-card__diagram-chip"
-                  onClick={() => onNavigateToNode?.(ref.path, ref.nodeId)}
-                  title={`Go to "${ref.label || "Untitled"}" in the diagram`}
-                >
-                  <Workflow size={11} />
-                  <span>{ref.label || "Untitled"}</span>
-                  {ref.hasSubDiagram && (
-                    <FileText size={10} className="requirement-card__diagram-chip-doc" aria-label="Has sub-diagram documentation" />
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <LinkedDiagramsSection
+          itemId={item.id}
+          itemTitle={item.title}
+          linkedNodes={linkedNodes}
+          onNavigateToNode={onNavigateToNode}
+          onCreateLinkedNode={onCreateLinkedNode}
+        />
       )}
     </div>
   );

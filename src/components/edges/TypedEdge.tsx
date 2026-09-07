@@ -204,11 +204,12 @@ export function TypedEdge({
       <BaseEdge
         id={id}
         path={path}
-        // A "reverse" edge shows its arrowhead at the source end instead of
-        // the target end, indicating the real traffic direction runs
-        // opposite to how the edge happens to be drawn.
+        // Which end(s) get an arrowhead. "reverse" moves the single
+        // arrowhead to the source end, indicating the real traffic runs
+        // opposite to how the edge happens to be drawn; "both" keeps one
+        // at each end for a genuinely bi-directional relationship.
         markerEnd={direction === "reverse" ? undefined : markerEnd}
-        markerStart={direction === "reverse" ? markerStart : undefined}
+        markerStart={direction === "reverse" || direction === "both" ? markerStart : undefined}
         className={`typed-edge${flowClass}`}
         style={{
           stroke: isStepCandidate ? "#fbbf24" : color,

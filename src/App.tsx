@@ -331,7 +331,6 @@ function App() {
   // only happen later, from event handlers or effects, never during
   // render itself.
   const activeSessionRef = useRef(activeSession);
-  // eslint-disable-next-line react-hooks/refs
   activeSessionRef.current = activeSession;
   const broadcastPresence = useCallback((patch: Partial<PresenceInfo>) => {
     const session = activeSessionRef.current?.session;
