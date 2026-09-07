@@ -61,6 +61,7 @@ import { createYjsProgramIncrementsStore, seedYjsProgramIncrementsDoc } from "./
 import type { ProgramIncrementsStore } from "./collab/programIncrementsStore";
 import { startCollabSession, type CollabSession, type PresenceInfo, type LocalPresenceInfo } from "./collab/session";
 import { loadPresenceName, savePresenceName, loadShowPeerCursors, saveShowPeerCursors } from "./domain/presenceIdentity";
+import { loadSignalingUrls, saveSignalingUrls, parseSignalingUrls } from "./domain/signalingConfig";
 import { classifyNodeChanges, applySelectionChanges, type PendingNodeUpdate, type CurrentNodeGeometry } from "./domain/nodeChangeBatching";
 import "./App.css";
 
@@ -373,10 +374,26 @@ function App() {
     };
   }, []);
 
-  const signalingUrls = useMemo(() => {
-    const raw = import.meta.env.VITE_SIGNALING_URL as string | undefined;
-    return raw ? raw.split(",").map((u) => u.trim()).filter(Boolean) : [];
+  // The deployer's own default, baked in at build time - still useful
+  // as a starting point, but no longer the only way to set this: see
+  // signalingUrlsInput/setSignalingUrlsRaw below for the runtime
+  // override that doesn't require a rebuild to change.
+  const buildTimeSignalingDefault = useMemo(() => (import.meta.env.VITE_SIGNALING_URL as string | undefined) ?? "", []);
+
+  // The raw, comma-separated string as typed/edited in CollabPanel -
+  // this person's own runtime override if they've ever set one,
+  // otherwise the deployer's build-time default. Kept as the raw
+  // string (not pre-parsed into an array) specifically so the input
+  // field in CollabPanel can be a normal, directly-editable controlled
+  // input without needing to serialize/deserialize on every keystroke.
+  const [signalingUrlsInput, setSignalingUrlsInputState] = useState(
+    () => loadSignalingUrls() ?? buildTimeSignalingDefault
+  );
+  const setSignalingUrlsInput = useCallback((raw: string) => {
+    setSignalingUrlsInputState(raw);
+    saveSignalingUrls(raw);
   }, []);
+  const signalingUrls = useMemo(() => parseSignalingUrls(signalingUrlsInput), [signalingUrlsInput]);
 
   // Starts a brand-new session, seeding it with whatever's already here so
   // nothing is lost - the new session's initial state IS the current local
@@ -1579,6 +1596,9 @@ function App() {
       {!isPresenting && (
         <CollabPanel
           signalingConfigured={signalingUrls.length > 0}
+          signalingUrlsInput={signalingUrlsInput}
+          onSignalingUrlsInputChange={setSignalingUrlsInput}
+          buildTimeSignalingDefault={buildTimeSignalingDefault}
           activeSession={activeSession ? { roomName: activeSession.roomName, isSynced: () => activeSession.session.isSynced(), peers: presencePeers } : null}
           displayName={displayName}
           onDisplayNameChange={onDisplayNameChange}

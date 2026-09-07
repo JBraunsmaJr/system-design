@@ -8657,6 +8657,17 @@
   margin-bottom: 10px;
 }
 
+.collab-panel__reset-signaling {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: -6px 0 10px;
+  color: var(--accent);
+  font-size: 11px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
 .collab-panel__peers {
   margin-bottom: 12px;
 }

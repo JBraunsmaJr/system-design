@@ -12,11 +12,25 @@ export interface ActiveSessionInfo {
 }
 
 interface CollabPanelProps {
-  /** Whether a signaling server URL is actually configured
-   * (VITE_SIGNALING_URL) - starting or joining a session is disabled,
-   * with an explanatory message instead, when this is false, rather than
-   * silently failing to connect anywhere. */
+  /** Whether a signaling server URL is actually configured, from EITHER
+   * source (this person's own runtime override, or VITE_SIGNALING_URL
+   * as the deployer's build-time default) - starting or joining a
+   * session is disabled, with an explanatory message instead, when this
+   * is false, rather than silently failing to connect anywhere. */
   signalingConfigured: boolean;
+  /** The current signaling URL(s), as a raw, comma-separated string -
+   * this person's own saved override if they've ever set one, otherwise
+   * whatever VITE_SIGNALING_URL was at build time. Controlled from
+   * App.tsx, which also persists edits to localStorage, so this
+   * component doesn't need to know anything about where it's stored. */
+  signalingUrlsInput: string;
+  onSignalingUrlsInputChange: (raw: string) => void;
+  /** The deployer's own build-time default (VITE_SIGNALING_URL, or an
+   * empty string if that was never set) - shown so a person editing
+   * their own override can always see what "reset to default" would
+   * actually reset to, and used to render a reset control at all only
+   * when the deployer actually configured one. */
+  buildTimeSignalingDefault: string;
   activeSession: ActiveSessionInfo | null;
   /** This person's own chosen display name - shown to everyone else in
    * the session. Controlled from App.tsx, which also persists it across
@@ -48,6 +62,9 @@ interface CollabPanelProps {
  */
 export function CollabPanel({
   signalingConfigured,
+  signalingUrlsInput,
+  onSignalingUrlsInputChange,
+  buildTimeSignalingDefault,
   activeSession,
   displayName,
   onDisplayNameChange,
@@ -101,18 +118,38 @@ export function CollabPanel({
               </button>
             </div>
 
+            <label className="collab-panel__field-label" htmlFor="collab-panel-signaling-url">
+              Relay Server URL
+            </label>
+            <input
+              id="collab-panel-signaling-url"
+              type="text"
+              value={signalingUrlsInput}
+              onChange={(e) => onSignalingUrlsInputChange(e.target.value)}
+              placeholder={buildTimeSignalingDefault || "ws://localhost:4444"}
+              className="collab-panel__name-input"
+            />
+            {buildTimeSignalingDefault && signalingUrlsInput !== buildTimeSignalingDefault && (
+              <button
+                type="button"
+                className="collab-panel__reset-signaling"
+                onClick={() => onSignalingUrlsInputChange(buildTimeSignalingDefault)}
+              >
+                Reset to deployment default
+              </button>
+            )}
+            <p className="collab-panel__hint">
+              One or more URLs (comma-separated) - only used to help peers find each other, never
+              involved once a connection is established. Takes effect the next time you
+              start or join a session.
+            </p>
+
             {!signalingConfigured && (
-              <p className="collab-panel__notice">
-                Collaboration isn't configured for this deployment - no signaling server URL has been set
-                (VITE_SIGNALING_URL).
-              </p>
+              <p className="collab-panel__notice">Set a signaling server URL above to enable collaboration.</p>
             )}
 
             {signalingConfigured && !activeSession && (
               <>
-                <p className="collab-panel__hint">
-                  Team, requirements, timeline/capacity, and the diagram are all shared live during a session.
-                </p>
                 <label className="collab-panel__field-label" htmlFor="collab-panel-display-name">
                   Your name
                 </label>
