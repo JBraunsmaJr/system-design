@@ -36,6 +36,7 @@ interface RequirementCardProps {
   onDeleteItem: (id: string) => void;
   onNavigateToItem: (itemId: string) => void;
   onCreateAndAssignCategory: (itemId: string, label: string) => void;
+  onDeleteCategory: (categoryId: string) => void;
   onAddRelationship: (typeId: string, fromItemId: string, toItemId: string) => string | null;
   onDeleteRelationship: (relationshipId: string) => void;
   /** True briefly after this item was scrolled to via a reference click,
@@ -65,6 +66,7 @@ function RequirementCardImpl({
   onDeleteItem,
   onNavigateToItem,
   onCreateAndAssignCategory,
+  onDeleteCategory,
   onAddRelationship,
   onDeleteRelationship,
   highlighted,
@@ -116,6 +118,7 @@ function RequirementCardImpl({
             onAssign={(categoryId) => onUpdateItem(item.id, { categoryId })}
             onCreateAndAssign={(label) => onCreateAndAssignCategory(item.id, label)}
             onClear={() => onUpdateItem(item.id, { categoryId: undefined })}
+            onDelete={onDeleteCategory}
           />
           {isItemWorkable(doc, item) && (
             <SprintPicker
@@ -263,6 +266,7 @@ function propsAreEqual(prev: RequirementCardProps, next: RequirementCardProps): 
     prev.onDeleteItem === next.onDeleteItem &&
     prev.onNavigateToItem === next.onNavigateToItem &&
     prev.onCreateAndAssignCategory === next.onCreateAndAssignCategory &&
+    prev.onDeleteCategory === next.onDeleteCategory &&
     prev.onAddRelationship === next.onAddRelationship &&
     prev.onDeleteRelationship === next.onDeleteRelationship
   );

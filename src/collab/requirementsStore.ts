@@ -10,6 +10,7 @@ import {
   addRelationship as addRelationshipPure,
   defaultStatusForType,
   isPrefixTaken,
+  countItemsUsingType,
 } from "../domain/requirementsRegistry";
 
 /**
@@ -38,16 +39,32 @@ export interface RequirementsStore {
   /** Assigns itemId to an existing category matching label
    * (case-insensitive), or creates a new one first if none matches. */
   createAndAssignCategory(itemId: string, label: string): void;
+  /** Removes the category and clears categoryId on every item that
+   * referenced it, so no item is left pointing at a category that no
+   * longer exists. Deliberately never blocked on usage: a category is an
+   * optional label, and losing it leaves the item itself untouched. */
+  deleteCategory(categoryId: string): void;
 
   /** Returns false (and does nothing) if prefix is already taken by
    * another type - matching onAddCustomType's existing validate-and-
    * reject behavior, rather than silently creating a colliding prefix. */
   addCustomType(label: string, prefix: string, color: string, isWorkable: boolean): boolean;
   updateType(typeId: string, patch: Partial<Pick<RequirementItemType, "label" | "color" | "isWorkable">>): void;
-  /** Also removes every item of this type, and any relationship
-   * touching one of those now-deleted items - matching
-   * onDeleteCustomType's existing cascade. */
-  deleteCustomType(typeId: string): void;
+  /** Returns false (and does nothing) if any item still uses this type.
+   *
+   * This used to cascade instead - deleting the type also deleted every
+   * item of that type and every relationship touching one of them. That
+   * turned a tidy-up action into silent, unrecoverable data loss, so the
+   * contract is now refuse-and-report: the caller checks
+   * countItemsUsingType to disable the affordance up front, and this
+   * guard is the backstop for the case the caller can't see (a
+   * collaborator adding an item of this type between the UI rendering
+   * and the click landing).
+   *
+   * Because a type can now only be removed when nothing references it,
+   * there is nothing left to cascade to - the item and relationship
+   * cleanup this used to do is gone rather than merely unreachable. */
+  deleteCustomType(typeId: string): boolean;
 
   addCustomRelationshipType(label: string, inverseLabel: string, color: string, isBlocking: boolean): void;
   /** Also removes every relationship of this type (items themselves are
@@ -124,6 +141,15 @@ export function createLocalRequirementsStore(
       notify();
     },
 
+    deleteCategory: (categoryId) => {
+      doc = {
+        ...doc,
+        categories: doc.categories.filter((c) => c.id !== categoryId),
+        items: doc.items.map((i) => (i.categoryId === categoryId ? { ...i, categoryId: undefined } : i)),
+      };
+      notify();
+    },
+
     addCustomType: (label, prefix, color, isWorkable) => {
       if (isPrefixTaken(doc, prefix)) return false;
       const newType: RequirementItemType = {
@@ -145,14 +171,10 @@ export function createLocalRequirementsStore(
     },
 
     deleteCustomType: (typeId) => {
-      const removedIds = new Set(doc.items.filter((i) => i.typeId === typeId).map((i) => i.id));
-      doc = {
-        ...doc,
-        itemTypes: doc.itemTypes.filter((t) => t.id !== typeId),
-        items: doc.items.filter((i) => i.typeId !== typeId),
-        relationships: doc.relationships.filter((r) => !removedIds.has(r.fromItemId) && !removedIds.has(r.toItemId)),
-      };
+      if (countItemsUsingType(doc, typeId) > 0) return false;
+      doc = { ...doc, itemTypes: doc.itemTypes.filter((t) => t.id !== typeId) };
       notify();
+      return true;
     },
 
     addCustomRelationshipType: (label, inverseLabel, color, isBlocking) => {
@@ -264,6 +286,14 @@ export function createAdapterRequirementsStore(
       });
     },
 
+    deleteCategory: (categoryId) => {
+      setSnapshot((prev) => ({
+        ...prev,
+        categories: prev.categories.filter((c) => c.id !== categoryId),
+        items: prev.items.map((i) => (i.categoryId === categoryId ? { ...i, categoryId: undefined } : i)),
+      }));
+    },
+
     addCustomType: (label, prefix, color, isWorkable) => {
       if (isPrefixTaken(getSnapshot(), prefix)) return false;
       const newType: RequirementItemType = {
@@ -286,15 +316,9 @@ export function createAdapterRequirementsStore(
     },
 
     deleteCustomType: (typeId) => {
-      setSnapshot((prev) => {
-        const removedIds = new Set(prev.items.filter((i) => i.typeId === typeId).map((i) => i.id));
-        return {
-          ...prev,
-          itemTypes: prev.itemTypes.filter((t) => t.id !== typeId),
-          items: prev.items.filter((i) => i.typeId !== typeId),
-          relationships: prev.relationships.filter((r) => !removedIds.has(r.fromItemId) && !removedIds.has(r.toItemId)),
-        };
-      });
+      if (countItemsUsingType(getSnapshot(), typeId) > 0) return false;
+      setSnapshot((prev) => ({ ...prev, itemTypes: prev.itemTypes.filter((t) => t.id !== typeId) }));
+      return true;
     },
 
     addCustomRelationshipType: (label, inverseLabel, color, isBlocking) => {

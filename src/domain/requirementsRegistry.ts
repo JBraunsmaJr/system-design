@@ -116,6 +116,37 @@ export function getCategory(doc: RequirementsDocument, categoryId: string | unde
   return doc.categories.find((c) => c.id === categoryId);
 }
 
+/**
+ * How many items currently carry this type. A type with a non-zero count
+ * cannot be deleted: an item's whole identity (its display id, "WID-3")
+ * is built from its type's prefix, so there's no coherent state to leave
+ * those items in once the type is gone - and deleting them along with it
+ * quietly destroys work that has nothing to do with the type definition
+ * the person was actually trying to tidy up.
+ */
+export function countItemsUsingType(doc: RequirementsDocument, typeId: string): number {
+  let count = 0;
+  for (const item of doc.items) {
+    if (item.typeId === typeId) count++;
+  }
+  return count;
+}
+
+/**
+ * How many items are currently assigned to this category. Unlike a type,
+ * this is NOT a barrier to deletion - categoryId is an optional label,
+ * and dropping it leaves the item completely intact and merely
+ * uncategorized. The count exists so the person can be told what a
+ * delete will touch before they confirm it, not to block them.
+ */
+export function countItemsUsingCategory(doc: RequirementsDocument, categoryId: string): number {
+  let count = 0;
+  for (const item of doc.items) {
+    if (item.categoryId === categoryId) count++;
+  }
+  return count;
+}
+
 /** Cycled by category creation order rather than assigned by the user -
  * categories are meant to be quick to create (type a name, done), and
  * asking for a color up front on every one would add friction that item

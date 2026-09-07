@@ -128,6 +128,10 @@ export function TimelineView({
     requirementsStore.createAndAssignCategory(itemId, trimmed);
   };
 
+  const onDeleteCategory = (categoryId: string) => {
+    requirementsStore.deleteCategory(categoryId);
+  };
+
   const onMoveItemToSprint = (itemId: string, targetSprintId: string): string | null => {
     const targetRange = allSprintRangesById.get(targetSprintId);
     if (targetRange) {
@@ -360,6 +364,7 @@ export function TimelineView({
           onNavigateToRequirement={onNavigateToRequirement}
           onSelectItem={(id) => setSelectedItemId(id)}
           onCreateAndAssignCategory={onCreateAndAssignCategory}
+          onDeleteCategory={onDeleteCategory}
           onAddRelationship={onAddRelationship}
           onDeleteRelationship={onDeleteRelationship}
         />

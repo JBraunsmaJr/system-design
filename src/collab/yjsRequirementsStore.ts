@@ -459,6 +459,22 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
       });
     },
 
+    deleteCategory: (categoryId) => {
+      doc.transact(() => {
+        categories.delete(categoryId);
+        const idx = categoryOrder.toArray().indexOf(categoryId);
+        if (idx !== -1) categoryOrder.delete(idx, 1);
+        // Clearing the reference matters more here than in the local
+        // store: a peer could be holding an item open with this category
+        // selected right now, and leaving a dangling categoryId would
+        // render as a silently blank chip rather than as uncategorized.
+        for (const storageKey of itemOrder.toArray()) {
+          const m = items.get(storageKey);
+          if (m?.get("categoryId") === categoryId) m.set("categoryId", undefined);
+        }
+      });
+    },
+
     // Same id-collision caveat as addItem, via the same "scan for the
     // smallest unused number" shape as RequirementsView.tsx's own
     // nextCustomTypeId - lower risk in practice since custom types are
@@ -491,29 +507,26 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
       });
     },
 
+    // The usage check reads the live Y.Maps rather than the cached
+    // snapshot, and sits INSIDE the transaction: in a session the whole
+    // point of this guard is the item a collaborator added since this
+    // client last rendered, which is exactly what a cached read would
+    // miss. It still can't close the window entirely - two peers can
+    // concurrently delete a type and add an item under it, and Yjs will
+    // merge both - but refusing on the freshest state available makes
+    // that a narrow race rather than the default outcome.
     deleteCustomType: (typeId) => {
+      let deleted = false;
       doc.transact(() => {
-        const removedStorageKeys = new Set<string>();
-        const removedDisplayIds = new Set<string>();
         for (const storageKey of itemOrder.toArray()) {
-          const m = items.get(storageKey);
-          if (m?.get("typeId") === typeId) {
-            removedStorageKeys.add(storageKey);
-            removedDisplayIds.add(m.get("id") as string);
-          }
+          if (items.get(storageKey)?.get("typeId") === typeId) return;
         }
         itemTypes.delete(typeId);
         const typeIdx = itemTypeOrder.toArray().indexOf(typeId);
         if (typeIdx !== -1) itemTypeOrder.delete(typeIdx, 1);
-        for (const storageKey of removedStorageKeys) {
-          items.delete(storageKey);
-          const idx = itemOrder.toArray().indexOf(storageKey);
-          if (idx !== -1) itemOrder.delete(idx, 1);
-        }
-        for (const [relId, rel] of relationships.entries()) {
-          if (removedDisplayIds.has(rel.fromItemId) || removedDisplayIds.has(rel.toItemId)) relationships.delete(relId);
-        }
+        deleted = true;
       });
+      return deleted;
     },
 
     addCustomRelationshipType: (label, inverseLabel, color, isBlocking) => {

@@ -29,6 +29,7 @@ interface RequirementDetailModalProps {
   onNavigateToRequirement?: (itemId: string) => void;
   onSelectItem?: (itemId: string) => void;
   onCreateAndAssignCategory?: (itemId: string, label: string) => void;
+  onDeleteCategory?: (categoryId: string) => void;
   onAddRelationship?: (typeId: string, fromItemId: string, toItemId: string) => string | null;
   onDeleteRelationship?: (relationshipId: string) => void;
 }
@@ -47,6 +48,7 @@ export function RequirementDetailModal({
   onNavigateToRequirement,
   onSelectItem,
   onCreateAndAssignCategory,
+  onDeleteCategory,
   onAddRelationship,
   onDeleteRelationship,
 }: RequirementDetailModalProps) {
@@ -139,6 +141,7 @@ export function RequirementDetailModal({
                 onAssign={(categoryId) => onUpdateItem(item.id, { categoryId })}
                 onCreateAndAssign={(label) => onCreateAndAssignCategory?.(item.id, label)}
                 onClear={() => onUpdateItem(item.id, { categoryId: undefined })}
+                onDelete={onDeleteCategory}
               />
             ) : (
               category && (

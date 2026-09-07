@@ -203,6 +203,14 @@ export function RequirementsView({
     requirementsStoreRef.current.createAndAssignCategory(itemId, label);
   }, []);
 
+  // Categories are created ad hoc from any card's picker, so they're
+  // deleted from there too - that's where issue #7's reporter went
+  // looking for it. The store clears categoryId on every item that
+  // referenced it, so nothing is left dangling.
+  const onDeleteCategory = useCallback((categoryId: string) => {
+    requirementsStoreRef.current.deleteCategory(categoryId);
+  }, []);
+
   const onAddRelationship = useCallback((typeId: string, fromItemId: string, toItemId: string): string | null => {
     return requirementsStoreRef.current.addRelationship(typeId, fromItemId, toItemId);
   }, []);
@@ -255,8 +263,8 @@ export function RequirementsView({
     requirementsStoreRef.current.updateType(typeId, patch);
   };
 
-  const onDeleteCustomType = (typeId: string) => {
-    requirementsStoreRef.current.deleteCustomType(typeId);
+  const onDeleteCustomType = (typeId: string): boolean => {
+    return requirementsStoreRef.current.deleteCustomType(typeId);
   };
 
   const itemCountsByType = useMemo(() => {
@@ -391,6 +399,7 @@ export function RequirementsView({
                   onDeleteItem={onDeleteItem}
                   onNavigateToItem={onNavigateToItem}
                   onCreateAndAssignCategory={onCreateAndAssignCategory}
+                  onDeleteCategory={onDeleteCategory}
                   onAddRelationship={onAddRelationship}
                   onDeleteRelationship={onDeleteRelationship}
                   highlighted={highlightedId === item.id}

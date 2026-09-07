@@ -2970,6 +2970,27 @@
   background: rgba(240, 87, 140, 0.1);
 }
 
+.manage-types-modal__delete:disabled {
+  color: var(--chrome-text-dim);
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Deliberately not :disabled-aware - a disabled control that gives no
+   reason for being disabled is what produced the report this whole
+   change answers, so the count stays visible rather than living only in
+   a tooltip nobody hovers. */
+.manage-types-modal__delete:disabled:hover {
+  color: var(--chrome-text-dim);
+  background: transparent;
+}
+
+.manage-types-modal__in-use {
+  font-size: 11px;
+  color: var(--chrome-text-dim);
+  white-space: nowrap;
+}
+
 .manage-types-modal__form {
   display: flex;
   gap: 6px;
@@ -3064,6 +3085,93 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
+}
+
+/* The select-this-category button and its delete affordance share a row.
+   The delete button stays hidden until the row is hovered or the button
+   itself is focused, so browsing the list still reads as a plain picker
+   and a destructive control never sits under the cursor by default -
+   but it remains keyboard-reachable, which display:none would break. */
+.category-picker__row {
+  display: flex;
+  align-items: center;
+  border-radius: 4px;
+}
+
+.category-picker__row:hover {
+  background: var(--chrome-bg-raised);
+}
+
+.category-picker__delete {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  padding: 4px;
+  margin-right: 4px;
+  color: var(--chrome-text-dim);
+}
+
+/* Gated on hover being available at all: on a touch device there is no
+   hover state to reveal this with, so an unconditional opacity: 0 would
+   make deleting a category simply impossible there. */
+@media (hover: hover) {
+  .category-picker__delete {
+    opacity: 0;
+  }
+
+  .category-picker__row:hover .category-picker__delete,
+  .category-picker__delete:focus-visible {
+    opacity: 1;
+  }
+}
+
+.category-picker__delete:hover {
+  color: var(--danger);
+  background: rgba(240, 87, 140, 0.1);
+}
+
+.category-picker__confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 4px;
+  background: var(--chrome-bg-raised);
+  border: 1px solid var(--chrome-border);
+}
+
+.category-picker__confirm-text {
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--chrome-text);
+}
+
+.category-picker__confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.category-picker__confirm-cancel,
+.category-picker__confirm-delete {
+  border: 1px solid var(--chrome-border);
+  border-radius: 4px;
+  padding: 3px 9px;
+  font-size: 11.5px;
+  background: transparent;
+  color: var(--chrome-text);
+}
+
+.category-picker__confirm-delete {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.category-picker__confirm-delete:hover {
+  background: rgba(240, 87, 140, 0.12);
 }
 
 .category-picker__option {

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Tag, X } from "lucide-react";
-import { findCategoryByLabel, getCategory } from "../../domain/requirementsRegistry";
+import { Tag, Trash2, X } from "lucide-react";
+import { countItemsUsingCategory, findCategoryByLabel, getCategory } from "../../domain/requirementsRegistry";
 import { computeFlippedPosition } from "../../domain/popoverPosition";
 import type { RequirementsDocument } from "../../domain/requirementsTypes";
 
@@ -11,6 +11,10 @@ interface CategoryPickerProps {
   onAssign: (categoryId: string) => void;
   onCreateAndAssign: (label: string) => void;
   onClear: () => void;
+  /** Optional: hosts that can't delete (a read-only view, or one with no
+   * store to hand) simply omit it and no delete affordance is rendered,
+   * rather than showing a button that does nothing. */
+  onDelete?: (categoryId: string) => void;
 }
 
 const DROPDOWN_WIDTH = 220;
@@ -37,9 +41,14 @@ const DROPDOWN_WIDTH = 220;
  * synchronously after the DOM commits but before the browser paints, so
  * any correction happens invisibly rather than as a visible jump.
  */
-export function CategoryPicker({ doc, categoryId, onAssign, onCreateAndAssign, onClear }: CategoryPickerProps) {
+export function CategoryPicker({ doc, categoryId, onAssign, onCreateAndAssign, onClear, onDelete }: CategoryPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
+  // Which row is showing its inline "really delete?" strip. An inline
+  // confirm rather than window.confirm because the count of affected
+  // items is the whole point of asking, and a native dialog can't show
+  // it in the same place the person is already looking.
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -56,6 +65,7 @@ export function CategoryPicker({ doc, categoryId, onAssign, onCreateAndAssign, o
   const close = () => {
     setIsOpen(false);
     setQuery("");
+    setPendingDeleteId(null);
   };
 
   // Measures the dropdown's real rendered size (only possible once it's
@@ -76,7 +86,7 @@ export function CategoryPicker({ doc, categoryId, onAssign, onCreateAndAssign, o
       { width: window.innerWidth, height: window.innerHeight }
     );
     setDropdownPos((prev) => (prev && prev.top === next.top && prev.left === next.left ? prev : next));
-  }, [isOpen, query]);
+  }, [isOpen, query, pendingDeleteId]);
 
   // Same measure-and-flip logic, reused for scroll/resize while open -
   // the dropdown is already rendered by this point, so there's no need
@@ -183,20 +193,65 @@ export function CategoryPicker({ doc, categoryId, onAssign, onCreateAndAssign, o
                   Uncategorized
                 </button>
               )}
-              {filtered.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  className="category-picker__option"
-                  onClick={() => {
-                    onAssign(c.id);
-                    close();
-                  }}
-                >
-                  <span className="category-picker__swatch" style={{ background: c.color }} />
-                  {c.label}
-                </button>
-              ))}
+              {filtered.map((c) =>
+                pendingDeleteId === c.id ? (
+                  <div key={c.id} className="category-picker__confirm">
+                    <span className="category-picker__confirm-text">
+                      Delete "{c.label}"?
+                      {(() => {
+                        const inUse = countItemsUsingCategory(doc, c.id);
+                        return inUse === 0
+                          ? " It isn't used by anything."
+                          : ` ${inUse} item${inUse === 1 ? "" : "s"} will become uncategorized.`;
+                      })()}
+                    </span>
+                    <div className="category-picker__confirm-actions">
+                      <button
+                        type="button"
+                        className="category-picker__confirm-cancel"
+                        onClick={() => setPendingDeleteId(null)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="category-picker__confirm-delete"
+                        onClick={() => {
+                          onDelete?.(c.id);
+                          setPendingDeleteId(null);
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div key={c.id} className="category-picker__row">
+                    <button
+                      type="button"
+                      className="category-picker__option"
+                      onClick={() => {
+                        onAssign(c.id);
+                        close();
+                      }}
+                    >
+                      <span className="category-picker__swatch" style={{ background: c.color }} />
+                      {c.label}
+                    </button>
+                    {onDelete && (
+                      <button
+                        type="button"
+                        className="category-picker__delete"
+                        aria-label={`Delete ${c.label} category`}
+                        title="Delete this category"
+                        onClick={() => setPendingDeleteId(c.id)}
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    )}
+                  </div>
+                )
+              )}
               {canCreate && (
                 <button
                   type="button"

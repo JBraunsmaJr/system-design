@@ -56,7 +56,19 @@ function seedYjsStore(): { doc: Y.Doc; store: RequirementsStore } {
     store.createAndAssignCategory(id1, "Auth");
     const relError = store.addRelationship("blocks", id1, id2);
     store.deleteItem(id2);
-    return { snapshot: store.getSnapshot(), id1, relError };
+    // Both deletion paths are exercised here so all three
+    // implementations have to agree on them, not just on the operations
+    // that existed before: a category deleted while an item still uses
+    // it, and a type deletion refused because an item still uses it.
+    store.createAndAssignCategory(id1, "Doomed");
+    const doomed = store.getSnapshot().categories.find((c) => c.label === "Doomed")!;
+    store.deleteCategory(doomed.id);
+    store.addCustomType("Widget", "WID", "#5b7cfa", true);
+    const widgetItem = store.addItem("custom-1");
+    const refusedDelete = store.deleteCustomType("custom-1");
+    store.deleteItem(widgetItem);
+    const allowedDelete = store.deleteCustomType("custom-1");
+    return { snapshot: store.getSnapshot(), id1, relError, refusedDelete, allowedDelete };
   }
 
   const localStore = createLocalRequirementsStore(seedDoc());
@@ -77,6 +89,14 @@ function seedYjsStore(): { doc: Y.Doc; store: RequirementsStore } {
   assert(localResult.id1 === yjsResult.id1, `local and Yjs stores generate the identical first item id ("${localResult.id1}" vs "${yjsResult.id1}") from the same starting state`);
   assert(localResult.id1 === adapterResult.id1, `the adapter store generates the identical first item id too ("${adapterResult.id1}")`);
   assert(localResult.relError === null && yjsResult.relError === null, "the relationship was added without error in both stores (added before the target was deleted)");
+  assert(
+    localResult.refusedDelete === false && yjsResult.refusedDelete === false && adapterResult.refusedDelete === false,
+    "all three stores refuse to delete a type that still has an item, and report the refusal identically"
+  );
+  assert(
+    localResult.allowedDelete === true && yjsResult.allowedDelete === true && adapterResult.allowedDelete === true,
+    "all three stores allow the same delete once the last item using that type is gone"
+  );
   assert(
     canonicalJSON(localResult.snapshot) === canonicalJSON(yjsResult.snapshot),
     "local and Yjs stores produce an IDENTICAL snapshot after the same sequence of operations (add, update, categorize, relate, delete) - the Yjs implementation is a faithful drop-in for single-user use"
@@ -234,11 +254,15 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: RequirementsStore } {
   );
 }
 
-// === Part 5: deleteCustomType's relationship cascade - storage keys vs display ids ===
-// A real bug this fix surfaced: once items are keyed internally by
-// storage key (not display id), a cascade that collects storage keys but
-// then compares them against relationships' fromItemId/toItemId (which
-// are always display ids) would silently never match anything.
+// === Part 5: deleteCustomType refuses while the type is still in use ===
+// This replaces what used to be a cascade (deleting the type also
+// deleted every item of that type and every relationship touching one).
+// An item's display id is built from its type's prefix, so there is no
+// coherent state to leave those items in - but destroying them to tidy
+// up a type definition is silent, unrecoverable data loss. Refusing is
+// the safer failure, and it has to be enforced in the store rather than
+// only in the UI, since a collaborator can add an item of this type
+// between the modal rendering and the click landing.
 {
   const testDoc = new Y.Doc();
   seedBuiltInTypesIfEmpty(testDoc);
@@ -250,11 +274,48 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: RequirementsStore } {
   const relError = store.addRelationship("blocks", idA, idB);
   assert(relError === null, "relationship created successfully as test setup");
 
-  store.deleteCustomType("custom-1");
+  const refused = store.deleteCustomType("custom-1");
+
+  assert(refused === false, "deleting a type that still has items returns false");
+  const blocked = store.getSnapshot();
+  assert(blocked.itemTypes.some((t) => t.id === "custom-1"), "the refused type is still present - the refusal is a genuine no-op, not a partial delete");
+  assert(blocked.items.some((i) => i.id === idA), "the item using the type is untouched - this is the data loss the old cascade caused");
+  assert(blocked.relationships.length === 1, "the relationship touching that item is untouched too");
+
+  // Clearing the last item using the type unblocks it.
+  store.deleteItem(idA);
+  const allowed = store.deleteCustomType("custom-1");
+
+  assert(allowed === true, "once nothing uses the type, deleting it succeeds");
+  const after = store.getSnapshot();
+  assert(after.itemTypes.every((t) => t.id !== "custom-1"), "the now-unused type is actually removed");
+  assert(after.items.some((i) => i.id === idB), "the unrelated item of a different type is left alone");
+}
+
+// === Part 5b: deleteCategory clears the reference on every item using it ===
+// Unlike a type, a category is an optional label - deleting it is never
+// blocked, but every item pointing at it has to be cleared or it renders
+// as a dangling reference rather than as uncategorized.
+{
+  const testDoc = new Y.Doc();
+  seedBuiltInTypesIfEmpty(testDoc);
+  const store = createYjsRequirementsStore(testDoc);
+  const idA = store.addItem("requirement");
+  const idB = store.addItem("requirement");
+  const idC = store.addItem("requirement");
+  store.createAndAssignCategory(idA, "Auth");
+  store.createAndAssignCategory(idB, "Auth");
+  store.createAndAssignCategory(idC, "Billing");
+
+  const authId = store.getSnapshot().categories.find((c) => c.label === "Auth")!.id;
+  store.deleteCategory(authId);
 
   const snap = store.getSnapshot();
-  assert(snap.items.every((i) => i.id !== idA), "the custom type's item is actually removed");
-  assert(snap.relationships.length === 0, "the relationship referencing the deleted item's display id is correctly cleaned up - this is the case that would have silently failed if storage keys and display ids were conflated");
+  assert(snap.categories.every((c) => c.id !== authId), "the deleted category is gone from the document");
+  assert(snap.items.find((i) => i.id === idA)!.categoryId === undefined, "the first item that used it is now uncategorized, not left pointing at a category that no longer exists");
+  assert(snap.items.find((i) => i.id === idB)!.categoryId === undefined, "every item that used it is cleared, not just the first one found");
+  assert(snap.items.find((i) => i.id === idC)!.categoryId !== undefined, "an item in a DIFFERENT category keeps its own assignment");
+  assert(snap.items.length === 3, "no items are removed - deleting a category only ever drops the label");
 }
 
 // === Part 6: seedYjsRequirementsDoc - starting a session must preserve existing work exactly, not lose or mangle it ===
