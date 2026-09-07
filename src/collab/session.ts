@@ -198,7 +198,17 @@ export function startCollabSession(doc: Y.Doc, roomName: string, options: Collab
     provider,
     isSynced: () => provider.room?.synced ?? false,
     disconnect: () => {
-      provider.disconnect();
+      // destroy() already calls Room.disconnect() as its own first
+      // step internally (see y-webrtc's own source), then additionally
+      // removes this room from a module-level registry shared across
+      // every WebrtcProvider on the page and detaches a beforeunload
+      // listener - neither of which plain disconnect() does on its own.
+      // Calling disconnect() separately first was redundant at best
+      // (the room's teardown logic - removing awareness state,
+      // destroying webrtc connections, unsubscribing from the
+      // broadcast channel - would run twice in a row) and a plausible
+      // source of its own issues at worst, depending on how idempotent
+      // each of those steps actually is.
       provider.destroy();
     },
     setLocalPresence: (info) => {
