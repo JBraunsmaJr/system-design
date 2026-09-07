@@ -3,39 +3,19 @@ import type * as Y from "yjs";
 
 /**
  * Wires a Y.Doc to a WebRTC-based collaborative session. This is the
- * transport layer the plan called for: actual document sync happens
- * peer-to-peer over WebRTC data channels, so no third party ever sees
- * workbook content - the only thing that touches outside infrastructure
- * is the signaling handshake (opaque connection-setup metadata,
- * meaningless without the data channel it's establishing), and even
- * that goes to a self-hosted relay, never y-webrtc's own public default
- * signaling servers.
+ * transport layer for how the actual document sync happens peer-to-peer over WebRTC data channels,
+ * so no third party ever sees workbook content - the only thing that touches outside infrastructure
+ * is the signaling handshake (opaque connection-setup metadata, meaningless without the data channel it's establishing),
+ * and even that goes to a self-hosted relay, never y-webrtc's own public default signaling servers. Technically,
+ * a user can configure y-webrtc to use the public signaling servers if desired.
  *
  * y-webrtc ships its own signaling server as a bin script
  * (node_modules/y-webrtc/bin/server.js, published as the
- * `y-webrtc-signaling` command) - confirmed by reading its actual
- * source before depending on it: it's a genuinely stateless relay (an
+ * `y-webrtc-signaling` command) - it's a genuinely stateless relay (an
  * in-memory Map from room name to the set of subscribed connections,
  * nothing persisted), and its `publish` handler forwards whatever
  * message object it's given to a room's other subscribers without ever
- * inspecting its content - exactly the "small, generic, self-hostable"
- * signaling piece the plan described, already built and maintained
- * upstream rather than something to hand-roll here. Its rendezvous
- * protocol (subscribe/publish by topic) was verified directly with real
- * WebSocket clients - start the server, connect two independent
- * clients, confirm a published message reaches a subscriber and not a
- * non-subscriber - before writing this integration.
- *
- * What ISN'T verified here, and can't be from this environment: actual
- * WebRTC peer-to-peer data flow between two browser tabs. WebRTC is a
- * browser API (RTCPeerConnection and friends) with no equivalent in
- * plain Node without a heavy, non-production native dependency (`wrtc`)
- * that wouldn't reflect real browser behavior anyway - so this specific
- * piece needs manual verification in an actual browser (two tabs, or
- * two machines) before being treated as proven. Everything that
- * genuinely IS testable without a browser - the signaling server's own
- * protocol, and this module's own construction/lifecycle logic - has
- * been.
+ * inspecting its content.
  *
  * A room name IS the whole "who's in this session" mechanism - anyone
  * with the exact room name (and, if set, the password) can join.
@@ -152,13 +132,6 @@ export interface CollabSessionOptions {
 }
 
 /**
- * Starts (or joins, if others are already there) a collaborative
- * session for the given Y.Doc under `roomName`. The returned session
- * stays live until `disconnect()` is called - this does not tie into
- * React's lifecycle itself; a caller (e.g. a hook) is responsible for
- * disconnecting when a session ends or a component unmounts.
- */
-/**
  * Validates and normalizes one peer's raw Awareness state into a
  * PresenceInfo, or returns null if it doesn't even have the minimum
  * required fields (name, color) to be considered a genuine, identified
@@ -195,6 +168,13 @@ export function parsePresenceState(clientId: number, state: unknown): PresenceIn
   };
 }
 
+/**
+ * Starts (or joins, if others are already there) a collaborative
+ * session for the given Y.Doc under `roomName`. The returned session
+ * stays live until `disconnect()` is called - this does not tie into
+ * React's lifecycle itself; a caller (e.g. a hook) is responsible for
+ * disconnecting when a session ends or a component unmounts.
+ */
 export function startCollabSession(doc: Y.Doc, roomName: string, options: CollabSessionOptions): CollabSession {
   if (options.signalingUrls.length === 0) {
     throw new Error(
@@ -211,17 +191,13 @@ export function startCollabSession(doc: Y.Doc, roomName: string, options: Collab
     provider,
     isSynced: () => provider.room?.synced ?? false,
     disconnect: () => {
-      // destroy() already calls Room.disconnect() as its own first
-      // step internally (see y-webrtc's own source), then additionally
-      // removes this room from a module-level registry shared across
-      // every WebrtcProvider on the page and detaches a beforeunload
-      // listener - neither of which plain disconnect() does on its own.
-      // Calling disconnect() separately first was redundant at best
-      // (the room's teardown logic - removing awareness state,
-      // destroying webrtc connections, unsubscribing from the
-      // broadcast channel - would run twice in a row) and a plausible
-      // source of its own issues at worst, depending on how idempotent
-      // each of those steps actually is.
+      /**
+       * destroy() already calls Room.disconnect() as its own first step
+       * internally (see y-webrtc's own source), then additionally removes
+       * this room from a module-level registry shared across every
+       * WebrtcProvider on the page and detaches a "beforeunload" listener
+       * - neither of which plain disconnect() does on its own.
+       */
       provider.destroy();
     },
     setLocalPresence: (info) => {
