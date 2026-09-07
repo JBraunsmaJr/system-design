@@ -4,8 +4,8 @@ name: Build and publish Docker image
 # image) plus workflow_dispatch for a manual re-run - e.g. to publish a
 # fresh image under today's date without needing an unrelated commit.
 on:
-  push:
-    branches: [main]
+  release:
+    types: [ published ]
   workflow_dispatch:
 
 permissions:
