@@ -501,4 +501,126 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: RequirementsStore } {
   );
 }
 
+// === Part 22: concurrent category assignment vs. category deletion ===
+// Two peers each make an edit that is perfectly valid against the state
+// they can see: one assigns an item to a category, the other deletes
+// that same category (having no items under it at the time). The
+// assignment and the deletion touch different maps, so Yjs merges both
+// and the item is left pointing at a category that no longer exists.
+// Neither mutator can prevent this - by the time the other peer's edit
+// arrives, both have already run - so the repair happens on the
+// post-change path instead.
+{
+  const docA = new Y.Doc();
+  seedBuiltInTypesIfEmpty(docA);
+  const storeA = createYjsRequirementsStore(docA);
+  const firstId = storeA.addItem("requirement");
+  storeA.addItem("requirement");
+  storeA.createAndAssignCategory(firstId, "Auth");
+  const categoryId = storeA.getSnapshot().categories[0].id;
+
+  const docB = new Y.Doc();
+  const storeB = createYjsRequirementsStore(docB);
+  sync(docA, docB);
+
+  const secondId = storeB.getSnapshot().items[1].id;
+  storeA.createAndAssignCategory(secondId, "Auth"); // resolves to the existing category by label
+  storeB.deleteCategory(categoryId);
+
+  sync(docA, docB);
+
+  const snapA = storeA.getSnapshot();
+  const snapB = storeB.getSnapshot();
+  const danglingA = snapA.items.filter((i) => i.categoryId && !snapA.categories.some((c) => c.id === i.categoryId));
+
+  assert(danglingA.length === 0, "after a concurrent assign-vs-delete merge, no item is left pointing at a category that no longer exists");
+  assert(snapA.items.length === 2, "and both items survive - only the label was dropped, never the item");
+  assert(
+    JSON.stringify(snapA.items.map((i) => i.categoryId)) === JSON.stringify(snapB.items.map((i) => i.categoryId)),
+    "both peers converge on the same repaired state, since the repair is deterministic and every peer runs it over the same merged document"
+  );
+}
+
+// === Part 23: concurrent item creation vs. custom type deletion ===
+// The race deleteCustomType's own guard explicitly can't close: the
+// guard correctly sees no items using the type, because the item that
+// uses it hasn't arrived yet. Repaired in the opposite direction from a
+// category - the TYPE is restored rather than the item reassigned,
+// because the item's display id, its relationships and any #WID-1
+// references in other items all derive from that type. It also has to
+// be restored for the item to be visible at all: "group by type" builds
+// groups from the types that exist, so an item whose type is gone
+// appears in none of them.
+{
+  const docA = new Y.Doc();
+  seedBuiltInTypesIfEmpty(docA);
+  const storeA = createYjsRequirementsStore(docA);
+  const added = storeA.addCustomType("Widget", "WID", "#5b7cfa", true);
+  assert(added, "custom type created as test setup");
+
+  const docB = new Y.Doc();
+  const storeB = createYjsRequirementsStore(docB);
+  sync(docA, docB);
+
+  const itemId = storeA.addItem("custom-1");
+  const deleted = storeB.deleteCustomType("custom-1");
+  assert(deleted === true, "the deleting peer's in-use guard passes, because the item using the type hasn't reached it yet");
+
+  sync(docA, docB);
+
+  const snapA = storeA.getSnapshot();
+  const snapB = storeB.getSnapshot();
+  const orphans = snapA.items.filter((i) => !snapA.itemTypes.some((t) => t.id === i.typeId));
+
+  assert(orphans.length === 0, "after the merge no item is left with a type that doesn't exist - which would have made it invisible in the default group-by-type view");
+  assert(snapA.items.some((i) => i.id === itemId), `the concurrently-created item still exists, keeping its original display id (${itemId})`);
+
+  const restored = snapA.itemTypes.find((t) => t.id === "custom-1");
+  assert(restored !== undefined, "the type is restored rather than the item being reassigned to some fallback");
+  assert(restored?.label === "Widget", "restored from the tombstone deleteCustomType recorded, so the real label survives rather than being reconstructed from the display-id prefix");
+  assert(restored?.prefix === "WID", "and its prefix, which the item's display id depends on");
+  assert(restored?.color === "#5b7cfa", "and its color");
+  assert(restored?.isWorkable === true, "and isWorkable - the field that decides whether these items can go into a sprint at all, and the one a prefix-derived guess would get wrong");
+  assert(
+    JSON.stringify(snapA.itemTypes) === JSON.stringify(snapB.itemTypes) && JSON.stringify(snapA.items) === JSON.stringify(snapB.items),
+    "both peers converge on the same restored type and items"
+  );
+}
+
+// === Part 24: an uncontested type deletion still just deletes ===
+// The repair must not resurrect types that were legitimately removed -
+// it only fires when something still references them.
+{
+  const testDoc = new Y.Doc();
+  seedBuiltInTypesIfEmpty(testDoc);
+  const store = createYjsRequirementsStore(testDoc);
+  store.addCustomType("Widget", "WID", "#5b7cfa", true);
+  const temp = store.addItem("custom-1");
+  store.deleteItem(temp);
+
+  assert(store.deleteCustomType("custom-1") === true, "an unused custom type deletes normally");
+  const snap = store.getSnapshot();
+  assert(snap.itemTypes.every((t) => t.id !== "custom-1"), "and stays deleted - the repair does not resurrect a type nothing references");
+}
+
+// === Part 25: a reused custom id doesn't resurrect the old definition ===
+// addCustomType hands out the smallest unused custom-N, so an id can be
+// reused. A stale tombstone under that id describes an unrelated type.
+{
+  const testDoc = new Y.Doc();
+  seedBuiltInTypesIfEmpty(testDoc);
+  const store = createYjsRequirementsStore(testDoc);
+  store.addCustomType("Widget", "WID", "#5b7cfa", true);
+  store.deleteCustomType("custom-1");
+  store.addCustomType("Gadget", "GAD", "#f0578c", false);
+
+  const reused = store.getSnapshot().itemTypes.find((t) => t.id === "custom-1");
+  assert(reused?.label === "Gadget", "the reused id carries the NEW type's definition, not the tombstoned one");
+
+  const itemId = store.addItem("custom-1");
+  const snap = store.getSnapshot();
+  assert(snap.items.find((i) => i.id === itemId) !== undefined, "and items created under it behave normally");
+  assert(snap.itemTypes.filter((t) => t.id === "custom-1").length === 1, "with no duplicate type left behind");
+}
+
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);

@@ -187,6 +187,20 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
   const relationshipTypes = doc.getMap<RelationshipType>("relationshipTypes");
   const relationships = doc.getMap<RequirementRelationship>("relationships");
   const nextSequence = doc.getMap<number>("nextSequence");
+  /**
+   * Definitions of custom item types that have been deleted, kept so a
+   * type can be restored faithfully if a concurrent edit turns out to
+   * have been using it - see repairOrphanedReferences. Written by
+   * deleteCustomType, consumed (and cleared) by the repair, and cleared
+   * again by addCustomType in case an id is later reused.
+   *
+   * A deleted type's definition is genuinely unrecoverable from the Yjs
+   * doc otherwise: deleting the map entry discards label, color and
+   * isWorkable, and isWorkable in particular decides whether the type's
+   * items can go into a sprint at all. Reconstructing that from a
+   * display-id prefix would be a guess.
+   */
+  const deletedItemTypes = doc.getMap<Y.Map<unknown>>("deletedItemTypes");
 
   function itemTypeMapToPlain(id: string, m: Y.Map<unknown>): RequirementItemType {
     return {
@@ -310,6 +324,110 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
     return true;
   }
 
+  /**
+   * Clears or restores references that point at something no longer in
+   * the document, and returns whether it changed anything.
+   *
+   * These dangling references are only ever produced by a MERGE, never
+   * by a local edit: deleteCategory and deleteCustomType both leave the
+   * document consistent when they run. The damage comes from two edits
+   * that were each valid against the state their own peer could see -
+   *
+   *   - one peer assigns an item to a category while another deletes
+   *     that category, and
+   *   - one peer creates an item under a custom type while another
+   *     deletes that type, its in-use guard correctly seeing no items.
+   *
+   * Yjs merges both, since the assignment and the deletion touch
+   * different maps and neither is a conflicting write. So the repair
+   * cannot live inside those mutators - by the time the conflicting
+   * edit arrives they have long since run. It belongs here, on the path
+   * that runs after every document change including a remote one,
+   * exactly like repairDuplicateDisplayIds above.
+   *
+   * Every peer runs the same deterministic repair over the same merged
+   * state and therefore writes the same values, so this converges
+   * rather than fighting itself. It also terminates: once the reference
+   * resolves, the repair no longer fires for it.
+   *
+   * The two cases are repaired in opposite directions on purpose.
+   *
+   * A dangling categoryId is CLEARED. A category is an optional label,
+   * so dropping it leaves the item intact and merely uncategorized -
+   * which is exactly what deleteCategory's own contract promises, and
+   * what "group by category" already displays for such items anyway.
+   *
+   * A missing item type is RESTORED, not reassigned. An item's whole
+   * identity derives from its type: the display id ("WID-1") carries
+   * the type's prefix, relationships reference items by that display
+   * id, and #WID-1 references in other items' bodies resolve through
+   * it. Reassigning the item to some fallback type would either break
+   * all of that or silently change what the item means. Restoring is
+   * also what deleteCustomType's own invariant asks for - a type with
+   * items is not deletable, and the merge is what reveals this one had
+   * items after all, so the deletion was never legal. Without this the
+   * item vanishes outright from the requirements list, since "group by
+   * type" (the default) builds its groups by iterating the types that
+   * exist and collecting their items - an item whose type is gone lands
+   * in no group at all.
+   */
+  function repairOrphanedReferences(): boolean {
+    const danglingCategoryKeys: string[] = [];
+    const missingTypeIds = new Map<string, string>(); // typeId -> a display id using it
+
+    for (const storageKey of itemOrder.toArray()) {
+      const m = items.get(storageKey);
+      if (!m) continue;
+
+      const categoryId = m.get("categoryId") as string | undefined;
+      if (categoryId !== undefined && !categories.has(categoryId)) danglingCategoryKeys.push(storageKey);
+
+      const typeId = m.get("typeId") as string;
+      if (typeId !== undefined && !itemTypes.has(typeId) && !missingTypeIds.has(typeId)) {
+        missingTypeIds.set(typeId, m.get("id") as string);
+      }
+    }
+
+    if (danglingCategoryKeys.length === 0 && missingTypeIds.size === 0) return false;
+
+    doc.transact(() => {
+      for (const storageKey of danglingCategoryKeys) {
+        items.get(storageKey)?.set("categoryId", undefined);
+      }
+
+      for (const [typeId, sampleDisplayId] of missingTypeIds) {
+        const restored = new Y.Map<unknown>();
+        const tombstone = deletedItemTypes.get(typeId);
+        if (tombstone) {
+          for (const [key, value] of tombstone.entries()) restored.set(key, value);
+        } else {
+          /**
+           * No tombstone: the type was dropped by a client that predates
+           * deleteCustomType recording one, or by some other path. Fall
+           * back to reconstructing just enough for the item to be
+           * visible and editable again, derived from the prefix already
+           * baked into its own display id. The label is marked so it's
+           * obvious this was recovered rather than authored, and
+           * isWorkable defaults to false because guessing it true would
+           * silently make these items sprint-eligible - the more
+           * damaging direction to be wrong in.
+           */
+          const prefix = /^([A-Za-z][A-Za-z0-9]*)-\d+$/.exec(sampleDisplayId)?.[1] ?? typeId.toUpperCase();
+          restored.set("label", `${prefix} (recovered)`);
+          restored.set("prefix", prefix);
+          restored.set("color", "#98a2b3");
+          restored.set("isWorkable", false);
+        }
+        restored.set("isBuiltIn", false);
+        itemTypes.set(typeId, restored);
+        if (!itemTypeOrder.toArray().includes(typeId)) itemTypeOrder.push([typeId]);
+        deletedItemTypes.delete(typeId);
+      }
+    });
+
+    return true;
+  }
+
   function buildSnapshot(): RequirementsDocument {
     const idIndex = new Map<string, string>();
     const items_ = itemOrder
@@ -350,11 +468,13 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
    * observe anything.
    */
   repairDuplicateDisplayIds();
+  repairOrphanedReferences();
 
   let cached = buildSnapshot();
   const listeners = new Set<() => void>();
   const recomputeAndNotify = () => {
     if (repairDuplicateDisplayIds()) return; // its own transact() triggers another observeDeep round, which will rebuild `cached` correctly
+    if (repairOrphanedReferences()) return; // same - its writes re-enter here with the document already consistent
     cached = buildSnapshot();
     for (const listener of listeners) listener();
   };
@@ -493,6 +613,10 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
         m.set("isWorkable", isWorkable);
         itemTypes.set(id, m);
         itemTypeOrder.push([id]);
+        // custom-N ids are reused once freed (the scan above picks the
+        // smallest unused number), so an old tombstone under this id
+        // would describe a completely unrelated type.
+        deletedItemTypes.delete(id);
       });
       return true;
     },
@@ -521,6 +645,15 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
         for (const storageKey of itemOrder.toArray()) {
           if (items.get(storageKey)?.get("typeId") === typeId) return;
         }
+        const existing = itemTypes.get(typeId);
+        if (!existing) return;
+        // Snapshot the definition before dropping it. If a peer created
+        // an item under this type concurrently, the merged document will
+        // contain that item and no type for it, and repairOrphanedReferences
+        // restores the type from here rather than guessing at it.
+        const tombstone = new Y.Map<unknown>();
+        for (const [key, value] of existing.entries()) tombstone.set(key, value);
+        deletedItemTypes.set(typeId, tombstone);
         itemTypes.delete(typeId);
         const typeIdx = itemTypeOrder.toArray().indexOf(typeId);
         if (typeIdx !== -1) itemTypeOrder.delete(typeIdx, 1);
