@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ChangeEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ChangeEvent } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useUndoableState } from "./hooks/useUndoableState";
 import {
@@ -325,13 +325,30 @@ function App() {
   const localPresenceRef = useRef<LocalPresenceInfo>({ name: "", color: "", cursor: null, selectedNodeIds: [], selectedEdgeIds: [], viewMode: null, focusedItemId: null, diagramPath: "" });
   // activeSessionRef lets broadcastPresence stay a permanently stable
   // function (empty deps) while still always reaching the CURRENT
-  // session - same rootRef/diagramStoreRef pattern used elsewhere in
-  // this file, and the same justification: this mutation always
-  // completes before broadcastPresence could ever read it, since reads
-  // only happen later, from event handlers or effects, never during
-  // render itself.
+  // session.
+  //
+  // Updated from a layout effect rather than during render, because a
+  // render can be started and then thrown away - interrupted by a
+  // higher-priority update, or double-invoked in StrictMode - while a
+  // ref mutation made during that render survives it. A callback
+  // committed from the last render that actually landed would then read
+  // a session this component never committed to, and broadcast presence
+  // into it. That is a real hazard on this branch specifically: the
+  // value being tracked IS the session identity.
+  //
+  // useLayoutEffect and not useEffect: passive effects are deferred
+  // after paint, leaving a window where committed handlers can fire
+  // against a ref that still points at the previous session. Layout
+  // effects run synchronously after commit and before both paint and
+  // every passive effect, so the ref is current before anything can
+  // read it. Every reader is an event handler or a passive effect
+  // (broadcastPresence's own call site below, and the useEffects that
+  // call it further down), never a render or a child layout effect -
+  // which is what makes the layout-effect timing sufficient here.
   const activeSessionRef = useRef(activeSession);
-  activeSessionRef.current = activeSession;
+  useLayoutEffect(() => {
+    activeSessionRef.current = activeSession;
+  }, [activeSession]);
   const broadcastPresence = useCallback((patch: Partial<PresenceInfo>) => {
     const session = activeSessionRef.current?.session;
     if (!session) return;
@@ -504,8 +521,15 @@ function App() {
   const diagramStore = activeSession?.diagramStore ?? localDiagramStore;
   const diagramStoreRef = useRef(diagramStore);
 
-  // eslint-disable-next-line react-hooks/refs
-  diagramStoreRef.current = diagramStore;
+  // Layout effect rather than a render-phase assignment, for the same
+  // reason as activeSessionRef above - and with the same consequence if
+  // it's wrong, since this ref decides whether an edit lands in the
+  // local adapter store or the session's shared Yjs doc. Its only
+  // readers are the onUpdateNode/onUpdateEdge callbacks further down,
+  // both invoked from event handlers.
+  useLayoutEffect(() => {
+    diagramStoreRef.current = diagramStore;
+  }, [diagramStore]);
 
   // Auto-saves the current diagram to localStorage so a refresh, an
   // accidental tab close, or a crash doesn't lose work - separate from
