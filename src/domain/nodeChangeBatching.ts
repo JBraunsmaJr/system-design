@@ -46,6 +46,36 @@ export interface CurrentNodeGeometry {
   position: { x: number; y: number };
   width?: number;
   height?: number;
+  /** Whether this node's size comes from its own content rather than
+   * from a user resize gesture - see isAutoSizedNodeType below. */
+  isAutoSized: boolean;
+}
+
+/**
+ * Whether a node type sizes itself from its content, as opposed to
+ * carrying a width/height the user set by dragging a NodeResizer.
+ *
+ * Only "typed" nodes are content-sized: group/shape/text/code all
+ * render a NodeResizer and genuinely own an explicit, user-chosen
+ * width/height that has to be shared with everyone else in a session.
+ *
+ * The distinction matters because React Flow applies a node's explicit
+ * width/height as an INLINE STYLE on the wrapper element it renders
+ * around the node component (NodeWrapper: `width: node.width ??
+ * node.style?.width`). Writing a content-sized node's MEASURED height
+ * back as an explicit height therefore pins that wrapper to a fixed
+ * box, and since the ResizeObserver observes that same wrapper, the
+ * wrapper can no longer change size in response to its own content -
+ * so the pinned value is frozen at whatever happened to be measured on
+ * whichever client committed it first. Any client whose content lays
+ * out even slightly taller (web font still loading at measure time,
+ * different text metrics, a label edited since) then renders its
+ * visible card overflowing a wrapper that's too short, while handles
+ * and peer selection outlines - which are positioned against the
+ * wrapper, not the card - sit inside the card's visible bounds.
+ */
+export function isAutoSizedNodeType(type: string | undefined): boolean {
+  return type === "typed";
 }
 
 /**
@@ -104,6 +134,13 @@ export function classifyNodeChanges(
       }
     } else if (change.type === "dimensions" && change.dimensions) {
       const current = currentNodes.get(change.id);
+      // A content-sized node's dimensions are a MEASUREMENT, not state -
+      // every client measures the same content for itself, and
+      // persisting one client's measurement pins the node's wrapper to
+      // a fixed box on all of them (see isAutoSizedNodeType). Dropped
+      // here rather than in App.tsx so the reasoning lives next to the
+      // no-op guard it sits beside, and so it's directly testable.
+      if (current?.isAutoSized) continue;
       const isNoOp = !!current && current.width === change.dimensions.width && current.height === change.dimensions.height;
       if (!isNoOp) {
         pending.set(change.id, {

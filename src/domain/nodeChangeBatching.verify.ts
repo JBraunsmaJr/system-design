@@ -15,7 +15,7 @@
  * position being committed (a new, worse bug) - so this is tested
  * thoroughly rather than trusted from a single manual read-through.
  */
-import { classifyNodeChanges, applySelectionChanges, type PendingNodeUpdate, type CurrentNodeGeometry } from "./nodeChangeBatching";
+import { classifyNodeChanges, applySelectionChanges, isAutoSizedNodeType, type PendingNodeUpdate, type CurrentNodeGeometry } from "./nodeChangeBatching";
 import type { NodeChange } from "@xyflow/react";
 
 let failures = 0;
@@ -202,7 +202,7 @@ function assert(cond: boolean, msg: string) {
 // a self-sustaining loop needing nothing to actually change to keep running.
 {
   const pending = new Map<string, PendingNodeUpdate>();
-  const current = new Map<string, CurrentNodeGeometry>([["n1", { position: { x: 0, y: 0 }, width: 200, height: 100 }]]);
+  const current = new Map<string, CurrentNodeGeometry>([["n1", { position: { x: 0, y: 0 }, width: 200, height: 100, isAutoSized: false }]]);
   const changes: NodeChange[] = [{ id: "n1", type: "dimensions", dimensions: { width: 200, height: 100 } }];
   const { isActiveGesture } = classifyNodeChanges(changes, pending, current);
 
@@ -213,7 +213,7 @@ function assert(cond: boolean, msg: string) {
 // === Part 17: a dimensions change that's genuinely DIFFERENT from current geometry is still queued normally ===
 {
   const pending = new Map<string, PendingNodeUpdate>();
-  const current = new Map<string, CurrentNodeGeometry>([["n1", { position: { x: 0, y: 0 }, width: 200, height: 100 }]]);
+  const current = new Map<string, CurrentNodeGeometry>([["n1", { position: { x: 0, y: 0 }, width: 200, height: 100, isAutoSized: false }]]);
   const changes: NodeChange[] = [{ id: "n1", type: "dimensions", dimensions: { width: 250, height: 100 } }]; // width genuinely changed
   classifyNodeChanges(changes, pending, current);
 
@@ -223,7 +223,7 @@ function assert(cond: boolean, msg: string) {
 // === Part 18: the same no-op guard applies to position changes ===
 {
   const pending = new Map<string, PendingNodeUpdate>();
-  const current = new Map<string, CurrentNodeGeometry>([["n1", { position: { x: 50, y: 75 } }]]);
+  const current = new Map<string, CurrentNodeGeometry>([["n1", { position: { x: 50, y: 75 }, isAutoSized: false }]]);
 
   const noOpChanges: NodeChange[] = [{ id: "n1", type: "position", position: { x: 50, y: 75 } }];
   classifyNodeChanges(noOpChanges, pending, current);
@@ -251,7 +251,7 @@ function assert(cond: boolean, msg: string) {
   const changes: NodeChange[] = [];
   for (let i = 0; i < 50; i++) {
     const id = `node-${i}`;
-    current.set(id, { position: { x: i * 10, y: 0 }, width: 226, height: 120 });
+    current.set(id, { position: { x: i * 10, y: 0 }, width: 226, height: 120, isAutoSized: false });
     changes.push({ id, type: "dimensions", dimensions: { width: 226, height: 120 } });
   }
   const { isActiveGesture } = classifyNodeChanges(changes, pending, current);
@@ -264,8 +264,8 @@ function assert(cond: boolean, msg: string) {
 {
   const pending = new Map<string, PendingNodeUpdate>();
   const current = new Map<string, CurrentNodeGeometry>([
-    ["unchanged", { position: { x: 0, y: 0 }, width: 100, height: 50 }],
-    ["resized", { position: { x: 0, y: 0 }, width: 100, height: 50 }],
+    ["unchanged", { position: { x: 0, y: 0 }, width: 100, height: 50, isAutoSized: false }],
+    ["resized", { position: { x: 0, y: 0 }, width: 100, height: 50, isAutoSized: false }],
   ]);
   const changes: NodeChange[] = [
     { id: "unchanged", type: "dimensions", dimensions: { width: 100, height: 50 } }, // no-op
@@ -274,6 +274,52 @@ function assert(cond: boolean, msg: string) {
   classifyNodeChanges(changes, pending, current);
 
   assert(pending.size === 1 && pending.has("resized") && !pending.has("unchanged"), "in a mixed batch, only the node that genuinely changed size is queued - the unchanged one is correctly filtered out without affecting the other");
+}
+
+// === Part 19: a CONTENT-SIZED node's dimensions are never queued at all ===
+// React Flow applies an explicit width/height as an inline style on the
+// wrapper it renders around each node, and observes that same wrapper
+// for resizes. Persisting a content-sized node's MEASURED size as an
+// explicit one therefore pins the wrapper to a fixed box that can no
+// longer respond to its own content - freezing it at whatever one
+// client measured, and leaving every other client's visible card
+// overflowing a wrapper that handles and peer selection outlines are
+// still positioned against. Each client measures this for itself.
+{
+  const pending = new Map<string, PendingNodeUpdate>();
+  const current = new Map<string, CurrentNodeGeometry>([
+    ["auto", { position: { x: 0, y: 0 }, isAutoSized: true }],
+  ]);
+  const changes: NodeChange[] = [{ id: "auto", type: "dimensions", dimensions: { width: 260, height: 126 } }];
+  const { isActiveGesture } = classifyNodeChanges(changes, pending, current);
+
+  assert(pending.size === 0, "a content-sized node's measured dimensions are never queued for the store, even though they differ from its (absent) explicit width/height - this is the fix for connectors and peer selection outlines rendering at the wrong size on other clients");
+  assert(!isActiveGesture, "a dropped content-sized dimensions change doesn't count as an active gesture either");
+}
+
+// === Part 20: an explicitly-sized node's resize IS still queued ===
+// The counterpart to Part 19 - group/shape/text/code nodes carry a
+// genuinely user-chosen size from their NodeResizer, which every
+// collaborator does need to see.
+{
+  const pending = new Map<string, PendingNodeUpdate>();
+  const current = new Map<string, CurrentNodeGeometry>([
+    ["grp", { position: { x: 0, y: 0 }, width: 400, height: 300, isAutoSized: false }],
+  ]);
+  const changes: NodeChange[] = [{ id: "grp", type: "dimensions", dimensions: { width: 520, height: 300 }, resizing: true }];
+  const { isActiveGesture } = classifyNodeChanges(changes, pending, current);
+
+  assert(pending.get("grp")?.type === "dimensions", "a resizable node's genuine resize is still queued normally");
+  assert(isActiveGesture, "an in-progress resize of a resizable node is still reported as an active gesture");
+}
+
+// === Part 21: isAutoSizedNodeType classifies every node type in use ===
+{
+  assert(isAutoSizedNodeType("typed"), "typed nodes size themselves from their content");
+  assert(!isAutoSizedNodeType("group"), "group nodes carry an explicit user-chosen size");
+  assert(!isAutoSizedNodeType("shape"), "shape nodes carry an explicit user-chosen size");
+  assert(!isAutoSizedNodeType("text"), "text nodes carry an explicit user-chosen size");
+  assert(!isAutoSizedNodeType("code"), "code nodes carry an explicit user-chosen size");
 }
 
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);

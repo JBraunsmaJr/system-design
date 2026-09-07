@@ -62,7 +62,7 @@ import type { ProgramIncrementsStore } from "./collab/programIncrementsStore";
 import { startCollabSession, type CollabSession, type PresenceInfo, type LocalPresenceInfo } from "./collab/session";
 import { loadPresenceName, savePresenceName, loadShowPeerCursors, saveShowPeerCursors } from "./domain/presenceIdentity";
 import { loadSignalingUrls, saveSignalingUrls, parseSignalingUrls } from "./domain/signalingConfig";
-import { classifyNodeChanges, applySelectionChanges, type PendingNodeUpdate, type CurrentNodeGeometry } from "./domain/nodeChangeBatching";
+import { classifyNodeChanges, applySelectionChanges, isAutoSizedNodeType, type PendingNodeUpdate, type CurrentNodeGeometry } from "./domain/nodeChangeBatching";
 import "./App.css";
 
 let idSeed = 0;
@@ -582,6 +582,19 @@ function App() {
   const requirementsSnapshot = useSyncExternalStore(requirementsStore.subscribe, requirementsStore.getSnapshot);
   const programIncrementsSnapshot = useSyncExternalStore(programIncrementsStore.subscribe, programIncrementsStore.getSnapshot);
 
+  // This client's own record of what React Flow last measured each node
+  // to be. Deliberately state rather than a ref, even though it's only
+  // ever written from an event handler: the nodes memo below reads it
+  // during render, which is exactly what a ref must not be used for.
+  // Writes are guarded on the value actually having changed, so the
+  // steady state (React Flow re-reporting sizes that didn't change) sets
+  // no state and triggers no render. Purely local and never written to
+  // any store - see the `measured` line below, and isAutoSizedNodeType,
+  // for why sharing it is what broke.
+  const [measuredDimensions, setMeasuredDimensions] = useState<Map<string, { width: number; height: number }>>(
+    () => new Map()
+  );
+
   // nodes/edges are derived from diagramStore rather than stored directly -
   // selection is deliberately NOT part of that store's schema (it's
   // ephemeral, per-person state, not something a collaborator should see
@@ -595,12 +608,25 @@ function App() {
     return {
       nodes: rawNodes.map((n) => ({
         ...n,
+        // Re-attached on every snapshot because the store mints brand
+        // new node objects on any write, and React Flow reads `measured`
+        // EXCLUSIVELY off the node object the app hands it
+        // (adoptUserNodes: `measured: { width: userNode.measured?.width,
+        // ... }`) - it does not carry its own previously-measured value
+        // forward. Without this, every remote edit anywhere in the
+        // diagram wipes every node's measured size back to undefined,
+        // dropping geometry onto the `?? node.width ?? 0` fallback until
+        // a re-measure lands a frame later. This is each client's OWN
+        // measurement of its OWN DOM, deliberately never sent over the
+        // session - see isAutoSizedNodeType for why sharing it is what
+        // caused the mismatched connectors and selection outlines.
+        measured: measuredDimensions.get(n.id) ?? n.measured,
         selected: selectedNodeIds.includes(n.id),
         data: { ...n.data, hasSubDiagram: hasSubDiagram(diagramSnapshot.nodes, path, n.id) },
       })),
       edges: rawEdges.map((e) => ({ ...e, selected: selectedEdgeIds.includes(e.id) })),
     };
-  }, [diagramSnapshot, path, selectedNodeIds, selectedEdgeIds]);
+  }, [diagramSnapshot, path, selectedNodeIds, selectedEdgeIds, measuredDimensions]);
 
   // Only position/dimensions changes need to reach the store - selection
   // changes are handled separately (and more robustly, since it's the
@@ -670,8 +696,31 @@ function App() {
       // so folding them in here one at a time is correct.
       setSelectedNodeIds((cur) => applySelectionChanges(changes, cur));
 
+      // Recorded for EVERY node, including the content-sized ones whose
+      // dimensions deliberately never reach the store - this is exactly
+      // the value the nodes memo re-attaches so a remote edit doesn't
+      // wipe it, so it has to be kept current regardless of whether the
+      // change is also going to be committed. The same-value check
+      // matters: React Flow re-reports unchanged sizes routinely, and
+      // returning the existing Map for those keeps this from rendering
+      // on every one of them.
+      setMeasuredDimensions((cur) => {
+        let next: Map<string, { width: number; height: number }> | null = null;
+        for (const change of changes) {
+          if (change.type !== "dimensions" || !change.dimensions) continue;
+          const prev = cur.get(change.id);
+          if (prev && prev.width === change.dimensions.width && prev.height === change.dimensions.height) continue;
+          next ??= new Map(cur);
+          next.set(change.id, { width: change.dimensions.width, height: change.dimensions.height });
+        }
+        return next ?? cur;
+      });
+
       const currentNodeGeometry = new Map<string, CurrentNodeGeometry>(
-        nodes.map((n) => [n.id, { position: n.position, width: n.width, height: n.height }])
+        nodes.map((n) => [
+          n.id,
+          { position: n.position, width: n.width, height: n.height, isAutoSized: isAutoSizedNodeType(n.type) },
+        ])
       );
       const { isActiveGesture } = classifyNodeChanges(changes, pendingNodeUpdates.current, currentNodeGeometry);
       if (isActiveGesture) {

@@ -605,23 +605,34 @@ export function Canvas({
             {peers.flatMap((peer) =>
               displayNodes
                 .filter((n) => peer.selectedNodeIds.includes(n.id))
-                .map((n) => (
-                  <div
-                    key={`${peer.clientId}-${n.id}`}
-                    className="peer-selection-outline"
-                    style={{
-                      left: n.position.x,
-                      top: n.position.y,
-                      width: n.width ?? 0,
-                      height: n.height ?? 0,
-                      borderColor: peer.color,
-                    }}
-                  >
-                    <span className="peer-selection-outline__label" style={{ backgroundColor: peer.color }}>
-                      {peer.name}
-                    </span>
-                  </div>
-                ))
+                .map((n) => {
+                  // Same geometry the alignment guides already use (see
+                  // toAlignBox): ViewportPortal renders into the
+                  // viewport's own coordinate space, so a node inside a
+                  // group needs its ABSOLUTE position - n.position is
+                  // relative to its parent - and a content-sized node
+                  // has no explicit width/height at all, only a
+                  // measured one, so `n.width ?? 0` collapsed those
+                  // outlines to nothing.
+                  const box = toAlignBox(n);
+                  return (
+                    <div
+                      key={`${peer.clientId}-${n.id}`}
+                      className="peer-selection-outline"
+                      style={{
+                        left: box.x,
+                        top: box.y,
+                        width: box.width,
+                        height: box.height,
+                        borderColor: peer.color,
+                      }}
+                    >
+                      <span className="peer-selection-outline__label" style={{ backgroundColor: peer.color }}>
+                        {peer.name}
+                      </span>
+                    </div>
+                  );
+                })
             )}
             {peers
               .filter((peer) => peer.cursor !== null)
