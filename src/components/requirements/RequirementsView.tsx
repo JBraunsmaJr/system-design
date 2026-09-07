@@ -43,6 +43,25 @@ function nextCustomTypeId(doc: RequirementsDocument): string {
   return `custom-${n}`;
 }
 
+function pluralizeText(text: string): string {
+  const lowered = text.toLowerCase()
+
+  if(lowered.endsWith("ies") || lowered.endsWith("es") || (!lowered.endsWith("us") && lowered.endsWith("s"))) {
+    return text
+  }
+
+  if(lowered.endsWith("y") && !lowered.endsWith("ay")) {
+    return text.substring(0, text.length -1) + "ies"
+  }
+
+  if(text.endsWith("us")) {
+    return text + "es"
+  }
+
+  return text + "s"
+}
+
+
 const HIGHLIGHT_DURATION_MS = 2000;
 // A single shared reference for "no linked nodes" - `linkedNodesByItemId.get(id) ?? []`
 // would otherwise allocate a brand new array on every single render for
@@ -119,7 +138,7 @@ export function RequirementsView({
       return doc.itemTypes
         .map((type) => ({
           key: type.id,
-          label: `${type.label}s`,
+          label: pluralizeText(type.label),
           color: type.color,
           items: filteredItems.filter((i) => i.typeId === type.id),
         }))
