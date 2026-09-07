@@ -1642,7 +1642,6 @@ function App() {
   const selectedNode = nodes.find((n) => n.id === selectedNodeId) ?? null;
   const selectedEdge = edges.find((e) => e.id === selectedEdgeId) ?? null;
   const canAddStep = selectedNodeIds.length > 0 || selectedEdgeIds.length > 0;
-  console.debug("DEBUG EDGES:", edges.length, edges);
   return (
     <div className="app">
       {!isPresenting && (
