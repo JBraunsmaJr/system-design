@@ -5667,6 +5667,10 @@
   color: var(--chrome-text-dim);
 }
 
+.sprint-capacity-bar__b-days {
+  padding-top: 3px;
+}
+
 .sprint-capacity-bar__toggle-btn {
   background: transparent;
   border: none;
