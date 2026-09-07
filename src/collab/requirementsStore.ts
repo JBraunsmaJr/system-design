@@ -20,31 +20,6 @@ import {
  * collaborative, Yjs-backed one (yjsRequirementsStore.ts) can be swapped
  * behind it without any consuming code needing to change.
  *
- * The operations here were derived by reading every onUpdateDoc /
- * onUpdateRequirements call site across RequirementsView.tsx,
- * TimelineView.tsx, and SkillTreeView.tsx (24 in total) - same discipline
- * as TeamStore, just a larger surface, since three different views
- * mutate this document today via their own separate inline transforms.
- *
- * One thing worth being explicit about: addItem, addCustomType, and
- * createAndAssignCategory all generate ids by inspecting CURRENT local
- * state (a sequence counter for items, "scan for the smallest unused
- * number" for categories and custom types) - see the doc comments on
- * addItem and createAndAssignCategory below, and yjsRequirementsStore.ts,
- * for what that means once two peers can create things concurrently
- * without having synced first. Relationship and relationship-type ids
- * already use a timestamp+random scheme (see requirementsRegistry.ts)
- * and don't have this problem.
- *
- * A second thing worth being explicit about: createAndAssignCategory
- * existed as THREE separate, slightly-diverged inline implementations
- * before this - RequirementsView.tsx used the shared, canonical
- * createCategory helper (category-N ids, colors cycling through a
- * palette), while TimelineView.tsx and SkillTreeView.tsx each had their
- * own inline copy (cat-<timestamp> ids, a single fixed color). This
- * store has exactly one implementation, using the canonical helper -
- * once views are migrated onto this seam, that pre-existing
- * inconsistency disappears as a side effect, not as a separate fix.
  */
 export interface RequirementsStore {
   getSnapshot(): RequirementsDocument;

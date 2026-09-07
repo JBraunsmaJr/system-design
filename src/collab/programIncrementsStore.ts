@@ -11,34 +11,6 @@ import { updateSprintEndDate, updatePIStartDate } from "../domain/programIncreme
  * Unlike TeamDocument/RequirementsDocument, the top-level shape here is
  * a plain array (ProgramIncrement[]), not a wrapper object - getSnapshot
  * reflects that directly.
- *
- * The operations were derived by reading every onUpdateProgramIncrements
- * call site across TimelineView.tsx and TeamView.tsx (11 in total,
- * including the shared ManageReservationsModal both views render), the
- * same discipline as the other two stores.
- *
- * This is the most deeply nested of the three domains so far: a PI
- * contains both an array of sprints AND an array of reservations, each
- * needing their own id-keyed structure. PI name/startDate and sprint
- * name/durationDays each have their own independent single-field patch
- * operation today (updatePIName vs updatePIStart; updateSprintName vs
- * updateSprintEnd) - the same "field-level patch operation exists"
- * signal that meant items and members needed nested Y.Maps rather than
- * plain values. Reservations don't: their one edit path
- * (ManageReservationsModal's save handler) always replaces every field
- * together, never just one - so, matching the same reasoning already
- * applied to team's extraDaysOff and requirements' categories, they stay
- * plain values in the Yjs implementation. See
- * yjsProgramIncrementsStore.ts's own doc comment for the full schema.
- *
- * One thing worth being explicit about, unlike requirements' item ids:
- * PI and sprint ids are purely internal (used only as React keys -
- * confirmed by checking every render site - never displayed to the
- * user, never referenced via markdown-style syntax the way requirement
- * item ids are). That means the Yjs implementation can generate them
- * with a fully collision-resistant scheme from the start, with no
- * visible-format trade-off and no need for anything like requirements'
- * id-collision repair pass.
  */
 export interface ProgramIncrementsStore {
   getSnapshot(): ProgramIncrement[];

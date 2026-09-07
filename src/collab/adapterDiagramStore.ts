@@ -33,31 +33,20 @@ import { flattenSubDiagramTree } from "./diagramStore";
  * data here - it's derived on demand via diagramStore.ts's own
  * hasSubDiagram helper (itself matching the real app's existing
  * definition in findLinkedNodes: at least one node one level deeper,
- * not merely a subDiagram field existing). An earlier version of this
- * file invented a separate hasOpenedSubDiagram flag for an "opened but
- * empty" state that turned out not to exist anywhere in the real app -
- * getSubDiagramAtPath is purely read-side and never writes an empty
- * subDiagram back when drilling into a never-populated node, so there
- * was nothing to actually derive that flag from correctly. Removed
- * rather than left as unused, inaccurate scaffolding.
+ * not merely a subDiagram field existing).
  */
 export function createAdapterDiagramStore(
   getRoot: () => SubDiagram,
   setRoot: (updater: (prev: SubDiagram) => SubDiagram) => void
 ): DiagramStore {
-  // getSnapshot MUST return the exact same reference when called
-  // repeatedly with nothing having actually changed - this is
-  // useSyncExternalStore's own contract, not an optional optimization:
-  // violating it means React sees a "new" snapshot on every single
-  // render (even though the data is identical), concludes something
-  // changed, re-renders to check again, sees another "new" object from
-  // this same always-rebuild-from-scratch flatten call, and loops
-  // forever - which is exactly what happened before this cache existed.
-  // root is only ever a genuinely new reference when setRoot produced
-  // an actual change (React state updates always produce new object
-  // identities for real changes, never for no-ops), so caching on
-  // reference equality is both correct and cheap - no deep comparison
-  // needed.
+  /**
+   * getSnapshot must return the exact same reference when called repeatedly with nothing having
+   * actually changed - this useSyncExternalStore's own contract, not an optional optimization:
+   *
+   * Violating it means React sees a "new" snapshot on every single render (even though the data is identical).
+   *
+   * This is why we cache the flattened result - to prevent infinite looping.
+   */
   let cachedRoot: SubDiagram | null = null;
   let cachedSnapshot: { nodes: Node<ArchNodeData>[]; edges: Edge<ArchEdgeData>[] } | null = null;
   function getSnapshot() {
@@ -109,12 +98,14 @@ export function createAdapterDiagramStore(
 
     addNode: (parentPath, type, position, data) => {
       const id = `node-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-      // parentPath is implicit in tree position here (it's what
-      // updateSubDiagramAtPath's own target path already encodes), so
-      // it's deliberately NOT stored on the node's own data field the
-      // way the flattened schema stores it - re-derived on every read
-      // by flattenSubDiagramTree instead, from whichever level the node
-      // ends up nested at in the real tree.
+      /**
+       * parentPath is implicit in tree position here (it's what
+       * updateSubDiagramAtPath's own target path already encodes), so
+       * it's deliberately NOT stored on the node's own data field the
+       * way the flattened schema stores it - re-derived on every read
+       * by flattenSubDiagramTree instead, from whichever level the node ends
+       * up nested at the real tree.
+       */
       const newNode: Node<ArchNodeData> = { id, type, position, data };
       setRoot((root) =>
         updateSubDiagramAtPath(root, parentPath, (sd) => ({ ...sd, nodes: [...sd.nodes, newNode] }))
@@ -166,14 +157,15 @@ export function createAdapterDiagramStore(
       });
     },
 
-    // Removing the node from its own level automatically takes its
-    // entire nested subDiagram (if any) along with it, for free - the
-    // exact same "nesting objects gets the cascade for free" property
-    // the flattened schema's own equivalent operation has to do
-    // explicitly instead (see diagramStore.ts's own doc comment on
-    // this). Edges at the SAME level touching the deleted node are
-    // removed too; edges belonging to whatever was nested inside it
-    // are already gone along with that nested subDiagram itself.
+    /**
+     * Removing the node from its own level automatically takes its entire
+     * nested subDiagram (if any) along with it, for free - the exact same "nesting objects gets
+     * the cascade for free" property the flattened schema's own equivalent operation has to
+     * do explicitly instead. Edges at the same level touching the deleted node are
+     * removed too; edges belonging to whatever was nested inside it are already gone
+     * with that nested subDiagram itself.
+     * @param id
+     */
     deleteNode: (id) => {
       setRoot((root) => {
         const found = findNodePath(root, id);

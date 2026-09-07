@@ -8,26 +8,18 @@ import type { ArchNodeData, ArchEdgeData, SubDiagram } from "../domain/types";
  * (yjsDiagramStore.ts) can be swapped behind it without any consuming
  * code needing to change.
  *
- * This is the hard schema problem the whole collaboration plan flagged
- * from the start: the app's actual model is a RECURSIVE tree - a node's
- * own data can hold a nested SubDiagram, whose nodes can themselves hold
- * further nested SubDiagrams, with no depth limit (see types.ts's
- * ArchNodeData doc comment). Plain nested objects handle that for free;
- * Yjs shared types don't nest as naturally to an unbounded depth the way
- * a plain object tree does.
+ * The actual model is a recursive tree, a node's own data can hold a nested
+ * SubDiagram, whose nodes can themselves hold further nested SubDiagrams, with no depth
+ * limit. Plain nested objects handle that for free; Yjs shared types don't nest
+ * as naturally to an unbound depth the way a plain object tree does.
  *
- * The approach taken here, agreed on before writing any code: FLATTEN
- * the tree into one shared space. Every node and edge across the ENTIRE
- * tree - root plus every nested sub-diagram, at any depth - lives in one
- * flat collection, each tagged with a `parentPath: string[]` (the same
- * shape as the app's existing DiagramPath) recording which level of the
- * tree it belongs to. `getNodesAtPath`/`getEdgesAtPath` filter down to
- * one level on demand - closer to how a database would model a tree
- * (parent-reference rows in one table) than how the in-memory version
- * does today (actual nested objects).
- *
- * A few things confirmed by reading the actual app before designing this,
- * each of which shaped the design:
+ * The approach taken here: Flatten the tree into one shared space. Every
+ * node and edge across the entire tree - root plus every nested sub-diagram, at any depth - lives
+ * in one flat collection, each tagged with a `parentPath: string[]` (the same
+ * shape as the app's existing DiagramPath) recording which level of the tree it
+ * belongs to. `getNodesAtPath`/`getEdgesAtPath` filter down to one level
+ * on demand - closer to how a database would model a tree (parent-reference rows
+ * in one table) than how the in-memory version does today (actual nested objects).
  *
  *  - Node and edge ids are already globally unique across the WHOLE
  *    tree, not just within their own level - App.tsx's nextId draws from
