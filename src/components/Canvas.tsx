@@ -18,6 +18,7 @@ import {
   SelectionMode,
   ViewportPortal,
   useReactFlow,
+  useUpdateNodeInternals,
   type Node,
   type Edge,
   type Connection,
@@ -151,6 +152,22 @@ export function Canvas({
   onCursorMove,
 }: CanvasProps) {
   const { screenToFlowPosition, getIntersectingNodes, fitView } = useReactFlow<Node<ArchNodeData>>();
+  const updateNodeInternals = useUpdateNodeInternals();
+  const measuredNodeIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const newIds = nodes.filter((n) => !measuredNodeIdsRef.current.has(n.id)).map((n) => n.id);
+    if (newIds.length === 0) return;
+    for (const id of newIds) measuredNodeIdsRef.current.add(id);
+    // Deferred one frame, not called synchronously - the point is
+    // specifically to double-check the measurement AFTER React Flow's
+    // own initial one has had a chance to run and the browser has had a
+    // chance to finish laying out the node's actual content (text wrap
+    // included), not to race it.
+    const frame = requestAnimationFrame(() => {
+      updateNodeInternals(newIds);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [nodes, updateNodeInternals]);
 
   const isPresenting = presentation !== null;
   // Full presentation always wins over a step preview if somehow both were
