@@ -1522,8 +1522,11 @@ function App() {
   // you're currently viewing - a save from inside a drilled-down sub-diagram
   // must not lose everything above/beside it.
   const onSave = useCallback(() => {
-    downloadDiagram(toDiagramFile(title, root.nodes, root.edges, scenarios, requirements, programIncrements, team));
-  }, [title, root, scenarios, requirements, programIncrements, team]);
+    const liveRoot = unflattenToSubDiagram(diagramSnapshot.nodes, diagramSnapshot.edges);
+    downloadDiagram(
+      toDiagramFile(title, liveRoot.nodes, liveRoot.edges, scenarios, requirementsSnapshot, programIncrementsSnapshot, teamSnapshot)
+    );
+  }, [title, diagramSnapshot, scenarios, requirementsSnapshot, programIncrementsSnapshot, teamSnapshot]);
 
   // Exports export the CURRENT view (whatever level you're looking at),
   // unlike Save - drilling into a node and exporting just that sub-diagram
@@ -1591,22 +1594,23 @@ function App() {
           onExportRequirementsMarkdown={onExportRequirementsMarkdown}
           canExportRequirements={requirements.items.length > 0}
           hasAutosaved={hasAutosaved}
-        />
-      )}
-      {!isPresenting && (
-        <CollabPanel
-          signalingConfigured={signalingUrls.length > 0}
-          signalingUrlsInput={signalingUrlsInput}
-          onSignalingUrlsInputChange={setSignalingUrlsInput}
-          buildTimeSignalingDefault={buildTimeSignalingDefault}
-          activeSession={activeSession ? { roomName: activeSession.roomName, isSynced: () => activeSession.session.isSynced(), peers: presencePeers } : null}
-          displayName={displayName}
-          onDisplayNameChange={onDisplayNameChange}
-          showPeerCursors={showPeerCursors}
-          onShowPeerCursorsChange={setShowPeerCursors}
-          onStartSession={startNewSession}
-          onJoinSession={joinSession}
-          onLeaveSession={leaveSession}
+          isInSession={!!activeSession}
+          collabPanel={
+            <CollabPanel
+              signalingConfigured={signalingUrls.length > 0}
+              signalingUrlsInput={signalingUrlsInput}
+              onSignalingUrlsInputChange={setSignalingUrlsInput}
+              buildTimeSignalingDefault={buildTimeSignalingDefault}
+              activeSession={activeSession ? { roomName: activeSession.roomName, isSynced: () => activeSession.session.isSynced(), peers: presencePeers } : null}
+              displayName={displayName}
+              onDisplayNameChange={onDisplayNameChange}
+              showPeerCursors={showPeerCursors}
+              onShowPeerCursorsChange={setShowPeerCursors}
+              onStartSession={startNewSession}
+              onJoinSession={joinSession}
+              onLeaveSession={leaveSession}
+            />
+          }
         />
       )}
       <input

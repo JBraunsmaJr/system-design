@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import {
   Check,
   ListChecks,
@@ -35,6 +36,21 @@ interface ToolbarProps {
   onExportRequirementsMarkdown: () => void;
   canExportRequirements: boolean;
   hasAutosaved: boolean;
+  /** Whether a collaborative session is currently active - disables
+   * Open (loading a file replaces the LOCAL, frozen state, which
+   * wouldn't even be visible until the session ends, since the
+   * displayed content comes from the live session snapshot instead;
+   * silently loading something you then can't see is confusing, so
+   * it's disabled outright rather than left to quietly do the wrong
+   * thing). */
+  isInSession: boolean;
+  /** Rendered as the last item in the toolbar's own action button
+   * group, so it's a genuine, in-flow flex item that participates in
+   * this toolbar's own responsive wrapping/overflow behavior - rather
+   * than a separately-positioned overlay with no relationship to
+   * whatever space the rest of the toolbar's own content actually
+   * needs at a given width. */
+  collabPanel: ReactNode;
 }
 
 export function Toolbar({
@@ -57,6 +73,8 @@ export function Toolbar({
   onExportRequirementsMarkdown,
   canExportRequirements,
   hasAutosaved,
+  isInSession,
+  collabPanel,
 }: ToolbarProps) {
   return (
     <header className="toolbar">
@@ -166,7 +184,7 @@ export function Toolbar({
           <FilePlus2 size={14} />
           <span className="toolbar__label">New</span>
         </button>
-        <button type="button" onClick={onLoadClick} title="Open">
+        <button type="button" onClick={onLoadClick} disabled={isInSession} title={isInSession ? "Open is disabled during a collaborative session - loading a file wouldn't be visible until the session ends" : "Open"}>
           <FolderOpen size={14} />
           <span className="toolbar__label">Open</span>
         </button>
@@ -174,6 +192,7 @@ export function Toolbar({
           <Save size={14} />
           <span className="toolbar__label">Save</span>
         </button>
+        {collabPanel}
       </div>
     </header>
   );
