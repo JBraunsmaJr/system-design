@@ -273,13 +273,16 @@ export function Inspector({
           />
         </Field>
 
-        {!isGroup && (
-          <IconPicker
-            value={data.icon}
-            defaultValue={nodeDef?.icon ?? "Box"}
-            onChange={(icon) => onUpdateNode(selectedNode.id, { icon })}
-          />
-        )}
+        {/* Boundaries carry an icon in their label chip just as typed
+            nodes do, so they get the same override. The fallback differs
+            per kind: SquareDashed matches GroupNode's own final fallback,
+            so clearing the override lands back on exactly what the node
+            renders rather than on a different default. */}
+        <IconPicker
+          value={data.icon}
+          defaultValue={(isGroup ? groupDef?.icon : nodeDef?.icon) ?? (isGroup ? "SquareDashed" : "Box")}
+          onChange={(icon) => onUpdateNode(selectedNode.id, { icon })}
+        />
 
         <ColorField
           value={data.color}

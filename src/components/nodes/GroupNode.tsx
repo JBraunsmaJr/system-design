@@ -35,8 +35,12 @@ type GroupNodeType = Node<ArchNodeData, "group">;
 export function GroupNode({ data, selected }: NodeProps<GroupNodeType>) {
   const def = getGroupType(data.nodeType);
   const accent = data.color ?? def?.color ?? "#7C8598";
+  // data.icon is a per-node override chosen in the Inspector; the group
+  // type's own icon is the fallback. Same resolution order as TypedNode,
+  // so a boundary behaves like every other node here.
+  const iconName = data.icon ?? def?.icon;
   const IconComponent =
-    (def && (Icons[def.icon as keyof typeof Icons] as Icons.LucideIcon)) || Icons.SquareDashed;
+    (iconName && (Icons[iconName as keyof typeof Icons] as Icons.LucideIcon)) || Icons.SquareDashed;
   const borderStyle = def?.borderStyle ?? "dashed";
   const borderColor = selected ? "var(--accent)" : `${accent}99`;
 
@@ -74,7 +78,6 @@ export function GroupNode({ data, selected }: NodeProps<GroupNodeType>) {
         <div className="group-node__edge-hit group-node__edge-hit--left" />
 
         <div className="group-node__label" style={{ borderColor, color: accent }}>
-          {/* eslint-disable-next-line react-hooks/static-components -- stable lookup, see TypedNode.tsx */}
           <IconComponent size={12} />
           <span>{data.label}</span>
         </div>
