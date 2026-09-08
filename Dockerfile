@@ -34,6 +34,8 @@ RUN npm run build -- --base=./
 # ---- Runtime stage: serves the built static files via nginx ----
 FROM nginx:stable-alpine AS runtime
 
+RUN apk update && apk upgrade
+
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 
