@@ -1,5 +1,20 @@
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+/**
+ * Makes a single newline render as an actual line break.
+ *
+ * CommonMark treats one newline as a "soft break" and renders it as a
+ * space, so consecutive lines collapse into one reflowed paragraph -
+ * which is not what anyone typing line by line into a plain textarea
+ * expects, and not what the chat and issue trackers people are used to
+ * do either. A blank line between every line would technically work, but
+ * that's a markdown rule to know rather than something the editor
+ * surfaces, and it doubles the vertical space.
+ *
+ * remark-breaks only rewrites soft breaks inside paragraphs, so code
+ * blocks, tables and lists keep their own line handling.
+ */
+import remarkBreaks from "remark-breaks";
 import { resolveReferencesToMarkdownLinks } from "../../domain/requirementsRegistry";
 import type { RequirementsDocument } from "../../domain/requirementsTypes";
 
@@ -47,7 +62,7 @@ export function RequirementBody({ text, doc, onNavigateToItem }: RequirementBody
   return (
     <div className="requirement-body">
       {text.trim() ? (
-        <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+        <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} components={components}>
           {resolved}
         </ReactMarkdown>
       ) : (

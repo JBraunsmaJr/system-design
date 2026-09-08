@@ -3014,6 +3014,10 @@
 
 .requirement-editor {
   position: relative;
+  padding: 10px 12px;
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm, 4px);
 }
 
 .markdown-toolbar {
@@ -4481,6 +4485,24 @@
 .requirement-detail-modal__dates {
   font-family: var(--mono);
   font-size: 12.5px;
+}
+
+/* The body is a scrolling column, so its children must not be shrinkable.
+   Flex items default to flex-shrink: 1, so once the content exceeded the
+   modal's 85vh the browser compressed them to fit instead of letting the
+   body scroll. That alone would only look cramped - what made it spill
+   is that the compressed item is .requirement-editor, whose textarea
+   carries an explicit inline height from its auto-sizing. The textarea
+   isn't a flex item, so it kept that height while its parent shrank
+   underneath it, and rendered straight over the relationships below.
+
+   flex-shrink: 0 makes every child keep its natural height and hands the
+   overflow to the body's own overflow-y: auto, which is what should have
+   been absorbing it all along. The same squashing affected the read-only
+   view too - .requirement-detail-modal__body-wrap has a min-height but no
+   max, so long markdown overflowed it identically. */
+.requirement-detail-modal__body > * {
+  flex-shrink: 0;
 }
 
 .requirement-detail-modal__body {
