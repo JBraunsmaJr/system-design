@@ -4,6 +4,16 @@
   height: 100vh;
 }
 
+.app-version {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  padding: 4px;
+  margin-right: 4px;
+  opacity: 0.6;
+  z-index: 9999
+}
+
 /* ---------- Toolbar ---------- */
 
 .toolbar {

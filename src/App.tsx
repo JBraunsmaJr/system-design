@@ -411,6 +411,8 @@ function App() {
   // override that doesn't require a rebuild to change.
   const buildTimeSignalingDefault = useMemo(() => (import.meta.env.VITE_SIGNALING_URL as string | undefined) ?? "", []);
 
+  const appVersion = useMemo(() => (import.meta.env.VITE_APP_VERSION as string | undefined) ?? "Development", [])
+
   // The raw, comma-separated string as typed/edited in CollabPanel -
   // this person's own runtime override if they've ever set one,
   // otherwise the deployer's build-time default. Kept as the raw
@@ -1659,6 +1661,9 @@ function App() {
   const canAddStep = selectedNodeIds.length > 0 || selectedEdgeIds.length > 0;
   return (
     <div className="app">
+      {appVersion && (
+          <div className="app-version">{appVersion}</div>
+      )}
       {!isPresenting && (
         <Toolbar
           title={title}
