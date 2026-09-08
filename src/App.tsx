@@ -63,6 +63,7 @@ import { startCollabSession, type CollabSession, type PresenceInfo, type LocalPr
 import { loadPresenceName, savePresenceName, loadShowPeerCursors, saveShowPeerCursors } from "./domain/presenceIdentity";
 import { loadSignalingUrls, saveSignalingUrls, parseSignalingUrls } from "./domain/signalingConfig";
 import { loadIceServers, saveIceServers, parseIceServers } from "./domain/iceServerConfig";
+import { applyZOrderCommand, computeEffectiveZIndices, type ZOrderCommand } from "./domain/zOrder";
 import { classifyNodeChanges, applySelectionChanges, isAutoSizedNodeType, type PendingNodeUpdate, type CurrentNodeGeometry } from "./domain/nodeChangeBatching";
 import "./App.css";
 
@@ -664,9 +665,32 @@ function App() {
   const { nodes, edges } = useMemo(() => {
     const rawNodes = reorderWithGroupsFirst(getNodesAtPath(diagramSnapshot.nodes, path));
     const rawEdges = getEdgesAtPath(diagramSnapshot.edges, path);
+    /**
+     * Keyed only on what the ordering actually depends on - id, size and
+     * any explicit override. Position is deliberately excluded: the rule
+     * is area-based, so recomputing while something is dragged would be
+     * pure waste on every animation frame.
+     */
+    const zIndices = computeEffectiveZIndices(
+      rawNodes.map((n) => ({
+        id: n.id,
+        x: 0,
+        y: 0,
+        width: n.width ?? measuredDimensions.get(n.id)?.width ?? 0,
+        height: n.height ?? measuredDimensions.get(n.id)?.height ?? 0,
+        zIndex: n.data.zIndex,
+      }))
+    );
+
     return {
       nodes: rawNodes.map((n) => ({
         ...n,
+        // Stacking order, folded into this existing pass rather than
+        // computed again downstream - see domain/zOrder.ts for the rule.
+        // Derived from live geometry so a rectangle enlarged to enclose
+        // more nodes drops behind them without anyone reordering
+        // anything.
+        zIndex: zIndices.get(n.id),
         // Re-attached on every snapshot because the store mints brand
         // new node objects on any write, and React Flow reads `measured`
         // EXCLUSIVELY off the node object the app hands it
@@ -1053,6 +1077,41 @@ function App() {
       diagramStoreRef.current.updateNode(id, patch);
     },
     []
+  );
+
+  /**
+   * Applies a z-order command to the current selection.
+   *
+   * Lives here rather than in the Inspector because reordering is
+   * inherently relative - working out what "in front" means needs every
+   * node's geometry, and the Inspector only ever sees the one that's
+   * selected.
+   *
+   * The width/height fallback matches Canvas's own: a content-sized node
+   * carries no explicit width, only a measured one, and reading n.width
+   * alone would score all of them as zero-area.
+   */
+  const onZOrderCommand = useCallback(
+    (command: ZOrderCommand, targetIds?: string[]) => {
+      // Defaults to the selection for the Inspector's buttons; the
+      // context menu passes targets explicitly, since right-clicking an
+      // unselected node should act on THAT node.
+      const ids = targetIds ?? selectedNodeIds;
+      const boxes = nodes.map((n) => ({
+        id: n.id,
+        x: n.position.x,
+        y: n.position.y,
+        width: n.width ?? n.measured?.width ?? 0,
+        height: n.height ?? n.measured?.height ?? 0,
+        zIndex: n.data.zIndex,
+      }));
+      // An empty result means the command wouldn't change anything -
+      // skip the store write rather than syncing a no-op to every peer.
+      for (const patch of applyZOrderCommand(boxes, ids, command)) {
+        diagramStoreRef.current.updateNode(patch.id, { zIndex: patch.zIndex });
+      }
+    },
+    [nodes, selectedNodeIds]
   );
 
   const onUpdateEdge = useCallback(
@@ -1778,6 +1837,7 @@ function App() {
               onUpdateEdge={onUpdateEdge}
               onReparentNode={onReparentNode}
               onAdoptIntoGroup={onAdoptIntoGroup}
+              onZOrderCommand={onZOrderCommand}
               presentation={presentation}
               previewFocus={previewFocus}
               focusNodeId={pendingNodeFocus}
@@ -1846,6 +1906,7 @@ function App() {
                 onDrillInto={onDrillInto}
                 requirements={requirementsSnapshot}
                 onNavigateToRequirement={onNavigateToRequirement}
+                onZOrderCommand={onZOrderCommand}
               />
             )}
           </div>

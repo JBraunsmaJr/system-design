@@ -1,4 +1,5 @@
 import { useState, type KeyboardEvent } from "react";
+import { SendToBack, BringToFront, ChevronUp, ChevronDown } from "lucide-react";
 import type { Node, Edge } from "@xyflow/react";
 import { getNodeType } from "../domain/nodeRegistry";
 import { getGroupType } from "../domain/groupRegistry";
@@ -8,9 +9,41 @@ import { EDGE_TYPES, STYLE_GROUP_LABELS } from "../domain/edgeRegistry";
 import { IconPicker } from "./IconPicker";
 import { RequirementLinker } from "./requirements/RequirementLinker";
 import type { ArchNodeData, ArchEdgeData } from "../domain/types";
+import type { ZOrderCommand } from "../domain/zOrder";
 import type { RequirementsDocument } from "../domain/requirementsTypes";
 
 const EDGE_STYLE_GROUP_ORDER = ["sync", "async", "control", "vcs", "blank", "data", "file", "generic"] as const;
+
+/**
+ * Front/back controls for the current selection.
+ *
+ * Shown for every node type because any node can end up buried - the
+ * reported case was a rectangle covering nodes, but a large node can
+ * just as easily cover a small one. The commands themselves live in
+ * App.tsx, since deciding what "in front" means needs every node's
+ * geometry and the Inspector only sees the selected one.
+ */
+function ZOrderControls({ onCommand }: { onCommand: (command: ZOrderCommand) => void }) {
+  return (
+    <div className="inspector__z-order">
+      <span className="inspector__z-order-label">Arrange</span>
+      <div className="inspector__z-order-buttons">
+        <button type="button" onClick={() => onCommand("back")} title="Send to back">
+          <SendToBack size={13} />
+        </button>
+        <button type="button" onClick={() => onCommand("backward")} title="Send backward">
+          <ChevronDown size={13} />
+        </button>
+        <button type="button" onClick={() => onCommand("forward")} title="Bring forward">
+          <ChevronUp size={13} />
+        </button>
+        <button type="button" onClick={() => onCommand("front")} title="Bring to front">
+          <BringToFront size={13} />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 interface InspectorProps {
   selectedNode: Node<ArchNodeData> | null;
@@ -22,6 +55,7 @@ interface InspectorProps {
   onDrillInto: (id: string) => void;
   requirements: RequirementsDocument;
   onNavigateToRequirement: (itemId: string) => void;
+  onZOrderCommand: (command: ZOrderCommand) => void;
 }
 
 export function Inspector({
@@ -34,6 +68,7 @@ export function Inspector({
   onDrillInto,
   requirements,
   onNavigateToRequirement,
+  onZOrderCommand,
 }: InspectorProps) {
   if (!selectedNode && !selectedEdge) {
     return (
@@ -97,6 +132,8 @@ export function Inspector({
             onNavigateToRequirement={onNavigateToRequirement}
           />
 
+          <ZOrderControls onCommand={onZOrderCommand} />
+
           <button type="button" className="inspector__delete" onClick={() => onDeleteNode(selectedNode.id)}>
             Delete text
           </button>
@@ -150,6 +187,8 @@ export function Inspector({
             onNavigateToRequirement={onNavigateToRequirement}
           />
 
+          <ZOrderControls onCommand={onZOrderCommand} />
+
           <button type="button" className="inspector__delete" onClick={() => onDeleteNode(selectedNode.id)}>
             Delete shape
           </button>
@@ -201,6 +240,8 @@ export function Inspector({
             requirements={requirements}
             onNavigateToRequirement={onNavigateToRequirement}
           />
+
+          <ZOrderControls onCommand={onZOrderCommand} />
 
           <button type="button" className="inspector__delete" onClick={() => onDeleteNode(selectedNode.id)}>
             Delete code snippet
@@ -266,6 +307,8 @@ export function Inspector({
           requirements={requirements}
           onNavigateToRequirement={onNavigateToRequirement}
         />
+
+        <ZOrderControls onCommand={onZOrderCommand} />
 
         <button type="button" className="inspector__delete" onClick={() => onDeleteNode(selectedNode.id)}>
           {isGroup ? "Delete boundary" : "Delete node"}

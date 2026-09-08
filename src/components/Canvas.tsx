@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -32,7 +33,8 @@ import {
   type NodeTypes,
   type EdgeTypes,
 } from "@xyflow/react";
-import { MousePointer2 } from "lucide-react";
+import { MousePointer2, BringToFront, SendToBack, ChevronUp, ChevronDown } from "lucide-react";
+import { createPortal } from "react-dom";
 import { TypedNode } from "./nodes/TypedNode";
 import { TypedEdge } from "./edges/TypedEdge";
 import { GroupNode } from "./nodes/GroupNode";
@@ -45,6 +47,7 @@ import { NODE_TYPES } from "../domain/nodeRegistry";
 import { GROUP_TYPES } from "../domain/groupRegistry";
 import { SHAPE_TYPES } from "../domain/shapeRegistry";
 import { computeAlignment, type AlignBox, type AlignmentGuide } from "../domain/alignmentGuides";
+import type { ZOrderCommand } from "../domain/zOrder";
 import { toAbsolutePosition } from "../domain/graphUtils";
 import { DRAG_MIME_TYPE, GROUP_DRAG_MIME_TYPE, TEXT_DRAG_MIME_TYPE, SHAPE_DRAG_MIME_TYPE, CODE_DRAG_MIME_TYPE } from "./Palette";
 import type { ArchNodeData, ArchEdgeData, Scenario, ScenarioStep } from "../domain/types";
@@ -52,6 +55,11 @@ import type { PresenceInfo } from "../collab/session";
 
 // edgeTypes now built inside the component via useMemo, so TypedEdge can
 // receive onUpdateEdge - see the factory near nodeTypes below.
+
+// Fixed because the menu always holds the same four items - see
+// openContextMenu's clamping.
+const CONTEXT_MENU_WIDTH = 184;
+const CONTEXT_MENU_HEIGHT = 140;
 
 const DIMMED_NODE_OPACITY = 0.15;
 const DIMMED_EDGE_OPACITY = 0.12;
@@ -89,6 +97,11 @@ interface CanvasProps {
   onUpdateEdge: (id: string, patch: Partial<ArchEdgeData>) => void;
   onReparentNode: (nodeId: string, newParentId: string | null) => void;
   onAdoptIntoGroup: (groupId: string, nodeIds: string[]) => void;
+  /** Applies a stacking command. targetIds is explicit rather than
+   * implied by the current selection, because right-clicking a node
+   * that ISN'T selected should act on that node - not on whatever
+   * happened to be selected beforehand. */
+  onZOrderCommand: (command: ZOrderCommand, targetIds: string[]) => void;
   presentation: PresentationState | null;
   previewFocus: FocusSet | null;
   /** Set (once) to zoom/pan the camera onto a specific node - used for
@@ -135,6 +148,7 @@ export function Canvas({
   onUpdateEdge,
   onReparentNode,
   onAdoptIntoGroup,
+  onZOrderCommand,
   presentation,
   previewFocus,
   focusNodeId,
@@ -461,7 +475,96 @@ export function Canvas({
   // focused elements so the highlight reads clearly, not just as "slightly
   // less dim." Group nodes and text annotations can be focus targets too -
   // they're ordinary node ids underneath.
+  /**
+   * Right-click menu state. Position is in VIEWPORT coordinates (the menu
+   * is portaled to document.body and fixed-positioned), not flow
+   * coordinates - it should stay under the cursor, not pinned to a spot
+   * on the canvas that moves when you pan.
+   */
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; targetIds: string[] } | null>(null);
+
+  /**
+   * The node list as of the last committed render, read only from event
+   * handlers. This exists so openContextMenu can have stable identity:
+   * closing over `nodes` directly would give it a new identity on every
+   * frame of a drag, and React Flow passes onNodeContextMenu down to
+   * every memo'd NodeWrapper - so the whole graph would re-render each
+   * frame purely because a callback changed.
+   *
+   * Layout effect, not render-phase assignment, for the same reason as
+   * App.tsx's own refs: a render can be discarded, and a discarded
+   * render must not leave the ref pointing at nodes that were never
+   * committed.
+   */
+  const nodesRef = useRef(nodes);
+  useLayoutEffect(() => {
+    nodesRef.current = nodes;
+  }, [nodes]);
+
+  const openContextMenu = useCallback(
+    (event: ReactMouseEvent, nodeId: string | null) => {
+      if (isPresenting) return; // the locked slideshow view has nothing to arrange
+      event.preventDefault();
+
+      const selectedIds = nodesRef.current.filter((n) => n.selected).map((n) => n.id);
+      // Right-clicking inside a multi-selection acts on the whole
+      // selection; right-clicking a node outside it acts on just that
+      // node, which is what every other editor does and avoids silently
+      // reordering something off-screen.
+      const targetIds =
+        nodeId === null ? selectedIds : selectedIds.includes(nodeId) ? selectedIds : [nodeId];
+      if (targetIds.length === 0) return;
+
+      // Clamped so the menu never opens partly off-screen. The size is
+      // fixed (four items), so constants are enough here and avoid a
+      // measure-then-reposition pass.
+      const left = Math.min(event.clientX, window.innerWidth - CONTEXT_MENU_WIDTH - 8);
+      const top = Math.min(event.clientY, window.innerHeight - CONTEXT_MENU_HEIGHT - 8);
+      setContextMenu({ x: Math.max(8, left), y: Math.max(8, top), targetIds });
+    },
+    [isPresenting]
+  );
+
+  const closeContextMenu = useCallback(() => setContextMenu(null), []);
+
+  /**
+   * Both handlers are memoized rather than written inline on the
+   * ReactFlow element, because React Flow hands onNodeContextMenu down
+   * to EVERY NodeWrapper (which is memo'd) and puts onMoveStart in its
+   * own store. An inline arrow is a new identity on every render, so it
+   * would break the memo on every node at once and push a store update
+   * each render - turning any Canvas re-render into a re-render of the
+   * whole graph.
+   */
+  const onNodeContextMenu = useCallback(
+    (event: ReactMouseEvent, node: Node<ArchNodeData>) => openContextMenu(event, node.id),
+    [openContextMenu]
+  );
+  const onSelectionContextMenu = useCallback(
+    (event: ReactMouseEvent) => openContextMenu(event, null),
+    [openContextMenu]
+  );
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeContextMenu();
+    };
+    // Any click anywhere dismisses, including one that lands on the menu
+    // itself - the item's own onClick has already run by then.
+    document.addEventListener("click", closeContextMenu);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("click", closeContextMenu);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [contextMenu, closeContextMenu]);
+
   const displayNodes = useMemo(() => {
+    // zIndex is attached upstream, inside App's existing nodes map, so
+    // there's no second pass over the array here - and the common case
+    // returns the identical array it was given, which is what lets React
+    // Flow skip re-adopting every node.
     if (presentationFocus) {
       const focusIds = new Set(presentationFocus.nodeIds);
       return nodes.map((n) => ({
@@ -579,6 +682,10 @@ export function Canvas({
         onConnect={handleConnect}
         onConnectStart={onConnectStart}
         onSelectionChange={onSelectionChange}
+        onNodeContextMenu={onNodeContextMenu}
+        onSelectionContextMenu={onSelectionContextMenu}
+        onPaneClick={closeContextMenu}
+        onMoveStart={closeContextMenu}
         onNodeDrag={onNodeDrag}
         onNodeDragStop={onNodeDragStop}
         onNodeDoubleClick={onNodeDoubleClick}
@@ -708,6 +815,37 @@ export function Canvas({
           />
         )}
       </ReactFlow>
+
+      {/* Portaled to document.body and fixed-positioned for the same
+          reason CollabPanel's dropdown is: React Flow's viewport is a
+          transformed, clipping ancestor, and a menu rendered inside it
+          would be scaled with the zoom and clipped at the pane edge. */}
+      {contextMenu &&
+        createPortal(
+          <div
+            className="canvas-context-menu"
+            style={{ position: "fixed", top: contextMenu.y, left: contextMenu.x, width: CONTEXT_MENU_WIDTH }}
+            role="menu"
+          >
+            <button type="button" role="menuitem" onClick={() => onZOrderCommand("front", contextMenu.targetIds)}>
+              <BringToFront size={13} />
+              Bring to front
+            </button>
+            <button type="button" role="menuitem" onClick={() => onZOrderCommand("forward", contextMenu.targetIds)}>
+              <ChevronUp size={13} />
+              Bring forward
+            </button>
+            <button type="button" role="menuitem" onClick={() => onZOrderCommand("backward", contextMenu.targetIds)}>
+              <ChevronDown size={13} />
+              Send backward
+            </button>
+            <button type="button" role="menuitem" onClick={() => onZOrderCommand("back", contextMenu.targetIds)}>
+              <SendToBack size={13} />
+              Send to back
+            </button>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
