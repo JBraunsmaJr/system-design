@@ -14,7 +14,7 @@ export default defineConfig({
       VitePWA({
         registerType: 'autoUpdate',
 
-        includeAssets: ["favicon.png"],
+        includeAssets: ["favicon_16x16.png, favicon_144x144.png"],
 
         manifest: {
           name: "System Design Editor",
