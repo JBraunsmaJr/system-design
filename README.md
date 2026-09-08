@@ -17,6 +17,31 @@ Ships as a fully static site. No backend, no database — runs entirely in the
 browser and deploys straight to GitHub Pages. The collaboration feature requires a relay to 
 handle the handshake between clients. Once the connection is established, clients no longer need the relay.
 
+## Collaborative editing
+
+Sessions are peer-to-peer: document data flows directly between browsers
+and never through a server. The one piece of infrastructure required is a
+**relay**, which carries only the initial handshake that lets two
+browsers find each other. Once connected, the relay is out of the path.
+
+There is no public default — you point the app at a relay you control, or
+collaboration stays disabled. Quickest possible start:
+
+```bash
+docker run -d -p 4444:4444 ghcr.io/jbraunsmajr/system-design-relay:latest
+```
+
+then set **Collaborate → Relay Server URL** to `ws://localhost:4444`, or
+bake in a default for everyone at build time:
+
+```bash
+VITE_SIGNALING_URL="wss://relay.example.com" npm run build
+```
+
+**See [docs/relay-server.md](docs/relay-server.md)** for hosting a relay
+properly, TLS and reverse proxy configuration, access control, running in
+restricted or air-gapped networks, and troubleshooting.
+
 ## Stack
 
 - React + TypeScript, built with Vite

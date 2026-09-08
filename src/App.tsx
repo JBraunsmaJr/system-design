@@ -62,6 +62,7 @@ import type { ProgramIncrementsStore } from "./collab/programIncrementsStore";
 import { startCollabSession, type CollabSession, type PresenceInfo, type LocalPresenceInfo } from "./collab/session";
 import { loadPresenceName, savePresenceName, loadShowPeerCursors, saveShowPeerCursors } from "./domain/presenceIdentity";
 import { loadSignalingUrls, saveSignalingUrls, parseSignalingUrls } from "./domain/signalingConfig";
+import { loadIceServers, saveIceServers, parseIceServers } from "./domain/iceServerConfig";
 import { classifyNodeChanges, applySelectionChanges, isAutoSizedNodeType, type PendingNodeUpdate, type CurrentNodeGeometry } from "./domain/nodeChangeBatching";
 import "./App.css";
 
@@ -428,6 +429,24 @@ function App() {
   }, []);
   const signalingUrls = useMemo(() => parseSignalingUrls(signalingUrlsInput), [signalingUrlsInput]);
 
+  // ICE servers, configured exactly like the signaling URLs above: a
+  // build-time default the deployer bakes in, overridable at runtime
+  // per browser without a rebuild.
+  //
+  // Separate from the signaling URL because they solve different halves
+  // of the connection and fail independently - the relay is how peers
+  // FIND each other, ICE is how they REACH each other. A network can
+  // have a perfectly working relay and still never form a peer
+  // connection, which is precisely the case on a segmented internal
+  // network with no route to the public STUN servers WebRTC ships with.
+  const buildTimeIceServersDefault = useMemo(() => (import.meta.env.VITE_ICE_SERVERS as string | undefined) ?? "", []);
+  const [iceServersInput, setIceServersInputState] = useState(() => loadIceServers() ?? buildTimeIceServersDefault);
+  const setIceServersInput = useCallback((raw: string) => {
+    setIceServersInputState(raw);
+    saveIceServers(raw);
+  }, []);
+  const iceServers = useMemo(() => parseIceServers(iceServersInput), [iceServersInput]);
+
   // Starts a brand-new session, seeding it with whatever's already here so
   // nothing is lost - the new session's initial state IS the current local
   // state, not an empty workbook.
@@ -443,7 +462,7 @@ function App() {
       const requirementsStoreForSession = createYjsRequirementsStore(doc);
       const programIncrementsStoreForSession = createYjsProgramIncrementsStore(doc);
       const diagramStoreForSession = createYjsDiagramStore(doc);
-      const session = startCollabSession(doc, roomName, { signalingUrls, password: password || undefined });
+      const session = startCollabSession(doc, roomName, { signalingUrls, password: password || undefined, iceServers });
       const initialPresence: LocalPresenceInfo = {
         name: displayName.trim() || "Guest",
         color: PRESENCE_COLORS[Math.floor(Math.random() * PRESENCE_COLORS.length)],
@@ -466,7 +485,7 @@ function App() {
         diagramStore: diagramStoreForSession,
       });
     },
-    [requirements, programIncrements, team, root, signalingUrls, displayName]
+    [requirements, programIncrements, team, root, signalingUrls, iceServers, displayName]
   );
 
   // Joins an existing session by room name - starts from an EMPTY doc
@@ -480,7 +499,7 @@ function App() {
       const requirementsStoreForSession = createYjsRequirementsStore(doc);
       const programIncrementsStoreForSession = createYjsProgramIncrementsStore(doc);
       const diagramStoreForSession = createYjsDiagramStore(doc);
-      const session = startCollabSession(doc, roomName, { signalingUrls, password: password || undefined });
+      const session = startCollabSession(doc, roomName, { signalingUrls, password: password || undefined, iceServers });
       const initialPresence: LocalPresenceInfo = {
         name: displayName.trim() || "Guest",
         color: PRESENCE_COLORS[Math.floor(Math.random() * PRESENCE_COLORS.length)],
@@ -503,7 +522,7 @@ function App() {
         diagramStore: diagramStoreForSession,
       });
     },
-    [signalingUrls, displayName]
+    [signalingUrls, iceServers, displayName]
   );
 
   // Leaving a session writes its final state back into the local,
@@ -1692,6 +1711,9 @@ function App() {
               signalingUrlsInput={signalingUrlsInput}
               onSignalingUrlsInputChange={setSignalingUrlsInput}
               buildTimeSignalingDefault={buildTimeSignalingDefault}
+              iceServersInput={iceServersInput}
+              onIceServersInputChange={setIceServersInput}
+              buildTimeIceServersDefault={buildTimeIceServersDefault}
               activeSession={activeSession ? { roomName: activeSession.roomName, isSynced: () => activeSession.session.isSynced(), relayConnected, peers: presencePeers } : null}
               displayName={displayName}
               onDisplayNameChange={onDisplayNameChange}

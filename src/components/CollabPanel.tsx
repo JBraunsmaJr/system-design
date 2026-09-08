@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Users, Copy, Check, LogOut, X, Wifi, WifiOff } from "lucide-react";
+import { Users, Copy, Check, LogOut, X, Wifi, WifiOff, Settings, ChevronRight, ChevronDown, ExternalLink } from "lucide-react";
 import { computeFlippedPosition } from "../domain/popoverPosition";
 import type { PresenceInfo } from "../collab/session";
 
@@ -40,6 +40,15 @@ interface CollabPanelProps {
    * actually reset to, and used to render a reset control at all only
    * when the deployer actually configured one. */
   buildTimeSignalingDefault: string;
+  /** ICE servers as a raw, comma-separated string, in the same
+   * build-default-with-runtime-override arrangement as the signaling
+   * URLs above. Separate setting because it solves the other half of
+   * the connection: the relay is how peers FIND each other, ICE is how
+   * they REACH each other, and a network can get the first right and
+   * the second wrong. */
+  iceServersInput: string;
+  onIceServersInputChange: (raw: string) => void;
+  buildTimeIceServersDefault: string;
   activeSession: ActiveSessionInfo | null;
   /** This person's own chosen display name - shown to everyone else in
    * the session. Controlled from App.tsx, which also persists it across
@@ -76,6 +85,9 @@ export function CollabPanel({
   signalingUrlsInput,
   onSignalingUrlsInputChange,
   buildTimeSignalingDefault,
+  iceServersInput,
+  onIceServersInputChange,
+  buildTimeIceServersDefault,
   activeSession,
   displayName,
   onDisplayNameChange,
@@ -88,6 +100,10 @@ export function CollabPanel({
   const [isOpen, setIsOpen] = useState(false);
   const [joinRoomName, setJoinRoomName] = useState("");
   const [password, setPassword] = useState("");
+  // Starts open only when there's nothing configured yet, since the
+  // panel can't do anything useful in that state and the fix is in
+  // here. Otherwise collapsed: these are set once and rarely revisited.
+  const [showSettings, setShowSettings] = useState(() => !signalingConfigured);
   const [copied, setCopied] = useState(false);
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -216,34 +232,10 @@ export function CollabPanel({
               </button>
             </div>
 
-            <label className="collab-panel__field-label" htmlFor="collab-panel-signaling-url">
-              Relay Server URL
-            </label>
-            <input
-              id="collab-panel-signaling-url"
-              type="text"
-              value={signalingUrlsInput}
-              onChange={(e) => onSignalingUrlsInputChange(e.target.value)}
-              placeholder={buildTimeSignalingDefault || "ws://localhost:4444"}
-              className="collab-panel__name-input"
-            />
-            {buildTimeSignalingDefault && signalingUrlsInput !== buildTimeSignalingDefault && (
-              <button
-                type="button"
-                className="collab-panel__reset-signaling"
-                onClick={() => onSignalingUrlsInputChange(buildTimeSignalingDefault)}
-              >
-                Reset to deployment default
-              </button>
-            )}
-            <p className="collab-panel__hint">
-              One or more URLs (comma-separated) - only used to help peers find each other, never
-              involved once a connection is established. Takes effect the next time you
-              start or join a session.
-            </p>
-
             {!signalingConfigured && (
-              <p className="collab-panel__notice">Set a signaling server URL above to enable collaboration.</p>
+              <p className="collab-panel__notice">
+                No relay server configured. Open Settings below to add one.
+              </p>
             )}
 
             {signalingConfigured && !activeSession && (
@@ -259,6 +251,7 @@ export function CollabPanel({
                   placeholder="How others will see you"
                   className="collab-panel__name-input"
                 />
+
                 <label className="collab-panel__field-label" htmlFor="collab-panel-room-password">
                   Room password <span className="collab-panel__label-optional">(optional)</span>
                 </label>
@@ -272,12 +265,10 @@ export function CollabPanel({
                   autoComplete="off"
                 />
                 <p className="collab-panel__hint">
-                  Encrypts the room's contents with a key derived from this password, so the relay
-                  - and anyone else who reaches it - cannot read the document even with the session
-                  code. Everyone joining must enter the same password, and it cannot be recovered
-                  or changed for a running session. Applies to starting a new session or joining
-                  an existing one.
+                  Encrypts the room so the relay can't read it. Everyone must enter the same
+                  password, and it can't be changed once the session is running.
                 </p>
+
                 <button
                   type="button"
                   className="collab-panel__primary-action"
@@ -314,7 +305,7 @@ export function CollabPanel({
                       ? "Contacting relay..."
                       : activeSession.relayConnected
                         ? "Relay connected"
-                        : "Relay unreachable - check the URL above, and that the server is running and reachable from this network"}
+                        : "Relay unreachable - check the URL in Settings, and that the server is running and reachable from this network"}
                   </span>
                 </div>
                 <p className="collab-panel__hint">Share this code with anyone you want to collaborate with:</p>
@@ -335,14 +326,6 @@ export function CollabPanel({
                     ))}
                   </div>
                 )}
-                <label className="collab-panel__cursor-toggle">
-                  <input
-                    type="checkbox"
-                    checked={showPeerCursors}
-                    onChange={(e) => onShowPeerCursorsChange(e.target.checked)}
-                  />
-                  Show other people's cursors
-                </label>
                 <button
                   type="button"
                   className="collab-panel__leave-button"
@@ -356,6 +339,101 @@ export function CollabPanel({
                 </button>
               </>
             )}
+
+            {/* Configuration lives behind a disclosure because it is set
+                once (often baked in at build time and never touched) while
+                the actions above are used every session. Kept in the same
+                panel rather than moved elsewhere so a failing connection
+                can still be diagnosed and fixed without hunting for it. */}
+            <div className="collab-panel__settings">
+              <button
+                type="button"
+                className="collab-panel__settings-toggle"
+                onClick={() => setShowSettings((v) => !v)}
+                aria-expanded={showSettings}
+                aria-controls="collab-panel-settings-body"
+              >
+                {showSettings ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                <Settings size={13} />
+                <span>Settings</span>
+              </button>
+
+              {showSettings && (
+                <div className="collab-panel__settings-body" id="collab-panel-settings-body">
+                  <label className="collab-panel__field-label" htmlFor="collab-panel-signaling-url">
+                    Relay server URL
+                  </label>
+                  <input
+                    id="collab-panel-signaling-url"
+                    type="text"
+                    value={signalingUrlsInput}
+                    onChange={(e) => onSignalingUrlsInputChange(e.target.value)}
+                    placeholder={buildTimeSignalingDefault || "ws://localhost:4444"}
+                    className="collab-panel__name-input"
+                  />
+                  {buildTimeSignalingDefault && signalingUrlsInput !== buildTimeSignalingDefault && (
+                    <button
+                      type="button"
+                      className="collab-panel__reset-signaling"
+                      onClick={() => onSignalingUrlsInputChange(buildTimeSignalingDefault)}
+                    >
+                      Reset to deployment default
+                    </button>
+                  )}
+                  <p className="collab-panel__hint">
+                    Where peers find each other. Not involved once they're connected. Comma-separate
+                    several. Takes effect on your next session.
+                  </p>
+
+                  <label className="collab-panel__field-label" htmlFor="collab-panel-ice-servers">
+                    ICE servers <span className="collab-panel__label-optional">(advanced)</span>
+                  </label>
+                  <input
+                    id="collab-panel-ice-servers"
+                    type="text"
+                    value={iceServersInput}
+                    onChange={(e) => onIceServersInputChange(e.target.value)}
+                    placeholder={buildTimeIceServersDefault || "Leave blank for defaults"}
+                    className="collab-panel__name-input"
+                  />
+                  {buildTimeIceServersDefault && iceServersInput !== buildTimeIceServersDefault && (
+                    <button
+                      type="button"
+                      className="collab-panel__reset-signaling"
+                      onClick={() => onIceServersInputChange(buildTimeIceServersDefault)}
+                    >
+                      Reset to deployment default
+                    </button>
+                  )}
+                  <p className="collab-panel__hint">
+                    How peers reach each other after the relay introduces them. Blank uses public
+                    STUN servers. On an isolated network where everyone shares a LAN, enter{" "}
+                    <code>none</code>. Otherwise list your own:{" "}
+                    <code>turn:turn.internal:3478|user|pass</code>.
+                  </p>
+
+                  <label className="collab-panel__cursor-toggle">
+                    <input
+                      type="checkbox"
+                      checked={showPeerCursors}
+                      onChange={(e) => onShowPeerCursorsChange(e.target.checked)}
+                    />
+                    Show other people's cursors
+                  </label>
+
+                  <a
+                    className="collab-panel__docs-link"
+                    href="https://github.com/jbraunsmajr/system-design/blob/main/docs/relay-server.md"
+                    target="_blank"
+                    rel="noreferrer noopener"
+                  >
+                    Relay server documentation
+                    <ExternalLink size={11} />
+                  </a>
+                </div>
+              )}
+            </div>
+
           </div>,
           document.body
         )}

@@ -145,6 +145,23 @@ export interface CollabSessionOptions {
    * encryption. Recommended for anything less private than "a
    * hard-to-guess generated room name is enough". */
   password?: string;
+  /**
+   * ICE servers for the WebRTC peer connections themselves - STUN for
+   * discovering how peers are reachable from each other, TURN for
+   * relaying when a direct connection can't be made at all.
+   *
+   * Three states, deliberately distinct:
+   *   undefined - leave simple-peer's own defaults in place, which are
+   *               public STUN servers (Google's and Twilio's)
+   *   []        - no ICE servers; host candidates only
+   *   [...]     - use exactly these instead of the defaults
+   *
+   * The middle case is what an isolated network wants: the bundled
+   * public STUN servers are unreachable there, so leaving them in place
+   * means every connection stalls on them before falling back to the
+   * host candidates that were sufficient all along.
+   */
+  iceServers?: RTCIceServer[];
 }
 
 /**
@@ -201,6 +218,20 @@ export function startCollabSession(doc: Y.Doc, roomName: string, options: Collab
   const provider = new WebrtcProvider(roomName, doc, {
     signaling: options.signalingUrls,
     password: options.password,
+    /**
+     * Reaches the RTCPeerConnection via y-webrtc's peerOpts, which it
+     * spreads into simple-peer's constructor. simple-peer merges this
+     * with Object.assign({}, Peer.config, opts.config) - a SHALLOW
+     * merge, so supplying iceServers replaces the default list outright
+     * while leaving its sdpSemantics setting intact, which is exactly
+     * the behavior wanted here.
+     *
+     * Omitted entirely when no servers are configured, rather than
+     * passed as undefined: `config: { iceServers: undefined }` would
+     * override the defaults with nothing, quietly turning "I didn't
+     * configure this" into "use no ICE servers at all".
+     */
+    ...(options.iceServers === undefined ? {} : { peerOpts: { config: { iceServers: options.iceServers } } }),
   });
 
   return {
