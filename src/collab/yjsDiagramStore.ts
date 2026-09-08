@@ -26,6 +26,7 @@ const NODE_DATA_FIELDS = [
   "codeContent",
   "codeLanguage",
   "linkedRequirementIds",
+  "zIndex",
 ] as const;
 
 const EDGE_DATA_FIELDS = [

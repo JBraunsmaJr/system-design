@@ -27,6 +27,7 @@ jobs:
       - run: npm run build
         env:
           VITE_SIGNALING_URL: ${{ vars.VITE_SIGNALING_URL }}
+          VITE_APP_VERSION: ${{ github.ref_name }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

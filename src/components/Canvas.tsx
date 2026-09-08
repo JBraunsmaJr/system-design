@@ -32,7 +32,8 @@ import {
   type NodeTypes,
   type EdgeTypes,
 } from "@xyflow/react";
-import { MousePointer2 } from "lucide-react";
+import { MousePointer2, BringToFront, SendToBack, ChevronUp, ChevronDown } from "lucide-react";
+import { createPortal } from "react-dom";
 import { TypedNode } from "./nodes/TypedNode";
 import { TypedEdge } from "./edges/TypedEdge";
 import { GroupNode } from "./nodes/GroupNode";
@@ -45,6 +46,7 @@ import { NODE_TYPES } from "../domain/nodeRegistry";
 import { GROUP_TYPES } from "../domain/groupRegistry";
 import { SHAPE_TYPES } from "../domain/shapeRegistry";
 import { computeAlignment, type AlignBox, type AlignmentGuide } from "../domain/alignmentGuides";
+import { computeEffectiveZIndices, type ZOrderCommand } from "../domain/zOrder";
 import { toAbsolutePosition } from "../domain/graphUtils";
 import { DRAG_MIME_TYPE, GROUP_DRAG_MIME_TYPE, TEXT_DRAG_MIME_TYPE, SHAPE_DRAG_MIME_TYPE, CODE_DRAG_MIME_TYPE } from "./Palette";
 import type { ArchNodeData, ArchEdgeData, Scenario, ScenarioStep } from "../domain/types";
@@ -52,6 +54,11 @@ import type { PresenceInfo } from "../collab/session";
 
 // edgeTypes now built inside the component via useMemo, so TypedEdge can
 // receive onUpdateEdge - see the factory near nodeTypes below.
+
+// Fixed because the menu always holds the same four items - see
+// openContextMenu's clamping.
+const CONTEXT_MENU_WIDTH = 184;
+const CONTEXT_MENU_HEIGHT = 140;
 
 const DIMMED_NODE_OPACITY = 0.15;
 const DIMMED_EDGE_OPACITY = 0.12;
@@ -89,6 +96,11 @@ interface CanvasProps {
   onUpdateEdge: (id: string, patch: Partial<ArchEdgeData>) => void;
   onReparentNode: (nodeId: string, newParentId: string | null) => void;
   onAdoptIntoGroup: (groupId: string, nodeIds: string[]) => void;
+  /** Applies a stacking command. targetIds is explicit rather than
+   * implied by the current selection, because right-clicking a node
+   * that ISN'T selected should act on that node - not on whatever
+   * happened to be selected beforehand. */
+  onZOrderCommand: (command: ZOrderCommand, targetIds: string[]) => void;
   presentation: PresentationState | null;
   previewFocus: FocusSet | null;
   /** Set (once) to zoom/pan the camera onto a specific node - used for
@@ -135,6 +147,7 @@ export function Canvas({
   onUpdateEdge,
   onReparentNode,
   onAdoptIntoGroup,
+  onZOrderCommand,
   presentation,
   previewFocus,
   focusNodeId,
@@ -461,10 +474,87 @@ export function Canvas({
   // focused elements so the highlight reads clearly, not just as "slightly
   // less dim." Group nodes and text annotations can be focus targets too -
   // they're ordinary node ids underneath.
+  /**
+   * Stacking order, applied as React Flow's own per-node zIndex.
+   *
+   * Computed from live geometry rather than stored per node, so the
+   * automatic part stays correct as things are resized - a rectangle
+   * enlarged to enclose more nodes drops behind them without anyone
+   * having to reorder anything. Nodes carrying an explicit override keep
+   * it; see domain/zOrder.ts.
+   *
+   * Uses the same width/height fallback as toAlignBox above: a node
+   * whose size is content-derived has no explicit width, only a measured
+   * one, and reading `n.width` alone would score every such node as
+   * zero-area.
+   */
+  const zIndices = useMemo(() => {
+    return computeEffectiveZIndices(
+      nodes.map((n) => ({
+        id: n.id,
+        x: n.position.x,
+        y: n.position.y,
+        width: n.width ?? n.measured?.width ?? 0,
+        height: n.height ?? n.measured?.height ?? 0,
+        zIndex: n.data.zIndex,
+      }))
+    );
+  }, [nodes]);
+
+  /**
+   * Right-click menu state. Position is in VIEWPORT coordinates (the menu
+   * is portaled to document.body and fixed-positioned), not flow
+   * coordinates - it should stay under the cursor, not pinned to a spot
+   * on the canvas that moves when you pan.
+   */
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; targetIds: string[] } | null>(null);
+
+  const openContextMenu = useCallback(
+    (event: ReactMouseEvent, nodeId: string | null) => {
+      if (isPresenting) return; // the locked slideshow view has nothing to arrange
+      event.preventDefault();
+
+      const selectedIds = nodes.filter((n) => n.selected).map((n) => n.id);
+      // Right-clicking inside a multi-selection acts on the whole
+      // selection; right-clicking a node outside it acts on just that
+      // node, which is what every other editor does and avoids silently
+      // reordering something off-screen.
+      const targetIds =
+        nodeId === null ? selectedIds : selectedIds.includes(nodeId) ? selectedIds : [nodeId];
+      if (targetIds.length === 0) return;
+
+      // Clamped so the menu never opens partly off-screen. The size is
+      // fixed (four items), so constants are enough here and avoid a
+      // measure-then-reposition pass.
+      const left = Math.min(event.clientX, window.innerWidth - CONTEXT_MENU_WIDTH - 8);
+      const top = Math.min(event.clientY, window.innerHeight - CONTEXT_MENU_HEIGHT - 8);
+      setContextMenu({ x: Math.max(8, left), y: Math.max(8, top), targetIds });
+    },
+    [isPresenting, nodes]
+  );
+
+  const closeContextMenu = useCallback(() => setContextMenu(null), []);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeContextMenu();
+    };
+    // Any click anywhere dismisses, including one that lands on the menu
+    // itself - the item's own onClick has already run by then.
+    document.addEventListener("click", closeContextMenu);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("click", closeContextMenu);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [contextMenu, closeContextMenu]);
+
   const displayNodes = useMemo(() => {
+    const withZ = nodes.map((n) => ({ ...n, zIndex: zIndices.get(n.id) }));
     if (presentationFocus) {
       const focusIds = new Set(presentationFocus.nodeIds);
-      return nodes.map((n) => ({
+      return withZ.map((n) => ({
         ...n,
         className: focusIds.has(n.id) ? "is-presentation-focus" : undefined,
         style: { ...n.style, opacity: focusIds.has(n.id) ? 1 : DIMMED_NODE_OPACITY },
@@ -472,7 +562,7 @@ export function Canvas({
     }
     if (previewFocus) {
       const memberIds = new Set(previewFocus.nodeIds);
-      return nodes.map((n) => {
+      return withZ.map((n) => {
         if (memberIds.has(n.id)) return { ...n, className: "is-step-member" };
         // Selected while a step is being edited, but not (yet) part of it -
         // a distinct highlight from is-step-member, signaling "you could
@@ -481,8 +571,8 @@ export function Canvas({
         return n;
       });
     }
-    return nodes;
-  }, [nodes, presentationFocus, previewFocus]);
+    return withZ;
+  }, [nodes, zIndices, presentationFocus, previewFocus]);
 
   const displayEdges = useMemo(() => {
     if (presentationFocus) {
@@ -579,6 +669,10 @@ export function Canvas({
         onConnect={handleConnect}
         onConnectStart={onConnectStart}
         onSelectionChange={onSelectionChange}
+        onNodeContextMenu={(event, node) => openContextMenu(event, node.id)}
+        onSelectionContextMenu={(event) => openContextMenu(event, null)}
+        onPaneClick={closeContextMenu}
+        onMoveStart={closeContextMenu}
         onNodeDrag={onNodeDrag}
         onNodeDragStop={onNodeDragStop}
         onNodeDoubleClick={onNodeDoubleClick}
@@ -708,6 +802,37 @@ export function Canvas({
           />
         )}
       </ReactFlow>
+
+      {/* Portaled to document.body and fixed-positioned for the same
+          reason CollabPanel's dropdown is: React Flow's viewport is a
+          transformed, clipping ancestor, and a menu rendered inside it
+          would be scaled with the zoom and clipped at the pane edge. */}
+      {contextMenu &&
+        createPortal(
+          <div
+            className="canvas-context-menu"
+            style={{ position: "fixed", top: contextMenu.y, left: contextMenu.x, width: CONTEXT_MENU_WIDTH }}
+            role="menu"
+          >
+            <button type="button" role="menuitem" onClick={() => onZOrderCommand("front", contextMenu.targetIds)}>
+              <BringToFront size={13} />
+              Bring to front
+            </button>
+            <button type="button" role="menuitem" onClick={() => onZOrderCommand("forward", contextMenu.targetIds)}>
+              <ChevronUp size={13} />
+              Bring forward
+            </button>
+            <button type="button" role="menuitem" onClick={() => onZOrderCommand("backward", contextMenu.targetIds)}>
+              <ChevronDown size={13} />
+              Send backward
+            </button>
+            <button type="button" role="menuitem" onClick={() => onZOrderCommand("back", contextMenu.targetIds)}>
+              <SendToBack size={13} />
+              Send to back
+            </button>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

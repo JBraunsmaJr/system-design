@@ -526,6 +526,209 @@
   border-color: var(--accent);
 }
 
+/* Arrange (z-order) controls. Ordered back -> front left to right so the
+   row reads as a depth axis rather than four unrelated buttons. */
+.inspector__z-order {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--chrome-border);
+}
+
+.inspector__z-order-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--chrome-text-dim);
+}
+
+.inspector__z-order-buttons {
+  display: flex;
+  gap: 2px;
+}
+
+.inspector__z-order-buttons button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  color: var(--chrome-text-dim);
+}
+
+.inspector__z-order-buttons button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Arrange (z-order) controls. Ordered back -> front left to right so the
+   row reads as a depth axis rather than four unrelated buttons. */
+/* Right-click menu. Portaled to document.body, so its position comes
+   from inline styles (see Canvas's openContextMenu) rather than from any
+   ancestor here - React Flow's viewport is transformed and clipping, and
+   a menu inside it would scale with the zoom. */
+.canvas-context-menu {
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px;
+  background: var(--chrome-bg-raised);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+.canvas-context-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  font-size: 12.5px;
+  color: var(--chrome-text);
+  text-align: left;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.canvas-context-menu button:hover {
+  background: var(--chrome-bg);
+  color: var(--accent);
+}
+
+.inspector__z-order {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--chrome-border);
+}
+
+.inspector__z-order-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--chrome-text-dim);
+}
+
+.inspector__z-order-buttons {
+  display: flex;
+  gap: 2px;
+}
+
+.inspector__z-order-buttons button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  color: var(--chrome-text-dim);
+}
+
+.inspector__z-order-buttons button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Arrange (z-order) controls. Ordered back -> front left to right so the
+   row reads as a depth axis rather than four unrelated buttons. */
+/* Right-click menu. Portaled to document.body, so its position comes
+   from inline styles (see Canvas's openContextMenu) rather than from any
+   ancestor here - React Flow's viewport is transformed and clipping, and
+   a menu inside it would scale with the zoom. */
+.canvas-context-menu {
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px;
+  background: var(--chrome-bg-raised);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+.canvas-context-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  font-size: 12.5px;
+  color: var(--chrome-text);
+  text-align: left;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.canvas-context-menu button:hover {
+  background: var(--chrome-bg);
+  color: var(--accent);
+}
+
+.inspector__z-order {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--chrome-border);
+}
+
+.inspector__z-order-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--chrome-text-dim);
+}
+
+.inspector__z-order-buttons {
+  display: flex;
+  gap: 2px;
+}
+
+.inspector__z-order-buttons button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  color: var(--chrome-text-dim);
+}
+
+.inspector__z-order-buttons button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .inspector__delete {
   width: 100%;
   margin-top: 6px;

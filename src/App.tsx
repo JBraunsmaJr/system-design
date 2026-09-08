@@ -63,6 +63,7 @@ import { startCollabSession, type CollabSession, type PresenceInfo, type LocalPr
 import { loadPresenceName, savePresenceName, loadShowPeerCursors, saveShowPeerCursors } from "./domain/presenceIdentity";
 import { loadSignalingUrls, saveSignalingUrls, parseSignalingUrls } from "./domain/signalingConfig";
 import { loadIceServers, saveIceServers, parseIceServers } from "./domain/iceServerConfig";
+import { applyZOrderCommand, type ZOrderCommand } from "./domain/zOrder";
 import { classifyNodeChanges, applySelectionChanges, isAutoSizedNodeType, type PendingNodeUpdate, type CurrentNodeGeometry } from "./domain/nodeChangeBatching";
 import "./App.css";
 
@@ -1055,6 +1056,41 @@ function App() {
     []
   );
 
+  /**
+   * Applies a z-order command to the current selection.
+   *
+   * Lives here rather than in the Inspector because reordering is
+   * inherently relative - working out what "in front" means needs every
+   * node's geometry, and the Inspector only ever sees the one that's
+   * selected.
+   *
+   * The width/height fallback matches Canvas's own: a content-sized node
+   * carries no explicit width, only a measured one, and reading n.width
+   * alone would score all of them as zero-area.
+   */
+  const onZOrderCommand = useCallback(
+    (command: ZOrderCommand, targetIds?: string[]) => {
+      // Defaults to the selection for the Inspector's buttons; the
+      // context menu passes targets explicitly, since right-clicking an
+      // unselected node should act on THAT node.
+      const ids = targetIds ?? selectedNodeIds;
+      const boxes = nodes.map((n) => ({
+        id: n.id,
+        x: n.position.x,
+        y: n.position.y,
+        width: n.width ?? n.measured?.width ?? 0,
+        height: n.height ?? n.measured?.height ?? 0,
+        zIndex: n.data.zIndex,
+      }));
+      // An empty result means the command wouldn't change anything -
+      // skip the store write rather than syncing a no-op to every peer.
+      for (const patch of applyZOrderCommand(boxes, ids, command)) {
+        diagramStoreRef.current.updateNode(patch.id, { zIndex: patch.zIndex });
+      }
+    },
+    [nodes, selectedNodeIds]
+  );
+
   const onUpdateEdge = useCallback(
     (id: string, patch: Partial<ArchEdgeData>) => {
       diagramStoreRef.current.updateEdge(id, patch);
@@ -1778,6 +1814,7 @@ function App() {
               onUpdateEdge={onUpdateEdge}
               onReparentNode={onReparentNode}
               onAdoptIntoGroup={onAdoptIntoGroup}
+              onZOrderCommand={onZOrderCommand}
               presentation={presentation}
               previewFocus={previewFocus}
               focusNodeId={pendingNodeFocus}
@@ -1846,6 +1883,7 @@ function App() {
                 onDrillInto={onDrillInto}
                 requirements={requirementsSnapshot}
                 onNavigateToRequirement={onNavigateToRequirement}
+                onZOrderCommand={onZOrderCommand}
               />
             )}
           </div>
