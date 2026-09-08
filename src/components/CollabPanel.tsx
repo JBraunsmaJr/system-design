@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Users, Copy, Check, LogOut, X } from "lucide-react";
+import { Users, Copy, Check, LogOut, X, Wifi, WifiOff } from "lucide-react";
 import { computeFlippedPosition } from "../domain/popoverPosition";
 import type { PresenceInfo } from "../collab/session";
 
@@ -9,6 +9,11 @@ const DROPDOWN_WIDTH = 300;
 export interface ActiveSessionInfo {
   roomName: string;
   isSynced: () => boolean;
+  /** Whether a signaling relay is currently reachable. Null before the
+   * first status arrives. Distinct from isSynced() - see session.ts's
+   * subscribeToRelayStatus for why conflating them makes every
+   * connection fault look like "nobody has joined yet". */
+  relayConnected: boolean | null;
   /** Everyone else currently in the session - never includes this
    * person's own presence (see session.ts's own subscribeToPresence
    * doc comment on why). */
@@ -42,8 +47,10 @@ interface CollabPanelProps {
    * where it's stored. */
   displayName: string;
   onDisplayNameChange: (name: string) => void;
-  onStartSession: () => void;
-  onJoinSession: (roomName: string) => void;
+  /** Password is "" when the field was left blank, meaning an
+   * unencrypted room. */
+  onStartSession: (password: string) => void;
+  onJoinSession: (roomName: string, password: string) => void;
   onLeaveSession: () => void;
   /** Whether to render OTHER peers' live cursors - a purely local,
    * display-side preference (see presenceIdentity.ts's own doc comment
@@ -80,6 +87,7 @@ export function CollabPanel({
 }: CollabPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [joinRoomName, setJoinRoomName] = useState("");
+  const [password, setPassword] = useState("");
   const [copied, setCopied] = useState(false);
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -172,8 +180,9 @@ export function CollabPanel({
     e.preventDefault();
     const trimmed = joinRoomName.trim();
     if (!trimmed) return;
-    onJoinSession(trimmed);
+    onJoinSession(trimmed, password);
     setJoinRoomName("");
+    setPassword("");
     close();
   };
 
@@ -250,7 +259,34 @@ export function CollabPanel({
                   placeholder="How others will see you"
                   className="collab-panel__name-input"
                 />
-                <button type="button" className="collab-panel__primary-action" onClick={() => { onStartSession(); close(); }}>
+                <label className="collab-panel__field-label" htmlFor="collab-panel-room-password">
+                  Room password <span className="collab-panel__label-optional">(optional)</span>
+                </label>
+                <input
+                  id="collab-panel-room-password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Leave blank for an open room"
+                  className="collab-panel__name-input"
+                  autoComplete="off"
+                />
+                <p className="collab-panel__hint">
+                  Encrypts the room's contents with a key derived from this password, so the relay
+                  - and anyone else who reaches it - cannot read the document even with the session
+                  code. Everyone joining must enter the same password, and it cannot be recovered
+                  or changed for a running session. Applies to starting a new session or joining
+                  an existing one.
+                </p>
+                <button
+                  type="button"
+                  className="collab-panel__primary-action"
+                  onClick={() => {
+                    onStartSession(password);
+                    setPassword("");
+                    close();
+                  }}
+                >
                   Start a new session
                 </button>
                 <div className="collab-panel__divider">or join an existing one</div>
@@ -271,6 +307,16 @@ export function CollabPanel({
 
             {activeSession && (
               <>
+                <div className={`collab-panel__relay-status${activeSession.relayConnected === false ? " is-disconnected" : ""}`}>
+                  {activeSession.relayConnected === false ? <WifiOff size={12} /> : <Wifi size={12} />}
+                  <span>
+                    {activeSession.relayConnected === null
+                      ? "Contacting relay..."
+                      : activeSession.relayConnected
+                        ? "Relay connected"
+                        : "Relay unreachable - check the URL above, and that the server is running and reachable from this network"}
+                  </span>
+                </div>
                 <p className="collab-panel__hint">Share this code with anyone you want to collaborate with:</p>
                 <div className="collab-panel__room-code">
                   <code>{activeSession.roomName}</code>

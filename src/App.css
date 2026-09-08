@@ -8609,6 +8609,36 @@
   cursor: not-allowed;
 }
 
+.collab-panel__label-optional {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--chrome-text-dim);
+}
+
+/* Reports whether a signaling relay is reachable, which is deliberately
+   not the same signal as "synced" - a session nobody has joined yet is
+   unsynced and perfectly healthy, whereas an unreachable relay means
+   something is genuinely misconfigured. */
+.collab-panel__relay-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 2px 0 8px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--chrome-text-dim);
+}
+
+.collab-panel__relay-status svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.collab-panel__relay-status.is-disconnected {
+  color: var(--danger);
+}
+
 .collab-panel__room-code {
   display: flex;
   align-items: center;

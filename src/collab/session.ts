@@ -114,6 +114,22 @@ export interface CollabSession {
    * presence for anyone in the room, but this session's own notion of
    * presence is specifically "peers who identified themselves". */
   subscribeToPresence(callback: (peers: PresenceInfo[]) => void): () => void;
+  /**
+   * Subscribes to whether this browser currently has a live WebSocket to
+   * at least one signaling relay. Fires immediately with the current
+   * state, then on every connect/disconnect. Returns an unsubscribe
+   * function.
+   *
+   * This is deliberately NOT the same question as isSynced(). A session
+   * can be unsynced simply because nobody else has joined yet, which is
+   * normal and fine. Being unable to reach the relay at all is a
+   * configuration or infrastructure fault - a wrong URL, a DNS name
+   * that doesn't resolve from this network, a TLS failure, a relay that
+   * isn't running - and it needs to be distinguishable, because without
+   * it every one of those looks identical to "waiting for someone to
+   * join".
+   */
+  subscribeToRelayStatus(callback: (connected: boolean) => void): () => void;
 }
 
 export interface CollabSessionOptions {
@@ -202,6 +218,31 @@ export function startCollabSession(doc: Y.Doc, roomName: string, options: Collab
     },
     setLocalPresence: (info) => {
       provider.awareness.setLocalState(info);
+    },
+    subscribeToRelayStatus: (callback) => {
+      /**
+       * y-webrtc's SignalingConn extends lib0's WebsocketClient, which
+       * carries a `connected` flag and emits "connect"/"disconnect" -
+       * read directly off that rather than tracked separately here, so
+       * this can never drift from what the provider actually believes.
+       *
+       * Connected means ANY relay is up: signalingUrls is a list
+       * precisely so one being unreachable isn't fatal, and reporting
+       * "disconnected" while a working relay remains would be wrong.
+       */
+      const isConnected = () => provider.signalingConns.some((conn) => conn.connected);
+      const handler = () => callback(isConnected());
+      for (const conn of provider.signalingConns) {
+        conn.on("connect", handler);
+        conn.on("disconnect", handler);
+      }
+      callback(isConnected()); // fire immediately - the relay may already be up (or already failing) before anyone subscribes
+      return () => {
+        for (const conn of provider.signalingConns) {
+          conn.off("connect", handler);
+          conn.off("disconnect", handler);
+        }
+      };
     },
     subscribeToPresence: (callback) => {
       const getOtherPeers = (): PresenceInfo[] => {

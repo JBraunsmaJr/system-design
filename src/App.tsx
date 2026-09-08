@@ -310,9 +310,24 @@ function App() {
   // calling setState directly and unconditionally in an effect body,
   // which is exactly the pattern React's own linting steers away from.
   const [presencePeers, setPresencePeers] = useState<PresenceInfo[]>([]);
+  /**
+   * Whether the current session can actually reach a signaling relay.
+   * Null outside a session, or before the first status arrives. Kept
+   * separate from isSynced() on purpose: "not synced" is the normal
+   * state of a session nobody else has joined yet, whereas "relay
+   * unreachable" means the URL, DNS, TLS or the relay process itself is
+   * wrong - and without telling those apart the panel reports "Session
+   * Active" identically in both cases.
+   */
+  const [relayConnected, setRelayConnected] = useState<boolean | null>(null);
   useEffect(() => {
     if (!activeSession) return;
-    return activeSession.session.subscribeToPresence(setPresencePeers);
+    const unsubscribePresence = activeSession.session.subscribeToPresence(setPresencePeers);
+    const unsubscribeRelay = activeSession.session.subscribeToRelayStatus(setRelayConnected);
+    return () => {
+      unsubscribePresence();
+      unsubscribeRelay();
+    };
   }, [activeSession]);
 
   // Holds this peer's own full presence state, rebuilt and rebroadcast
@@ -415,7 +430,7 @@ function App() {
   // nothing is lost - the new session's initial state IS the current local
   // state, not an empty workbook.
   const startNewSession = useCallback(
-    () => {
+    (password: string) => {
       const roomName = `session-${Math.random().toString(36).slice(2, 10)}`;
       const doc = new Y.Doc();
       seedYjsRequirementsDoc(doc, requirements);
@@ -426,7 +441,7 @@ function App() {
       const requirementsStoreForSession = createYjsRequirementsStore(doc);
       const programIncrementsStoreForSession = createYjsProgramIncrementsStore(doc);
       const diagramStoreForSession = createYjsDiagramStore(doc);
-      const session = startCollabSession(doc, roomName, { signalingUrls });
+      const session = startCollabSession(doc, roomName, { signalingUrls, password: password || undefined });
       const initialPresence: LocalPresenceInfo = {
         name: displayName.trim() || "Guest",
         color: PRESENCE_COLORS[Math.floor(Math.random() * PRESENCE_COLORS.length)],
@@ -457,13 +472,13 @@ function App() {
   // to receive whatever the session already has from other peers, not to
   // impose this browser's own local state onto it.
   const joinSession = useCallback(
-    (roomName: string) => {
+    (roomName: string, password: string) => {
       const doc = new Y.Doc();
       const teamStore = createYjsTeamStore(doc);
       const requirementsStoreForSession = createYjsRequirementsStore(doc);
       const programIncrementsStoreForSession = createYjsProgramIncrementsStore(doc);
       const diagramStoreForSession = createYjsDiagramStore(doc);
-      const session = startCollabSession(doc, roomName, { signalingUrls });
+      const session = startCollabSession(doc, roomName, { signalingUrls, password: password || undefined });
       const initialPresence: LocalPresenceInfo = {
         name: displayName.trim() || "Guest",
         color: PRESENCE_COLORS[Math.floor(Math.random() * PRESENCE_COLORS.length)],
@@ -1672,7 +1687,7 @@ function App() {
               signalingUrlsInput={signalingUrlsInput}
               onSignalingUrlsInputChange={setSignalingUrlsInput}
               buildTimeSignalingDefault={buildTimeSignalingDefault}
-              activeSession={activeSession ? { roomName: activeSession.roomName, isSynced: () => activeSession.session.isSynced(), peers: presencePeers } : null}
+              activeSession={activeSession ? { roomName: activeSession.roomName, isSynced: () => activeSession.session.isSynced(), relayConnected, peers: presencePeers } : null}
               displayName={displayName}
               onDisplayNameChange={onDisplayNameChange}
               showPeerCursors={showPeerCursors}
