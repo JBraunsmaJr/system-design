@@ -15,7 +15,12 @@ import {
   type Edge,
 } from "@xyflow/react";
 import { getEdgeType } from "../../domain/edgeRegistry";
-import { getContainmentAwarePositions, getContainmentRelation, type ContainmentRelation } from "../../domain/edgeContainment";
+import {
+  getClickBandEndpoints,
+  getContainmentAwarePositions,
+  getContainmentRelation,
+  type ContainmentRelation,
+} from "../../domain/edgeContainment";
 import type { ArchEdgeData } from "../../domain/types";
 
 type TypedEdgeType = Edge<ArchEdgeData, "typed">;
@@ -116,6 +121,31 @@ export function TypedEdge({
     targetPosition: routed.targetPosition,
     borderRadius: 10,
   });
+
+  /**
+   * A second, invisible path used only as the click target, generated
+   * from endpoints pulled back from the boundary's own connector - see
+   * getClickBandEndpoints. Without it React Flow's 20px click band ends
+   * on top of that connector and makes it impossible to grab, because
+   * an edge touching a nested node always paints above the boundary.
+   *
+   * Only built for containment edges; every other edge keeps React
+   * Flow's default band untouched.
+   */
+  const clickBandPath = (() => {
+    if (containment === "none") return null;
+    const inset = getClickBandEndpoints(containment, { sourceX, sourceY, targetX, targetY }, routed);
+    const [p] = getSmoothStepPath({
+      sourceX: inset.sourceX,
+      sourceY: inset.sourceY,
+      sourcePosition: routed.sourcePosition,
+      targetX: inset.targetX,
+      targetY: inset.targetY,
+      targetPosition: routed.targetPosition,
+      borderRadius: 10,
+    });
+    return p;
+  })();
 
   const anchorT = data?.labelAnchorT ?? 0.5;
   const offsetX = data?.labelOffsetX ?? 0;
@@ -225,9 +255,21 @@ export function TypedEdge({
 
   return (
     <>
+      {/* Replaces BaseEdge's own click band when one is supplied below,
+          so the two don't overlap and re-cover the connector. */}
+      {clickBandPath && (
+        <path
+          d={clickBandPath}
+          fill="none"
+          strokeOpacity={0}
+          strokeWidth={20}
+          className="react-flow__edge-interaction"
+        />
+      )}
       <BaseEdge
         id={id}
         path={path}
+        interactionWidth={clickBandPath ? 0 : undefined}
         // Which end(s) get an arrowhead. "reverse" moves the single
         // arrowhead to the source end, indicating the real traffic runs
         // opposite to how the edge happens to be drawn; "both" keeps one

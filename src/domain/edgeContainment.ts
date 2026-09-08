@@ -99,3 +99,73 @@ export function getContainmentAwarePositions(
       return { sourcePosition, targetPosition };
   }
 }
+
+/**
+ * How far the invisible click band is pulled back from a boundary's own
+ * connector.
+ *
+ * A handle is 8px plus a 2px border on each side, so it occupies roughly
+ * 6px either side of the border line it sits on. 14px clears that with
+ * margin while still leaving the band covering all but the very tip of
+ * the edge.
+ */
+export const HANDLE_CLEARANCE = 14;
+
+/** Unit vector for the direction a handle on this side points. */
+function positionDelta(position: Position): { dx: number; dy: number } {
+  switch (position) {
+    case Position.Left:
+      return { dx: -1, dy: 0 };
+    case Position.Right:
+      return { dx: 1, dy: 0 };
+    case Position.Top:
+      return { dx: 0, dy: -1 };
+    default:
+      return { dx: 0, dy: 1 };
+  }
+}
+
+/**
+ * Endpoints for the edge's invisible CLICK band - not for the visible
+ * line, which still runs all the way to the handle.
+ *
+ * React Flow draws a 20px-wide transparent stroke over every edge so it
+ * can be clicked, and that band ends exactly on the endpoint. When the
+ * endpoint is a boundary's own connector, the band therefore covers it.
+ * The edge also paints above the boundary (React Flow gives an edge the
+ * z-index of whichever end has a parent, and a child always outranks its
+ * parent), so the band wins the hit test and the connector cannot be
+ * grabbed to start a new edge at all.
+ *
+ * Pulling just the band's boundary end inward leaves the connector free
+ * while keeping the edge itself clickable along its whole length bar the
+ * last few pixels. The visible geometry is untouched.
+ *
+ * `inward` is the already-flipped Position from
+ * getContainmentAwarePositions - the direction the path leaves the
+ * boundary - so the band retreats along the line rather than sideways
+ * off it.
+ */
+export function getClickBandEndpoints(
+  relation: ContainmentRelation,
+  points: { sourceX: number; sourceY: number; targetX: number; targetY: number },
+  inward: { sourcePosition: Position; targetPosition: Position }
+): { sourceX: number; sourceY: number; targetX: number; targetY: number } {
+  if (relation === "target-inside") {
+    const { dx, dy } = positionDelta(inward.sourcePosition);
+    return {
+      ...points,
+      sourceX: points.sourceX + dx * HANDLE_CLEARANCE,
+      sourceY: points.sourceY + dy * HANDLE_CLEARANCE,
+    };
+  }
+  if (relation === "source-inside") {
+    const { dx, dy } = positionDelta(inward.targetPosition);
+    return {
+      ...points,
+      targetX: points.targetX + dx * HANDLE_CLEARANCE,
+      targetY: points.targetY + dy * HANDLE_CLEARANCE,
+    };
+  }
+  return points;
+}

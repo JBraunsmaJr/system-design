@@ -7,6 +7,8 @@ import {
   getContainmentRelation,
   flipPosition,
   getContainmentAwarePositions,
+  getClickBandEndpoints,
+  HANDLE_CLEARANCE,
 } from "./edgeContainment";
 
 let failures = 0;
@@ -160,6 +162,54 @@ const simple = tree({ api: "boundary", db: "boundary" });
   // above would pass whether or not the flip happened.
   assert(escapes(pathBounds(Position.Left, boundary.x, 200)),
     "without the flip the same edge leaves the boundary and comes back - the behavior reported in issue #29");
+}
+
+// === Part 11: the click band is pulled clear of the boundary's connector ===
+// React Flow draws a 20px transparent stroke over every edge as its click
+// target, ending exactly on the endpoint. On a boundary's own connector
+// that band covers the handle - and since an edge touching a nested node
+// always paints above the boundary, the band wins the hit test and the
+// connector can't be grabbed to start a new edge.
+{
+  const points = { sourceX: 320, sourceY: 100, targetX: 302, targetY: 175 };
+  const routed = getContainmentAwarePositions("target-inside", Position.Top, Position.Top);
+  const inset = getClickBandEndpoints("target-inside", points, routed);
+
+  assert(inset.sourceY === 100 + HANDLE_CLEARANCE, "the boundary end of the band retreats INWARD along the edge, not sideways off it");
+  assert(inset.sourceX === points.sourceX, "and doesn't drift across the other axis");
+  assert(inset.targetX === points.targetX && inset.targetY === points.targetY, "the contained node's end is untouched - its handle isn't the one being covered");
+
+  // A handle is 8px plus a 2px border each side, so ~6px either side of
+  // the border line. The clearance has to beat that.
+  assert(HANDLE_CLEARANCE > 6, `the clearance (${HANDLE_CLEARANCE}px) exceeds the handle's own ~6px radius, so the band's end cap lands clear of it`);
+}
+
+// === Part 12: each side retreats along its own axis ===
+{
+  const points = { sourceX: 300, sourceY: 200, targetX: 400, targetY: 250 };
+  const cases: [Position, "sourceX" | "sourceY", number][] = [
+    [Position.Top, "sourceY", 200 + HANDLE_CLEARANCE],    // flips to Bottom -> inward is +y
+    [Position.Bottom, "sourceY", 200 - HANDLE_CLEARANCE], // flips to Top -> inward is -y
+    [Position.Left, "sourceX", 300 + HANDLE_CLEARANCE],   // flips to Right -> inward is +x
+    [Position.Right, "sourceX", 300 - HANDLE_CLEARANCE],  // flips to Left -> inward is -x
+  ];
+  for (const [side, axis, expected] of cases) {
+    const routed = getContainmentAwarePositions("target-inside", side, Position.Left);
+    const inset = getClickBandEndpoints("target-inside", points, routed);
+    assert(inset[axis] === expected, `a connector on the ${side} side retreats into the boundary along the right axis`);
+  }
+}
+
+// === Part 13: ordinary edges keep React Flow's default band ===
+{
+  const points = { sourceX: 10, sourceY: 20, targetX: 30, targetY: 40 };
+  const routed = getContainmentAwarePositions("none", Position.Left, Position.Right);
+  const inset = getClickBandEndpoints("none", points, routed);
+
+  assert(
+    inset.sourceX === 10 && inset.sourceY === 20 && inset.targetX === 30 && inset.targetY === 40,
+    "an edge between unrelated nodes is returned unchanged, so it keeps React Flow's own click band"
+  );
 }
 
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);

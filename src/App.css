@@ -987,6 +987,22 @@
   pointer-events: auto;
 }
 
+/* Connection handles have to sit ABOVE the border hit-strips below.
+   GroupNode renders <BidirectionalHandles /> and then the .group-node div
+   that contains those strips, as siblings with no z-index between them -
+   so the strips, being later in the DOM, painted on top and won every hit
+   test. The top strip spans y -5..+5 around the border and the top handle
+   is centred on that same line, so a press on the connector landed on the
+   strip instead: the boundary started dragging rather than a connection
+   starting. Scoped to boundaries because they're the only node type with
+   a full-width interactive strip laid over their own handles.
+
+   Kept below .react-flow__edgelabel-renderer's 1000 and React Flow's
+   in-progress connection line at 1001, both of which should stay on top. */
+.react-flow__node-group .react-flow__handle {
+  z-index: 1;
+}
+
 .group-node__edge-hit--top,
 .group-node__edge-hit--bottom {
   left: 0;
