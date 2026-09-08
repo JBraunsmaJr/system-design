@@ -142,6 +142,7 @@ export function TimelineView({
         requirements.items,
         requirements.relationships,
         requirements.relationshipTypes,
+        requirements.itemTypes,
         sprintRangesByItemId
       );
       if (conflict && conflict.severity === "blocked") {
@@ -215,6 +216,7 @@ export function TimelineView({
       requirements.items,
       requirements.relationships,
       requirements.relationshipTypes,
+      requirements.itemTypes,
       byItemId
     );
     // An item can have more than one conflict at once (e.g. one blocker
@@ -244,9 +246,11 @@ export function TimelineView({
     return findBlockingItemIds(
       draggedItemId,
       requirements.relationships,
-      requirements.relationshipTypes
+      requirements.relationshipTypes,
+      requirements.itemTypes,
+      requirements.items
     );
-  }, [draggedItemId, requirements.relationships, requirements.relationshipTypes]);
+  }, [draggedItemId, requirements.relationships, requirements.relationshipTypes, requirements.itemTypes, requirements.items]);
 
   return (
     <div className="timeline-view">
@@ -932,9 +936,10 @@ function SprintBoardColumn({
       requirements.items,
       requirements.relationships,
       requirements.relationshipTypes,
+      requirements.itemTypes,
       sprintRangesByItemId
     );
-  }, [draggedItemId, sprint.id, range, requirements.items, requirements.relationships, requirements.relationshipTypes, sprintRangesByItemId]);
+  }, [draggedItemId, sprint.id, range, requirements.items, requirements.relationships, requirements.relationshipTypes, requirements.itemTypes, sprintRangesByItemId]);
 
   const isBlocked = dropConflict?.severity === "blocked";
   const isAtRisk = dropConflict?.severity === "risk";

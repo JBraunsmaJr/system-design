@@ -94,8 +94,8 @@ export function GanttChart({ programIncrements, requirements, onSelectItem, onNa
   }, [scheduledItems, rangesBySprintId]);
 
   const conflicts = useMemo(
-    () => findScheduleConflicts(requirements.items, requirements.relationships, requirements.relationshipTypes, sprintRangesByItemId),
-    [requirements.items, requirements.relationships, requirements.relationshipTypes, sprintRangesByItemId]
+    () => findScheduleConflicts(requirements.items, requirements.relationships, requirements.relationshipTypes, requirements.itemTypes, sprintRangesByItemId),
+    [requirements.items, requirements.relationships, requirements.relationshipTypes, requirements.itemTypes, sprintRangesByItemId]
   );
   // An item can have more than one conflict at once - the bar should
   // reflect its MOST severe one, so a genuine "blocked" is never masked

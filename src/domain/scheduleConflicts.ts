@@ -1,4 +1,31 @@
-import type { RequirementItem, RequirementRelationship, RelationshipType } from "./requirementsTypes";
+import type {
+  RequirementItem,
+  RequirementRelationship,
+  RelationshipType,
+  RequirementItemType,
+} from "./requirementsTypes";
+
+/**
+ * The ids of item types that represent actual work.
+ *
+ * Every function in this file needs the same thing: a way to tell
+ * whether a blocker is something a team can schedule and finish. A
+ * non-workable item - a Requirement, Goal, Constraint, Assumption or
+ * Risk - can never be assigned to a sprint and never reaches "done"
+ * (defaultStatusForType assigns it no status at all), so asking "will
+ * this blocker be finished before my sprint starts?" has no answer that
+ * could ever become yes.
+ *
+ * This mirrors the rule computeSkillTree already applies, where an edge
+ * only counts when both ends are workable. The two were meant to agree
+ * and didn't: the skill tree quietly ignored these edges while the
+ * scheduling side treated them as hard blocks, which is why a ticket
+ * could be locked out of every sprint by a blocker that was never
+ * schedulable in the first place.
+ */
+function workableTypeIds(itemTypes: RequirementItemType[]): Set<string> {
+  return new Set(itemTypes.filter((t) => t.isWorkable).map((t) => t.id));
+}
 
 /**
  * "blocked" - the blocker's own timing genuinely can't be sequenced ahead
@@ -61,9 +88,11 @@ export function findScheduleConflicts(
   items: RequirementItem[],
   relationships: RequirementRelationship[],
   relationshipTypes: RelationshipType[],
+  itemTypes: RequirementItemType[],
   sprintRangesByItemId: Map<string, { startDate: string; endDate: string }>
 ): ScheduleConflict[] {
   const blockingTypeIds = new Set(relationshipTypes.filter((t) => t.isBlocking).map((t) => t.id));
+  const workableIds = workableTypeIds(itemTypes);
   const itemById = new Map(items.map((i) => [i.id, i]));
   const conflicts: ScheduleConflict[] = [];
 
@@ -76,6 +105,8 @@ export function findScheduleConflicts(
     const item = itemById.get(itemId);
     const blocker = itemById.get(blockerId);
     if (!item || !blocker) continue;
+    // Both ends must be workable, exactly as computeSkillTree requires.
+    if (!workableIds.has(blocker.typeId) || !workableIds.has(item.typeId)) continue;
 
     const itemRange = sprintRangesByItemId.get(itemId);
     if (!itemRange) continue;
@@ -149,9 +180,11 @@ export function checkScheduleConflict(
   items: RequirementItem[],
   relationships: RequirementRelationship[],
   relationshipTypes: RelationshipType[],
+  itemTypes: RequirementItemType[],
   sprintRangesByItemId: Map<string, { startDate: string; endDate: string }>
 ): HypotheticalScheduleConflict | null {
   const blockingTypeIds = new Set(relationshipTypes.filter((t) => t.isBlocking).map((t) => t.id));
+  const workableIds = workableTypeIds(itemTypes);
   const itemById = new Map(items.map((i) => [i.id, i]));
 
   let bestRiskSoFar: HypotheticalScheduleConflict | null = null;
@@ -163,6 +196,10 @@ export function checkScheduleConflict(
     if (blockerId === itemId) continue;
     const blocker = itemById.get(blockerId);
     if (!blocker) continue;
+    // A non-workable blocker can never be scheduled or completed, so it
+    // would otherwise report "blocked - isn't scheduled yet" forever and
+    // lock this item out of every sprint permanently.
+    if (!workableIds.has(blocker.typeId)) continue;
 
     const blockerRange = sprintRangesByItemId.get(blockerId) ?? null;
 
@@ -191,13 +228,24 @@ export function checkScheduleConflict(
  * Finds all item IDs that directly or transitively block the given item.
  * Follows relationships where the relationship type is marked blocking
  * (isBlocking: true) from toItemId to fromItemId.
+ *
+ * Non-workable blockers are skipped, and traversal does not continue
+ * THROUGH them: this drives the drag-time highlight of "things that must
+ * come first", and an item that can never be scheduled can never come
+ * first in any sprint order. Passing through one would also drag in
+ * whatever blocks a Requirement or Goal, which is documentation lineage
+ * rather than schedule ordering.
  */
 export function findBlockingItemIds(
   itemId: string,
   relationships: RequirementRelationship[],
-  relationshipTypes: RelationshipType[]
+  relationshipTypes: RelationshipType[],
+  itemTypes: RequirementItemType[],
+  items: RequirementItem[]
 ): Set<string> {
   const blockingTypeIds = new Set(relationshipTypes.filter((t) => t.isBlocking).map((t) => t.id));
+  const workableIds = workableTypeIds(itemTypes);
+  const typeByItemId = new Map(items.map((i) => [i.id, i.typeId]));
   const blockers = new Set<string>();
   const queue = [itemId];
   const visited = new Set<string>([itemId]);
@@ -210,6 +258,8 @@ export function findBlockingItemIds(
         const blockerId = rel.fromItemId;
         if (!visited.has(blockerId)) {
           visited.add(blockerId);
+          const blockerTypeId = typeByItemId.get(blockerId);
+          if (blockerTypeId === undefined || !workableIds.has(blockerTypeId)) continue;
           blockers.add(blockerId);
           queue.push(blockerId);
         }
