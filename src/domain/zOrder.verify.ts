@@ -72,15 +72,45 @@ function box(id: string, x: number, y: number, width: number, height: number, zI
   const first = computeAutoZIndices([box("b", 0, 0, 100, 100), box("a", 200, 0, 100, 100)]);
   const second = computeAutoZIndices([box("a", 200, 0, 100, 100), box("b", 0, 0, 100, 100)]);
 
-  assert(first.get("a") === second.get("a") && first.get("b") === second.get("b"), "equal-area boxes get the same order regardless of input order - ties break on id, so nothing flickers");
+  assert(first.get("a") === second.get("a") && first.get("b") === second.get("b"), "equal-area boxes get the same z regardless of input order - the value comes from the box's own area, so array order can't perturb it");
 }
 
-// === Part 6: an explicit override beats area ===
+// === Part 6: an explicit override is used verbatim ===
+// Explicit values share a scale with the automatic ones, because the
+// front/back commands work from the effective z of everything on the
+// canvas and would otherwise be comparing incomparable numbers.
 {
-  const boxes = [box("rect", 0, 0, 400, 300, 50), box("node", 20, 20, 100, 60)];
+  const boxes = [box("rect", 0, 0, 400, 300, 950), box("node", 20, 20, 100, 60)];
   const z = computeEffectiveZIndices(boxes);
 
-  assert(z.get("rect")! > z.get("node")!, "an explicitly-set zIndex wins over the automatic area rule - a deliberate choice isn't overridden by geometry");
+  assert(z.get("rect") === 950, "an explicit zIndex is used exactly as given, not recomputed from geometry");
+  assert(z.get("rect")! > z.get("node")!, "so a rectangle explicitly raised above the automatic range sits in front of a small node, overriding the area rule");
+}
+
+// === Part 6b: automatic values stay below React Flow's selection lift ===
+// React Flow adds 1000 to a selected node's z. Automatic values have to
+// stay under that, or selecting a node wouldn't reliably raise it.
+{
+  const z = computeEffectiveZIndices([box("tiny", 0, 0, 1, 1), box("unmeasured", 0, 0, 0, 0), box("huge", 0, 0, 5000, 5000)]);
+  assert([...z.values()].every((v) => v >= 0 && v < 1000), `every automatic z-index stays within 0..999 - got ${[...z.values()].join(", ")}`);
+}
+
+// === Part 6c: one node resizing does NOT disturb the others ===
+// The regression this scheme exists to prevent. An earlier version
+// assigned a dense rank by size, so any node changing size shifted the
+// rank - and therefore the z-index - of every node sorted after it.
+// React Flow rebuilds a node's internals whenever its z changes, so a
+// single measurement re-rendered a large fraction of the graph. On a
+// real document it moved 67 of 137 nodes.
+{
+  const many: ZOrderBox[] = Array.from({ length: 137 }, (_, i) => ({
+    id: `n${i}`, x: 0, y: 0, width: 100 + i, height: 60,
+  }));
+  const before = computeEffectiveZIndices(many);
+  const after = computeEffectiveZIndices(many.map((b) => (b.id === "n70" ? { ...b, width: 400 } : b)));
+
+  const moved = many.filter((b) => before.get(b.id) !== after.get(b.id)).map((b) => b.id);
+  assert(moved.length === 1 && moved[0] === "n70", `resizing one node changes ONLY that node's z-index - got ${moved.length} changed (${moved.slice(0, 5).join(", ")})`);
 }
 
 // === Part 7: bring to front ===
@@ -95,8 +125,11 @@ function box(id: string, x: number, y: number, width: number, height: number, zI
 
 // === Part 8: send to back ===
 {
-  const boxes = [box("node", 20, 20, 100, 60), box("rect", 0, 0, 400, 300, 99)];
+  // The rectangle has been explicitly raised in front of the node, so
+  // there is genuinely something for "send to back" to undo.
+  const boxes = [box("node", 20, 20, 100, 60), box("rect", 0, 0, 400, 300, 950)];
   const patches = applyZOrderCommand(boxes, ["rect"], "back");
+  assert(patches.length === 1, "sending to back produces a patch when the node isn't already at the back");
   const after = computeEffectiveZIndices(boxes.map((b) => (b.id === "rect" ? { ...b, zIndex: patches[0].zIndex } : b)));
 
   assert(after.get("rect")! < after.get("node")!, "sending to back drops it below everything - the fix for a rectangle covering things");

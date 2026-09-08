@@ -33,10 +33,23 @@ export interface ZOrderBox {
   zIndex?: number;
 }
 
-/** Where automatic z-indices live. Explicit overrides assigned by the
- * front/back controls climb above or fall below this band, so an
- * override always beats every automatic value regardless of area. */
-const AUTO_Z_BASE = 0;
+/**
+ * Automatic z-indices are spread across this range, largest area lowest.
+ *
+ * The ceiling is kept below React Flow's own selection elevation (it adds
+ * 1000 to a selected node's z) so selecting something always lifts it
+ * clear of the automatic ordering rather than competing with it.
+ */
+const AUTO_Z_MAX = 900;
+
+/**
+ * How finely area differences are resolved. Applied to log2(area), so
+ * this is resolution in "doublings": two nodes whose areas differ by
+ * less than roughly 2% land on the same z-index, which is fine - they're
+ * the same size to the eye, and an arbitrary order between them is what
+ * a tie-break would have produced anyway.
+ */
+const AREA_RESOLUTION = 40;
 
 /**
  * True when two boxes share any area at all. Touching edges don't count -
@@ -53,30 +66,40 @@ function area(box: ZOrderBox): number {
 }
 
 /**
- * The automatic z-index for every box without an explicit override,
- * largest area furthest back.
+ * The automatic z-index for every box without an explicit override.
  *
- * Ties break on id so the result is stable: two identically-sized boxes
- * must not swap places from one render to the next, which would make
- * them flicker whenever anything else on the canvas changed.
+ * Derived from each box's OWN area, deliberately not from its rank among
+ * the others. A dense rank (0, 1, 2, ... by size) expresses the same
+ * ordering, but couples every node to every other: one node being
+ * measured a few pixels differently shifts the rank - and therefore the
+ * z-index - of every node sorted after it. React Flow rebuilds a node's
+ * internals whenever its z changes, so that turned a single measurement
+ * into a re-render of a large fraction of the graph. Measured on a real
+ * document, resizing one node changed the z-index of 67 of 137 nodes.
+ *
+ * A function of area alone has no such coupling: a node's z-index
+ * changes only when that node's own size changes. Ordering is preserved
+ * because log2 is monotonic, so a bigger area still always maps to a
+ * lower z-index.
  */
 export function computeAutoZIndices(boxes: ZOrderBox[]): Map<string, number> {
-  const auto = boxes
-    .filter((b) => b.zIndex === undefined)
-    .sort((a, b) => {
-      const diff = area(b) - area(a); // descending: biggest first, so it lands lowest
-      return diff !== 0 ? diff : a.id.localeCompare(b.id);
-    });
-
   const result = new Map<string, number>();
-  auto.forEach((box, index) => result.set(box.id, AUTO_Z_BASE + index));
+  for (const box of boxes) {
+    if (box.zIndex !== undefined) continue;
+    // log2 rather than raw area because areas span orders of magnitude -
+    // a label and a backdrop rectangle can differ by a factor of a
+    // thousand, and a linear mapping would collapse every ordinary node
+    // into the same value at the top of the range.
+    const scaled = Math.round(Math.log2(area(box) + 1) * AREA_RESOLUTION);
+    result.set(box.id, Math.max(0, Math.min(AUTO_Z_MAX, AUTO_Z_MAX - scaled)));
+  }
   return result;
 }
 
 /** The z-index a box actually renders at: its override if it has one,
  * otherwise its computed automatic value. */
 export function effectiveZIndex(box: ZOrderBox, autoZIndices: Map<string, number>): number {
-  return box.zIndex ?? autoZIndices.get(box.id) ?? AUTO_Z_BASE;
+  return box.zIndex ?? autoZIndices.get(box.id) ?? AUTO_Z_MAX;
 }
 
 /** Every box's effective z-index, keyed by id - what the canvas hands
