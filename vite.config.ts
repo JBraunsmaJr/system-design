@@ -29,10 +29,16 @@ export default defineConfig({
 
           icons: [
             {
-              src: "favicon.png",
+              src: "favicon_16x16.png",
               sizes:"16x16",
               type: "image/png",
-              purpose: "any maskable"
+              purpose: "any"
+            },
+            {
+              src: "favicon_144x144.png",
+              sizes:"144x144",
+              type: "image/png",
+              purpose: "any"
             }
           ]
         },

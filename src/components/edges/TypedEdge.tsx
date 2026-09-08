@@ -10,10 +10,12 @@ import {
   EdgeLabelRenderer,
   getSmoothStepPath,
   useReactFlow,
+  useStore,
   type EdgeProps,
   type Edge,
 } from "@xyflow/react";
 import { getEdgeType } from "../../domain/edgeRegistry";
+import { getContainmentAwarePositions, getContainmentRelation, type ContainmentRelation } from "../../domain/edgeContainment";
 import type { ArchEdgeData } from "../../domain/types";
 
 type TypedEdgeType = Edge<ArchEdgeData, "typed">;
@@ -65,6 +67,8 @@ function findClosestPointOnPath(pathEl: SVGPathElement, targetX: number, targetY
 
 export function TypedEdge({
   id,
+  source,
+  target,
   sourceX,
   sourceY,
   targetX,
@@ -83,13 +87,33 @@ export function TypedEdge({
   const def = getEdgeType(data?.edgeType ?? "generic");
   const color = data?.color ?? def.color;
   const direction = data?.direction ?? "forward";
+
+  /**
+   * Whether one end of this edge is a boundary containing the other.
+   *
+   * Selected as a single string rather than by pulling node objects out
+   * of the store, so this component only re-renders when the ANSWER
+   * changes - which is essentially never, since it changes only when a
+   * node is reparented. Selecting the nodes themselves would re-run on
+   * every position update of either one, for every edge on the canvas.
+   */
+  const containment = useStore(
+    useCallback(
+      (state): ContainmentRelation =>
+        getContainmentRelation(source, target, (id) => state.nodeLookup.get(id)?.parentId),
+      [source, target]
+    )
+  );
+
+  const routed = getContainmentAwarePositions(containment, sourcePosition, targetPosition);
+
   const [path] = getSmoothStepPath({
     sourceX,
     sourceY,
-    sourcePosition,
+    sourcePosition: routed.sourcePosition,
     targetX,
     targetY,
-    targetPosition,
+    targetPosition: routed.targetPosition,
     borderRadius: 10,
   });
 
