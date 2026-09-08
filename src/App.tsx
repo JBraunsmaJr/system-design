@@ -63,7 +63,7 @@ import { startCollabSession, type CollabSession, type PresenceInfo, type LocalPr
 import { loadPresenceName, savePresenceName, loadShowPeerCursors, saveShowPeerCursors } from "./domain/presenceIdentity";
 import { loadSignalingUrls, saveSignalingUrls, parseSignalingUrls } from "./domain/signalingConfig";
 import { loadIceServers, saveIceServers, parseIceServers } from "./domain/iceServerConfig";
-import { applyZOrderCommand, type ZOrderCommand } from "./domain/zOrder";
+import { applyZOrderCommand, computeEffectiveZIndices, type ZOrderCommand } from "./domain/zOrder";
 import { classifyNodeChanges, applySelectionChanges, isAutoSizedNodeType, type PendingNodeUpdate, type CurrentNodeGeometry } from "./domain/nodeChangeBatching";
 import "./App.css";
 
@@ -665,9 +665,32 @@ function App() {
   const { nodes, edges } = useMemo(() => {
     const rawNodes = reorderWithGroupsFirst(getNodesAtPath(diagramSnapshot.nodes, path));
     const rawEdges = getEdgesAtPath(diagramSnapshot.edges, path);
+    /**
+     * Keyed only on what the ordering actually depends on - id, size and
+     * any explicit override. Position is deliberately excluded: the rule
+     * is area-based, so recomputing while something is dragged would be
+     * pure waste on every animation frame.
+     */
+    const zIndices = computeEffectiveZIndices(
+      rawNodes.map((n) => ({
+        id: n.id,
+        x: 0,
+        y: 0,
+        width: n.width ?? measuredDimensions.get(n.id)?.width ?? 0,
+        height: n.height ?? measuredDimensions.get(n.id)?.height ?? 0,
+        zIndex: n.data.zIndex,
+      }))
+    );
+
     return {
       nodes: rawNodes.map((n) => ({
         ...n,
+        // Stacking order, folded into this existing pass rather than
+        // computed again downstream - see domain/zOrder.ts for the rule.
+        // Derived from live geometry so a rectangle enlarged to enclose
+        // more nodes drops behind them without anyone reordering
+        // anything.
+        zIndex: zIndices.get(n.id),
         // Re-attached on every snapshot because the store mints brand
         // new node objects on any write, and React Flow reads `measured`
         // EXCLUSIVELY off the node object the app hands it

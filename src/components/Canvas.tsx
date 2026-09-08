@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -46,7 +47,7 @@ import { NODE_TYPES } from "../domain/nodeRegistry";
 import { GROUP_TYPES } from "../domain/groupRegistry";
 import { SHAPE_TYPES } from "../domain/shapeRegistry";
 import { computeAlignment, type AlignBox, type AlignmentGuide } from "../domain/alignmentGuides";
-import { computeEffectiveZIndices, type ZOrderCommand } from "../domain/zOrder";
+import type { ZOrderCommand } from "../domain/zOrder";
 import { toAbsolutePosition } from "../domain/graphUtils";
 import { DRAG_MIME_TYPE, GROUP_DRAG_MIME_TYPE, TEXT_DRAG_MIME_TYPE, SHAPE_DRAG_MIME_TYPE, CODE_DRAG_MIME_TYPE } from "./Palette";
 import type { ArchNodeData, ArchEdgeData, Scenario, ScenarioStep } from "../domain/types";
@@ -475,33 +476,6 @@ export function Canvas({
   // less dim." Group nodes and text annotations can be focus targets too -
   // they're ordinary node ids underneath.
   /**
-   * Stacking order, applied as React Flow's own per-node zIndex.
-   *
-   * Computed from live geometry rather than stored per node, so the
-   * automatic part stays correct as things are resized - a rectangle
-   * enlarged to enclose more nodes drops behind them without anyone
-   * having to reorder anything. Nodes carrying an explicit override keep
-   * it; see domain/zOrder.ts.
-   *
-   * Uses the same width/height fallback as toAlignBox above: a node
-   * whose size is content-derived has no explicit width, only a measured
-   * one, and reading `n.width` alone would score every such node as
-   * zero-area.
-   */
-  const zIndices = useMemo(() => {
-    return computeEffectiveZIndices(
-      nodes.map((n) => ({
-        id: n.id,
-        x: n.position.x,
-        y: n.position.y,
-        width: n.width ?? n.measured?.width ?? 0,
-        height: n.height ?? n.measured?.height ?? 0,
-        zIndex: n.data.zIndex,
-      }))
-    );
-  }, [nodes]);
-
-  /**
    * Right-click menu state. Position is in VIEWPORT coordinates (the menu
    * is portaled to document.body and fixed-positioned), not flow
    * coordinates - it should stay under the cursor, not pinned to a spot
@@ -509,12 +483,30 @@ export function Canvas({
    */
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; targetIds: string[] } | null>(null);
 
+  /**
+   * The node list as of the last committed render, read only from event
+   * handlers. This exists so openContextMenu can have stable identity:
+   * closing over `nodes` directly would give it a new identity on every
+   * frame of a drag, and React Flow passes onNodeContextMenu down to
+   * every memo'd NodeWrapper - so the whole graph would re-render each
+   * frame purely because a callback changed.
+   *
+   * Layout effect, not render-phase assignment, for the same reason as
+   * App.tsx's own refs: a render can be discarded, and a discarded
+   * render must not leave the ref pointing at nodes that were never
+   * committed.
+   */
+  const nodesRef = useRef(nodes);
+  useLayoutEffect(() => {
+    nodesRef.current = nodes;
+  }, [nodes]);
+
   const openContextMenu = useCallback(
     (event: ReactMouseEvent, nodeId: string | null) => {
       if (isPresenting) return; // the locked slideshow view has nothing to arrange
       event.preventDefault();
 
-      const selectedIds = nodes.filter((n) => n.selected).map((n) => n.id);
+      const selectedIds = nodesRef.current.filter((n) => n.selected).map((n) => n.id);
       // Right-clicking inside a multi-selection acts on the whole
       // selection; right-clicking a node outside it acts on just that
       // node, which is what every other editor does and avoids silently
@@ -530,10 +522,28 @@ export function Canvas({
       const top = Math.min(event.clientY, window.innerHeight - CONTEXT_MENU_HEIGHT - 8);
       setContextMenu({ x: Math.max(8, left), y: Math.max(8, top), targetIds });
     },
-    [isPresenting, nodes]
+    [isPresenting]
   );
 
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
+
+  /**
+   * Both handlers are memoized rather than written inline on the
+   * ReactFlow element, because React Flow hands onNodeContextMenu down
+   * to EVERY NodeWrapper (which is memo'd) and puts onMoveStart in its
+   * own store. An inline arrow is a new identity on every render, so it
+   * would break the memo on every node at once and push a store update
+   * each render - turning any Canvas re-render into a re-render of the
+   * whole graph.
+   */
+  const onNodeContextMenu = useCallback(
+    (event: ReactMouseEvent, node: Node<ArchNodeData>) => openContextMenu(event, node.id),
+    [openContextMenu]
+  );
+  const onSelectionContextMenu = useCallback(
+    (event: ReactMouseEvent) => openContextMenu(event, null),
+    [openContextMenu]
+  );
 
   useEffect(() => {
     if (!contextMenu) return;
@@ -551,10 +561,13 @@ export function Canvas({
   }, [contextMenu, closeContextMenu]);
 
   const displayNodes = useMemo(() => {
-    const withZ = nodes.map((n) => ({ ...n, zIndex: zIndices.get(n.id) }));
+    // zIndex is attached upstream, inside App's existing nodes map, so
+    // there's no second pass over the array here - and the common case
+    // returns the identical array it was given, which is what lets React
+    // Flow skip re-adopting every node.
     if (presentationFocus) {
       const focusIds = new Set(presentationFocus.nodeIds);
-      return withZ.map((n) => ({
+      return nodes.map((n) => ({
         ...n,
         className: focusIds.has(n.id) ? "is-presentation-focus" : undefined,
         style: { ...n.style, opacity: focusIds.has(n.id) ? 1 : DIMMED_NODE_OPACITY },
@@ -562,7 +575,7 @@ export function Canvas({
     }
     if (previewFocus) {
       const memberIds = new Set(previewFocus.nodeIds);
-      return withZ.map((n) => {
+      return nodes.map((n) => {
         if (memberIds.has(n.id)) return { ...n, className: "is-step-member" };
         // Selected while a step is being edited, but not (yet) part of it -
         // a distinct highlight from is-step-member, signaling "you could
@@ -571,8 +584,8 @@ export function Canvas({
         return n;
       });
     }
-    return withZ;
-  }, [nodes, zIndices, presentationFocus, previewFocus]);
+    return nodes;
+  }, [nodes, presentationFocus, previewFocus]);
 
   const displayEdges = useMemo(() => {
     if (presentationFocus) {
@@ -669,8 +682,8 @@ export function Canvas({
         onConnect={handleConnect}
         onConnectStart={onConnectStart}
         onSelectionChange={onSelectionChange}
-        onNodeContextMenu={(event, node) => openContextMenu(event, node.id)}
-        onSelectionContextMenu={(event) => openContextMenu(event, null)}
+        onNodeContextMenu={onNodeContextMenu}
+        onSelectionContextMenu={onSelectionContextMenu}
         onPaneClick={closeContextMenu}
         onMoveStart={closeContextMenu}
         onNodeDrag={onNodeDrag}
