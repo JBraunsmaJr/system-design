@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { ExportMenu } from "./ExportMenu";
 import { FileMenu } from "./FileMenu";
+import {faGithub} from "@fortawesome/free-brands-svg-icons"
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
 
 interface ToolbarProps {
   title: string;
@@ -50,6 +52,12 @@ interface ToolbarProps {
    * whatever space the rest of the toolbar's own content actually
    * needs at a given width. */
   collabPanel: ReactNode;
+}
+
+function navigateToGithubSource() {
+  window.open(
+      "https://github.com/jbraunsmajr/system-design", "_blank"
+  )
 }
 
 export function Toolbar({
@@ -139,6 +147,9 @@ export function Toolbar({
             <span className="toolbar__label">Save</span>
           </button>
           {collabPanel}
+          <button type="button" title={"View source on GitHub"} onClick={navigateToGithubSource}>
+            <FontAwesomeIcon icon={faGithub} size={"lg"} />
+          </button>
         </div>
       </div>
       <div className="toolbar__row toolbar__row--tabs">
