@@ -29,7 +29,6 @@ export function seedYjsMilestonesDoc(doc: Y.Doc, initial: Milestone[]): void {
         relArr.push(ids);
       }
       mM.set("relatedItemIds", relArr);
-      mM.set("relatedWorkableItemIds", relArr);
       if (m.createdAt) mM.set("createdAt", m.createdAt);
       if (m.updatedAt) mM.set("updatedAt", m.updatedAt);
 
@@ -111,7 +110,6 @@ export function createYjsMilestonesStore(doc: Y.Doc): MilestonesStore {
           relArr.push(sanitizedIds);
         }
         mM.set("relatedItemIds", relArr);
-        mM.set("relatedWorkableItemIds", relArr);
         mM.set("createdAt", now);
         mM.set("updatedAt", now);
 
@@ -142,7 +140,6 @@ export function createYjsMilestonesStore(doc: Y.Doc): MilestonesStore {
           if (!relArr) {
             relArr = new Y.Array<string>();
             mM.set("relatedItemIds", relArr);
-            mM.set("relatedWorkableItemIds", relArr);
           }
           relArr.delete(0, relArr.length);
           if (sanitized.length > 0) {
@@ -170,7 +167,6 @@ export function createYjsMilestonesStore(doc: Y.Doc): MilestonesStore {
         if (!relArr) {
           relArr = new Y.Array<string>();
           mM.set("relatedItemIds", relArr);
-          mM.set("relatedWorkableItemIds", relArr);
         }
         if (!relArr.toArray().includes(itemId)) {
           relArr.push([itemId]);
@@ -204,7 +200,6 @@ export function createYjsMilestonesStore(doc: Y.Doc): MilestonesStore {
         if (!relArr) {
           relArr = new Y.Array<string>();
           mM.set("relatedItemIds", relArr);
-          mM.set("relatedWorkableItemIds", relArr);
         }
         relArr.delete(0, relArr.length);
         if (sanitized.length > 0) {

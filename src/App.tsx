@@ -584,6 +584,27 @@ function App() {
   const diagramStore = activeSession?.diagramStore ?? localDiagramStore;
   const diagramStoreRef = useRef(diagramStore);
 
+  // Subscribed via useSyncExternalStore (not just a plain useMemo keyed
+  // on diagramStore/path/selection) because the Yjs-backed session store
+  // never changes ITS OWN object reference when a remote peer edits the
+  // diagram - it's the same store instance for the whole session. A
+  // plain useMemo would never re-run for a remote change at all, only
+  // ever catching up once something else (like switching views) forced
+  // a re-render for an unrelated reason. The local adapter's own
+  // subscribe is a deliberate no-op (local mode already re-renders via
+  // React's own state flow when setRoot changes), so this costs nothing
+  // extra there - it's specifically the collaborative path this fixes.
+  const diagramSnapshot = useSyncExternalStore(diagramStore.subscribe, diagramStore.getSnapshot);
+  const teamSnapshot = useSyncExternalStore(teamStore.subscribe, teamStore.getSnapshot);
+  const requirementsSnapshot = useSyncExternalStore(requirementsStore.subscribe, requirementsStore.getSnapshot);
+  const programIncrementsSnapshot = useSyncExternalStore(programIncrementsStore.subscribe, programIncrementsStore.getSnapshot);
+  const milestonesSnapshot = useSyncExternalStore(milestonesStore.subscribe, milestonesStore.getSnapshot);
+
+  const liveRoot = useMemo(
+    () => unflattenToSubDiagram(diagramSnapshot.nodes, diagramSnapshot.edges),
+    [diagramSnapshot]
+  );
+
   // Layout effect rather than a render-phase assignment, for the same
   // reason as activeSessionRef above - and with the same consequence if
   // it's wrong, since this ref decides whether an edit lands in the
@@ -608,20 +629,20 @@ function App() {
     const timer = setTimeout(() => {
       saveAutosave(
         toDiagramFile(
-          diagram.title,
-          diagram.root.nodes,
-          diagram.root.edges,
-          diagram.scenarios,
-          diagram.requirements,
-          diagram.programIncrements,
-          diagram.team,
-          diagram.milestones ?? []
+          title,
+          liveRoot.nodes,
+          liveRoot.edges,
+          scenarios,
+          requirementsSnapshot,
+          programIncrementsSnapshot,
+          teamSnapshot,
+          milestonesSnapshot
         )
       );
       setHasAutosaved(true);
     }, 1000);
     return () => clearTimeout(timer);
-  }, [diagram]);
+  }, [title, liveRoot, scenarios, requirementsSnapshot, programIncrementsSnapshot, teamSnapshot, milestonesSnapshot]);
 
   const [path, setPath] = useState<DiagramPath>([]);
 
@@ -636,7 +657,7 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSession, path]);
 
-  const breadcrumbLabels = useMemo(() => getBreadcrumbLabels(root, path), [root, path]);
+  const breadcrumbLabels = useMemo(() => getBreadcrumbLabels(liveRoot, path), [liveRoot, path]);
 
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
   const [selectedEdgeIds, setSelectedEdgeIds] = useState<string[]>([]);
@@ -652,23 +673,6 @@ function App() {
     broadcastPresence({ selectedNodeIds, selectedEdgeIds });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSession, selectedNodeIds, selectedEdgeIds]);
-
-
-  // Subscribed via useSyncExternalStore (not just a plain useMemo keyed
-  // on diagramStore/path/selection) because the Yjs-backed session store
-  // never changes ITS OWN object reference when a remote peer edits the
-  // diagram - it's the same store instance for the whole session. A
-  // plain useMemo would never re-run for a remote change at all, only
-  // ever catching up once something else (like switching views) forced
-  // a re-render for an unrelated reason. The local adapter's own
-  // subscribe is a deliberate no-op (local mode already re-renders via
-  // React's own state flow when setRoot changes), so this costs nothing
-  // extra there - it's specifically the collaborative path this fixes.
-  const diagramSnapshot = useSyncExternalStore(diagramStore.subscribe, diagramStore.getSnapshot);
-  const teamSnapshot = useSyncExternalStore(teamStore.subscribe, teamStore.getSnapshot);
-  const requirementsSnapshot = useSyncExternalStore(requirementsStore.subscribe, requirementsStore.getSnapshot);
-  const programIncrementsSnapshot = useSyncExternalStore(programIncrementsStore.subscribe, programIncrementsStore.getSnapshot);
-  const milestonesSnapshot = useSyncExternalStore(milestonesStore.subscribe, milestonesStore.getSnapshot);
 
   // This client's own record of what React Flow last measured each node
   // to be. Deliberately state rather than a ref, even though it's only
@@ -1711,7 +1715,7 @@ function App() {
   // --- File / diagram lifecycle -------------------------------------------
 
   const onNew = useCallback(() => {
-    if (root.nodes.length > 0 && !window.confirm("Clear the current diagram? Unsaved changes will be lost.")) {
+    if (liveRoot.nodes.length > 0 && !window.confirm("Clear the current diagram? Unsaved changes will be lost.")) {
       return;
     }
     resetDiagramHistory(DEFAULT_SNAPSHOT);
@@ -1719,13 +1723,12 @@ function App() {
     setActiveScenarioId(null);
     setActiveStepIndex(0);
     setIsPresenting(false);
-  }, [root.nodes.length, resetDiagramHistory]);
+  }, [liveRoot.nodes.length, resetDiagramHistory]);
 
   // Always saves the full tree from the root, regardless of which level
   // you're currently viewing - a save from inside a drilled-down sub-diagram
   // must not lose everything above/beside it.
   const onSave = useCallback(() => {
-    const liveRoot = unflattenToSubDiagram(diagramSnapshot.nodes, diagramSnapshot.edges);
     downloadDiagram(
       toDiagramFile(
         title,
@@ -1738,7 +1741,7 @@ function App() {
         milestonesSnapshot
       )
     );
-  }, [title, diagramSnapshot, scenarios, requirementsSnapshot, programIncrementsSnapshot, teamSnapshot, milestonesSnapshot]);
+  }, [title, liveRoot, scenarios, requirementsSnapshot, programIncrementsSnapshot, teamSnapshot, milestonesSnapshot]);
 
   // Exports export the CURRENT view (whatever level you're looking at),
   // unlike Save - drilling into a node and exporting just that sub-diagram
@@ -1752,8 +1755,8 @@ function App() {
   }, [nodes, title]);
 
   const onExportRequirementsMarkdown = useCallback(() => {
-    downloadRequirementsMarkdown(title, requirements);
-  }, [title, requirements]);
+    downloadRequirementsMarkdown(title, requirementsSnapshot);
+  }, [title, requirementsSnapshot]);
 
   const onLoadClick = useCallback(() => fileInputRef.current?.click(), []);
 
@@ -1806,7 +1809,7 @@ function App() {
           viewMode={viewMode}
           onSetViewMode={setViewMode}
           onExportRequirementsMarkdown={onExportRequirementsMarkdown}
-          canExportRequirements={requirements.items.length > 0}
+          canExportRequirements={requirementsSnapshot.items.length > 0}
           hasAutosaved={hasAutosaved}
           isInSession={!!activeSession}
           collabPanel={
@@ -1915,7 +1918,7 @@ function App() {
               canAddStep={canAddStep}
               activeStepId={activeStepId}
               onSelectStep={onSelectStep}
-              root={root}
+              root={liveRoot}
               currentPath={path}
               height={scenarioPanelHeight}
               onHeightChange={setScenarioPanelHeight}
@@ -1962,7 +1965,7 @@ function App() {
             requirementsStore={requirementsStore}
             programIncrements={programIncrementsSnapshot}
             team={teamSnapshot}
-            diagramRoot={root}
+            diagramRoot={liveRoot}
             onNavigateToNode={onNavigateToNode}
             onCreateLinkedNode={onCreateLinkedNode}
             focusItemId={pendingRequirementFocus}
@@ -1977,7 +1980,7 @@ function App() {
             requirementsStore={requirementsStore}
             milestonesStore={milestonesStore}
             team={teamSnapshot}
-            diagramRoot={root}
+            diagramRoot={liveRoot}
             onNavigateToNode={onNavigateToNode}
             onCreateLinkedNode={onCreateLinkedNode}
             onNavigateToRequirement={onNavigateToRequirement}
@@ -1997,7 +2000,7 @@ function App() {
             requirementsStore={requirementsStore}
             programIncrements={programIncrementsSnapshot}
             team={teamSnapshot}
-            diagramRoot={root}
+            diagramRoot={liveRoot}
             onNavigateToNode={onNavigateToNode}
             onCreateLinkedNode={onCreateLinkedNode}
             onNavigateToRequirement={onNavigateToRequirement}

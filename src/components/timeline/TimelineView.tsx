@@ -488,6 +488,7 @@ export function TimelineView({
           onUpdateMilestone={onUpdateMilestone}
           onDeleteMilestone={onDeleteMilestone}
           onNavigateToRequirement={onNavigateToRequirement}
+          onSelectItem={(id) => setSelectedItemId(id)}
         />
       )}
 

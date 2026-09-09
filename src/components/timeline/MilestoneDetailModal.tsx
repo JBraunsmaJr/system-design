@@ -30,6 +30,7 @@ interface MilestoneDetailModalProps {
   onUpdateMilestone: (id: string, patch: Partial<Omit<Milestone, "id">>) => void;
   onDeleteMilestone: (id: string) => void;
   onNavigateToRequirement?: (itemId: string) => void;
+  onSelectItem?: (itemId: string) => void;
 }
 
 export function MilestoneDetailModal({
@@ -40,6 +41,7 @@ export function MilestoneDetailModal({
   onUpdateMilestone,
   onDeleteMilestone,
   onNavigateToRequirement,
+  onSelectItem,
 }: MilestoneDetailModalProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(milestone.name);
@@ -145,7 +147,10 @@ export function MilestoneDetailModal({
   }, [programIncrements]);
 
   const handleNavigateRef = (targetId: string) => {
-    if (onNavigateToRequirement) {
+    if (onSelectItem) {
+      onClose();
+      onSelectItem(targetId);
+    } else if (onNavigateToRequirement) {
       onClose();
       onNavigateToRequirement(targetId);
     }
@@ -525,15 +530,19 @@ export function MilestoneDetailModal({
                       </div>
 
                       <div className="milestone-detail-modal__work-row-actions">
-                        {onNavigateToRequirement && (
+                        {(onSelectItem || onNavigateToRequirement) && (
                           <button
                             type="button"
                             className="milestone-detail-modal__link-action"
                             onClick={() => {
                               onClose();
-                              onNavigateToRequirement(item.id);
+                              if (onSelectItem) {
+                                onSelectItem(item.id);
+                              } else if (onNavigateToRequirement) {
+                                onNavigateToRequirement(item.id);
+                              }
                             }}
-                            title={`Open ${item.id} in Requirements View`}
+                            title={`Open ${item.id} details`}
                           >
                             View Item
                           </button>

@@ -62,7 +62,7 @@ const mockDoc: RequirementsDocument = {
 
   assert(html.includes("Release 2.4"), "Milestone title is rendered");
   assert(html.includes("T-1"), "Related workable item T-1 is rendered");
-  assert(html.includes("Related Workable Items (1)"), "Related work items count is 1");
+  assert(html.includes("Associated Requirement Items &amp; Epics (1)"), "Related work items count is 1");
 }
 
 // --- Test 2: Simulating multiple work item additions ---
@@ -120,10 +120,37 @@ const mockDoc: RequirementsDocument = {
       onClose: () => {},
       onUpdateMilestone: handleUpdate,
       onDeleteMilestone: () => {},
+      onSelectItem: () => {},
     })
   );
 
-  assert(html.includes("Related Workable Items (3)"), "Modal displays all 3 selected related items");
+  assert(html.includes("Associated Requirement Items &amp; Epics (3)"), "Modal displays all 3 selected related items");
+  assert(html.includes("View Item"), "View Item buttons are rendered for associated items");
+}
+
+// --- Test 3: View Item action triggers onSelectItem callback ---
+{
+  const milestone: Milestone = {
+    id: "m-1",
+    type: "release",
+    name: "Release 2.4",
+    scheduledAt: "2026-09-30",
+    relatedWorkableItemIds: ["T-1"],
+  };
+
+  const html = renderToStaticMarkup(
+    React.createElement(MilestoneDetailModal, {
+      milestone,
+      doc: mockDoc,
+      onClose: () => {},
+      onUpdateMilestone: () => {},
+      onDeleteMilestone: () => {},
+      onSelectItem: (_id) => {},
+    })
+  );
+
+  assert(html.includes("View Item"), "View Item button is rendered when onSelectItem is provided");
+  assert(html.includes(`title="Open T-1 details"`), "View Item button has title to open item details");
 }
 
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);
