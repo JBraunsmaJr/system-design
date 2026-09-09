@@ -5,56 +5,34 @@ import { getCodeLanguage } from "../../domain/codeRegistry";
 import { highlightCode } from "../../domain/prismSetup";
 import { BidirectionalHandles } from "./BidirectionalHandles";
 import type { ArchNodeData } from "../../domain/types";
+import { useCanvasContext } from "../CanvasContext";
 
 type CodeNodeType = Node<ArchNodeData, "code">;
 
 interface CodeNodeProps extends NodeProps<CodeNodeType> {
-  // Same "which node is being edited right now" mechanism Text/Shape nodes
-  // use - shared state in Canvas.tsx. onChangeCode is separate from the
-  // text/shape nodes' onChangeText since this writes to codeContent, not
-  // label (label is this node's optional title instead - see Inspector).
   isEditing?: boolean;
   onStartEditing?: (nodeId: string) => void;
   onFinishEditing?: () => void;
   onChangeCode?: (nodeId: string, code: string) => void;
 }
 
-// Inserted for Tab in the editor, since real indentation is fairly
-// essential for JSON/code to stay readable as you type it.
 const INDENT = "  ";
 
-/**
- * A resizable, connectable code snippet with syntax highlighting -
- * double-click to edit, same interaction pattern as Text/Shape annotations.
- * Language and the optional title (data.label) are set via the Inspector,
- * not inline - only the code content itself is directly editable on the
- * canvas.
- *
- * Highlighting updates live as you type: this is the standard "transparent
- * textarea layered exactly over a highlighted <pre>" technique (the
- * textarea's own text is invisible via `color: transparent`, but its caret
- * stays visible via `caret-color`, and both layers share identical
- * font/padding/line-height so the invisible caret always lines up with the
- * highlighted character underneath). Built directly rather than via a
- * third-party editor package - react-simple-code-editor implements this
- * same technique and was tried first, but it's a plain CommonJS package
- * with no "exports" field, and its compiled `exports.default = Editor`
- * shape triggered "Element type is invalid... got: object" at runtime, a
- * known class of bundler/CJS-interop mismatch. Since that failure mode
- * isn't something reproducible/verifiable outside an actual browser,
- * removing the dependency entirely was more reliable than guessing at a
- * workaround - the technique itself is genuinely just a textarea, a <pre>,
- * and a scroll-sync handler, none of which needed a library to begin with.
- */
 export function CodeNode({
   id,
   data,
   selected,
-  isEditing,
-  onStartEditing,
-  onFinishEditing,
-  onChangeCode,
+  isEditing: propIsEditing,
+  onStartEditing: propOnStartEditing,
+  onFinishEditing: propOnFinishEditing,
+  onChangeCode: propOnChangeCode,
 }: CodeNodeProps) {
+  const canvasContext = useCanvasContext();
+  const isEditing = propIsEditing ?? (canvasContext?.editingLabelNodeId === id);
+  const onStartEditing = propOnStartEditing ?? (canvasContext?.isPresenting ? undefined : canvasContext?.setEditingLabelNodeId);
+  const onFinishEditing = propOnFinishEditing ?? (() => canvasContext?.setEditingLabelNodeId(null));
+  const onChangeCode = propOnChangeCode ?? canvasContext?.onChangeCodeNode;
+
   const languageId = data.codeLanguage ?? "json";
   const lang = getCodeLanguage(languageId);
   const code = data.codeContent ?? "";

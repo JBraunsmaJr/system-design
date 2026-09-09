@@ -3,37 +3,32 @@ import { NodeResizer, type NodeProps, type Node } from "@xyflow/react";
 import { getShapeType } from "../../domain/shapeRegistry";
 import { BidirectionalHandles } from "./BidirectionalHandles";
 import type { ArchNodeData } from "../../domain/types";
+import { useCanvasContext } from "../CanvasContext";
 
 type ShapeNodeType = Node<ArchNodeData, "shape">;
 
 interface ShapeNodeProps extends NodeProps<ShapeNodeType> {
-  // Same "which node is being text-edited right now" mechanism TextNode
-  // uses - shared state in Canvas.tsx, since a shape's optional label works
-  // exactly the same way (double-click to edit, blur/Escape to finish).
   isEditing?: boolean;
   onStartEditing?: (nodeId: string) => void;
   onFinishEditing?: () => void;
   onChangeText?: (nodeId: string, text: string) => void;
 }
 
-/**
- * A drawn shape (Circle/Square/Rectangle) - like Text annotations, it can
- * optionally hold a short centered label (double-click to edit), but no
- * properties/tags/sub-diagram. Circle and Square keep a 1:1 aspect ratio
- * while resizing; Rectangle resizes freely. Connectable the same way a
- * regular component node is (see BidirectionalHandles) - the resize
- * handles only appear when selected, so they don't fight the always-present
- * connection points for the same screen space in the common case.
- */
 export function ShapeNode({
   id,
   data,
   selected,
-  isEditing,
-  onStartEditing,
-  onFinishEditing,
-  onChangeText,
+  isEditing: propIsEditing,
+  onStartEditing: propOnStartEditing,
+  onFinishEditing: propOnFinishEditing,
+  onChangeText: propOnChangeText,
 }: ShapeNodeProps) {
+  const canvasContext = useCanvasContext();
+  const isEditing = propIsEditing ?? (canvasContext?.editingLabelNodeId === id);
+  const onStartEditing = propOnStartEditing ?? (canvasContext?.isPresenting ? undefined : canvasContext?.setEditingLabelNodeId);
+  const onFinishEditing = propOnFinishEditing ?? (() => canvasContext?.setEditingLabelNodeId(null));
+  const onChangeText = propOnChangeText ?? canvasContext?.onChangeTextNode;
+
   const def = getShapeType(data.nodeType);
   const color = data.color ?? def?.color ?? "#5B7CFA";
   const fontSize = data.fontSize ?? 16;

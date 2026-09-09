@@ -22,13 +22,11 @@ import {
   type ContainmentRelation,
 } from "../../domain/edgeContainment";
 import type { ArchEdgeData } from "../../domain/types";
+import { useCanvasContext } from "../CanvasContext";
 
 type TypedEdgeType = Edge<ArchEdgeData, "typed">;
 
 interface TypedEdgeProps extends EdgeProps<TypedEdgeType> {
-  // Injected via the edgeTypes factory in Canvas.tsx, same pattern as
-  // TypedNode's onDrillInto - lets the label be dragged to reposition it
-  // without this component needing its own state-management plumbing.
   onUpdateEdge?: (id: string, patch: Partial<ArchEdgeData>) => void;
 }
 
@@ -86,8 +84,10 @@ export function TypedEdge({
   selected,
   style,
   animated,
-  onUpdateEdge,
+  onUpdateEdge: propOnUpdateEdge,
 }: TypedEdgeProps) {
+  const canvasContext = useCanvasContext();
+  const onUpdateEdge = canvasContext?.isPresenting ? undefined : (propOnUpdateEdge ?? canvasContext?.onUpdateEdge);
   const { screenToFlowPosition } = useReactFlow();
   const def = getEdgeType(data?.edgeType ?? "generic");
   const color = data?.color ?? def.color;

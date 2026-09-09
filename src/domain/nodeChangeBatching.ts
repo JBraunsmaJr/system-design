@@ -133,13 +133,14 @@ export function classifyNodeChanges(
         if (change.dragging === true) isActiveGesture = true;
       }
     } else if (change.type === "dimensions" && change.dimensions) {
+      // Passive measurements from React Flow's internal ResizeObserver
+      // (where `change.resizing` is undefined) must NEVER be committed
+      // to the document store - they are local rendering measurements,
+      // not user edits. Only explicit user resize gestures (where
+      // `change.resizing` is true while dragging, or false on release)
+      // represent user intent to change the node's stored dimensions.
+      if (change.resizing === undefined) continue;
       const current = currentNodes.get(change.id);
-      // A content-sized node's dimensions are a MEASUREMENT, not state -
-      // every client measures the same content for itself, and
-      // persisting one client's measurement pins the node's wrapper to
-      // a fixed box on all of them (see isAutoSizedNodeType). Dropped
-      // here rather than in App.tsx so the reasoning lives next to the
-      // no-op guard it sits beside, and so it's directly testable.
       if (current?.isAutoSized) continue;
       const isNoOp = !!current && current.width === change.dimensions.width && current.height === change.dimensions.height;
       if (!isNoOp) {

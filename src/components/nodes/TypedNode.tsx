@@ -4,20 +4,19 @@ import * as Icons from "lucide-react";
 import { getNodeType, CATEGORY_LABELS } from "../../domain/nodeRegistry";
 import { BidirectionalHandles } from "./BidirectionalHandles";
 import type { ArchNodeData } from "../../domain/types";
+import { useCanvasContext } from "../CanvasContext";
 
 type TypedNodeType = Node<ArchNodeData, "typed">;
 
 interface TypedNodeProps extends NodeProps<TypedNodeType> {
-  // Not part of NodeProps - injected via the nodeTypes factory in Canvas.tsx
-  // so this component can trigger navigation without needing its own
-  // ReactFlow-context plumbing. Absent (and the button hidden) while
-  // presenting, since editing/navigation are locked in that mode.
   onDrillInto?: (nodeId: string) => void;
 }
 
 const VISIBLE_PROPERTY_CHIPS = 2;
 
-export function TypedNode({ id, data, selected, onDrillInto }: TypedNodeProps) {
+export function TypedNode({ id, data, selected, onDrillInto: propOnDrillInto }: TypedNodeProps) {
+  const canvasContext = useCanvasContext();
+  const onDrillInto = canvasContext?.isPresenting ? undefined : (propOnDrillInto ?? canvasContext?.onDrillInto);
   const def = getNodeType(data.nodeType);
   const iconName = data.icon ?? def?.icon;
   const IconComponent =

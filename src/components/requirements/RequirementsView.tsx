@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { LayoutList, Search, Settings2, Tags, Waypoints, X } from "lucide-react";
 import { RequirementCard } from "./RequirementCard";
 import { ManageTypesModal } from "./ManageTypesModal";
@@ -102,9 +102,11 @@ export function RequirementsView({
    * through the store rather than a stable setter.
    */
   const requirementsStoreRef = useRef(requirementsStore);
-  useEffect(() => {
+  const onFocusHandledRef = useRef(onFocusHandled);
+  useLayoutEffect(() => {
     requirementsStoreRef.current = requirementsStore;
-  }, [requirementsStore]);
+    onFocusHandledRef.current = onFocusHandled;
+  }, [requirementsStore, onFocusHandled]);
 
   /**
    * Computed once for every item here, rather than each RequirementCard
@@ -251,10 +253,10 @@ export function RequirementsView({
     if (!focusItemId) return;
     const frame = requestAnimationFrame(() => {
       onNavigateToItem(focusItemId);
-      onFocusHandled?.();
+      onFocusHandledRef.current?.();
     });
     return () => cancelAnimationFrame(frame);
-  }, [focusItemId, onNavigateToItem, onFocusHandled]);
+  }, [focusItemId, onNavigateToItem]);
 
   const onAddCustomType = (label: string, prefix: string, color: string, isWorkable: boolean): boolean => {
     return requirementsStoreRef.current.addCustomType(label, prefix, color, isWorkable);
