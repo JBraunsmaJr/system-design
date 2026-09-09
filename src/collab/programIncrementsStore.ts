@@ -1,5 +1,5 @@
 import type { ProgramIncrement, CapacityReservation } from "../domain/programIncrements";
-import { updateSprintEndDate, updatePIStartDate } from "../domain/programIncrements";
+import { updateSprintEndDate, updatePIStartDate, getNextPIStartDate, DEFAULT_SPRINT_DURATION_DAYS } from "../domain/programIncrements";
 
 /**
  * ProgramIncrementsStore is the same kind of seam TeamStore and
@@ -38,13 +38,6 @@ export interface ProgramIncrementsStore {
   deleteReservation(piId: string, reservationId: string): void;
 }
 
-const DEFAULT_SPRINT_DURATION_DAYS = 14;
-
-function todayISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
 let idCounter = 0;
 function nextId(prefix: string): string {
   idCounter += 1;
@@ -71,7 +64,7 @@ export function createLocalProgramIncrementsStore(initial: ProgramIncrement[] = 
       const newPI: ProgramIncrement = {
         id: nextId("pi"),
         name: `PI ${pis.length + 1}`,
-        startDate: todayISO(),
+        startDate: getNextPIStartDate(pis),
         sprints: [{ id: nextId("sprint"), name: "Sprint 1", durationDays: DEFAULT_SPRINT_DURATION_DAYS }],
       };
       pis = [...pis, newPI];
@@ -186,10 +179,11 @@ export function createAdapterProgramIncrementsStore(
     subscribe: () => () => {},
 
     addPI: () => {
+      const currentPis = getSnapshot();
       const newPI: ProgramIncrement = {
         id: nextId("pi"),
-        name: `PI ${getSnapshot().length + 1}`,
-        startDate: todayISO(),
+        name: `PI ${currentPis.length + 1}`,
+        startDate: getNextPIStartDate(currentPis),
         sprints: [{ id: nextId("sprint"), name: "Sprint 1", durationDays: DEFAULT_SPRINT_DURATION_DAYS }],
       };
       setSnapshot((prev) => [...prev, newPI]);

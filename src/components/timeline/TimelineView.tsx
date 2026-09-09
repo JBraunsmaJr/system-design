@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef, useSyncExternalStore } from "react";
-import { AlertTriangle, CalendarRange, ChevronDown, ChevronRight, ChevronUp, GanttChartSquare, Inbox, Plus, Trash2, ShieldAlert } from "lucide-react";
+import { AlertTriangle, CalendarRange, ChevronDown, ChevronRight, ChevronUp, GanttChartSquare, Inbox, Plus, Trash2, ShieldAlert, Diamond } from "lucide-react";
 import {
   computeSprintDateRanges,
   getSprintActiveReservations,
@@ -12,6 +12,10 @@ import { findScheduleConflicts, checkScheduleConflict, findBlockingItemIds, type
 import type { RequirementItem, RequirementsDocument } from "../../domain/requirementsTypes";
 import type { RequirementsStore } from "../../collab/requirementsStore";
 import type { ProgramIncrementsStore } from "../../collab/programIncrementsStore";
+import type { MilestonesStore } from "../../collab/milestonesStore";
+import { createLocalMilestonesStore } from "../../collab/milestonesStore";
+import type { Milestone } from "../../domain/milestones";
+import { getMilestoneColor, getMilestoneTypeLabel } from "../../domain/milestones";
 import type { TeamDocument } from "../../domain/teamTypes";
 import type { SubDiagram } from "../../domain/types";
 import type { DiagramPath } from "../../domain/subDiagramTree";
@@ -21,6 +25,8 @@ import { SprintCapacityBar } from "../team/SprintCapacityBar";
 import { MemberPicker } from "../team/MemberPicker";
 import { PointsPicker } from "../team/PointsPicker";
 import { RequirementDetailModal } from "./RequirementDetailModal";
+import { MilestoneDetailModal } from "./MilestoneDetailModal";
+import { AddMilestoneModal } from "./AddMilestoneModal";
 import { GanttChart } from "./GanttChart";
 import { SprintQuickAdd } from "./SprintQuickAdd";
 import { ManageReservationsModal } from "./ManageReservationsModal";
@@ -28,6 +34,7 @@ import { ManageReservationsModal } from "./ManageReservationsModal";
 interface TimelineViewProps {
   programIncrementsStore: ProgramIncrementsStore;
   requirementsStore: RequirementsStore;
+  milestonesStore?: MilestonesStore;
   team?: TeamDocument;
   diagramRoot?: SubDiagram;
   onNavigateToNode?: (path: DiagramPath, nodeId: string) => void;
@@ -46,6 +53,7 @@ interface TimelineViewProps {
 export function TimelineView({
   programIncrementsStore,
   requirementsStore,
+  milestonesStore,
   team,
   diagramRoot,
   onNavigateToNode,
@@ -54,9 +62,17 @@ export function TimelineView({
   peers = [],
   onFocusedItemChange,
 }: TimelineViewProps) {
+  const fallbackMilestonesStore = useMemo(() => createLocalMilestonesStore([]), []);
+  const activeMilestonesStore = milestonesStore ?? fallbackMilestonesStore;
+
   const programIncrements = useSyncExternalStore(programIncrementsStore.subscribe, programIncrementsStore.getSnapshot);
   const requirements = useSyncExternalStore(requirementsStore.subscribe, requirementsStore.getSnapshot);
+  const milestones = useSyncExternalStore(activeMilestonesStore.subscribe, activeMilestonesStore.getSnapshot);
+
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [selectedMilestoneId, setSelectedMilestoneId] = useState<string | null>(null);
+  const [isAddingMilestone, setIsAddingMilestone] = useState(false);
+  const [addMilestoneDate, setAddMilestoneDate] = useState<string | undefined>(undefined);
   const [chartMode, setChartMode] = useState<"board" | "gantt">("board");
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
 
@@ -120,6 +136,18 @@ export function TimelineView({
 
   const onDeleteItem = (id: string) => {
     requirementsStore.deleteItem(id);
+  };
+
+  const onAddMilestone = (candidate: Omit<Milestone, "id" | "createdAt" | "updatedAt">) => {
+    return activeMilestonesStore.addMilestone(candidate);
+  };
+
+  const onUpdateMilestone = (id: string, patch: Partial<Omit<Milestone, "id">>) => {
+    activeMilestonesStore.updateMilestone(id, patch);
+  };
+
+  const onDeleteMilestone = (id: string) => {
+    activeMilestonesStore.deleteMilestone(id);
   };
 
   const onCreateAndAssignCategory = (itemId: string, label: string) => {
@@ -252,12 +280,26 @@ export function TimelineView({
     );
   }, [draggedItemId, requirements.relationships, requirements.relationshipTypes, requirements.itemTypes, requirements.items]);
 
+  const selectedMilestone = selectedMilestoneId ? milestones.find((m) => m.id === selectedMilestoneId) : null;
+
   return (
     <div className="timeline-view">
       <div className="timeline-view__toolbar">
         <button type="button" className="timeline-view__add-pi" onClick={onAddPI}>
           <Plus size={13} />
           Program Increment
+        </button>
+        <button
+          type="button"
+          className="timeline-view__add-milestone"
+          onClick={() => {
+            setAddMilestoneDate(undefined);
+            setIsAddingMilestone(true);
+          }}
+          title="Create a new Release or Timeline Milestone (FR-001)"
+        >
+          <Diamond size={13} />
+          Release / Milestone
         </button>
         <div className="timeline-view__mode-toggle">
           <button
@@ -276,32 +318,35 @@ export function TimelineView({
             Gantt
           </button>
         </div>
-      </div>
 
-      {peers.length > 0 && (
-        <div className="timeline-view__presence-bar">
-          {peers.map((p) => {
-            const focusedItem = p.focusedItemId ? requirements.items.find((it) => it.id === p.focusedItemId) : null;
-            return (
-              <span key={p.clientId} className="timeline-view__presence-chip">
-                <span className="timeline-view__presence-dot" style={{ backgroundColor: p.color }} />
-                <strong>{p.name}</strong>
-                {focusedItem ? <> — viewing {focusedItem.id}: {focusedItem.title}</> : " — browsing"}
-              </span>
-            );
-          })}
-        </div>
-      )}
+        <PresenceAvatarStack peers={peers} requirements={requirements} />
+      </div>
 
       {chartMode === "gantt" ? (
         <GanttChart
           programIncrements={programIncrements}
           requirements={requirements}
+          milestones={milestones}
           onSelectItem={(id) => setSelectedItemId(id)}
+          onSelectMilestone={(id) => setSelectedMilestoneId(id)}
+          onAddMilestoneOnDate={(date) => {
+            setAddMilestoneDate(date);
+            setIsAddingMilestone(true);
+          }}
           onNavigateToRequirement={onNavigateToRequirement}
         />
       ) : (
       <div className="timeline-view__content">
+        {/* Scheduled Releases & Milestones Overview Section (FR-003, AC-002, AC-009) */}
+        <MilestonesSection
+          milestones={milestones}
+          onSelectMilestone={(id) => setSelectedMilestoneId(id)}
+          onAddMilestone={() => {
+            setAddMilestoneDate(undefined);
+            setIsAddingMilestone(true);
+          }}
+        />
+
         {backlogItems.length > 0 && (
           <BacklogSection
             items={backlogItems}
@@ -326,6 +371,7 @@ export function TimelineView({
               key={pi.id}
               pi={pi}
               requirements={requirements}
+              milestones={milestones}
               team={team}
               itemsBySprintId={itemsBySprintId}
               backlogItems={backlogItems}
@@ -334,6 +380,7 @@ export function TimelineView({
               blockingItemIds={blockingItemIds}
               sprintRangesByItemId={sprintRangesByItemId}
               onSelectItem={(id) => setSelectedItemId(id)}
+              onSelectMilestone={(id) => setSelectedMilestoneId(id)}
               onDragStartItem={(id) => setDraggedItemId(id)}
               onDragEndItem={() => setDraggedItemId(null)}
               onDropItem={onMoveItemToSprint}
@@ -373,7 +420,212 @@ export function TimelineView({
           onDeleteRelationship={onDeleteRelationship}
         />
       )}
+
+      {selectedMilestone && (
+        <MilestoneDetailModal
+          milestone={selectedMilestone}
+          doc={requirements}
+          programIncrements={programIncrements}
+          onClose={() => setSelectedMilestoneId(null)}
+          onUpdateMilestone={onUpdateMilestone}
+          onDeleteMilestone={onDeleteMilestone}
+          onNavigateToRequirement={onNavigateToRequirement}
+        />
+      )}
+
+      {isAddingMilestone && (
+        <AddMilestoneModal
+          initialDate={addMilestoneDate}
+          doc={requirements}
+          onClose={() => {
+            setIsAddingMilestone(false);
+            setAddMilestoneDate(undefined);
+          }}
+          onCreateMilestone={onAddMilestone}
+          onMilestoneCreated={(id) => setSelectedMilestoneId(id)}
+        />
+      )}
     </div>
+  );
+}
+
+interface PresenceAvatarStackProps {
+  peers: PresenceInfo[];
+  requirements: RequirementsDocument;
+}
+
+function getPresenceInitials(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) return "?";
+  const parts = trimmed.split(/[\s_-]+/);
+  if (parts.length >= 2 && parts[0] && parts[1]) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  return trimmed.slice(0, 2).toUpperCase();
+}
+
+function PresenceAvatarStack({ peers, requirements }: PresenceAvatarStackProps) {
+  if (peers.length === 0) return null;
+
+  const MAX_DISPLAY = 4;
+  const displayPeers = peers.slice(0, MAX_DISPLAY);
+  const overflowCount = peers.length - MAX_DISPLAY;
+
+  const summaryLines = peers.map((p) => {
+    const focusedItem = p.focusedItemId ? requirements.items.find((it) => it.id === p.focusedItemId) : null;
+    const action = focusedItem ? `viewing ${focusedItem.id}: ${focusedItem.title}` : "browsing";
+    return `• ${p.name} (${action})`;
+  });
+
+  const titleText = `Users on Timeline (${peers.length}):\n${summaryLines.join("\n")}`;
+
+  return (
+    <div
+      className="timeline-view__presence-stack"
+      title={titleText}
+      aria-label={`Users on Timeline: ${peers.length}`}
+    >
+      <div className="timeline-view__presence-avatars">
+        {displayPeers.map((p, idx) => {
+          const focusedItem = p.focusedItemId ? requirements.items.find((it) => it.id === p.focusedItemId) : null;
+          const statusText = focusedItem ? `viewing ${focusedItem.id}: ${focusedItem.title}` : "browsing";
+          return (
+            <span
+              key={p.clientId}
+              className="timeline-view__presence-avatar"
+              style={{
+                backgroundColor: p.color,
+                zIndex: displayPeers.length - idx,
+              }}
+              title={`${p.name} — ${statusText}`}
+            >
+              {getPresenceInitials(p.name)}
+            </span>
+          );
+        })}
+        {overflowCount > 0 && (
+          <span
+            className="timeline-view__presence-avatar timeline-view__presence-avatar--more"
+            style={{ zIndex: 0 }}
+            title={`${overflowCount} more user${overflowCount === 1 ? "" : "s"}`}
+          >
+            +{overflowCount}
+          </span>
+        )}
+      </div>
+
+      <div className="timeline-view__presence-popover" role="tooltip">
+        <div className="timeline-view__presence-popover-header">
+          Users on Timeline ({peers.length})
+        </div>
+        <div className="timeline-view__presence-popover-list">
+          {peers.map((p) => {
+            const focusedItem = p.focusedItemId ? requirements.items.find((it) => it.id === p.focusedItemId) : null;
+            const statusText = focusedItem ? `viewing ${focusedItem.id}: ${focusedItem.title}` : "browsing";
+            return (
+              <div key={p.clientId} className="timeline-view__presence-popover-item">
+                <span
+                  className="timeline-view__presence-popover-avatar"
+                  style={{ backgroundColor: p.color }}
+                >
+                  {getPresenceInitials(p.name)}
+                </span>
+                <div className="timeline-view__presence-popover-info">
+                  <span className="timeline-view__presence-popover-name">{p.name}</span>
+                  <span className="timeline-view__presence-popover-status">{statusText}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface MilestonesSectionProps {
+  milestones: Milestone[];
+  onSelectMilestone: (id: string) => void;
+  onAddMilestone: () => void;
+}
+
+function MilestonesSection({ milestones, onSelectMilestone, onAddMilestone }: MilestonesSectionProps) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  return (
+    <section className="milestones-section">
+      <div className="milestones-section__header">
+        <button
+          type="button"
+          className="milestones-section__collapse-toggle"
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          aria-label={isCollapsed ? "Expand milestones" : "Collapse milestones"}
+        >
+          {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+        </button>
+        <Diamond size={14} className="milestones-section__icon" />
+        <span className="milestones-section__title">Milestones & Releases</span>
+        <span className="milestones-section__count" title={`${milestones.length} milestone${milestones.length === 1 ? "" : "s"}`}>
+          {milestones.length}
+        </span>
+        <button
+          type="button"
+          className="milestones-section__add-btn"
+          onClick={onAddMilestone}
+          title="Create a new Release or Milestone"
+        >
+          <Plus size={12} />
+          <span>Add Release</span>
+        </button>
+      </div>
+
+      {!isCollapsed && (
+        <div className="milestones-section__items">
+          {milestones.length === 0 ? (
+            <p className="milestones-section__empty">
+              No releases or milestones scheduled yet. Click <strong>Add Release</strong> to place point-in-time outcomes on the timeline.
+            </p>
+          ) : (
+            milestones.map((m) => {
+              const color = getMilestoneColor(m);
+              const typeLabel = getMilestoneTypeLabel(m.type);
+              const relatedCount = m.relatedWorkableItemIds?.length ?? 0;
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  className="milestones-section__card"
+                  style={{ borderLeftColor: color }}
+                  onClick={() => onSelectMilestone(m.id)}
+                  title={`${typeLabel}: ${m.name} \u2022 Scheduled: ${m.scheduledAt}${relatedCount > 0 ? ` \u2022 ${relatedCount} related work item${relatedCount === 1 ? "" : "s"}` : ""}`}
+                >
+                  <div className="milestones-section__card-header">
+                    <span className="milestones-section__card-shape" style={{ color }}>
+                      ◆
+                    </span>
+                    <span className="milestones-section__card-type" style={{ color }}>
+                      {typeLabel}
+                    </span>
+                    {m.version && (
+                      <span className="milestones-section__card-version">v{m.version}</span>
+                    )}
+                  </div>
+                  <div className="milestones-section__card-name">{m.name}</div>
+                  <div className="milestones-section__card-footer">
+                    <span className="milestones-section__card-date">{m.scheduledAt}</span>
+                    {relatedCount > 0 && (
+                      <span className="milestones-section__card-work-badge">
+                        {relatedCount} {relatedCount === 1 ? "item" : "items"}
+                      </span>
+                    )}
+                  </div>
+                </button>
+              );
+            })
+          )}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -585,6 +837,7 @@ function BacklogSection({
 interface ProgramIncrementCardProps {
   pi: ProgramIncrement;
   requirements: RequirementsDocument;
+  milestones?: Milestone[];
   team?: TeamDocument;
   itemsBySprintId: Map<string, RequirementItem[]>;
   backlogItems: RequirementItem[];
@@ -593,6 +846,7 @@ interface ProgramIncrementCardProps {
   blockingItemIds: Set<string>;
   sprintRangesByItemId: Map<string, { startDate: string; endDate: string }>;
   onSelectItem: (itemId: string) => void;
+  onSelectMilestone?: (id: string) => void;
   onDragStartItem: (itemId: string) => void;
   onDragEndItem: () => void;
   onDropItem: (itemId: string, sprintId: string) => string | null;
@@ -611,6 +865,7 @@ interface ProgramIncrementCardProps {
 function ProgramIncrementCard({
   pi,
   requirements,
+  milestones,
   team,
   itemsBySprintId,
   backlogItems,
@@ -619,6 +874,7 @@ function ProgramIncrementCard({
   blockingItemIds,
   sprintRangesByItemId,
   onSelectItem,
+  onSelectMilestone,
   onDragStartItem,
   onDragEndItem,
   onDropItem,
@@ -842,6 +1098,7 @@ function ProgramIncrementCard({
                 range={rangeBySprintId.get(sprint.id)}
                 items={itemsBySprintId.get(sprint.id) ?? []}
                 requirements={requirements}
+                milestones={milestones}
                 team={team}
                 backlogItems={backlogItems}
                 conflictSeverityByItemId={conflictSeverityByItemId}
@@ -850,6 +1107,7 @@ function ProgramIncrementCard({
                 sprintRangesByItemId={sprintRangesByItemId}
                 reservations={pi.reservations}
                 onSelectItem={onSelectItem}
+                onSelectMilestone={onSelectMilestone}
                 onDragStartItem={onDragStartItem}
                 onDragEndItem={onDragEndItem}
                 onDropItem={onDropItem}
@@ -878,6 +1136,7 @@ interface SprintBoardColumnProps {
   range?: { startDate: string; endDate: string };
   items: RequirementItem[];
   requirements: RequirementsDocument;
+  milestones?: Milestone[];
   team?: TeamDocument;
   backlogItems: RequirementItem[];
   conflictSeverityByItemId: Map<string, { severity: ScheduleConflictSeverity; blocker: RequirementItem }>;
@@ -886,6 +1145,7 @@ interface SprintBoardColumnProps {
   sprintRangesByItemId: Map<string, { startDate: string; endDate: string }>;
   reservations?: CapacityReservation[];
   onSelectItem: (id: string) => void;
+  onSelectMilestone?: (id: string) => void;
   onDragStartItem: (id: string) => void;
   onDragEndItem: () => void;
   onDropItem: (itemId: string, sprintId: string) => string | null;
@@ -897,6 +1157,7 @@ function SprintBoardColumn({
   range,
   items,
   requirements,
+  milestones,
   team,
   backlogItems,
   conflictSeverityByItemId,
@@ -905,6 +1166,7 @@ function SprintBoardColumn({
   sprintRangesByItemId,
   reservations,
   onSelectItem,
+  onSelectMilestone,
   onDragStartItem,
   onDragEndItem,
   onDropItem,
@@ -914,6 +1176,11 @@ function SprintBoardColumn({
   const dragCounter = useRef(0);
   const [dropError, setDropError] = useState<string | null>(null);
   const dropErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const sprintMilestones = useMemo(() => {
+    if (!range || !milestones) return [];
+    return milestones.filter((m) => m.scheduledAt >= range.startDate && m.scheduledAt <= range.endDate);
+  }, [milestones, range]);
 
   const activeSprintReservations = getSprintActiveReservations(reservations, sprint.id);
 
@@ -1015,6 +1282,28 @@ function SprintBoardColumn({
 
         {capacitySummary && <SprintCapacityBar summary={capacitySummary} compact={true} />}
       </div>
+      {sprintMilestones.length > 0 && (
+        <div className="pi-board-column__milestones">
+          {sprintMilestones.map((m) => {
+            const color = getMilestoneColor(m);
+            const typeLabel = getMilestoneTypeLabel(m.type);
+            return (
+              <button
+                key={m.id}
+                type="button"
+                className="pi-board-column__milestone-pill"
+                style={{ borderColor: color, color }}
+                onClick={() => onSelectMilestone?.(m.id)}
+                title={`${typeLabel}: ${m.name} \u2022 Scheduled: ${m.scheduledAt}`}
+              >
+                <span className="pi-board-column__milestone-shape">◆</span>
+                <span className="pi-board-column__milestone-name">{m.name}</span>
+                {m.version && <span className="pi-board-column__milestone-ver">v{m.version}</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
       {dropConflict && (
         <div
           className={`pi-board-column__blocked-banner${isAtRisk ? " is-risk" : ""}`}

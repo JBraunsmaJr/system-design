@@ -6,8 +6,10 @@ import { BUILT_IN_ITEM_TYPES, BUILT_IN_RELATIONSHIP_TYPES } from "./requirements
 import type { ProgramIncrement } from "./programIncrements.ts";
 import type { TeamDocument } from "./teamTypes.ts";
 import { EMPTY_TEAM_DOCUMENT, DEFAULT_TEAM_SETTINGS } from "./teamTypes.ts";
+import type { Milestone } from "./milestones.ts";
+import { sanitizeRelatedItemIds } from "./milestones.ts";
 
-export const SCHEMA_VERSION = "0.6";
+export const SCHEMA_VERSION = "0.7";
 
 export interface DiagramFile {
   schemaVersion: string;
@@ -24,6 +26,7 @@ export interface DiagramFile {
   requirements: RequirementsDocument;
   programIncrements: ProgramIncrement[];
   team: TeamDocument;
+  milestones?: Milestone[];
   metadata: {
     updatedAt: string;
   };
@@ -36,7 +39,8 @@ export function toDiagramFile(
   scenarios: Scenario[],
   requirements: RequirementsDocument,
   programIncrements: ProgramIncrement[],
-  team: TeamDocument
+  team: TeamDocument,
+  milestones: Milestone[] = []
 ): DiagramFile {
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -47,6 +51,7 @@ export function toDiagramFile(
     requirements,
     programIncrements,
     team,
+    milestones,
     metadata: { updatedAt: new Date().toISOString() },
   };
 }
@@ -202,9 +207,33 @@ function parseTeamDocument(raw: unknown): TeamDocument {
   return { members, settings };
 }
 
+function parseMilestones(raw: unknown): Milestone[] {
+  if (!Array.isArray(raw)) return [];
+  const result: Milestone[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object") continue;
+    const m = entry as Partial<Milestone>;
+    if (typeof m.id !== "string" || typeof m.name !== "string" || typeof m.scheduledAt !== "string") continue;
+    result.push({
+      id: m.id,
+      type: typeof m.type === "string" && m.type.trim() !== "" ? m.type : "release",
+      name: m.name.trim(),
+      scheduledAt: m.scheduledAt,
+      version: typeof m.version === "string" ? m.version : undefined,
+      description: typeof m.description === "string" ? m.description : undefined,
+      color: typeof m.color === "string" ? m.color : undefined,
+      icon: typeof m.icon === "string" ? m.icon : undefined,
+      relatedWorkableItemIds: sanitizeRelatedItemIds(m.relatedWorkableItemIds),
+      createdAt: typeof m.createdAt === "string" ? m.createdAt : undefined,
+      updatedAt: typeof m.updatedAt === "string" ? m.updatedAt : undefined,
+    });
+  }
+  return result;
+}
+
 /**
  * Parses and lightly validates a diagram file loaded from disk.
- * `scenarios`/`requirements`/`programIncrements`/`team` all default to an empty
+ * `scenarios`/`requirements`/`programIncrements`/`team`/`milestones` all default to an empty
  * state so files saved before those features existed still open without
  * error - App.tsx's onFileSelected is responsible for further normalizing
  * an empty requirements document to include the built-in item types, same
@@ -224,6 +253,7 @@ export function parseDiagramFile(raw: string): DiagramFile {
     requirements: parseRequirementsDocument(parsed.requirements),
     programIncrements: parseProgramIncrements(parsed.programIncrements),
     team: parseTeamDocument(parsed.team),
+    milestones: parseMilestones(parsed.milestones),
     metadata: parsed.metadata ?? { updatedAt: new Date().toISOString() },
   };
 }

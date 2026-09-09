@@ -58,6 +58,9 @@ import type { DiagramStore } from "./collab/diagramStore";
 import { createYjsDiagramStore, seedYjsDiagramDoc } from "./collab/yjsDiagramStore";
 import { createYjsProgramIncrementsStore, seedYjsProgramIncrementsDoc } from "./collab/yjsProgramIncrementsStore";
 import type { ProgramIncrementsStore } from "./collab/programIncrementsStore";
+import type { Milestone } from "./domain/milestones";
+import { createAdapterMilestonesStore, type MilestonesStore } from "./collab/milestonesStore";
+import { createYjsMilestonesStore, seedYjsMilestonesDoc } from "./collab/yjsMilestonesStore";
 import { startCollabSession, type CollabSession, type PresenceInfo, type LocalPresenceInfo } from "./collab/session";
 import { loadPresenceName, savePresenceName, loadShowPeerCursors, saveShowPeerCursors } from "./domain/presenceIdentity";
 import { loadSignalingUrls, saveSignalingUrls, parseSignalingUrls } from "./domain/signalingConfig";
@@ -81,6 +84,7 @@ interface DiagramSnapshot {
   requirements: RequirementsDocument;
   programIncrements: ProgramIncrement[];
   team: TeamDocument;
+  milestones?: Milestone[];
 }
 
 /**
@@ -117,6 +121,7 @@ function diagramFileToSnapshot(file: ReturnType<typeof parseDiagramFile>): Diagr
     requirements: finalRequirements,
     programIncrements: file.programIncrements,
     team: file.team ?? EMPTY_TEAM_DOCUMENT,
+    milestones: file.milestones ?? [],
   };
 }
 
@@ -131,6 +136,7 @@ const DEFAULT_SNAPSHOT: DiagramSnapshot = {
   },
   programIncrements: [],
   team: EMPTY_TEAM_DOCUMENT,
+  milestones: [],
 };
 
 // Small, fixed palette for presence colors - not shared with team's own
@@ -259,6 +265,19 @@ function App() {
   );
   const localTeamStore = useMemo(() => createAdapterTeamStore(() => team, setTeam), [team, setTeam]);
 
+  const setMilestones = useCallback(
+    (updater: Milestone[] | ((prev: Milestone[]) => Milestone[])) =>
+      setDiagram((prev) => ({
+        ...prev,
+        milestones: typeof updater === "function" ? (updater as (p: Milestone[]) => Milestone[])(prev.milestones ?? []) : updater,
+      })),
+    [setDiagram]
+  );
+  const localMilestonesStore = useMemo(
+    () => createAdapterMilestonesStore(() => diagram.milestones ?? [], setMilestones),
+    [diagram.milestones, setMilestones]
+  );
+
   // --- Collaborative sessions -----------------------------------------------
   //
   // A session covers all four domains - team, requirements, program
@@ -287,6 +306,7 @@ function App() {
     requirementsStore: RequirementsStore;
     programIncrementsStore: ProgramIncrementsStore;
     diagramStore: DiagramStore;
+    milestonesStore: MilestonesStore;
   }
   const [activeSession, setActiveSession] = useState<ActiveCollabSession | null>(null);
 
@@ -457,11 +477,13 @@ function App() {
       seedYjsRequirementsDoc(doc, requirements);
       seedYjsProgramIncrementsDoc(doc, programIncrements);
       seedYjsDiagramDoc(doc, root);
+      seedYjsMilestonesDoc(doc, diagram.milestones ?? []);
       const teamStore = createYjsTeamStore(doc);
       seedTeamStore(teamStore, team);
       const requirementsStoreForSession = createYjsRequirementsStore(doc);
       const programIncrementsStoreForSession = createYjsProgramIncrementsStore(doc);
       const diagramStoreForSession = createYjsDiagramStore(doc);
+      const milestonesStoreForSession = createYjsMilestonesStore(doc);
       const session = startCollabSession(doc, roomName, { signalingUrls, password: password || undefined, iceServers });
       const initialPresence: LocalPresenceInfo = {
         name: displayName.trim() || "Guest",
@@ -483,9 +505,10 @@ function App() {
         requirementsStore: requirementsStoreForSession,
         programIncrementsStore: programIncrementsStoreForSession,
         diagramStore: diagramStoreForSession,
+        milestonesStore: milestonesStoreForSession,
       });
     },
-    [requirements, programIncrements, team, root, signalingUrls, iceServers, displayName]
+    [requirements, programIncrements, team, root, diagram.milestones, signalingUrls, iceServers, displayName]
   );
 
   // Joins an existing session by room name - starts from an EMPTY doc
@@ -499,6 +522,7 @@ function App() {
       const requirementsStoreForSession = createYjsRequirementsStore(doc);
       const programIncrementsStoreForSession = createYjsProgramIncrementsStore(doc);
       const diagramStoreForSession = createYjsDiagramStore(doc);
+      const milestonesStoreForSession = createYjsMilestonesStore(doc);
       const session = startCollabSession(doc, roomName, { signalingUrls, password: password || undefined, iceServers });
       const initialPresence: LocalPresenceInfo = {
         name: displayName.trim() || "Guest",
@@ -520,6 +544,7 @@ function App() {
         requirementsStore: requirementsStoreForSession,
         programIncrementsStore: programIncrementsStoreForSession,
         diagramStore: diagramStoreForSession,
+        milestonesStore: milestonesStoreForSession,
       });
     },
     [signalingUrls, iceServers, displayName]
@@ -535,11 +560,12 @@ function App() {
     setTeam(() => activeSession.teamStore.getSnapshot());
     setRequirements(() => activeSession.requirementsStore.getSnapshot());
     setProgramIncrements(() => activeSession.programIncrementsStore.getSnapshot());
+    setMilestones(() => activeSession.milestonesStore.getSnapshot());
     const finalDiagramSnapshot = activeSession.diagramStore.getSnapshot();
     setRoot(() => unflattenToSubDiagram(finalDiagramSnapshot.nodes, finalDiagramSnapshot.edges));
     activeSession.session.disconnect();
     setActiveSession(null);
-  }, [activeSession, setTeam, setRequirements, setProgramIncrements, setRoot]);
+  }, [activeSession, setTeam, setRequirements, setProgramIncrements, setMilestones, setRoot]);
 
   useEffect(() => {
     return () => {
@@ -554,6 +580,7 @@ function App() {
   const teamStore = activeSession?.teamStore ?? localTeamStore;
   const requirementsStore = activeSession?.requirementsStore ?? localRequirementsStore;
   const programIncrementsStore = activeSession?.programIncrementsStore ?? localProgramIncrementsStore;
+  const milestonesStore = activeSession?.milestonesStore ?? localMilestonesStore;
   const diagramStore = activeSession?.diagramStore ?? localDiagramStore;
   const diagramStoreRef = useRef(diagramStore);
 
@@ -587,7 +614,8 @@ function App() {
           diagram.scenarios,
           diagram.requirements,
           diagram.programIncrements,
-          diagram.team
+          diagram.team,
+          diagram.milestones ?? []
         )
       );
       setHasAutosaved(true);
@@ -640,6 +668,7 @@ function App() {
   const teamSnapshot = useSyncExternalStore(teamStore.subscribe, teamStore.getSnapshot);
   const requirementsSnapshot = useSyncExternalStore(requirementsStore.subscribe, requirementsStore.getSnapshot);
   const programIncrementsSnapshot = useSyncExternalStore(programIncrementsStore.subscribe, programIncrementsStore.getSnapshot);
+  const milestonesSnapshot = useSyncExternalStore(milestonesStore.subscribe, milestonesStore.getSnapshot);
 
   // This client's own record of what React Flow last measured each node
   // to be. Deliberately state rather than a ref, even though it's only
@@ -1698,9 +1727,18 @@ function App() {
   const onSave = useCallback(() => {
     const liveRoot = unflattenToSubDiagram(diagramSnapshot.nodes, diagramSnapshot.edges);
     downloadDiagram(
-      toDiagramFile(title, liveRoot.nodes, liveRoot.edges, scenarios, requirementsSnapshot, programIncrementsSnapshot, teamSnapshot)
+      toDiagramFile(
+        title,
+        liveRoot.nodes,
+        liveRoot.edges,
+        scenarios,
+        requirementsSnapshot,
+        programIncrementsSnapshot,
+        teamSnapshot,
+        milestonesSnapshot
+      )
     );
-  }, [title, diagramSnapshot, scenarios, requirementsSnapshot, programIncrementsSnapshot, teamSnapshot]);
+  }, [title, diagramSnapshot, scenarios, requirementsSnapshot, programIncrementsSnapshot, teamSnapshot, milestonesSnapshot]);
 
   // Exports export the CURRENT view (whatever level you're looking at),
   // unlike Save - drilling into a node and exporting just that sub-diagram
@@ -1937,6 +1975,7 @@ function App() {
           <TimelineView
             programIncrementsStore={programIncrementsStore}
             requirementsStore={requirementsStore}
+            milestonesStore={milestonesStore}
             team={teamSnapshot}
             diagramRoot={root}
             onNavigateToNode={onNavigateToNode}

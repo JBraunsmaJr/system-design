@@ -241,4 +241,24 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: ProgramIncrementsStore
   assert(seededPI.reservations?.[0].name === "Existing Reservation", "the reservation's own id and content are both preserved");
 }
 
+// === Part 5: contiguous PI start dates ===
+{
+  const local = createLocalProgramIncrementsStore();
+  const pi1Id = local.addPI();
+  local.updatePIStart(pi1Id, "2026-11-24"); // Sprint 1 (14 days) runs 2026-11-24 -> 2026-12-07
+  const pi2Id = local.addPI();
+  const snap = local.getSnapshot();
+  const pi2 = snap.find((pi) => pi.id === pi2Id)!;
+  assert(pi2.startDate === "2026-12-08", "local store: PI 2 automatically starts on Dec 8 when PI 1 ends on Dec 7");
+
+  const ydoc = new Y.Doc();
+  const ystore = createYjsProgramIncrementsStore(ydoc);
+  const yPi1Id = ystore.addPI();
+  ystore.updatePIStart(yPi1Id, "2026-11-24");
+  const yPi2Id = ystore.addPI();
+  const ySnap = ystore.getSnapshot();
+  const yPi2 = ySnap.find((pi) => pi.id === yPi2Id)!;
+  assert(yPi2.startDate === "2026-12-08", "Yjs store: PI 2 automatically starts on Dec 8 when PI 1 ends on Dec 7");
+}
+
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);
