@@ -24,9 +24,11 @@ export function seedYjsMilestonesDoc(doc: Y.Doc, initial: Milestone[]): void {
       if (m.color !== undefined) mM.set("color", m.color);
       if (m.icon !== undefined) mM.set("icon", m.icon);
       const relArr = new Y.Array<string>();
-      if (m.relatedWorkableItemIds && m.relatedWorkableItemIds.length > 0) {
-        relArr.push(m.relatedWorkableItemIds);
+      const ids = sanitizeRelatedItemIds(m.relatedItemIds ?? m.relatedWorkableItemIds);
+      if (ids.length > 0) {
+        relArr.push(ids);
       }
+      mM.set("relatedItemIds", relArr);
       mM.set("relatedWorkableItemIds", relArr);
       if (m.createdAt) mM.set("createdAt", m.createdAt);
       if (m.updatedAt) mM.set("updatedAt", m.updatedAt);
@@ -42,7 +44,8 @@ export function createYjsMilestonesStore(doc: Y.Doc): MilestonesStore {
   const milestones = doc.getMap<Y.Map<unknown>>("milestones");
 
   function milestoneMapToPlain(id: string, m: Y.Map<unknown>): Milestone {
-    const relArr = m.get("relatedWorkableItemIds") as Y.Array<string> | undefined;
+    const relArr = (m.get("relatedItemIds") ?? m.get("relatedWorkableItemIds")) as Y.Array<string> | undefined;
+    const ids = relArr ? relArr.toArray() : [];
     return {
       id,
       type: (m.get("type") as string) || "release",
@@ -52,7 +55,8 @@ export function createYjsMilestonesStore(doc: Y.Doc): MilestonesStore {
       description: m.get("description") as string | undefined,
       color: m.get("color") as string | undefined,
       icon: m.get("icon") as string | undefined,
-      relatedWorkableItemIds: relArr ? relArr.toArray() : [],
+      relatedItemIds: ids,
+      relatedWorkableItemIds: ids,
       createdAt: m.get("createdAt") as string | undefined,
       updatedAt: m.get("updatedAt") as string | undefined,
     };
@@ -79,7 +83,7 @@ export function createYjsMilestonesStore(doc: Y.Doc): MilestonesStore {
   milestoneOrder.observeDeep(recomputeAndNotify);
   milestones.observeDeep(recomputeAndNotify);
 
-  return {
+  const store: MilestonesStore = {
     getSnapshot: () => cached,
 
     subscribe: (listener) => {
@@ -91,7 +95,7 @@ export function createYjsMilestonesStore(doc: Y.Doc): MilestonesStore {
       const now = new Date().toISOString();
       const id = nextMilestoneId(milestone.type || "milestone");
       const name = milestone.name.trim();
-      const sanitizedWorkableIds = sanitizeRelatedItemIds(milestone.relatedWorkableItemIds);
+      const sanitizedIds = sanitizeRelatedItemIds(milestone.relatedItemIds ?? milestone.relatedWorkableItemIds);
 
       doc.transact(() => {
         const mM = new Y.Map<unknown>();
@@ -103,9 +107,10 @@ export function createYjsMilestonesStore(doc: Y.Doc): MilestonesStore {
         if (milestone.color !== undefined) mM.set("color", milestone.color);
         if (milestone.icon !== undefined) mM.set("icon", milestone.icon);
         const relArr = new Y.Array<string>();
-        if (sanitizedWorkableIds.length > 0) {
-          relArr.push(sanitizedWorkableIds);
+        if (sanitizedIds.length > 0) {
+          relArr.push(sanitizedIds);
         }
+        mM.set("relatedItemIds", relArr);
         mM.set("relatedWorkableItemIds", relArr);
         mM.set("createdAt", now);
         mM.set("updatedAt", now);
@@ -131,11 +136,12 @@ export function createYjsMilestonesStore(doc: Y.Doc): MilestonesStore {
         if (patch.color !== undefined) mM.set("color", patch.color);
         if (patch.icon !== undefined) mM.set("icon", patch.icon);
 
-        if (patch.relatedWorkableItemIds !== undefined) {
-          const sanitized = sanitizeRelatedItemIds(patch.relatedWorkableItemIds);
-          let relArr = mM.get("relatedWorkableItemIds") as Y.Array<string> | undefined;
+        if (patch.relatedItemIds !== undefined || patch.relatedWorkableItemIds !== undefined) {
+          const sanitized = sanitizeRelatedItemIds(patch.relatedItemIds ?? patch.relatedWorkableItemIds);
+          let relArr = (mM.get("relatedItemIds") ?? mM.get("relatedWorkableItemIds")) as Y.Array<string> | undefined;
           if (!relArr) {
             relArr = new Y.Array<string>();
+            mM.set("relatedItemIds", relArr);
             mM.set("relatedWorkableItemIds", relArr);
           }
           relArr.delete(0, relArr.length);
@@ -155,31 +161,32 @@ export function createYjsMilestonesStore(doc: Y.Doc): MilestonesStore {
       });
     },
 
-    addRelatedWorkableItem: (milestoneId, workableItemId) => {
+    addRelatedItem: (milestoneId, itemId) => {
       const mM = milestones.get(milestoneId);
       if (!mM) return;
 
       doc.transact(() => {
-        let relArr = mM.get("relatedWorkableItemIds") as Y.Array<string> | undefined;
+        let relArr = (mM.get("relatedItemIds") ?? mM.get("relatedWorkableItemIds")) as Y.Array<string> | undefined;
         if (!relArr) {
           relArr = new Y.Array<string>();
+          mM.set("relatedItemIds", relArr);
           mM.set("relatedWorkableItemIds", relArr);
         }
-        if (!relArr.toArray().includes(workableItemId)) {
-          relArr.push([workableItemId]);
+        if (!relArr.toArray().includes(itemId)) {
+          relArr.push([itemId]);
           mM.set("updatedAt", new Date().toISOString());
         }
       });
     },
 
-    removeRelatedWorkableItem: (milestoneId, workableItemId) => {
+    removeRelatedItem: (milestoneId, itemId) => {
       const mM = milestones.get(milestoneId);
       if (!mM) return;
 
       doc.transact(() => {
-        const relArr = mM.get("relatedWorkableItemIds") as Y.Array<string> | undefined;
+        const relArr = (mM.get("relatedItemIds") ?? mM.get("relatedWorkableItemIds")) as Y.Array<string> | undefined;
         if (!relArr) return;
-        const idx = relArr.toArray().indexOf(workableItemId);
+        const idx = relArr.toArray().indexOf(itemId);
         if (idx !== -1) {
           relArr.delete(idx, 1);
           mM.set("updatedAt", new Date().toISOString());
@@ -187,15 +194,16 @@ export function createYjsMilestonesStore(doc: Y.Doc): MilestonesStore {
       });
     },
 
-    setRelatedWorkableItems: (milestoneId, workableItemIds) => {
+    setRelatedItems: (milestoneId, itemIds) => {
       const mM = milestones.get(milestoneId);
       if (!mM) return;
-      const sanitized = sanitizeRelatedItemIds(workableItemIds);
+      const sanitized = sanitizeRelatedItemIds(itemIds);
 
       doc.transact(() => {
-        let relArr = mM.get("relatedWorkableItemIds") as Y.Array<string> | undefined;
+        let relArr = (mM.get("relatedItemIds") ?? mM.get("relatedWorkableItemIds")) as Y.Array<string> | undefined;
         if (!relArr) {
           relArr = new Y.Array<string>();
+          mM.set("relatedItemIds", relArr);
           mM.set("relatedWorkableItemIds", relArr);
         }
         relArr.delete(0, relArr.length);
@@ -205,5 +213,19 @@ export function createYjsMilestonesStore(doc: Y.Doc): MilestonesStore {
         mM.set("updatedAt", new Date().toISOString());
       });
     },
+
+    addRelatedWorkableItem: (milestoneId, workableItemId) => {
+      store.addRelatedItem(milestoneId, workableItemId);
+    },
+
+    removeRelatedWorkableItem: (milestoneId, workableItemId) => {
+      store.removeRelatedItem(milestoneId, workableItemId);
+    },
+
+    setRelatedWorkableItems: (milestoneId, workableItemIds) => {
+      store.setRelatedItems(milestoneId, workableItemIds);
+    },
   };
+
+  return store;
 }

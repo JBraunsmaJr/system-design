@@ -5257,7 +5257,7 @@
   top: 0;
   bottom: 0;
   pointer-events: none;
-  z-index: 1;
+  z-index: 2;
 }
 
 .gantt-chart__header-row {
@@ -5282,6 +5282,27 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--chrome-text-dim);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+}
+
+.gantt-chart__resizer {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  bottom: 0;
+  width: 7px;
+  cursor: col-resize;
+  z-index: 20;
+  background: transparent;
+  transition: background 0.15s ease;
+}
+
+.gantt-chart__resizer:hover,
+.gantt-chart__resizer.is-dragging {
+  background: var(--accent);
 }
 
 .gantt-chart__bands {
@@ -7588,6 +7609,172 @@
   color: var(--danger);
   background: rgba(240, 87, 140, 0.1);
 }
+
+.manage-types-modal__transfer {
+  background: transparent;
+  border: none;
+  color: var(--chrome-text-dim);
+  padding: 3px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.manage-types-modal__transfer:hover {
+  color: var(--accent);
+  background: rgba(91, 124, 250, 0.12);
+}
+
+.manage-types-modal__row--transferring {
+  background: rgba(91, 124, 250, 0.08);
+  border: 1px solid rgba(91, 124, 250, 0.3);
+  border-radius: var(--radius-sm);
+  padding: 6px 6px;
+  gap: 6px;
+}
+
+.manage-types-modal__transfer-label {
+  font-size: 11.5px;
+  color: var(--chrome-text);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.manage-types-modal__transfer-select {
+  flex: 1;
+  min-width: 130px;
+  background: var(--chrome-bg-raised);
+  border: 1px solid var(--chrome-border);
+  border-radius: 4px;
+  color: var(--chrome-text);
+  font-size: 12px;
+  padding: 3px 6px;
+}
+
+.manage-types-modal__transfer-select:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+/* ---------- Type Picker (Requirements & Modals) ---------- */
+
+.type-picker__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--chrome-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--chrome-text-dim);
+  padding: 1.5px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.type-picker__trigger:hover:not(:disabled) {
+  background: var(--chrome-bg);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.type-picker__swatch {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.type-picker__label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 110px;
+}
+
+.type-picker__chevron {
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
+.type-picker__dropdown {
+  background: var(--chrome-bg-raised);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-md, 8px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  overflow: hidden;
+  padding: 4px;
+}
+
+.type-picker__header {
+  padding: 5px 8px 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--chrome-text-dim);
+  border-bottom: 1px solid var(--chrome-border);
+}
+
+.type-picker__list {
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 4px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.type-picker__option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  background: transparent;
+  color: var(--chrome-text);
+  font-size: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s ease;
+}
+
+.type-picker__option:hover {
+  background: var(--chrome-bg);
+}
+
+.type-picker__option.is-selected {
+  background: rgba(91, 124, 250, 0.15);
+  font-weight: 600;
+}
+
+.type-picker__option-name {
+  flex: 1;
+}
+
+.type-picker__option-prefix {
+  font-size: 10.5px;
+  color: var(--chrome-text-dim);
+  font-family: var(--mono);
+}
+
+.type-picker__workable-icon {
+  color: var(--chrome-text-dim);
+  flex-shrink: 0;
+}
+
+.type-picker__check {
+  color: var(--accent);
+  flex-shrink: 0;
+  margin-left: 2px;
+}
 /* ---------- Status picker (Requirements) ---------- */
 
 .status-picker {
@@ -9422,27 +9609,33 @@
   font-weight: 600;
 }
 
-/* ---------- Sprint Column Milestone Chips ---------- */
+/* ---------- Sprint Column Milestone Chips & Epic Progression ---------- */
 
 .pi-board-column__milestones {
   flex-shrink: 0;
   display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--chrome-bg, #141417);
+  border-bottom: 1px solid var(--chrome-border);
+}
+
+.pi-board-column__milestone-chips {
+  display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  padding: 6px 10px;
-  background: rgba(144, 97, 249, 0.04);
-  border-bottom: 1px solid var(--chrome-border);
 }
 
 .pi-board-column__milestone-pill {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid;
-  border-radius: 999px;
+  background: #18191e;
+  border: 1px solid var(--chrome-border);
+  border-radius: 4px;
   padding: 2px 7px;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -9450,8 +9643,8 @@
 }
 
 .pi-board-column__milestone-pill:hover {
-  transform: scale(1.02);
-  background: rgba(255, 255, 255, 0.08);
+  filter: brightness(1.2);
+  background: #23252e;
 }
 
 .pi-board-column__milestone-shape {
@@ -9465,9 +9658,218 @@
 }
 
 .pi-board-column__milestone-ver {
-  opacity: 0.8;
   font-size: 11px;
   font-family: var(--mono);
+}
+
+.pi-board-column__release-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #1c192c;
+  border: 1px solid #8b5cf6;
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #c4b5fd;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  max-width: 100%;
+}
+
+.pi-board-column__release-pill:hover {
+  filter: brightness(1.2);
+  background: #292340;
+}
+
+.pi-board-column__release-shape {
+  font-size: 11px;
+}
+
+.pi-board-column__release-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pi-board-column__release-progress {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #ddd6fe;
+  font-family: var(--mono);
+}
+
+.pi-board-column__dep-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: #261c10;
+  border: 1px solid #f59e0b;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fbbf24;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pi-board-column__dep-pill:hover {
+  filter: brightness(1.2);
+  background: #362716;
+}
+
+/* Epic Progression in Sprint Column */
+.pi-board-column__epic-progress-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pi-board-column__epic-progress-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: #181524;
+  border: 1px solid rgba(139, 92, 246, 0.4);
+  border-radius: 4px;
+  padding: 4px 6px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.pi-board-column__epic-progress-card:hover {
+  background: #231c36;
+  border-color: #a78bfa;
+}
+
+.pi-board-column__epic-progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.pi-board-column__epic-progress-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  color: #c4b5fd;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pi-board-column__epic-progress-name {
+  color: var(--chrome-text-dim);
+  font-weight: 400;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pi-board-column__epic-progress-metrics {
+  font-size: 10.5px;
+  font-family: var(--mono);
+  color: #e9d5ff;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.pi-board-column__epic-progress-bar-bg {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.pi-board-column__epic-progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #8b5cf6, #a78bfa);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.pi-board-column__epic-progress-card.is-complete .pi-board-column__epic-progress-bar-fill {
+  background: linear-gradient(90deg, #10b981, #34d399);
+}
+
+.sprint-row__epic-badge {
+  font-size: 11px;
+  font-family: var(--mono);
+  color: #a78bfa;
+  background: #1e172a;
+  border: 1px solid #7c3aed;
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-weight: 700;
+}
+
+.pi-board-item__epic-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  color: #a78bfa;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 10.5px;
+  font-weight: 600;
+  font-family: var(--mono);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timeline-view__epic-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+}
+
+.timeline-view__epic-select {
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  color: var(--chrome-text);
+  border-radius: var(--radius-sm);
+  padding: 5px 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+  outline: none;
+}
+
+.timeline-view__epic-select:focus {
+  border-color: var(--accent);
+}
+
+.sprint-row__milestone-badge {
+  flex-shrink: 0;
+  background: rgba(144, 97, 249, 0.15);
+  border: 1px solid rgba(144, 97, 249, 0.4);
+  color: #c084fc;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.sprint-row__release-badge {
+  flex-shrink: 0;
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  color: #60a5fa;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 11.5px;
+  font-weight: 600;
 }
 
 /* ---------- Gantt Chart Milestones Track ---------- */
@@ -9590,12 +9992,126 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 1.5px;
-  opacity: 0.45;
+  width: 0;
+  opacity: 0.75;
   border-left: 1.5px dashed;
   transform: translateX(-50%);
   pointer-events: none;
-  z-index: 1;
+  z-index: 2;
+}
+
+/* ---------- Gantt Chart Epics & Non-Workable Section ---------- */
+
+.gantt-chart__epics-section {
+  border-bottom: 1px solid var(--chrome-border);
+  background: transparent;
+}
+
+.gantt-chart__epics-header-row {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--chrome-border);
+  background: transparent;
+}
+
+.gantt-chart__epics-toggle-label {
+  flex-shrink: 0;
+  position: sticky;
+  left: 0;
+  z-index: 12;
+  background: var(--chrome-bg-raised);
+  border-right: 1px solid var(--chrome-border);
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #8b5cf6;
+  cursor: pointer;
+  border: none;
+  text-align: left;
+}
+
+.gantt-chart__epics-toggle-label:hover {
+  background: var(--chrome-bg);
+}
+
+.gantt-chart__epic-row {
+  display: flex;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  min-height: 36px;
+  align-items: center;
+  background: transparent;
+}
+
+.gantt-chart__epic-label {
+  flex-shrink: 0;
+  position: sticky;
+  left: 0;
+  z-index: 8;
+  background: var(--chrome-bg-raised);
+  border-right: 1px solid var(--chrome-border);
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gantt-chart__epic-bar {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  z-index: 3;
+}
+
+.gantt-chart__epic-bar--solid {
+  background: rgba(139, 92, 246, 0.25);
+  border: 1.5px solid #8b5cf6;
+  color: #ddd6fe;
+}
+
+.gantt-chart__epic-bar--solid:hover {
+  background: rgba(139, 92, 246, 0.38);
+}
+
+.gantt-chart__epic-bar--open-ended {
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.25) 0%, rgba(139, 92, 246, 0.05) 100%);
+  border: 1.5px dashed #8b5cf6;
+  border-right: none;
+  color: #ddd6fe;
+}
+
+.gantt-chart__epic-bar--open-ended:hover {
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.35) 0%, rgba(139, 92, 246, 0.12) 100%);
+}
+
+.gantt-chart__epic-status-badge {
+  font-size: 10px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: var(--mono);
+  background: rgba(0, 0, 0, 0.3);
 }
 
 /* ---------- Milestone Detail Modal & Add Milestone Modal ---------- */
@@ -9739,8 +10255,16 @@
 
 .milestone-detail-modal__date-input::-webkit-calendar-picker-indicator,
 .add-milestone-modal__input::-webkit-calendar-picker-indicator {
-  filter: invert(0.8) brightness(1.2);
   cursor: pointer;
+  opacity: 0.75;
+  filter: invert(48%) sepia(79%) saturate(2476%) hue-rotate(209deg) brightness(98%) contrast(97%);
+  transition: opacity 0.15s ease, filter 0.15s ease;
+}
+
+.milestone-detail-modal__date-input::-webkit-calendar-picker-indicator:hover,
+.add-milestone-modal__input::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+  filter: invert(65%) sepia(85%) saturate(3000%) hue-rotate(209deg) brightness(110%) contrast(100%);
 }
 
 .milestone-detail-modal__input--sm {
@@ -10208,4 +10732,163 @@
   font-size: 12.5px;
   margin: 0;
   font-weight: 500;
+}
+
+/* ---------- Milestone modal type filters ---------- */
+
+.milestone-modal__type-filters {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.milestone-modal__type-filter-btn {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  color: var(--chrome-text-dim);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.milestone-modal__type-filter-btn:hover {
+  background: var(--chrome-bg-hover, rgba(255, 255, 255, 0.05));
+  color: var(--chrome-text);
+}
+
+.milestone-modal__type-filter-btn.is-active {
+  background: rgba(91, 124, 250, 0.15);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ---------- Gantt Chart Grouping Controls & Rows ---------- */
+
+.gantt-chart__controls-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: var(--chrome-bg-raised);
+  border-bottom: 1px solid var(--chrome-border);
+  gap: 12px;
+}
+
+.gantt-chart__grouping-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gantt-chart__control-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--chrome-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.gantt-chart__group-btn-group {
+  display: inline-flex;
+  align-items: center;
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  gap: 2px;
+}
+
+.gantt-chart__group-btn {
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 3px;
+  border: none;
+  background: transparent;
+  color: var(--chrome-text-dim);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.gantt-chart__group-btn:hover {
+  color: var(--chrome-text);
+}
+
+.gantt-chart__group-btn.is-active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.gantt-chart__group-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.gantt-chart__group-header-row {
+  display: flex;
+  border-bottom: 1px solid var(--chrome-border);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.gantt-chart__group-toggle-label {
+  flex-shrink: 0;
+  position: sticky;
+  left: 0;
+  z-index: 6;
+  background: var(--chrome-bg-raised);
+  border-right: 1px solid var(--chrome-border);
+  border-top: none;
+  border-bottom: none;
+  border-left: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  overflow: hidden;
+  text-align: left;
+  cursor: pointer;
+  color: var(--chrome-text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.gantt-chart__group-toggle-label:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.gantt-chart__group-color-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.gantt-chart__group-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gantt-chart__group-badge {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--chrome-text-dim);
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  padding: 1px 5px;
+  flex-shrink: 0;
+}
+
+.gantt-chart__group-track {
+  background: rgba(255, 255, 255, 0.015);
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.06);
 }

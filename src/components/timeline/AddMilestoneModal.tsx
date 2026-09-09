@@ -7,7 +7,7 @@ import {
   validateMilestone,
 } from "../../domain/milestones";
 import type { RequirementsDocument } from "../../domain/requirementsTypes";
-import { getItemType, isItemWorkable } from "../../domain/requirementsRegistry";
+import { getItemType } from "../../domain/requirementsRegistry";
 
 interface AddMilestoneModalProps {
   initialDate?: string;
@@ -23,6 +23,15 @@ function todayISO(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+function formatTypeFilterLabel(label: string): string {
+  const lower = label.toLowerCase();
+  if (lower === "dependency") return "Dependencies";
+  if (lower === "story") return "Stories";
+  if (label.endsWith("s") || label.endsWith("sh") || label.endsWith("ch") || label.endsWith("x") || label.endsWith("z")) return `${label}es`;
+  if (label.endsWith("y") && !/[aeiou]y$/i.test(label)) return `${label.slice(0, -1)}ies`;
+  return `${label}s`;
+}
+
 export function AddMilestoneModal({
   initialDate,
   initialType = "release",
@@ -36,8 +45,9 @@ export function AddMilestoneModal({
   const [scheduledAt, setScheduledAt] = useState(initialDate || todayISO());
   const [version, setVersion] = useState("");
   const [description, setDescription] = useState("");
-  const [selectedWorkableIds, setSelectedWorkableIds] = useState<string[]>([]);
-  const [workableSearch, setWorkableSearch] = useState("");
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
+  const [itemSearch, setItemSearch] = useState("");
+  const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>("all");
   const [error, setError] = useState<string | null>(null);
 
   // Close on Escape
@@ -53,24 +63,30 @@ export function AddMilestoneModal({
   const typeDef = BUILT_IN_MILESTONE_TYPES.find((t) => t.id === type);
   const themeColor = typeDef?.color ?? "#9061f9";
 
-  const allWorkableItems = useMemo(
-    () => doc.items.filter((item) => isItemWorkable(doc, item)),
-    [doc]
-  );
+  const uniqueItemTypes = useMemo(() => {
+    const map = new Map<string, (typeof doc.itemTypes)[number]>();
+    for (const t of doc.itemTypes) {
+      if (!map.has(t.id)) map.set(t.id, t);
+    }
+    return Array.from(map.values());
+  }, [doc.itemTypes]);
 
-  const filteredWorkableItems = useMemo(() => {
-    const q = workableSearch.trim().toLowerCase();
-    if (!q) return allWorkableItems;
-    return allWorkableItems.filter(
-      (item) => item.id.toLowerCase().includes(q) || item.title.toLowerCase().includes(q)
-    );
-  }, [allWorkableItems, workableSearch]);
+  const allDocItems = useMemo(() => doc.items, [doc]);
 
-  const toggleWorkableId = (id: string) => {
-    if (selectedWorkableIds.includes(id)) {
-      setSelectedWorkableIds(selectedWorkableIds.filter((i) => i !== id));
+  const filteredItems = useMemo(() => {
+    const q = itemSearch.trim().toLowerCase();
+    return allDocItems.filter((item) => {
+      if (selectedTypeFilter !== "all" && item.typeId !== selectedTypeFilter) return false;
+      if (!q) return true;
+      return item.id.toLowerCase().includes(q) || item.title.toLowerCase().includes(q);
+    });
+  }, [allDocItems, itemSearch, selectedTypeFilter]);
+
+  const toggleItemId = (id: string) => {
+    if (selectedItemIds.includes(id)) {
+      setSelectedItemIds(selectedItemIds.filter((i) => i !== id));
     } else {
-      setSelectedWorkableIds([...selectedWorkableIds, id]);
+      setSelectedItemIds([...selectedItemIds, id]);
     }
   };
 
@@ -82,7 +98,8 @@ export function AddMilestoneModal({
       scheduledAt,
       version: version.trim() !== "" ? version.trim() : undefined,
       description: description.trim() !== "" ? description.trim() : undefined,
-      relatedWorkableItemIds: selectedWorkableIds.length > 0 ? selectedWorkableIds : undefined,
+      relatedItemIds: selectedItemIds.length > 0 ? selectedItemIds : undefined,
+      relatedWorkableItemIds: selectedItemIds.length > 0 ? selectedItemIds : undefined,
     };
 
     const errors = validateMilestone(candidate, doc);
@@ -230,32 +247,57 @@ export function AddMilestoneModal({
               />
             </div>
 
-            {/* Optional Related Workable Items (FR-007, FR-008) */}
+            {/* Optional Related Items & Epics (FR-005, FR-007, FR-008) */}
             <div className="add-milestone-modal__field">
               <label className="add-milestone-modal__label">
-                Related Workable Items ({selectedWorkableIds.length} selected)
+                Associated Requirement Items & Epics ({selectedItemIds.length} selected)
               </label>
               <p className="add-milestone-modal__hint">
-                Optionally link work items that culminate in this {typeLabel.toLowerCase()}. Standalone milestones are also valid.
+                Optionally link workable items, Epics, external dependencies, or goals that culminate in this {typeLabel.toLowerCase()}.
               </p>
+
+              <div className="milestone-modal__type-filters">
+                <button
+                  type="button"
+                  className={`milestone-modal__type-filter-btn${selectedTypeFilter === "all" ? " is-active" : ""}`}
+                  onClick={() => setSelectedTypeFilter("all")}
+                >
+                  All Types
+                </button>
+                {uniqueItemTypes.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    className={`milestone-modal__type-filter-btn${selectedTypeFilter === t.id ? " is-active" : ""}`}
+                    style={
+                      selectedTypeFilter === t.id
+                        ? { borderColor: t.color, color: t.color, backgroundColor: `${t.color}20` }
+                        : {}
+                    }
+                    onClick={() => setSelectedTypeFilter(t.id)}
+                  >
+                    {formatTypeFilterLabel(t.label)}
+                  </button>
+                ))}
+              </div>
 
               <input
                 type="text"
                 className="add-milestone-modal__search-input"
-                placeholder="Filter work items..."
-                value={workableSearch}
-                onChange={(e) => setWorkableSearch(e.target.value)}
+                placeholder="Filter requirement items..."
+                value={itemSearch}
+                onChange={(e) => setItemSearch(e.target.value)}
               />
 
               <div className="add-milestone-modal__workable-picker">
-                {filteredWorkableItems.length === 0 ? (
+                {filteredItems.length === 0 ? (
                   <p className="add-milestone-modal__workable-empty">
-                    {allWorkableItems.length === 0 ? "No workable items in requirements doc." : "No matching items."}
+                    {allDocItems.length === 0 ? "No items in requirements doc." : "No matching items."}
                   </p>
                 ) : (
-                  filteredWorkableItems.map((item) => {
+                  filteredItems.map((item) => {
                     const itemType = getItemType(doc, item.typeId);
-                    const isSelected = selectedWorkableIds.includes(item.id);
+                    const isSelected = selectedItemIds.includes(item.id);
                     return (
                       <label
                         key={item.id}
@@ -265,7 +307,7 @@ export function AddMilestoneModal({
                         <input
                           type="checkbox"
                           checked={isSelected}
-                          onChange={() => toggleWorkableId(item.id)}
+                          onChange={() => toggleItemId(item.id)}
                         />
                         <span
                           className="add-milestone-modal__item-id"

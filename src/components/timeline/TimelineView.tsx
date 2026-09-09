@@ -16,6 +16,8 @@ import type { MilestonesStore } from "../../collab/milestonesStore";
 import { createLocalMilestonesStore } from "../../collab/milestonesStore";
 import type { Milestone } from "../../domain/milestones";
 import { getMilestoneColor, getMilestoneTypeLabel } from "../../domain/milestones";
+import { computeSprintMilestoneSummary } from "../../domain/sprintSummaries";
+import { getAllEpicsWithInferredSchedule, getChildItemsForParent } from "../../domain/epicScheduling";
 import type { TeamDocument } from "../../domain/teamTypes";
 import type { SubDiagram } from "../../domain/types";
 import type { DiagramPath } from "../../domain/subDiagramTree";
@@ -75,6 +77,32 @@ export function TimelineView({
   const [addMilestoneDate, setAddMilestoneDate] = useState<string | undefined>(undefined);
   const [chartMode, setChartMode] = useState<"board" | "gantt">("board");
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
+  const [filterEpicId, setFilterEpicId] = useState<string>("all");
+
+  const epicsWithSchedule = useMemo(() => {
+    return getAllEpicsWithInferredSchedule(requirements, programIncrements, milestones);
+  }, [requirements, programIncrements, milestones]);
+
+  const parentEpicByItemId = useMemo(() => {
+    const map = new Map<string, RequirementItem>();
+    const epics = requirements.items.filter((i) => i.typeId === "epic" || i.typeId.toLowerCase().includes("epic"));
+    const epicIds = new Set(epics.map((e) => e.id));
+    for (const rel of requirements.relationships) {
+      if (epicIds.has(rel.fromItemId) && (rel.typeId === "parent-of" || rel.typeId === "relates-to")) {
+        const epic = epics.find((e) => e.id === rel.fromItemId);
+        if (epic) map.set(rel.toItemId, epic);
+      } else if (epicIds.has(rel.toItemId) && rel.typeId === "child-of") {
+        const epic = epics.find((e) => e.id === rel.toItemId);
+        if (epic) map.set(rel.fromItemId, epic);
+      }
+    }
+    return map;
+  }, [requirements]);
+
+  const filteredChildItemIds = useMemo(() => {
+    if (filterEpicId === "all") return null;
+    return new Set(getChildItemsForParent(filterEpicId, requirements).map((i) => i.id));
+  }, [filterEpicId, requirements]);
 
   // Rebroadcasts this peer's own selection so others' "someone else has
   // this item open" indicator (see ItemCard's peersHere prop) stays
@@ -132,6 +160,10 @@ export function TimelineView({
 
   const onUpdateItem = (id: string, patch: Partial<RequirementItem>) => {
     requirementsStore.updateItem(id, patch);
+  };
+
+  const onConvertItemType = (id: string, newTypeId: string) => {
+    requirementsStore.convertItemType(id, newTypeId);
   };
 
   const onDeleteItem = (id: string) => {
@@ -319,6 +351,25 @@ export function TimelineView({
           </button>
         </div>
 
+        {epicsWithSchedule.length > 0 && (
+          <div className="timeline-view__epic-filter">
+            <span style={{ fontSize: "12px", color: "var(--chrome-text-dim)" }}>Epic:</span>
+            <select
+              className="timeline-view__epic-select"
+              value={filterEpicId}
+              onChange={(e) => setFilterEpicId(e.target.value)}
+              title="Filter timeline cards by Epic"
+            >
+              <option value="all">All Epics</option>
+              {epicsWithSchedule.map(({ epic, schedule }) => (
+                <option key={epic.id} value={epic.id}>
+                  {epic.id}: {epic.title || "Untitled"} ({schedule.scheduledChildrenCount}/{schedule.totalChildrenCount} scheduled)
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <PresenceAvatarStack peers={peers} requirements={requirements} />
       </div>
 
@@ -354,6 +405,8 @@ export function TimelineView({
             team={team}
             draggedItemId={draggedItemId}
             blockingItemIds={blockingItemIds}
+            parentEpicByItemId={parentEpicByItemId}
+            filteredChildItemIds={filteredChildItemIds}
             onSelectItem={(id) => setSelectedItemId(id)}
             onDragStartItem={(id) => setDraggedItemId(id)}
             onDragEndItem={() => setDraggedItemId(null)}
@@ -379,6 +432,8 @@ export function TimelineView({
               draggedItemId={draggedItemId}
               blockingItemIds={blockingItemIds}
               sprintRangesByItemId={sprintRangesByItemId}
+              parentEpicByItemId={parentEpicByItemId}
+              filteredChildItemIds={filteredChildItemIds}
               onSelectItem={(id) => setSelectedItemId(id)}
               onSelectMilestone={(id) => setSelectedMilestoneId(id)}
               onDragStartItem={(id) => setDraggedItemId(id)}
@@ -405,15 +460,18 @@ export function TimelineView({
           item={selectedItem}
           doc={requirements}
           programIncrements={programIncrements}
+          milestones={milestones}
           team={team}
           diagramRoot={diagramRoot}
           onNavigateToNode={onNavigateToNode}
           onCreateLinkedNode={onCreateLinkedNode}
           onClose={() => setSelectedItemId(null)}
           onUpdateItem={onUpdateItem}
+          onConvertItemType={onConvertItemType}
           onDeleteItem={onDeleteItem}
           onNavigateToRequirement={onNavigateToRequirement}
           onSelectItem={(id) => setSelectedItemId(id)}
+          onSelectMilestone={(id) => setSelectedMilestoneId(id)}
           onCreateAndAssignCategory={onCreateAndAssignCategory}
           onDeleteCategory={onDeleteCategory}
           onAddRelationship={onAddRelationship}
@@ -635,6 +693,8 @@ interface BacklogSectionProps {
   team?: TeamDocument;
   draggedItemId: string | null;
   blockingItemIds?: Set<string>;
+  parentEpicByItemId?: Map<string, RequirementItem>;
+  filteredChildItemIds?: Set<string> | null;
   onSelectItem: (itemId: string) => void;
   onDragStartItem: (itemId: string) => void;
   onDragEndItem: () => void;
@@ -669,6 +729,8 @@ function BacklogSection({
   team,
   draggedItemId,
   blockingItemIds,
+  parentEpicByItemId,
+  filteredChildItemIds,
   onSelectItem,
   onDragStartItem,
   onDragEndItem,
@@ -711,8 +773,11 @@ function BacklogSection({
   };
 
   const q = query.trim().toLowerCase();
-  const filteredItems =
-    q === "" ? items : items.filter((item) => item.id.toLowerCase().includes(q) || item.title.toLowerCase().includes(q));
+  const filteredItems = items.filter((item) => {
+    if (filteredChildItemIds && !filteredChildItemIds.has(item.id)) return false;
+    if (q === "") return true;
+    return item.id.toLowerCase().includes(q) || item.title.toLowerCase().includes(q);
+  });
 
   return (
     <section className="backlog-section">
@@ -751,13 +816,14 @@ function BacklogSection({
           onDrop={handleDrop}
         >
           {filteredItems.length === 0 ? (
-            <p className="backlog-section__empty">No items match "{query.trim()}".</p>
+            <p className="backlog-section__empty">No backlog items match criteria.</p>
           ) : (
             filteredItems.map((item) => {
               const type = getItemType(requirements, item.typeId);
               const category = item.categoryId ? requirements.categories.find((c) => c.id === item.categoryId) : undefined;
               const isDragging = draggedItemId === item.id;
               const isBlocker = blockingItemIds?.has(item.id);
+              const parentEpic = parentEpicByItemId?.get(item.id);
               return (
                 <div
                   key={item.id}
@@ -790,6 +856,14 @@ function BacklogSection({
                     >
                       {item.id}
                     </span>
+                    {parentEpic && (
+                      <span
+                        className="pi-board-item__epic-badge"
+                        title={`Epic: ${parentEpic.id} ${parentEpic.title || ""}`}
+                      >
+                        {parentEpic.id}
+                      </span>
+                    )}
                     {isBlocker && (
                       <span
                         className="pi-board-item__blocker-badge"
@@ -809,7 +883,7 @@ function BacklogSection({
                   </div>
                   <div className="pi-board-item__title">{item.title || "Untitled"}</div>
                   <div className="pi-board-item__footer">
-                    {team && (
+                    {team && isItemWorkable(requirements, item) && (
                       <MemberPicker
                         team={team}
                         assigneeId={item.assigneeId}
@@ -818,11 +892,13 @@ function BacklogSection({
                         onClear={() => onUpdateItem(item.id, { assigneeId: undefined })}
                       />
                     )}
-                    <PointsPicker
-                      points={item.points}
-                      compact={true}
-                      onChange={(points) => onUpdateItem(item.id, { points })}
-                    />
+                    {isItemWorkable(requirements, item) && (
+                      <PointsPicker
+                        points={item.points}
+                        compact={true}
+                        onChange={(points) => onUpdateItem(item.id, { points })}
+                      />
+                    )}
                   </div>
                 </div>
               );
@@ -845,6 +921,8 @@ interface ProgramIncrementCardProps {
   draggedItemId: string | null;
   blockingItemIds: Set<string>;
   sprintRangesByItemId: Map<string, { startDate: string; endDate: string }>;
+  parentEpicByItemId?: Map<string, RequirementItem>;
+  filteredChildItemIds?: Set<string> | null;
   onSelectItem: (itemId: string) => void;
   onSelectMilestone?: (id: string) => void;
   onDragStartItem: (itemId: string) => void;
@@ -873,6 +951,8 @@ function ProgramIncrementCard({
   draggedItemId,
   blockingItemIds,
   sprintRangesByItemId,
+  parentEpicByItemId,
+  filteredChildItemIds,
   onSelectItem,
   onSelectMilestone,
   onDragStartItem,
@@ -1067,6 +1147,8 @@ function ProgramIncrementCard({
                 sprint={sprint}
                 range={rangeBySprintId.get(sprint.id)}
                 itemCount={itemsBySprintId.get(sprint.id)?.length ?? 0}
+                milestones={milestones}
+                requirements={requirements}
                 isFirst={index === 0}
                 isLast={index === pi.sprints.length - 1}
                 onUpdateName={(name) => onUpdateSprintName(sprint.id, name)}
@@ -1106,6 +1188,8 @@ function ProgramIncrementCard({
                 blockingItemIds={blockingItemIds}
                 sprintRangesByItemId={sprintRangesByItemId}
                 reservations={pi.reservations}
+                parentEpicByItemId={parentEpicByItemId}
+                filteredChildItemIds={filteredChildItemIds}
                 onSelectItem={onSelectItem}
                 onSelectMilestone={onSelectMilestone}
                 onDragStartItem={onDragStartItem}
@@ -1144,6 +1228,8 @@ interface SprintBoardColumnProps {
   blockingItemIds: Set<string>;
   sprintRangesByItemId: Map<string, { startDate: string; endDate: string }>;
   reservations?: CapacityReservation[];
+  parentEpicByItemId?: Map<string, RequirementItem>;
+  filteredChildItemIds?: Set<string> | null;
   onSelectItem: (id: string) => void;
   onSelectMilestone?: (id: string) => void;
   onDragStartItem: (id: string) => void;
@@ -1165,6 +1251,8 @@ function SprintBoardColumn({
   blockingItemIds,
   sprintRangesByItemId,
   reservations,
+  parentEpicByItemId,
+  filteredChildItemIds,
   onSelectItem,
   onSelectMilestone,
   onDragStartItem,
@@ -1177,10 +1265,9 @@ function SprintBoardColumn({
   const [dropError, setDropError] = useState<string | null>(null);
   const dropErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const sprintMilestones = useMemo(() => {
-    if (!range || !milestones) return [];
-    return milestones.filter((m) => m.scheduledAt >= range.startDate && m.scheduledAt <= range.endDate);
-  }, [milestones, range]);
+  const sprintSummary = useMemo(() => {
+    return computeSprintMilestoneSummary(sprint, range, milestones, requirements);
+  }, [sprint, range, milestones, requirements]);
 
   const activeSprintReservations = getSprintActiveReservations(reservations, sprint.id);
 
@@ -1282,26 +1369,103 @@ function SprintBoardColumn({
 
         {capacitySummary && <SprintCapacityBar summary={capacitySummary} compact={true} />}
       </div>
-      {sprintMilestones.length > 0 && (
+      {(sprintSummary.directMilestones.length > 0 ||
+        sprintSummary.impactedReleases.length > 0 ||
+        sprintSummary.impactedEpics.length > 0 ||
+        sprintSummary.externalDependencies.length > 0) && (
         <div className="pi-board-column__milestones">
-          {sprintMilestones.map((m) => {
-            const color = getMilestoneColor(m);
-            const typeLabel = getMilestoneTypeLabel(m.type);
-            return (
-              <button
-                key={m.id}
-                type="button"
-                className="pi-board-column__milestone-pill"
-                style={{ borderColor: color, color }}
-                onClick={() => onSelectMilestone?.(m.id)}
-                title={`${typeLabel}: ${m.name} \u2022 Scheduled: ${m.scheduledAt}`}
-              >
-                <span className="pi-board-column__milestone-shape">◆</span>
-                <span className="pi-board-column__milestone-name">{m.name}</span>
-                {m.version && <span className="pi-board-column__milestone-ver">v{m.version}</span>}
-              </button>
-            );
-          })}
+          {(sprintSummary.directMilestones.length > 0 ||
+            sprintSummary.impactedReleases.length > 0 ||
+            sprintSummary.externalDependencies.length > 0) && (
+            <div className="pi-board-column__milestone-chips">
+              {sprintSummary.directMilestones.map((m) => {
+                const color = getMilestoneColor(m);
+                const typeLabel = getMilestoneTypeLabel(m.type);
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    className="pi-board-column__milestone-pill"
+                    style={{ borderColor: color, color }}
+                    onClick={() => onSelectMilestone?.(m.id)}
+                    title={`${typeLabel}: ${m.name} \u2022 Scheduled: ${m.scheduledAt}`}
+                  >
+                    <span className="pi-board-column__milestone-shape">◆</span>
+                    <span className="pi-board-column__milestone-name">{m.name}</span>
+                    {m.version && <span className="pi-board-column__milestone-ver">v{m.version}</span>}
+                  </button>
+                );
+              })}
+              {sprintSummary.impactedReleases.map((rel) => {
+                const mColor = getMilestoneColor(rel.milestone);
+                return (
+                  <button
+                    key={rel.milestone.id}
+                    type="button"
+                    className="pi-board-column__release-pill"
+                    style={{ borderColor: mColor, color: mColor }}
+                    onClick={() => onSelectMilestone?.(rel.milestone.id)}
+                    title={`Target Release: ${rel.milestone.name} (${rel.completedRelatedItemsCount}/${rel.totalRelatedItemsCount} completed \u2022 ${rel.relatedItemsInSprint.length} in this sprint)`}
+                  >
+                    <span className="pi-board-column__release-shape">📦</span>
+                    <span className="pi-board-column__release-name">{rel.milestone.name}</span>
+                    <span className="pi-board-column__release-progress">
+                      {rel.completedRelatedItemsCount}/{rel.totalRelatedItemsCount} ({rel.completionPercentage}%)
+                    </span>
+                  </button>
+                );
+              })}
+              {sprintSummary.externalDependencies.map((dep) => (
+                <button
+                  key={dep.id}
+                  type="button"
+                  className="pi-board-column__dep-pill"
+                  onClick={() => onSelectItem(dep.id)}
+                  title={`External Dependency: ${dep.id} ${dep.title || ""}`}
+                >
+                  <span className="pi-board-column__dep-icon">⚡</span>
+                  <span className="pi-board-column__dep-name">{dep.id}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {sprintSummary.impactedEpics.length > 0 && (
+            <div className="pi-board-column__epic-progress-list">
+              {sprintSummary.impactedEpics.map((epicInfo) => {
+                const isComplete = epicInfo.completionPercentage === 100;
+                return (
+                  <div
+                    key={epicInfo.epic.id}
+                    className={`pi-board-column__epic-progress-card${isComplete ? " is-complete" : ""}`}
+                    onClick={() => onSelectItem(epicInfo.epic.id)}
+                    title={`Epic: ${epicInfo.epic.id} - ${epicInfo.epic.title || "Untitled"}\n${epicInfo.completedChildrenCount}/${epicInfo.totalChildrenCount} completed (${epicInfo.completionPercentage}%)\n${epicInfo.itemsInSprint.length} item(s) in this sprint`}
+                  >
+                    <div className="pi-board-column__epic-progress-header">
+                      <span className="pi-board-column__epic-progress-title">
+                        <span style={{ color: "#a78bfa" }}>⚡</span>
+                        <span>{epicInfo.epic.id}</span>
+                        {epicInfo.epic.title && (
+                          <span className="pi-board-column__epic-progress-name">
+                            {epicInfo.epic.title}
+                          </span>
+                        )}
+                      </span>
+                      <span className="pi-board-column__epic-progress-metrics">
+                        {epicInfo.completedChildrenCount}/{epicInfo.totalChildrenCount} ({epicInfo.completionPercentage}%)
+                      </span>
+                    </div>
+                    <div className="pi-board-column__epic-progress-bar-bg">
+                      <div
+                        className="pi-board-column__epic-progress-bar-fill"
+                        style={{ width: `${Math.max(epicInfo.completionPercentage, 4)}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
       {dropConflict && (
@@ -1346,6 +1510,9 @@ function SprintBoardColumn({
             const isConflicted = conflictInfo?.severity === "blocked";
             const isAtRisk = conflictInfo?.severity === "risk";
             const isBlocker = blockingItemIds.has(item.id);
+            const parentEpic = parentEpicByItemId?.get(item.id);
+            const isFilteredOut = filteredChildItemIds && !filteredChildItemIds.has(item.id);
+            if (isFilteredOut) return null;
             return (
               <div
                 key={item.id}
@@ -1382,6 +1549,14 @@ function SprintBoardColumn({
                   >
                     {item.id}
                   </span>
+                  {parentEpic && (
+                    <span
+                      className="pi-board-item__epic-badge"
+                      title={`Epic: ${parentEpic.id} ${parentEpic.title || ""}`}
+                    >
+                      {parentEpic.id}
+                    </span>
+                  )}
                   {isBlocker && (
                     <span
                       className="pi-board-item__blocker-badge"
@@ -1419,7 +1594,7 @@ function SprintBoardColumn({
                 </div>
                 <div className="pi-board-item__title">{item.title || "Untitled"}</div>
                 <div className="pi-board-item__footer">
-                  {team && (
+                  {team && isItemWorkable(requirements, item) && (
                     <MemberPicker
                       team={team}
                       assigneeId={item.assigneeId}
@@ -1428,11 +1603,13 @@ function SprintBoardColumn({
                       onClear={() => onUpdateItem(item.id, { assigneeId: undefined })}
                     />
                   )}
-                  <PointsPicker
-                    points={item.points}
-                    compact={true}
-                    onChange={(points) => onUpdateItem(item.id, { points })}
-                  />
+                  {isItemWorkable(requirements, item) && (
+                    <PointsPicker
+                      points={item.points}
+                      compact={true}
+                      onChange={(points) => onUpdateItem(item.id, { points })}
+                    />
+                  )}
                 </div>
               </div>
             );
@@ -1447,6 +1624,8 @@ interface SprintRowProps {
   sprint: Sprint;
   range: { startDate: string; endDate: string } | undefined;
   itemCount: number;
+  milestones?: Milestone[];
+  requirements: RequirementsDocument;
   isFirst: boolean;
   isLast: boolean;
   onUpdateName: (name: string) => void;
@@ -1456,7 +1635,24 @@ interface SprintRowProps {
   onMoveDown: () => void;
 }
 
-function SprintRow({ sprint, range, itemCount, isFirst, isLast, onUpdateName, onUpdateEnd, onDelete, onMoveUp, onMoveDown }: SprintRowProps) {
+function SprintRow({
+  sprint,
+  range,
+  itemCount,
+  milestones = [],
+  requirements,
+  isFirst,
+  isLast,
+  onUpdateName,
+  onUpdateEnd,
+  onDelete,
+  onMoveUp,
+  onMoveDown,
+}: SprintRowProps) {
+  const sprintSummary = useMemo(() => {
+    return computeSprintMilestoneSummary(sprint, range, milestones, requirements);
+  }, [sprint, range, milestones, requirements]);
+
   return (
     <div className="sprint-row">
       <div className="sprint-row__reorder">
@@ -1479,6 +1675,30 @@ function SprintRow({ sprint, range, itemCount, isFirst, isLast, onUpdateName, on
         onChange={(e) => onUpdateEnd(e.target.value)}
       />
       <span className="sprint-row__duration">{sprint.durationDays}d</span>
+      {sprintSummary.directMilestones.length > 0 && (
+        <span
+          className="sprint-row__milestone-badge"
+          title={`${sprintSummary.directMilestones.length} milestone(s) in sprint: ${sprintSummary.directMilestones.map((m) => m.name).join(", ")}`}
+        >
+          ◆ {sprintSummary.directMilestones.length}
+        </span>
+      )}
+      {sprintSummary.impactedReleases.length > 0 && (
+        <span
+          className="sprint-row__release-badge"
+          title={`Impacts ${sprintSummary.impactedReleases.length} release(s): ${sprintSummary.impactedReleases.map((r) => r.milestone.name).join(", ")}`}
+        >
+          📦 {sprintSummary.impactedReleases.length}
+        </span>
+      )}
+      {sprintSummary.impactedEpics.length > 0 && (
+        <span
+          className="sprint-row__epic-badge"
+          title={`Contains work for ${sprintSummary.impactedEpics.length} epic(s): ${sprintSummary.impactedEpics.map((e) => `${e.epic.id} (${e.completedChildrenCount}/${e.totalChildrenCount})`).join(", ")}`}
+        >
+          ⚡ {sprintSummary.impactedEpics.length}
+        </span>
+      )}
       {itemCount > 0 && (
         <span className="sprint-row__item-count" title={`${itemCount} requirement item${itemCount === 1 ? "" : "s"} assigned`}>
           {itemCount}

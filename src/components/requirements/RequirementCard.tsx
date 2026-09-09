@@ -8,6 +8,7 @@ import { LinkedDiagramsSection } from "./LinkedDiagramsSection";
 import { RequirementEditor } from "./RequirementEditor";
 import { CategoryPicker } from "./CategoryPicker";
 import { StatusPicker } from "./StatusPicker";
+import { TypePicker } from "./TypePicker";
 import { SprintPicker } from "./SprintPicker";
 import { RelationshipManager } from "./RelationshipManager";
 import { MemberPicker } from "../team/MemberPicker";
@@ -35,6 +36,7 @@ interface RequirementCardProps {
   onNavigateToNode?: (path: DiagramPath, nodeId: string) => void;
   onCreateLinkedNode?: (itemId: string, label: string) => void;
   onUpdateItem: (id: string, patch: Partial<RequirementItem>) => void;
+  onConvertItemType?: (id: string, newTypeId: string) => void;
   onDeleteItem: (id: string) => void;
   onNavigateToItem: (itemId: string) => void;
   onCreateAndAssignCategory: (itemId: string, label: string) => void;
@@ -70,6 +72,7 @@ function RequirementCardImpl({
   onNavigateToNode,
   onCreateLinkedNode,
   onUpdateItem,
+  onConvertItemType,
   onDeleteItem,
   onNavigateToItem,
   onCreateAndAssignCategory,
@@ -107,6 +110,17 @@ function RequirementCardImpl({
           <span className="requirement-card__id" style={{ color: type?.color ?? "var(--chrome-text-dim)" }}>
             {item.id}
           </span>
+          <TypePicker
+            doc={doc}
+            typeId={item.typeId}
+            onChange={(newTypeId) => {
+              if (onConvertItemType) {
+                onConvertItemType(item.id, newTypeId);
+              } else {
+                onUpdateItem(item.id, { typeId: newTypeId } as any);
+              }
+            }}
+          />
           {peersHere.length > 0 && (
             <span className="requirement-card__peers" title={`${peersHere.map((p) => p.name).join(", ")} ${peersHere.length === 1 ? "is" : "are"} editing this`}>
               {peersHere.map((p) => (
@@ -135,7 +149,7 @@ function RequirementCardImpl({
               onClear={() => onUpdateItem(item.id, { sprintId: undefined })}
             />
           )}
-          {team && (
+          {team && isItemWorkable(doc, item) && (
             <MemberPicker
               team={team}
               assigneeId={item.assigneeId}
@@ -143,10 +157,12 @@ function RequirementCardImpl({
               onClear={() => onUpdateItem(item.id, { assigneeId: undefined })}
             />
           )}
-          <PointsPicker
-            points={item.points}
-            onChange={(points) => onUpdateItem(item.id, { points })}
-          />
+          {isItemWorkable(doc, item) && (
+            <PointsPicker
+              points={item.points}
+              onChange={(points) => onUpdateItem(item.id, { points })}
+            />
+          )}
           <button
             type="button"
             className="requirement-card__delete"

@@ -1,4 +1,4 @@
-import type { RequirementsDocument } from "./requirementsTypes.ts";
+import type { RequirementsDocument, RequirementItem } from "./requirementsTypes.ts";
 import { isItemWorkable } from "./requirementsRegistry.ts";
 
 export type BuiltInMilestoneType =
@@ -79,7 +79,9 @@ export interface Milestone {
   color?: string;
   /** Optional icon override (FR-001) */
   icon?: string;
-  /** Optional list of associated workable item IDs (FR-001, FR-007, 7.3) */
+  /** Generalized list of associated requirement item IDs (Tickets, Epics, Dependencies, etc.) */
+  relatedItemIds?: string[];
+  /** Backward compatibility alias for older payloads */
   relatedWorkableItemIds?: string[];
   /** ISO timestamp when created */
   createdAt?: string;
@@ -91,6 +93,14 @@ export interface Milestone {
 export interface MilestoneValidationError {
   field: keyof Milestone | "general";
   message: string;
+}
+
+/**
+ * Returns the normalized list of related item IDs for a milestone,
+ * checking both `relatedItemIds` and backward-compatible `relatedWorkableItemIds`.
+ */
+export function getMilestoneRelatedItemIds(milestone: Partial<Milestone>): string[] {
+  return sanitizeRelatedItemIds(milestone.relatedItemIds ?? milestone.relatedWorkableItemIds);
 }
 
 /**
@@ -131,19 +141,17 @@ export function validateMilestone(
     errors.push({ field: "type", message: "Milestone type must not be empty." });
   }
 
-  // Related workable items validation (Section 12)
-  if (milestone.relatedWorkableItemIds && requirementsDoc) {
-    const existingWorkableIds = new Set(
-      requirementsDoc.items
-        .filter((item) => isItemWorkable(requirementsDoc, item))
-        .map((item) => item.id)
-    );
+  // Related items validation (FR-005, Section 12)
+  const relatedIds = milestone.relatedItemIds ?? milestone.relatedWorkableItemIds;
+  if (relatedIds && requirementsDoc) {
+    const existingItemIds = new Set(requirementsDoc.items.map((item) => item.id));
 
-    for (const itemId of milestone.relatedWorkableItemIds) {
-      if (!existingWorkableIds.has(itemId)) {
+    for (const itemId of relatedIds) {
+      if (!existingItemIds.has(itemId)) {
+        const errorField: keyof Milestone = milestone.relatedItemIds !== undefined ? "relatedItemIds" : "relatedWorkableItemIds";
         errors.push({
-          field: "relatedWorkableItemIds",
-          message: `Referenced workable item '${itemId}' does not exist or is not workable.`,
+          field: errorField,
+          message: `Referenced requirement item '${itemId}' does not exist.`,
         });
       }
     }
@@ -153,7 +161,7 @@ export function validateMilestone(
 }
 
 /**
- * Ensures duplicate workable item IDs are stripped.
+ * Ensures duplicate item IDs are stripped.
  */
 export function sanitizeRelatedItemIds(ids: string[] | undefined): string[] {
   if (!ids || !Array.isArray(ids)) return [];
@@ -193,15 +201,68 @@ export function filterMilestonesByDateRange(
 }
 
 /**
- * Returns all milestones that reference a given workable item ID (FR-007, Section 13).
+ * Returns all milestones that reference a given requirement item ID (FR-005).
+ */
+export function findMilestonesForItem(
+  milestones: Milestone[],
+  itemId: string
+): Milestone[] {
+  return milestones.filter((m) => {
+    const ids = getMilestoneRelatedItemIds(m);
+    return ids.includes(itemId);
+  });
+}
+
+/**
+ * Returns all milestones that reference a given workable item ID (FR-007, Section 13, backwards-compatible alias).
  */
 export function findMilestonesForWorkableItem(
   milestones: Milestone[],
   workableItemId: string
 ): Milestone[] {
-  return milestones.filter(
-    (m) => m.relatedWorkableItemIds && m.relatedWorkableItemIds.includes(workableItemId)
-  );
+  return findMilestonesForItem(milestones, workableItemId);
+}
+
+/**
+ * Returns all RequirementItems linked to a given milestone.
+ */
+export function getMilestoneItems(
+  milestone: Milestone,
+  doc: RequirementsDocument
+): RequirementItem[] {
+  const ids = new Set(getMilestoneRelatedItemIds(milestone));
+  return doc.items.filter((item) => ids.has(item.id));
+}
+
+/**
+ * Returns workable items linked to a given milestone.
+ */
+export function getMilestoneWorkableItems(
+  milestone: Milestone,
+  doc: RequirementsDocument
+): RequirementItem[] {
+  return getMilestoneItems(milestone, doc).filter((item) => isItemWorkable(doc, item));
+}
+
+/**
+ * Returns non-workable items linked to a given milestone (e.g. Epics, Dependencies, Requirements, Goals).
+ */
+export function getMilestoneNonWorkableItems(
+  milestone: Milestone,
+  doc: RequirementsDocument
+): RequirementItem[] {
+  return getMilestoneItems(milestone, doc).filter((item) => !isItemWorkable(doc, item));
+}
+
+/**
+ * Returns items linked to a given milestone filtered by typeId (e.g. "epic", "dependency", "ticket").
+ */
+export function filterMilestoneItemsByType(
+  milestone: Milestone,
+  doc: RequirementsDocument,
+  typeId: string
+): RequirementItem[] {
+  return getMilestoneItems(milestone, doc).filter((item) => item.typeId === typeId);
 }
 
 /**

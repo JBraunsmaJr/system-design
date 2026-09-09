@@ -214,6 +214,7 @@ function parseMilestones(raw: unknown): Milestone[] {
     if (!entry || typeof entry !== "object") continue;
     const m = entry as Partial<Milestone>;
     if (typeof m.id !== "string" || typeof m.name !== "string" || typeof m.scheduledAt !== "string") continue;
+    const sanitizedIds = sanitizeRelatedItemIds(m.relatedItemIds ?? m.relatedWorkableItemIds);
     result.push({
       id: m.id,
       type: typeof m.type === "string" && m.type.trim() !== "" ? m.type : "release",
@@ -223,7 +224,8 @@ function parseMilestones(raw: unknown): Milestone[] {
       description: typeof m.description === "string" ? m.description : undefined,
       color: typeof m.color === "string" ? m.color : undefined,
       icon: typeof m.icon === "string" ? m.icon : undefined,
-      relatedWorkableItemIds: sanitizeRelatedItemIds(m.relatedWorkableItemIds),
+      relatedItemIds: sanitizedIds,
+      relatedWorkableItemIds: sanitizedIds,
       createdAt: typeof m.createdAt === "string" ? m.createdAt : undefined,
       updatedAt: typeof m.updatedAt === "string" ? m.updatedAt : undefined,
     });

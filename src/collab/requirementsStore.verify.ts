@@ -623,4 +623,66 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: RequirementsStore } {
   assert(snap.itemTypes.filter((t) => t.id === "custom-1").length === 1, "with no duplicate type left behind");
 }
 
+// === Part 26: item type conversion and batch transfer ===
+{
+  function verifyConversion(store: RequirementsStore, label: string) {
+    store.addCustomType("LegacyEpic", "LEP", "#8b5cf6", false);
+    const item1 = store.addItem("custom-1");
+    const item2 = store.addItem("custom-1");
+    store.updateItem(item1, { title: "Custom Item 1" });
+    store.updateItem(item2, { title: "Custom Item 2" });
+
+    // Single item convert
+    store.convertItemType(item1, "epic");
+    let snap = store.getSnapshot();
+    const convertedItem1 = snap.items.find((i) => i.id === item1);
+    assert(convertedItem1?.typeId === "epic", `[${label}] single item conversion updates typeId to epic`);
+    assert(convertedItem1?.title === "Custom Item 1", `[${label}] single item conversion preserves item title and data`);
+
+    // Deleting custom-1 is still refused because item2 is using it
+    assert(store.deleteCustomType("custom-1") === false, `[${label}] delete custom type refused when items remain`);
+
+    // Batch convert / transfer all items of custom-1 to dependency
+    const count = store.convertAllItemsOfType("custom-1", "dependency");
+    assert(count === 1, `[${label}] convertAllItemsOfType returns the number of converted items`);
+
+    snap = store.getSnapshot();
+    const convertedItem2 = snap.items.find((i) => i.id === item2);
+    assert(convertedItem2?.typeId === "dependency", `[${label}] item2 converted to dependency`);
+
+    // Now delete custom-1 succeeds
+    assert(store.deleteCustomType("custom-1") === true, `[${label}] delete custom type succeeds after all items transferred`);
+
+    // Workability transition test
+    const ticketId = store.addItem("ticket");
+    store.updateItem(ticketId, { status: "in-progress" });
+    // Convert to non-workable epic
+    store.convertItemType(ticketId, "epic");
+    snap = store.getSnapshot();
+    const epicTicket = snap.items.find((i) => i.id === ticketId);
+    assert(epicTicket?.typeId === "epic" && epicTicket?.status === undefined, `[${label}] converting workable item to non-workable clears status/points`);
+
+    // Convert back to workable ticket
+    store.convertItemType(ticketId, "ticket");
+    snap = store.getSnapshot();
+    const restoredTicket = snap.items.find((i) => i.id === ticketId);
+    assert(restoredTicket?.typeId === "ticket" && restoredTicket?.status === "todo", `[${label}] converting non-workable item to workable sets default status to todo`);
+  }
+
+  const localStore = createLocalRequirementsStore(seedDoc());
+  verifyConversion(localStore, "LocalStore");
+
+  const yjsStore = seedYjsStore().store;
+  verifyConversion(yjsStore, "YjsStore");
+
+  let adapterDoc = seedDoc();
+  const adapterStore = createAdapterRequirementsStore(
+    () => adapterDoc,
+    (updater) => {
+      adapterDoc = updater(adapterDoc);
+    }
+  );
+  verifyConversion(adapterStore, "AdapterStore");
+}
+
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);

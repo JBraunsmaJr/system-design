@@ -21,7 +21,22 @@ export interface MilestonesStore {
   deleteMilestone(id: string): void;
 
   /**
-   * Associates a workable item with a milestone (FR-007, AC-007).
+   * Associates an item with a milestone (FR-005).
+   */
+  addRelatedItem(milestoneId: string, itemId: string): void;
+
+  /**
+   * Disassociates an item from a milestone.
+   */
+  removeRelatedItem(milestoneId: string, itemId: string): void;
+
+  /**
+   * Replaces all related item associations for a milestone.
+   */
+  setRelatedItems(milestoneId: string, itemIds: string[]): void;
+
+  /**
+   * Associates a workable item with a milestone (FR-007, AC-007, alias for addRelatedItem).
    */
   addRelatedWorkableItem(milestoneId: string, workableItemId: string): void;
 
@@ -50,7 +65,7 @@ export function createLocalMilestonesStore(initial: Milestone[] = []): Milestone
     for (const listener of listeners) listener();
   };
 
-  return {
+  const store: MilestonesStore = {
     getSnapshot: () => milestones,
 
     subscribe: (listener) => {
@@ -60,13 +75,15 @@ export function createLocalMilestonesStore(initial: Milestone[] = []): Milestone
 
     addMilestone: (milestone) => {
       const now = new Date().toISOString();
+      const sanitized = sanitizeRelatedItemIds(milestone.relatedItemIds ?? milestone.relatedWorkableItemIds);
       const newMilestone: Milestone = {
         ...milestone,
         id: nextMilestoneId(milestone.type || "milestone"),
         type: milestone.type || "release",
         name: milestone.name.trim(),
         scheduledAt: milestone.scheduledAt,
-        relatedWorkableItemIds: sanitizeRelatedItemIds(milestone.relatedWorkableItemIds),
+        relatedItemIds: sanitized,
+        relatedWorkableItemIds: sanitized,
         createdAt: now,
         updatedAt: now,
       };
@@ -79,14 +96,16 @@ export function createLocalMilestonesStore(initial: Milestone[] = []): Milestone
       const now = new Date().toISOString();
       milestones = milestones.map((m) => {
         if (m.id !== id) return m;
+        const hasNewRelated = patch.relatedItemIds !== undefined || patch.relatedWorkableItemIds !== undefined;
+        const sanitized = hasNewRelated
+          ? sanitizeRelatedItemIds(patch.relatedItemIds ?? patch.relatedWorkableItemIds)
+          : (m.relatedItemIds ?? m.relatedWorkableItemIds);
         return {
           ...m,
           ...patch,
           name: patch.name !== undefined ? patch.name.trim() : m.name,
-          relatedWorkableItemIds:
-            patch.relatedWorkableItemIds !== undefined
-              ? sanitizeRelatedItemIds(patch.relatedWorkableItemIds)
-              : m.relatedWorkableItemIds,
+          relatedItemIds: sanitized,
+          relatedWorkableItemIds: sanitized,
           updatedAt: now,
         };
       });
@@ -98,47 +117,66 @@ export function createLocalMilestonesStore(initial: Milestone[] = []): Milestone
       notify();
     },
 
-    addRelatedWorkableItem: (milestoneId, workableItemId) => {
+    addRelatedItem: (milestoneId, itemId) => {
       milestones = milestones.map((m) => {
         if (m.id !== milestoneId) return m;
-        const current = m.relatedWorkableItemIds ?? [];
-        if (current.includes(workableItemId)) return m;
+        const current = m.relatedItemIds ?? m.relatedWorkableItemIds ?? [];
+        if (current.includes(itemId)) return m;
+        const updated = [...current, itemId];
         return {
           ...m,
-          relatedWorkableItemIds: [...current, workableItemId],
+          relatedItemIds: updated,
+          relatedWorkableItemIds: updated,
           updatedAt: new Date().toISOString(),
         };
       });
       notify();
     },
 
-    removeRelatedWorkableItem: (milestoneId, workableItemId) => {
+    removeRelatedItem: (milestoneId, itemId) => {
       milestones = milestones.map((m) => {
         if (m.id !== milestoneId) return m;
-        const current = m.relatedWorkableItemIds ?? [];
-        if (!current.includes(workableItemId)) return m;
+        const current = m.relatedItemIds ?? m.relatedWorkableItemIds ?? [];
+        if (!current.includes(itemId)) return m;
+        const updated = current.filter((id) => id !== itemId);
         return {
           ...m,
-          relatedWorkableItemIds: current.filter((id) => id !== workableItemId),
+          relatedItemIds: updated,
+          relatedWorkableItemIds: updated,
           updatedAt: new Date().toISOString(),
         };
       });
       notify();
     },
 
-    setRelatedWorkableItems: (milestoneId, workableItemIds) => {
-      const sanitized = sanitizeRelatedItemIds(workableItemIds);
+    setRelatedItems: (milestoneId, itemIds) => {
+      const sanitized = sanitizeRelatedItemIds(itemIds);
       milestones = milestones.map((m) => {
         if (m.id !== milestoneId) return m;
         return {
           ...m,
+          relatedItemIds: sanitized,
           relatedWorkableItemIds: sanitized,
           updatedAt: new Date().toISOString(),
         };
       });
       notify();
     },
+
+    addRelatedWorkableItem: (milestoneId, workableItemId) => {
+      store.addRelatedItem(milestoneId, workableItemId);
+    },
+
+    removeRelatedWorkableItem: (milestoneId, workableItemId) => {
+      store.removeRelatedItem(milestoneId, workableItemId);
+    },
+
+    setRelatedWorkableItems: (milestoneId, workableItemIds) => {
+      store.setRelatedItems(milestoneId, workableItemIds);
+    },
   };
+
+  return store;
 }
 
 /**
@@ -151,7 +189,7 @@ export function createAdapterMilestonesStore(
   // Listeners are informed whenever React state changes
   const listeners = new Set<() => void>();
 
-  return {
+  const store: MilestonesStore = {
     getSnapshot: () => getMilestones(),
 
     subscribe: (listener) => {
@@ -161,13 +199,15 @@ export function createAdapterMilestonesStore(
 
     addMilestone: (milestone) => {
       const now = new Date().toISOString();
+      const sanitized = sanitizeRelatedItemIds(milestone.relatedItemIds ?? milestone.relatedWorkableItemIds);
       const newMilestone: Milestone = {
         ...milestone,
         id: nextMilestoneId(milestone.type || "milestone"),
         type: milestone.type || "release",
         name: milestone.name.trim(),
         scheduledAt: milestone.scheduledAt,
-        relatedWorkableItemIds: sanitizeRelatedItemIds(milestone.relatedWorkableItemIds),
+        relatedItemIds: sanitized,
+        relatedWorkableItemIds: sanitized,
         createdAt: now,
         updatedAt: now,
       };
@@ -180,14 +220,16 @@ export function createAdapterMilestonesStore(
       setMilestones((prev) =>
         (prev ?? []).map((m) => {
           if (m.id !== id) return m;
+          const hasNewRelated = patch.relatedItemIds !== undefined || patch.relatedWorkableItemIds !== undefined;
+          const sanitized = hasNewRelated
+            ? sanitizeRelatedItemIds(patch.relatedItemIds ?? patch.relatedWorkableItemIds)
+            : (m.relatedItemIds ?? m.relatedWorkableItemIds);
           return {
             ...m,
             ...patch,
             name: patch.name !== undefined ? patch.name.trim() : m.name,
-            relatedWorkableItemIds:
-              patch.relatedWorkableItemIds !== undefined
-                ? sanitizeRelatedItemIds(patch.relatedWorkableItemIds)
-                : m.relatedWorkableItemIds,
+            relatedItemIds: sanitized,
+            relatedWorkableItemIds: sanitized,
             updatedAt: now,
           };
         })
@@ -198,51 +240,70 @@ export function createAdapterMilestonesStore(
       setMilestones((prev) => (prev ?? []).filter((m) => m.id !== id));
     },
 
-    addRelatedWorkableItem: (milestoneId, workableItemId) => {
+    addRelatedItem: (milestoneId, itemId) => {
       const now = new Date().toISOString();
       setMilestones((prev) =>
         (prev ?? []).map((m) => {
           if (m.id !== milestoneId) return m;
-          const current = m.relatedWorkableItemIds ?? [];
-          if (current.includes(workableItemId)) return m;
+          const current = m.relatedItemIds ?? m.relatedWorkableItemIds ?? [];
+          if (current.includes(itemId)) return m;
+          const updated = [...current, itemId];
           return {
             ...m,
-            relatedWorkableItemIds: [...current, workableItemId],
+            relatedItemIds: updated,
+            relatedWorkableItemIds: updated,
             updatedAt: now,
           };
         })
       );
     },
 
-    removeRelatedWorkableItem: (milestoneId, workableItemId) => {
+    removeRelatedItem: (milestoneId, itemId) => {
       const now = new Date().toISOString();
       setMilestones((prev) =>
         (prev ?? []).map((m) => {
           if (m.id !== milestoneId) return m;
-          const current = m.relatedWorkableItemIds ?? [];
-          if (!current.includes(workableItemId)) return m;
+          const current = m.relatedItemIds ?? m.relatedWorkableItemIds ?? [];
+          if (!current.includes(itemId)) return m;
+          const updated = current.filter((id) => id !== itemId);
           return {
             ...m,
-            relatedWorkableItemIds: current.filter((id) => id !== workableItemId),
+            relatedItemIds: updated,
+            relatedWorkableItemIds: updated,
             updatedAt: now,
           };
         })
       );
     },
 
-    setRelatedWorkableItems: (milestoneId, workableItemIds) => {
-      const sanitized = sanitizeRelatedItemIds(workableItemIds);
+    setRelatedItems: (milestoneId, itemIds) => {
+      const sanitized = sanitizeRelatedItemIds(itemIds);
       const now = new Date().toISOString();
       setMilestones((prev) =>
         (prev ?? []).map((m) => {
           if (m.id !== milestoneId) return m;
           return {
             ...m,
+            relatedItemIds: sanitized,
             relatedWorkableItemIds: sanitized,
             updatedAt: now,
           };
         })
       );
     },
+
+    addRelatedWorkableItem: (milestoneId, workableItemId) => {
+      store.addRelatedItem(milestoneId, workableItemId);
+    },
+
+    removeRelatedWorkableItem: (milestoneId, workableItemId) => {
+      store.removeRelatedItem(milestoneId, workableItemId);
+    },
+
+    setRelatedWorkableItems: (milestoneId, workableItemIds) => {
+      store.setRelatedItems(milestoneId, workableItemIds);
+    },
   };
+
+  return store;
 }

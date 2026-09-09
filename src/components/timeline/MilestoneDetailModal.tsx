@@ -13,6 +13,15 @@ import type { ProgramIncrement } from "../../domain/programIncrements";
 import { computeSprintDateRanges } from "../../domain/programIncrements";
 import { RequirementBody } from "../requirements/RequirementBody";
 
+function formatTypeFilterLabel(label: string): string {
+  const lower = label.toLowerCase();
+  if (lower === "dependency") return "Dependencies";
+  if (lower === "story") return "Stories";
+  if (label.endsWith("s") || label.endsWith("sh") || label.endsWith("ch") || label.endsWith("x") || label.endsWith("z")) return `${label}es`;
+  if (label.endsWith("y") && !/[aeiou]y$/i.test(label)) return `${label.slice(0, -1)}ies`;
+  return `${label}s`;
+}
+
 interface MilestoneDetailModalProps {
   milestone: Milestone;
   doc: RequirementsDocument;
@@ -43,6 +52,8 @@ export function MilestoneDetailModal({
   const [workableSearch, setWorkableSearch] = useState("");
   const [isAddingWork, setIsAddingWork] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+
+  const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>("all");
 
   const startEditing = () => {
     setName(milestone.name);
@@ -80,24 +91,38 @@ export function MilestoneDetailModal({
   );
   const typeLabel = getMilestoneTypeLabel(isEditing ? type : milestone.type);
 
-  // Workable items in requirements doc
-  const allWorkableItems = useMemo(
-    () => doc.items.filter((item) => isItemWorkable(doc, item)),
-    [doc]
+  // All items in requirements doc (workable and non-workable: Tickets, Epics, Dependencies, etc.)
+  const allDocItems = useMemo(() => doc.items, [doc]);
+
+  const uniqueItemTypes = useMemo(() => {
+    const map = new Map<string, (typeof doc.itemTypes)[number]>();
+    for (const t of doc.itemTypes) {
+      if (!map.has(t.id)) map.set(t.id, t);
+    }
+    return Array.from(map.values());
+  }, [doc.itemTypes]);
+
+  const currentRelatedIds = useMemo(
+    () => milestone.relatedItemIds ?? milestone.relatedWorkableItemIds ?? [],
+    [milestone.relatedItemIds, milestone.relatedWorkableItemIds]
   );
 
-  const relatedWorkableItems = useMemo(() => {
-    const ids = new Set(milestone.relatedWorkableItemIds ?? []);
-    return allWorkableItems.filter((item) => ids.has(item.id));
-  }, [allWorkableItems, milestone.relatedWorkableItemIds]);
+  const relatedItems = useMemo(() => {
+    const ids = new Set(currentRelatedIds);
+    return allDocItems.filter((item) => ids.has(item.id));
+  }, [allDocItems, currentRelatedIds]);
 
-  const availableWorkableToAdd = useMemo(() => {
-    const existingIds = new Set(milestone.relatedWorkableItemIds ?? []);
+  const availableItemsToAdd = useMemo(() => {
+    const existingIds = new Set(currentRelatedIds);
     const q = workableSearch.trim().toLowerCase();
-    return allWorkableItems
+    return allDocItems
       .filter((item) => !existingIds.has(item.id))
-      .filter((item) => q === "" || item.id.toLowerCase().includes(q) || item.title.toLowerCase().includes(q));
-  }, [allWorkableItems, milestone.relatedWorkableItemIds, workableSearch]);
+      .filter((item) => {
+        if (selectedTypeFilter !== "all" && item.typeId !== selectedTypeFilter) return false;
+        if (q === "") return true;
+        return item.id.toLowerCase().includes(q) || item.title.toLowerCase().includes(q);
+      });
+  }, [allDocItems, currentRelatedIds, workableSearch, selectedTypeFilter]);
 
   // Map each workable item to its sprint date range if scheduled
   const sprintRangesBySprintId = useMemo(() => {
@@ -147,19 +172,21 @@ export function MilestoneDetailModal({
     setIsEditing(false);
   };
 
-  const handleAddRelatedWork = (itemId: string) => {
-    const current = milestone.relatedWorkableItemIds ?? [];
-    if (!current.includes(itemId)) {
+  const handleAddItem = (itemId: string) => {
+    if (!currentRelatedIds.includes(itemId)) {
+      const next = [...currentRelatedIds, itemId];
       onUpdateMilestone(milestone.id, {
-        relatedWorkableItemIds: [...current, itemId],
+        relatedItemIds: next,
+        relatedWorkableItemIds: next,
       });
     }
   };
 
-  const handleRemoveRelatedWork = (itemId: string) => {
-    const current = milestone.relatedWorkableItemIds ?? [];
+  const handleRemoveItem = (itemId: string) => {
+    const next = currentRelatedIds.filter((id) => id !== itemId);
     onUpdateMilestone(milestone.id, {
-      relatedWorkableItemIds: current.filter((id) => id !== itemId),
+      relatedItemIds: next,
+      relatedWorkableItemIds: next,
     });
   };
 
@@ -252,11 +279,13 @@ export function MilestoneDetailModal({
 
           <div className="milestone-detail-modal__meta-bar">
             <div className="milestone-detail-modal__meta-item">
-              <Calendar size={14} className="milestone-detail-modal__meta-icon" />
               {!isEditing ? (
-                <span>
-                  Scheduled: <strong>{milestone.scheduledAt}</strong>
-                </span>
+                <>
+                  <Calendar size={14} className="milestone-detail-modal__meta-icon" />
+                  <span>
+                    Scheduled: <strong>{milestone.scheduledAt}</strong>
+                  </span>
+                </>
               ) : (
                 <label className="milestone-detail-modal__inline-label">
                   Scheduled Date *:
@@ -345,11 +374,11 @@ export function MilestoneDetailModal({
             )}
           </div>
 
-          {/* Related Workable Items section (FR-007, AC-007, DR-005, DR-006) */}
+          {/* Associated Items section (FR-005, FR-007, AC-005, DR-005, DR-006) */}
           <div className="milestone-detail-modal__section">
             <div className="milestone-detail-modal__section-header">
               <h3 className="milestone-detail-modal__section-title">
-                Related Workable Items ({relatedWorkableItems.length})
+                Associated Requirement Items & Epics ({relatedItems.length})
               </h3>
               <button
                 type="button"
@@ -360,20 +389,45 @@ export function MilestoneDetailModal({
                 }}
               >
                 {isAddingWork ? <Check size={13} /> : <Plus size={13} />}
-                <span>{isAddingWork ? "Done" : "Add Work Item"}</span>
+                <span>{isAddingWork ? "Done" : "Add Associated Item"}</span>
               </button>
             </div>
 
             <p className="milestone-detail-modal__info-hint">
-              Work items contributing to this {typeLabel.toLowerCase()}. Associating work is informational and does not alter sprint capacity or item lifecycles.
+              Requirement items, Epics, external dependencies, or goals linked to this {typeLabel.toLowerCase()}.
             </p>
 
             {isAddingWork && (
               <div className="milestone-detail-modal__picker-box">
+                <div className="milestone-modal__type-filters">
+                  <button
+                    type="button"
+                    className={`milestone-modal__type-filter-btn${selectedTypeFilter === "all" ? " is-active" : ""}`}
+                    onClick={() => setSelectedTypeFilter("all")}
+                  >
+                    All Types
+                  </button>
+                  {uniqueItemTypes.map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      className={`milestone-modal__type-filter-btn${selectedTypeFilter === t.id ? " is-active" : ""}`}
+                      style={
+                        selectedTypeFilter === t.id
+                          ? { borderColor: t.color, color: t.color, backgroundColor: `${t.color}20` }
+                          : {}
+                      }
+                      onClick={() => setSelectedTypeFilter(t.id)}
+                    >
+                      {formatTypeFilterLabel(t.label)}
+                    </button>
+                  ))}
+                </div>
+
                 <input
                   type="text"
                   className="milestone-detail-modal__picker-search"
-                  placeholder="Search workable items by ID or title..."
+                  placeholder="Search requirement items by ID or title..."
                   value={workableSearch}
                   onChange={(e) => setWorkableSearch(e.target.value)}
                   onKeyDown={(e) => {
@@ -386,19 +440,19 @@ export function MilestoneDetailModal({
                   autoFocus
                 />
                 <div className="milestone-detail-modal__picker-list">
-                  {availableWorkableToAdd.length === 0 ? (
+                  {availableItemsToAdd.length === 0 ? (
                     <p className="milestone-detail-modal__picker-empty">
-                      {workableSearch.trim() ? "No matching workable items." : "All workable items are already associated."}
+                      {workableSearch.trim() ? "No matching items." : "All items in this filter are already associated."}
                     </p>
                   ) : (
-                    availableWorkableToAdd.map((item) => {
+                    availableItemsToAdd.map((item) => {
                       const itemType = getItemType(doc, item.typeId);
                       return (
                         <button
                           key={item.id}
                           type="button"
                           className="milestone-detail-modal__picker-item"
-                          onClick={() => handleAddRelatedWork(item.id)}
+                          onClick={() => handleAddItem(item.id)}
                           title={`${item.id}: ${item.title || "Untitled"}`}
                         >
                           <span
@@ -413,7 +467,7 @@ export function MilestoneDetailModal({
                           >
                             {item.title || "Untitled"}
                           </span>
-                          {item.points !== undefined && (
+                          {isItemWorkable(doc, item) && item.points !== undefined && (
                             <span className="milestone-detail-modal__item-pts">{item.points} pts</span>
                           )}
                         </button>
@@ -424,13 +478,13 @@ export function MilestoneDetailModal({
               </div>
             )}
 
-            {relatedWorkableItems.length === 0 ? (
+            {relatedItems.length === 0 ? (
               <p className="milestone-detail-modal__work-empty">
-                No workable items associated with this milestone yet. Standalone milestones without related work are fully supported.
+                No requirement items or epics associated with this milestone yet. Standalone milestones are fully supported.
               </p>
             ) : (
               <ul className="milestone-detail-modal__work-list">
-                {relatedWorkableItems.map((item) => {
+                {relatedItems.map((item) => {
                   const itemType = getItemType(doc, item.typeId);
                   const sprintSchedule = item.sprintId ? sprintRangesBySprintId.get(item.sprintId) : undefined;
                   return (
@@ -487,7 +541,7 @@ export function MilestoneDetailModal({
                         <button
                           type="button"
                           className="milestone-detail-modal__remove-work-btn"
-                          onClick={() => handleRemoveRelatedWork(item.id)}
+                          onClick={() => handleRemoveItem(item.id)}
                           title={`Unlink ${item.id} from this milestone`}
                           aria-label={`Unlink ${item.id}`}
                         >

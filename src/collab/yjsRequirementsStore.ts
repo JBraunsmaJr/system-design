@@ -536,6 +536,52 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
       });
     },
 
+    convertItemType: (id, newTypeId) => {
+      const storageKey = displayIdToStorageKey.get(id);
+      const m = storageKey ? items.get(storageKey) : undefined;
+      if (!m) return;
+      const targetTypeMap = itemTypes.get(newTypeId);
+      if (!targetTypeMap) return;
+      const isWorkable = (targetTypeMap.get("isWorkable") as boolean) ?? false;
+      doc.transact(() => {
+        m.set("typeId", newTypeId);
+        if (isWorkable) {
+          if (!m.get("status")) m.set("status", "todo");
+        } else {
+          m.set("status", undefined);
+          m.set("points", undefined);
+          m.set("assigneeId", undefined);
+          m.set("sprintId", undefined);
+        }
+      });
+    },
+
+    convertAllItemsOfType: (fromTypeId, toTypeId) => {
+      if (fromTypeId === toTypeId) return 0;
+      const targetTypeMap = itemTypes.get(toTypeId);
+      if (!targetTypeMap) return 0;
+      const isWorkable = (targetTypeMap.get("isWorkable") as boolean) ?? false;
+      let count = 0;
+      doc.transact(() => {
+        for (const storageKey of itemOrder.toArray()) {
+          const m = items.get(storageKey);
+          if (m && m.get("typeId") === fromTypeId) {
+            m.set("typeId", toTypeId);
+            if (isWorkable) {
+              if (!m.get("status")) m.set("status", "todo");
+            } else {
+              m.set("status", undefined);
+              m.set("points", undefined);
+              m.set("assigneeId", undefined);
+              m.set("sprintId", undefined);
+            }
+            count++;
+          }
+        }
+      });
+      return count;
+    },
+
     deleteItem: (id) => {
       const storageKey = displayIdToStorageKey.get(id);
       if (!storageKey) return;

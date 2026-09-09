@@ -31,6 +31,10 @@ export interface RequirementsStore {
    * scroll to / focus the new item immediately after creating it. */
   addItem(typeId: string): string;
   updateItem(id: string, patch: Partial<Omit<RequirementItem, "id" | "typeId">>): void;
+  /** Converts an existing item to a different type, adjusting workable fields as needed */
+  convertItemType(id: string, newTypeId: string): void;
+  /** Converts all items using fromTypeId to toTypeId and returns the count of converted items */
+  convertAllItemsOfType(fromTypeId: string, toTypeId: string): number;
   /** Also removes any relationship touching this item on either side -
    * matching all three existing deleteItem call sites' "orphaned
    * reference" cleanup. */
@@ -120,6 +124,50 @@ export function createLocalRequirementsStore(
     updateItem: (id, patch) => {
       doc = { ...doc, items: doc.items.map((i) => (i.id === id ? { ...i, ...patch } : i)) };
       notify();
+    },
+
+    convertItemType: (id, newTypeId) => {
+      const targetType = doc.itemTypes.find((t) => t.id === newTypeId);
+      if (!targetType) return;
+      doc = {
+        ...doc,
+        items: doc.items.map((item) => {
+          if (item.id !== id) return item;
+          return {
+            ...item,
+            typeId: newTypeId,
+            status: targetType.isWorkable ? (item.status ?? "todo") : undefined,
+            points: targetType.isWorkable ? item.points : undefined,
+            assigneeId: targetType.isWorkable ? item.assigneeId : undefined,
+            sprintId: targetType.isWorkable ? item.sprintId : undefined,
+          };
+        }),
+      };
+      notify();
+    },
+
+    convertAllItemsOfType: (fromTypeId, toTypeId) => {
+      if (fromTypeId === toTypeId) return 0;
+      const targetType = doc.itemTypes.find((t) => t.id === toTypeId);
+      if (!targetType) return 0;
+      let count = 0;
+      doc = {
+        ...doc,
+        items: doc.items.map((item) => {
+          if (item.typeId !== fromTypeId) return item;
+          count++;
+          return {
+            ...item,
+            typeId: toTypeId,
+            status: targetType.isWorkable ? (item.status ?? "todo") : undefined,
+            points: targetType.isWorkable ? item.points : undefined,
+            assigneeId: targetType.isWorkable ? item.assigneeId : undefined,
+            sprintId: targetType.isWorkable ? item.sprintId : undefined,
+          };
+        }),
+      };
+      if (count > 0) notify();
+      return count;
     },
 
     deleteItem: (id) => {
@@ -265,6 +313,52 @@ export function createAdapterRequirementsStore(
         ...prev,
         items: prev.items.map((i) => (i.id === id ? { ...i, ...patch } : i)),
       }));
+    },
+
+    convertItemType: (id, newTypeId) => {
+      setSnapshot((prev) => {
+        const targetType = prev.itemTypes.find((t) => t.id === newTypeId);
+        if (!targetType) return prev;
+        return {
+          ...prev,
+          items: prev.items.map((item) => {
+            if (item.id !== id) return item;
+            return {
+              ...item,
+              typeId: newTypeId,
+              status: targetType.isWorkable ? (item.status ?? "todo") : undefined,
+              points: targetType.isWorkable ? item.points : undefined,
+              assigneeId: targetType.isWorkable ? item.assigneeId : undefined,
+              sprintId: targetType.isWorkable ? item.sprintId : undefined,
+            };
+          }),
+        };
+      });
+    },
+
+    convertAllItemsOfType: (fromTypeId, toTypeId) => {
+      if (fromTypeId === toTypeId) return 0;
+      let count = 0;
+      setSnapshot((prev) => {
+        const targetType = prev.itemTypes.find((t) => t.id === toTypeId);
+        if (!targetType) return prev;
+        return {
+          ...prev,
+          items: prev.items.map((item) => {
+            if (item.typeId !== fromTypeId) return item;
+            count++;
+            return {
+              ...item,
+              typeId: toTypeId,
+              status: targetType.isWorkable ? (item.status ?? "todo") : undefined,
+              points: targetType.isWorkable ? item.points : undefined,
+              assigneeId: targetType.isWorkable ? item.assigneeId : undefined,
+              sprintId: targetType.isWorkable ? item.sprintId : undefined,
+            };
+          }),
+        };
+      });
+      return count;
     },
 
     deleteItem: (id) => {

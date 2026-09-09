@@ -71,8 +71,14 @@ export function RelationshipManager({
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const verbOptions = useMemo(() => buildVerbOptions(doc), [doc]);
-  const [selectedVerb, setSelectedVerb] = useState<VerbOption | null>(null);
-  const activeVerb = selectedVerb ?? verbOptions[0] ?? null;
+  const [selectedVerbKey, setSelectedVerbKey] = useState<string | null>(null);
+  const activeVerb = useMemo(() => {
+    if (selectedVerbKey) {
+      const match = verbOptions.find((v) => `${v.typeId}::${v.direction}` === selectedVerbKey);
+      if (match) return match;
+    }
+    return verbOptions[0] ?? null;
+  }, [verbOptions, selectedVerbKey]);
 
   const existingRelationships = useMemo(() => getRelationshipsForItem(doc, itemId), [doc, itemId]);
 
@@ -102,7 +108,7 @@ export function RelationshipManager({
       { width: window.innerWidth, height: window.innerHeight }
     );
     setDropdownPos((prev) => (prev && prev.top === next.top && prev.left === next.left ? prev : next));
-  }, [isOpen, query, activeVerb]);
+  }, [isOpen, query, activeVerb, existingRelationships.length]);
 
   const reposition = useCallback(() => {
     const trigger = triggerRef.current;
@@ -122,9 +128,9 @@ export function RelationshipManager({
   useEffect(() => {
     if (!isOpen) return;
     const handler = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (triggerRef.current?.contains(target)) return;
-      if (dropdownRef.current?.contains(target)) return;
+      const path = event.composedPath();
+      if (triggerRef.current && path.includes(triggerRef.current)) return;
+      if (dropdownRef.current && path.includes(dropdownRef.current)) return;
       close();
     };
     document.addEventListener("mousedown", handler);
@@ -256,20 +262,23 @@ export function RelationshipManager({
             style={{ position: "fixed", top: dropdownPos.top, left: dropdownPos.left }}
           >
             <div className="relationship-manager__verbs">
-              {verbOptions.map((verb) => (
-                <button
-                  key={`${verb.typeId}-${verb.direction}`}
-                  type="button"
-                  className={`relationship-manager__verb${activeVerb === verb ? " active" : ""}`}
-                  style={activeVerb === verb ? { borderColor: verb.color, color: verb.color } : undefined}
-                  onClick={() => {
-                    setSelectedVerb(verb);
-                    setErrorMessage(null);
-                  }}
-                >
-                  {verb.displayLabel}
-                </button>
-              ))}
+              {verbOptions.map((verb) => {
+                const isActive = activeVerb?.typeId === verb.typeId && activeVerb?.direction === verb.direction;
+                return (
+                  <button
+                    key={`${verb.typeId}-${verb.direction}`}
+                    type="button"
+                    className={`relationship-manager__verb${isActive ? " active" : ""}`}
+                    style={isActive ? { borderColor: verb.color, color: verb.color } : undefined}
+                    onClick={() => {
+                      setSelectedVerbKey(`${verb.typeId}::${verb.direction}`);
+                      setErrorMessage(null);
+                    }}
+                  >
+                    {verb.displayLabel}
+                  </button>
+                );
+              })}
             </div>
             <input
               autoFocus
@@ -291,7 +300,7 @@ export function RelationshipManager({
                   key={item.id}
                   type="button"
                   className="relationship-manager__option"
-                  onMouseDown={(e) => {
+                  onClick={(e) => {
                     e.preventDefault();
                     if (!activeVerb) return;
                     const result =
@@ -302,7 +311,6 @@ export function RelationshipManager({
                       setErrorMessage(result);
                     } else {
                       setErrorMessage(null);
-                      setQuery("");
                     }
                   }}
                 >

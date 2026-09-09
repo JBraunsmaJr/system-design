@@ -11,6 +11,8 @@ export const BUILT_IN_ITEM_TYPES: RequirementItemType[] = [
   { id: "constraint", label: "Constraint", prefix: "CON", color: "#F2994A", isBuiltIn: true, isWorkable: false },
   { id: "assumption", label: "Assumption", prefix: "ASM", color: "#9061F9", isBuiltIn: true, isWorkable: false },
   { id: "risk", label: "Risk", prefix: "RISK", color: "#F0578C", isBuiltIn: true, isWorkable: false },
+  { id: "epic", label: "Epic", prefix: "EPIC", color: "#8b5cf6", isBuiltIn: true, isWorkable: false },
+  { id: "dependency", label: "Dependency", prefix: "DEP", color: "#f59e0b", isBuiltIn: true, isWorkable: false },
   { id: "ticket", label: "Ticket", prefix: "TICKET", color: "#22B8CF", isBuiltIn: true, isWorkable: true },
 ];
 
@@ -54,7 +56,9 @@ export function isItemWorkable(doc: RequirementsDocument, item: RequirementItem)
  * shown when viewing the relationship from the other item. */
 export const BUILT_IN_RELATIONSHIP_TYPES: RelationshipType[] = [
   { id: "relates-to", label: "Relates to", inverseLabel: "Relates to", color: "#8b90a0", isBuiltIn: true, isBlocking: false },
+  { id: "parent-of", label: "Parent of", inverseLabel: "Child of", color: "#8b5cf6", isBuiltIn: true, isBlocking: false },
   { id: "blocks", label: "Blocks", inverseLabel: "Is blocked by", color: "#F0578C", isBuiltIn: true, isBlocking: true },
+  { id: "depends-on", label: "Depends on", inverseLabel: "Depended on by", color: "#f59e0b", isBuiltIn: true, isBlocking: true },
   { id: "duplicates", label: "Duplicates", inverseLabel: "Is duplicated by", color: "#F2994A", isBuiltIn: true, isBlocking: false },
 ];
 

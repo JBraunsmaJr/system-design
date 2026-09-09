@@ -8,9 +8,15 @@ import {
   getMilestoneTypeLabel,
   filterMilestonesByDateRange,
   findMilestonesForWorkableItem,
+  findMilestonesForItem,
+  getMilestoneItems,
+  getMilestoneWorkableItems,
+  getMilestoneNonWorkableItems,
+  filterMilestoneItemsByType,
   getMilestoneCapacityWorkload,
   type Milestone,
 } from "./milestones";
+import { BUILT_IN_ITEM_TYPES, BUILT_IN_RELATIONSHIP_TYPES } from "./requirementsRegistry";
 import type { RequirementsDocument } from "./requirementsTypes";
 
 let failures = 0;
@@ -24,17 +30,16 @@ function assert(condition: boolean, message: string) {
 }
 
 const mockDoc: RequirementsDocument = {
-  itemTypes: [
-    { id: "ticket", label: "Ticket", prefix: "TICKET", color: "#22B8CF", isBuiltIn: true, isWorkable: true },
-    { id: "requirement", label: "Requirement", prefix: "REQ", color: "#5b7cfa", isBuiltIn: true, isWorkable: false },
-  ],
+  itemTypes: BUILT_IN_ITEM_TYPES,
   categories: [],
   items: [
     { id: "TICKET-1", typeId: "ticket", title: "Auth Feature", body: "", status: "todo" },
     { id: "TICKET-2", typeId: "ticket", title: "Database Migration", body: "", status: "todo" },
     { id: "REQ-1", typeId: "requirement", title: "Compliance Doc", body: "" },
+    { id: "EPIC-1", typeId: "epic", title: "User Onboarding Epic", body: "" },
+    { id: "DEP-1", typeId: "dependency", title: "Vendor SSO API", body: "" },
   ],
-  relationshipTypes: [],
+  relationshipTypes: BUILT_IN_RELATIONSHIP_TYPES,
   relationships: [],
   nextSequence: {},
 };
@@ -82,39 +87,27 @@ const mockDoc: RequirementsDocument = {
   assert(formatErrors.some((e) => e.field === "scheduledAt"), "non YYYY-MM-DD date format is rejected");
 }
 
-// --- Test 4: Related Workable Items Validation (AC-007, Section 12) ---
+// --- Test 4: Related Items Validation (FR-005, AC-005, Section 12) ---
 {
-  const releaseWithValidWork: Partial<Milestone> = {
+  const releaseWithValidItems: Partial<Milestone> = {
     type: "release",
     name: "Release 2.4",
     scheduledAt: "2026-09-30",
-    relatedWorkableItemIds: ["TICKET-1", "TICKET-2"],
+    relatedItemIds: ["TICKET-1", "TICKET-2", "REQ-1"],
   };
-  const errors = validateMilestone(releaseWithValidWork, mockDoc);
-  assert(errors.length === 0, "referencing existing workable items passes validation");
+  const errors = validateMilestone(releaseWithValidItems, mockDoc);
+  assert(errors.length === 0, "referencing existing workable and non-workable items passes validation");
 
   const releaseWithNonexistentWork: Partial<Milestone> = {
     type: "release",
     name: "Release 2.4",
     scheduledAt: "2026-09-30",
-    relatedWorkableItemIds: ["TICKET-999"],
+    relatedItemIds: ["TICKET-999"],
   };
   const nonExistErrors = validateMilestone(releaseWithNonexistentWork, mockDoc);
   assert(
-    nonExistErrors.some((e) => e.field === "relatedWorkableItemIds"),
+    nonExistErrors.some((e) => e.field === "relatedItemIds" || e.field === "relatedWorkableItemIds"),
     "referencing non-existent item is rejected"
-  );
-
-  const releaseWithNonWorkableItem: Partial<Milestone> = {
-    type: "release",
-    name: "Release 2.4",
-    scheduledAt: "2026-09-30",
-    relatedWorkableItemIds: ["REQ-1"],
-  };
-  const nonWorkableErrors = validateMilestone(releaseWithNonWorkableItem, mockDoc);
-  assert(
-    nonWorkableErrors.some((e) => e.field === "relatedWorkableItemIds"),
-    "referencing non-workable item (REQ-1) is rejected"
   );
 }
 
@@ -170,6 +163,67 @@ const mockDoc: RequirementsDocument = {
   assert(getMilestoneColor(customMilestone) === "#123456", "returns custom color when specified");
   assert(getMilestoneTypeLabel("release") === "Release", "returns human readable label for release");
   assert(getMilestoneTypeLabel("code-freeze") === "Code Freeze", "returns human readable label for code-freeze");
+}
+
+// --- Test 10: Built-in Item Types & Relationship Types (FR-001, FR-002) ---
+{
+  const epicType = BUILT_IN_ITEM_TYPES.find((t) => t.id === "epic");
+  assert(
+    !!epicType && epicType.prefix === "EPIC" && epicType.isWorkable === false && epicType.color === "#8b5cf6",
+    "built-in epic item type is defined as non-workable with prefix EPIC"
+  );
+
+  const depType = BUILT_IN_ITEM_TYPES.find((t) => t.id === "dependency");
+  assert(
+    !!depType && depType.prefix === "DEP" && depType.isWorkable === false && depType.color === "#f59e0b",
+    "built-in dependency item type is defined as non-workable with prefix DEP"
+  );
+
+  const parentRel = BUILT_IN_RELATIONSHIP_TYPES.find((r) => r.id === "parent-of");
+  assert(
+    !!parentRel && parentRel.label === "Parent of" && parentRel.inverseLabel === "Child of" && parentRel.isBlocking === false,
+    "built-in parent-of relationship type is defined"
+  );
+
+  const dependsRel = BUILT_IN_RELATIONSHIP_TYPES.find((r) => r.id === "depends-on");
+  assert(
+    !!dependsRel && dependsRel.label === "Depends on" && dependsRel.inverseLabel === "Depended on by" && dependsRel.isBlocking === true,
+    "built-in depends-on relationship type is defined"
+  );
+}
+
+// --- Test 11: Milestone Related Item Helper Functions (FR-005) ---
+{
+  const milestone: Milestone = {
+    id: "m-test",
+    type: "release",
+    name: "Q4 Release",
+    scheduledAt: "2026-11-15",
+    relatedItemIds: ["EPIC-1", "DEP-1", "TICKET-1"],
+  };
+
+  const allItems = getMilestoneItems(milestone, mockDoc);
+  assert(allItems.length === 3, "getMilestoneItems returns all 3 linked items");
+
+  const workableItems = getMilestoneWorkableItems(milestone, mockDoc);
+  assert(
+    workableItems.length === 1 && workableItems[0]?.id === "TICKET-1",
+    "getMilestoneWorkableItems returns only workable items"
+  );
+
+  const nonWorkableItems = getMilestoneNonWorkableItems(milestone, mockDoc);
+  assert(
+    nonWorkableItems.length === 2 &&
+      nonWorkableItems.some((i) => i.id === "EPIC-1") &&
+      nonWorkableItems.some((i) => i.id === "DEP-1"),
+    "getMilestoneNonWorkableItems returns non-workable items (Epic and Dep)"
+  );
+
+  const epics = filterMilestoneItemsByType(milestone, mockDoc, "epic");
+  assert(epics.length === 1 && epics[0]?.id === "EPIC-1", "filterMilestoneItemsByType filters by epic");
+
+  const forDep = findMilestonesForItem([milestone], "DEP-1");
+  assert(forDep.length === 1 && forDep[0]?.id === "m-test", "findMilestonesForItem finds milestone linked to DEP-1");
 }
 
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);
