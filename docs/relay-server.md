@@ -203,7 +203,8 @@ an auth check would go, and no check:
 
 ```js
 server.on('upgrade', (request, socket, head) => {
-  // You may check auth of request here..
+    // You may check auth of request here..
+})
 ```
 
 Anyone who can reach the relay can subscribe to any topic, and **topics
