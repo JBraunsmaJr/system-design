@@ -319,8 +319,14 @@ export function RequirementDetailModal({
               itemId={item.id}
               itemTitle={item.title}
               linkedNodes={linkedNodes}
-              onNavigateToNode={onNavigateToNode}
-              onCreateLinkedNode={onCreateLinkedNode}
+              onNavigateToNode={(nodePath, nodeId) => {
+                onClose();
+                onNavigateToNode?.(nodePath, nodeId);
+              }}
+              onCreateLinkedNode={(itemId, label) => {
+                onClose();
+                onCreateLinkedNode?.(itemId, label);
+              }}
             />
           )}
         </div>

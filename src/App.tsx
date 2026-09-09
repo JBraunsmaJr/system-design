@@ -8,7 +8,6 @@ import {
   type Connection,
   type OnNodesChange,
   type OnEdgesChange,
-  type OnSelectionChangeFunc,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { Toolbar } from "./components/Toolbar";
@@ -759,6 +758,11 @@ function App() {
     };
   }, []);
 
+  const nodesRef = useRef(nodes);
+  useLayoutEffect(() => {
+    nodesRef.current = nodes;
+  }, [nodes]);
+
   const onNodesChange = useCallback<OnNodesChange<Node<ArchNodeData>>>(
     (changes) => {
       // Handled here, synchronously, rather than relying solely on
@@ -800,7 +804,7 @@ function App() {
       });
 
       const currentNodeGeometry = new Map<string, CurrentNodeGeometry>(
-        nodes.map((n) => [
+        nodesRef.current.map((n) => [
           n.id,
           { position: n.position, width: n.width, height: n.height, isAutoSized: isAutoSizedNodeType(n.type) },
         ])
@@ -810,7 +814,7 @@ function App() {
         if (pendingFlushHandle.current === null) {
           pendingFlushHandle.current = requestAnimationFrame(flushPendingNodeUpdates);
         }
-      } else {
+      } else if (pendingNodeUpdates.current.size > 0) {
         // The gesture just ended (dragging/resizing became false), or
         // this is a standalone change with no dragging flag at all (an
         // arrow-key nudge, or onNodeDragStop's own alignment-snap
@@ -824,7 +828,7 @@ function App() {
         flushPendingNodeUpdates();
       }
     },
-    [flushPendingNodeUpdates, nodes]
+    [flushPendingNodeUpdates]
   );
 
   // Edges have no position/dimensions concept, so the only thing this
@@ -885,6 +889,9 @@ function App() {
   // RequirementsView's focusItemId prop for how this actually triggers
   // the scroll-and-highlight once that view mounts.
   const [pendingRequirementFocus, setPendingRequirementFocus] = useState<string | null>(null);
+  const onFocusRequirementHandled = useCallback(() => {
+    setPendingRequirementFocus(null);
+  }, []);
   const onNavigateToRequirement = useCallback((itemId: string) => {
     setViewMode("requirements");
     setPendingRequirementFocus(itemId);
@@ -894,11 +901,16 @@ function App() {
   // (path is relative to root, see findLinkedNodes), and requests the
   // camera focus Canvas consumes via focusNodeId/onFocusHandled.
   const [pendingNodeFocus, setPendingNodeFocus] = useState<string | null>(null);
+  const onFocusNodeHandled = useCallback(() => {
+    setPendingNodeFocus(null);
+  }, []);
   const onNavigateToNode = useCallback(
     (nodePath: DiagramPath, nodeId: string) => {
       setViewMode("diagram");
       setPath(nodePath);
       setPendingNodeFocus(nodeId);
+      setSelectedNodeIds([nodeId]);
+      setSelectedEdgeIds([]);
     },
     [setViewMode]
   );
@@ -1066,11 +1078,6 @@ function App() {
     },
     [nodes, diagramStore]
   );
-
-  const onSelectionChange = useCallback<OnSelectionChangeFunc>(({ nodes: selNodes, edges: selEdges }) => {
-    setSelectedNodeIds(selNodes.map((n) => n.id));
-    setSelectedEdgeIds(selEdges.map((e) => e.id));
-  }, []);
 
   const onUpdateNode = useCallback(
     (id: string, patch: Partial<ArchNodeData>) => {
@@ -1827,7 +1834,6 @@ function App() {
               }
               onCursorMove={onCursorMove}
               onConnect={onConnect}
-              onSelectionChange={onSelectionChange}
               onAddNode={onAddNode}
               onAddGroup={onAddGroup}
               onAddText={onAddText}
@@ -1841,7 +1847,7 @@ function App() {
               presentation={presentation}
               previewFocus={previewFocus}
               focusNodeId={pendingNodeFocus}
-              onFocusHandled={() => setPendingNodeFocus(null)}
+              onFocusHandled={onFocusNodeHandled}
               onPresentNext={onPresentNext}
               onPresentPrev={onPresentPrev}
               onExitPresenting={onExitPresenting}
@@ -1922,7 +1928,7 @@ function App() {
             onNavigateToNode={onNavigateToNode}
             onCreateLinkedNode={onCreateLinkedNode}
             focusItemId={pendingRequirementFocus}
-            onFocusHandled={() => setPendingRequirementFocus(null)}
+            onFocusHandled={onFocusRequirementHandled}
             peers={activeSession ? presencePeers.filter((p) => p.viewMode === "requirements") : []}
             onFocusedItemChange={setFocusedItemId}
           />

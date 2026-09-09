@@ -27,7 +27,6 @@ import {
   type OnEdgesChange,
   type OnConnect,
   type OnConnectStart,
-  type OnSelectionChangeFunc,
   type OnNodeDrag,
   type NodeMouseHandler,
   type NodeTypes,
@@ -52,9 +51,38 @@ import { toAbsolutePosition } from "../domain/graphUtils";
 import { DRAG_MIME_TYPE, GROUP_DRAG_MIME_TYPE, TEXT_DRAG_MIME_TYPE, SHAPE_DRAG_MIME_TYPE, CODE_DRAG_MIME_TYPE } from "./Palette";
 import type { ArchNodeData, ArchEdgeData, Scenario, ScenarioStep } from "../domain/types";
 import type { PresenceInfo } from "../collab/session";
+import { CanvasContext, type CanvasContextValue } from "./CanvasContext";
 
-// edgeTypes now built inside the component via useMemo, so TypedEdge can
-// receive onUpdateEdge - see the factory near nodeTypes below.
+const CANVAS_NODE_TYPES: NodeTypes = {
+  typed: TypedNode,
+  group: GroupNode,
+  shape: ShapeNode,
+  text: TextNode,
+  code: CodeNode,
+};
+
+const CANVAS_EDGE_TYPES: EdgeTypes = {
+  typed: TypedEdge,
+};
+
+const DEFAULT_EDGE_OPTIONS = {
+  type: "typed",
+  markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16, color: "#98a2b3" },
+  markerStart: { type: MarkerType.ArrowClosed, width: 16, height: 16, color: "#98a2b3" },
+};
+
+const PRO_OPTIONS = { hideAttribution: true };
+
+function nodeToAlignBox(n: Node<ArchNodeData>, allNodes: Node<ArchNodeData>[]): AlignBox {
+  const absolute = toAbsolutePosition(n, allNodes, n.parentId);
+  return {
+    id: n.id,
+    x: absolute.x,
+    y: absolute.y,
+    width: n.width ?? n.measured?.width ?? 0,
+    height: n.height ?? n.measured?.height ?? 0,
+  };
+}
 
 // Fixed because the menu always holds the same four items - see
 // openContextMenu's clamping.
@@ -85,7 +113,6 @@ interface CanvasProps {
   onNodesChange: OnNodesChange<Node<ArchNodeData>>;
   onEdgesChange: OnEdgesChange<Edge<ArchEdgeData>>;
   onConnect: OnConnect;
-  onSelectionChange: OnSelectionChangeFunc;
   onAddNode: (typeId: string, position: { x: number; y: number }) => void;
   onAddGroup: (typeId: string, position: { x: number; y: number }) => void;
   /** Creates a text annotation and returns its id, so the caller can immediately put it into edit mode. */
@@ -138,7 +165,6 @@ export function Canvas({
   onNodesChange,
   onEdgesChange,
   onConnect,
-  onSelectionChange,
   onAddNode,
   onAddGroup,
   onAddText,
@@ -167,6 +193,10 @@ export function Canvas({
 }: CanvasProps) {
   const { screenToFlowPosition, getIntersectingNodes, fitView } = useReactFlow<Node<ArchNodeData>>();
   const updateNodeInternals = useUpdateNodeInternals();
+  const nodesRef = useRef(nodes);
+  useLayoutEffect(() => {
+    nodesRef.current = nodes;
+  }, [nodes]);
   const measuredNodeIdsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     const newIds = nodes.filter((n) => !measuredNodeIdsRef.current.has(n.id)).map((n) => n.id);
@@ -223,21 +253,6 @@ export function Canvas({
   // only while actively dragging a node, cleared as soon as the drag ends.
   const [alignmentGuides, setAlignmentGuides] = useState<AlignmentGuide[]>([]);
 
-
-  const toAlignBox = useCallback(
-    (n: Node<ArchNodeData>): AlignBox => {
-      const absolute = toAbsolutePosition(n, nodes, n.parentId);
-      return {
-        id: n.id,
-        x: absolute.x,
-        y: absolute.y,
-        width: n.width ?? n.measured?.width ?? 0,
-        height: n.height ?? n.measured?.height ?? 0,
-      };
-    },
-    [nodes]
-  );
-
   const onChangeTextNode = useCallback(
     (nodeId: string, text: string) => onUpdateNode(nodeId, { label: text }),
     [onUpdateNode]
@@ -248,54 +263,17 @@ export function Canvas({
     [onUpdateNode]
   );
 
-  // TypedNode/TextNode/ShapeNode/CodeNode need extra callbacks that aren't
-  // part of React Flow's own NodeProps - wrapping them here (rather than a
-  // stable module-level `nodeTypes` constant) is the standard way to thread
-  // those in. All disabled while presenting, since drilling in or editing
-  // text would break the locked slideshow view.
-  const nodeTypes = useMemo<NodeTypes>(
+  const canvasContextValue = useMemo<CanvasContextValue>(
     () => ({
-      typed: (props) => <TypedNode {...props} onDrillInto={isPresenting ? undefined : onDrillInto} />,
-      group: GroupNode,
-      shape: (props) => (
-        <ShapeNode
-          {...props}
-          isEditing={editingLabelNodeId === props.id}
-          onStartEditing={isPresenting ? undefined : setEditingLabelNodeId}
-          onFinishEditing={() => setEditingLabelNodeId(null)}
-          onChangeText={onChangeTextNode}
-        />
-      ),
-      text: (props) => (
-        <TextNode
-          {...props}
-          isEditing={editingLabelNodeId === props.id}
-          onStartEditing={isPresenting ? undefined : setEditingLabelNodeId}
-          onFinishEditing={() => setEditingLabelNodeId(null)}
-          onChangeText={onChangeTextNode}
-        />
-      ),
-      code: (props) => (
-        <CodeNode
-          {...props}
-          isEditing={editingLabelNodeId === props.id}
-          onStartEditing={isPresenting ? undefined : setEditingLabelNodeId}
-          onFinishEditing={() => setEditingLabelNodeId(null)}
-          onChangeCode={onChangeCodeNode}
-        />
-      ),
+      isPresenting,
+      onDrillInto,
+      editingLabelNodeId,
+      setEditingLabelNodeId,
+      onChangeTextNode,
+      onChangeCodeNode,
+      onUpdateEdge,
     }),
-    [isPresenting, onDrillInto, editingLabelNodeId, onChangeTextNode, onChangeCodeNode]
-  );
-
-  // TypedEdge needs onUpdateEdge to support dragging its label - disabled
-  // (label becomes non-draggable, falls back to the fixed anchor) while
-  // presenting, same as everything else that mutates the diagram.
-  const edgeTypes = useMemo<EdgeTypes>(
-    () => ({
-      typed: (props) => <TypedEdge {...props} onUpdateEdge={isPresenting ? undefined : onUpdateEdge} />,
-    }),
-    [isPresenting, onUpdateEdge]
+    [isPresenting, onDrillInto, editingLabelNodeId, onChangeTextNode, onChangeCodeNode, onUpdateEdge]
   );
 
   const pathKey = breadcrumbLabels.join(">");
@@ -391,23 +369,24 @@ export function Canvas({
 
   const getAlignmentCandidates = useCallback(
     (draggedNode: Node<ArchNodeData>) =>
-      nodes.filter((n) => {
+      nodesRef.current.filter((n) => {
         if (n.id === draggedNode.id) return false;
-        if (draggedNode.type === "group" && n.parentId === draggedNode.id) return false;
-        return true;
+        return !(draggedNode.type === "group" && n.parentId === draggedNode.id);
       }),
-    [nodes]
+    []
   );
 
   const onNodeDrag = useCallback<OnNodeDrag<Node<ArchNodeData>>>(
     (_event, draggedNode) => {
-      const boxes = [draggedNode, ...getAlignmentCandidates(draggedNode)].map(toAlignBox);
+      const boxes = [draggedNode, ...getAlignmentCandidates(draggedNode)].map((n) =>
+        nodeToAlignBox(n, nodesRef.current)
+      );
       const movingBox = boxes.find((b) => b.id === draggedNode.id);
       if (!movingBox) return;
       const { guides } = computeAlignment(movingBox, boxes);
       setAlignmentGuides(guides);
     },
-    [getAlignmentCandidates, toAlignBox]
+    [getAlignmentCandidates]
   );
 
   // Two symmetric cases here:
@@ -422,7 +401,9 @@ export function Canvas({
     (_event, draggedNode) => {
       setAlignmentGuides([]);
 
-      const boxes = [draggedNode, ...getAlignmentCandidates(draggedNode)].map(toAlignBox);
+      const boxes = [draggedNode, ...getAlignmentCandidates(draggedNode)].map((n) =>
+        nodeToAlignBox(n, nodesRef.current)
+      );
       const movingBox = boxes.find((b) => b.id === draggedNode.id);
       if (movingBox) {
         const { snapDx, snapDy } = computeAlignment(movingBox, boxes);
@@ -452,7 +433,7 @@ export function Canvas({
       const intersectingGroup = getIntersectingNodes(draggedNode).find((n) => n.type === "group");
       onReparentNode(draggedNode.id, intersectingGroup ? intersectingGroup.id : null);
     },
-    [getAlignmentCandidates, toAlignBox, onNodesChange, getIntersectingNodes, onReparentNode, onAdoptIntoGroup]
+    [getAlignmentCandidates, onNodesChange, getIntersectingNodes, onReparentNode, onAdoptIntoGroup]
   );
 
   const onNodeDoubleClick = useCallback<NodeMouseHandler<Node<ArchNodeData>>>(
@@ -482,24 +463,6 @@ export function Canvas({
    * on the canvas that moves when you pan.
    */
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; targetIds: string[] } | null>(null);
-
-  /**
-   * The node list as of the last committed render, read only from event
-   * handlers. This exists so openContextMenu can have stable identity:
-   * closing over `nodes` directly would give it a new identity on every
-   * frame of a drag, and React Flow passes onNodeContextMenu down to
-   * every memo'd NodeWrapper - so the whole graph would re-render each
-   * frame purely because a callback changed.
-   *
-   * Layout effect, not render-phase assignment, for the same reason as
-   * App.tsx's own refs: a render can be discarded, and a discarded
-   * render must not leave the ref pointing at nodes that were never
-   * committed.
-   */
-  const nodesRef = useRef(nodes);
-  useLayoutEffect(() => {
-    nodesRef.current = nodes;
-  }, [nodes]);
 
   const openContextMenu = useCallback(
     (event: ReactMouseEvent, nodeId: string | null) => {
@@ -647,11 +610,16 @@ export function Canvas({
   // already be rendered). Deliberately a separate effect, not folded into
   // the fitView effects above, so it can't change their existing,
   // already-correct coordination logic.
+  const onFocusHandledRef = useRef(onFocusHandled);
+  useLayoutEffect(() => {
+    onFocusHandledRef.current = onFocusHandled;
+  }, [onFocusHandled]);
+
   useEffect(() => {
     if (!focusNodeId) return;
-    const frame = requestAnimationFrame(() => onFocusHandled?.());
+    const frame = requestAnimationFrame(() => onFocusHandledRef.current?.());
     return () => cancelAnimationFrame(frame);
-  }, [focusNodeId, onFocusHandled]);
+  }, [focusNodeId]);
 
   const levelLabel = breadcrumbLabels.length === 0 ? "Root" : breadcrumbLabels.join(" › ");
 
@@ -666,186 +634,183 @@ export function Canvas({
   }, [onCursorMove]);
 
   return (
-    <div
-      className={`canvas${isSelectMode ? " is-select-mode" : ""}`}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
-      onDoubleClick={onCanvasDoubleClick}
-    >
-      <ReactFlow
-        nodes={displayNodes}
-        edges={displayEdges}
-        nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onConnect={handleConnect}
-        onConnectStart={onConnectStart}
-        onSelectionChange={onSelectionChange}
-        onNodeContextMenu={onNodeContextMenu}
-        onSelectionContextMenu={onSelectionContextMenu}
-        onPaneClick={closeContextMenu}
-        onMoveStart={closeContextMenu}
-        onNodeDrag={onNodeDrag}
-        onNodeDragStop={onNodeDragStop}
-        onNodeDoubleClick={onNodeDoubleClick}
-        onPaneMouseMove={handlePaneMouseMove}
-        onPaneMouseLeave={handlePaneMouseLeave}
-        defaultEdgeOptions={{
-          type: "typed",
-          markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16, color: "#98a2b3" },
-          markerStart: { type: MarkerType.ArrowClosed, width: 16, height: 16, color: "#98a2b3" },
-        }}
-        deleteKeyCode={null}
-        nodesDraggable={!isPresenting}
-        nodesConnectable={!isPresenting}
-        elementsSelectable={!isPresenting}
-        panOnDrag={!isSelectMode}
-        selectionOnDrag={isSelectMode}
-        selectionMode={SelectionMode.Partial}
-        fitView
-        proOptions={{ hideAttribution: true }}
+    <CanvasContext.Provider value={canvasContextValue}>
+      <div
+        className={`canvas${isSelectMode ? " is-select-mode" : ""}`}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
+        onDoubleClick={onCanvasDoubleClick}
       >
-        <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="rgba(255, 255, 255, 0.07)" />
-        {!isPresenting && peers.length > 0 && (
-          <ViewportPortal>
-            {peers.flatMap((peer) =>
-              displayNodes
-                .filter((n) => peer.selectedNodeIds.includes(n.id))
-                .map((n) => {
-                  // Same geometry the alignment guides already use (see
-                  // toAlignBox): ViewportPortal renders into the
-                  // viewport's own coordinate space, so a node inside a
-                  // group needs its ABSOLUTE position - n.position is
-                  // relative to its parent - and a content-sized node
-                  // has no explicit width/height at all, only a
-                  // measured one, so `n.width ?? 0` collapsed those
-                  // outlines to nothing.
-                  const box = toAlignBox(n);
-                  return (
-                    <div
-                      key={`${peer.clientId}-${n.id}`}
-                      className="peer-selection-outline"
-                      style={{
-                        left: box.x,
-                        top: box.y,
-                        width: box.width,
-                        height: box.height,
-                        borderColor: peer.color,
-                      }}
-                    >
-                      <span className="peer-selection-outline__label" style={{ backgroundColor: peer.color }}>
-                        {peer.name}
-                      </span>
-                    </div>
-                  );
-                })
-            )}
-            {peers
-              .filter((peer) => peer.cursor !== null)
-              .map((peer) => (
+        <ReactFlow
+          nodes={displayNodes}
+          edges={displayEdges}
+          nodeTypes={CANVAS_NODE_TYPES}
+          edgeTypes={CANVAS_EDGE_TYPES}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={handleConnect}
+          onConnectStart={onConnectStart}
+          onNodeContextMenu={onNodeContextMenu}
+          onSelectionContextMenu={onSelectionContextMenu}
+          onPaneClick={closeContextMenu}
+          onMoveStart={closeContextMenu}
+          onNodeDrag={onNodeDrag}
+          onNodeDragStop={onNodeDragStop}
+          onNodeDoubleClick={onNodeDoubleClick}
+          onPaneMouseMove={handlePaneMouseMove}
+          onPaneMouseLeave={handlePaneMouseLeave}
+          defaultEdgeOptions={DEFAULT_EDGE_OPTIONS}
+          deleteKeyCode={null}
+          nodesDraggable={!isPresenting}
+          nodesConnectable={!isPresenting}
+          elementsSelectable={!isPresenting}
+          panOnDrag={!isSelectMode}
+          selectionOnDrag={isSelectMode}
+          selectionMode={SelectionMode.Partial}
+          fitView
+          proOptions={PRO_OPTIONS}
+        >
+          <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="rgba(255, 255, 255, 0.07)" />
+          {!isPresenting && peers.length > 0 && (
+            <ViewportPortal>
+              {peers.flatMap((peer) =>
+                displayNodes
+                  .filter((n) => peer.selectedNodeIds.includes(n.id))
+                  .map((n) => {
+                    // Same geometry the alignment guides already use (see
+                    // toAlignBox): ViewportPortal renders into the
+                    // viewport's own coordinate space, so a node inside a
+                    // group needs its ABSOLUTE position - n.position is
+                    // relative to its parent - and a content-sized node
+                    // has no explicit width/height at all, only a
+                    // measured one, so `n.width ?? 0` collapsed those
+                    // outlines to nothing.
+                    const box = nodeToAlignBox(n, displayNodes);
+                    return (
+                      <div
+                        key={`${peer.clientId}-${n.id}`}
+                        className="peer-selection-outline"
+                        style={{
+                          left: box.x,
+                          top: box.y,
+                          width: box.width,
+                          height: box.height,
+                          borderColor: peer.color,
+                        }}
+                      >
+                        <span className="peer-selection-outline__label" style={{ backgroundColor: peer.color }}>
+                          {peer.name}
+                        </span>
+                      </div>
+                    );
+                  })
+              )}
+              {peers
+                .filter((peer) => peer.cursor !== null)
+                .map((peer) => (
+                  <div
+                    key={peer.clientId}
+                    className="peer-cursor"
+                    style={{ left: peer.cursor!.x, top: peer.cursor!.y }}
+                  >
+                    <MousePointer2 size={16} color={peer.color} fill={peer.color} />
+                    <span className="peer-cursor__label" style={{ backgroundColor: peer.color }}>
+                      {peer.name}
+                    </span>
+                  </div>
+                ))}
+            </ViewportPortal>
+          )}
+          {alignmentGuides.length > 0 && (
+            <ViewportPortal>
+              {alignmentGuides.map((guide, i) => (
                 <div
-                  key={peer.clientId}
-                  className="peer-cursor"
-                  style={{ left: peer.cursor!.x, top: peer.cursor!.y }}
-                >
-                  <MousePointer2 size={16} color={peer.color} fill={peer.color} />
-                  <span className="peer-cursor__label" style={{ backgroundColor: peer.color }}>
-                    {peer.name}
-                  </span>
-                </div>
+                  key={i}
+                  className="alignment-guide"
+                  style={
+                    guide.orientation === "vertical"
+                      ? { left: guide.position, top: guide.start, width: 0, height: guide.end - guide.start }
+                      : { top: guide.position, left: guide.start, width: guide.end - guide.start, height: 0 }
+                  }
+                />
               ))}
-          </ViewportPortal>
-        )}
-        {alignmentGuides.length > 0 && (
-          <ViewportPortal>
-            {alignmentGuides.map((guide, i) => (
-              <div
-                key={i}
-                className="alignment-guide"
-                style={
-                  guide.orientation === "vertical"
-                    ? { left: guide.position, top: guide.start, width: 0, height: guide.end - guide.start }
-                    : { top: guide.position, left: guide.start, width: guide.end - guide.start, height: 0 }
+            </ViewportPortal>
+          )}
+          {!isPresenting && (
+            <MiniMap
+              pannable
+              zoomable
+              className="canvas__minimap"
+              nodeColor="#3a3f4f"
+              maskColor="rgba(15, 17, 23, 0.65)"
+            />
+          )}
+          {!isPresenting && (
+            <Controls>
+              <ControlButton
+                onClick={onToggleSelectMode}
+                className={isSelectMode ? "is-active" : undefined}
+                title={
+                  isSelectMode
+                    ? "Select mode - drag to marquee-select. Click to switch back to pan."
+                    : "Pan mode - drag to move the canvas. Click to switch to select mode."
                 }
-              />
-            ))}
-          </ViewportPortal>
-        )}
-        {!isPresenting && (
-          <MiniMap
-            pannable
-            zoomable
-            className="canvas__minimap"
-            nodeColor="#3a3f4f"
-            maskColor="rgba(15, 17, 23, 0.65)"
-          />
-        )}
-        {!isPresenting && (
-          <Controls>
-            <ControlButton
-              onClick={onToggleSelectMode}
-              className={isSelectMode ? "is-active" : undefined}
-              title={
-                isSelectMode
-                  ? "Select mode - drag to marquee-select. Click to switch back to pan."
-                  : "Pan mode - drag to move the canvas. Click to switch to select mode."
-              }
-            >
-              <MousePointer2 size={13} />
-            </ControlButton>
-          </Controls>
-        )}
-        {!isPresenting && (
-          <Breadcrumb
-            labels={breadcrumbLabels}
-            onNavigateToRoot={onNavigateToRoot}
-            onNavigateToIndex={onNavigateToPathIndex}
-          />
-        )}
-        {presentation && (
-          <PresentationOverlay
-            scenario={presentation.scenario}
-            step={presentation.step}
-            stepIndex={presentation.stepIndex}
-            levelLabel={levelLabel}
-            onNext={onPresentNext}
-            onPrev={onPresentPrev}
-            onExit={onExitPresenting}
-          />
-        )}
-      </ReactFlow>
+              >
+                <MousePointer2 size={13} />
+              </ControlButton>
+            </Controls>
+          )}
+          {!isPresenting && (
+            <Breadcrumb
+              labels={breadcrumbLabels}
+              onNavigateToRoot={onNavigateToRoot}
+              onNavigateToIndex={onNavigateToPathIndex}
+            />
+          )}
+          {presentation && (
+            <PresentationOverlay
+              scenario={presentation.scenario}
+              step={presentation.step}
+              stepIndex={presentation.stepIndex}
+              levelLabel={levelLabel}
+              onNext={onPresentNext}
+              onPrev={onPresentPrev}
+              onExit={onExitPresenting}
+            />
+          )}
+        </ReactFlow>
 
-      {/* Portaled to document.body and fixed-positioned for the same
-          reason CollabPanel's dropdown is: React Flow's viewport is a
-          transformed, clipping ancestor, and a menu rendered inside it
-          would be scaled with the zoom and clipped at the pane edge. */}
-      {contextMenu &&
-        createPortal(
-          <div
-            className="canvas-context-menu"
-            style={{ position: "fixed", top: contextMenu.y, left: contextMenu.x, width: CONTEXT_MENU_WIDTH }}
-            role="menu"
-          >
-            <button type="button" role="menuitem" onClick={() => onZOrderCommand("front", contextMenu.targetIds)}>
-              <BringToFront size={13} />
-              Bring to front
-            </button>
-            <button type="button" role="menuitem" onClick={() => onZOrderCommand("forward", contextMenu.targetIds)}>
-              <ChevronUp size={13} />
-              Bring forward
-            </button>
-            <button type="button" role="menuitem" onClick={() => onZOrderCommand("backward", contextMenu.targetIds)}>
-              <ChevronDown size={13} />
-              Send backward
-            </button>
-            <button type="button" role="menuitem" onClick={() => onZOrderCommand("back", contextMenu.targetIds)}>
-              <SendToBack size={13} />
-              Send to back
-            </button>
-          </div>,
-          document.body
-        )}
-    </div>
+        {/* Portaled to document.body and fixed-positioned for the same
+            reason CollabPanel's dropdown is: React Flow's viewport is a
+            transformed, clipping ancestor, and a menu rendered inside it
+            would be scaled with the zoom and clipped at the pane edge. */}
+        {contextMenu &&
+          createPortal(
+            <div
+              className="canvas-context-menu"
+              style={{ position: "fixed", top: contextMenu.y, left: contextMenu.x, width: CONTEXT_MENU_WIDTH }}
+              role="menu"
+            >
+              <button type="button" role="menuitem" onClick={() => onZOrderCommand("front", contextMenu.targetIds)}>
+                <BringToFront size={13} />
+                Bring to front
+              </button>
+              <button type="button" role="menuitem" onClick={() => onZOrderCommand("forward", contextMenu.targetIds)}>
+                <ChevronUp size={13} />
+                Bring forward
+              </button>
+              <button type="button" role="menuitem" onClick={() => onZOrderCommand("backward", contextMenu.targetIds)}>
+                <ChevronDown size={13} />
+                Send backward
+              </button>
+              <button type="button" role="menuitem" onClick={() => onZOrderCommand("back", contextMenu.targetIds)}>
+                <SendToBack size={13} />
+                Send to back
+              </button>
+            </div>,
+            document.body
+          )}
+      </div>
+    </CanvasContext.Provider>
   );
 }
