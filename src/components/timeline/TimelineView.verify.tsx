@@ -84,6 +84,8 @@ const mockDoc: RequirementsDocument = {
   assert(!html.includes("pi-board-item__blocker-badge"), "No cards have pi-board-item__blocker-badge when no item is dragged");
   assert(html.includes("TICKET-1"), "TICKET-1 card is rendered in sprint-1");
   assert(html.includes("TICKET-2"), "TICKET-2 card is rendered in backlog");
+  assert(html.includes("Markers"), "Markers section header is rendered with 'Markers' title");
+  assert(html.includes("Add Marker"), "'Add Marker' button is rendered");
 }
 
 // --- Test 3: Clearing drag state removes all blocker highlighting and badges ---

@@ -43,7 +43,6 @@ export function AddMilestoneModal({
   const [name, setName] = useState("");
   const [type, setType] = useState(initialType);
   const [scheduledAt, setScheduledAt] = useState(initialDate || todayISO());
-  const [version, setVersion] = useState("");
   const [description, setDescription] = useState("");
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [itemSearch, setItemSearch] = useState("");
@@ -96,7 +95,6 @@ export function AddMilestoneModal({
       type,
       name: name.trim(),
       scheduledAt,
-      version: version.trim() !== "" ? version.trim() : undefined,
       description: description.trim() !== "" ? description.trim() : undefined,
       relatedItemIds: selectedItemIds.length > 0 ? selectedItemIds : undefined,
       relatedWorkableItemIds: selectedItemIds.length > 0 ? selectedItemIds : undefined,
@@ -153,7 +151,7 @@ export function AddMilestoneModal({
             </button>
           </div>
           <p className="add-milestone-modal__subtitle">
-            Schedule a point-in-time milestone on the timeline without consuming sprint capacity.
+            Schedule a point-in-time marker on the timeline without consuming sprint capacity.
           </p>
         </div>
 
@@ -163,7 +161,7 @@ export function AddMilestoneModal({
 
             <div className="add-milestone-modal__field">
               <label className="add-milestone-modal__label">
-                Milestone Type
+                Marker Type
               </label>
               <div className="add-milestone-modal__type-selector">
                 {BUILT_IN_MILESTONE_TYPES.map((t) => (
@@ -200,35 +198,19 @@ export function AddMilestoneModal({
               />
             </div>
 
-            <div className="add-milestone-modal__row">
-              <div className="add-milestone-modal__field add-milestone-modal__field--half">
-                <label className="add-milestone-modal__label" htmlFor="milestone-date">
-                  Scheduled Date *
-                </label>
-                <div className="add-milestone-modal__input-with-icon">
-                  <Calendar size={14} className="add-milestone-modal__field-icon" />
-                  <input
-                    id="milestone-date"
-                    type="date"
-                    className="add-milestone-modal__input"
-                    value={scheduledAt}
-                    onChange={(e) => setScheduledAt(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="add-milestone-modal__field add-milestone-modal__field--half">
-                <label className="add-milestone-modal__label" htmlFor="milestone-version">
-                  Version (Optional)
-                </label>
+            <div className="add-milestone-modal__field">
+              <label className="add-milestone-modal__label" htmlFor="milestone-date">
+                Scheduled Date *
+              </label>
+              <div className="add-milestone-modal__input-with-icon">
+                <Calendar size={14} className="add-milestone-modal__field-icon" />
                 <input
-                  id="milestone-version"
-                  type="text"
+                  id="milestone-date"
+                  type="date"
                   className="add-milestone-modal__input"
-                  placeholder="e.g. 2.4.0, 2026.09"
-                  value={version}
-                  onChange={(e) => setVersion(e.target.value)}
+                  value={scheduledAt}
+                  onChange={(e) => setScheduledAt(e.target.value)}
+                  required
                 />
               </div>
             </div>

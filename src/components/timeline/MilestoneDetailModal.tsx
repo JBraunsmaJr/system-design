@@ -47,7 +47,6 @@ export function MilestoneDetailModal({
   const [name, setName] = useState(milestone.name);
   const [scheduledAt, setScheduledAt] = useState(milestone.scheduledAt);
   const [type, setType] = useState(milestone.type || "release");
-  const [version, setVersion] = useState(milestone.version ?? "");
   const [description, setDescription] = useState(milestone.description ?? "");
   const [color, setColor] = useState(milestone.color ?? "");
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
@@ -61,7 +60,6 @@ export function MilestoneDetailModal({
     setName(milestone.name);
     setScheduledAt(milestone.scheduledAt);
     setType(milestone.type || "release");
-    setVersion(milestone.version ?? "");
     setDescription(milestone.description ?? "");
     setColor(milestone.color ?? "");
     setValidationError(null);
@@ -161,7 +159,6 @@ export function MilestoneDetailModal({
       name: name.trim(),
       scheduledAt,
       type,
-      version: version.trim() !== "" ? version.trim() : undefined,
       description: description.trim() !== "" ? description : undefined,
       color: color.trim() !== "" ? color.trim() : undefined,
     };
@@ -234,7 +231,7 @@ export function MilestoneDetailModal({
                   type="button"
                   className="milestone-detail-modal__btn milestone-detail-modal__btn--edit"
                   onClick={startEditing}
-                  title="Edit Milestone"
+                  title="Edit Marker"
                 >
                   <Edit3 size={14} />
                   <span>Edit</span>
@@ -266,7 +263,7 @@ export function MilestoneDetailModal({
             <h2 className="milestone-detail-modal__name">{milestone.name}</h2>
           ) : (
             <div className="milestone-detail-modal__edit-name-wrap">
-              <label className="milestone-detail-modal__input-label">Milestone Name *</label>
+              <label className="milestone-detail-modal__input-label">Marker Name *</label>
               <input
                 type="text"
                 className="milestone-detail-modal__input"
@@ -326,19 +323,6 @@ export function MilestoneDetailModal({
 
                 <div className="milestone-detail-modal__meta-item">
                   <label className="milestone-detail-modal__inline-label">
-                    Version:
-                    <input
-                      type="text"
-                      className="milestone-detail-modal__input milestone-detail-modal__input--sm"
-                      placeholder="e.g. 2.4.0"
-                      value={version}
-                      onChange={(e) => setVersion(e.target.value)}
-                    />
-                  </label>
-                </div>
-
-                <div className="milestone-detail-modal__meta-item">
-                  <label className="milestone-detail-modal__inline-label">
                     Color:
                     <input
                       type="color"
@@ -372,7 +356,7 @@ export function MilestoneDetailModal({
               <textarea
                 className="milestone-detail-modal__textarea"
                 rows={3}
-                placeholder="Describe the scope, objectives, or release notes for this milestone..."
+                placeholder="Describe the scope, objectives, or release notes for this marker..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />

@@ -4,6 +4,7 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MilestoneDetailModal } from "./MilestoneDetailModal";
+import { AddMilestoneModal } from "./AddMilestoneModal";
 import type { Milestone } from "../../domain/milestones";
 import type { RequirementsDocument } from "../../domain/requirementsTypes";
 
@@ -151,6 +152,21 @@ const mockDoc: RequirementsDocument = {
 
   assert(html.includes("View Item"), "View Item button is rendered when onSelectItem is provided");
   assert(html.includes(`title="Open T-1 details"`), "View Item button has title to open item details");
+}
+
+// --- Test 4: AddMilestoneModal does not render a version input field and uses Marker terminology ---
+{
+  const html = renderToStaticMarkup(
+    React.createElement(AddMilestoneModal, {
+      doc: mockDoc,
+      onClose: () => {},
+      onCreateMilestone: () => "m-new",
+    })
+  );
+
+  assert(!html.includes("Version (Optional)"), "AddMilestoneModal does not render Version (Optional) input");
+  assert(!html.includes('id="milestone-version"'), "AddMilestoneModal does not render milestone-version input");
+  assert(html.includes("Marker Type"), "AddMilestoneModal renders Marker Type label");
 }
 
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);

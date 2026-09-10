@@ -404,7 +404,7 @@ export function RequirementDetailModal({
 
           {linkedMilestones.length > 0 && (
             <div className="requirement-detail-modal__section" style={{ marginTop: "16px" }}>
-              <span className="requirement-detail-modal__desc-label">Linked Milestones & Releases</span>
+              <span className="requirement-detail-modal__desc-label">Linked Markers</span>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "6px" }}>
                 {linkedMilestones.map((m) => {
                   const mColor = getMilestoneColor(m);

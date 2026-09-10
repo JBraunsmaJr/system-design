@@ -1631,6 +1631,7 @@ function App() {
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if (isPresenting) return;
+      if (viewMode !== "diagram") return;
       if (event.key !== "Backspace" && event.key !== "Delete") return;
       const target = event.target as HTMLElement | null;
       const tag = target?.tagName;
@@ -1641,7 +1642,7 @@ function App() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [isPresenting, selectedNodeIds, selectedEdgeIds, onDeleteSelection]);
+  }, [isPresenting, viewMode, selectedNodeIds, selectedEdgeIds, onDeleteSelection]);
 
   const onUndo = useCallback(() => {
     if (isPresenting) return;
@@ -1659,25 +1660,34 @@ function App() {
 
   // Copy/paste: Ctrl+C / Cmd+C and Ctrl+V / Cmd+V, same guards as delete -
   // never while presenting, never while typing in a field (so normal text
-  // copy/paste inside the Inspector's inputs is completely unaffected).
+  // copy/paste inside the Inspector's inputs is completely unaffected), and
+  // never when text is highlighted/selected (so users can copy selected text
+  // from requirement items and elsewhere via standard clipboard).
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if (isPresenting) return;
       const target = event.target as HTMLElement | null;
       const tag = target?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) return;
+
+      const selection = window.getSelection();
+      const hasTextSelection = Boolean(selection && !selection.isCollapsed && selection.toString().length > 0);
+      if (hasTextSelection) return;
+
       const key = event.key.toLowerCase();
       if ((event.ctrlKey || event.metaKey) && key === "c") {
+        if (viewMode !== "diagram") return;
         event.preventDefault();
         onCopy();
       } else if ((event.ctrlKey || event.metaKey) && key === "v") {
+        if (viewMode !== "diagram") return;
         event.preventDefault();
         onPaste();
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [isPresenting, onCopy, onPaste]);
+  }, [isPresenting, viewMode, onCopy, onPaste]);
 
   // Undo/redo: Ctrl+Z / Cmd+Z, and BOTH common redo conventions - Ctrl+Y
   // (Windows-style) and Ctrl+Shift+Z (Mac/many web apps) - same guards as
@@ -1688,6 +1698,7 @@ function App() {
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if (isPresenting) return;
+      if (viewMode !== "diagram") return;
       const target = event.target as HTMLElement | null;
       const tag = target?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) return;
@@ -1706,7 +1717,7 @@ function App() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [isPresenting, onUndo, onRedo]);
+  }, [isPresenting, viewMode, onUndo, onRedo]);
 
   // Presentation navigation: arrow keys / space / escape.
   useEffect(() => {
