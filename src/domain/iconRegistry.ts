@@ -75,17 +75,112 @@ function getBuiltinTags(name: string): string[] {
   return tags;
 }
 
+const ALLOWED_SVG_TAGS = new Set([
+  "svg",
+  "g",
+  "path",
+  "circle",
+  "ellipse",
+  "line",
+  "rect",
+  "polygon",
+  "polyline",
+  "text",
+  "tspan",
+  "defs",
+  "clippath",
+  "mask",
+  "pattern",
+  "lineargradient",
+  "radialgradient",
+  "stop",
+  "use",
+  "symbol",
+]);
+
+const ALLOWED_SVG_ATTRS = new Set([
+  "id",
+  "class",
+  "viewbox",
+  "xmlns",
+  "version",
+  "width",
+  "height",
+  "x",
+  "y",
+  "x1",
+  "y1",
+  "x2",
+  "y2",
+  "cx",
+  "cy",
+  "r",
+  "rx",
+  "ry",
+  "d",
+  "points",
+  "fill",
+  "fill-opacity",
+  "fill-rule",
+  "stroke",
+  "stroke-width",
+  "stroke-linecap",
+  "stroke-linejoin",
+  "stroke-miterlimit",
+  "stroke-dasharray",
+  "stroke-dashoffset",
+  "stroke-opacity",
+  "opacity",
+  "transform",
+  "clip-path",
+  "clip-rule",
+  "mask",
+  "offset",
+  "stop-color",
+  "stop-opacity",
+  "gradientunits",
+  "gradienttransform",
+  "spreadmethod",
+  "font-family",
+  "font-size",
+  "font-weight",
+  "text-anchor",
+  "dominant-baseline",
+  "dx",
+  "dy",
+  "href",
+  "xlink:href",
+  "xml:space",
+]);
+
+function isDangerousHref(val: string): boolean {
+  const trimmed = val.trim().toLowerCase();
+  return (
+    trimmed.startsWith("javascript:") ||
+    trimmed.startsWith("vbscript:") ||
+    trimmed.startsWith("data:text/html")
+  );
+}
+
+function escapeAttributeValue(val: string): string {
+  return val
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 /**
- * Sanitizes an SVG string to prevent XSS / arbitrary script execution.
- * Removes <script> tags, inline javascript event handlers (e.g. onload, onclick),
- * javascript: hrefs, and dangerous elements like <object>, <embed>, <iframe>.
+ * Sanitizes an SVG string using a strict whitelist approach for both tags and attributes.
+ * Strips all script tags, foreignObject, iframe, embed, object, inline event handlers,
+ * and dangerous hrefs, handling nested evasions and arbitrary whitespace.
  */
 export function sanitizeSvg(svgContent: string): string {
   if (!svgContent || typeof svgContent !== "string") return "";
 
   let cleaned = svgContent;
 
-  // Multi-pass iterative sanitization loop to prevent incomplete multi-character evasion
+  // Multi-pass iterative sanitization loop to reach a safe fixed-point
   let previous: string;
   let iterations = 0;
   const MAX_ITERATIONS = 20;
@@ -94,27 +189,54 @@ export function sanitizeSvg(svgContent: string): string {
     previous = cleaned;
     iterations++;
 
-    // Remove XML declaration and doctype if present
+    // Remove XML declaration, doctype, and comments
     cleaned = cleaned.replace(/<\?xml[\s\S]*?\?>/gi, "");
     cleaned = cleaned.replace(/<!DOCTYPE[\s\S]*?>/gi, "");
     cleaned = cleaned.replace(/<!--[\s\S]*?-->/gi, "");
 
-    // Remove script tags and their content (handling whitespace in closing tags like </script >)
-    cleaned = cleaned.replace(/<script\b[\s\S]*?<\/\s*script\s*>/gi, "");
-    cleaned = cleaned.replace(/<\/?\s*script\b[^>]*>/gi, "");
+    // Remove block-level active content tags and anything inside them (including variations with whitespace)
+    cleaned = cleaned.replace(/<\s*script\b[\s\S]*?<\/\s*script\s*>/gi, "");
+    cleaned = cleaned.replace(/<\s*style\b[\s\S]*?<\/\s*style\s*>/gi, "");
+    cleaned = cleaned.replace(/<\s*foreignobject\b[\s\S]*?<\/\s*foreignobject\s*>/gi, "");
+    cleaned = cleaned.replace(/<\s*(?:object|embed|iframe|applet|link|meta|form|input|button|base|frame|frameset)\b[\s\S]*?<\/\s*(?:object|embed|iframe|applet|link|meta|form|input|button|base|frame|frameset)\s*>/gi, "");
 
-    // Remove dangerous tags and their content
-    cleaned = cleaned.replace(/<(object|embed|iframe|applet|link|meta|foreignObject|style|form|input|button|base|frame|frameset)\b[\s\S]*?<\/\s*\1\s*>/gi, "");
-    cleaned = cleaned.replace(/<\/?\s*(object|embed|iframe|applet|link|meta|foreignObject|style|form|input|button|base|frame|frameset)\b[^>]*>/gi, "");
+    // Tokenize and filter all remaining tags against the SVG element and attribute whitelists
+    cleaned = cleaned.replace(/<(\/)?([a-zA-Z0-9_:-]+)((?:\s+[^>]*)?)\/?>/gi, (match, isClosing, tagName, rawAttrs) => {
+      const lowerTag = tagName.toLowerCase();
+      if (!ALLOWED_SVG_TAGS.has(lowerTag)) {
+        return "";
+      }
 
-    // Remove inline event handlers: on*="..." or on*='...' or on*=...
-    cleaned = cleaned.replace(/(?:[\s/])on[a-z0-9_-]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, " ");
-    cleaned = cleaned.replace(/\bon[a-z0-9_-]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+      if (isClosing) {
+        return `</${lowerTag}>`;
+      }
 
-    // Remove href / xlink:href / src / formaction containing javascript:, vbscript:, or data:text/html
-    cleaned = cleaned.replace(/\s+(?:xlink:)?href\s*=\s*(?:"\s*(?:javascript:[^"]*|vbscript:[^"]*|data:text\/html[^"]*)"|'\s*(?:javascript:[^']*|vbscript:[^']*|data:text\/html[^']*)|(?:javascript:[^\s>]*|vbscript:[^\s>]*|data:text\/html[^\s>]*))/gi, "");
-    cleaned = cleaned.replace(/\s+src\s*=\s*(?:"\s*(?:javascript:[^"]*|vbscript:[^"]*|data:text\/html[^"]*)"|'\s*(?:javascript:[^']*|vbscript:[^']*|data:text\/html[^']*)|(?:javascript:[^\s>]*|vbscript:[^\s>]*|data:text\/html[^\s>]*))/gi, "");
-    cleaned = cleaned.replace(/\s+(?:action|formaction)\s*=\s*(?:"\s*(?:javascript:[^"]*|vbscript:[^"]*|data:text\/html[^"]*)"|'\s*(?:javascript:[^']*|vbscript:[^']*|data:text\/html[^']*)|(?:javascript:[^\s>]*|vbscript:[^\s>]*|data:text\/html[^\s>]*))/gi, "");
+      const isSelfClosing = match.trimEnd().endsWith("/>");
+      const cleanAttrs: string[] = [];
+
+      if (rawAttrs) {
+        const attrRegex = /([a-zA-Z0-9_:-]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
+        let attrMatch: RegExpExecArray | null;
+        while ((attrMatch = attrRegex.exec(rawAttrs)) !== null) {
+          const name = attrMatch[1];
+          const lowerName = name.toLowerCase();
+          const val = attrMatch[2] ?? attrMatch[3] ?? attrMatch[4] ?? "";
+
+          // Reject inline event handlers (on*) or non-whitelisted attributes
+          if (lowerName.startsWith("on")) continue;
+          if (!ALLOWED_SVG_ATTRS.has(lowerName) && !lowerName.startsWith("data-")) continue;
+
+          // Reject dangerous URI schemes in href / xlink:href / src
+          if ((lowerName === "href" || lowerName === "xlink:href" || lowerName === "src") && isDangerousHref(val)) {
+            continue;
+          }
+
+          cleanAttrs.push(`${name}="${escapeAttributeValue(val)}"`);
+        }
+      }
+
+      return `<${lowerTag}${cleanAttrs.length > 0 ? " " + cleanAttrs.join(" ") : ""}${isSelfClosing ? " />" : ">"}`;
+    });
   } while (cleaned !== previous && iterations < MAX_ITERATIONS);
 
   // If running in DOM environment (browser), apply DOMParser sanitization for full defense-in-depth
@@ -123,32 +245,34 @@ export function sanitizeSvg(svgContent: string): string {
       const parser = new DOMParser();
       const doc = parser.parseFromString(cleaned, "image/svg+xml");
       if (!doc.querySelector("parsererror")) {
-        const dangerousElements = doc.querySelectorAll("script, object, embed, iframe, applet, link, meta, foreignObject, style, form, input, button, base, frame, frameset");
-        dangerousElements.forEach((el) => el.remove());
+        const allElements = Array.from(doc.querySelectorAll("*"));
+        for (const el of allElements) {
+          const tag = el.tagName.toLowerCase();
+          if (!ALLOWED_SVG_TAGS.has(tag)) {
+            el.remove();
+            continue;
+          }
 
-        const allElements = doc.querySelectorAll("*");
-        allElements.forEach((el) => {
           const toRemove: string[] = [];
           for (let i = 0; i < el.attributes.length; i++) {
             const attr = el.attributes[i];
             const name = attr.name.toLowerCase();
             const val = attr.value.trim().toLowerCase();
-            if (name.startsWith("on")) {
+            if (name.startsWith("on") || (!ALLOWED_SVG_ATTRS.has(name) && !name.startsWith("data-"))) {
               toRemove.push(attr.name);
-            } else if ((name === "href" || name === "xlink:href" || name === "src" || name === "action" || name === "formaction") &&
-                       (val.startsWith("javascript:") || val.startsWith("data:text/html") || val.startsWith("vbscript:"))) {
+            } else if ((name === "href" || name === "xlink:href" || name === "src") && isDangerousHref(val)) {
               toRemove.push(attr.name);
             }
           }
           for (const attrName of toRemove) {
             el.removeAttribute(attrName);
           }
-        });
+        }
 
         cleaned = new XMLSerializer().serializeToString(doc.documentElement || doc);
       }
     } catch {
-      // Fallback to regex-cleaned result
+      // Fallback to tokenizer-cleaned result
     }
   }
 
@@ -164,8 +288,15 @@ export function isValidSvg(svg: string): boolean {
   if (!trimmed.toLowerCase().startsWith("<svg") || !trimmed.toLowerCase().endsWith("</svg>")) {
     return false;
   }
-  // Check for script tag remnants or dangerous elements
-  if (/<script/i.test(trimmed) || /<iframe/i.test(trimmed) || /<object/i.test(trimmed) || /<embed/i.test(trimmed) || /\bon[a-z0-9_-]+/i.test(trimmed)) {
+  // Check for script tag remnants, active content, or event handlers
+  if (
+    /<\s*\/?\s*script/i.test(trimmed) ||
+    /<\s*\/?\s*iframe/i.test(trimmed) ||
+    /<\s*\/?\s*object/i.test(trimmed) ||
+    /<\s*\/?\s*embed/i.test(trimmed) ||
+    /<\s*\/?\s*foreignobject/i.test(trimmed) ||
+    /\bon[a-z0-9_-]+\s*=/i.test(trimmed)
+  ) {
     return false;
   }
   return true;
