@@ -184,33 +184,6 @@ function escapeAttributeValue(val: string): string {
     .replace(/>/g, "&gt;");
 }
 
-function cleanDomNode(el: Element): void {
-  const tag = el.tagName.toLowerCase();
-  if (!ALLOWED_SVG_TAGS.has(tag)) {
-    el.remove();
-    return;
-  }
-
-  const toRemove: string[] = [];
-  for (let i = 0; i < el.attributes.length; i++) {
-    const attr = el.attributes[i];
-    const name = attr.name.toLowerCase();
-    const val = attr.value;
-    if (name.startsWith("on") || (!ALLOWED_SVG_ATTRS.has(name) && !name.startsWith("data-"))) {
-      toRemove.push(attr.name);
-    } else if ((name === "href" || name === "xlink:href" || name === "src") && isDangerousHref(val)) {
-      toRemove.push(attr.name);
-    }
-  }
-  for (const attrName of toRemove) {
-    el.removeAttribute(attrName);
-  }
-
-  const children = Array.from(el.children);
-  for (const child of children) {
-    cleanDomNode(child);
-  }
-}
 
 /**
  * Tokenizes raw SVG content and reconstructs it using only allowed tags and attributes.
@@ -369,24 +342,7 @@ function sanitizeSvgTokens(svgContent: string): string {
  */
 export function sanitizeSvg(svgContent: string): string {
   if (!svgContent || typeof svgContent !== "string") return "";
-
-  // If running in DOM environment (browser), apply DOMParser sanitization for full defense-in-depth
-  if (typeof DOMParser !== "undefined" && typeof XMLSerializer !== "undefined") {
-    try {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(svgContent, "image/svg+xml");
-      if (!doc.querySelector("parsererror")) {
-        const root = doc.documentElement;
-        if (root && root.nodeName.toLowerCase() === "svg") {
-          cleanDomNode(root);
-          return new XMLSerializer().serializeToString(root).trim();
-        }
-      }
-    } catch {
-      // Fallback to token-based sanitizer
-    }
-  }
-
+  // Avoid reparsing untrusted input with DOMParser; sanitize through strict token whitelist
   return sanitizeSvgTokens(svgContent);
 }
 
@@ -419,10 +375,7 @@ export function isValidSvg(svg: string): boolean {
       return false;
     }
   }
-  if (/\bon[a-z0-9_-]+\s*=/i.test(trimmed)) {
-    return false;
-  }
-  return true;
+  return !/\bon[a-z0-9_-]+\s*=/i.test(trimmed);
 }
 
 export class IconRegistry {
@@ -471,16 +424,6 @@ export class IconRegistry {
     }
 
     this.icons.set(definition.id, { ...definition });
-    this.notify();
-  }
-
-  public registerIcons(definitions: IconDefinition[]): void {
-    for (const def of definitions) {
-      if (def.source.type === "svg") {
-        def.source.data = sanitizeSvg(def.source.data);
-      }
-      this.icons.set(def.id, { ...def });
-    }
     this.notify();
   }
 
@@ -539,15 +482,8 @@ export class IconRegistry {
       if (icon.id.toLowerCase().includes(q)) return true;
       if (icon.category && icon.category.toLowerCase().includes(q)) return true;
       if (icon.libraryId && icon.libraryId.toLowerCase().includes(q)) return true;
-      if (icon.tags && icon.tags.some((tag) => tag.toLowerCase().includes(q))) return true;
-      return false;
+      return !!(icon.tags && icon.tags.some((tag) => tag.toLowerCase().includes(q)));
     });
-  }
-
-  public resetToBuiltins() {
-    this.icons.clear();
-    this.registerBuiltinIcons();
-    this.notify();
   }
 }
 
