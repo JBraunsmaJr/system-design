@@ -84,7 +84,7 @@ interface DiagramSnapshot {
   requirements: RequirementsDocument;
   programIncrements: ProgramIncrement[];
   team: TeamDocument;
-  milestones?: Milestone[];
+  milestones: Milestone[];
 }
 
 /**
@@ -269,12 +269,12 @@ function App() {
     (updater: Milestone[] | ((prev: Milestone[]) => Milestone[])) =>
       setDiagram((prev) => ({
         ...prev,
-        milestones: typeof updater === "function" ? (updater as (p: Milestone[]) => Milestone[])(prev.milestones ?? []) : updater,
+        milestones: typeof updater === "function" ? (updater as (p: Milestone[]) => Milestone[])(prev.milestones) : updater,
       })),
     [setDiagram]
   );
   const localMilestonesStore = useMemo(
-    () => createAdapterMilestonesStore(() => diagram.milestones ?? [], setMilestones),
+    () => createAdapterMilestonesStore(() => diagram.milestones, setMilestones),
     [diagram.milestones, setMilestones]
   );
 
