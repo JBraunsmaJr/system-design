@@ -976,7 +976,6 @@ function App() {
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [isPaletteCollapsed, setIsPaletteCollapsed] = useState(false);
   const [isInspectorCollapsed, setIsInspectorCollapsed] = useState(false);
-  const [scenarioPanelHeight, setScenarioPanelHeight] = useState(380);
 
   const onConnect = useCallback<(connection: Connection) => void>(
     (connection) => {
@@ -1430,13 +1429,38 @@ function App() {
     setActiveStepId(null);
   }, []);
 
+  // Falls back to the first scenario when nothing's been explicitly picked
+  // yet (e.g. right after loading a file, or before ever touching the
+  // dropdown) - this MUST match whatever ScenarioPanel displays, or the
+  // preview toggle silently does nothing while the panel looks fine. See
+  // the activeScenarioId prop passed to ScenarioPanel below - it receives
+  // this already-resolved id rather than the raw state, so there's only one
+  // place deciding the fallback.
+  const activeScenario = useMemo(
+    () => scenarios.find((s) => s.id === activeScenarioId) ?? scenarios[0] ?? null,
+    [scenarios, activeScenarioId]
+  );
+
   // Selecting a step in the list makes it both the editor's subject AND the
   // canvas preview target at once - clicking the same one again deselects,
   // which is how you get back to seeing the undimmed diagram without
-  // closing the panel.
-  const onSelectStep = useCallback((stepId: string) => {
-    setActiveStepId((cur) => (cur === stepId ? null : stepId));
-  }, []);
+  // closing the panel. When previewing a step that resides on a subdiagram,
+  // automatically navigate there just like during presentation.
+  const onSelectStep = useCallback(
+    (stepId: string) => {
+      setActiveStepId((cur) => {
+        if (cur === stepId) {
+          return null;
+        }
+        const step = activeScenario?.steps.find((st) => st.id === stepId);
+        if (step && step.path) {
+          setPath(step.path);
+        }
+        return stepId;
+      });
+    },
+    [activeScenario]
+  );
 
   // Captures whatever's currently selected on the canvas - AND which level
   // of the tree you're currently drilled into - as a new step. That's what
@@ -1561,18 +1585,6 @@ function App() {
       );
     },
     [setScenarios]
-  );
-
-  // Falls back to the first scenario when nothing's been explicitly picked
-  // yet (e.g. right after loading a file, or before ever touching the
-  // dropdown) - this MUST match whatever ScenarioPanel displays, or the
-  // preview toggle silently does nothing while the panel looks fine. See
-  // the activeScenarioId prop passed to ScenarioPanel below - it receives
-  // this already-resolved id rather than the raw state, so there's only one
-  // place deciding the fallback.
-  const activeScenario = useMemo(
-    () => scenarios.find((s) => s.id === activeScenarioId) ?? scenarios[0] ?? null,
-    [scenarios, activeScenarioId]
   );
 
   const previewFocus = useMemo(() => {
@@ -1869,7 +1881,7 @@ function App() {
       <div className="app__body">
         {viewMode === "diagram" && (
           <>
-        {!isPresenting && (
+        {!isPresenting && !isScenarioPanelOpen && (
           <div className={`app__sidebar-wrap app__sidebar-wrap--left${isPaletteCollapsed ? " is-collapsed" : ""}`}>
             {!isPaletteCollapsed && <Palette />}
             <button
@@ -1926,61 +1938,64 @@ function App() {
               onToggleSelectMode={() => setIsSelectMode((v) => !v)}
             />
           </ReactFlowProvider>
-          {!isPresenting && isScenarioPanelOpen && (
-            <ScenarioPanel
-              scenarios={scenarios}
-              activeScenarioId={activeScenario?.id ?? null}
-              onSelectScenario={onSelectScenario}
-              onCreateScenario={onCreateScenario}
-              onRenameScenario={onRenameScenario}
-              onDeleteScenario={onDeleteScenario}
-              onAddStep={onAddStep}
-              onAddSelectionToStep={onAddSelectionToStep}
-              onRemoveSelectionFromStep={onRemoveSelectionFromStep}
-              onUpdateStep={onUpdateStep}
-              onDeleteStep={onDeleteStep}
-              onMoveStep={onMoveStep}
-              onPresent={onStartPresenting}
-              canAddStep={canAddStep}
-              activeStepId={activeStepId}
-              onSelectStep={onSelectStep}
-              root={liveRoot}
-              currentPath={path}
-              height={scenarioPanelHeight}
-              onHeightChange={setScenarioPanelHeight}
-              onClose={() => {
-                setIsScenarioPanelOpen(false);
-                setActiveStepId(null);
-              }}
-            />
-          )}
         </div>
         {!isPresenting && (
           <div
-            className={`app__sidebar-wrap app__sidebar-wrap--right${isInspectorCollapsed ? " is-collapsed" : ""}`}
+            className={`app__sidebar-wrap app__sidebar-wrap--right${
+              !isScenarioPanelOpen && isInspectorCollapsed ? " is-collapsed" : ""
+            }`}
           >
-            <button
-              type="button"
-              className="app__sidebar-toggle app__sidebar-toggle--right"
-              onClick={() => setIsInspectorCollapsed((v) => !v)}
-              title={isInspectorCollapsed ? "Show inspector" : "Hide inspector"}
-              aria-label={isInspectorCollapsed ? "Show inspector" : "Hide inspector"}
-            >
-              {isInspectorCollapsed ? <ChevronLeft size={13} /> : <ChevronRight size={13} />}
-            </button>
-            {!isInspectorCollapsed && (
-              <Inspector
-                selectedNode={selectedNode}
-                selectedEdge={selectedEdge}
-                onUpdateNode={onUpdateNode}
-                onUpdateEdge={onUpdateEdge}
-                onDeleteNode={onDeleteNode}
-                onDeleteEdge={onDeleteEdge}
-                onDrillInto={onDrillInto}
-                requirements={requirementsSnapshot}
-                onNavigateToRequirement={onNavigateToRequirement}
-                onZOrderCommand={onZOrderCommand}
+            {isScenarioPanelOpen ? (
+              <ScenarioPanel
+                scenarios={scenarios}
+                activeScenarioId={activeScenario?.id ?? null}
+                onSelectScenario={onSelectScenario}
+                onCreateScenario={onCreateScenario}
+                onRenameScenario={onRenameScenario}
+                onDeleteScenario={onDeleteScenario}
+                onAddStep={onAddStep}
+                onAddSelectionToStep={onAddSelectionToStep}
+                onRemoveSelectionFromStep={onRemoveSelectionFromStep}
+                onUpdateStep={onUpdateStep}
+                onDeleteStep={onDeleteStep}
+                onMoveStep={onMoveStep}
+                onPresent={onStartPresenting}
+                canAddStep={canAddStep}
+                activeStepId={activeStepId}
+                onSelectStep={onSelectStep}
+                root={liveRoot}
+                currentPath={path}
+                onClose={() => {
+                  setIsScenarioPanelOpen(false);
+                  setActiveStepId(null);
+                }}
               />
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="app__sidebar-toggle app__sidebar-toggle--right"
+                  onClick={() => setIsInspectorCollapsed((v) => !v)}
+                  title={isInspectorCollapsed ? "Show inspector" : "Hide inspector"}
+                  aria-label={isInspectorCollapsed ? "Show inspector" : "Hide inspector"}
+                >
+                  {isInspectorCollapsed ? <ChevronLeft size={13} /> : <ChevronRight size={13} />}
+                </button>
+                {!isInspectorCollapsed && (
+                  <Inspector
+                    selectedNode={selectedNode}
+                    selectedEdge={selectedEdge}
+                    onUpdateNode={onUpdateNode}
+                    onUpdateEdge={onUpdateEdge}
+                    onDeleteNode={onDeleteNode}
+                    onDeleteEdge={onDeleteEdge}
+                    onDrillInto={onDrillInto}
+                    requirements={requirementsSnapshot}
+                    onNavigateToRequirement={onNavigateToRequirement}
+                    onZOrderCommand={onZOrderCommand}
+                  />
+                )}
+              </>
             )}
           </div>
         )}
