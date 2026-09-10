@@ -4,10 +4,13 @@ import type { RequirementsDocument } from "./requirementsTypes.ts";
 import { EMPTY_REQUIREMENTS_DOCUMENT } from "./requirementsTypes.ts";
 import { BUILT_IN_ITEM_TYPES, BUILT_IN_RELATIONSHIP_TYPES } from "./requirementsRegistry.ts";
 import type { ProgramIncrement } from "./programIncrements.ts";
+import { DEFAULT_SPRINT_DURATION_DAYS } from "./programIncrements.ts";
 import type { TeamDocument } from "./teamTypes.ts";
 import { EMPTY_TEAM_DOCUMENT, DEFAULT_TEAM_SETTINGS } from "./teamTypes.ts";
 import type { Milestone } from "./milestones.ts";
 import { sanitizeRelatedItemIds, validateMilestone } from "./milestones.ts";
+import { globalShapeRegistry, type ShapeDefinition } from "./shapeRegistry.ts";
+import { globalIconRegistry, type IconDefinition } from "./iconRegistry.ts";
 
 export const SCHEMA_VERSION = "0.7";
 
@@ -27,9 +30,45 @@ export interface DiagramFile {
   programIncrements: ProgramIncrement[];
   team: TeamDocument;
   milestones?: Milestone[];
+  shapeFallbacks?: Record<string, ShapeDefinition>;
+  iconFallbacks?: Record<string, IconDefinition>;
   metadata: {
     updatedAt: string;
   };
+}
+
+function collectAssetFallbacks(nodes: Node<ArchNodeData>[]): {
+  shapeFallbacks: Record<string, ShapeDefinition>;
+  iconFallbacks: Record<string, IconDefinition>;
+} {
+  const shapeFallbacks: Record<string, ShapeDefinition> = {};
+  const iconFallbacks: Record<string, IconDefinition> = {};
+
+  function scanNode(node: Node<ArchNodeData>) {
+    if (node.type === "shape" && node.data?.nodeType) {
+      const shapeDef = globalShapeRegistry.getShape(node.data.nodeType);
+      if (shapeDef) {
+        shapeFallbacks[shapeDef.id] = shapeDef;
+      }
+    }
+    if (node.data?.icon) {
+      const iconDef = globalIconRegistry.getIcon(node.data.icon);
+      if (iconDef && iconDef.source.type !== "builtin") {
+        iconFallbacks[iconDef.id] = iconDef;
+      }
+    }
+    if (node.data?.subDiagram?.nodes) {
+      for (const child of node.data.subDiagram.nodes) {
+        scanNode(child);
+      }
+    }
+  }
+
+  for (const node of nodes) {
+    scanNode(node);
+  }
+
+  return { shapeFallbacks, iconFallbacks };
 }
 
 export function toDiagramFile(
@@ -42,6 +81,8 @@ export function toDiagramFile(
   team: TeamDocument,
   milestones: Milestone[] = []
 ): DiagramFile {
+  const { shapeFallbacks, iconFallbacks } = collectAssetFallbacks(nodes);
+
   return {
     schemaVersion: SCHEMA_VERSION,
     title,
@@ -52,6 +93,8 @@ export function toDiagramFile(
     programIncrements,
     team,
     milestones,
+    ...(Object.keys(shapeFallbacks).length > 0 ? { shapeFallbacks } : {}),
+    ...(Object.keys(iconFallbacks).length > 0 ? { iconFallbacks } : {}),
     metadata: { updatedAt: new Date().toISOString() },
   };
 }
@@ -73,14 +116,6 @@ export function downloadDiagram(file: DiagramFile): void {
 function parseRequirementsDocument(raw: unknown): RequirementsDocument {
   if (!raw || typeof raw !== "object") return EMPTY_REQUIREMENTS_DOCUMENT;
   const r = raw as Partial<RequirementsDocument>;
-  // Files saved before "workable" types existed won't have isWorkable at
-  // all on any of their item types - fall back to the matching CURRENT
-  // built-in's value when the type is a recognized built-in (so a legacy
-  // "ticket" record correctly comes back workable, not silently excluded
-  // from the skill tree and stripped of its StatusPicker), or false for
-  // anything unrecognized (a custom type predating this field, where
-  // there's no built-in value to recover). Same reasoning as
-  // relationshipTypes' isBlocking fallback just below.
   const itemTypes = Array.isArray(r.itemTypes)
     ? r.itemTypes.map((t) => ({
         ...t,
@@ -113,31 +148,46 @@ function parseProgramIncrements(raw: unknown): ProgramIncrement[] {
   for (const entry of raw) {
     if (!entry || typeof entry !== "object") continue;
     const pi = entry as Partial<ProgramIncrement>;
-    if (typeof pi.id !== "string" || typeof pi.name !== "string" || typeof pi.startDate !== "string") continue;
+    if (typeof pi.id !== "string" || typeof pi.name !== "string" || typeof pi.startDate !== "string") {
+      continue;
+    }
     if (!Array.isArray(pi.sprints)) continue;
-    const sprints = pi.sprints.filter(
-      (s): s is ProgramIncrement["sprints"][number] =>
-        !!s && typeof s === "object" && typeof s.id === "string" && typeof s.name === "string" && typeof s.durationDays === "number"
-    );
+
+    const sprints = (pi.sprints as unknown[])
+      .filter(
+        (s): s is Record<string, unknown> =>
+          !!s &&
+          typeof s === "object" &&
+          typeof (s as Record<string, unknown>).id === "string" &&
+          typeof (s as Record<string, unknown>).name === "string"
+      )
+      .map((s) => ({
+        id: String(s.id),
+        name: String(s.name),
+        durationDays:
+          typeof s.durationDays === "number" && s.durationDays > 0
+            ? s.durationDays
+            : DEFAULT_SPRINT_DURATION_DAYS,
+      }));
+
     const reservations = Array.isArray(pi.reservations)
       ? (pi.reservations as unknown[])
           .filter(
-            (r): r is NonNullable<ProgramIncrement["reservations"]>[number] =>
+            (r): r is Record<string, unknown> =>
               !!r &&
               typeof r === "object" &&
               typeof (r as Record<string, unknown>).id === "string" &&
-              typeof (r as Record<string, unknown>).name === "string" &&
-              ((r as Record<string, unknown>).unit === "percentage" || (r as Record<string, unknown>).unit === "points") &&
-              typeof (r as Record<string, unknown>).value === "number"
+              (typeof (r as Record<string, unknown>).name === "string" || typeof (r as Record<string, unknown>).title === "string") &&
+              (typeof (r as Record<string, unknown>).value === "number" || typeof (r as Record<string, unknown>).points === "number")
           )
-          .map((r) => ({
-            id: String(r.id),
-            name: String(r.name),
-            unit: r.unit,
-            value: Number(r.value),
-            sprintId: typeof r.sprintId === "string" && r.sprintId.trim() !== "" ? r.sprintId : undefined,
-            category: typeof r.category === "string" ? r.category : undefined,
-            note: typeof r.note === "string" ? r.note : undefined,
+          .map((rec) => ({
+            id: String(rec.id),
+            name: String(rec.name ?? rec.title),
+            unit: (rec.unit === "points" ? "points" : "percentage") as "percentage" | "points",
+            value: Number(rec.value ?? rec.points),
+            sprintId: typeof rec.sprintId === "string" && rec.sprintId.trim() !== "" ? rec.sprintId : undefined,
+            category: typeof rec.category === "string" ? rec.category : undefined,
+            note: typeof rec.note === "string" ? rec.note : undefined,
           }))
       : undefined;
 
@@ -240,15 +290,39 @@ function parseMilestones(raw: unknown): Milestone[] {
  * Parses and lightly validates a diagram file loaded from disk.
  * `scenarios`/`requirements`/`programIncrements`/`team`/`milestones` all default to an empty
  * state so files saved before those features existed still open without
- * error - App.tsx's onFileSelected is responsible for further normalizing
- * an empty requirements document to include the built-in item types, same
- * as it already does for scenario steps missing a `path`.
+ * error.
  */
 export function parseDiagramFile(raw: string): DiagramFile {
   const parsed = JSON.parse(raw);
   if (!Array.isArray(parsed?.nodes) || !Array.isArray(parsed?.edges)) {
     throw new Error("File does not look like a diagram export (missing nodes/edges).");
   }
+
+  // Restore fallback definitions into registries if present
+  if (parsed.shapeFallbacks && typeof parsed.shapeFallbacks === "object") {
+    for (const [id, def] of Object.entries(parsed.shapeFallbacks)) {
+      if (def && typeof def === "object" && !globalShapeRegistry.getShape(id)) {
+        try {
+          globalShapeRegistry.registerShape(def as ShapeDefinition);
+        } catch {
+          // Ignore registration failures for corrupted fallbacks
+        }
+      }
+    }
+  }
+
+  if (parsed.iconFallbacks && typeof parsed.iconFallbacks === "object") {
+    for (const [id, def] of Object.entries(parsed.iconFallbacks)) {
+      if (def && typeof def === "object" && !globalIconRegistry.getIcon(id)) {
+        try {
+          globalIconRegistry.registerIcon(def as IconDefinition);
+        } catch {
+          // Ignore registration failures for corrupted fallbacks
+        }
+      }
+    }
+  }
+
   return {
     schemaVersion: parsed.schemaVersion ?? SCHEMA_VERSION,
     title: parsed.title ?? "Untitled Diagram",
@@ -259,6 +333,8 @@ export function parseDiagramFile(raw: string): DiagramFile {
     programIncrements: parseProgramIncrements(parsed.programIncrements),
     team: parseTeamDocument(parsed.team),
     milestones: parseMilestones(parsed.milestones),
+    shapeFallbacks: parsed.shapeFallbacks,
+    iconFallbacks: parsed.iconFallbacks,
     metadata: parsed.metadata ?? { updatedAt: new Date().toISOString() },
   };
 }

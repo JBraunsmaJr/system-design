@@ -16,13 +16,14 @@ import { Palette } from "./components/Palette";
 import { Canvas } from "./components/Canvas";
 import { Inspector } from "./components/Inspector";
 import { ScenarioPanel } from "./components/ScenarioPanel";
+import { LibraryManagerModal } from "./components/LibraryManagerModal";
 import { RequirementsView } from "./components/requirements/RequirementsView";
 import { TimelineView } from "./components/timeline/TimelineView";
 import { TeamView } from "./components/team/TeamView";
 import { SkillTreeView } from "./components/skilltree/SkillTreeView";
 import { NODE_TYPES } from "./domain/nodeRegistry";
 import { GROUP_TYPES } from "./domain/groupRegistry";
-import { SHAPE_TYPES } from "./domain/shapeRegistry";
+import { SHAPE_TYPES, globalShapeRegistry } from "./domain/shapeRegistry";
 import { reorderWithGroupsFirst, toAbsolutePosition } from "./domain/graphUtils";
 import {
   getBreadcrumbLabels,
@@ -970,6 +971,7 @@ function App() {
     setPendingNodeFocus(id);
   }, [diagramStore, setViewMode]);
   const [isScenarioPanelOpen, setIsScenarioPanelOpen] = useState(false);
+  const [isLibraryModalOpen, setIsLibraryModalOpen] = useState(false);
   const [activeStepId, setActiveStepId] = useState<string | null>(null);
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [isPaletteCollapsed, setIsPaletteCollapsed] = useState(false);
@@ -1038,14 +1040,24 @@ function App() {
 
   const onAddShape = useCallback(
     (typeId: string, position: { x: number; y: number }) => {
-      const def = SHAPE_TYPES.find((s) => s.id === typeId);
+      const fullDef = globalShapeRegistry.getShape(typeId);
+      const def = fullDef
+        ? {
+            id: fullDef.id,
+            defaultWidth: fullDef.defaults.width,
+            defaultHeight: fullDef.defaults.height,
+            color: fullDef.defaults.color,
+            label: fullDef.defaults.label ?? "",
+          }
+        : SHAPE_TYPES.find((s) => s.id === typeId);
       if (!def) return;
       const id = diagramStore.addNode(path, "shape", position, {
         nodeType: typeId,
-        label: "",
+        label: (def as { label?: string }).label ?? "",
         description: "",
         properties: {},
         tags: [],
+        color: (def as { color?: string }).color,
       });
       diagramStore.updateDimensions(id, def.defaultWidth, def.defaultHeight);
     },
@@ -1812,6 +1824,7 @@ function App() {
           onSetViewMode={setViewMode}
           onExportRequirementsMarkdown={onExportRequirementsMarkdown}
           canExportRequirements={requirementsSnapshot.items.length > 0}
+          onManageLibraries={() => setIsLibraryModalOpen(true)}
           hasAutosaved={hasAutosaved}
           isInSession={!!activeSession}
           collabPanel={
@@ -2009,6 +2022,10 @@ function App() {
           />
         )}
       </div>
+      <LibraryManagerModal
+        isOpen={isLibraryModalOpen}
+        onClose={() => setIsLibraryModalOpen(false)}
+      />
     </div>
   );
 }

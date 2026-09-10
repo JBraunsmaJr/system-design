@@ -6,6 +6,7 @@ import { computeFlippedPosition } from "../domain/popoverPosition";
 interface FileMenuProps {
   onNew: () => void;
   onLoadClick: () => void;
+  onManageLibraries?: () => void;
   /** Whether a collaborative session is currently active - see
    * Toolbar's own isInSession doc comment for why this disables the
    * Open item specifically (New still works fine mid-session: it just
@@ -22,7 +23,7 @@ const DROPDOWN_WIDTH = 150;
 // in Toolbar itself: as the single most-used action of the three, it
 // benefits from staying a direct, one-click target rather than being
 // buried behind an extra click.
-export function FileMenu({ onNew, onLoadClick, isInSession }: FileMenuProps) {
+export function FileMenu({ onNew, onLoadClick, onManageLibraries, isInSession }: FileMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -131,6 +132,17 @@ export function FileMenu({ onNew, onLoadClick, isInSession }: FileMenuProps) {
             >
               Open
             </button>
+            {onManageLibraries && (
+              <button
+                type="button"
+                onClick={() => {
+                  onManageLibraries();
+                  close();
+                }}
+              >
+                Libraries...
+              </button>
+            )}
           </div>,
           document.body
         )}

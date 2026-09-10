@@ -11,6 +11,7 @@ import {
   Save,
   Route,
   FileDown,
+  Package,
 } from "lucide-react";
 import { ExportMenu } from "./ExportMenu";
 import { FileMenu } from "./FileMenu";
@@ -36,6 +37,7 @@ interface ToolbarProps {
   onSetViewMode: (mode: "diagram" | "requirements" | "timeline" | "team" | "skill-tree") => void;
   onExportRequirementsMarkdown: () => void;
   canExportRequirements: boolean;
+  onManageLibraries?: () => void;
   hasAutosaved: boolean;
   /** Whether a collaborative session is currently active - disables
    * Open (loading a file replaces the LOCAL, frozen state, which
@@ -79,6 +81,7 @@ export function Toolbar({
   onSetViewMode,
   onExportRequirementsMarkdown,
   canExportRequirements,
+  onManageLibraries,
   hasAutosaved,
   isInSession,
   collabPanel,
@@ -134,6 +137,16 @@ export function Toolbar({
               <span className="toolbar__label">Scenarios</span>
             </button>
           )}
+          {viewMode === "diagram" && onManageLibraries && (
+            <button
+              type="button"
+              onClick={onManageLibraries}
+              title="Manage Shape & Icon Libraries"
+            >
+              <Package size={14} />
+              <span className="toolbar__label">Libraries</span>
+            </button>
+          )}
           {viewMode === "diagram" && <ExportMenu onExportPng={onExportPng} onExportSvg={onExportSvg} disabled={!canExport} />}
           {viewMode === "requirements" && (
             <button type="button" onClick={onExportRequirementsMarkdown} disabled={!canExportRequirements} title="Export Markdown">
@@ -141,7 +154,7 @@ export function Toolbar({
               <span className="toolbar__label">Export Markdown</span>
             </button>
           )}
-          <FileMenu onNew={onNew} onLoadClick={onLoadClick} isInSession={isInSession} />
+          <FileMenu onNew={onNew} onLoadClick={onLoadClick} onManageLibraries={onManageLibraries} isInSession={isInSession} />
           <button type="button" className="primary" onClick={onSave} title="Save">
             <Save size={14} />
             <span className="toolbar__label">Save</span>

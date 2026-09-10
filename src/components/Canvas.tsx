@@ -44,7 +44,7 @@ import { PresentationOverlay } from "./PresentationOverlay";
 import { Breadcrumb } from "./Breadcrumb";
 import { NODE_TYPES } from "../domain/nodeRegistry";
 import { GROUP_TYPES } from "../domain/groupRegistry";
-import { SHAPE_TYPES } from "../domain/shapeRegistry";
+import { SHAPE_TYPES, globalShapeRegistry } from "../domain/shapeRegistry";
 import { computeAlignment, type AlignBox, type AlignmentGuide } from "../domain/alignmentGuides";
 import type { ZOrderCommand } from "../domain/zOrder";
 import { toAbsolutePosition } from "../domain/graphUtils";
@@ -335,7 +335,7 @@ export function Canvas({
       }
 
       const shapeTypeId = event.dataTransfer.getData(SHAPE_DRAG_MIME_TYPE);
-      if (shapeTypeId && SHAPE_TYPES.some((s) => s.id === shapeTypeId)) {
+      if (shapeTypeId && (SHAPE_TYPES.some((s) => s.id === shapeTypeId) || globalShapeRegistry.getShape(shapeTypeId))) {
         onAddShape(shapeTypeId, position);
         return;
       }
