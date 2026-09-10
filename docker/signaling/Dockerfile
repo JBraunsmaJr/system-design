@@ -8,6 +8,8 @@ FROM node:26.7.0-alpine
 
 WORKDIR /app
 
+RUN apk update && apk upgrade
+
 # Copying just the manifest before running install (rather than
 # COPY . . first) means this layer is cached and only re-runs when the
 # manifest itself actually changes - same reasoning as the main app's
