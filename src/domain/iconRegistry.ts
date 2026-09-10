@@ -153,12 +153,26 @@ const ALLOWED_SVG_ATTRS = new Set([
   "xml:space",
 ]);
 
+const ACTIVE_CONTAINER_TAGS = new Set([
+  "script",
+  "style",
+  "foreignobject",
+]);
+
+const ALLOWED_TEXT_TAGS = new Set([
+  "text",
+  "tspan",
+]);
+
 function isDangerousHref(val: string): boolean {
+  if (!val || typeof val !== "string") return false;
   const trimmed = val.trim().toLowerCase();
   return (
     trimmed.startsWith("javascript:") ||
     trimmed.startsWith("vbscript:") ||
-    trimmed.startsWith("data:text/html")
+    trimmed.startsWith("data:") ||
+    trimmed.startsWith("file:") ||
+    trimmed.startsWith("blob:")
   );
 }
 
@@ -170,6 +184,184 @@ function escapeAttributeValue(val: string): string {
     .replace(/>/g, "&gt;");
 }
 
+function cleanDomNode(el: Element): void {
+  const tag = el.tagName.toLowerCase();
+  if (!ALLOWED_SVG_TAGS.has(tag)) {
+    el.remove();
+    return;
+  }
+
+  const toRemove: string[] = [];
+  for (let i = 0; i < el.attributes.length; i++) {
+    const attr = el.attributes[i];
+    const name = attr.name.toLowerCase();
+    const val = attr.value;
+    if (name.startsWith("on") || (!ALLOWED_SVG_ATTRS.has(name) && !name.startsWith("data-"))) {
+      toRemove.push(attr.name);
+    } else if ((name === "href" || name === "xlink:href" || name === "src") && isDangerousHref(val)) {
+      toRemove.push(attr.name);
+    }
+  }
+  for (const attrName of toRemove) {
+    el.removeAttribute(attrName);
+  }
+
+  const children = Array.from(el.children);
+  for (const child of children) {
+    cleanDomNode(child);
+  }
+}
+
+/**
+ * Tokenizes raw SVG content and reconstructs it using only allowed tags and attributes.
+ * Disallowed tags and active blocks (script, style, foreignObject, iframe, etc.) and comments are skipped.
+ */
+function sanitizeSvgTokens(svgContent: string): string {
+  let pos = 0;
+  const len = svgContent.length;
+  const output: string[] = [];
+  let openTextTagCount = 0;
+
+  while (pos < len) {
+    const nextLt = svgContent.indexOf("<", pos);
+    if (nextLt === -1) {
+      if (openTextTagCount > 0) {
+        output.push(svgContent.slice(pos));
+      }
+      break;
+    }
+
+    // Preserve text only inside text/tspan elements
+    if (nextLt > pos && openTextTagCount > 0) {
+      output.push(svgContent.slice(pos, nextLt));
+    }
+    pos = nextLt;
+
+    // 1. Skip comments: <!-- ... -->
+    if (svgContent.startsWith("<!--", pos)) {
+      const endComment = svgContent.indexOf("-->", pos + 4);
+      pos = endComment === -1 ? len : endComment + 3;
+      continue;
+    }
+
+    // 2. Skip XML declarations and DOCTYPE: <?...?> or <!DOCTYPE ...>
+    if (svgContent.startsWith("<?", pos)) {
+      const endDecl = svgContent.indexOf("?>", pos + 2);
+      pos = endDecl === -1 ? len : endDecl + 2;
+      continue;
+    }
+    if (svgContent.startsWith("<!", pos)) {
+      const endDoc = svgContent.indexOf(">", pos + 2);
+      pos = endDoc === -1 ? len : endDoc + 1;
+      continue;
+    }
+
+    // 3. Parse tag: <(/)? tagName [attrs] (/)?>
+    const tagMatch = /^<(\/)?([a-zA-Z0-9_:-]+)/.exec(svgContent.slice(pos));
+    if (!tagMatch) {
+      pos++;
+      continue;
+    }
+
+    const isClosing = Boolean(tagMatch[1]);
+    const rawTag = tagMatch[2];
+    const lowerTag = rawTag.toLowerCase();
+
+    // Find end of tag '>' but abort if nested unescaped '<' is encountered
+    let tagEnd = pos + tagMatch[0].length;
+    let inQuotes: string | null = null;
+    let hitNestedLt = false;
+
+    while (tagEnd < len) {
+      const char = svgContent[tagEnd];
+      if (inQuotes) {
+        if (char === inQuotes) inQuotes = null;
+      } else if (char === '"' || char === "'") {
+        inQuotes = char;
+      } else if (char === "<") {
+        hitNestedLt = true;
+        break;
+      } else if (char === ">") {
+        break;
+      }
+      tagEnd++;
+    }
+
+    if (hitNestedLt) {
+      pos = tagEnd;
+      continue;
+    }
+
+    if (tagEnd >= len) {
+      break;
+    }
+
+    const fullTagContent = svgContent.slice(pos, tagEnd + 1);
+    const isSelfClosing = fullTagContent.endsWith("/>") || fullTagContent.endsWith("/ >");
+    const rawAttrs = svgContent.slice(pos + tagMatch[0].length, tagEnd - (isSelfClosing ? 1 : 0));
+    pos = tagEnd + 1;
+
+    // Handle closing tags
+    if (isClosing) {
+      if (ALLOWED_TEXT_TAGS.has(lowerTag) && openTextTagCount > 0) {
+        openTextTagCount--;
+      }
+      if (ALLOWED_SVG_TAGS.has(lowerTag)) {
+        output.push(`</${lowerTag}>`);
+      }
+      continue;
+    }
+
+    // If tag is active container (script, style, foreignObject), skip to closing tag
+    if (ACTIVE_CONTAINER_TAGS.has(lowerTag)) {
+      if (!isSelfClosing) {
+        const closeTagRegex = new RegExp(`</\\s*${lowerTag}[^>]*>`, "i");
+        const match = closeTagRegex.exec(svgContent.slice(pos));
+        if (match) {
+          pos = pos + match.index + match[0].length;
+        } else {
+          pos = len;
+        }
+      }
+      continue;
+    }
+
+    if (!ALLOWED_SVG_TAGS.has(lowerTag)) {
+      continue;
+    }
+
+    if (ALLOWED_TEXT_TAGS.has(lowerTag) && !isSelfClosing) {
+      openTextTagCount++;
+    }
+
+    // Parse attributes
+    const cleanAttrs: string[] = [];
+    if (rawAttrs) {
+      const attrRegex = /([a-zA-Z0-9_:-]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
+      let attrMatch: RegExpExecArray | null;
+      while ((attrMatch = attrRegex.exec(rawAttrs)) !== null) {
+        const attrName = attrMatch[1];
+        const lowerName = attrName.toLowerCase();
+        const attrVal = attrMatch[2] ?? attrMatch[3] ?? attrMatch[4] ?? "";
+
+        if (lowerName.startsWith("on")) continue;
+        if (!ALLOWED_SVG_ATTRS.has(lowerName) && !lowerName.startsWith("data-")) continue;
+
+        if ((lowerName === "href" || lowerName === "xlink:href" || lowerName === "src") && isDangerousHref(attrVal)) {
+          continue;
+        }
+
+        cleanAttrs.push(`${attrName}="${escapeAttributeValue(attrVal)}"`);
+      }
+    }
+
+    const attrsString = cleanAttrs.length > 0 ? " " + cleanAttrs.join(" ") : "";
+    output.push(`<${lowerTag}${attrsString}${isSelfClosing ? " />" : ">"}`);
+  }
+
+  return output.join("").trim();
+}
+
 /**
  * Sanitizes an SVG string using a strict whitelist approach for both tags and attributes.
  * Strips all script tags, foreignObject, iframe, embed, object, inline event handlers,
@@ -178,105 +370,24 @@ function escapeAttributeValue(val: string): string {
 export function sanitizeSvg(svgContent: string): string {
   if (!svgContent || typeof svgContent !== "string") return "";
 
-  let cleaned = svgContent;
-
-  // Multi-pass iterative sanitization loop to reach a safe fixed-point
-  let previous: string;
-  let iterations = 0;
-  const MAX_ITERATIONS = 20;
-
-  do {
-    previous = cleaned;
-    iterations++;
-
-    // Remove XML declaration, doctype, and comments
-    cleaned = cleaned.replace(/<\?xml[\s\S]*?\?>/gi, "");
-    cleaned = cleaned.replace(/<!DOCTYPE[\s\S]*?>/gi, "");
-    cleaned = cleaned.replace(/<!--[\s\S]*?-->/gi, "");
-
-    // Remove block-level active content tags and anything inside them (including variations with whitespace)
-    cleaned = cleaned.replace(/<\s*script\b[\s\S]*?<\/\s*script\s*>/gi, "");
-    cleaned = cleaned.replace(/<\s*style\b[\s\S]*?<\/\s*style\s*>/gi, "");
-    cleaned = cleaned.replace(/<\s*foreignobject\b[\s\S]*?<\/\s*foreignobject\s*>/gi, "");
-    cleaned = cleaned.replace(/<\s*(?:object|embed|iframe|applet|link|meta|form|input|button|base|frame|frameset)\b[\s\S]*?<\/\s*(?:object|embed|iframe|applet|link|meta|form|input|button|base|frame|frameset)\s*>/gi, "");
-
-    // Tokenize and filter all remaining tags against the SVG element and attribute whitelists
-    cleaned = cleaned.replace(/<(\/)?([a-zA-Z0-9_:-]+)((?:\s+[^>]*)?)\/?>/gi, (match, isClosing, tagName, rawAttrs) => {
-      const lowerTag = tagName.toLowerCase();
-      if (!ALLOWED_SVG_TAGS.has(lowerTag)) {
-        return "";
-      }
-
-      if (isClosing) {
-        return `</${lowerTag}>`;
-      }
-
-      const isSelfClosing = match.trimEnd().endsWith("/>");
-      const cleanAttrs: string[] = [];
-
-      if (rawAttrs) {
-        const attrRegex = /([a-zA-Z0-9_:-]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
-        let attrMatch: RegExpExecArray | null;
-        while ((attrMatch = attrRegex.exec(rawAttrs)) !== null) {
-          const name = attrMatch[1];
-          const lowerName = name.toLowerCase();
-          const val = attrMatch[2] ?? attrMatch[3] ?? attrMatch[4] ?? "";
-
-          // Reject inline event handlers (on*) or non-whitelisted attributes
-          if (lowerName.startsWith("on")) continue;
-          if (!ALLOWED_SVG_ATTRS.has(lowerName) && !lowerName.startsWith("data-")) continue;
-
-          // Reject dangerous URI schemes in href / xlink:href / src
-          if ((lowerName === "href" || lowerName === "xlink:href" || lowerName === "src") && isDangerousHref(val)) {
-            continue;
-          }
-
-          cleanAttrs.push(`${name}="${escapeAttributeValue(val)}"`);
-        }
-      }
-
-      return `<${lowerTag}${cleanAttrs.length > 0 ? " " + cleanAttrs.join(" ") : ""}${isSelfClosing ? " />" : ">"}`;
-    });
-  } while (cleaned !== previous && iterations < MAX_ITERATIONS);
-
   // If running in DOM environment (browser), apply DOMParser sanitization for full defense-in-depth
   if (typeof DOMParser !== "undefined" && typeof XMLSerializer !== "undefined") {
     try {
       const parser = new DOMParser();
-      const doc = parser.parseFromString(cleaned, "image/svg+xml");
+      const doc = parser.parseFromString(svgContent, "image/svg+xml");
       if (!doc.querySelector("parsererror")) {
-        const allElements = Array.from(doc.querySelectorAll("*"));
-        for (const el of allElements) {
-          const tag = el.tagName.toLowerCase();
-          if (!ALLOWED_SVG_TAGS.has(tag)) {
-            el.remove();
-            continue;
-          }
-
-          const toRemove: string[] = [];
-          for (let i = 0; i < el.attributes.length; i++) {
-            const attr = el.attributes[i];
-            const name = attr.name.toLowerCase();
-            const val = attr.value.trim().toLowerCase();
-            if (name.startsWith("on") || (!ALLOWED_SVG_ATTRS.has(name) && !name.startsWith("data-"))) {
-              toRemove.push(attr.name);
-            } else if ((name === "href" || name === "xlink:href" || name === "src") && isDangerousHref(val)) {
-              toRemove.push(attr.name);
-            }
-          }
-          for (const attrName of toRemove) {
-            el.removeAttribute(attrName);
-          }
+        const root = doc.documentElement;
+        if (root && root.nodeName.toLowerCase() === "svg") {
+          cleanDomNode(root);
+          return new XMLSerializer().serializeToString(root).trim();
         }
-
-        cleaned = new XMLSerializer().serializeToString(doc.documentElement || doc);
       }
     } catch {
-      // Fallback to tokenizer-cleaned result
+      // Fallback to token-based sanitizer
     }
   }
 
-  return cleaned.trim();
+  return sanitizeSvgTokens(svgContent);
 }
 
 /**
@@ -285,18 +396,30 @@ export function sanitizeSvg(svgContent: string): string {
 export function isValidSvg(svg: string): boolean {
   if (!svg || typeof svg !== "string") return false;
   const trimmed = svg.trim();
-  if (!trimmed.toLowerCase().startsWith("<svg") || !trimmed.toLowerCase().endsWith("</svg>")) {
+  const lower = trimmed.toLowerCase();
+  if (!lower.startsWith("<svg") || !lower.endsWith("</svg>")) {
     return false;
   }
-  // Check for script tag remnants, active content, or event handlers
-  if (
-    /<\s*\/?\s*script/i.test(trimmed) ||
-    /<\s*\/?\s*iframe/i.test(trimmed) ||
-    /<\s*\/?\s*object/i.test(trimmed) ||
-    /<\s*\/?\s*embed/i.test(trimmed) ||
-    /<\s*\/?\s*foreignobject/i.test(trimmed) ||
-    /\bon[a-z0-9_-]+\s*=/i.test(trimmed)
-  ) {
+  const disallowed = [
+    "script",
+    "style",
+    "foreignobject",
+    "iframe",
+    "object",
+    "embed",
+    "applet",
+    "template",
+    "meta",
+    "link",
+    "body",
+    "html",
+  ];
+  for (const tag of disallowed) {
+    if (lower.includes(`<${tag}`) || lower.includes(`</${tag}`)) {
+      return false;
+    }
+  }
+  if (/\bon[a-z0-9_-]+\s*=/i.test(trimmed)) {
     return false;
   }
   return true;
