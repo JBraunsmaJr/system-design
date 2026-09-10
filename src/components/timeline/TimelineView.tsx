@@ -67,9 +67,21 @@ export function TimelineView({
   const fallbackMilestonesStore = useMemo(() => createLocalMilestonesStore([]), []);
   const activeMilestonesStore = milestonesStore ?? fallbackMilestonesStore;
 
-  const programIncrements = useSyncExternalStore(programIncrementsStore.subscribe, programIncrementsStore.getSnapshot);
-  const requirements = useSyncExternalStore(requirementsStore.subscribe, requirementsStore.getSnapshot);
-  const milestones = useSyncExternalStore(activeMilestonesStore.subscribe, activeMilestonesStore.getSnapshot);
+  const programIncrements = useSyncExternalStore(
+    programIncrementsStore.subscribe,
+    programIncrementsStore.getSnapshot,
+    programIncrementsStore.getSnapshot
+  );
+  const requirements = useSyncExternalStore(
+    requirementsStore.subscribe,
+    requirementsStore.getSnapshot,
+    requirementsStore.getSnapshot
+  );
+  const milestones = useSyncExternalStore(
+    activeMilestonesStore.subscribe,
+    activeMilestonesStore.getSnapshot,
+    activeMilestonesStore.getSnapshot
+  );
 
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [selectedMilestoneId, setSelectedMilestoneId] = useState<string | null>(null);
@@ -78,6 +90,19 @@ export function TimelineView({
   const [chartMode, setChartMode] = useState<"board" | "gantt">("board");
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [filterEpicId, setFilterEpicId] = useState<string>("all");
+
+  useEffect(() => {
+    if (!draggedItemId) return;
+    const handleDragEnd = () => {
+      setDraggedItemId(null);
+    };
+    window.addEventListener("dragend", handleDragEnd);
+    window.addEventListener("drop", handleDragEnd);
+    return () => {
+      window.removeEventListener("dragend", handleDragEnd);
+      window.removeEventListener("drop", handleDragEnd);
+    };
+  }, [draggedItemId]);
 
   const epicsWithSchedule = useMemo(() => {
     return getAllEpicsWithInferredSchedule(requirements, programIncrements, milestones);
@@ -741,6 +766,13 @@ function BacklogSection({
   const [query, setQuery] = useState("");
   const dragCounter = useRef(0);
 
+  useEffect(() => {
+    if (!draggedItemId) {
+      dragCounter.current = 0;
+      setIsDragOver(false);
+    }
+  }, [draggedItemId]);
+
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
     dragCounter.current += 1;
@@ -765,6 +797,7 @@ function BacklogSection({
     e.preventDefault();
     dragCounter.current = 0;
     setIsDragOver(false);
+    onDragEndItem();
     const itemId = e.dataTransfer.getData("text/plain") || draggedItemId;
     if (itemId) {
       onDropItem(itemId);
@@ -1264,6 +1297,13 @@ function SprintBoardColumn({
   const [dropError, setDropError] = useState<string | null>(null);
   const dropErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  useEffect(() => {
+    if (!draggedItemId) {
+      dragCounter.current = 0;
+      setIsDragOver(false);
+    }
+  }, [draggedItemId]);
+
   const sprintSummary = useMemo(() => {
     return computeSprintMilestoneSummary(sprint, range, milestones, requirements);
   }, [sprint, range, milestones, requirements]);
@@ -1330,6 +1370,7 @@ function SprintBoardColumn({
     e.preventDefault();
     dragCounter.current = 0;
     setIsDragOver(false);
+    onDragEndItem();
     const itemId = e.dataTransfer.getData("text/plain") || draggedItemId;
     if (itemId) {
       const error = onDropItem(itemId, sprint.id);
