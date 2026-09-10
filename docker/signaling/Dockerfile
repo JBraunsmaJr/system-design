@@ -15,7 +15,7 @@ RUN apk update && apk upgrade
 # manifest itself actually changes - same reasoning as the main app's
 # own Dockerfile.
 COPY package.json ./
-RUN npm install --omit=dev
+RUN npm install --omit=dev && npm update
 
 # y-webrtc's own bundled server (node_modules/y-webrtc/bin/server.js)
 # reads process.env.PORT directly, defaulting to 4444 if it's unset -
