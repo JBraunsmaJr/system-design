@@ -19,10 +19,10 @@ $designLatestTag = "{0}:latest" -f $designName
 $relayTag = "{0}:{1}" -f $relayName, $DockerTag
 $relayLatestTag = "{0}:latest" -f $relayName
 
-docker build -t "$designTag" "$serverPath"
+docker build --no-cache -t "$designTag" "$serverPath"
 docker tag "$designTag" "$designLatestTag"
 
-docker build -t "$relayTag" "$relayPath"
+docker build --no-cache -t "$relayTag" "$relayPath"
 docker tag "$relayTag" "$relayLatestTag"
 
 if ($push) {
