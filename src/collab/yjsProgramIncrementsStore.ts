@@ -1,14 +1,7 @@
 import * as Y from "yjs";
 import type { ProgramIncrement, Sprint, CapacityReservation } from "../domain/programIncrements";
-import { updateSprintEndDate } from "../domain/programIncrements";
+import { updateSprintEndDate, getNextPIStartDate, DEFAULT_SPRINT_DURATION_DAYS } from "../domain/programIncrements";
 import type { ProgramIncrementsStore } from "./programIncrementsStore";
-
-const DEFAULT_SPRINT_DURATION_DAYS = 14;
-
-function todayISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
 
 /** PI and sprint ids are purely internal (never displayed - see
  * programIncrementsStore.ts's doc comment), so there's no reason not to
@@ -159,6 +152,7 @@ export function createYjsProgramIncrementsStore(doc: Y.Doc): ProgramIncrementsSt
     addPI: () => {
       const piId = collisionResistantId("pi");
       const sprintId = collisionResistantId("sprint");
+      const nextStart = getNextPIStartDate(cached);
       doc.transact(() => {
         const sprintM = new Y.Map<unknown>();
         sprintM.set("name", "Sprint 1");
@@ -170,7 +164,7 @@ export function createYjsProgramIncrementsStore(doc: Y.Doc): ProgramIncrementsSt
 
         const piM = new Y.Map<unknown>();
         piM.set("name", `PI ${piOrder.length + 1}`);
-        piM.set("startDate", todayISO());
+        piM.set("startDate", nextStart);
         piM.set("sprintOrder", sprintOrderArr);
         piM.set("sprints", sprintsMap);
         piM.set("reservations", new Y.Map<CapacityReservation>());

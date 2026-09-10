@@ -48,19 +48,55 @@ export interface SprintDateRange {
   endDate: string;
 }
 
+export const DEFAULT_SPRINT_DURATION_DAYS = 14;
+
+export function todayISO(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 /** Converts a YYYY-MM-DD string to a day count (days since the Unix
  * epoch, UTC-based). All date arithmetic in this module works on these
  * plain integers rather than JS Date objects directly, specifically to
  * avoid local-timezone drift - a UTC-based day count is unambiguous
  * regardless of what timezone the browser or server happens to be in. */
-function parseISODate(iso: string): number {
+export function parseISODate(iso: string): number {
   const [y, m, d] = iso.split("-").map(Number);
   return Date.UTC(y, m - 1, d) / 86400000;
 }
 
-function formatISODate(days: number): string {
+export function formatISODate(days: number): string {
   const d = new Date(days * 86400000);
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+}
+
+/**
+ * Calculates the starting date for a newly added Program Increment.
+ * Automatically picks up where the previous PI ended:
+ * If a previous PI exists, the new PI starts the day after the last sprint of the previous PI ends.
+ * If no previous PI exists, starts on today's date.
+ */
+export function getNextPIStartDate(pis: ProgramIncrement[]): string {
+  if (!pis || pis.length === 0) {
+    return todayISO();
+  }
+  const lastPI = pis[pis.length - 1];
+  if (!lastPI) return todayISO();
+  if (!lastPI.startDate || typeof lastPI.startDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(lastPI.startDate)) {
+    return todayISO();
+  }
+  const [y, m, d] = lastPI.startDate.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  if (date.getUTCFullYear() !== y || date.getUTCMonth() !== m - 1 || date.getUTCDate() !== d) {
+    return todayISO();
+  }
+  if (!lastPI.sprints || lastPI.sprints.length === 0) {
+    return formatISODate(parseISODate(lastPI.startDate) + 1);
+  }
+  const ranges = computeSprintDateRanges(lastPI);
+  if (ranges.length === 0) return todayISO();
+  const lastSprintRange = ranges[ranges.length - 1];
+  return formatISODate(parseISODate(lastSprintRange.endDate) + 1);
 }
 
 /** Computes every sprint's actual start/end date by walking the sequence

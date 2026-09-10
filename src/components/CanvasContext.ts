@@ -9,6 +9,7 @@ export interface CanvasContextValue {
   onChangeTextNode: (nodeId: string, text: string) => void;
   onChangeCodeNode: (nodeId: string, code: string) => void;
   onUpdateEdge?: (id: string, patch: Partial<ArchEdgeData>) => void;
+  onAdoptIntoGroup?: (groupId: string, nodeIds: string[], groupPosition?: { x: number; y: number }) => void;
 }
 
 export const CanvasContext = createContext<CanvasContextValue | null>(null);

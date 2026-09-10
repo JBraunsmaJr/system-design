@@ -124,6 +124,20 @@ export interface RequirementsDocument {
   nextSequence: Record<string, number>;
 }
 
+export interface EpicInferredSchedule {
+  epicId: string;
+  startDate?: string;
+  endDate?: string;
+  isFullyScheduled: boolean;
+  totalChildrenCount: number;
+  scheduledChildrenCount: number;
+  unscheduledChildrenCount: number;
+  completedChildrenCount: number;
+  totalPoints: number;
+  childItemIds: string[];
+  scheduledSprintIds: string[];
+}
+
 export const EMPTY_REQUIREMENTS_DOCUMENT: RequirementsDocument = {
   itemTypes: [],
   categories: [],

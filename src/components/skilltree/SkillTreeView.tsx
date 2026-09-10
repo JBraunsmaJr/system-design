@@ -102,6 +102,13 @@ export function SkillTreeView({
     requirementsStore.updateItem(id, patch);
   };
 
+  const onConvertItemType = (id: string, newTypeId: string) => {
+    const newId = requirementsStore.convertItemType(id, newTypeId);
+    if (selectedItemId === id && newId) {
+      setSelectedItemId(newId);
+    }
+  };
+
   const onDeleteItem = (id: string) => {
     requirementsStore.deleteItem(id);
     setSelectedItemId(null);
@@ -224,6 +231,7 @@ export function SkillTreeView({
           onCreateLinkedNode={onCreateLinkedNode}
           onClose={() => setSelectedItemId(null)}
           onUpdateItem={onUpdateItem}
+          onConvertItemType={onConvertItemType}
           onDeleteItem={onDeleteItem}
           onNavigateToRequirement={onNavigateToRequirement}
           onSelectItem={(id) => setSelectedItemId(id)}

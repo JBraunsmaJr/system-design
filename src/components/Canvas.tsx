@@ -123,7 +123,7 @@ interface CanvasProps {
   onUpdateNode: (id: string, patch: Partial<ArchNodeData>) => void;
   onUpdateEdge: (id: string, patch: Partial<ArchEdgeData>) => void;
   onReparentNode: (nodeId: string, newParentId: string | null) => void;
-  onAdoptIntoGroup: (groupId: string, nodeIds: string[]) => void;
+  onAdoptIntoGroup: (groupId: string, nodeIds: string[], groupPosition?: { x: number; y: number }) => void;
   /** Applies a stacking command. targetIds is explicit rather than
    * implied by the current selection, because right-clicking a node
    * that ISN'T selected should act on that node - not on whatever
@@ -272,8 +272,9 @@ export function Canvas({
       onChangeTextNode,
       onChangeCodeNode,
       onUpdateEdge,
+      onAdoptIntoGroup,
     }),
-    [isPresenting, onDrillInto, editingLabelNodeId, onChangeTextNode, onChangeCodeNode, onUpdateEdge]
+    [isPresenting, onDrillInto, editingLabelNodeId, onChangeTextNode, onChangeCodeNode, onUpdateEdge, onAdoptIntoGroup]
   );
 
   const pathKey = breadcrumbLabels.join(">");

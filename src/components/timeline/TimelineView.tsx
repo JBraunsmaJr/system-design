@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef, useSyncExternalStore } from "react";
-import { AlertTriangle, CalendarRange, ChevronDown, ChevronRight, ChevronUp, GanttChartSquare, Inbox, Plus, Trash2, ShieldAlert } from "lucide-react";
+import { AlertTriangle, CalendarRange, ChevronDown, ChevronRight, ChevronUp, GanttChartSquare, Inbox, Plus, Trash2, ShieldAlert, Diamond } from "lucide-react";
 import {
   computeSprintDateRanges,
   getSprintActiveReservations,
@@ -12,6 +12,12 @@ import { findScheduleConflicts, checkScheduleConflict, findBlockingItemIds, type
 import type { RequirementItem, RequirementsDocument } from "../../domain/requirementsTypes";
 import type { RequirementsStore } from "../../collab/requirementsStore";
 import type { ProgramIncrementsStore } from "../../collab/programIncrementsStore";
+import type { MilestonesStore } from "../../collab/milestonesStore";
+import { createLocalMilestonesStore } from "../../collab/milestonesStore";
+import type { Milestone } from "../../domain/milestones";
+import { getMilestoneColor, getMilestoneTypeLabel } from "../../domain/milestones";
+import { computeSprintMilestoneSummary } from "../../domain/sprintSummaries";
+import { getAllEpicsWithInferredSchedule, getChildItemsForParent } from "../../domain/epicScheduling";
 import type { TeamDocument } from "../../domain/teamTypes";
 import type { SubDiagram } from "../../domain/types";
 import type { DiagramPath } from "../../domain/subDiagramTree";
@@ -21,6 +27,8 @@ import { SprintCapacityBar } from "../team/SprintCapacityBar";
 import { MemberPicker } from "../team/MemberPicker";
 import { PointsPicker } from "../team/PointsPicker";
 import { RequirementDetailModal } from "./RequirementDetailModal";
+import { MilestoneDetailModal } from "./MilestoneDetailModal";
+import { AddMilestoneModal } from "./AddMilestoneModal";
 import { GanttChart } from "./GanttChart";
 import { SprintQuickAdd } from "./SprintQuickAdd";
 import { ManageReservationsModal } from "./ManageReservationsModal";
@@ -28,6 +36,7 @@ import { ManageReservationsModal } from "./ManageReservationsModal";
 interface TimelineViewProps {
   programIncrementsStore: ProgramIncrementsStore;
   requirementsStore: RequirementsStore;
+  milestonesStore?: MilestonesStore;
   team?: TeamDocument;
   diagramRoot?: SubDiagram;
   onNavigateToNode?: (path: DiagramPath, nodeId: string) => void;
@@ -46,6 +55,7 @@ interface TimelineViewProps {
 export function TimelineView({
   programIncrementsStore,
   requirementsStore,
+  milestonesStore,
   team,
   diagramRoot,
   onNavigateToNode,
@@ -54,11 +64,67 @@ export function TimelineView({
   peers = [],
   onFocusedItemChange,
 }: TimelineViewProps) {
-  const programIncrements = useSyncExternalStore(programIncrementsStore.subscribe, programIncrementsStore.getSnapshot);
-  const requirements = useSyncExternalStore(requirementsStore.subscribe, requirementsStore.getSnapshot);
+  const fallbackMilestonesStore = useMemo(() => createLocalMilestonesStore([]), []);
+  const activeMilestonesStore = milestonesStore ?? fallbackMilestonesStore;
+
+  const programIncrements = useSyncExternalStore(
+    programIncrementsStore.subscribe,
+    programIncrementsStore.getSnapshot,
+    programIncrementsStore.getSnapshot
+  );
+  const requirements = useSyncExternalStore(
+    requirementsStore.subscribe,
+    requirementsStore.getSnapshot,
+    requirementsStore.getSnapshot
+  );
+  const milestones = useSyncExternalStore(
+    activeMilestonesStore.subscribe,
+    activeMilestonesStore.getSnapshot,
+    activeMilestonesStore.getSnapshot
+  );
+
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [selectedMilestoneId, setSelectedMilestoneId] = useState<string | null>(null);
+  const [isAddingMilestone, setIsAddingMilestone] = useState(false);
+  const [addMilestoneDate, setAddMilestoneDate] = useState<string | undefined>(undefined);
   const [chartMode, setChartMode] = useState<"board" | "gantt">("board");
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
+  const [filterEpicId, setFilterEpicId] = useState<string>("all");
+
+  useEffect(() => {
+    if (!draggedItemId) return;
+    const handleDragEnd = () => {
+      setDraggedItemId(null);
+    };
+    window.addEventListener("dragend", handleDragEnd);
+    window.addEventListener("drop", handleDragEnd);
+    return () => {
+      window.removeEventListener("dragend", handleDragEnd);
+      window.removeEventListener("drop", handleDragEnd);
+    };
+  }, [draggedItemId]);
+
+  const epicsWithSchedule = useMemo(() => {
+    return getAllEpicsWithInferredSchedule(requirements, programIncrements, milestones);
+  }, [requirements, programIncrements, milestones]);
+
+  const parentEpicByItemId = useMemo(() => {
+    const map = new Map<string, RequirementItem>();
+    const epics = requirements.items.filter((i) => i.typeId === "epic" || i.typeId.toLowerCase().includes("epic"));
+    const epicIds = new Set(epics.map((e) => e.id));
+    for (const rel of requirements.relationships) {
+      if (epicIds.has(rel.fromItemId) && rel.typeId === "parent-of") {
+        const epic = epics.find((e) => e.id === rel.fromItemId);
+        if (epic) map.set(rel.toItemId, epic);
+      }
+    }
+    return map;
+  }, [requirements]);
+
+  const filteredChildItemIds = useMemo(() => {
+    if (filterEpicId === "all") return null;
+    return new Set(getChildItemsForParent(filterEpicId, requirements).map((i) => i.id));
+  }, [filterEpicId, requirements]);
 
   // Rebroadcasts this peer's own selection so others' "someone else has
   // this item open" indicator (see ItemCard's peersHere prop) stays
@@ -118,8 +184,27 @@ export function TimelineView({
     requirementsStore.updateItem(id, patch);
   };
 
+  const onConvertItemType = (id: string, newTypeId: string) => {
+    const newId = requirementsStore.convertItemType(id, newTypeId);
+    if (selectedItemId === id && newId) {
+      setSelectedItemId(newId);
+    }
+  };
+
   const onDeleteItem = (id: string) => {
     requirementsStore.deleteItem(id);
+  };
+
+  const onAddMilestone = (candidate: Omit<Milestone, "id" | "createdAt" | "updatedAt">) => {
+    return activeMilestonesStore.addMilestone(candidate);
+  };
+
+  const onUpdateMilestone = (id: string, patch: Partial<Omit<Milestone, "id">>) => {
+    activeMilestonesStore.updateMilestone(id, patch);
+  };
+
+  const onDeleteMilestone = (id: string) => {
+    activeMilestonesStore.deleteMilestone(id);
   };
 
   const onCreateAndAssignCategory = (itemId: string, label: string) => {
@@ -252,12 +337,26 @@ export function TimelineView({
     );
   }, [draggedItemId, requirements.relationships, requirements.relationshipTypes, requirements.itemTypes, requirements.items]);
 
+  const selectedMilestone = selectedMilestoneId ? milestones.find((m) => m.id === selectedMilestoneId) : null;
+
   return (
     <div className="timeline-view">
       <div className="timeline-view__toolbar">
         <button type="button" className="timeline-view__add-pi" onClick={onAddPI}>
           <Plus size={13} />
           Program Increment
+        </button>
+        <button
+          type="button"
+          className="timeline-view__add-milestone"
+          onClick={() => {
+            setAddMilestoneDate(undefined);
+            setIsAddingMilestone(true);
+          }}
+          title="Create a new Release or Timeline Milestone (FR-001)"
+        >
+          <Diamond size={13} />
+          Release / Milestone
         </button>
         <div className="timeline-view__mode-toggle">
           <button
@@ -276,32 +375,52 @@ export function TimelineView({
             Gantt
           </button>
         </div>
-      </div>
 
-      {peers.length > 0 && (
-        <div className="timeline-view__presence-bar">
-          {peers.map((p) => {
-            const focusedItem = p.focusedItemId ? requirements.items.find((it) => it.id === p.focusedItemId) : null;
-            return (
-              <span key={p.clientId} className="timeline-view__presence-chip">
-                <span className="timeline-view__presence-dot" style={{ backgroundColor: p.color }} />
-                <strong>{p.name}</strong>
-                {focusedItem ? <> — viewing {focusedItem.id}: {focusedItem.title}</> : " — browsing"}
-              </span>
-            );
-          })}
-        </div>
-      )}
+        {epicsWithSchedule.length > 0 && (
+          <div className="timeline-view__epic-filter">
+            <span style={{ fontSize: "12px", color: "var(--chrome-text-dim)" }}>Epic:</span>
+            <select
+              className="timeline-view__epic-select"
+              value={filterEpicId}
+              onChange={(e) => setFilterEpicId(e.target.value)}
+              title="Filter timeline cards by Epic"
+            >
+              <option value="all">All Epics</option>
+              {epicsWithSchedule.map(({ epic, schedule }) => (
+                <option key={epic.id} value={epic.id}>
+                  {epic.id}: {epic.title || "Untitled"} ({schedule.scheduledChildrenCount}/{schedule.totalChildrenCount} scheduled)
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <PresenceAvatarStack peers={peers} requirements={requirements} />
+      </div>
 
       {chartMode === "gantt" ? (
         <GanttChart
           programIncrements={programIncrements}
           requirements={requirements}
+          milestones={milestones}
+          filterEpicId={filterEpicId}
+          filteredChildItemIds={filteredChildItemIds}
           onSelectItem={(id) => setSelectedItemId(id)}
+          onSelectMilestone={(id) => setSelectedMilestoneId(id)}
           onNavigateToRequirement={onNavigateToRequirement}
         />
       ) : (
       <div className="timeline-view__content">
+        {/* Scheduled Releases & Milestones Overview Section (FR-003, AC-002, AC-009) */}
+        <MilestonesSection
+          milestones={milestones}
+          onSelectMilestone={(id) => setSelectedMilestoneId(id)}
+          onAddMilestone={() => {
+            setAddMilestoneDate(undefined);
+            setIsAddingMilestone(true);
+          }}
+        />
+
         {backlogItems.length > 0 && (
           <BacklogSection
             items={backlogItems}
@@ -309,6 +428,8 @@ export function TimelineView({
             team={team}
             draggedItemId={draggedItemId}
             blockingItemIds={blockingItemIds}
+            parentEpicByItemId={parentEpicByItemId}
+            filteredChildItemIds={filteredChildItemIds}
             onSelectItem={(id) => setSelectedItemId(id)}
             onDragStartItem={(id) => setDraggedItemId(id)}
             onDragEndItem={() => setDraggedItemId(null)}
@@ -326,6 +447,7 @@ export function TimelineView({
               key={pi.id}
               pi={pi}
               requirements={requirements}
+              milestones={milestones}
               team={team}
               itemsBySprintId={itemsBySprintId}
               backlogItems={backlogItems}
@@ -333,7 +455,10 @@ export function TimelineView({
               draggedItemId={draggedItemId}
               blockingItemIds={blockingItemIds}
               sprintRangesByItemId={sprintRangesByItemId}
+              parentEpicByItemId={parentEpicByItemId}
+              filteredChildItemIds={filteredChildItemIds}
               onSelectItem={(id) => setSelectedItemId(id)}
+              onSelectMilestone={(id) => setSelectedMilestoneId(id)}
               onDragStartItem={(id) => setDraggedItemId(id)}
               onDragEndItem={() => setDraggedItemId(null)}
               onDropItem={onMoveItemToSprint}
@@ -358,22 +483,231 @@ export function TimelineView({
           item={selectedItem}
           doc={requirements}
           programIncrements={programIncrements}
+          milestones={milestones}
           team={team}
           diagramRoot={diagramRoot}
           onNavigateToNode={onNavigateToNode}
           onCreateLinkedNode={onCreateLinkedNode}
           onClose={() => setSelectedItemId(null)}
           onUpdateItem={onUpdateItem}
+          onConvertItemType={onConvertItemType}
           onDeleteItem={onDeleteItem}
           onNavigateToRequirement={onNavigateToRequirement}
           onSelectItem={(id) => setSelectedItemId(id)}
+          onSelectMilestone={(id) => setSelectedMilestoneId(id)}
           onCreateAndAssignCategory={onCreateAndAssignCategory}
           onDeleteCategory={onDeleteCategory}
           onAddRelationship={onAddRelationship}
           onDeleteRelationship={onDeleteRelationship}
         />
       )}
+
+      {selectedMilestone && (
+        <MilestoneDetailModal
+          milestone={selectedMilestone}
+          doc={requirements}
+          programIncrements={programIncrements}
+          onClose={() => setSelectedMilestoneId(null)}
+          onUpdateMilestone={onUpdateMilestone}
+          onDeleteMilestone={onDeleteMilestone}
+          onNavigateToRequirement={onNavigateToRequirement}
+          onSelectItem={(id) => setSelectedItemId(id)}
+        />
+      )}
+
+      {isAddingMilestone && (
+        <AddMilestoneModal
+          initialDate={addMilestoneDate}
+          doc={requirements}
+          onClose={() => {
+            setIsAddingMilestone(false);
+            setAddMilestoneDate(undefined);
+          }}
+          onCreateMilestone={onAddMilestone}
+          onMilestoneCreated={(id) => setSelectedMilestoneId(id)}
+        />
+      )}
     </div>
+  );
+}
+
+interface PresenceAvatarStackProps {
+  peers: PresenceInfo[];
+  requirements: RequirementsDocument;
+}
+
+function getPresenceInitials(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) return "?";
+  const parts = trimmed.split(/[\s_-]+/);
+  if (parts.length >= 2 && parts[0] && parts[1]) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  return trimmed.slice(0, 2).toUpperCase();
+}
+
+function PresenceAvatarStack({ peers, requirements }: PresenceAvatarStackProps) {
+  if (peers.length === 0) return null;
+
+  const MAX_DISPLAY = 4;
+  const displayPeers = peers.slice(0, MAX_DISPLAY);
+  const overflowCount = peers.length - MAX_DISPLAY;
+
+  const summaryLines = peers.map((p) => {
+    const focusedItem = p.focusedItemId ? requirements.items.find((it) => it.id === p.focusedItemId) : null;
+    const action = focusedItem ? `viewing ${focusedItem.id}: ${focusedItem.title}` : "browsing";
+    return `• ${p.name} (${action})`;
+  });
+
+  const titleText = `Users on Timeline (${peers.length}):\n${summaryLines.join("\n")}`;
+
+  return (
+    <div
+      className="timeline-view__presence-stack"
+      title={titleText}
+      aria-label={`Users on Timeline: ${peers.length}`}
+    >
+      <div className="timeline-view__presence-avatars">
+        {displayPeers.map((p, idx) => {
+          const focusedItem = p.focusedItemId ? requirements.items.find((it) => it.id === p.focusedItemId) : null;
+          const statusText = focusedItem ? `viewing ${focusedItem.id}: ${focusedItem.title}` : "browsing";
+          return (
+            <span
+              key={p.clientId}
+              className="timeline-view__presence-avatar"
+              style={{
+                backgroundColor: p.color,
+                zIndex: displayPeers.length - idx,
+              }}
+              title={`${p.name} — ${statusText}`}
+            >
+              {getPresenceInitials(p.name)}
+            </span>
+          );
+        })}
+        {overflowCount > 0 && (
+          <span
+            className="timeline-view__presence-avatar timeline-view__presence-avatar--more"
+            style={{ zIndex: 0 }}
+            title={`${overflowCount} more user${overflowCount === 1 ? "" : "s"}`}
+          >
+            +{overflowCount}
+          </span>
+        )}
+      </div>
+
+      <div className="timeline-view__presence-popover" role="tooltip">
+        <div className="timeline-view__presence-popover-header">
+          Users on Timeline ({peers.length})
+        </div>
+        <div className="timeline-view__presence-popover-list">
+          {peers.map((p) => {
+            const focusedItem = p.focusedItemId ? requirements.items.find((it) => it.id === p.focusedItemId) : null;
+            const statusText = focusedItem ? `viewing ${focusedItem.id}: ${focusedItem.title}` : "browsing";
+            return (
+              <div key={p.clientId} className="timeline-view__presence-popover-item">
+                <span
+                  className="timeline-view__presence-popover-avatar"
+                  style={{ backgroundColor: p.color }}
+                >
+                  {getPresenceInitials(p.name)}
+                </span>
+                <div className="timeline-view__presence-popover-info">
+                  <span className="timeline-view__presence-popover-name">{p.name}</span>
+                  <span className="timeline-view__presence-popover-status">{statusText}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface MilestonesSectionProps {
+  milestones: Milestone[];
+  onSelectMilestone: (id: string) => void;
+  onAddMilestone: () => void;
+}
+
+function MilestonesSection({ milestones, onSelectMilestone, onAddMilestone }: MilestonesSectionProps) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  return (
+    <section className="milestones-section">
+      <div className="milestones-section__header">
+        <button
+          type="button"
+          className="milestones-section__collapse-toggle"
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          aria-label={isCollapsed ? "Expand milestones" : "Collapse milestones"}
+        >
+          {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+        </button>
+        <Diamond size={14} className="milestones-section__icon" />
+        <span className="milestones-section__title">Milestones & Releases</span>
+        <span className="milestones-section__count" title={`${milestones.length} milestone${milestones.length === 1 ? "" : "s"}`}>
+          {milestones.length}
+        </span>
+        <button
+          type="button"
+          className="milestones-section__add-btn"
+          onClick={onAddMilestone}
+          title="Create a new Release or Milestone"
+        >
+          <Plus size={12} />
+          <span>Add Release</span>
+        </button>
+      </div>
+
+      {!isCollapsed && (
+        <div className="milestones-section__items">
+          {milestones.length === 0 ? (
+            <p className="milestones-section__empty">
+              No releases or milestones scheduled yet. Click <strong>Add Release</strong> to place point-in-time outcomes on the timeline.
+            </p>
+          ) : (
+            milestones.map((m) => {
+              const color = getMilestoneColor(m);
+              const typeLabel = getMilestoneTypeLabel(m.type);
+              const relatedCount = m.relatedWorkableItemIds?.length ?? 0;
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  className="milestones-section__card"
+                  style={{ borderLeftColor: color }}
+                  onClick={() => onSelectMilestone(m.id)}
+                  title={`${typeLabel}: ${m.name} \u2022 Scheduled: ${m.scheduledAt}${relatedCount > 0 ? ` \u2022 ${relatedCount} related work item${relatedCount === 1 ? "" : "s"}` : ""}`}
+                >
+                  <div className="milestones-section__card-header">
+                    <span className="milestones-section__card-shape" style={{ color }}>
+                      ◆
+                    </span>
+                    <span className="milestones-section__card-type" style={{ color }}>
+                      {typeLabel}
+                    </span>
+                    {m.version && (
+                      <span className="milestones-section__card-version">v{m.version}</span>
+                    )}
+                  </div>
+                  <div className="milestones-section__card-name">{m.name}</div>
+                  <div className="milestones-section__card-footer">
+                    <span className="milestones-section__card-date">{m.scheduledAt}</span>
+                    {relatedCount > 0 && (
+                      <span className="milestones-section__card-work-badge">
+                        {relatedCount} {relatedCount === 1 ? "item" : "items"}
+                      </span>
+                    )}
+                  </div>
+                </button>
+              );
+            })
+          )}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -383,6 +717,8 @@ interface BacklogSectionProps {
   team?: TeamDocument;
   draggedItemId: string | null;
   blockingItemIds?: Set<string>;
+  parentEpicByItemId?: Map<string, RequirementItem>;
+  filteredChildItemIds?: Set<string> | null;
   onSelectItem: (itemId: string) => void;
   onDragStartItem: (itemId: string) => void;
   onDragEndItem: () => void;
@@ -417,6 +753,8 @@ function BacklogSection({
   team,
   draggedItemId,
   blockingItemIds,
+  parentEpicByItemId,
+  filteredChildItemIds,
   onSelectItem,
   onDragStartItem,
   onDragEndItem,
@@ -427,6 +765,13 @@ function BacklogSection({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [query, setQuery] = useState("");
   const dragCounter = useRef(0);
+
+  useEffect(() => {
+    if (!draggedItemId) {
+      dragCounter.current = 0;
+      setIsDragOver(false);
+    }
+  }, [draggedItemId]);
 
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
@@ -452,6 +797,7 @@ function BacklogSection({
     e.preventDefault();
     dragCounter.current = 0;
     setIsDragOver(false);
+    onDragEndItem();
     const itemId = e.dataTransfer.getData("text/plain") || draggedItemId;
     if (itemId) {
       onDropItem(itemId);
@@ -459,8 +805,11 @@ function BacklogSection({
   };
 
   const q = query.trim().toLowerCase();
-  const filteredItems =
-    q === "" ? items : items.filter((item) => item.id.toLowerCase().includes(q) || item.title.toLowerCase().includes(q));
+  const filteredItems = items.filter((item) => {
+    if (filteredChildItemIds && !filteredChildItemIds.has(item.id)) return false;
+    if (q === "") return true;
+    return item.id.toLowerCase().includes(q) || item.title.toLowerCase().includes(q);
+  });
 
   return (
     <section className="backlog-section">
@@ -499,13 +848,14 @@ function BacklogSection({
           onDrop={handleDrop}
         >
           {filteredItems.length === 0 ? (
-            <p className="backlog-section__empty">No items match "{query.trim()}".</p>
+            <p className="backlog-section__empty">No backlog items match criteria.</p>
           ) : (
             filteredItems.map((item) => {
               const type = getItemType(requirements, item.typeId);
               const category = item.categoryId ? requirements.categories.find((c) => c.id === item.categoryId) : undefined;
               const isDragging = draggedItemId === item.id;
               const isBlocker = blockingItemIds?.has(item.id);
+              const parentEpic = parentEpicByItemId?.get(item.id);
               return (
                 <div
                   key={item.id}
@@ -538,6 +888,14 @@ function BacklogSection({
                     >
                       {item.id}
                     </span>
+                    {parentEpic && (
+                      <span
+                        className="pi-board-item__epic-badge"
+                        title={`Epic: ${parentEpic.id} ${parentEpic.title || ""}`}
+                      >
+                        {parentEpic.id}
+                      </span>
+                    )}
                     {isBlocker && (
                       <span
                         className="pi-board-item__blocker-badge"
@@ -557,7 +915,7 @@ function BacklogSection({
                   </div>
                   <div className="pi-board-item__title">{item.title || "Untitled"}</div>
                   <div className="pi-board-item__footer">
-                    {team && (
+                    {team && isItemWorkable(requirements, item) && (
                       <MemberPicker
                         team={team}
                         assigneeId={item.assigneeId}
@@ -566,11 +924,13 @@ function BacklogSection({
                         onClear={() => onUpdateItem(item.id, { assigneeId: undefined })}
                       />
                     )}
-                    <PointsPicker
-                      points={item.points}
-                      compact={true}
-                      onChange={(points) => onUpdateItem(item.id, { points })}
-                    />
+                    {isItemWorkable(requirements, item) && (
+                      <PointsPicker
+                        points={item.points}
+                        compact={true}
+                        onChange={(points) => onUpdateItem(item.id, { points })}
+                      />
+                    )}
                   </div>
                 </div>
               );
@@ -585,6 +945,7 @@ function BacklogSection({
 interface ProgramIncrementCardProps {
   pi: ProgramIncrement;
   requirements: RequirementsDocument;
+  milestones?: Milestone[];
   team?: TeamDocument;
   itemsBySprintId: Map<string, RequirementItem[]>;
   backlogItems: RequirementItem[];
@@ -592,7 +953,10 @@ interface ProgramIncrementCardProps {
   draggedItemId: string | null;
   blockingItemIds: Set<string>;
   sprintRangesByItemId: Map<string, { startDate: string; endDate: string }>;
+  parentEpicByItemId?: Map<string, RequirementItem>;
+  filteredChildItemIds?: Set<string> | null;
   onSelectItem: (itemId: string) => void;
+  onSelectMilestone?: (id: string) => void;
   onDragStartItem: (itemId: string) => void;
   onDragEndItem: () => void;
   onDropItem: (itemId: string, sprintId: string) => string | null;
@@ -611,6 +975,7 @@ interface ProgramIncrementCardProps {
 function ProgramIncrementCard({
   pi,
   requirements,
+  milestones,
   team,
   itemsBySprintId,
   backlogItems,
@@ -618,7 +983,10 @@ function ProgramIncrementCard({
   draggedItemId,
   blockingItemIds,
   sprintRangesByItemId,
+  parentEpicByItemId,
+  filteredChildItemIds,
   onSelectItem,
+  onSelectMilestone,
   onDragStartItem,
   onDragEndItem,
   onDropItem,
@@ -811,6 +1179,8 @@ function ProgramIncrementCard({
                 sprint={sprint}
                 range={rangeBySprintId.get(sprint.id)}
                 itemCount={itemsBySprintId.get(sprint.id)?.length ?? 0}
+                milestones={milestones}
+                requirements={requirements}
                 isFirst={index === 0}
                 isLast={index === pi.sprints.length - 1}
                 onUpdateName={(name) => onUpdateSprintName(sprint.id, name)}
@@ -842,6 +1212,7 @@ function ProgramIncrementCard({
                 range={rangeBySprintId.get(sprint.id)}
                 items={itemsBySprintId.get(sprint.id) ?? []}
                 requirements={requirements}
+                milestones={milestones}
                 team={team}
                 backlogItems={backlogItems}
                 conflictSeverityByItemId={conflictSeverityByItemId}
@@ -849,7 +1220,10 @@ function ProgramIncrementCard({
                 blockingItemIds={blockingItemIds}
                 sprintRangesByItemId={sprintRangesByItemId}
                 reservations={pi.reservations}
+                parentEpicByItemId={parentEpicByItemId}
+                filteredChildItemIds={filteredChildItemIds}
                 onSelectItem={onSelectItem}
+                onSelectMilestone={onSelectMilestone}
                 onDragStartItem={onDragStartItem}
                 onDragEndItem={onDragEndItem}
                 onDropItem={onDropItem}
@@ -878,6 +1252,7 @@ interface SprintBoardColumnProps {
   range?: { startDate: string; endDate: string };
   items: RequirementItem[];
   requirements: RequirementsDocument;
+  milestones?: Milestone[];
   team?: TeamDocument;
   backlogItems: RequirementItem[];
   conflictSeverityByItemId: Map<string, { severity: ScheduleConflictSeverity; blocker: RequirementItem }>;
@@ -885,7 +1260,10 @@ interface SprintBoardColumnProps {
   blockingItemIds: Set<string>;
   sprintRangesByItemId: Map<string, { startDate: string; endDate: string }>;
   reservations?: CapacityReservation[];
+  parentEpicByItemId?: Map<string, RequirementItem>;
+  filteredChildItemIds?: Set<string> | null;
   onSelectItem: (id: string) => void;
+  onSelectMilestone?: (id: string) => void;
   onDragStartItem: (id: string) => void;
   onDragEndItem: () => void;
   onDropItem: (itemId: string, sprintId: string) => string | null;
@@ -897,6 +1275,7 @@ function SprintBoardColumn({
   range,
   items,
   requirements,
+  milestones,
   team,
   backlogItems,
   conflictSeverityByItemId,
@@ -904,7 +1283,10 @@ function SprintBoardColumn({
   blockingItemIds,
   sprintRangesByItemId,
   reservations,
+  parentEpicByItemId,
+  filteredChildItemIds,
   onSelectItem,
+  onSelectMilestone,
   onDragStartItem,
   onDragEndItem,
   onDropItem,
@@ -914,6 +1296,17 @@ function SprintBoardColumn({
   const dragCounter = useRef(0);
   const [dropError, setDropError] = useState<string | null>(null);
   const dropErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!draggedItemId) {
+      dragCounter.current = 0;
+      setIsDragOver(false);
+    }
+  }, [draggedItemId]);
+
+  const sprintSummary = useMemo(() => {
+    return computeSprintMilestoneSummary(sprint, range, milestones, requirements);
+  }, [sprint, range, milestones, requirements]);
 
   const activeSprintReservations = getSprintActiveReservations(reservations, sprint.id);
 
@@ -940,6 +1333,11 @@ function SprintBoardColumn({
       sprintRangesByItemId
     );
   }, [draggedItemId, sprint.id, range, requirements.items, requirements.relationships, requirements.relationshipTypes, requirements.itemTypes, sprintRangesByItemId]);
+
+  const visibleItems = useMemo(() => {
+    if (!filteredChildItemIds) return items;
+    return items.filter((item) => filteredChildItemIds.has(item.id));
+  }, [items, filteredChildItemIds]);
 
   const isBlocked = dropConflict?.severity === "blocked";
   const isAtRisk = dropConflict?.severity === "risk";
@@ -972,6 +1370,7 @@ function SprintBoardColumn({
     e.preventDefault();
     dragCounter.current = 0;
     setIsDragOver(false);
+    onDragEndItem();
     const itemId = e.dataTransfer.getData("text/plain") || draggedItemId;
     if (itemId) {
       const error = onDropItem(itemId, sprint.id);
@@ -996,9 +1395,9 @@ function SprintBoardColumn({
           <span className="pi-board-column__name">{sprint.name}</span>
           <span
             className="pi-board-column__count"
-            title={`${items.length} requirement item${items.length === 1 ? "" : "s"} assigned`}
+            title={`${visibleItems.length} requirement item${visibleItems.length === 1 ? "" : "s"} assigned`}
           >
-            {items.length}
+            {visibleItems.length}
           </span>
           <SprintQuickAdd
             backlogItems={backlogItems}
@@ -1015,6 +1414,105 @@ function SprintBoardColumn({
 
         {capacitySummary && <SprintCapacityBar summary={capacitySummary} compact={true} />}
       </div>
+      {(sprintSummary.directMilestones.length > 0 ||
+        sprintSummary.impactedReleases.length > 0 ||
+        sprintSummary.impactedEpics.length > 0 ||
+        sprintSummary.externalDependencies.length > 0) && (
+        <div className="pi-board-column__milestones">
+          {(sprintSummary.directMilestones.length > 0 ||
+            sprintSummary.impactedReleases.length > 0 ||
+            sprintSummary.externalDependencies.length > 0) && (
+            <div className="pi-board-column__milestone-chips">
+              {sprintSummary.directMilestones.map((m) => {
+                const color = getMilestoneColor(m);
+                const typeLabel = getMilestoneTypeLabel(m.type);
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    className="pi-board-column__milestone-pill"
+                    style={{ borderColor: color, color }}
+                    onClick={() => onSelectMilestone?.(m.id)}
+                    title={`${typeLabel}: ${m.name} \u2022 Scheduled: ${m.scheduledAt}`}
+                  >
+                    <span className="pi-board-column__milestone-shape">◆</span>
+                    <span className="pi-board-column__milestone-name">{m.name}</span>
+                    {m.version && <span className="pi-board-column__milestone-ver">v{m.version}</span>}
+                  </button>
+                );
+              })}
+              {sprintSummary.impactedReleases.map((rel) => {
+                const mColor = getMilestoneColor(rel.milestone);
+                return (
+                  <button
+                    key={rel.milestone.id}
+                    type="button"
+                    className="pi-board-column__release-pill"
+                    style={{ borderColor: mColor, color: mColor }}
+                    onClick={() => onSelectMilestone?.(rel.milestone.id)}
+                    title={`Target Release: ${rel.milestone.name} (${rel.completedRelatedItemsCount}/${rel.totalRelatedItemsCount} completed \u2022 ${rel.relatedItemsInSprint.length} in this sprint)`}
+                  >
+                    <span className="pi-board-column__release-shape">📦</span>
+                    <span className="pi-board-column__release-name">{rel.milestone.name}</span>
+                    <span className="pi-board-column__release-progress">
+                      {rel.completedRelatedItemsCount}/{rel.totalRelatedItemsCount} ({rel.completionPercentage}%)
+                    </span>
+                  </button>
+                );
+              })}
+              {sprintSummary.externalDependencies.map((dep) => (
+                <button
+                  key={dep.id}
+                  type="button"
+                  className="pi-board-column__dep-pill"
+                  onClick={() => onSelectItem(dep.id)}
+                  title={`External Dependency: ${dep.id} ${dep.title || ""}`}
+                >
+                  <span className="pi-board-column__dep-icon">⚡</span>
+                  <span className="pi-board-column__dep-name">{dep.id}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {sprintSummary.impactedEpics.length > 0 && (
+            <div className="pi-board-column__epic-progress-list">
+              {sprintSummary.impactedEpics.map((epicInfo) => {
+                const isComplete = epicInfo.completionPercentage === 100;
+                return (
+                  <div
+                    key={epicInfo.epic.id}
+                    className={`pi-board-column__epic-progress-card${isComplete ? " is-complete" : ""}`}
+                    onClick={() => onSelectItem(epicInfo.epic.id)}
+                    title={`Epic: ${epicInfo.epic.id} - ${epicInfo.epic.title || "Untitled"}\n${epicInfo.completedChildrenCount}/${epicInfo.totalChildrenCount} completed (${epicInfo.completionPercentage}%)\n${epicInfo.itemsInSprint.length} item(s) in this sprint`}
+                  >
+                    <div className="pi-board-column__epic-progress-header">
+                      <span className="pi-board-column__epic-progress-title">
+                        <span style={{ color: "#a78bfa" }}>⚡</span>
+                        <span>{epicInfo.epic.id}</span>
+                        {epicInfo.epic.title && (
+                          <span className="pi-board-column__epic-progress-name">
+                            {epicInfo.epic.title}
+                          </span>
+                        )}
+                      </span>
+                      <span className="pi-board-column__epic-progress-metrics">
+                        {epicInfo.completedChildrenCount}/{epicInfo.totalChildrenCount} ({epicInfo.completionPercentage}%)
+                      </span>
+                    </div>
+                    <div className="pi-board-column__epic-progress-bar-bg">
+                      <div
+                        className="pi-board-column__epic-progress-bar-fill"
+                        style={{ width: `${Math.max(epicInfo.completionPercentage, 4)}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
       {dropConflict && (
         <div
           className={`pi-board-column__blocked-banner${isAtRisk ? " is-risk" : ""}`}
@@ -1038,7 +1536,7 @@ function SprintBoardColumn({
       )}
       {dropError && <p className="pi-board-column__drop-error">{dropError}</p>}
       <div className="pi-board-column__items">
-        {items.length === 0 ? (
+        {visibleItems.length === 0 ? (
           <div className="pi-board-column__empty">
             {isBlocked
               ? `Cannot add: blocked by ${dropConflict?.blocker.id}`
@@ -1047,7 +1545,7 @@ function SprintBoardColumn({
                 : "No requirements assigned"}
           </div>
         ) : (
-          items.map((item) => {
+          visibleItems.map((item) => {
             const type = getItemType(requirements, item.typeId);
             const category = item.categoryId
               ? requirements.categories.find((c) => c.id === item.categoryId)
@@ -1057,6 +1555,7 @@ function SprintBoardColumn({
             const isConflicted = conflictInfo?.severity === "blocked";
             const isAtRisk = conflictInfo?.severity === "risk";
             const isBlocker = blockingItemIds.has(item.id);
+            const parentEpic = parentEpicByItemId?.get(item.id);
             return (
               <div
                 key={item.id}
@@ -1093,6 +1592,14 @@ function SprintBoardColumn({
                   >
                     {item.id}
                   </span>
+                  {parentEpic && (
+                    <span
+                      className="pi-board-item__epic-badge"
+                      title={`Epic: ${parentEpic.id} ${parentEpic.title || ""}`}
+                    >
+                      {parentEpic.id}
+                    </span>
+                  )}
                   {isBlocker && (
                     <span
                       className="pi-board-item__blocker-badge"
@@ -1130,7 +1637,7 @@ function SprintBoardColumn({
                 </div>
                 <div className="pi-board-item__title">{item.title || "Untitled"}</div>
                 <div className="pi-board-item__footer">
-                  {team && (
+                  {team && isItemWorkable(requirements, item) && (
                     <MemberPicker
                       team={team}
                       assigneeId={item.assigneeId}
@@ -1139,11 +1646,13 @@ function SprintBoardColumn({
                       onClear={() => onUpdateItem(item.id, { assigneeId: undefined })}
                     />
                   )}
-                  <PointsPicker
-                    points={item.points}
-                    compact={true}
-                    onChange={(points) => onUpdateItem(item.id, { points })}
-                  />
+                  {isItemWorkable(requirements, item) && (
+                    <PointsPicker
+                      points={item.points}
+                      compact={true}
+                      onChange={(points) => onUpdateItem(item.id, { points })}
+                    />
+                  )}
                 </div>
               </div>
             );
@@ -1158,6 +1667,8 @@ interface SprintRowProps {
   sprint: Sprint;
   range: { startDate: string; endDate: string } | undefined;
   itemCount: number;
+  milestones?: Milestone[];
+  requirements: RequirementsDocument;
   isFirst: boolean;
   isLast: boolean;
   onUpdateName: (name: string) => void;
@@ -1167,7 +1678,24 @@ interface SprintRowProps {
   onMoveDown: () => void;
 }
 
-function SprintRow({ sprint, range, itemCount, isFirst, isLast, onUpdateName, onUpdateEnd, onDelete, onMoveUp, onMoveDown }: SprintRowProps) {
+function SprintRow({
+  sprint,
+  range,
+  itemCount,
+  milestones = [],
+  requirements,
+  isFirst,
+  isLast,
+  onUpdateName,
+  onUpdateEnd,
+  onDelete,
+  onMoveUp,
+  onMoveDown,
+}: SprintRowProps) {
+  const sprintSummary = useMemo(() => {
+    return computeSprintMilestoneSummary(sprint, range, milestones, requirements);
+  }, [sprint, range, milestones, requirements]);
+
   return (
     <div className="sprint-row">
       <div className="sprint-row__reorder">
@@ -1190,6 +1718,30 @@ function SprintRow({ sprint, range, itemCount, isFirst, isLast, onUpdateName, on
         onChange={(e) => onUpdateEnd(e.target.value)}
       />
       <span className="sprint-row__duration">{sprint.durationDays}d</span>
+      {sprintSummary.directMilestones.length > 0 && (
+        <span
+          className="sprint-row__milestone-badge"
+          title={`${sprintSummary.directMilestones.length} milestone(s) in sprint: ${sprintSummary.directMilestones.map((m) => m.name).join(", ")}`}
+        >
+          ◆ {sprintSummary.directMilestones.length}
+        </span>
+      )}
+      {sprintSummary.impactedReleases.length > 0 && (
+        <span
+          className="sprint-row__release-badge"
+          title={`Impacts ${sprintSummary.impactedReleases.length} release(s): ${sprintSummary.impactedReleases.map((r) => r.milestone.name).join(", ")}`}
+        >
+          📦 {sprintSummary.impactedReleases.length}
+        </span>
+      )}
+      {sprintSummary.impactedEpics.length > 0 && (
+        <span
+          className="sprint-row__epic-badge"
+          title={`Contains work for ${sprintSummary.impactedEpics.length} epic(s): ${sprintSummary.impactedEpics.map((e) => `${e.epic.id} (${e.completedChildrenCount}/${e.totalChildrenCount})`).join(", ")}`}
+        >
+          ⚡ {sprintSummary.impactedEpics.length}
+        </span>
+      )}
       {itemCount > 0 && (
         <span className="sprint-row__item-count" title={`${itemCount} requirement item${itemCount === 1 ? "" : "s"} assigned`}>
           {itemCount}

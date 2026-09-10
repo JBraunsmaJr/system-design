@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Link2, X } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, Link2, Plus, Search, X } from "lucide-react";
 import {
+  getItemType,
   getRelationshipType,
   getRelationshipsForItem,
   getOtherItemId,
@@ -18,7 +19,7 @@ interface RelationshipManagerProps {
   onNavigateToItem: (itemId: string) => void;
 }
 
-const DROPDOWN_WIDTH = 260;
+const DROPDOWN_WIDTH = 320;
 
 /** One selectable "verb" in the add-relationship popover. A single
  * RelationshipType with distinct forward/inverse labels (e.g. "Blocks" /
@@ -48,13 +49,9 @@ function buildVerbOptions(doc: RequirementsDocument): VerbOption[] {
 
 /**
  * Same portal + flip-positioning approach used throughout this app's
- * dropdowns (see CategoryPicker for the full reasoning). Two-part
- * popover: a row of verb chips at the top (built from every relationship
- * type's forward and, where distinct, inverse label), then a searchable
- * list of every OTHER item below - picking one immediately creates the
- * relationship using whichever verb is currently selected, and the
- * popover stays open afterward so several relationships can be added in
- * one sitting without reopening it each time.
+ * dropdowns (see CategoryPicker for the full reasoning).
+ * A compact, clean popover with an intuitive relationship type selector
+ * and searchable list of target items.
  */
 export function RelationshipManager({
   itemId,
@@ -64,15 +61,23 @@ export function RelationshipManager({
   onNavigateToItem,
 }: RelationshipManagerProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isSelectingVerb, setIsSelectingVerb] = useState(false);
   const [query, setQuery] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const verbOptions = useMemo(() => buildVerbOptions(doc), [doc]);
-  const [selectedVerb, setSelectedVerb] = useState<VerbOption | null>(null);
-  const activeVerb = selectedVerb ?? verbOptions[0] ?? null;
+  const [selectedVerbKey, setSelectedVerbKey] = useState<string | null>(null);
+  const activeVerb = useMemo(() => {
+    if (selectedVerbKey) {
+      const match = verbOptions.find((v) => `${v.typeId}::${v.direction}` === selectedVerbKey);
+      if (match) return match;
+    }
+    return verbOptions[0] ?? null;
+  }, [verbOptions, selectedVerbKey]);
 
   const existingRelationships = useMemo(() => getRelationshipsForItem(doc, itemId), [doc, itemId]);
 
@@ -82,9 +87,11 @@ export function RelationshipManager({
     const rect = trigger.getBoundingClientRect();
     setDropdownPos({ top: rect.bottom + 4, left: Math.max(8, rect.right - DROPDOWN_WIDTH) });
     setIsOpen(true);
+    setIsSelectingVerb(false);
   };
   const close = () => {
     setIsOpen(false);
+    setIsSelectingVerb(false);
     setQuery("");
     setErrorMessage(null);
   };
@@ -102,7 +109,7 @@ export function RelationshipManager({
       { width: window.innerWidth, height: window.innerHeight }
     );
     setDropdownPos((prev) => (prev && prev.top === next.top && prev.left === next.left ? prev : next));
-  }, [isOpen, query, activeVerb]);
+  }, [isOpen, query, activeVerb, isSelectingVerb, existingRelationships.length]);
 
   const reposition = useCallback(() => {
     const trigger = triggerRef.current;
@@ -122,9 +129,9 @@ export function RelationshipManager({
   useEffect(() => {
     if (!isOpen) return;
     const handler = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (triggerRef.current?.contains(target)) return;
-      if (dropdownRef.current?.contains(target)) return;
+      const path = event.composedPath();
+      if (triggerRef.current && path.includes(triggerRef.current)) return;
+      if (dropdownRef.current && path.includes(dropdownRef.current)) return;
       close();
     };
     document.addEventListener("mousedown", handler);
@@ -140,6 +147,12 @@ export function RelationshipManager({
       window.removeEventListener("resize", reposition);
     };
   }, [isOpen, reposition]);
+
+  useEffect(() => {
+    if (isOpen && !isSelectingVerb) {
+      searchInputRef.current?.focus();
+    }
+  }, [isOpen, isSelectingVerb]);
 
   // Excludes the current item itself and anything already related to it
   // via the currently-selected verb+direction specifically - the same
@@ -253,69 +266,146 @@ export function RelationshipManager({
           <div
             ref={dropdownRef}
             className="relationship-manager__dropdown"
-            style={{ position: "fixed", top: dropdownPos.top, left: dropdownPos.left }}
+            style={{ position: "fixed", top: dropdownPos.top, left: dropdownPos.left, width: DROPDOWN_WIDTH }}
+            role="dialog"
+            aria-label="Add relationship"
           >
-            <div className="relationship-manager__verbs">
-              {verbOptions.map((verb) => (
-                <button
-                  key={`${verb.typeId}-${verb.direction}`}
-                  type="button"
-                  className={`relationship-manager__verb${activeVerb === verb ? " active" : ""}`}
-                  style={activeVerb === verb ? { borderColor: verb.color, color: verb.color } : undefined}
-                  onClick={() => {
-                    setSelectedVerb(verb);
-                    setErrorMessage(null);
-                  }}
-                >
-                  {verb.displayLabel}
-                </button>
-              ))}
+            <div className="relationship-manager__header">
+              <span className="relationship-manager__header-label">Relationship</span>
+              <button
+                type="button"
+                className={`relationship-manager__type-btn ${isSelectingVerb ? "is-open" : ""}`}
+                onClick={() => {
+                  setIsSelectingVerb((prev) => !prev);
+                  setErrorMessage(null);
+                }}
+                aria-expanded={isSelectingVerb}
+                title="Choose relationship type"
+              >
+                <span
+                  className="relationship-manager__verb-swatch"
+                  style={{ background: activeVerb?.color ?? "var(--accent)" }}
+                />
+                <span className="relationship-manager__verb-name">{activeVerb?.displayLabel ?? "Select type"}</span>
+                {isSelectingVerb ? (
+                  <ChevronUp size={13} className="relationship-manager__type-chevron" />
+                ) : (
+                  <ChevronDown size={13} className="relationship-manager__type-chevron" />
+                )}
+              </button>
             </div>
-            <input
-              autoFocus
-              className="relationship-manager__search"
-              placeholder="Search items to relate..."
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                setErrorMessage(null);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") close();
-              }}
-            />
-            {errorMessage && <p className="relationship-manager__error">{errorMessage}</p>}
-            <div className="relationship-manager__list">
-              {candidates.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  className="relationship-manager__option"
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    if (!activeVerb) return;
-                    const result =
-                      activeVerb.direction === "forward"
-                        ? onAddRelationship(activeVerb.typeId, itemId, item.id)
-                        : onAddRelationship(activeVerb.typeId, item.id, itemId);
-                    if (result) {
-                      setErrorMessage(result);
-                    } else {
+
+            {isSelectingVerb ? (
+              <div className="relationship-manager__verb-menu">
+                <div className="relationship-manager__section-label">Select relationship type:</div>
+                <div className="relationship-manager__verb-list">
+                  {verbOptions.map((verb) => {
+                    const isSelected = activeVerb?.typeId === verb.typeId && activeVerb?.direction === verb.direction;
+                    return (
+                      <button
+                        key={`${verb.typeId}-${verb.direction}`}
+                        type="button"
+                        className={`relationship-manager__verb-option ${isSelected ? "is-selected" : ""}`}
+                        onClick={() => {
+                          setSelectedVerbKey(`${verb.typeId}::${verb.direction}`);
+                          setIsSelectingVerb(false);
+                          setErrorMessage(null);
+                        }}
+                      >
+                        <span className="relationship-manager__verb-swatch" style={{ background: verb.color }} />
+                        <span className="relationship-manager__verb-option-label">{verb.displayLabel}</span>
+                        {isSelected && <Check size={13} className="relationship-manager__check-icon" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="relationship-manager__search-wrap">
+                  <Search size={13} className="relationship-manager__search-icon" />
+                  <input
+                    ref={searchInputRef}
+                    autoFocus
+                    className="relationship-manager__search-input"
+                    placeholder="Search items to relate..."
+                    value={query}
+                    onChange={(e) => {
+                      setQuery(e.target.value);
                       setErrorMessage(null);
-                      setQuery("");
-                    }
-                  }}
-                >
-                  <span className="relationship-manager__option-id">{item.id}</span>
-                  <span className="relationship-manager__option-title">{item.title || "(untitled)"}</span>
-                </button>
-              ))}
-              {candidates.length === 0 && (
-                <p className="relationship-manager__empty">
-                  {doc.items.length <= 1 ? "No other items exist yet." : "No matching items."}
-                </p>
-              )}
-            </div>
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") close();
+                    }}
+                  />
+                  {query && (
+                    <button
+                      type="button"
+                      className="relationship-manager__search-clear"
+                      onClick={() => setQuery("")}
+                      title="Clear search"
+                      aria-label="Clear search"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+
+                {errorMessage && <p className="relationship-manager__error">{errorMessage}</p>}
+
+                <div className="relationship-manager__list">
+                  {candidates.map((item) => {
+                    const itemType = getItemType(doc, item.typeId);
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className="relationship-manager__option"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (!activeVerb) return;
+                          const result =
+                            activeVerb.direction === "forward"
+                              ? onAddRelationship(activeVerb.typeId, itemId, item.id)
+                              : onAddRelationship(activeVerb.typeId, item.id, itemId);
+                          if (result) {
+                            setErrorMessage(result);
+                          } else {
+                            setErrorMessage(null);
+                          }
+                        }}
+                      >
+                        <span
+                          className="relationship-manager__option-id"
+                          style={
+                            itemType
+                              ? {
+                                  color: itemType.color,
+                                  borderColor: `${itemType.color}55`,
+                                  backgroundColor: `${itemType.color}15`,
+                                }
+                              : undefined
+                          }
+                        >
+                          {item.id}
+                        </span>
+                        <span className="relationship-manager__option-title">{item.title || "(untitled)"}</span>
+                        <Plus size={13} className="relationship-manager__option-add" />
+                      </button>
+                    );
+                  })}
+                  {candidates.length === 0 && (
+                    <p className="relationship-manager__empty">
+                      {doc.items.length <= 1
+                        ? "No other items exist yet."
+                        : query
+                        ? `No items match "${query}"`
+                        : "All items are already linked."}
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
           </div>,
           document.body
         )}

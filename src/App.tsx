@@ -58,6 +58,9 @@ import type { DiagramStore } from "./collab/diagramStore";
 import { createYjsDiagramStore, seedYjsDiagramDoc } from "./collab/yjsDiagramStore";
 import { createYjsProgramIncrementsStore, seedYjsProgramIncrementsDoc } from "./collab/yjsProgramIncrementsStore";
 import type { ProgramIncrementsStore } from "./collab/programIncrementsStore";
+import type { Milestone } from "./domain/milestones";
+import { createAdapterMilestonesStore, type MilestonesStore } from "./collab/milestonesStore";
+import { createYjsMilestonesStore, seedYjsMilestonesDoc } from "./collab/yjsMilestonesStore";
 import { startCollabSession, type CollabSession, type PresenceInfo, type LocalPresenceInfo } from "./collab/session";
 import { loadPresenceName, savePresenceName, loadShowPeerCursors, saveShowPeerCursors } from "./domain/presenceIdentity";
 import { loadSignalingUrls, saveSignalingUrls, parseSignalingUrls } from "./domain/signalingConfig";
@@ -81,6 +84,7 @@ interface DiagramSnapshot {
   requirements: RequirementsDocument;
   programIncrements: ProgramIncrement[];
   team: TeamDocument;
+  milestones: Milestone[];
 }
 
 /**
@@ -117,6 +121,7 @@ function diagramFileToSnapshot(file: ReturnType<typeof parseDiagramFile>): Diagr
     requirements: finalRequirements,
     programIncrements: file.programIncrements,
     team: file.team ?? EMPTY_TEAM_DOCUMENT,
+    milestones: file.milestones ?? [],
   };
 }
 
@@ -131,6 +136,7 @@ const DEFAULT_SNAPSHOT: DiagramSnapshot = {
   },
   programIncrements: [],
   team: EMPTY_TEAM_DOCUMENT,
+  milestones: [],
 };
 
 // Small, fixed palette for presence colors - not shared with team's own
@@ -259,6 +265,19 @@ function App() {
   );
   const localTeamStore = useMemo(() => createAdapterTeamStore(() => team, setTeam), [team, setTeam]);
 
+  const setMilestones = useCallback(
+    (updater: Milestone[] | ((prev: Milestone[]) => Milestone[])) =>
+      setDiagram((prev) => ({
+        ...prev,
+        milestones: typeof updater === "function" ? (updater as (p: Milestone[]) => Milestone[])(prev.milestones) : updater,
+      })),
+    [setDiagram]
+  );
+  const localMilestonesStore = useMemo(
+    () => createAdapterMilestonesStore(() => diagram.milestones, setMilestones),
+    [diagram.milestones, setMilestones]
+  );
+
   // --- Collaborative sessions -----------------------------------------------
   //
   // A session covers all four domains - team, requirements, program
@@ -287,6 +306,7 @@ function App() {
     requirementsStore: RequirementsStore;
     programIncrementsStore: ProgramIncrementsStore;
     diagramStore: DiagramStore;
+    milestonesStore: MilestonesStore;
   }
   const [activeSession, setActiveSession] = useState<ActiveCollabSession | null>(null);
 
@@ -457,11 +477,13 @@ function App() {
       seedYjsRequirementsDoc(doc, requirements);
       seedYjsProgramIncrementsDoc(doc, programIncrements);
       seedYjsDiagramDoc(doc, root);
+      seedYjsMilestonesDoc(doc, diagram.milestones ?? []);
       const teamStore = createYjsTeamStore(doc);
       seedTeamStore(teamStore, team);
       const requirementsStoreForSession = createYjsRequirementsStore(doc);
       const programIncrementsStoreForSession = createYjsProgramIncrementsStore(doc);
       const diagramStoreForSession = createYjsDiagramStore(doc);
+      const milestonesStoreForSession = createYjsMilestonesStore(doc);
       const session = startCollabSession(doc, roomName, { signalingUrls, password: password || undefined, iceServers });
       const initialPresence: LocalPresenceInfo = {
         name: displayName.trim() || "Guest",
@@ -483,9 +505,10 @@ function App() {
         requirementsStore: requirementsStoreForSession,
         programIncrementsStore: programIncrementsStoreForSession,
         diagramStore: diagramStoreForSession,
+        milestonesStore: milestonesStoreForSession,
       });
     },
-    [requirements, programIncrements, team, root, signalingUrls, iceServers, displayName]
+    [requirements, programIncrements, team, root, diagram.milestones, signalingUrls, iceServers, displayName]
   );
 
   // Joins an existing session by room name - starts from an EMPTY doc
@@ -499,6 +522,7 @@ function App() {
       const requirementsStoreForSession = createYjsRequirementsStore(doc);
       const programIncrementsStoreForSession = createYjsProgramIncrementsStore(doc);
       const diagramStoreForSession = createYjsDiagramStore(doc);
+      const milestonesStoreForSession = createYjsMilestonesStore(doc);
       const session = startCollabSession(doc, roomName, { signalingUrls, password: password || undefined, iceServers });
       const initialPresence: LocalPresenceInfo = {
         name: displayName.trim() || "Guest",
@@ -520,6 +544,7 @@ function App() {
         requirementsStore: requirementsStoreForSession,
         programIncrementsStore: programIncrementsStoreForSession,
         diagramStore: diagramStoreForSession,
+        milestonesStore: milestonesStoreForSession,
       });
     },
     [signalingUrls, iceServers, displayName]
@@ -535,11 +560,12 @@ function App() {
     setTeam(() => activeSession.teamStore.getSnapshot());
     setRequirements(() => activeSession.requirementsStore.getSnapshot());
     setProgramIncrements(() => activeSession.programIncrementsStore.getSnapshot());
+    setMilestones(() => activeSession.milestonesStore.getSnapshot());
     const finalDiagramSnapshot = activeSession.diagramStore.getSnapshot();
     setRoot(() => unflattenToSubDiagram(finalDiagramSnapshot.nodes, finalDiagramSnapshot.edges));
     activeSession.session.disconnect();
     setActiveSession(null);
-  }, [activeSession, setTeam, setRequirements, setProgramIncrements, setRoot]);
+  }, [activeSession, setTeam, setRequirements, setProgramIncrements, setMilestones, setRoot]);
 
   useEffect(() => {
     return () => {
@@ -554,8 +580,30 @@ function App() {
   const teamStore = activeSession?.teamStore ?? localTeamStore;
   const requirementsStore = activeSession?.requirementsStore ?? localRequirementsStore;
   const programIncrementsStore = activeSession?.programIncrementsStore ?? localProgramIncrementsStore;
+  const milestonesStore = activeSession?.milestonesStore ?? localMilestonesStore;
   const diagramStore = activeSession?.diagramStore ?? localDiagramStore;
   const diagramStoreRef = useRef(diagramStore);
+
+  // Subscribed via useSyncExternalStore (not just a plain useMemo keyed
+  // on diagramStore/path/selection) because the Yjs-backed session store
+  // never changes ITS OWN object reference when a remote peer edits the
+  // diagram - it's the same store instance for the whole session. A
+  // plain useMemo would never re-run for a remote change at all, only
+  // ever catching up once something else (like switching views) forced
+  // a re-render for an unrelated reason. The local adapter's own
+  // subscribe is a deliberate no-op (local mode already re-renders via
+  // React's own state flow when setRoot changes), so this costs nothing
+  // extra there - it's specifically the collaborative path this fixes.
+  const diagramSnapshot = useSyncExternalStore(diagramStore.subscribe, diagramStore.getSnapshot);
+  const teamSnapshot = useSyncExternalStore(teamStore.subscribe, teamStore.getSnapshot);
+  const requirementsSnapshot = useSyncExternalStore(requirementsStore.subscribe, requirementsStore.getSnapshot);
+  const programIncrementsSnapshot = useSyncExternalStore(programIncrementsStore.subscribe, programIncrementsStore.getSnapshot);
+  const milestonesSnapshot = useSyncExternalStore(milestonesStore.subscribe, milestonesStore.getSnapshot);
+
+  const liveRoot = useMemo(
+    () => unflattenToSubDiagram(diagramSnapshot.nodes, diagramSnapshot.edges),
+    [diagramSnapshot]
+  );
 
   // Layout effect rather than a render-phase assignment, for the same
   // reason as activeSessionRef above - and with the same consequence if
@@ -581,19 +629,20 @@ function App() {
     const timer = setTimeout(() => {
       saveAutosave(
         toDiagramFile(
-          diagram.title,
-          diagram.root.nodes,
-          diagram.root.edges,
-          diagram.scenarios,
-          diagram.requirements,
-          diagram.programIncrements,
-          diagram.team
+          title,
+          liveRoot.nodes,
+          liveRoot.edges,
+          scenarios,
+          requirementsSnapshot,
+          programIncrementsSnapshot,
+          teamSnapshot,
+          milestonesSnapshot
         )
       );
       setHasAutosaved(true);
     }, 1000);
     return () => clearTimeout(timer);
-  }, [diagram]);
+  }, [title, liveRoot, scenarios, requirementsSnapshot, programIncrementsSnapshot, teamSnapshot, milestonesSnapshot]);
 
   const [path, setPath] = useState<DiagramPath>([]);
 
@@ -608,7 +657,7 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSession, path]);
 
-  const breadcrumbLabels = useMemo(() => getBreadcrumbLabels(root, path), [root, path]);
+  const breadcrumbLabels = useMemo(() => getBreadcrumbLabels(liveRoot, path), [liveRoot, path]);
 
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
   const [selectedEdgeIds, setSelectedEdgeIds] = useState<string[]>([]);
@@ -624,22 +673,6 @@ function App() {
     broadcastPresence({ selectedNodeIds, selectedEdgeIds });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSession, selectedNodeIds, selectedEdgeIds]);
-
-
-  // Subscribed via useSyncExternalStore (not just a plain useMemo keyed
-  // on diagramStore/path/selection) because the Yjs-backed session store
-  // never changes ITS OWN object reference when a remote peer edits the
-  // diagram - it's the same store instance for the whole session. A
-  // plain useMemo would never re-run for a remote change at all, only
-  // ever catching up once something else (like switching views) forced
-  // a re-render for an unrelated reason. The local adapter's own
-  // subscribe is a deliberate no-op (local mode already re-renders via
-  // React's own state flow when setRoot changes), so this costs nothing
-  // extra there - it's specifically the collaborative path this fixes.
-  const diagramSnapshot = useSyncExternalStore(diagramStore.subscribe, diagramStore.getSnapshot);
-  const teamSnapshot = useSyncExternalStore(teamStore.subscribe, teamStore.getSnapshot);
-  const requirementsSnapshot = useSyncExternalStore(requirementsStore.subscribe, requirementsStore.getSnapshot);
-  const programIncrementsSnapshot = useSyncExternalStore(programIncrementsStore.subscribe, programIncrementsStore.getSnapshot);
 
   // This client's own record of what React Flow last measured each node
   // to be. Deliberately state rather than a ref, even though it's only
@@ -1058,21 +1091,23 @@ function App() {
     [nodes, diagramStore]
   );
 
-  // Called after dragging a *boundary* - see Canvas.tsx's onNodeDragStop.
+  // Called after dragging or resizing a *boundary* - see Canvas.tsx's onNodeDragStop
+  // and GroupNode.tsx's onResizeEnd.
   // `nodeIds` are whichever nodes now fall fully inside it and aren't
   // already its children. Any node already parented to a different group
   // gets moved over (its position is re-derived relative to the new parent,
   // same math as onReparentNode).
   const onAdoptIntoGroup = useCallback(
-    (groupId: string, nodeIds: string[]) => {
+    (groupId: string, nodeIds: string[], groupPosition?: { x: number; y: number }) => {
       const group = nodes.find((n) => n.id === groupId);
       if (!group) return;
+      const groupPos = groupPosition ?? group.position;
       for (const nodeId of nodeIds) {
         if (nodeId === groupId) continue;
         const n = nodes.find((nn) => nn.id === nodeId);
         if (!n) continue;
         const absolute = toAbsolutePosition(n, nodes, n.parentId);
-        const relative = { x: absolute.x - group.position.x, y: absolute.y - group.position.y };
+        const relative = { x: absolute.x - groupPos.x, y: absolute.y - groupPos.y };
         diagramStore.updateParentId(nodeId, groupId, relative);
       }
     },
@@ -1682,7 +1717,7 @@ function App() {
   // --- File / diagram lifecycle -------------------------------------------
 
   const onNew = useCallback(() => {
-    if (root.nodes.length > 0 && !window.confirm("Clear the current diagram? Unsaved changes will be lost.")) {
+    if (liveRoot.nodes.length > 0 && !window.confirm("Clear the current diagram? Unsaved changes will be lost.")) {
       return;
     }
     resetDiagramHistory(DEFAULT_SNAPSHOT);
@@ -1690,17 +1725,25 @@ function App() {
     setActiveScenarioId(null);
     setActiveStepIndex(0);
     setIsPresenting(false);
-  }, [root.nodes.length, resetDiagramHistory]);
+  }, [liveRoot.nodes.length, resetDiagramHistory]);
 
   // Always saves the full tree from the root, regardless of which level
   // you're currently viewing - a save from inside a drilled-down sub-diagram
   // must not lose everything above/beside it.
   const onSave = useCallback(() => {
-    const liveRoot = unflattenToSubDiagram(diagramSnapshot.nodes, diagramSnapshot.edges);
     downloadDiagram(
-      toDiagramFile(title, liveRoot.nodes, liveRoot.edges, scenarios, requirementsSnapshot, programIncrementsSnapshot, teamSnapshot)
+      toDiagramFile(
+        title,
+        liveRoot.nodes,
+        liveRoot.edges,
+        scenarios,
+        requirementsSnapshot,
+        programIncrementsSnapshot,
+        teamSnapshot,
+        milestonesSnapshot
+      )
     );
-  }, [title, diagramSnapshot, scenarios, requirementsSnapshot, programIncrementsSnapshot, teamSnapshot]);
+  }, [title, liveRoot, scenarios, requirementsSnapshot, programIncrementsSnapshot, teamSnapshot, milestonesSnapshot]);
 
   // Exports export the CURRENT view (whatever level you're looking at),
   // unlike Save - drilling into a node and exporting just that sub-diagram
@@ -1714,8 +1757,8 @@ function App() {
   }, [nodes, title]);
 
   const onExportRequirementsMarkdown = useCallback(() => {
-    downloadRequirementsMarkdown(title, requirements);
-  }, [title, requirements]);
+    downloadRequirementsMarkdown(title, requirementsSnapshot);
+  }, [title, requirementsSnapshot]);
 
   const onLoadClick = useCallback(() => fileInputRef.current?.click(), []);
 
@@ -1768,7 +1811,7 @@ function App() {
           viewMode={viewMode}
           onSetViewMode={setViewMode}
           onExportRequirementsMarkdown={onExportRequirementsMarkdown}
-          canExportRequirements={requirements.items.length > 0}
+          canExportRequirements={requirementsSnapshot.items.length > 0}
           hasAutosaved={hasAutosaved}
           isInSession={!!activeSession}
           collabPanel={
@@ -1877,7 +1920,7 @@ function App() {
               canAddStep={canAddStep}
               activeStepId={activeStepId}
               onSelectStep={onSelectStep}
-              root={root}
+              root={liveRoot}
               currentPath={path}
               height={scenarioPanelHeight}
               onHeightChange={setScenarioPanelHeight}
@@ -1924,7 +1967,7 @@ function App() {
             requirementsStore={requirementsStore}
             programIncrements={programIncrementsSnapshot}
             team={teamSnapshot}
-            diagramRoot={root}
+            diagramRoot={liveRoot}
             onNavigateToNode={onNavigateToNode}
             onCreateLinkedNode={onCreateLinkedNode}
             focusItemId={pendingRequirementFocus}
@@ -1937,8 +1980,9 @@ function App() {
           <TimelineView
             programIncrementsStore={programIncrementsStore}
             requirementsStore={requirementsStore}
+            milestonesStore={milestonesStore}
             team={teamSnapshot}
-            diagramRoot={root}
+            diagramRoot={liveRoot}
             onNavigateToNode={onNavigateToNode}
             onCreateLinkedNode={onCreateLinkedNode}
             onNavigateToRequirement={onNavigateToRequirement}
@@ -1958,7 +2002,7 @@ function App() {
             requirementsStore={requirementsStore}
             programIncrements={programIncrementsSnapshot}
             team={teamSnapshot}
-            diagramRoot={root}
+            diagramRoot={liveRoot}
             onNavigateToNode={onNavigateToNode}
             onCreateLinkedNode={onCreateLinkedNode}
             onNavigateToRequirement={onNavigateToRequirement}

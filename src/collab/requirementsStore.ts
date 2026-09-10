@@ -6,6 +6,9 @@ import type {
 import { EMPTY_REQUIREMENTS_DOCUMENT } from "../domain/requirementsTypes";
 import {
   generateItemId,
+  getNextAvailableIdForType,
+  updateItemReferencesInItems,
+  updateItemReferencesInRelationships,
   createCategory,
   addRelationship as addRelationshipPure,
   defaultStatusForType,
@@ -31,6 +34,10 @@ export interface RequirementsStore {
    * scroll to / focus the new item immediately after creating it. */
   addItem(typeId: string): string;
   updateItem(id: string, patch: Partial<Omit<RequirementItem, "id" | "typeId">>): void;
+  /** Converts an existing item to a different type, adjusting its ID and workable fields as needed, retroactively updating all references */
+  convertItemType(id: string, newTypeId: string): string | undefined;
+  /** Converts all items using fromTypeId to toTypeId, regenerating their IDs and updating references, and returns the count of converted items */
+  convertAllItemsOfType(fromTypeId: string, toTypeId: string): number;
   /** Also removes any relationship touching this item on either side -
    * matching all three existing deleteItem call sites' "orphaned
    * reference" cleanup. */
@@ -120,6 +127,84 @@ export function createLocalRequirementsStore(
     updateItem: (id, patch) => {
       doc = { ...doc, items: doc.items.map((i) => (i.id === id ? { ...i, ...patch } : i)) };
       notify();
+    },
+
+    convertItemType: (id, newTypeId) => {
+      const itemToConvert = doc.items.find((i) => i.id === id);
+      if (!itemToConvert) return undefined;
+      if (itemToConvert.typeId === newTypeId) return id;
+      const targetType = doc.itemTypes.find((t) => t.id === newTypeId);
+      if (!targetType) return undefined;
+
+      const newId = getNextAvailableIdForType(doc, newTypeId);
+      const isWorkable = targetType.isWorkable;
+
+      let updatedItems = doc.items.map((item) => {
+        if (item.id !== id) return item;
+        return {
+          ...item,
+          id: newId,
+          typeId: newTypeId,
+          status: isWorkable ? (item.status ?? "todo") : undefined,
+          points: isWorkable ? item.points : undefined,
+          assigneeId: isWorkable ? item.assigneeId : undefined,
+          sprintId: isWorkable ? item.sprintId : undefined,
+        };
+      });
+
+      updatedItems = updateItemReferencesInItems(updatedItems, id, newId);
+      const updatedRelationships = updateItemReferencesInRelationships(doc.relationships, id, newId);
+
+      doc = {
+        ...doc,
+        items: updatedItems,
+        relationships: updatedRelationships,
+      };
+      notify();
+      return newId;
+    },
+
+    convertAllItemsOfType: (fromTypeId, toTypeId) => {
+      if (fromTypeId === toTypeId) return 0;
+      const targetType = doc.itemTypes.find((t) => t.id === toTypeId);
+      if (!targetType) return 0;
+
+      const itemsToConvert = doc.items.filter((i) => i.typeId === fromTypeId);
+      if (itemsToConvert.length === 0) return 0;
+
+      const isWorkable = targetType.isWorkable;
+      const conversions: { oldId: string; newId: string }[] = [];
+      const occupiedIds = new Set<string>();
+
+      let updatedItems = doc.items.map((item) => {
+        if (item.typeId !== fromTypeId) return item;
+        const newId = getNextAvailableIdForType(doc, toTypeId, occupiedIds);
+        occupiedIds.add(newId);
+        conversions.push({ oldId: item.id, newId });
+        return {
+          ...item,
+          id: newId,
+          typeId: toTypeId,
+          status: isWorkable ? (item.status ?? "todo") : undefined,
+          points: isWorkable ? item.points : undefined,
+          assigneeId: isWorkable ? item.assigneeId : undefined,
+          sprintId: isWorkable ? item.sprintId : undefined,
+        };
+      });
+
+      let updatedRelationships = doc.relationships;
+      for (const { oldId, newId } of conversions) {
+        updatedItems = updateItemReferencesInItems(updatedItems, oldId, newId);
+        updatedRelationships = updateItemReferencesInRelationships(updatedRelationships, oldId, newId);
+      }
+
+      doc = {
+        ...doc,
+        items: updatedItems,
+        relationships: updatedRelationships,
+      };
+      notify();
+      return conversions.length;
     },
 
     deleteItem: (id) => {
@@ -265,6 +350,99 @@ export function createAdapterRequirementsStore(
         ...prev,
         items: prev.items.map((i) => (i.id === id ? { ...i, ...patch } : i)),
       }));
+    },
+
+    convertItemType: (id, newTypeId) => {
+      let resultId: string | undefined = undefined;
+      setSnapshot((prev) => {
+        const itemToConvert = prev.items.find((i) => i.id === id);
+        if (!itemToConvert) return prev;
+        if (itemToConvert.typeId === newTypeId) {
+          resultId = id;
+          return prev;
+        }
+        const targetType = prev.itemTypes.find((t) => t.id === newTypeId);
+        if (!targetType) return prev;
+
+        const newId = getNextAvailableIdForType(prev, newTypeId);
+        resultId = newId;
+        const isWorkable = targetType.isWorkable;
+
+        let updatedItems = prev.items.map((item) => {
+          if (item.id !== id) return item;
+          return {
+            ...item,
+            id: newId,
+            typeId: newTypeId,
+            status: isWorkable ? (item.status ?? "todo") : undefined,
+            points: isWorkable ? item.points : undefined,
+            assigneeId: isWorkable ? item.assigneeId : undefined,
+            sprintId: isWorkable ? item.sprintId : undefined,
+          };
+        });
+
+        updatedItems = updateItemReferencesInItems(updatedItems, id, newId);
+        const updatedRelationships = updateItemReferencesInRelationships(prev.relationships, id, newId);
+
+        return {
+          ...prev,
+          items: updatedItems,
+          relationships: updatedRelationships,
+        };
+      });
+      return resultId;
+    },
+
+    convertAllItemsOfType: (fromTypeId, toTypeId) => {
+      if (fromTypeId === toTypeId) return 0;
+      const snapshot = getSnapshot();
+      const targetType = snapshot.itemTypes.find((t) => t.id === toTypeId);
+      if (!targetType) return 0;
+
+      const matchingItems = snapshot.items.filter((i) => i.typeId === fromTypeId);
+      if (matchingItems.length === 0) return 0;
+      const count = matchingItems.length;
+
+      setSnapshot((prev) => {
+        const currentTargetType = prev.itemTypes.find((t) => t.id === toTypeId);
+        if (!currentTargetType) return prev;
+
+        const itemsToConvert = prev.items.filter((i) => i.typeId === fromTypeId);
+        if (itemsToConvert.length === 0) return prev;
+
+        const isWorkable = currentTargetType.isWorkable;
+        const conversions: { oldId: string; newId: string }[] = [];
+        const occupiedIds = new Set<string>();
+
+        let updatedItems = prev.items.map((item) => {
+          if (item.typeId !== fromTypeId) return item;
+          const newId = getNextAvailableIdForType(prev, toTypeId, occupiedIds);
+          occupiedIds.add(newId);
+          conversions.push({ oldId: item.id, newId });
+          return {
+            ...item,
+            id: newId,
+            typeId: toTypeId,
+            status: isWorkable ? (item.status ?? "todo") : undefined,
+            points: isWorkable ? item.points : undefined,
+            assigneeId: isWorkable ? item.assigneeId : undefined,
+            sprintId: isWorkable ? item.sprintId : undefined,
+          };
+        });
+
+        let updatedRelationships = prev.relationships;
+        for (const { oldId, newId } of conversions) {
+          updatedItems = updateItemReferencesInItems(updatedItems, oldId, newId);
+          updatedRelationships = updateItemReferencesInRelationships(updatedRelationships, oldId, newId);
+        }
+
+        return {
+          ...prev,
+          items: updatedItems,
+          relationships: updatedRelationships,
+        };
+      });
+      return count;
     },
 
     deleteItem: (id) => {

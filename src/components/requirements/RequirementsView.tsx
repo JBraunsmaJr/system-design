@@ -188,6 +188,14 @@ export function RequirementsView({
     requirementsStoreRef.current.updateItem(id, patch);
   }, []);
 
+  const onConvertItemType = useCallback((id: string, newTypeId: string) => {
+    requirementsStoreRef.current.convertItemType(id, newTypeId);
+  }, []);
+
+  const onConvertAllItemsOfType = useCallback((fromTypeId: string, toTypeId: string) => {
+    return requirementsStoreRef.current.convertAllItemsOfType(fromTypeId, toTypeId);
+  }, []);
+
   const onDeleteItem = useCallback((id: string) => {
     requirementsStoreRef.current.deleteItem(id);
   }, []);
@@ -413,6 +421,7 @@ export function RequirementsView({
                   onNavigateToNode={onNavigateToNode}
                   onCreateLinkedNode={onCreateLinkedNode}
                   onUpdateItem={onUpdateItem}
+                  onConvertItemType={onConvertItemType}
                   onDeleteItem={onDeleteItem}
                   onNavigateToItem={onNavigateToItem}
                   onCreateAndAssignCategory={onCreateAndAssignCategory}
@@ -435,6 +444,7 @@ export function RequirementsView({
           onAddCustomType={onAddCustomType}
           onUpdateType={onUpdateType}
           onDeleteCustomType={onDeleteCustomType}
+          onConvertAllItemsOfType={onConvertAllItemsOfType}
           onClose={() => setIsManagingTypes(false)}
         />
       )}

@@ -11,6 +11,8 @@ export const BUILT_IN_ITEM_TYPES: RequirementItemType[] = [
   { id: "constraint", label: "Constraint", prefix: "CON", color: "#F2994A", isBuiltIn: true, isWorkable: false },
   { id: "assumption", label: "Assumption", prefix: "ASM", color: "#9061F9", isBuiltIn: true, isWorkable: false },
   { id: "risk", label: "Risk", prefix: "RISK", color: "#F0578C", isBuiltIn: true, isWorkable: false },
+  { id: "epic", label: "Epic", prefix: "EPIC", color: "#8b5cf6", isBuiltIn: true, isWorkable: false },
+  { id: "dependency", label: "Dependency", prefix: "DEP", color: "#f59e0b", isBuiltIn: true, isWorkable: false },
   { id: "ticket", label: "Ticket", prefix: "TICKET", color: "#22B8CF", isBuiltIn: true, isWorkable: true },
 ];
 
@@ -54,7 +56,9 @@ export function isItemWorkable(doc: RequirementsDocument, item: RequirementItem)
  * shown when viewing the relationship from the other item. */
 export const BUILT_IN_RELATIONSHIP_TYPES: RelationshipType[] = [
   { id: "relates-to", label: "Relates to", inverseLabel: "Relates to", color: "#8b90a0", isBuiltIn: true, isBlocking: false },
+  { id: "parent-of", label: "Parent of", inverseLabel: "Child of", color: "#8b5cf6", isBuiltIn: true, isBlocking: false },
   { id: "blocks", label: "Blocks", inverseLabel: "Is blocked by", color: "#F0578C", isBuiltIn: true, isBlocking: true },
+  { id: "depends-on", label: "Depends on", inverseLabel: "Depended on by", color: "#f59e0b", isBuiltIn: true, isBlocking: true },
   { id: "duplicates", label: "Duplicates", inverseLabel: "Is duplicated by", color: "#F2994A", isBuiltIn: true, isBlocking: false },
 ];
 
@@ -100,15 +104,44 @@ export function isPrefixTaken(doc: RequirementsDocument, prefix: string, exclude
 /** Generates the next id for `typeId` (e.g. "REQ-1", then "REQ-2"...) and
  * returns the updated sequence map to store back onto the document -
  * doesn't mutate `doc`, matching the immutable-update pattern used
- * throughout this app's state. */
+ * throughout this app's state.
+ * Fills gaps if items were deleted (e.g. if DEP-2 was deleted from DEP-1 and DEP-3,
+ * the next item generated will be DEP-2, then DEP-4). */
+export function getNextAvailableIdForType(
+  doc: RequirementsDocument,
+  typeId: string,
+  extraOccupiedIds?: Set<string>
+): string {
+  const type = getItemType(doc, typeId);
+  if (!type) throw new Error(`Unknown requirement item type: ${typeId}`);
+  const prefix = type.prefix;
+  const existingIds = new Set(doc.items.map((i) => i.id));
+  if (extraOccupiedIds) {
+    for (const id of extraOccupiedIds) existingIds.add(id);
+  }
+  let n = 1;
+  while (existingIds.has(`${prefix}-${n}`)) {
+    n++;
+  }
+  return `${prefix}-${n}`;
+}
+
 export function generateItemId(
   doc: RequirementsDocument,
   typeId: string
 ): { id: string; nextSequence: Record<string, number> } {
   const type = getItemType(doc, typeId);
   if (!type) throw new Error(`Unknown requirement item type: ${typeId}`);
-  const sequence = doc.nextSequence[typeId] ?? 1;
-  return { id: `${type.prefix}-${sequence}`, nextSequence: { ...doc.nextSequence, [typeId]: sequence + 1 } };
+  const id = getNextAvailableIdForType(doc, typeId);
+  const match = new RegExp(`^${type.prefix}-(\\d+)$`).exec(id);
+  const seqNum = match ? parseInt(match[1], 10) : (doc.nextSequence[typeId] ?? 1);
+  return {
+    id,
+    nextSequence: {
+      ...doc.nextSequence,
+      [typeId]: Math.max(doc.nextSequence[typeId] ?? 1, seqNum + 1),
+    },
+  };
 }
 
 export function getCategory(doc: RequirementsDocument, categoryId: string | undefined): RequirementCategory | undefined {
@@ -230,6 +263,46 @@ export function resolveReferencesToMarkdownLinks(text: string, doc: Requirements
   return text.replace(REFERENCE_PATTERN, (fullMatch, id: string) => {
     if (!existingIds.has(id)) return fullMatch;
     return `[${fullMatch}](#ref:${id})`;
+  });
+}
+
+/** Updates all `#oldId` and `#ref:oldId` references in markdown text to `#newId` and `#ref:newId`. */
+export function updateItemReferencesInText(text: string, oldId: string, newId: string): string {
+  if (!text || oldId === newId) return text;
+  const escapedOldId = oldId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return text
+    .replace(new RegExp(`#${escapedOldId}\\b`, "g"), `#${newId}`)
+    .replace(new RegExp(`#ref:${escapedOldId}\\b`, "g"), `#ref:${newId}`);
+}
+
+/** Updates all `fromItemId` and `toItemId` occurrences of `oldId` to `newId` across relationships. */
+export function updateItemReferencesInRelationships(
+  relationships: RequirementRelationship[],
+  oldId: string,
+  newId: string
+): RequirementRelationship[] {
+  if (oldId === newId) return relationships;
+  return relationships.map((r) => {
+    if (r.fromItemId !== oldId && r.toItemId !== oldId) return r;
+    return {
+      ...r,
+      fromItemId: r.fromItemId === oldId ? newId : r.fromItemId,
+      toItemId: r.toItemId === oldId ? newId : r.toItemId,
+    };
+  });
+}
+
+/** Updates all references to `oldId` in items' bodies. */
+export function updateItemReferencesInItems(
+  items: RequirementItem[],
+  oldId: string,
+  newId: string
+): RequirementItem[] {
+  if (oldId === newId) return items;
+  return items.map((item) => {
+    const updatedBody = updateItemReferencesInText(item.body, oldId, newId);
+    if (updatedBody === item.body) return item;
+    return { ...item, body: updatedBody };
   });
 }
 

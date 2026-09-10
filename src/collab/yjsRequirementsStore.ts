@@ -7,7 +7,14 @@ import type {
   RelationshipType,
   RequirementRelationship,
 } from "../domain/requirementsTypes";
-import { defaultStatusForType, isPrefixTaken, addRelationship as addRelationshipPure, BUILT_IN_ITEM_TYPES, BUILT_IN_RELATIONSHIP_TYPES } from "../domain/requirementsRegistry";
+import {
+  defaultStatusForType,
+  isPrefixTaken,
+  addRelationship as addRelationshipPure,
+  updateItemReferencesInText,
+  BUILT_IN_ITEM_TYPES,
+  BUILT_IN_RELATIONSHIP_TYPES,
+} from "../domain/requirementsRegistry";
 import type { RequirementsStore } from "./requirementsStore";
 
 /** Item storage keys are purely internal - never displayed, never
@@ -506,10 +513,22 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
      * @param typeId
      */
     addItem: (typeId) => {
-      const sequence = (nextSequence.get(typeId) as number | undefined) ?? 1;
       const typeMap = itemTypes.get(typeId);
       const type = typeMap ? itemTypeMapToPlain(typeId, typeMap) : undefined;
-      const displayId = `${type?.prefix ?? typeId}-${sequence}`;
+      const prefix = type?.prefix ?? typeId;
+      const usedIds = new Set<string>();
+      for (const storageKey of itemOrder.toArray()) {
+        const itemMap = items.get(storageKey);
+        if (itemMap) {
+          const itId = itemMap.get("id") as string;
+          if (itId) usedIds.add(itId);
+        }
+      }
+      let sequence = 1;
+      while (usedIds.has(`${prefix}-${sequence}`)) {
+        sequence++;
+      }
+      const displayId = `${prefix}-${sequence}`;
       const storageKey = collisionResistantId("item");
       doc.transact(() => {
         const m = new Y.Map<unknown>();
@@ -534,6 +553,160 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
           m.set(key, value);
         }
       });
+    },
+
+    convertItemType: (id, newTypeId) => {
+      const storageKey = displayIdToStorageKey.get(id);
+      const m = storageKey ? items.get(storageKey) : undefined;
+      if (!m) return undefined;
+      const currentTypeId = m.get("typeId") as string;
+      if (currentTypeId === newTypeId) return id;
+
+      const targetTypeMap = itemTypes.get(newTypeId);
+      if (!targetTypeMap) return undefined;
+      const isWorkable = (targetTypeMap.get("isWorkable") as boolean) ?? false;
+      const targetPrefix = (targetTypeMap.get("prefix") as string) ?? newTypeId;
+
+      const usedIds = new Set<string>();
+      for (const key of itemOrder.toArray()) {
+        const itemMap = items.get(key);
+        if (itemMap) {
+          const itId = itemMap.get("id") as string;
+          if (itId) usedIds.add(itId);
+        }
+      }
+      let sequence = 1;
+      while (usedIds.has(`${targetPrefix}-${sequence}`)) {
+        sequence++;
+      }
+      const newId = `${targetPrefix}-${sequence}`;
+
+      doc.transact(() => {
+        m.set("id", newId);
+        m.set("typeId", newTypeId);
+        if (isWorkable) {
+          if (!m.get("status")) m.set("status", "todo");
+        } else {
+          m.set("status", undefined);
+          m.set("points", undefined);
+          m.set("assigneeId", undefined);
+          m.set("sprintId", undefined);
+        }
+
+        // Update relationships
+        for (const [relId, rel] of relationships.entries()) {
+          if (rel.fromItemId === id || rel.toItemId === id) {
+            relationships.set(relId, {
+              ...rel,
+              fromItemId: rel.fromItemId === id ? newId : rel.fromItemId,
+              toItemId: rel.toItemId === id ? newId : rel.toItemId,
+            });
+          }
+        }
+
+        // Update references in body of all items
+        for (const key of itemOrder.toArray()) {
+          const itemMap = items.get(key);
+          if (itemMap) {
+            const body = itemMap.get("body") as string | undefined;
+            if (body && (body.includes(`#${id}`) || body.includes(`#ref:${id}`))) {
+              itemMap.set("body", updateItemReferencesInText(body, id, newId));
+            }
+          }
+        }
+
+        nextSequence.set(newTypeId, sequence + 1);
+      });
+      return newId;
+    },
+
+    convertAllItemsOfType: (fromTypeId, toTypeId) => {
+      if (fromTypeId === toTypeId) return 0;
+      const targetTypeMap = itemTypes.get(toTypeId);
+      if (!targetTypeMap) return 0;
+      const isWorkable = (targetTypeMap.get("isWorkable") as boolean) ?? false;
+      const targetPrefix = (targetTypeMap.get("prefix") as string) ?? toTypeId;
+
+      const usedIds = new Set<string>();
+      for (const key of itemOrder.toArray()) {
+        const itemMap = items.get(key);
+        if (itemMap) {
+          const itId = itemMap.get("id") as string;
+          if (itId) usedIds.add(itId);
+        }
+      }
+
+      const conversions: { oldId: string; newId: string; storageKey: string }[] = [];
+      let sequence = 1;
+
+      for (const storageKey of itemOrder.toArray()) {
+        const m = items.get(storageKey);
+        if (m && m.get("typeId") === fromTypeId) {
+          const oldId = m.get("id") as string;
+          while (usedIds.has(`${targetPrefix}-${sequence}`)) {
+            sequence++;
+          }
+          const newId = `${targetPrefix}-${sequence}`;
+          usedIds.add(newId);
+          conversions.push({ oldId, newId, storageKey });
+          sequence++;
+        }
+      }
+
+      if (conversions.length === 0) return 0;
+
+      doc.transact(() => {
+        for (const { newId, storageKey } of conversions) {
+          const m = items.get(storageKey);
+          if (m) {
+            m.set("id", newId);
+            m.set("typeId", toTypeId);
+            if (isWorkable) {
+              if (!m.get("status")) m.set("status", "todo");
+            } else {
+              m.set("status", undefined);
+              m.set("points", undefined);
+              m.set("assigneeId", undefined);
+              m.set("sprintId", undefined);
+            }
+          }
+        }
+
+        // Update relationships
+        for (const { oldId, newId } of conversions) {
+          for (const [relId, rel] of relationships.entries()) {
+            if (rel.fromItemId === oldId || rel.toItemId === oldId) {
+              relationships.set(relId, {
+                ...rel,
+                fromItemId: rel.fromItemId === oldId ? newId : rel.fromItemId,
+                toItemId: rel.toItemId === oldId ? newId : rel.toItemId,
+              });
+            }
+          }
+        }
+
+        // Update references in body of all items
+        for (const key of itemOrder.toArray()) {
+          const itemMap = items.get(key);
+          if (itemMap) {
+            let body = itemMap.get("body") as string | undefined;
+            if (body) {
+              let updated = body;
+              for (const { oldId, newId } of conversions) {
+                if (updated.includes(`#${oldId}`) || updated.includes(`#ref:${oldId}`)) {
+                  updated = updateItemReferencesInText(updated, oldId, newId);
+                }
+              }
+              if (updated !== body) {
+                itemMap.set("body", updated);
+              }
+            }
+          }
+        }
+
+        nextSequence.set(toTypeId, sequence);
+      });
+      return conversions.length;
     },
 
     deleteItem: (id) => {
