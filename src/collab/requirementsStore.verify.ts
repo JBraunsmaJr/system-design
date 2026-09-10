@@ -623,7 +623,7 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: RequirementsStore } {
   assert(snap.itemTypes.filter((t) => t.id === "custom-1").length === 1, "with no duplicate type left behind");
 }
 
-// === Part 26: item type conversion and batch transfer ===
+// === Part 26: item type conversion, retroactive references, gap-filling sequence ===
 {
   function verifyConversion(store: RequirementsStore, label: string) {
     store.addCustomType("LegacyEpic", "LEP", "#8b5cf6", false);
@@ -632,10 +632,11 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: RequirementsStore } {
     store.updateItem(item1, { title: "Custom Item 1" });
     store.updateItem(item2, { title: "Custom Item 2" });
 
-    // Single item convert
-    store.convertItemType(item1, "epic");
+    // Single item convert changes ID to target type's prefix
+    const newId1 = store.convertItemType(item1, "epic");
     let snap = store.getSnapshot();
-    const convertedItem1 = snap.items.find((i) => i.id === item1);
+    const convertedItem1 = snap.items.find((i) => i.id === newId1);
+    assert(Boolean(newId1?.startsWith("EPIC-")), `[${label}] single item conversion updates ID to prefix of target type`);
     assert(convertedItem1?.typeId === "epic", `[${label}] single item conversion updates typeId to epic`);
     assert(convertedItem1?.title === "Custom Item 1", `[${label}] single item conversion preserves item title and data`);
 
@@ -647,7 +648,8 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: RequirementsStore } {
     assert(count === 1, `[${label}] convertAllItemsOfType returns the number of converted items`);
 
     snap = store.getSnapshot();
-    const convertedItem2 = snap.items.find((i) => i.id === item2);
+    const convertedItem2 = snap.items.find((i) => i.title === "Custom Item 2");
+    assert(Boolean(convertedItem2?.id.startsWith("DEP-")), `[${label}] batch converted item gets target type prefix DEP-`);
     assert(convertedItem2?.typeId === "dependency", `[${label}] item2 converted to dependency`);
 
     // Now delete custom-1 succeeds
@@ -657,15 +659,15 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: RequirementsStore } {
     const ticketId = store.addItem("ticket");
     store.updateItem(ticketId, { status: "in-progress" });
     // Convert to non-workable epic
-    store.convertItemType(ticketId, "epic");
+    const convertedEpicId = store.convertItemType(ticketId, "epic");
     snap = store.getSnapshot();
-    const epicTicket = snap.items.find((i) => i.id === ticketId);
+    const epicTicket = snap.items.find((i) => i.id === convertedEpicId);
     assert(epicTicket?.typeId === "epic" && epicTicket?.status === undefined, `[${label}] converting workable item to non-workable clears status/points`);
 
     // Convert back to workable ticket
-    store.convertItemType(ticketId, "ticket");
+    const restoredTicketId = store.convertItemType(convertedEpicId!, "ticket");
     snap = store.getSnapshot();
-    const restoredTicket = snap.items.find((i) => i.id === ticketId);
+    const restoredTicket = snap.items.find((i) => i.id === restoredTicketId);
     assert(restoredTicket?.typeId === "ticket" && restoredTicket?.status === "todo", `[${label}] converting non-workable item to workable sets default status to todo`);
   }
 
@@ -683,6 +685,67 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: RequirementsStore } {
     }
   );
   verifyConversion(adapterStore, "AdapterStore");
+}
+
+// === Part 27: Retroactive reference updating and gap-filling IDs ===
+{
+  function verifyReferencesAndGapFilling(store: RequirementsStore, label: string) {
+    // 1. Given REQ-1, REQ-2 and a referencing item referencing REQ-2
+    // and a relationship between REQ-1 and REQ-2
+    const req1 = store.addItem("requirement");
+    const req2 = store.addItem("requirement");
+    const refItem = store.addItem("requirement");
+    store.updateItem(refItem, {
+      body: `This depends on #${req2} and has a link [#${req2}](#ref:${req2}) inside text.`,
+    });
+    store.addRelationship("rel-type-blocks", req1, req2);
+
+    // Convert REQ-2 to dependency -> should become DEP-1
+    const dep1 = store.convertItemType(req2, "dependency");
+    assert(dep1 === "DEP-1", `[${label}] REQ-2 converted to dependency becomes DEP-1`);
+
+    let snap = store.getSnapshot();
+    const updatedRefItem = snap.items.find((i) => i.id === refItem);
+    assert(
+      updatedRefItem?.body === "This depends on #DEP-1 and has a link [#DEP-1](#ref:DEP-1) inside text.",
+      `[${label}] body references retroactively updated from #${req2} to #${dep1}`
+    );
+
+    const rel = snap.relationships.find((r) => r.fromItemId === req1);
+    assert(rel?.toItemId === "DEP-1", `[${label}] relationship target retroactively updated from ${req2} to DEP-1`);
+
+    // 2. Gap filling sequence on deletion:
+    // Create DEP-2 and DEP-3
+    const dep2 = store.addItem("dependency");
+    const dep3 = store.addItem("dependency");
+    assert(dep2 === "DEP-2", `[${label}] created DEP-2`);
+    assert(dep3 === "DEP-3", `[${label}] created DEP-3`);
+
+    // Delete DEP-2
+    store.deleteItem("DEP-2");
+
+    // Next created dependency should be DEP-2, then DEP-4
+    const nextDepA = store.addItem("dependency");
+    assert(nextDepA === "DEP-2", `[${label}] gap-filling assigns DEP-2 after DEP-2 was deleted`);
+
+    const nextDepB = store.addItem("dependency");
+    assert(nextDepB === "DEP-4", `[${label}] after filling DEP-2, next is DEP-4`);
+  }
+
+  const localStore = createLocalRequirementsStore(seedDoc());
+  verifyReferencesAndGapFilling(localStore, "LocalStore");
+
+  const yjsStore = seedYjsStore().store;
+  verifyReferencesAndGapFilling(yjsStore, "YjsStore");
+
+  let adapterDoc = seedDoc();
+  const adapterStore = createAdapterRequirementsStore(
+    () => adapterDoc,
+    (updater) => {
+      adapterDoc = updater(adapterDoc);
+    }
+  );
+  verifyReferencesAndGapFilling(adapterStore, "AdapterStore");
 }
 
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);

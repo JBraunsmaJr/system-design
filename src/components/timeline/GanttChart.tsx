@@ -18,12 +18,14 @@ import { findScheduleConflicts } from "../../domain/scheduleConflicts";
 import type { RequirementsDocument, RequirementItem } from "../../domain/requirementsTypes";
 import type { Milestone } from "../../domain/milestones";
 import { getMilestoneColor, getMilestoneTypeLabel } from "../../domain/milestones";
-import { getAllEpicsWithInferredSchedule } from "../../domain/epicScheduling";
+import { getAllEpicsWithInferredSchedule, getChildItemsForParent } from "../../domain/epicScheduling";
 
 interface GanttChartProps {
   programIncrements: ProgramIncrement[];
   requirements: RequirementsDocument;
   milestones?: Milestone[];
+  filterEpicId?: string;
+  filteredChildItemIds?: Set<string> | null;
   onSelectItem: (itemId: string) => void;
   onSelectMilestone?: (milestoneId: string) => void;
   onAddMilestoneOnDate?: (date: string) => void;
@@ -55,7 +57,9 @@ function parseISODate(iso: string): number {
 function useGanttLayout(
   programIncrements: ProgramIncrement[],
   milestones: Milestone[] = [],
-  requirements?: RequirementsDocument
+  requirements?: RequirementsDocument,
+  filterEpicId?: string,
+  filteredChildItemIds?: Set<string> | null
 ) {
   return useMemo(() => {
     const bands: {
@@ -159,7 +163,13 @@ function useGanttLayout(
 
     // Epic spans layout (FR-009, AC-008)
     const epicLayouts = epicsWithSchedule
-      .filter(({ schedule }) => !!schedule.startDate)
+      .filter(({ epic, schedule }) => {
+        if (!schedule.startDate) return false;
+        if (filterEpicId && filterEpicId !== "all") {
+          return epic.id === filterEpicId;
+        }
+        return true;
+      })
       .map(({ epic, schedule }) => {
         const startDays = parseISODate(schedule.startDate!);
         const left = (startDays - originDays) * DAY_WIDTH;
@@ -183,6 +193,15 @@ function useGanttLayout(
     const depLayouts = requirements
       ? requirements.items
           .filter((i) => (i.typeId === "dependency" || i.typeId.toLowerCase().includes("dep")) && !isItemWorkable(requirements, i))
+          .filter((dep) => {
+            if (!filterEpicId || filterEpicId === "all") return true;
+            if (filteredChildItemIds && filteredChildItemIds.has(dep.id)) return true;
+            return requirements.relationships.some(
+              (r) =>
+                (r.fromItemId === dep.id && (r.toItemId === filterEpicId || filteredChildItemIds?.has(r.toItemId))) ||
+                (r.toItemId === dep.id && (r.fromItemId === filterEpicId || filteredChildItemIds?.has(r.fromItemId)))
+            );
+          })
           .map((dep) => {
             const linkedMs = milestones.filter((m) => {
               const ids = m.relatedItemIds ?? m.relatedWorkableItemIds ?? [];
@@ -209,7 +228,7 @@ function useGanttLayout(
       originDays,
       maxStack,
     };
-  }, [programIncrements, milestones, requirements]);
+  }, [programIncrements, milestones, requirements, filterEpicId, filteredChildItemIds]);
 }
 
 /**
@@ -221,6 +240,8 @@ export function GanttChart({
   programIncrements,
   requirements,
   milestones = [],
+  filterEpicId = "all",
+  filteredChildItemIds,
   onSelectItem,
   onSelectMilestone,
   onNavigateToRequirement,
@@ -231,6 +252,12 @@ export function GanttChart({
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(new Set());
   const [labelColumnWidth, setLabelColumnWidth] = useState(DEFAULT_LABEL_COLUMN_WIDTH);
   const [isDraggingResizer, setIsDraggingResizer] = useState(false);
+
+  const effectiveFilteredChildItemIds = useMemo(() => {
+    if (filteredChildItemIds !== undefined) return filteredChildItemIds;
+    if (!filterEpicId || filterEpicId === "all") return null;
+    return new Set(getChildItemsForParent(filterEpicId, requirements).map((i) => i.id));
+  }, [filteredChildItemIds, filterEpicId, requirements]);
 
   const handleResizerMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -267,12 +294,20 @@ export function GanttChart({
   const { bands, rangesBySprintId, milestoneLayouts, epicLayouts, depLayouts, totalWidth, maxStack } = useGanttLayout(
     programIncrements,
     milestones,
-    requirements
+    requirements,
+    filterEpicId,
+    effectiveFilteredChildItemIds
   );
 
-  const scheduledItems = requirements.items.filter(
-    (item) => item.sprintId && rangesBySprintId.has(item.sprintId) && isItemWorkable(requirements, item)
-  );
+  const scheduledItems = requirements.items.filter((item) => {
+    if (!item.sprintId || !rangesBySprintId.has(item.sprintId) || !isItemWorkable(requirements, item)) {
+      return false;
+    }
+    if (effectiveFilteredChildItemIds && !effectiveFilteredChildItemIds.has(item.id) && item.id !== filterEpicId) {
+      return false;
+    }
+    return true;
+  });
 
   const sprintRangesByItemId = useMemo(() => {
     const map = new Map<string, { startDate: string; endDate: string }>();
@@ -283,10 +318,23 @@ export function GanttChart({
     return map;
   }, [scheduledItems, rangesBySprintId]);
 
-  const conflicts = useMemo(
-    () => findScheduleConflicts(requirements.items, requirements.relationships, requirements.relationshipTypes, requirements.itemTypes, sprintRangesByItemId),
-    [requirements.items, requirements.relationships, requirements.relationshipTypes, requirements.itemTypes, sprintRangesByItemId]
-  );
+  const conflicts = useMemo(() => {
+    const allConflicts = findScheduleConflicts(
+      requirements.items,
+      requirements.relationships,
+      requirements.relationshipTypes,
+      requirements.itemTypes,
+      sprintRangesByItemId
+    );
+    if (!effectiveFilteredChildItemIds) return allConflicts;
+    return allConflicts.filter(
+      (c) =>
+        effectiveFilteredChildItemIds.has(c.item.id) ||
+        effectiveFilteredChildItemIds.has(c.blocker.id) ||
+        c.item.id === filterEpicId ||
+        c.blocker.id === filterEpicId
+    );
+  }, [requirements.items, requirements.relationships, requirements.relationshipTypes, requirements.itemTypes, sprintRangesByItemId, effectiveFilteredChildItemIds, filterEpicId]);
 
   const conflictByItemId = new Map<string, (typeof conflicts)[number]>();
   for (const c of conflicts) {
@@ -807,7 +855,11 @@ export function GanttChart({
           {/* Workable items rows */}
           <div className="gantt-chart__rows">
             {groups.length === 0 || rows.length === 0 ? (
-              <p className="gantt-chart__no-items">No workable items scheduled into a sprint yet.</p>
+              <p className="gantt-chart__no-items">
+                {filterEpicId && filterEpicId !== "all"
+                  ? "No workable items matching the selected Epic are scheduled into a sprint yet."
+                  : "No workable items scheduled into a sprint yet."}
+              </p>
             ) : (
               groups.map((group) => {
                 const isGroupCollapsed = collapsedGroupIds.has(group.id);

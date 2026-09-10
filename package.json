@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "tsx scripts/run-tests.ts",
+    "tests": "tsx scripts/run-tests.ts",
     "signaling-server": "y-webrtc-signaling"
   },
   "dependencies": {

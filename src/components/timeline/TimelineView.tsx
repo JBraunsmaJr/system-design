@@ -163,7 +163,10 @@ export function TimelineView({
   };
 
   const onConvertItemType = (id: string, newTypeId: string) => {
-    requirementsStore.convertItemType(id, newTypeId);
+    const newId = requirementsStore.convertItemType(id, newTypeId);
+    if (selectedItemId === id && newId) {
+      setSelectedItemId(newId);
+    }
   };
 
   const onDeleteItem = (id: string) => {
@@ -378,6 +381,8 @@ export function TimelineView({
           programIncrements={programIncrements}
           requirements={requirements}
           milestones={milestones}
+          filterEpicId={filterEpicId}
+          filteredChildItemIds={filteredChildItemIds}
           onSelectItem={(id) => setSelectedItemId(id)}
           onSelectMilestone={(id) => setSelectedMilestoneId(id)}
           onAddMilestoneOnDate={(date) => {
