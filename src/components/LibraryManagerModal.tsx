@@ -12,7 +12,7 @@ import {
   type AssetLibrary,
   type LibraryValidationResult,
 } from "../domain/assetLibrary";
-import type { IconDefinition } from "../domain/iconRegistry";
+import { sanitizeSvg, type IconDefinition } from "../domain/iconRegistry";
 import { type ShapeDefinition, DEFAULT_CONNECTION_POINTS } from "../domain/shapeRegistry";
 import { IconRenderer } from "./IconRenderer";
 import { SvgShapeRenderer } from "./nodes/SvgShapeRenderer";
@@ -153,7 +153,7 @@ export function LibraryManagerModal({ isOpen, onClose }: LibraryManagerModalProp
       version: 1,
       source: {
         type: "svg",
-        data: newIconSvg,
+        data: sanitizeSvg(newIconSvg),
       },
       attribution: (newIconAuthor || newIconLicense) ? {
         author: newIconAuthor.trim() || undefined,
@@ -544,7 +544,20 @@ export function LibraryManagerModal({ isOpen, onClose }: LibraryManagerModalProp
                 {/* Preview */}
                 <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", background: "var(--bg-field)", borderRadius: 4 }}>
                   <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Preview:</span>
-                  <div style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center" }} dangerouslySetInnerHTML={{ __html: newIconSvg }} />
+                  <div style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <IconRenderer
+                      iconDefinition={{
+                        id: "preview-new-icon",
+                        name: newIconName || "Preview",
+                        version: 1,
+                        source: {
+                          type: "svg",
+                          data: sanitizeSvg(newIconSvg),
+                        },
+                      }}
+                      size={24}
+                    />
+                  </div>
                 </div>
                 <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                   <button type="submit" style={{ padding: "6px 14px", background: "var(--accent)", color: "#fff", border: "none", borderRadius: 4, cursor: "pointer" }}>

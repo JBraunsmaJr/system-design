@@ -53,6 +53,30 @@ console.log("\n=== 2. Testing SVG Sanitization & Security ===");
   assert(isValidSvg(cleaned), "Sanitized SVG is valid SVG");
   assert(!isValidSvg("not an svg"), "Non-SVG string rejected by isValidSvg");
   assert(!isValidSvg("<svg><script>bad</script></svg>"), "Raw SVG with script tag rejected by isValidSvg");
+
+  // Advanced evasion tests
+  const evasiveSvg = `
+    <svg viewBox="0 0 100 100">
+      <script >alert(1)</script >
+      <SCRIPT>alert('uppercase')</SCRIPT>
+      <scr<script>ipt>nested()</script>
+      <if<iframe src="evil.html">rame>
+      <circle cx="20" cy="20" r="10" onerror=alert(2) onmouseover="alert(3)" />
+      <foreignObject><body xmlns="http://www.w3.org/1999/xhtml"><script>bad()</script></body></foreignObject>
+      <a xlink:href="javascript:evil()">Link</a>
+      <image src="data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==" />
+    </svg>
+  `;
+  const sanitizedEvasive = sanitizeSvg(evasiveSvg);
+  assert(!sanitizedEvasive.toLowerCase().includes("<script"), "Strips script tags with whitespace (</script >)");
+  assert(!sanitizedEvasive.toLowerCase().includes("nested()"), "Strips nested script tag evasion");
+  assert(!sanitizedEvasive.toLowerCase().includes("<iframe"), "Strips nested iframe tag evasion");
+  assert(!sanitizedEvasive.toLowerCase().includes("onerror"), "Strips unquoted event handlers (onerror=)");
+  assert(!sanitizedEvasive.toLowerCase().includes("onmouseover"), "Strips onmouseover");
+  assert(!sanitizedEvasive.toLowerCase().includes("<foreignobject"), "Strips foreignObject");
+  assert(!sanitizedEvasive.toLowerCase().includes("javascript:"), "Strips xlink:href javascript:");
+  assert(!sanitizedEvasive.toLowerCase().includes("data:text/html"), "Strips data:text/html src");
+  assert(sanitizedEvasive.includes("<circle cx=\"20\" cy=\"20\" r=\"10\""), "Preserves circle in evasive test");
 }
 
 console.log("\n=== 3. Testing Custom Icon Registration & Search ===");

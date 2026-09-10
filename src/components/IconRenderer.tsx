@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import * as Icons from "lucide-react";
-import { globalIconRegistry, type IconDefinition } from "../domain/iconRegistry";
+import { globalIconRegistry, sanitizeSvg, type IconDefinition } from "../domain/iconRegistry";
 
 interface IconRendererProps {
   icon?: string;
@@ -55,7 +55,7 @@ export function IconRenderer({
           height: size,
           ...style,
         }}
-        dangerouslySetInnerHTML={{ __html: source.data }}
+        dangerouslySetInnerHTML={{ __html: sanitizeSvg(source.data) }}
       />
     );
   }
