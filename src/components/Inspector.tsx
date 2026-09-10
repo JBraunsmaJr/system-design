@@ -209,7 +209,7 @@ export function Inspector({
                     ) : prop.type === "boolean" ? (
                       <input
                         type="checkbox"
-                        checked={Boolean(currentVal)}
+                        checked={currentVal === "true" || currentVal === "1"}
                         onChange={(e) =>
                           onUpdateNode(selectedNode.id, {
                             properties: { ...(data.properties || {}), [prop.id]: e.target.checked ? "true" : "false" },

@@ -21,7 +21,8 @@ export function SvgShapeRenderer({
 }: SvgShapeRendererProps) {
   const strokeColor = style?.stroke || color;
   const strokeWidth = style?.strokeWidth ?? 2;
-  const fillColor = style?.fill || `${color}22`;
+  const fillColor =
+    style?.fill || (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(color) ? `${color}22` : "transparent");
   const strokeDasharray = style?.strokeDasharray;
   const opacity = style?.opacity ?? 1;
 

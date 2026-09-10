@@ -1448,18 +1448,17 @@ function App() {
   // automatically navigate there just like during presentation.
   const onSelectStep = useCallback(
     (stepId: string) => {
-      setActiveStepId((cur) => {
-        if (cur === stepId) {
-          return null;
-        }
+      const isDeselecting = activeStepId === stepId;
+      const nextId = isDeselecting ? null : stepId;
+      setActiveStepId(nextId);
+      if (!isDeselecting) {
         const step = activeScenario?.steps.find((st) => st.id === stepId);
         if (step && step.path) {
           setPath(step.path);
         }
-        return stepId;
-      });
+      }
     },
-    [activeScenario]
+    [activeScenario, activeStepId, setPath]
   );
 
   // Captures whatever's currently selected on the canvas - AND which level
@@ -1673,8 +1672,8 @@ function App() {
   // Copy/paste: Ctrl+C / Cmd+C and Ctrl+V / Cmd+V, same guards as delete -
   // never while presenting, never while typing in a field (so normal text
   // copy/paste inside the Inspector's inputs is completely unaffected), and
-  // never when text is highlighted/selected (so users can copy selected text
-  // from requirement items and elsewhere via standard clipboard).
+  // never when text is highlighted/selected during copy (so users can copy
+  // selected text from requirement items and elsewhere via standard clipboard).
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if (isPresenting) return;
@@ -1682,12 +1681,11 @@ function App() {
       const tag = target?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) return;
 
-      const selection = window.getSelection();
-      const hasTextSelection = Boolean(selection && !selection.isCollapsed && selection.toString().length > 0);
-      if (hasTextSelection) return;
-
       const key = event.key.toLowerCase();
       if ((event.ctrlKey || event.metaKey) && key === "c") {
+        const selection = window.getSelection();
+        const hasTextSelection = Boolean(selection && !selection.isCollapsed && selection.toString().length > 0);
+        if (hasTextSelection) return;
         if (viewMode !== "diagram") return;
         event.preventDefault();
         onCopy();

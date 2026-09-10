@@ -263,8 +263,9 @@ export function MilestoneDetailModal({
             <h2 className="milestone-detail-modal__name">{milestone.name}</h2>
           ) : (
             <div className="milestone-detail-modal__edit-name-wrap">
-              <label className="milestone-detail-modal__input-label">Marker Name *</label>
+              <label htmlFor="marker-name-input" className="milestone-detail-modal__input-label">Marker Name *</label>
               <input
+                id="marker-name-input"
                 type="text"
                 className="milestone-detail-modal__input"
                 value={name}
@@ -469,7 +470,7 @@ export function MilestoneDetailModal({
 
             {relatedItems.length === 0 ? (
               <p className="milestone-detail-modal__work-empty">
-                No requirement items or epics associated with this milestone yet. Standalone milestones are fully supported.
+                No requirement items or epics associated with this marker yet. Standalone markers are fully supported.
               </p>
             ) : (
               <ul className="milestone-detail-modal__work-list">
@@ -535,7 +536,7 @@ export function MilestoneDetailModal({
                           type="button"
                           className="milestone-detail-modal__remove-work-btn"
                           onClick={() => handleRemoveItem(item.id)}
-                          title={`Unlink ${item.id} from this milestone`}
+                          title={`Unlink ${item.id} from this marker`}
                           aria-label={`Unlink ${item.id}`}
                         >
                           <X size={13} />

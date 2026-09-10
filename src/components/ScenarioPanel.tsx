@@ -213,8 +213,16 @@ export function ScenarioPanel({
                   return (
                     <div
                       key={step.id}
+                      role="button"
+                      tabIndex={0}
                       className={`scenario-step-row${isActive ? " is-active" : ""}`}
                       onClick={() => onSelectStep(step.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          onSelectStep(step.id);
+                        }
+                      }}
                       title="Click to preview this step on the diagram and edit details"
                     >
                       <span className="scenario-step-row__number">{index + 1}</span>

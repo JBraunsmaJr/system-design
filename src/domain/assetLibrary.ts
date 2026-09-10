@@ -79,7 +79,8 @@ export function validateAssetLibrary(raw: unknown): LibraryValidationResult {
       }
 
       const rawJson = JSON.stringify(item);
-      if (rawJson.length > MAX_ASSET_SIZE_BYTES) {
+      const byteLength = new TextEncoder().encode(rawJson).length;
+      if (byteLength > MAX_ASSET_SIZE_BYTES) {
         errors.push(`Icon "${item.name}" exceeds maximum allowed size of 512KB.`);
         continue;
       }
@@ -125,7 +126,8 @@ export function validateAssetLibrary(raw: unknown): LibraryValidationResult {
       }
 
       const rawJson = JSON.stringify(item);
-      if (rawJson.length > MAX_ASSET_SIZE_BYTES) {
+      const byteLength = new TextEncoder().encode(rawJson).length;
+      if (byteLength > MAX_ASSET_SIZE_BYTES) {
         errors.push(`Shape "${item.name}" exceeds maximum allowed size of 512KB.`);
         continue;
       }
@@ -322,7 +324,9 @@ export const globalAssetLibraryManager = new AssetLibraryManager();
 export function getRecentIcons(): string[] {
   try {
     const raw = localStorage.getItem(RECENT_ICONS_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [];
   } catch {
     return [];
   }
@@ -343,7 +347,9 @@ export function addRecentIcon(iconId: string): void {
 export function getFavoriteIcons(): string[] {
   try {
     const raw = localStorage.getItem(FAVORITE_ICONS_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [];
   } catch {
     return [];
   }

@@ -144,6 +144,7 @@ export function ShapeNode({
           {isEditing ? (
             <textarea
               ref={textareaRef}
+              aria-label={data.label ? `Edit label for ${data.label}` : "Edit shape label"}
               className="shape-node__text-input nodrag nopan nowheel"
               style={{
                 fontSize,

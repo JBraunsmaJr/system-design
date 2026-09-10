@@ -125,5 +125,26 @@ function assert(condition: boolean, message: string) {
   assert(html.includes("us-east-1"), "DocumentationRenderer formats nested object values safely");
 }
 
+// 7. Positive-path test for DocumentationPopup with open=true and meaningful documentation
+{
+  const doc: DiagramDocumentation = {
+    description: "Routes incoming requests to backend services.",
+    properties: { Protocol: "HTTPS" },
+    tags: ["Gateway"],
+  };
+  const html = renderToStaticMarkup(
+    <DocumentationPopup
+      documentation={doc}
+      title="API Gateway"
+      open={true}
+      anchor={{ x: 150, y: 250 }}
+    />
+  );
+  assert(html.includes("doc-popup"), "DocumentationPopup renders .doc-popup container");
+  assert(html.includes('role="tooltip"'), 'DocumentationPopup renders role="tooltip"');
+  assert(html.includes("Routes incoming requests to backend services."), "DocumentationPopup renders description text");
+  assert(html.includes("API Gateway"), "DocumentationPopup renders title");
+}
+
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);
 if (failures > 0) throw new Error(`${failures} test(s) failed`);

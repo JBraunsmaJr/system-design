@@ -83,8 +83,19 @@ export function DocumentationPopup({
       12
     );
 
-    setPos(nextPos);
-  }, [shouldShow, anchor?.x, anchor?.y, documentation, title, subtitle]);
+    setPos((prev) =>
+      prev?.top === nextPos.top && prev.left === nextPos.left ? prev : nextPos
+    );
+  }, [
+    shouldShow,
+    anchor?.x,
+    anchor?.y,
+    documentation.description,
+    documentation.properties,
+    documentation.tags,
+    title,
+    subtitle,
+  ]);
 
   if (!shouldShow) {
     return null;
@@ -97,7 +108,6 @@ export function DocumentationPopup({
     <div
       ref={popupRef}
       role="tooltip"
-      aria-label={title ? `${title} documentation` : "Element documentation"}
       className={`doc-popup nodrag ${className}`.trim()}
       style={{
         position: "fixed",

@@ -122,5 +122,14 @@ assert(DEFAULT_LEAVE_DELAY === 150, "DEFAULT_LEAVE_DELAY is 150ms");
   assert(extracted2.title === "User DB", "node2 documentation extracted correctly");
 }
 
+// 5. Test interaction lifecycle and edge cases
+{
+  const extractedDoc = extractNodeDocumentation(node1);
+  assert(hasDocumentation(extractedDoc.documentation), "Extracted node1 documentation is valid and meaningful");
+
+  const emptyDoc = extractNodeDocumentation(emptyNode);
+  assert(!hasDocumentation(emptyDoc.documentation), "Empty node documentation is not meaningful");
+}
+
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);
 if (failures > 0) throw new Error(`${failures} test(s) failed`);

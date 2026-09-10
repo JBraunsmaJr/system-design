@@ -46,12 +46,11 @@ function createKeyboardHandler(options: {
     const tag = target?.tagName;
     if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) return;
 
-    const selection = options.getSelection();
-    const hasTextSelection = Boolean(selection && !selection.isCollapsed && selection.text.length > 0);
-    if (hasTextSelection) return;
-
     const key = event.key.toLowerCase();
     if ((event.ctrlKey || event.metaKey) && key === "c") {
+      const selection = options.getSelection();
+      const hasTextSelection = Boolean(selection && !selection.isCollapsed && selection.text.length > 0);
+      if (hasTextSelection) return;
       if (options.viewMode !== "diagram") return;
       event.preventDefault();
       options.onCopy();
@@ -176,6 +175,26 @@ function createEvent(key: string, ctrl = true, tag = "DIV", isContentEditable = 
 
   assert(!event.defaultPrevented, "Ctrl+C inside INPUT allows standard browser input copy");
   assert(!diagramCopyCalled, "Diagram node onCopy is not called inside INPUT");
+}
+
+// --- Test 6: Text selection does NOT block Ctrl+V paste on diagram ---
+{
+  let diagramPasteCalled = false;
+  const handler = createKeyboardHandler({
+    isPresenting: false,
+    viewMode: "diagram",
+    getSelection: () => ({ isCollapsed: false, text: "Some selected text elsewhere" }),
+    onCopy: () => {},
+    onPaste: () => {
+      diagramPasteCalled = true;
+    },
+  });
+
+  const event = createEvent("v", true, "DIV");
+  handler(event);
+
+  assert(event.defaultPrevented, "Ctrl+V on diagram prevents default even when text selection exists");
+  assert(diagramPasteCalled, "Diagram node onPaste is executed when text selection exists");
 }
 
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);

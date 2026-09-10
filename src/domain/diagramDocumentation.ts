@@ -18,8 +18,9 @@ export const DEFAULT_LEAVE_DELAY = 150;
  * Checks whether a single property value has meaningful content.
  * Empty strings (or whitespace-only), empty arrays, and empty objects
  * are considered empty. Numbers, booleans, and non-empty structures are meaningful.
+ * Cycles are tracked via WeakSet to prevent stack overflow on self-referential structures.
  */
-export function isMeaningfulValue(val: unknown): boolean {
+export function isMeaningfulValue(val: unknown, seen = new WeakSet<object>()): boolean {
   if (val === undefined || val === null) {
     return false;
   }
@@ -32,13 +33,15 @@ export function isMeaningfulValue(val: unknown): boolean {
   if (typeof val === "boolean") {
     return true;
   }
-  if (Array.isArray(val)) {
-    return val.length > 0 && val.some((item) => isMeaningfulValue(item));
-  }
   if (typeof val === "object") {
+    if (seen.has(val)) return false;
+    seen.add(val);
+    if (Array.isArray(val)) {
+      return val.length > 0 && val.some((item) => isMeaningfulValue(item, seen));
+    }
     const entries = Object.entries(val);
     if (entries.length === 0) return false;
-    return entries.some(([k, v]) => k.trim().length > 0 && isMeaningfulValue(v));
+    return entries.some(([k, v]) => k.trim().length > 0 && isMeaningfulValue(v, seen));
   }
   return false;
 }
@@ -93,32 +96,34 @@ export function hasDocumentation(
  * Safely formats property values into human-readable strings (TR-005, FR-006).
  * Handles primitives, arrays, objects, and circular references without crashing.
  */
-export function formatPropertyValue(value: unknown): string {
+export function formatPropertyValue(value: unknown, seen = new WeakSet<object>()): string {
   if (value === null) return "null";
   if (value === undefined) return "undefined";
   if (typeof value === "string") return value;
   if (typeof value === "number") return Number.isNaN(value) ? "NaN" : String(value);
   if (typeof value === "boolean") return value ? "true" : "false";
 
-  if (Array.isArray(value)) {
-    if (value.length === 0) return "[]";
-    const formattedItems = value.map((item) => {
-      if (typeof item === "string") return item;
-      return formatPropertyValue(item);
-    });
-    return formattedItems.join(", ");
-  }
-
   if (typeof value === "object") {
+    if (seen.has(value)) return "[Circular]";
+    seen.add(value);
+
+    if (Array.isArray(value)) {
+      if (value.length === 0) return "[]";
+      const formattedItems = value.map((item) => formatPropertyValue(item, seen));
+      return formattedItems.join(", ");
+    }
+
     try {
-      const seen = new WeakSet();
+      const jsonSeen = new WeakSet<object>();
+      jsonSeen.add(value);
       return JSON.stringify(
         value,
-        (_key, val) => {
+        (key, val) => {
           if (typeof val === "object" && val !== null) {
-            if (seen.has(val)) {
+            if (key !== "" && (jsonSeen.has(val) || seen.has(val))) {
               return "[Circular]";
             }
+            jsonSeen.add(val);
             seen.add(val);
           }
           return val;
@@ -151,7 +156,7 @@ export function extractNodeDocumentation(
   const isCode = node.type === "code";
   const isText = node.type === "text";
 
-  let title: string | undefined = data?.label?.trim() ? data.label.trim() : undefined;
+  const title: string | undefined = data?.label?.trim() ? data.label.trim() : undefined;
   let subtitle: string | undefined;
 
   if (isGroup) {
@@ -174,10 +179,15 @@ export function extractNodeDocumentation(
     }
   }
 
+  const rawTags = data?.tags;
+  const tags = Array.isArray(rawTags)
+    ? rawTags.filter((t): t is string => typeof t === "string" && t.trim().length > 0)
+    : undefined;
+
   const documentation: DiagramDocumentation = {
     description: data.description,
     properties: data.properties,
-    tags: data.tags,
+    tags,
   };
 
   return {
@@ -196,7 +206,7 @@ export function extractEdgeDocumentation(
   const data = edge.data;
   const edgeTypeDef = getEdgeType(data?.edgeType ?? "generic");
 
-  let title: string | undefined = data?.label?.trim()
+  const title: string | undefined = data?.label?.trim()
     ? data.label.trim()
     : edgeTypeDef?.label?.trim()
     ? edgeTypeDef.label.trim()
@@ -204,10 +214,15 @@ export function extractEdgeDocumentation(
 
   const subtitle = edgeTypeDef?.label || "Edge";
 
+  const rawTags = (data as Record<string, unknown> | undefined)?.tags;
+  const tags = Array.isArray(rawTags)
+    ? rawTags.filter((t): t is string => typeof t === "string" && t.trim().length > 0)
+    : undefined;
+
   const documentation: DiagramDocumentation = {
     description: (data as Record<string, unknown> | undefined)?.description as string | undefined,
     properties: data?.properties,
-    tags: (data as Record<string, unknown> | undefined)?.tags as string[] | undefined,
+    tags,
   };
 
   return {

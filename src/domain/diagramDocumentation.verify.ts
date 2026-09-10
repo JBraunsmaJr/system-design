@@ -85,6 +85,13 @@ circularObj.self = circularObj;
 const formattedCircular = formatPropertyValue(circularObj);
 assert(typeof formattedCircular === "string" && formattedCircular.includes("[Circular]"), "formatPropertyValue handles circular references safely without throwing");
 
+const circularArr: unknown[] = ["start"];
+circularArr.push(circularArr);
+const formattedArr = formatPropertyValue(circularArr);
+assert(typeof formattedArr === "string" && formattedArr.includes("[Circular]"), "formatPropertyValue handles cyclic array references safely without throwing");
+
+assert(hasDocumentation({ properties: { cyclic: circularObj } }), "hasDocumentation handles cyclic structures without stack overflow");
+
 // === Extraction tests ===
 const sampleNode: Node<ArchNodeData> = {
   id: "node-1",
