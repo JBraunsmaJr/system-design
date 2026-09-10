@@ -1091,21 +1091,23 @@ function App() {
     [nodes, diagramStore]
   );
 
-  // Called after dragging a *boundary* - see Canvas.tsx's onNodeDragStop.
+  // Called after dragging or resizing a *boundary* - see Canvas.tsx's onNodeDragStop
+  // and GroupNode.tsx's onResizeEnd.
   // `nodeIds` are whichever nodes now fall fully inside it and aren't
   // already its children. Any node already parented to a different group
   // gets moved over (its position is re-derived relative to the new parent,
   // same math as onReparentNode).
   const onAdoptIntoGroup = useCallback(
-    (groupId: string, nodeIds: string[]) => {
+    (groupId: string, nodeIds: string[], groupPosition?: { x: number; y: number }) => {
       const group = nodes.find((n) => n.id === groupId);
       if (!group) return;
+      const groupPos = groupPosition ?? group.position;
       for (const nodeId of nodeIds) {
         if (nodeId === groupId) continue;
         const n = nodes.find((nn) => nn.id === nodeId);
         if (!n) continue;
         const absolute = toAbsolutePosition(n, nodes, n.parentId);
-        const relative = { x: absolute.x - group.position.x, y: absolute.y - group.position.y };
+        const relative = { x: absolute.x - groupPos.x, y: absolute.y - groupPos.y };
         diagramStore.updateParentId(nodeId, groupId, relative);
       }
     },

@@ -1,14 +1,21 @@
-import { NodeResizer, type NodeProps, type Node } from "@xyflow/react";
+import { NodeResizer, useReactFlow, type NodeProps, type Node } from "@xyflow/react";
 import * as Icons from "lucide-react";
 import { getGroupType } from "../../domain/groupRegistry";
 import { BidirectionalHandles } from "./BidirectionalHandles";
 import type { ArchNodeData } from "../../domain/types";
+import { useCanvasContext } from "../CanvasContext";
 
 type GroupNodeType = Node<ArchNodeData, "group">;
+
+interface GroupNodeProps extends NodeProps<GroupNodeType> {
+  onAdoptIntoGroup?: (groupId: string, nodeIds: string[], groupPosition?: { x: number; y: number }) => void;
+}
 
 /**
  * A labeled boundary that other nodes can be dropped/dragged into (see
  * Canvas.tsx's onNodeDragStop + App.tsx's onReparentNode/onAdoptIntoGroup).
+ * Resizing the boundary automatically adopts any non-group nodes that now
+ * fall fully within its new bounds.
  * Editing the label/description/tags goes through the same Inspector as
  * regular nodes - this component owns layout plus the per-kind visual
  * identity (icon/color/border style) looked up from groupRegistry.ts.
@@ -32,7 +39,16 @@ type GroupNodeType = Node<ArchNodeData, "group">;
  * become undraggable; as a sibling it's unaffected regardless of the
  * interior's click-through state.
  */
-export function GroupNode({ data, selected }: NodeProps<GroupNodeType>) {
+export function GroupNode({
+  id,
+  data,
+  selected,
+  onAdoptIntoGroup: propOnAdoptIntoGroup,
+}: GroupNodeProps) {
+  const canvasContext = useCanvasContext();
+  const onAdoptIntoGroup = propOnAdoptIntoGroup ?? canvasContext?.onAdoptIntoGroup;
+  const { getIntersectingNodes } = useReactFlow<Node<ArchNodeData>>();
+
   const def = getGroupType(data.nodeType);
   const accent = data.color ?? def?.color ?? "#7C8598";
   // data.icon is a per-node override chosen in the Inspector; the group
@@ -57,6 +73,24 @@ export function GroupNode({ data, selected }: NodeProps<GroupNodeType>) {
         minHeight={140}
         lineClassName="node-resize-line"
         handleClassName="node-resize-handle"
+        onResizeEnd={(_event, params) => {
+          const rect = {
+            x: params.x,
+            y: params.y,
+            width: params.width,
+            height: params.height,
+          };
+          const contained = getIntersectingNodes(rect, false).filter(
+            (n) => n.id !== id && n.type !== "group" && n.parentId !== id
+          );
+          if (contained.length > 0) {
+            onAdoptIntoGroup?.(
+              id,
+              contained.map((n) => n.id),
+              { x: params.x, y: params.y }
+            );
+          }
+        }}
       />
       <BidirectionalHandles />
       <div
