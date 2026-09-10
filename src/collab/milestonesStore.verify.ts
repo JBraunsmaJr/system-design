@@ -137,6 +137,27 @@ function assert(condition: boolean, message: string) {
     Boolean(finalA.relatedWorkableItemIds?.includes("TICKET-20") && finalB.relatedWorkableItemIds?.includes("TICKET-20")),
     "both peers have merged related workable items"
   );
+
+  // Peer A and Peer B concurrently add the exact same related item
+  storeA.addRelatedItem("seed-1", "TICKET-30");
+  storeB.addRelatedItem("seed-1", "TICKET-30");
+
+  // Sync both ways
+  Y.applyUpdate(docB, Y.encodeStateAsUpdate(docA));
+  Y.applyUpdate(docA, Y.encodeStateAsUpdate(docB));
+
+  const mergedA = storeA.getSnapshot()[0];
+  const mergedB = storeB.getSnapshot()[0];
+
+  const countInA = mergedA.relatedItemIds?.filter((id) => id === "TICKET-30").length ?? 0;
+  const countInB = mergedB.relatedItemIds?.filter((id) => id === "TICKET-30").length ?? 0;
+
+  assert(countInA === 1, "peer A snapshot deduplicates concurrent addRelatedItem result");
+  assert(countInB === 1, "peer B snapshot deduplicates concurrent addRelatedItem result");
+  assert(
+    mergedA.relatedItemIds?.length === 3 && mergedB.relatedItemIds?.length === 3,
+    "set semantics observed across concurrent additions"
+  );
 }
 
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);

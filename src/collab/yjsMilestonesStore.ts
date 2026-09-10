@@ -44,7 +44,7 @@ export function createYjsMilestonesStore(doc: Y.Doc): MilestonesStore {
 
   function milestoneMapToPlain(id: string, m: Y.Map<unknown>): Milestone {
     const relArr = (m.get("relatedItemIds") ?? m.get("relatedWorkableItemIds")) as Y.Array<string> | undefined;
-    const ids = relArr ? relArr.toArray() : [];
+    const ids = sanitizeRelatedItemIds(relArr ? relArr.toArray() : []);
     return {
       id,
       type: (m.get("type") as string) || "release",
