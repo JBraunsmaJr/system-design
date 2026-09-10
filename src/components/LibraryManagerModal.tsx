@@ -16,6 +16,7 @@ import type { IconDefinition } from "../domain/iconRegistry";
 import { type ShapeDefinition, DEFAULT_CONNECTION_POINTS } from "../domain/shapeRegistry";
 import { IconRenderer } from "./IconRenderer";
 import { SvgShapeRenderer } from "./nodes/SvgShapeRenderer";
+import { GeometryPicker } from "./GeometryPicker";
 
 interface LibraryManagerModalProps {
   isOpen: boolean;
@@ -583,23 +584,10 @@ export function LibraryManagerModal({ isOpen, onClose }: LibraryManagerModalProp
                 <div style={{ display: "flex", gap: 12 }}>
                   <div style={{ flex: 1 }}>
                     <label style={{ display: "block", fontSize: 12, marginBottom: 4, color: "var(--text-muted)" }}>Geometry Type</label>
-                    <select
-                      style={{ width: "100%", padding: "6px 8px", background: "var(--bg-field)", border: "1px solid var(--border)", color: "#fff", borderRadius: 4 }}
+                    <GeometryPicker
                       value={newShapeGeomType}
-                      onChange={(e) => setNewShapeGeomType(e.target.value)}
-                    >
-                      <option value="rounded-rectangle">Rounded Rectangle</option>
-                      <option value="rectangle">Rectangle</option>
-                      <option value="circle">Circle / Ellipse</option>
-                      <option value="cylinder">Cylinder (Database)</option>
-                      <option value="diamond">Diamond (Decision)</option>
-                      <option value="hexagon">Hexagon</option>
-                      <option value="parallelogram">Parallelogram</option>
-                      <option value="document">Document</option>
-                      <option value="cloud">Cloud</option>
-                      <option value="actor">Actor (User)</option>
-                      <option value="path">Custom SVG Path</option>
-                    </select>
+                      onChange={(type) => setNewShapeGeomType(type)}
+                    />
                   </div>
                   <div style={{ flex: 1 }}>
                     <label style={{ display: "block", fontSize: 12, marginBottom: 4, color: "var(--text-muted)" }}>Shape Color</label>

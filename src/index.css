@@ -3,6 +3,7 @@
    fonts.googleapis.com at runtime - this app needs to keep working with
    no internet access once deployed. */
 :root {
+  color-scheme: dark;
   /* Tool chrome (toolbar / palette / inspector) - dark, quiet, out of the way */
   --chrome-bg: #14161c;
   --chrome-bg-raised: #1b1e27;
@@ -65,9 +66,11 @@ button {
 
 input,
 textarea,
-select {
+select,
+option {
   font-family: inherit;
   font-size: var(--text-base);
+  color-scheme: dark;
 }
 
 /* Scrollbars - default OS/browser scrollbars read as a jarring, out-of-

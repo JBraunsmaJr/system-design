@@ -1,4 +1,5 @@
 import { useEffect, useState, type DragEvent } from "react";
+import { Boxes, Shapes, Code2, GitBranch, type LucideIcon } from "lucide-react";
 import {
   NODE_TYPES,
   CATEGORY_LABELS,
@@ -28,6 +29,13 @@ export const CODE_DRAG_MIME_TYPE = "application/x-archcode";
 
 type PaletteMode = "system" | "shapes" | "code" | "git";
 
+const PALETTE_TABS: { id: PaletteMode; label: string; icon: LucideIcon }[] = [
+  { id: "system", label: "System", icon: Boxes },
+  { id: "shapes", label: "Shapes", icon: Shapes },
+  { id: "code", label: "Code", icon: Code2 },
+  { id: "git", label: "Git", icon: GitBranch },
+];
+
 const MODE_HINTS: Record<PaletteMode, string | null> = {
   system: null,
   shapes: "Diagram shapes, flowchart symbols, infrastructure components, and imported custom libraries.",
@@ -50,34 +58,17 @@ export function Palette() {
   return (
     <aside className="palette">
       <div className="palette__tabs">
-        <button
-          type="button"
-          className={mode === "system" ? "is-active" : undefined}
-          onClick={() => setMode("system")}
-        >
-          System
-        </button>
-        <button
-          type="button"
-          className={mode === "shapes" ? "is-active" : undefined}
-          onClick={() => setMode("shapes")}
-        >
-          Shapes
-        </button>
-        <button
-          type="button"
-          className={mode === "code" ? "is-active" : undefined}
-          onClick={() => setMode("code")}
-        >
-          Code
-        </button>
-        <button
-          type="button"
-          className={mode === "git" ? "is-active" : undefined}
-          onClick={() => setMode("git")}
-        >
-          Git
-        </button>
+        {PALETTE_TABS.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            type="button"
+            className={mode === id ? "is-active" : undefined}
+            onClick={() => setMode(id)}
+          >
+            <Icon size={14} className="palette__tab-icon" />
+            <span>{label}</span>
+          </button>
+        ))}
       </div>
 
       <div className="palette__list">

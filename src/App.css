@@ -262,10 +262,17 @@
   border-bottom: 1px solid var(--chrome-border);
 }
 
+select,
+option {
+  color-scheme: dark;
+  background: var(--chrome-bg-raised);
+  color: var(--chrome-text);
+}
+
 /* ---------- Palette ---------- */
 
 .palette {
-  width: 224px;
+  width: 248px;
   flex-shrink: 0;
   background: var(--chrome-bg-raised);
   border-right: 1px solid var(--chrome-border);
@@ -1776,33 +1783,53 @@
 /* ---------- Palette mode tabs ---------- */
 
 .palette__tabs {
-  display: flex;
-  gap: 4px;
-  margin-bottom: 12px;
-  padding: 3px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  margin-bottom: 14px;
+  padding: 4px;
   background: var(--chrome-bg);
   border: 1px solid var(--chrome-border);
   border-radius: var(--radius-sm);
 }
 
 .palette__tabs button {
-  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   background: transparent;
-  border: none;
+  border: 1px solid transparent;
   border-radius: 5px;
-  padding: 6px 0;
+  padding: 7px 8px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--chrome-text-dim);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  user-select: none;
 }
 
 .palette__tabs button:hover {
   color: var(--chrome-text);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .palette__tabs button.is-active {
   background: var(--chrome-bg-raised);
   color: var(--accent);
+  border-color: var(--chrome-border);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+.palette__tab-icon {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.palette__tabs button.is-active .palette__tab-icon {
+  opacity: 1;
 }
 
 .palette__mode-hint {
