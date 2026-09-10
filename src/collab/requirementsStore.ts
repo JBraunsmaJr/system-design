@@ -395,15 +395,22 @@ export function createAdapterRequirementsStore(
 
     convertAllItemsOfType: (fromTypeId, toTypeId) => {
       if (fromTypeId === toTypeId) return 0;
-      let count = 0;
+      const snapshot = getSnapshot();
+      const targetType = snapshot.itemTypes.find((t) => t.id === toTypeId);
+      if (!targetType) return 0;
+
+      const matchingItems = snapshot.items.filter((i) => i.typeId === fromTypeId);
+      if (matchingItems.length === 0) return 0;
+      const count = matchingItems.length;
+
       setSnapshot((prev) => {
-        const targetType = prev.itemTypes.find((t) => t.id === toTypeId);
-        if (!targetType) return prev;
+        const currentTargetType = prev.itemTypes.find((t) => t.id === toTypeId);
+        if (!currentTargetType) return prev;
 
         const itemsToConvert = prev.items.filter((i) => i.typeId === fromTypeId);
         if (itemsToConvert.length === 0) return prev;
 
-        const isWorkable = targetType.isWorkable;
+        const isWorkable = currentTargetType.isWorkable;
         const conversions: { oldId: string; newId: string }[] = [];
         const occupiedIds = new Set<string>();
 
@@ -429,7 +436,6 @@ export function createAdapterRequirementsStore(
           updatedRelationships = updateItemReferencesInRelationships(updatedRelationships, oldId, newId);
         }
 
-        count = conversions.length;
         return {
           ...prev,
           items: updatedItems,
