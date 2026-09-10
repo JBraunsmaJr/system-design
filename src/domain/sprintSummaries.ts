@@ -97,8 +97,6 @@ export function computeSprintMilestoneSummary(
   for (const rel of requirementsDoc.relationships) {
     if (itemsInSprintIds.has(rel.fromItemId) && rel.typeId === "depends-on") {
       externalDepIds.add(rel.toItemId);
-    } else if (itemsInSprintIds.has(rel.toItemId) && rel.typeId === "depended-on-by") {
-      externalDepIds.add(rel.fromItemId);
     }
   }
 

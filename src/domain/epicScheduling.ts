@@ -7,7 +7,7 @@ import { getMilestoneRelatedItemIds } from "./milestones.ts";
 
 /**
  * Returns all child requirement items directly linked to a parent (e.g. Epic).
- * Checks both "parent-of" (from parent to child) and "child-of" (from child to parent).
+ * Checks "parent-of" (from parent to child).
  */
 export function getChildItemsForParent(
   parentId: string,
@@ -16,10 +16,8 @@ export function getChildItemsForParent(
   const childItemIds = new Set<string>();
 
   for (const rel of doc.relationships) {
-    if (rel.fromItemId === parentId && (rel.typeId === "parent-of" || rel.typeId === "relates-to")) {
+    if (rel.fromItemId === parentId && rel.typeId === "parent-of") {
       childItemIds.add(rel.toItemId);
-    } else if (rel.toItemId === parentId && rel.typeId === "child-of") {
-      childItemIds.add(rel.fromItemId);
     }
   }
 

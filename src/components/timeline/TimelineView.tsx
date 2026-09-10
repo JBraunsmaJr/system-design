@@ -88,12 +88,9 @@ export function TimelineView({
     const epics = requirements.items.filter((i) => i.typeId === "epic" || i.typeId.toLowerCase().includes("epic"));
     const epicIds = new Set(epics.map((e) => e.id));
     for (const rel of requirements.relationships) {
-      if (epicIds.has(rel.fromItemId) && (rel.typeId === "parent-of" || rel.typeId === "relates-to")) {
+      if (epicIds.has(rel.fromItemId) && rel.typeId === "parent-of") {
         const epic = epics.find((e) => e.id === rel.fromItemId);
         if (epic) map.set(rel.toItemId, epic);
-      } else if (epicIds.has(rel.toItemId) && rel.typeId === "child-of") {
-        const epic = epics.find((e) => e.id === rel.toItemId);
-        if (epic) map.set(rel.fromItemId, epic);
       }
     }
     return map;
@@ -385,10 +382,6 @@ export function TimelineView({
           filteredChildItemIds={filteredChildItemIds}
           onSelectItem={(id) => setSelectedItemId(id)}
           onSelectMilestone={(id) => setSelectedMilestoneId(id)}
-          onAddMilestoneOnDate={(date) => {
-            setAddMilestoneDate(date);
-            setIsAddingMilestone(true);
-          }}
           onNavigateToRequirement={onNavigateToRequirement}
         />
       ) : (
@@ -1301,6 +1294,11 @@ function SprintBoardColumn({
     );
   }, [draggedItemId, sprint.id, range, requirements.items, requirements.relationships, requirements.relationshipTypes, requirements.itemTypes, sprintRangesByItemId]);
 
+  const visibleItems = useMemo(() => {
+    if (!filteredChildItemIds) return items;
+    return items.filter((item) => filteredChildItemIds.has(item.id));
+  }, [items, filteredChildItemIds]);
+
   const isBlocked = dropConflict?.severity === "blocked";
   const isAtRisk = dropConflict?.severity === "risk";
 
@@ -1356,9 +1354,9 @@ function SprintBoardColumn({
           <span className="pi-board-column__name">{sprint.name}</span>
           <span
             className="pi-board-column__count"
-            title={`${items.length} requirement item${items.length === 1 ? "" : "s"} assigned`}
+            title={`${visibleItems.length} requirement item${visibleItems.length === 1 ? "" : "s"} assigned`}
           >
-            {items.length}
+            {visibleItems.length}
           </span>
           <SprintQuickAdd
             backlogItems={backlogItems}
@@ -1497,7 +1495,7 @@ function SprintBoardColumn({
       )}
       {dropError && <p className="pi-board-column__drop-error">{dropError}</p>}
       <div className="pi-board-column__items">
-        {items.length === 0 ? (
+        {visibleItems.length === 0 ? (
           <div className="pi-board-column__empty">
             {isBlocked
               ? `Cannot add: blocked by ${dropConflict?.blocker.id}`
@@ -1506,7 +1504,7 @@ function SprintBoardColumn({
                 : "No requirements assigned"}
           </div>
         ) : (
-          items.map((item) => {
+          visibleItems.map((item) => {
             const type = getItemType(requirements, item.typeId);
             const category = item.categoryId
               ? requirements.categories.find((c) => c.id === item.categoryId)
@@ -1517,8 +1515,6 @@ function SprintBoardColumn({
             const isAtRisk = conflictInfo?.severity === "risk";
             const isBlocker = blockingItemIds.has(item.id);
             const parentEpic = parentEpicByItemId?.get(item.id);
-            const isFilteredOut = filteredChildItemIds && !filteredChildItemIds.has(item.id);
-            if (isFilteredOut) return null;
             return (
               <div
                 key={item.id}

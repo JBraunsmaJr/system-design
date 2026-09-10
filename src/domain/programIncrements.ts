@@ -82,11 +82,16 @@ export function getNextPIStartDate(pis: ProgramIncrement[]): string {
   }
   const lastPI = pis[pis.length - 1];
   if (!lastPI) return todayISO();
-  if (!lastPI.sprints || lastPI.sprints.length === 0) {
-    if (lastPI.startDate && /^\d{4}-\d{2}-\d{2}$/.test(lastPI.startDate)) {
-      return formatISODate(parseISODate(lastPI.startDate) + 1);
-    }
+  if (!lastPI.startDate || typeof lastPI.startDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(lastPI.startDate)) {
     return todayISO();
+  }
+  const [y, m, d] = lastPI.startDate.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  if (date.getUTCFullYear() !== y || date.getUTCMonth() !== m - 1 || date.getUTCDate() !== d) {
+    return todayISO();
+  }
+  if (!lastPI.sprints || lastPI.sprints.length === 0) {
+    return formatISODate(parseISODate(lastPI.startDate) + 1);
   }
   const ranges = computeSprintDateRanges(lastPI);
   if (ranges.length === 0) return todayISO();

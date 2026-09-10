@@ -259,6 +259,14 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: ProgramIncrementsStore
   const ySnap = ystore.getSnapshot();
   const yPi2 = ySnap.find((pi) => pi.id === yPi2Id)!;
   assert(yPi2.startDate === "2026-12-08", "Yjs store: PI 2 automatically starts on Dec 8 when PI 1 ends on Dec 7");
+
+  // Invalid or empty start date fallbacks
+  const { getNextPIStartDate, todayISO } = await import("../domain/programIncrements");
+  const fallbackEmpty = getNextPIStartDate([{ id: "pi-x", name: "Empty start", startDate: "", sprints: [{ id: "s1", name: "S1", durationDays: 14 }] }]);
+  assert(fallbackEmpty === todayISO(), "getNextPIStartDate falls back to todayISO() when startDate is empty");
+
+  const fallbackInvalid = getNextPIStartDate([{ id: "pi-x", name: "Invalid date", startDate: "2026-02-31", sprints: [{ id: "s1", name: "S1", durationDays: 14 }] }]);
+  assert(fallbackInvalid === todayISO(), "getNextPIStartDate falls back to todayISO() when startDate is calendar-invalid (Feb 31)");
 }
 
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);

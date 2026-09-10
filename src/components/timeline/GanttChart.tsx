@@ -28,7 +28,6 @@ interface GanttChartProps {
   filteredChildItemIds?: Set<string> | null;
   onSelectItem: (itemId: string) => void;
   onSelectMilestone?: (milestoneId: string) => void;
-  onAddMilestoneOnDate?: (date: string) => void;
   onNavigateToRequirement?: (itemId: string) => void;
 }
 
@@ -360,12 +359,9 @@ export function GanttChart({
     const epics = requirements.items.filter((i) => i.typeId === "epic" || i.typeId.toLowerCase().includes("epic"));
     const epicIds = new Set(epics.map((e) => e.id));
     for (const rel of requirements.relationships) {
-      if (epicIds.has(rel.fromItemId) && (rel.typeId === "parent-of" || rel.typeId === "relates-to")) {
+      if (epicIds.has(rel.fromItemId) && rel.typeId === "parent-of") {
         const epic = epics.find((e) => e.id === rel.fromItemId);
         if (epic) map.set(rel.toItemId, epic);
-      } else if (epicIds.has(rel.toItemId) && rel.typeId === "child-of") {
-        const epic = epics.find((e) => e.id === rel.toItemId);
-        if (epic) map.set(rel.fromItemId, epic);
       }
     }
     return map;
@@ -375,12 +371,9 @@ export function GanttChart({
     const map = new Map<string, RequirementItem>();
     const itemById = new Map(requirements.items.map((i) => [i.id, i]));
     for (const rel of requirements.relationships) {
-      if (rel.typeId === "parent-of" || rel.typeId === "relates-to") {
+      if (rel.typeId === "parent-of") {
         const parent = itemById.get(rel.fromItemId);
         if (parent) map.set(rel.toItemId, parent);
-      } else if (rel.typeId === "child-of") {
-        const parent = itemById.get(rel.toItemId);
-        if (parent) map.set(rel.fromItemId, parent);
       }
     }
     return map;

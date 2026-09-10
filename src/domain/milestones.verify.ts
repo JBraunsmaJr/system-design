@@ -18,6 +18,7 @@ import {
 } from "./milestones";
 import { BUILT_IN_ITEM_TYPES, BUILT_IN_RELATIONSHIP_TYPES } from "./requirementsRegistry";
 import type { RequirementsDocument } from "./requirementsTypes";
+import { parseDiagramFile } from "./serialization";
 
 let failures = 0;
 function assert(condition: boolean, message: string) {
@@ -85,6 +86,14 @@ const mockDoc: RequirementsDocument = {
   };
   const formatErrors = validateMilestone(releaseWithInvalidFormat, mockDoc);
   assert(formatErrors.some((e) => e.field === "scheduledAt"), "non YYYY-MM-DD date format is rejected");
+
+  const releaseWithInvalidCalendarDate: Partial<Milestone> = {
+    type: "release",
+    name: "Release 2.4",
+    scheduledAt: "2026-02-31",
+  };
+  const calErrors = validateMilestone(releaseWithInvalidCalendarDate, mockDoc);
+  assert(calErrors.some((e) => e.field === "scheduledAt"), "calendar-invalid date Feb 31 is rejected");
 }
 
 // --- Test 4: Related Items Validation (FR-005, AC-005, Section 12) ---
@@ -224,6 +233,24 @@ const mockDoc: RequirementsDocument = {
 
   const forDep = findMilestonesForItem([milestone], "DEP-1");
   assert(forDep.length === 1 && forDep[0]?.id === "m-test", "findMilestonesForItem finds milestone linked to DEP-1");
+}
+
+// --- Test 12: parseDiagramFile validates milestones and rejects calendar-invalid dates ---
+{
+  const json = JSON.stringify({
+    nodes: [],
+    edges: [],
+    milestones: [
+      { id: "m-valid", type: "release", name: "Valid Release", scheduledAt: "2026-06-15" },
+      { id: "m-invalid-date", type: "release", name: "Feb 31", scheduledAt: "2026-02-31" },
+      { id: "m-empty-name", type: "release", name: "   ", scheduledAt: "2026-06-15" },
+      { id: "m-invalid-format", type: "release", name: "Bad Format", scheduledAt: "2026/06/15" },
+    ],
+  });
+
+  const parsed = parseDiagramFile(json);
+  assert(parsed.milestones?.length === 1, "parseDiagramFile retains only valid milestones");
+  assert(parsed.milestones?.[0]?.id === "m-valid", "valid milestone is parsed successfully");
 }
 
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);

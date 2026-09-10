@@ -1,7 +1,7 @@
 /**
  * Run with: npx tsx --tsconfig tsconfig.app.json src/domain/epicScheduling.verify.ts
  */
-import { computeEpicInferredSchedule } from "./epicScheduling";
+import { computeEpicInferredSchedule, getChildItemsForParent } from "./epicScheduling";
 import type { RequirementsDocument } from "./requirementsTypes";
 import type { ProgramIncrement } from "./programIncrements";
 import type { Milestone } from "./milestones";
@@ -129,6 +129,31 @@ const baseDoc: RequirementsDocument = {
   assert(schedule.endDate === "2026-11-11", "end date spans into PI 2 Sprint 3 end (2026-11-11)");
   assert(schedule.isFullyScheduled === true, "isFullyScheduled is true");
   assert(schedule.scheduledSprintIds.includes("sprint-1") && schedule.scheduledSprintIds.includes("sprint-3"), "tracks all sprint IDs across PIs");
+}
+
+// --- Test 6: getChildItemsForParent strictly matches canonical parent-of and ignores relates-to ---
+{
+  const hierarchyDoc: RequirementsDocument = {
+    itemTypes: BUILT_IN_ITEM_TYPES,
+    categories: [],
+    items: [
+      { id: "EPIC-10", typeId: "epic", title: "Parent Epic", body: "" },
+      { id: "TICKET-11", typeId: "ticket", title: "Parent-of Child", body: "" },
+      { id: "TICKET-13", typeId: "ticket", title: "Related Ticket", body: "" },
+    ],
+    relationshipTypes: BUILT_IN_RELATIONSHIP_TYPES,
+    relationships: [
+      { id: "r1", typeId: "parent-of", fromItemId: "EPIC-10", toItemId: "TICKET-11" },
+      { id: "r3", typeId: "relates-to", fromItemId: "EPIC-10", toItemId: "TICKET-13" },
+    ],
+    nextSequence: {},
+  };
+
+  const children = getChildItemsForParent("EPIC-10", hierarchyDoc);
+  const childIds = children.map((c) => c.id);
+
+  assert(childIds.includes("TICKET-11"), "includes parent-of target child");
+  assert(!childIds.includes("TICKET-13"), "excludes relates-to relationship");
 }
 
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);

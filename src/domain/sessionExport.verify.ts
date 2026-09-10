@@ -38,12 +38,19 @@ function testSessionExportIncludesSessionChanges() {
   };
 
   const initialReqs: RequirementsDocument = {
-    items: [],
+    items: [
+      {
+        id: "REQ-1",
+        typeId: "requirement",
+        title: "Initial Requirement",
+        body: "Original pre-session body text",
+      },
+    ],
     categories: [],
     itemTypes: BUILT_IN_ITEM_TYPES,
     relationshipTypes: BUILT_IN_RELATIONSHIP_TYPES,
     relationships: [],
-    nextSequence: {},
+    nextSequence: { requirement: 2 },
   };
 
   // 2. Start a session
@@ -54,7 +61,7 @@ function testSessionExportIncludesSessionChanges() {
   const diagramStore = createYjsDiagramStore(doc);
   const requirementsStore = createYjsRequirementsStore(doc);
 
-  // 3. Make changes during session: add node-2 and requirement-1
+  // 3. Make changes during session: add node-2 and requirement-1, and update initial requirement body
   diagramStore.addNode([], "typed", { x: 200, y: 200 }, {
     nodeType: "custom",
     label: "Session Node",
@@ -63,6 +70,7 @@ function testSessionExportIncludesSessionChanges() {
     tags: [],
   });
 
+  requirementsStore.updateItem("REQ-1", { body: "Updated during session body text" });
   const reqId = requirementsStore.addItem("requirement");
   requirementsStore.updateItem(reqId, { title: "Session Requirement", body: "Req body" });
 
@@ -89,13 +97,15 @@ function testSessionExportIncludesSessionChanges() {
     "exported diagram contains the node added during collaborative session"
   );
   assert(
-    exportedFile.requirements.items.length === 1,
-    "exported diagram contains requirement added during session"
+    exportedFile.requirements.items.length === 2,
+    "exported diagram contains both initial updated requirement and requirement added during session"
   );
 
   // 6. Export requirements markdown
   const markdown = toMarkdownDocument("Test Diagram", requirementsSnapshot);
   assert(markdown.includes("Session Requirement"), "exported markdown includes requirement added during session");
+  assert(markdown.includes("Updated during session body text"), "exported markdown contains updated body text");
+  assert(!markdown.includes("Original pre-session body text"), "exported markdown excludes original pre-session body text");
 }
 
 testSessionExportIncludesSessionChanges();

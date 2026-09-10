@@ -7,7 +7,7 @@ import type { ProgramIncrement } from "./programIncrements.ts";
 import type { TeamDocument } from "./teamTypes.ts";
 import { EMPTY_TEAM_DOCUMENT, DEFAULT_TEAM_SETTINGS } from "./teamTypes.ts";
 import type { Milestone } from "./milestones.ts";
-import { sanitizeRelatedItemIds } from "./milestones.ts";
+import { sanitizeRelatedItemIds, validateMilestone } from "./milestones.ts";
 
 export const SCHEMA_VERSION = "0.7";
 
@@ -215,7 +215,7 @@ function parseMilestones(raw: unknown): Milestone[] {
     const m = entry as Partial<Milestone>;
     if (typeof m.id !== "string" || typeof m.name !== "string" || typeof m.scheduledAt !== "string") continue;
     const sanitizedIds = sanitizeRelatedItemIds(m.relatedItemIds ?? m.relatedWorkableItemIds);
-    result.push({
+    const candidate: Milestone = {
       id: m.id,
       type: typeof m.type === "string" && m.type.trim() !== "" ? m.type : "release",
       name: m.name.trim(),
@@ -228,7 +228,10 @@ function parseMilestones(raw: unknown): Milestone[] {
       relatedWorkableItemIds: sanitizedIds,
       createdAt: typeof m.createdAt === "string" ? m.createdAt : undefined,
       updatedAt: typeof m.updatedAt === "string" ? m.updatedAt : undefined,
-    });
+    };
+    const errors = validateMilestone(candidate);
+    if (errors.length > 0) continue;
+    result.push(candidate);
   }
   return result;
 }
