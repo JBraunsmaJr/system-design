@@ -3,7 +3,7 @@ import { SendToBack, BringToFront, ChevronUp, ChevronDown } from "lucide-react";
 import type { Node, Edge } from "@xyflow/react";
 import { getNodeType } from "../domain/nodeRegistry";
 import { getGroupType } from "../domain/groupRegistry";
-import { getShapeType } from "../domain/shapeRegistry";
+import { getShapeType, globalShapeRegistry } from "../domain/shapeRegistry";
 import { CODE_LANGUAGES } from "../domain/codeRegistry";
 import { EDGE_TYPES, STYLE_GROUP_LABELS } from "../domain/edgeRegistry";
 import { IconPicker } from "./IconPicker";
@@ -142,11 +142,12 @@ export function Inspector({
     }
 
     if (selectedNode.type === "shape") {
+      const fullShapeDef = globalShapeRegistry.getShape(data.nodeType);
       const shapeDef = getShapeType(data.nodeType);
       const fontSize = data.fontSize ?? 16;
       return (
         <aside className="inspector">
-          <div className="panel-header">{shapeDef?.label ?? "Shape"}</div>
+          <div className="panel-header">{fullShapeDef?.name ?? shapeDef?.label ?? "Shape"}</div>
 
           <Field label="Text">
             <textarea
@@ -171,11 +172,79 @@ export function Inspector({
 
           <ColorField
             value={data.color}
-            defaultValue={shapeDef?.color ?? "#5B7CFA"}
+            defaultValue={fullShapeDef?.defaults.color ?? shapeDef?.color ?? "#5B7CFA"}
             onChange={(color) => onUpdateNode(selectedNode.id, { color })}
           />
 
-          <p className="inspector__hint" style={{ marginTop: -8 }}>
+          <IconPicker
+            value={data.icon}
+            defaultValue={fullShapeDef?.iconId}
+            onChange={(icon) => onUpdateNode(selectedNode.id, { icon })}
+          />
+
+          {fullShapeDef?.properties && fullShapeDef.properties.length > 0 && (
+            <div className="inspector__custom-properties" style={{ marginTop: 12 }}>
+              <span className="inspector__section-title" style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)" }}>
+                Shape Properties
+              </span>
+              {fullShapeDef.properties.map((prop) => {
+                const currentVal = data.properties?.[prop.id] ?? prop.defaultValue ?? "";
+                return (
+                  <Field key={prop.id} label={prop.label}>
+                    {prop.type === "select" && prop.options ? (
+                      <select
+                        value={String(currentVal)}
+                        onChange={(e) =>
+                          onUpdateNode(selectedNode.id, {
+                            properties: { ...(data.properties || {}), [prop.id]: e.target.value },
+                          })
+                        }
+                      >
+                        {prop.options.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    ) : prop.type === "boolean" ? (
+                      <input
+                        type="checkbox"
+                        checked={currentVal === "true" || currentVal === "1"}
+                        onChange={(e) =>
+                          onUpdateNode(selectedNode.id, {
+                            properties: { ...(data.properties || {}), [prop.id]: e.target.checked ? "true" : "false" },
+                          })
+                        }
+                      />
+                    ) : prop.type === "color" ? (
+                      <input
+                        type="color"
+                        value={String(currentVal || "#5B7CFA")}
+                        onChange={(e) =>
+                          onUpdateNode(selectedNode.id, {
+                            properties: { ...(data.properties || {}), [prop.id]: e.target.value },
+                          })
+                        }
+                      />
+                    ) : (
+                      <input
+                        type={prop.type === "number" ? "number" : "text"}
+                        value={String(currentVal)}
+                        placeholder={prop.description}
+                        onChange={(e) =>
+                          onUpdateNode(selectedNode.id, {
+                            properties: { ...(data.properties || {}), [prop.id]: e.target.value },
+                          })
+                        }
+                      />
+                    )}
+                  </Field>
+                );
+              })}
+            </div>
+          )}
+
+          <p className="inspector__hint" style={{ marginTop: 4 }}>
             Double-click the shape on the canvas to edit its text directly.
           </p>
 

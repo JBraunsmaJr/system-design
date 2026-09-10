@@ -689,11 +689,11 @@ export function GanttChart({
               </div>
             </div>
 
-            {/* Dedicated Milestones & Releases track (FR-003, AC-002, AC-009) */}
+            {/* Dedicated Markers track (FR-003, AC-002, AC-009) */}
             <div className="gantt-chart__milestones-row" style={{ minHeight: milestoneTrackHeight }}>
               <div className="gantt-chart__milestones-label" style={{ width: labelColumnWidth }}>
                 <Diamond size={13} className="gantt-chart__milestone-header-icon" />
-                <span>Milestones & Releases</span>
+                <span>Markers</span>
               </div>
 
               <div className="gantt-chart__milestones-track" style={{ width: totalWidth, minHeight: milestoneTrackHeight }}>

@@ -353,10 +353,10 @@ export function TimelineView({
             setAddMilestoneDate(undefined);
             setIsAddingMilestone(true);
           }}
-          title="Create a new Release or Timeline Milestone (FR-001)"
+          title="Create a new Marker"
         >
           <Diamond size={13} />
-          Release / Milestone
+          Marker
         </button>
         <div className="timeline-view__mode-toggle">
           <button
@@ -641,23 +641,23 @@ function MilestonesSection({ milestones, onSelectMilestone, onAddMilestone }: Mi
           type="button"
           className="milestones-section__collapse-toggle"
           onClick={() => setIsCollapsed(!isCollapsed)}
-          aria-label={isCollapsed ? "Expand milestones" : "Collapse milestones"}
+          aria-label={isCollapsed ? "Expand markers" : "Collapse markers"}
         >
           {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
         </button>
         <Diamond size={14} className="milestones-section__icon" />
-        <span className="milestones-section__title">Milestones & Releases</span>
-        <span className="milestones-section__count" title={`${milestones.length} milestone${milestones.length === 1 ? "" : "s"}`}>
+        <span className="milestones-section__title">Markers</span>
+        <span className="milestones-section__count" title={`${milestones.length} marker${milestones.length === 1 ? "" : "s"}`}>
           {milestones.length}
         </span>
         <button
           type="button"
           className="milestones-section__add-btn"
           onClick={onAddMilestone}
-          title="Create a new Release or Milestone"
+          title="Create a new Marker"
         >
           <Plus size={12} />
-          <span>Add Release</span>
+          <span>Add Marker</span>
         </button>
       </div>
 
@@ -665,7 +665,7 @@ function MilestonesSection({ milestones, onSelectMilestone, onAddMilestone }: Mi
         <div className="milestones-section__items">
           {milestones.length === 0 ? (
             <p className="milestones-section__empty">
-              No releases or milestones scheduled yet. Click <strong>Add Release</strong> to place point-in-time outcomes on the timeline.
+              No markers scheduled yet. Click <strong>Add Marker</strong> to place point-in-time outcomes on the timeline.
             </p>
           ) : (
             milestones.map((m) => {

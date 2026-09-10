@@ -1,8 +1,8 @@
 import { type NodeProps, type Node } from "@xyflow/react";
 import { Maximize2 } from "lucide-react";
-import * as Icons from "lucide-react";
 import { getNodeType, CATEGORY_LABELS } from "../../domain/nodeRegistry";
 import { BidirectionalHandles } from "./BidirectionalHandles";
+import { IconRenderer } from "../IconRenderer";
 import type { ArchNodeData } from "../../domain/types";
 import { useCanvasContext } from "../CanvasContext";
 
@@ -18,9 +18,8 @@ export function TypedNode({ id, data, selected, onDrillInto: propOnDrillInto }: 
   const canvasContext = useCanvasContext();
   const onDrillInto = canvasContext?.isPresenting ? undefined : (propOnDrillInto ?? canvasContext?.onDrillInto);
   const def = getNodeType(data.nodeType);
-  const iconName = data.icon ?? def?.icon;
-  const IconComponent =
-    (iconName && (Icons[iconName as keyof typeof Icons] as Icons.LucideIcon)) || Icons.Box;
+  const rawIcon = data.icon === "none" ? undefined : (data.icon ?? def?.icon);
+  const iconName = rawIcon && rawIcon.trim() !== "" ? rawIcon : undefined;
   const accent = data.color ?? def?.color ?? "#98A2B3";
   const hasSubDiagram = data.hasSubDiagram ?? false;
   // The "Custom" type's category label and its own type label are both
@@ -42,9 +41,11 @@ export function TypedNode({ id, data, selected, onDrillInto: propOnDrillInto }: 
       <BidirectionalHandles />
 
       <div className="typed-node__body">
-        <div className="typed-node__icon" style={{ background: `${accent}1a`, color: accent }}>
-          <IconComponent size={16} strokeWidth={2} />
-        </div>
+        {iconName && (
+          <div className="typed-node__icon" style={{ background: `${accent}1a`, color: accent }}>
+            <IconRenderer icon={iconName} size={16} />
+          </div>
+        )}
         <div className="typed-node__text">
           <div className="typed-node__label">{data.label}</div>
           {isCustom ? (

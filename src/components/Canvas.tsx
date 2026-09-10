@@ -42,9 +42,11 @@ import { ShapeNode } from "./nodes/ShapeNode";
 import { CodeNode } from "./nodes/CodeNode";
 import { PresentationOverlay } from "./PresentationOverlay";
 import { Breadcrumb } from "./Breadcrumb";
+import { DocumentationPopup } from "./documentation/DocumentationPopup";
+import { useDiagramHoverDocumentation } from "./documentation/useDiagramHoverDocumentation";
 import { NODE_TYPES } from "../domain/nodeRegistry";
 import { GROUP_TYPES } from "../domain/groupRegistry";
-import { SHAPE_TYPES } from "../domain/shapeRegistry";
+import { SHAPE_TYPES, globalShapeRegistry } from "../domain/shapeRegistry";
 import { computeAlignment, type AlignBox, type AlignmentGuide } from "../domain/alignmentGuides";
 import type { ZOrderCommand } from "../domain/zOrder";
 import { toAbsolutePosition } from "../domain/graphUtils";
@@ -335,7 +337,7 @@ export function Canvas({
       }
 
       const shapeTypeId = event.dataTransfer.getData(SHAPE_DRAG_MIME_TYPE);
-      if (shapeTypeId && SHAPE_TYPES.some((s) => s.id === shapeTypeId)) {
+      if (shapeTypeId && (SHAPE_TYPES.some((s) => s.id === shapeTypeId) || globalShapeRegistry.getShape(shapeTypeId))) {
         onAddShape(shapeTypeId, position);
         return;
       }
@@ -465,6 +467,8 @@ export function Canvas({
    */
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; targetIds: string[] } | null>(null);
 
+  const closeContextMenu = useCallback(() => setContextMenu(null), []);
+
   const openContextMenu = useCallback(
     (event: ReactMouseEvent, nodeId: string | null) => {
       if (isPresenting) return; // the locked slideshow view has nothing to arrange
@@ -488,8 +492,6 @@ export function Canvas({
     },
     [isPresenting]
   );
-
-  const closeContextMenu = useCallback(() => setContextMenu(null), []);
 
   /**
    * Both handlers are memoized rather than written inline on the
@@ -624,6 +626,36 @@ export function Canvas({
 
   const levelLabel = breadcrumbLabels.length === 0 ? "Root" : breadcrumbLabels.join(" › ");
 
+  const docHover = useDiagramHoverDocumentation({
+    nodes: displayNodes,
+    edges: displayEdges,
+    disabled: isPresenting,
+  });
+
+  const handlePaneClick = useCallback(() => {
+    closeContextMenu();
+    docHover.closeDocumentation();
+  }, [closeContextMenu, docHover.closeDocumentation]);
+
+  const handleMoveStart = useCallback(() => {
+    closeContextMenu();
+    docHover.closeDocumentation();
+  }, [closeContextMenu, docHover.closeDocumentation]);
+
+  const handleConnectStartWithDoc = useCallback<OnConnectStart>(
+    (event, params) => {
+      closeContextMenu();
+      docHover.closeDocumentation();
+      onConnectStart(event, params);
+    },
+    [closeContextMenu, docHover.closeDocumentation, onConnectStart]
+  );
+
+  const onNodeDragStart = useCallback(() => {
+    closeContextMenu();
+    docHover.closeDocumentation();
+  }, [closeContextMenu, docHover.closeDocumentation]);
+
   const handlePaneMouseMove = useCallback(
     (event: ReactMouseEvent) => {
       onCursorMove(screenToFlowPosition({ x: event.clientX, y: event.clientY }));
@@ -650,11 +682,20 @@ export function Canvas({
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={handleConnect}
-          onConnectStart={onConnectStart}
+          onConnectStart={handleConnectStartWithDoc}
           onNodeContextMenu={onNodeContextMenu}
           onSelectionContextMenu={onSelectionContextMenu}
-          onPaneClick={closeContextMenu}
-          onMoveStart={closeContextMenu}
+          onNodeMouseEnter={docHover.handleNodeMouseEnter}
+          onNodeMouseMove={docHover.handleNodeMouseMove}
+          onNodeMouseLeave={docHover.handleNodeMouseLeave}
+          onEdgeMouseEnter={docHover.handleEdgeMouseEnter}
+          onEdgeMouseMove={docHover.handleEdgeMouseMove}
+          onEdgeMouseLeave={docHover.handleEdgeMouseLeave}
+          onNodeClick={docHover.handleNodeClick}
+          onEdgeClick={docHover.handleEdgeClick}
+          onPaneClick={handlePaneClick}
+          onMoveStart={handleMoveStart}
+          onNodeDragStart={onNodeDragStart}
           onNodeDrag={onNodeDrag}
           onNodeDragStop={onNodeDragStop}
           onNodeDoubleClick={onNodeDoubleClick}
@@ -811,6 +852,17 @@ export function Canvas({
             </div>,
             document.body
           )}
+
+        <DocumentationPopup
+          documentation={docHover.documentation}
+          title={docHover.title}
+          subtitle={docHover.subtitle}
+          open={docHover.isOpen}
+          anchor={docHover.anchor}
+          onClose={docHover.closeDocumentation}
+          onMouseEnter={docHover.handlePopupMouseEnter}
+          onMouseLeave={docHover.handlePopupMouseLeave}
+        />
       </div>
     </CanvasContext.Provider>
   );
