@@ -186,8 +186,11 @@ async function runSuite() {
           const perfObj = (window as unknown as Record<string, unknown>).__PERF__ as
             | { getMetrics?: () => PerfMetrics }
             | undefined;
-          return (perfObj?.getMetrics ? perfObj.getMetrics() : {}) as PerfMetrics;
+          return perfObj?.getMetrics?.() ?? null;
         });
+        if (!metrics) {
+          throw new Error("Performance instrumentation is unavailable. Build with VITE_PERF_INSTRUMENTATION=1.");
+        }
 
         repeatMetrics.push({
           ...metrics,
