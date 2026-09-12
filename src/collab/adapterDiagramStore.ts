@@ -9,6 +9,7 @@ import {
   withWaypointRemoved,
   withWaypointsCleared,
 } from "./diagramStore";
+import { recordSnapshotBuild, recordStoreWrite } from "../perf/instrumentation";
 
 /**
  * A DiagramStore that owns no state of its own - same purpose as
@@ -60,6 +61,7 @@ export function createAdapterDiagramStore(
     if (root !== cachedRoot) {
       cachedRoot = root;
       cachedSnapshot = flattenSubDiagramTree(root);
+      recordSnapshotBuild();
     }
     return cachedSnapshot!;
   }
@@ -118,6 +120,7 @@ export function createAdapterDiagramStore(
     subscribe: () => () => {},
 
     addNode: (parentPath, type, position, data) => {
+      recordStoreWrite();
       const id = `node-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
       /**
        * parentPath is implicit in tree position here (it's what
@@ -135,6 +138,7 @@ export function createAdapterDiagramStore(
     },
 
     updateNode: (id, patch) => {
+      recordStoreWrite();
       setRoot((root) => {
         const found = findNodePath(root, id);
         if (!found) return root;
@@ -146,6 +150,7 @@ export function createAdapterDiagramStore(
     },
 
     updatePosition: (id, position) => {
+      recordStoreWrite();
       setRoot((root) => {
         const found = findNodePath(root, id);
         if (!found) return root;
@@ -157,6 +162,7 @@ export function createAdapterDiagramStore(
     },
 
     updateParentId: (id, parentId, position) => {
+      recordStoreWrite();
       setRoot((root) => {
         const found = findNodePath(root, id);
         if (!found) return root;
@@ -168,6 +174,7 @@ export function createAdapterDiagramStore(
     },
 
     updateDimensions: (id, width, height) => {
+      recordStoreWrite();
       setRoot((root) => {
         const found = findNodePath(root, id);
         if (!found) return root;
@@ -188,6 +195,7 @@ export function createAdapterDiagramStore(
      * @param id
      */
     deleteNode: (id) => {
+      recordStoreWrite();
       setRoot((root) => {
         const found = findNodePath(root, id);
         if (!found) return root;
@@ -200,6 +208,7 @@ export function createAdapterDiagramStore(
     },
 
     addEdge: (parentPath, source, target, data, sourceHandle, targetHandle) => {
+      recordStoreWrite();
       const id = `edge-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
       const newEdge: Edge<ArchEdgeData> = { id, source, target, sourceHandle, targetHandle, type: "typed", data };
       setRoot((root) =>
@@ -209,6 +218,7 @@ export function createAdapterDiagramStore(
     },
 
     updateEdge: (id, patch) => {
+      recordStoreWrite();
       setRoot((root) => {
         const path = findEdgePath(root, id);
         if (path === null) return root;
@@ -220,6 +230,7 @@ export function createAdapterDiagramStore(
     },
 
     deleteEdge: (id) => {
+      recordStoreWrite();
       setRoot((root) => {
         const path = findEdgePath(root, id);
         if (path === null) return root;
@@ -228,6 +239,7 @@ export function createAdapterDiagramStore(
     },
 
     reconnectEdge: (id, endpoints) => {
+      recordStoreWrite();
       updateEdgeInTree(id, (edge) => ({
         ...edge,
         source: endpoints.source,
@@ -243,6 +255,7 @@ export function createAdapterDiagramStore(
     // drift apart on the details - particularly the "drop the key when
     // the last bend goes" rule, which is easy to get subtly wrong twice.
     addEdgeWaypoint: (edgeId, index, waypoint) => {
+      recordStoreWrite();
       updateEdgeInTree(edgeId, (edge) => ({
         ...edge,
         data: withWaypointAdded(edge.data as ArchEdgeData, index, waypoint),
@@ -250,6 +263,7 @@ export function createAdapterDiagramStore(
     },
 
     moveEdgeWaypoint: (edgeId, waypointId, position) => {
+      recordStoreWrite();
       updateEdgeInTree(edgeId, (edge) => ({
         ...edge,
         data: withWaypointMoved(edge.data as ArchEdgeData, waypointId, position),
@@ -257,6 +271,7 @@ export function createAdapterDiagramStore(
     },
 
     removeEdgeWaypoint: (edgeId, waypointId) => {
+      recordStoreWrite();
       updateEdgeInTree(edgeId, (edge) => ({
         ...edge,
         data: withWaypointRemoved(edge.data as ArchEdgeData, waypointId),
@@ -264,6 +279,7 @@ export function createAdapterDiagramStore(
     },
 
     clearEdgeWaypoints: (edgeId) => {
+      recordStoreWrite();
       updateEdgeInTree(edgeId, (edge) => ({
         ...edge,
         data: withWaypointsCleared(edge.data as ArchEdgeData),

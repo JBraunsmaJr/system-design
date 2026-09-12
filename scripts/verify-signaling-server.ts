@@ -32,6 +32,7 @@
  * to be from reading the code.
  */
 import { spawn, type ChildProcess } from "child_process";
+// @ts-expect-error ws lacks typescript definitions in devDependencies
 import WebSocket from "ws";
 
 let failures = 0;
@@ -94,7 +95,7 @@ try {
   clientB.send(JSON.stringify({ type: "subscribe", topics: [ROOM] }));
 
   let receivedByB: { data: unknown } | null = null;
-  clientB.on("message", (raw) => {
+  clientB.on("message", (raw: { toString: () => string }) => {
     const msg = JSON.parse(raw.toString());
     if (msg.type === "publish") receivedByB = msg;
   });

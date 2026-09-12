@@ -1,0 +1,57 @@
+name: Performance Testing
+
+on:
+  workflow_dispatch:
+  release:
+    types: [ published ]
+  pull_request:
+    types: [ opened, synchronize, reopened, labeled ]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  perf-test:
+    name: Layer 2 Containerized Performance Harness
+    # Run on release, workflow_dispatch, or PRs labeled with 'perf' / 'perf-check' (or all PRs if unlabelled)
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'release' ||
+      (github.event_name == 'pull_request' && (
+        contains(github.event.pull_request.labels.*.name, 'perf') ||
+        contains(github.event.pull_request.labels.*.name, 'perf-check') ||
+        github.event.action == 'opened'
+      ))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Layer 1 Complexity Guards
+        run: npm run tests
+
+      - name: Run Layer 2 Containerized Performance Suite
+        run: npm run test:perf
+
+      - name: Evaluate Baseline Performance Gate & Generate Summary
+        run: npx tsx scripts/perf-gate.ts --markdown dist/perf-summary.md
+
+      - name: Verify Reference Regression Sensitivity
+        run: npm run test:perf:regressions
+
+      - name: Publish Performance Summary to GitHub Job Summary
+        if: always()
+        run: |
+          if [ -f dist/perf-summary.md ]; then
+            cat dist/perf-summary.md >> $GITHUB_STEP_SUMMARY
+          fi

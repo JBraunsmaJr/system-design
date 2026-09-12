@@ -32,6 +32,7 @@ import {
 } from "../../domain/edgeContainment";
 import type { ArchEdgeData, ArchEdgeDataPatch, EdgeWaypoint } from "../../domain/types";
 import { useCanvasContext } from "../CanvasContext";
+import { recordEdgeRender } from "../../perf/instrumentation";
 
 type TypedEdgeType = Edge<ArchEdgeData, "typed">;
 
@@ -100,6 +101,7 @@ export function TypedEdge({
   animated,
   onUpdateEdge: propOnUpdateEdge,
 }: TypedEdgeProps) {
+  recordEdgeRender();
   const canvasContext = useCanvasContext();
   const isEditable = !canvasContext?.isPresenting;
   const onUpdateEdge = isEditable ? (propOnUpdateEdge ?? canvasContext?.onUpdateEdge) : undefined;

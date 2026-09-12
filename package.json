@@ -10,6 +10,10 @@
     "preview": "vite preview",
     "test": "tsx scripts/run-tests.ts",
     "tests": "tsx scripts/run-tests.ts",
+    "test:perf": "tsx scripts/run-perf.ts",
+    "test:perf:local": "tsx scripts/run-perf.ts --local",
+    "test:perf:gate": "tsx scripts/perf-gate.ts",
+    "test:perf:regressions": "tsx scripts/verify-perf-regressions.ts",
     "signaling-server": "y-webrtc-signaling"
   },
   "dependencies": {
@@ -41,6 +45,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.6",
     "globals": "^17.12.0",
+    "playwright": "^1.63.0",
     "tsx": "^4.23.13",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.70.0",

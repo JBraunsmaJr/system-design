@@ -5,6 +5,7 @@ import { BidirectionalHandles } from "./BidirectionalHandles";
 import { SvgShapeRenderer } from "./SvgShapeRenderer";
 import type { ArchNodeData } from "../../domain/types";
 import { useCanvasContext } from "../CanvasContext";
+import { recordNodeRender } from "../../perf/instrumentation";
 
 type ShapeNodeType = Node<ArchNodeData, "shape">;
 
@@ -26,6 +27,7 @@ export function ShapeNode({
   onFinishEditing: propOnFinishEditing,
   onChangeText: propOnChangeText,
 }: ShapeNodeProps) {
+  recordNodeRender();
   const canvasContext = useCanvasContext();
   const isEditing = propIsEditing ?? (canvasContext?.editingLabelNodeId === id);
   const onStartEditing = propOnStartEditing ?? (canvasContext?.isPresenting ? undefined : canvasContext?.setEditingLabelNodeId);

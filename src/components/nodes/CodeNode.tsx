@@ -6,6 +6,7 @@ import { highlightCode } from "../../domain/prismSetup";
 import { BidirectionalHandles } from "./BidirectionalHandles";
 import type { ArchNodeData } from "../../domain/types";
 import { useCanvasContext } from "../CanvasContext";
+import { recordNodeRender } from "../../perf/instrumentation";
 
 type CodeNodeType = Node<ArchNodeData, "code">;
 
@@ -27,6 +28,7 @@ export function CodeNode({
   onFinishEditing: propOnFinishEditing,
   onChangeCode: propOnChangeCode,
 }: CodeNodeProps) {
+  recordNodeRender();
   const canvasContext = useCanvasContext();
   const isEditing = propIsEditing ?? (canvasContext?.editingLabelNodeId === id);
   const onStartEditing = propOnStartEditing ?? (canvasContext?.isPresenting ? undefined : canvasContext?.setEditingLabelNodeId);

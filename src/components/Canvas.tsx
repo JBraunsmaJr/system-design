@@ -63,6 +63,7 @@ import {
 } from "../domain/edgeReconnect";
 import type { PresenceInfo } from "../collab/session";
 import { CanvasContext, type CanvasContextValue } from "./CanvasContext";
+import { recordCanvasRender } from "../perf/instrumentation";
 
 const CANVAS_NODE_TYPES: NodeTypes = {
   typed: TypedNode,
@@ -214,6 +215,7 @@ export function Canvas({
   peers,
   onCursorMove,
 }: CanvasProps) {
+  recordCanvasRender();
   const { screenToFlowPosition, getIntersectingNodes, fitView } = useReactFlow<Node<ArchNodeData>>();
   const updateNodeInternals = useUpdateNodeInternals();
   const nodesRef = useRef(nodes);

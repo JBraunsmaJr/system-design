@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ChangeEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, Profiler, type ProfilerOnRenderCallback, type ChangeEvent } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useUndoableState } from "./hooks/useUndoableState";
 import {
@@ -69,6 +69,8 @@ import { loadSignalingUrls, saveSignalingUrls, parseSignalingUrls } from "./doma
 import { loadIceServers, saveIceServers, parseIceServers } from "./domain/iceServerConfig";
 import { applyZOrderCommand, computeEffectiveZIndices, type ZOrderCommand } from "./domain/zOrder";
 import { classifyNodeChanges, applySelectionChanges, isAutoSizedNodeType, type PendingNodeUpdate, type CurrentNodeGeometry } from "./domain/nodeChangeBatching";
+import { recordCommit, isPerfInstrumentationActive } from "./perf/instrumentation";
+import { getStandardFixture, type FixtureName } from "./perf/fixtures";
 import "./App.css";
 
 let idSeed = 0;
@@ -658,6 +660,54 @@ function App() {
     broadcastPresence({ diagramPath: path.join("/") });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSession, path]);
+
+  // Expose test harness helper hooks onto window.__PERF__ when active
+  useEffect(() => {
+    if (typeof window !== "undefined" && (window as unknown as Record<string, unknown>).__PERF__) {
+      const perfObj = (window as unknown as Record<string, unknown>).__PERF__ as Record<string, unknown>;
+      perfObj.Y = Y;
+      (window as unknown as Record<string, unknown>).Y = Y;
+      perfObj.loadFixture = (name: FixtureName) => {
+        const fixture = getStandardFixture(name);
+        setRoot(fixture);
+        return fixture;
+      };
+      perfObj.setDiagram = (diagram: SubDiagram) => {
+        setRoot(diagram);
+      };
+      perfObj.setPath = (newPath: string[]) => {
+        setPath(newPath);
+      };
+      perfObj.setSelectedNodes = (nodeIds: string[]) => {
+        setSelectedNodeIds(nodeIds);
+      };
+      perfObj.setSelectedEdges = (edgeIds: string[]) => {
+        setSelectedEdgeIds(edgeIds);
+      };
+      perfObj.startCollabSessionWithDoc = (doc: Y.Doc) => {
+        const roomName = `perf-room-${Math.random().toString(36).slice(2, 8)}`;
+        const teamStore = createYjsTeamStore(doc);
+        const requirementsStoreForSession = createYjsRequirementsStore(doc);
+        const programIncrementsStoreForSession = createYjsProgramIncrementsStore(doc);
+        const diagramStoreForSession = createYjsDiagramStore(doc);
+        const milestonesStoreForSession = createYjsMilestonesStore(doc);
+        const session = startCollabSession(doc, roomName, { signalingUrls, iceServers });
+        setActiveSession({
+          doc,
+          session,
+          roomName,
+          teamStore,
+          requirementsStore: requirementsStoreForSession,
+          programIncrementsStore: programIncrementsStoreForSession,
+          diagramStore: diagramStoreForSession,
+          milestonesStore: milestonesStoreForSession,
+        });
+      };
+      perfObj.leaveCollabSession = () => {
+        leaveSession();
+      };
+    }
+  }, [setRoot, setPath, signalingUrls, iceServers, leaveSession]);
 
   const breadcrumbLabels = useMemo(() => getBreadcrumbLabels(liveRoot, path), [liveRoot, path]);
 
@@ -1862,6 +1912,13 @@ function App() {
   const selectedNode = nodes.find((n) => n.id === selectedNodeId) ?? null;
   const selectedEdge = edges.find((e) => e.id === selectedEdgeId) ?? null;
   const canAddStep = selectedNodeIds.length > 0 || selectedEdgeIds.length > 0;
+  const onCanvasProfilerRender: ProfilerOnRenderCallback = useCallback(
+    (_id, _phase, actualDuration) => {
+      recordCommit(actualDuration);
+    },
+    []
+  );
+
   return (
     <div className="app">
       {appVersion && (
@@ -1937,50 +1994,99 @@ function App() {
         )}
         <div className="app__canvas-column">
           <ReactFlowProvider>
-            <Canvas
-              nodes={nodes}
-              edges={edges}
-              onNodesChange={onNodesChange}
-              onEdgesChange={onEdgesChange}
-              peers={
-                !activeSession
-                  ? []
-                  : presencePeers.map((p) => {
-                      const onSamePath = p.diagramPath === path.join("/");
-                      const shouldShowCursor = showPeerCursors && onSamePath;
-                      return p.cursor === null || shouldShowCursor ? p : { ...p, cursor: null };
-                    })
-              }
-              onCursorMove={onCursorMove}
-              onConnect={onConnect}
-              onAddNode={onAddNode}
-              onAddGroup={onAddGroup}
-              onAddText={onAddText}
-              onAddShape={onAddShape}
-              onAddCode={onAddCode}
-              onUpdateNode={onUpdateNode}
-              onUpdateEdge={onUpdateEdge}
-              onReconnectEdge={onReconnectEdge}
-              onAddEdgeWaypoint={onAddEdgeWaypoint}
-              onMoveEdgeWaypoint={onMoveEdgeWaypoint}
-              onRemoveEdgeWaypoint={onRemoveEdgeWaypoint}
-              onReparentNode={onReparentNode}
-              onAdoptIntoGroup={onAdoptIntoGroup}
-              onZOrderCommand={onZOrderCommand}
-              presentation={presentation}
-              previewFocus={previewFocus}
-              focusNodeId={pendingNodeFocus}
-              onFocusHandled={onFocusNodeHandled}
-              onPresentNext={onPresentNext}
-              onPresentPrev={onPresentPrev}
-              onExitPresenting={onExitPresenting}
-              breadcrumbLabels={breadcrumbLabels}
-              onDrillInto={onDrillInto}
-              onNavigateToRoot={onNavigateToRoot}
-              onNavigateToPathIndex={onNavigateToPathIndex}
-              isSelectMode={isSelectMode}
-              onToggleSelectMode={() => setIsSelectMode((v) => !v)}
-            />
+            {isPerfInstrumentationActive() ? (
+              <Profiler id="CanvasProfiler" onRender={onCanvasProfilerRender}>
+                <Canvas
+                  nodes={nodes}
+                  edges={edges}
+                  onNodesChange={onNodesChange}
+                  onEdgesChange={onEdgesChange}
+                  peers={
+                    !activeSession
+                      ? []
+                      : presencePeers.map((p) => {
+                          const onSamePath = p.diagramPath === path.join("/");
+                          const shouldShowCursor = showPeerCursors && onSamePath;
+                          return p.cursor === null || shouldShowCursor ? p : { ...p, cursor: null };
+                        })
+                  }
+                  onCursorMove={onCursorMove}
+                  onConnect={onConnect}
+                  onAddNode={onAddNode}
+                  onAddGroup={onAddGroup}
+                  onAddText={onAddText}
+                  onAddShape={onAddShape}
+                  onAddCode={onAddCode}
+                  onUpdateNode={onUpdateNode}
+                  onUpdateEdge={onUpdateEdge}
+                  onReconnectEdge={onReconnectEdge}
+                  onAddEdgeWaypoint={onAddEdgeWaypoint}
+                  onMoveEdgeWaypoint={onMoveEdgeWaypoint}
+                  onRemoveEdgeWaypoint={onRemoveEdgeWaypoint}
+                  onReparentNode={onReparentNode}
+                  onAdoptIntoGroup={onAdoptIntoGroup}
+                  onZOrderCommand={onZOrderCommand}
+                  presentation={presentation}
+                  previewFocus={previewFocus}
+                  focusNodeId={pendingNodeFocus}
+                  onFocusHandled={onFocusNodeHandled}
+                  onPresentNext={onPresentNext}
+                  onPresentPrev={onPresentPrev}
+                  onExitPresenting={onExitPresenting}
+                  breadcrumbLabels={breadcrumbLabels}
+                  onDrillInto={onDrillInto}
+                  onNavigateToRoot={onNavigateToRoot}
+                  onNavigateToPathIndex={onNavigateToPathIndex}
+                  isSelectMode={isSelectMode}
+                  onToggleSelectMode={() => setIsSelectMode((v) => !v)}
+                />
+              </Profiler>
+            ) : (
+              <Canvas
+                nodes={nodes}
+                edges={edges}
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                peers={
+                  !activeSession
+                    ? []
+                    : presencePeers.map((p) => {
+                        const onSamePath = p.diagramPath === path.join("/");
+                        const shouldShowCursor = showPeerCursors && onSamePath;
+                        return p.cursor === null || shouldShowCursor ? p : { ...p, cursor: null };
+                      })
+                }
+                onCursorMove={onCursorMove}
+                onConnect={onConnect}
+                onAddNode={onAddNode}
+                onAddGroup={onAddGroup}
+                onAddText={onAddText}
+                onAddShape={onAddShape}
+                onAddCode={onAddCode}
+                onUpdateNode={onUpdateNode}
+                onUpdateEdge={onUpdateEdge}
+                onReconnectEdge={onReconnectEdge}
+                onAddEdgeWaypoint={onAddEdgeWaypoint}
+                onMoveEdgeWaypoint={onMoveEdgeWaypoint}
+                onRemoveEdgeWaypoint={onRemoveEdgeWaypoint}
+                onReparentNode={onReparentNode}
+                onAdoptIntoGroup={onAdoptIntoGroup}
+                onZOrderCommand={onZOrderCommand}
+                presentation={presentation}
+                previewFocus={previewFocus}
+                focusNodeId={pendingNodeFocus}
+                onFocusHandled={onFocusNodeHandled}
+                onPresentNext={onPresentNext}
+                onPresentPrev={onPresentPrev}
+                onExitPresenting={onExitPresenting}
+                breadcrumbLabels={breadcrumbLabels}
+                onDrillInto={onDrillInto}
+                onNavigateToRoot={onNavigateToRoot}
+                onNavigateToPathIndex={onNavigateToPathIndex}
+                isSelectMode={isSelectMode}
+                onToggleSelectMode={() => setIsSelectMode((v) => !v)}
+              />
+            )}
           </ReactFlowProvider>
         </div>
         {!isPresenting && (

@@ -1,6 +1,7 @@
 import type { Node, Edge } from "@xyflow/react";
 import type { ArchNodeData, ArchEdgeData, ArchEdgeDataPatch, EdgeWaypoint, SubDiagram } from "../domain/types";
 import type { EdgeEndpoints } from "../domain/edgeReconnect";
+import { recordUnflattenCall, recordStoreWrite } from "../perf/instrumentation";
 
 /**
  * DiagramStore is the same kind of seam TeamStore, RequirementsStore, and
@@ -272,6 +273,7 @@ export function flattenSubDiagramTree(root: SubDiagram): { nodes: Node<ArchNodeD
  * position in the rebuilt tree is what encodes nesting once again,
  * exactly as it does everywhere else in the app. */
 export function unflattenToSubDiagram(nodes: Node<ArchNodeData>[], edges: Edge<ArchEdgeData>[]): SubDiagram {
+  recordUnflattenCall();
   function buildLevel(path: string[]): SubDiagram {
     const levelNodes = getNodesAtPath(nodes, path).map((n) => {
       const restData: Record<string, unknown> = { ...(n.data as Record<string, unknown>) };
@@ -326,6 +328,7 @@ export function createLocalDiagramStore(initial?: {
     },
 
     addNode: (parentPath, type, position, data) => {
+      recordStoreWrite();
       const id = `node-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
       const node: Node<ArchNodeData> = {
         id,
@@ -339,26 +342,31 @@ export function createLocalDiagramStore(initial?: {
     },
 
     updateNode: (id, patch) => {
+      recordStoreWrite();
       nodes = nodes.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...patch } } : n));
       notify();
     },
 
     updatePosition: (id, position) => {
+      recordStoreWrite();
       nodes = nodes.map((n) => (n.id === id ? { ...n, position } : n));
       notify();
     },
 
     updateParentId: (id, parentId, position) => {
+      recordStoreWrite();
       nodes = nodes.map((n) => (n.id === id ? { ...n, parentId, position } : n));
       notify();
     },
 
     updateDimensions: (id, width, height) => {
+      recordStoreWrite();
       nodes = nodes.map((n) => (n.id === id ? { ...n, width, height } : n));
       notify();
     },
 
     deleteNode: (id) => {
+      recordStoreWrite();
       const target = nodes.find((n) => n.id === id);
       if (!target) return;
       const descendantPrefix = [...nodeParentPath(target), id];
@@ -371,6 +379,7 @@ export function createLocalDiagramStore(initial?: {
     },
 
     addEdge: (parentPath, source, target, data, sourceHandle, targetHandle) => {
+      recordStoreWrite();
       const id = `edge-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
       const edge: Edge<ArchEdgeData> = {
         id,
@@ -387,16 +396,19 @@ export function createLocalDiagramStore(initial?: {
     },
 
     updateEdge: (id, patch) => {
+      recordStoreWrite();
       edges = edges.map((e) => (e.id === id ? { ...e, data: { ...(e.data as ArchEdgeData), ...patch } } : e));
       notify();
     },
 
     deleteEdge: (id) => {
+      recordStoreWrite();
       edges = edges.filter((e) => e.id !== id);
       notify();
     },
 
     reconnectEdge: (id, endpoints) => {
+      recordStoreWrite();
       edges = edges.map((e) =>
         e.id === id
           ? {
@@ -412,6 +424,7 @@ export function createLocalDiagramStore(initial?: {
     },
 
     addEdgeWaypoint: (edgeId, index, waypoint) => {
+      recordStoreWrite();
       edges = edges.map((e) =>
         e.id === edgeId ? { ...e, data: withWaypointAdded(e.data as ArchEdgeData, index, waypoint) } : e
       );
@@ -419,6 +432,7 @@ export function createLocalDiagramStore(initial?: {
     },
 
     moveEdgeWaypoint: (edgeId, waypointId, position) => {
+      recordStoreWrite();
       edges = edges.map((e) =>
         e.id === edgeId ? { ...e, data: withWaypointMoved(e.data as ArchEdgeData, waypointId, position) } : e
       );
@@ -426,6 +440,7 @@ export function createLocalDiagramStore(initial?: {
     },
 
     removeEdgeWaypoint: (edgeId, waypointId) => {
+      recordStoreWrite();
       edges = edges.map((e) =>
         e.id === edgeId ? { ...e, data: withWaypointRemoved(e.data as ArchEdgeData, waypointId) } : e
       );
@@ -433,6 +448,7 @@ export function createLocalDiagramStore(initial?: {
     },
 
     clearEdgeWaypoints: (edgeId) => {
+      recordStoreWrite();
       edges = edges.map((e) =>
         e.id === edgeId ? { ...e, data: withWaypointsCleared(e.data as ArchEdgeData) } : e
       );

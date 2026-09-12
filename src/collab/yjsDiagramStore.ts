@@ -3,6 +3,7 @@ import type { Node, Edge } from "@xyflow/react";
 import type { ArchNodeData, ArchEdgeData, EdgeWaypoint, SubDiagram } from "../domain/types";
 import type { DiagramStore } from "./diagramStore";
 import { flattenSubDiagramTree } from "./diagramStore";
+import { recordSnapshotBuild, recordStoreWrite } from "../perf/instrumentation";
 
 /** Node and edge ids are purely internal (never displayed - React Flow
  * uses them as keys and connection endpoints, nothing more), so - same
@@ -295,6 +296,7 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
   }
 
   function buildSnapshot(): { nodes: Node<ArchNodeData>[]; edges: Edge<ArchEdgeData>[] } {
+    recordSnapshotBuild();
     return {
       nodes: nodeOrder
         .toArray()
@@ -339,6 +341,7 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
     },
 
     addNode: (parentPath, type, position, data) => {
+      recordStoreWrite();
       const id = collisionResistantId("node");
       doc.transact(() => {
         const m = new Y.Map<unknown>();
@@ -355,6 +358,7 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
     },
 
     updateNode: (id, patch) => {
+      recordStoreWrite();
       const m = nodesMap.get(id);
       if (!m) return;
       doc.transact(() => {
@@ -365,11 +369,13 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
     },
 
     updatePosition: (id, position) => {
+      recordStoreWrite();
       const m = nodesMap.get(id);
       if (m) m.set("position", position);
     },
 
     updateParentId: (id, parentId, position) => {
+      recordStoreWrite();
       const m = nodesMap.get(id);
       if (!m) return;
       doc.transact(() => {
@@ -379,6 +385,7 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
     },
 
     updateDimensions: (id, width, height) => {
+      recordStoreWrite();
       const m = nodesMap.get(id);
       if (!m) return;
       doc.transact(() => {
@@ -388,6 +395,7 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
     },
 
     deleteNode: (id) => {
+      recordStoreWrite();
       const targetM = nodesMap.get(id);
       if (!targetM) return;
       const targetParentPath = (targetM.get("parentPath") as string[]) ?? [];
@@ -420,6 +428,7 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
     },
 
     addEdge: (parentPath, source, target, data, sourceHandle, targetHandle) => {
+      recordStoreWrite();
       const id = collisionResistantId("edge");
       doc.transact(() => {
         const m = new Y.Map<unknown>();
@@ -446,6 +455,7 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
     },
 
     updateEdge: (id, patch) => {
+      recordStoreWrite();
       const m = edgesMap.get(id);
       if (!m) return;
       doc.transact(() => {
@@ -456,6 +466,7 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
     },
 
     deleteEdge: (id) => {
+      recordStoreWrite();
       doc.transact(() => {
         edgesMap.delete(id);
         const idx = edgeOrder.toArray().indexOf(id);
@@ -464,6 +475,7 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
     },
 
     reconnectEdge: (id, endpoints) => {
+      recordStoreWrite();
       const m = edgesMap.get(id);
       if (!m) return;
       // One transaction, so no peer can ever observe the new target
@@ -482,6 +494,7 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
     },
 
     addEdgeWaypoint: (edgeId, index, waypoint) => {
+      recordStoreWrite();
       const m = edgesMap.get(edgeId);
       if (!m) return;
       doc.transact(() => {
@@ -492,6 +505,7 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
     },
 
     moveEdgeWaypoint: (edgeId, waypointId, position) => {
+      recordStoreWrite();
       const m = edgesMap.get(edgeId);
       if (!m) return;
       const array = readWaypointArray(m);
@@ -510,6 +524,7 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
     },
 
     removeEdgeWaypoint: (edgeId, waypointId) => {
+      recordStoreWrite();
       const m = edgesMap.get(edgeId);
       if (!m) return;
       const array = readWaypointArray(m);
@@ -520,6 +535,7 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
     },
 
     clearEdgeWaypoints: (edgeId) => {
+      recordStoreWrite();
       const m = edgesMap.get(edgeId);
       if (!m) return;
       const array = readWaypointArray(m);
