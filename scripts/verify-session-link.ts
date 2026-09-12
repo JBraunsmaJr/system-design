@@ -1,17 +1,50 @@
 import { chromium } from "playwright";
 import { spawn } from "child_process";
+import { connect } from "net";
+
+const SIGNALING_PORT = 14447;
+const VITE_PORT = 5180;
+
+/** Resolves once something is accepting connections on `port`, or throws after `timeoutMs`. */
+async function waitForPort(port: number, timeoutMs = 60000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const open = await new Promise<boolean>((res) => {
+      const socket = connect({ host: "127.0.0.1", port });
+      socket.setTimeout(1000);
+      socket.once("connect", () => { socket.destroy(); res(true); });
+      socket.once("timeout", () => { socket.destroy(); res(false); });
+      socket.once("error", () => { socket.destroy(); res(false); });
+    });
+    if (open) return;
+    if (Date.now() > deadline) {
+      throw new Error(`Timed out after ${timeoutMs}ms waiting for port ${port} to accept connections`);
+    }
+    await new Promise((res) => setTimeout(res, 250));
+  }
+}
 
 async function run() {
   console.log("Starting local signaling server and vite server...");
   const signalingServer = spawn("node", ["node_modules/y-webrtc/bin/server.js"], {
-    env: { ...process.env, PORT: "14447" },
+    env: { ...process.env, PORT: String(SIGNALING_PORT) },
   });
+  signalingServer.stdout?.on("data", (d) => process.stdout.write(`[signaling] ${d}`));
+  signalingServer.stderr?.on("data", (d) => process.stderr.write(`[signaling] ${d}`));
 
-  const viteServer = spawn("npx", ["vite", "--port", "5180"], {
+  // VITE_PERF_INSTRUMENTATION=1 is what defines window.__PERF__ (see
+  // src/perf/instrumentation.ts). Without it loadFixture() silently no-ops and
+  // the canvas stays empty, so the sync assertions below fail for the wrong
+  // reason. Do not rely on a local .env for this - it is gitignored.
+  const viteServer = spawn("npx", ["vite", "--port", String(VITE_PORT), "--strictPort"], {
     shell: true,
+    env: { ...process.env, VITE_PERF_INSTRUMENTATION: "1" },
   });
+  viteServer.stdout?.on("data", (d) => process.stdout.write(`[vite] ${d}`));
+  viteServer.stderr?.on("data", (d) => process.stderr.write(`[vite] ${d}`));
 
-  await new Promise((res) => setTimeout(res, 2000));
+  await Promise.all([waitForPort(SIGNALING_PORT), waitForPort(VITE_PORT)]);
+  console.log(`Signaling server on :${SIGNALING_PORT}, vite on :${VITE_PORT}`);
 
   const browser = await chromium.launch({ headless: true });
   const context1 = await browser.newContext({ permissions: ["clipboard-read", "clipboard-write"] });
@@ -25,15 +58,17 @@ async function run() {
 
     // 1. Page 1 loads diagram and configures relay
     console.log("Loading page 1...");
-    await page1.goto("http://localhost:5180");
+    await page1.goto(`http://localhost:${VITE_PORT}`);
     await page1.waitForSelector(".collab-panel__trigger");
-    await page1.evaluate(`window.__PERF__?.loadFixture?.("small");`);
+    // Fail loudly rather than letting optional chaining swallow a missing harness.
+    await page1.waitForFunction("typeof window.__PERF__?.loadFixture === 'function'", null, { timeout: 15000 });
+    await page1.evaluate(`window.__PERF__.loadFixture("small");`);
     await new Promise((res) => setTimeout(res, 200));
 
     // Open collab panel and start session on custom relay
     await page1.click(".collab-panel__trigger");
     await page1.click(".collab-panel__settings-toggle");
-    await page1.fill("#collab-panel-signaling-url", "ws://localhost:14447");
+    await page1.fill("#collab-panel-signaling-url", `ws://localhost:${SIGNALING_PORT}`);
     await page1.click(".collab-panel__primary-action");
 
     // Open collab panel on page 1 to check active session
@@ -60,7 +95,7 @@ async function run() {
 
     // 2. Page 2 joins by pasting the copied link directly into the join input
     console.log("Loading page 2 and joining via pasted link...");
-    await page2.goto("http://localhost:5180");
+    await page2.goto(`http://localhost:${VITE_PORT}`);
     await page2.waitForSelector(".collab-panel__trigger");
 
     await page2.click(".collab-panel__trigger");
