@@ -96,6 +96,19 @@ async function run() {
     await page3.goto(copiedLinkPage2);
     await page3.waitForSelector(".collab-panel__trigger");
 
+    // Verify toast notification appeared on page 3 indicating auto-join
+    const page3Toast = await page3.waitForSelector(".app-toast", { timeout: 2000 }).then(() => true).catch(() => false);
+    if (!page3Toast) {
+      throw new Error("Toast notification did not appear on page 3 after joining via direct link");
+    }
+
+    // Verify page 3 address bar URL was sanitized to avoid exposing credentials to live streams
+    const page3Url = page3.url();
+    console.log("Page 3 sanitized address bar URL:", page3Url);
+    if (page3Url.includes("session=") || page3Url.includes("key=") || page3Url.includes("relay=") || page3Url.includes("#")) {
+      throw new Error(`Page 3 address bar was not sanitized: ${page3Url}`);
+    }
+
     // Wait for peer sync
     await new Promise((res) => setTimeout(res, 4000));
     const nodesCount3 = await page3.$$eval(".react-flow__node", (els) => els.length);

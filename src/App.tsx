@@ -67,7 +67,7 @@ import { startCollabSession, type CollabSession, type PresenceInfo, type LocalPr
 import { loadPresenceName, savePresenceName, loadShowPeerCursors, saveShowPeerCursors } from "./domain/presenceIdentity";
 import { loadSignalingUrls, saveSignalingUrls, parseSignalingUrls, getDefaultSignalingUrl } from "./domain/signalingConfig";
 import { loadIceServers, saveIceServers, parseIceServers, getDefaultIceServers } from "./domain/iceServerConfig";
-import { createSessionLink, parseSessionLink, generateSessionKey } from "./domain/sessionLink";
+import { createSessionLink, parseSessionLink, generateSessionKey, sanitizeCurrentUrl } from "./domain/sessionLink";
 import { Toast, type ToastType } from "./components/Toast";
 import { applyZOrderCommand, computeEffectiveZIndices, type ZOrderCommand } from "./domain/zOrder";
 import { classifyNodeChanges, applySelectionChanges, isAutoSizedNodeType, type PendingNodeUpdate, type CurrentNodeGeometry } from "./domain/nodeChangeBatching";
@@ -608,17 +608,27 @@ function App() {
     [signalingUrls, setSignalingUrlsInput, iceServers, displayName]
   );
 
-  // Auto-join if a session link is present in the URL on initial mount
-  const initialUrlJoinedRef = useRef(false);
+  // Auto-join if a session link is present in the URL on initial mount or hash change
   useEffect(() => {
-    if (typeof window === "undefined" || initialUrlJoinedRef.current) return;
-    const currentHref = window.location.href;
-    const parsed = parseSessionLink(currentHref);
-    if (parsed.roomName && parsed.roomName !== currentHref) {
-      initialUrlJoinedRef.current = true;
-      joinSession(parsed.roomName, parsed.password || "", parsed.relay);
-    }
-  }, [joinSession]);
+    if (typeof window === "undefined") return;
+
+    const handleUrlSession = () => {
+      const currentHref = window.location.href;
+      const parsed = parseSessionLink(currentHref);
+      if (parsed.roomName && parsed.roomName !== currentHref) {
+        joinSession(parsed.roomName, parsed.password || parsed.key || "", parsed.relay);
+        showToast(`Joined session: ${parsed.roomName}`, "info");
+        sanitizeCurrentUrl();
+      }
+    };
+
+    handleUrlSession();
+
+    window.addEventListener("hashchange", handleUrlSession);
+    return () => {
+      window.removeEventListener("hashchange", handleUrlSession);
+    };
+  }, [joinSession, showToast]);
 
   // Leaving a session writes its final state back into the local,
   // undo-tracked snapshot before disconnecting - so whatever happened

@@ -13,7 +13,7 @@ function assert(cond: boolean, msg: string) {
   }
 }
 
-const { createSessionLink, parseSessionLink, generateSessionKey, getBaseAppUrl } = await import("./sessionLink");
+const { createSessionLink, parseSessionLink, generateSessionKey, getBaseAppUrl, cleanSessionFromUrl, sanitizeCurrentUrl } = await import("./sessionLink");
 
 // === generateSessionKey ===
 {
@@ -218,6 +218,52 @@ const { createSessionLink, parseSessionLink, generateSessionKey, getBaseAppUrl }
 
   const p10 = parseSessionLink("   ");
   assert(p10.roomName === "", "whitespace-only input returns empty roomName");
+}
+
+// === cleanSessionFromUrl & sanitizeCurrentUrl ===
+{
+  // 1. Hash fragment with session and key
+  const c1 = cleanSessionFromUrl("https://example.com/system-design/#session=session-xyz&key=secret123");
+  assert(c1 === "https://example.com/system-design/", "cleans hash fragment containing session and key");
+
+  // 2. Hash fragment with relay override
+  const c2 = cleanSessionFromUrl("https://example.com/system-design/#session=session-xyz&key=secret123&relay=wss%3A%2F%2Frelay.org");
+  assert(c2 === "https://example.com/system-design/", "cleans hash fragment containing session, key, and relay");
+
+  // 3. Query params with session and key
+  const c3 = cleanSessionFromUrl("https://example.com/system-design/?session=session-xyz&key=secret123");
+  assert(c3 === "https://example.com/system-design/", "cleans query params containing session and key");
+
+  // 4. Preserves non-session query parameters
+  const c4 = cleanSessionFromUrl("https://example.com/system-design/?theme=dark&session=session-xyz&key=secret123");
+  assert(c4 === "https://example.com/system-design/?theme=dark", "preserves unrelated query parameters");
+
+  // 5. Root domain URL with hash
+  const c5 = cleanSessionFromUrl("http://localhost:5180/#session=session-abc123&key=k_123");
+  assert(c5 === "http://localhost:5180/", "cleans root origin URL with hash");
+
+  // 6. Relative path
+  const c6 = cleanSessionFromUrl("/system-design/#session=session-xyz&key=k_123");
+  assert(c6 === "/system-design/", "cleans relative path with hash");
+
+  // 7. sanitizeCurrentUrl with mocked window history
+  let replacedUrl = "";
+  (globalThis as unknown as { window?: { location: { href: string }; history: { state: null; replaceState: (_s: unknown, _t: string, url: string) => void } }; document?: { title: string } }).window = {
+    location: { href: "https://example.com/system-design/#session=session-xyz&key=secret" },
+    history: {
+      state: null,
+      replaceState: (_s: unknown, _t: string, url: string) => {
+        replacedUrl = url;
+      },
+    },
+  };
+  (globalThis as unknown as { document?: { title: string } }).document = { title: "System Design" };
+
+  sanitizeCurrentUrl();
+  assert(replacedUrl === "https://example.com/system-design/", "sanitizeCurrentUrl calls window.history.replaceState with clean URL");
+
+  (globalThis as unknown as { window?: unknown; document?: unknown }).window = undefined;
+  (globalThis as unknown as { window?: unknown; document?: unknown }).document = undefined;
 }
 
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);

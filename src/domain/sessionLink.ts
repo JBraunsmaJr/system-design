@@ -127,6 +127,90 @@ export function createSessionLink(options: CreateSessionLinkOptions): string {
 }
 
 /**
+ * Removes session-related parameters (session, key, password, relay) from a URL string,
+ * returning a clean base URL suitable for displaying in the address bar without exposing
+ * session identifiers or cryptographic keys to screen shares or livestreams.
+ */
+export function cleanSessionFromUrl(rawUrl: string): string {
+  if (!rawUrl || typeof rawUrl !== "string") return "";
+  try {
+    const isRelative = !rawUrl.startsWith("http://") && !rawUrl.startsWith("https://");
+    const dummyBase = "https://system-design.local";
+    const parsedUrl = new URL(rawUrl, isRelative ? dummyBase : undefined);
+
+    const sessionParamNames = [
+      "session",
+      "room",
+      "id",
+      "key",
+      "k",
+      "password",
+      "pwd",
+      "p",
+      "secret",
+      "relay",
+      "signaling",
+      "relayUrl",
+      "signalingUrl",
+    ];
+
+    // 1. Clean query search params
+    for (const param of sessionParamNames) {
+      parsedUrl.searchParams.delete(param);
+    }
+
+    // 2. Clean hash params if hash formatted as params
+    if (parsedUrl.hash) {
+      let hashContent = parsedUrl.hash.slice(1);
+      const prefix = hashContent.startsWith("/") ? "/" : "";
+      if (prefix) hashContent = hashContent.slice(1);
+
+      if (hashContent.includes("=") || hashContent.includes("&")) {
+        const hashParams = new URLSearchParams(hashContent);
+        let hashModified = false;
+        for (const param of sessionParamNames) {
+          if (hashParams.has(param)) {
+            hashParams.delete(param);
+            hashModified = true;
+          }
+        }
+        if (hashModified) {
+          const remaining = hashParams.toString();
+          parsedUrl.hash = remaining ? `${prefix}${remaining}` : "";
+        }
+      } else if (sessionParamNames.some((p) => hashContent.startsWith(`${p}=`))) {
+        parsedUrl.hash = "";
+      }
+    }
+
+    if (isRelative) {
+      return parsedUrl.pathname + parsedUrl.search + parsedUrl.hash;
+    }
+    return parsedUrl.toString();
+  } catch {
+    return rawUrl.split("#")[0].split("?")[0];
+  }
+}
+
+/**
+ * Strips collaborative session parameters (room ID, key, relay) from the current
+ * browser URL and updates the browser history state so the room code and encryption key
+ * are not visible in the address bar during screen sharing or livestreaming.
+ */
+export function sanitizeCurrentUrl(): void {
+  if (typeof window === "undefined" || !window.history?.replaceState) return;
+  try {
+    const currentUrl = window.location.href;
+    const cleanUrl = cleanSessionFromUrl(currentUrl);
+    if (cleanUrl && cleanUrl !== currentUrl) {
+      window.history.replaceState(window.history.state, document.title, cleanUrl);
+    }
+  } catch {
+    // Graceful fallback if history API is restricted in sandbox
+  }
+}
+
+/**
  * Parses a user input string which may be:
  * 1. A full URL with hash params (e.g. `https://example.com/#session=session-xyz&key=...&relay=ws%3A%2F%2F...`)
  * 2. A full URL with search query params (e.g. `https://example.com/?session=session-xyz...`)
