@@ -1,6 +1,7 @@
 import { readFileSync, existsSync } from "fs";
 import { resolve, join } from "path";
 import type { PerfRunResults } from "../src/perf/scenarios/types";
+import { evaluateGate } from "./perf-gate";
 
 const rootDir = resolve(".");
 const baselinePath = resolve(join(rootDir, "baselines", "perf-baseline.json"));
@@ -74,10 +75,28 @@ for (const reg of REFERENCE_REGRESSIONS) {
   const baseMetricValue = (baseScenario.metrics[reg.metric] as number) ?? 0;
   const simulatedRegressedValue = baseMetricValue + reg.expectedSpikeDelta;
 
-  // Evaluate against gating rule (+10% or +2 absolute)
+  // Build a simulated results object with the spiked metric to evaluate with evaluateGate
+  const simulatedResults: PerfRunResults = {
+    ...baseline,
+    scenarios: {
+      ...baseline.scenarios,
+      [reg.targetScenario]: {
+        ...baseScenario,
+        metrics: {
+          ...baseScenario.metrics,
+          [reg.metric]: simulatedRegressedValue,
+        },
+      },
+    },
+  };
+
+  const { evaluations } = evaluateGate(simulatedResults, baseline);
+  const evaluation = evaluations.find(
+    (ev) => ev.scenarioId === reg.targetScenario && ev.metric === reg.metric
+  );
+  const isCaught = evaluation ? !evaluation.passed : false;
   const maxAllowedIncrease = Math.max(2, baseMetricValue * 0.1);
   const delta = simulatedRegressedValue - baseMetricValue;
-  const isCaught = delta > maxAllowedIncrease;
 
   if (isCaught) {
     passedCount++;

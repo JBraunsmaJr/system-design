@@ -93,14 +93,19 @@ function seedEdge(store: DiagramStore): { a: string; b: string; c: string; edgeI
 // it's still one contract and not three dialects of one.
 {
   function runSequence(store: DiagramStore) {
-    const { c, edgeId } = seedEdge(store);
+    const { a, b, c, edgeId } = seedEdge(store);
+    const idMap = new Map([
+      [a, "node-a"],
+      [b, "node-b"],
+      [c, "node-c"],
+    ]);
     store.addEdgeWaypoint(edgeId, 0, wp("w1", 100, 50));
     store.addEdgeWaypoint(edgeId, 1, wp("w2", 200, 50));
     store.addEdgeWaypoint(edgeId, 0, wp("w0", 40, 50));
     store.moveEdgeWaypoint(edgeId, "w2", { x: 250, y: 75 });
     store.removeEdgeWaypoint(edgeId, "w1");
     store.reconnectEdge(edgeId, { source: c, target: store.getSnapshot().nodes[1].id, sourceHandle: "top", targetHandle: "bottom" });
-    return { store, edgeId };
+    return { store, edgeId, idMap };
   }
 
   const impls: { name: string; store: DiagramStore }[] = [
@@ -110,11 +115,13 @@ function seedEdge(store: DiagramStore): { a: string; b: string; c: string; edgeI
   ];
 
   const results = impls.map(({ name, store }) => {
-    const { edgeId } = runSequence(store);
+    const { edgeId, idMap } = runSequence(store);
     const edge = edgeById(store, edgeId);
     return {
       name,
       shape: JSON.stringify({
+        source: idMap.get(edge.source) ?? edge.source,
+        target: idMap.get(edge.target) ?? edge.target,
         waypoints: waypointsOf(store, edgeId),
         sourceHandle: edge.sourceHandle ?? null,
         targetHandle: edge.targetHandle ?? null,

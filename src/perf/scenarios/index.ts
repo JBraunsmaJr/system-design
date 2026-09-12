@@ -29,9 +29,7 @@ export const dragNodeScenario: ScenarioDefinition = {
     const nodeEl = page.locator('.react-flow__node[data-id="node-50"]');
     const box = await nodeEl.boundingBox();
     if (!box) {
-      // Fallback coordinates
-      await dragCoordinates(page, 400, 300, 200, 0, 20);
-      return;
+      throw new Error("Could not find bounding box for node-50");
     }
 
     const startX = box.x + box.width / 2;
@@ -51,8 +49,11 @@ export const dragHubNodeScenario: ScenarioDefinition = {
 
     const nodeEl = page.locator('.react-flow__node[data-id="node-0"]');
     const box = await nodeEl.boundingBox();
-    const startX = box ? box.x + box.width / 2 : 200;
-    const startY = box ? box.y + box.height / 2 : 200;
+    if (!box) {
+      throw new Error("Could not find bounding box for hub node-0");
+    }
+    const startX = box.x + box.width / 2;
+    const startY = box.y + box.height / 2;
 
     await dragCoordinates(page, startX, startY, 200, 0, 20);
   },
@@ -70,8 +71,11 @@ export const dragGroupScenario: ScenarioDefinition = {
     // Target the top edge hit area of group-0
     const groupHitEl = page.locator('.react-flow__node[data-id="group-0"] .group-node__edge-hit--top');
     const box = await groupHitEl.boundingBox();
-    const startX = box ? box.x + box.width / 2 : 450;
-    const startY = box ? box.y + 10 : 350;
+    if (!box) {
+      throw new Error("Could not find bounding box for group-0 top edge hit area");
+    }
+    const startX = box.x + box.width / 2;
+    const startY = box.y + 10;
 
     await dragCoordinates(page, startX, startY, 150, 0, 15);
   },
@@ -151,9 +155,12 @@ export const dragWaypointScenario: ScenarioDefinition = {
     await resetCounters(page);
 
     const handleEl = page.locator(".typed-edge__waypoint").first();
-    const box = await handleEl.boundingBox().catch(() => null);
-    const startX = box ? box.x + box.width / 2 : 300;
-    const startY = box ? box.y + box.height / 2 : 300;
+    const box = await handleEl.boundingBox();
+    if (!box) {
+      throw new Error("Could not find bounding box for waypoint handle");
+    }
+    const startX = box.x + box.width / 2;
+    const startY = box.y + box.height / 2;
 
     await dragCoordinates(page, startX, startY, 150, 0, 15);
   },
@@ -179,9 +186,12 @@ export const createWaypointScenario: ScenarioDefinition = {
     await resetCounters(page);
 
     const insertHandleEl = page.locator(".typed-edge__insert-dot").first();
-    const box = await insertHandleEl.boundingBox().catch(() => null);
-    const startX = box ? box.x + box.width / 2 : 250;
-    const startY = box ? box.y + box.height / 2 : 250;
+    const box = await insertHandleEl.boundingBox();
+    if (!box) {
+      throw new Error("Could not find bounding box for waypoint insert handle");
+    }
+    const startX = box.x + box.width / 2;
+    const startY = box.y + box.height / 2;
 
     await dragCoordinates(page, startX, startY, 100, 50, 10);
   },
@@ -206,13 +216,26 @@ export const reconnectEdgeScenario: ScenarioDefinition = {
 
     await resetCounters(page);
 
+    // Locate the reconnect handle for the selected edge
+    const reconnectHandle = page.locator(".react-flow__edgeupdater").first();
+    const handleBox = await reconnectHandle.boundingBox();
+    if (!handleBox) {
+      throw new Error("Could not find bounding box for edge reconnect handle");
+    }
+
     // Reconnect endpoint to node-10
     const targetNode = page.locator('.react-flow__node[data-id="node-10"]');
-    const targetBox = await targetNode.boundingBox().catch(() => null);
-    const targetX = targetBox ? targetBox.x + 20 : 500;
-    const targetY = targetBox ? targetBox.y + 20 : 400;
+    const targetBox = await targetNode.boundingBox();
+    if (!targetBox) {
+      throw new Error("Could not find bounding box for target node-10");
+    }
 
-    await dragCoordinates(page, 200, 200, targetX - 200, targetY - 200, 10);
+    const startX = handleBox.x + handleBox.width / 2;
+    const startY = handleBox.y + handleBox.height / 2;
+    const targetX = targetBox.x + targetBox.width / 2;
+    const targetY = targetBox.y + targetBox.height / 2;
+
+    await dragCoordinates(page, startX, startY, targetX - startX, targetY - startY, 10);
   },
 };
 
@@ -265,14 +288,19 @@ export const remoteBurstScenario: ScenarioDefinition = {
         const Y = window.Y || (perfObj ? perfObj.Y : null);
         if (!Y || !perfObj) return;
 
-        const doc = new Y.Doc();
-        perfObj.startCollabSessionWithDoc(doc);
+        const appDoc = new Y.Doc();
+        const sourceDoc = new Y.Doc();
+        perfObj.startCollabSessionWithDoc(appDoc);
 
-        const nodesMap = doc.getMap("nodes");
-        const nodeOrder = doc.getArray("nodeOrder");
+        sourceDoc.on("update", (update) => {
+          Y.applyUpdate(appDoc, update);
+        });
+
+        const nodesMap = sourceDoc.getMap("nodes");
+        const nodeOrder = sourceDoc.getArray("nodeOrder");
 
         for (let i = 0; i < 120; i++) {
-          doc.transact(() => {
+          sourceDoc.transact(() => {
             const targetId = "node-" + (i % 20);
             let m = nodesMap.get(targetId);
             if (m) {
@@ -306,21 +334,53 @@ export const remoteDuringDragScenario: ScenarioDefinition = {
   description: "Apply 120 remote Yjs updates while actively dragging a local node 200px. Protects worst-case collaborative throughput.",
   run: async (page) => {
     await setupFixture(page, "large");
+    await page.evaluate(`
+      (() => {
+        const perfObj = window.__PERF__;
+        const Y = window.Y || (perfObj ? perfObj.Y : null);
+        if (!Y || !perfObj) return;
+
+        window.__perfAppDoc = new Y.Doc();
+        window.__perfSourceDoc = new Y.Doc();
+        perfObj.startCollabSessionWithDoc(window.__perfAppDoc);
+
+        window.__perfSourceDoc.on("update", (update) => {
+          Y.applyUpdate(window.__perfAppDoc, update);
+        });
+
+        const nodesMap = window.__perfSourceDoc.getMap("nodes");
+        const nodeOrder = window.__perfSourceDoc.getArray("nodeOrder");
+
+        // Seed initial nodes
+        window.__perfSourceDoc.transact(() => {
+          for (let k = 0; k <= 50; k++) {
+            const m = new Y.Map();
+            m.set("type", "typed");
+            m.set("position", { x: 150 + (k % 8) * 120, y: 100 + Math.floor(k / 8) * 90 });
+            m.set("label", "Node " + k);
+            m.set("nodeType", "microservice");
+            m.set("properties", {});
+            m.set("tags", []);
+            m.set("parentPath", []);
+            nodesMap.set("node-" + k, m);
+            nodeOrder.push(["node-" + k]);
+          }
+        });
+      })()
+    `);
+    await settleCanvas(page, 2);
+
     await resetCounters(page);
 
     // Start remote updates in background while driving mouse drag
     const updatePromise = page.evaluate(`
       (async () => {
-        const perfObj = window.__PERF__;
-        const Y = window.Y || (perfObj ? perfObj.Y : null);
-        if (!Y || !perfObj) return;
+        const sourceDoc = window.__perfSourceDoc;
+        if (!sourceDoc) return;
+        const nodesMap = sourceDoc.getMap("nodes");
 
-        const doc = new Y.Doc();
-        perfObj.startCollabSessionWithDoc(doc);
-
-        const nodesMap = doc.getMap("nodes");
         for (let i = 0; i < 120; i++) {
-          doc.transact(() => {
+          sourceDoc.transact(() => {
             const targetId = "node-" + ((i % 10) + 20);
             const m = nodesMap.get(targetId);
             if (m) {
@@ -332,8 +392,15 @@ export const remoteDuringDragScenario: ScenarioDefinition = {
       })()
     `);
 
-    // Simultaneously perform drag
-    await dragCoordinates(page, 300, 300, 200, 0, 20);
+    // Simultaneously perform drag on node-50
+    const nodeEl = page.locator('.react-flow__node[data-id="node-50"]');
+    const box = await nodeEl.boundingBox();
+    if (!box) {
+      throw new Error("Could not find bounding box for node-50");
+    }
+    const startX = box.x + box.width / 2;
+    const startY = box.y + box.height / 2;
+    await dragCoordinates(page, startX, startY, 200, 0, 20);
     await updatePromise;
     await settleCanvas(page, 3);
   },

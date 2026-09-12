@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { resolve, join } from "path";
+import { fileURLToPath } from "url";
 import type { PerfRunResults, ScenarioResult } from "../src/perf/scenarios/types";
 
 const rootDir = resolve(".");
@@ -22,7 +23,7 @@ const markdownPath = args.includes("--markdown")
   ? resolve(getArgValue("--markdown", join(rootDir, "dist", "perf-summary.md")))
   : null;
 
-const GATING_COUNTERS: (keyof ScenarioResult["metrics"])[] = [
+export const GATING_COUNTERS: (keyof ScenarioResult["metrics"])[] = [
   "commits",
   "nodeRenders",
   "edgeRenders",
@@ -32,7 +33,7 @@ const GATING_COUNTERS: (keyof ScenarioResult["metrics"])[] = [
   "unflattenCalls",
 ];
 
-const REQUIREMENT_MAPPING: Record<string, string> = {
+export const REQUIREMENT_MAPPING: Record<string, string> = {
   "idle": "PERF-S-1 (idle)",
   "drag-node": "PERF-S-1 (drag-node) / PERF-V-1",
   "drag-hub-node": "PERF-S-1 (drag-hub-node)",
@@ -48,7 +49,7 @@ const REQUIREMENT_MAPPING: Record<string, string> = {
   "remote-during-drag": "PERF-S-1 (remote-during-drag) / PERF-S-2",
 };
 
-interface MetricEvaluation {
+export interface MetricEvaluation {
   scenarioId: string;
   metric: string;
   baseline: number;
@@ -61,7 +62,7 @@ interface MetricEvaluation {
   requirementId: string;
 }
 
-function evaluateGate(
+export function evaluateGate(
   results: PerfRunResults,
   baseline: PerfRunResults
 ): { evaluations: MetricEvaluation[]; failedCount: number; passedCount: number } {
@@ -69,18 +70,60 @@ function evaluateGate(
   let failedCount = 0;
   let passedCount = 0;
 
-  for (const [id, scenario] of Object.entries(results.scenarios)) {
-    const baseScenario = baseline.scenarios[id];
+  const resultScenarios = results?.scenarios ?? {};
+  const baselineScenarios = baseline?.scenarios ?? {};
+
+  const allScenarioIds = Array.from(
+    new Set([...Object.keys(resultScenarios), ...Object.keys(baselineScenarios)])
+  );
+
+  if (allScenarioIds.length === 0) {
+    return { evaluations, failedCount: 1, passedCount: 0 };
+  }
+
+  for (const id of allScenarioIds) {
+    const scenario = resultScenarios[id];
+    const baseScenario = baselineScenarios[id];
     const requirementId = REQUIREMENT_MAPPING[id] || "PERF-S-1";
 
-    if (!baseScenario) {
-      console.warn(`⚠️ No baseline found for scenario [${id}] - reporting as un-gated.`);
+    if (!baseScenario || !scenario) {
+      failedCount++;
+      evaluations.push({
+        scenarioId: id,
+        metric: "scenario",
+        baseline: baseScenario ? 1 : 0,
+        measured: scenario ? 1 : 0,
+        delta: (scenario ? 1 : 0) - (baseScenario ? 1 : 0),
+        pctDelta: 100,
+        gating: true,
+        passed: false,
+        improvement: false,
+        requirementId,
+      });
       continue;
     }
 
     for (const metric of GATING_COUNTERS) {
-      const measured = (scenario.metrics[metric] as number) ?? 0;
-      const baseVal = (baseScenario.metrics[metric] as number) ?? 0;
+      const measured = scenario.metrics?.[metric];
+      const baseVal = baseScenario.metrics?.[metric];
+
+      if (typeof measured !== "number" || typeof baseVal !== "number" || Number.isNaN(measured) || Number.isNaN(baseVal)) {
+        failedCount++;
+        evaluations.push({
+          scenarioId: id,
+          metric,
+          baseline: typeof baseVal === "number" ? baseVal : NaN,
+          measured: typeof measured === "number" ? measured : NaN,
+          delta: NaN,
+          pctDelta: NaN,
+          gating: true,
+          passed: false,
+          improvement: false,
+          requirementId,
+        });
+        continue;
+      }
+
       const delta = measured - baseVal;
       const pctDelta = baseVal === 0 ? (measured === 0 ? 0 : 100) : (delta / baseVal) * 100;
 
@@ -162,13 +205,9 @@ function main() {
   }
 
   if (!existsSync(baselinePath)) {
-    console.warn(`⚠️ Baseline file not found at: ${baselinePath}`);
-    console.warn("   Recording current results as initial baseline...");
-    const baselineDir = resolve(baselinePath, "..");
-    if (!existsSync(baselineDir)) mkdirSync(baselineDir, { recursive: true });
-    writeFileSync(baselinePath, JSON.stringify(results, null, 2), "utf-8");
-    console.log(`📝 Created initial baseline at: ${baselinePath}\n`);
-    process.exit(0);
+    console.error(`❌ Baseline file not found at: ${baselinePath}`);
+    console.error("   To record a new baseline from results, run with `--record`.");
+    process.exit(1);
   }
 
   const baseline: PerfRunResults = JSON.parse(readFileSync(baselinePath, "utf-8"));
@@ -209,4 +248,13 @@ function main() {
   }
 }
 
-main();
+const isMain =
+  process.argv[1] &&
+  (resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url)) ||
+    process.argv[1].endsWith("perf-gate.ts") ||
+    process.argv[1].endsWith("perf-gate.js") ||
+    process.argv[1].endsWith("perf-gate"));
+
+if (isMain) {
+  main();
+}

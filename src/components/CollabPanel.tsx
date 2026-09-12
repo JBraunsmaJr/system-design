@@ -195,6 +195,28 @@ export function CollabPanel({
       signalingUrlsInput,
       defaultSignalingUrls: buildTimeSignalingDefault,
     });
+
+    const fallbackCopy = (text: string) => {
+      try {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed";
+        textArea.style.opacity = "0";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        const successful = document.execCommand("copy");
+        document.body.removeChild(textArea);
+        if (successful) {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+          onCopyLink?.(text);
+        }
+      } catch {
+        // Copy failed
+      }
+    };
+
     if (typeof navigator !== "undefined" && typeof navigator.clipboard?.writeText === "function") {
       navigator.clipboard
         .writeText(link)
@@ -204,10 +226,10 @@ export function CollabPanel({
           onCopyLink?.(link);
         })
         .catch(() => {
-          onCopyLink?.(link);
+          fallbackCopy(link);
         });
     } else {
-      onCopyLink?.(link);
+      fallbackCopy(link);
     }
   };
 

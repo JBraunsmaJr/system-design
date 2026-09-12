@@ -218,6 +218,7 @@ function generateNestedDiagram(options: FixtureOptions, rand: () => number): Sub
   const totalNodes = options.nodeCount;
   const totalEdges = options.edgeCount;
   const depth = options.depth ?? 4;
+  const waypointFraction = options.waypointFraction ?? 0.2;
 
   // Distribute nodes and edges across 4 levels (root + 3 nested levels)
   const nodesPerLevel = Math.floor(totalNodes / depth);
@@ -265,7 +266,7 @@ function generateNestedDiagram(options: FixtureOptions, rand: () => number): Sub
     for (let e = 0; e < levelEdgeCount && levelNodeCount >= 2; e++) {
       const srcIdx = e % levelNodeCount;
       const dstIdx = (e + 1) % levelNodeCount;
-      const isBent = rand() < 0.2;
+      const isBent = rand() < waypointFraction;
       const waypoints = isBent ? generateWaypoints(rand, e) : undefined;
 
       edges.push({

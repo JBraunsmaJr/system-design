@@ -460,6 +460,7 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
       if (!m) return;
       doc.transact(() => {
         for (const [key, value] of Object.entries(patch)) {
+          if (key === WAYPOINTS_KEY) continue;
           m.set(key, value);
         }
       });

@@ -6,8 +6,17 @@ import { VitePWA } from 'vite-plugin-pwa'
 // Base path matches the GitHub Pages project-site URL:
 // https://<user>.github.io/system-design/
 // If you rename the repo, update this to match.
+const isPerfBuild = process.env.VITE_PERF_INSTRUMENTATION === '1';
+
 export default defineConfig({
   base: '/system-design/',
+  resolve: isPerfBuild
+    ? {
+        alias: {
+          'react-dom/client': 'react-dom/profiling',
+        },
+      }
+    : undefined,
   plugins: [
       react(),
 

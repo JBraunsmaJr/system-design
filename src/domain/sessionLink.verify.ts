@@ -267,3 +267,6 @@ const { createSessionLink, parseSessionLink, generateSessionKey, getBaseAppUrl, 
 }
 
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);
+if (failures > 0) {
+  (globalThis as unknown as { process: { exitCode: number } }).process.exitCode = 1;
+}

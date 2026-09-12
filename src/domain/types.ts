@@ -204,7 +204,18 @@ export interface ArchEdgeData extends Record<string, unknown> {
  * by someone reasonably assuming waypoints work like every other field
  * here.
  */
-export type ArchEdgeDataPatch = Partial<Omit<ArchEdgeData, "waypoints">>;
+export interface ArchEdgeDataPatch {
+  edgeType?: string;
+  label?: string;
+  direction?: "forward" | "reverse" | "both";
+  hideLabel?: boolean;
+  color?: string;
+  labelAnchorT?: number;
+  labelOffsetX?: number;
+  labelOffsetY?: number;
+  isStepMember?: boolean;
+  properties?: Record<string, string>;
+}
 
 /**
  * An independent set of nodes/edges nested inside a parent node. Scenarios

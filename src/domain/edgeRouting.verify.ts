@@ -274,9 +274,23 @@ function passesThrough(points: Point[], p: Point): boolean {
 // Two peers inserting a bend at the same moment must not generate the
 // same id, or their two bends would merge into one.
 {
-  const generated = new Set<string>();
-  for (let i = 0; i < 2000; i++) generated.add(createWaypointId());
-  assert(generated.size === 2000, `2000 generated waypoint ids are all distinct (got ${generated.size})`);
+  const originalDateNow = Date.now;
+  const originalMathRandom = Math.random;
+  let counter = 0;
+  Date.now = () => 1700000000000 + counter;
+  Math.random = () => {
+    counter++;
+    return ((counter * 7919) % 100000) / 100000;
+  };
+
+  try {
+    const generated = new Set<string>();
+    for (let i = 0; i < 2000; i++) generated.add(createWaypointId());
+    assert(generated.size === 2000, `2000 generated waypoint ids are all distinct (got ${generated.size})`);
+  } finally {
+    Date.now = originalDateNow;
+    Math.random = originalMathRandom;
+  }
 }
 
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);

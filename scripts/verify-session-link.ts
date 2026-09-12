@@ -56,15 +56,17 @@ async function run() {
   viteServer.stdout?.on("data", (d) => process.stdout.write(`[vite] ${d}`));
   viteServer.stderr?.on("data", (d) => process.stderr.write(`[vite] ${d}`));
 
-  await Promise.all([waitForPort(SIGNALING_PORT), waitForPort(VITE_PORT)]);
-  console.log(`Signaling server on :${SIGNALING_PORT}, vite on :${VITE_PORT}`);
-
-  const browser = await chromium.launch({ headless: true });
-  const context1 = await browser.newContext({ permissions: ["clipboard-read", "clipboard-write"] });
-  const context2 = await browser.newContext({ permissions: ["clipboard-read", "clipboard-write"] });
-  const context3 = await browser.newContext({ permissions: ["clipboard-read", "clipboard-write"] });
+  let browser: import("playwright").Browser | undefined;
 
   try {
+    await Promise.all([waitForPort(SIGNALING_PORT), waitForPort(VITE_PORT)]);
+    console.log(`Signaling server on :${SIGNALING_PORT}, vite on :${VITE_PORT}`);
+
+    browser = await chromium.launch({ headless: true });
+    const context1 = await browser.newContext({ permissions: ["clipboard-read", "clipboard-write"] });
+    const context2 = await browser.newContext({ permissions: ["clipboard-read", "clipboard-write"] });
+    const context3 = await browser.newContext({ permissions: ["clipboard-read", "clipboard-write"] });
+
     const page1 = await context1.newPage();
     const page2 = await context2.newPage();
     const page3 = await context3.newPage();
@@ -182,7 +184,9 @@ async function run() {
     console.error("Verification failed with error:", err);
     process.exitCode = 1;
   } finally {
-    await browser.close();
+    if (browser) {
+      await browser.close().catch(() => {});
+    }
     viteServer.kill();
     signalingServer.kill();
     process.exit(process.exitCode || 0);

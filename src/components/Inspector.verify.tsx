@@ -48,7 +48,10 @@ function assert(condition: boolean, message: string) {
     />
   );
 
-  assert(html.includes("Inspector") || html.includes("Edge"), "Renders Edge panel header");
+  assert(
+    html.includes('<div class="panel-header">Edge</div>') || html.includes('<div class="panel-header">Inspector</div>'),
+    "Renders Edge panel header"
+  );
   assert(!html.includes("Bends / Waypoints"), "Does not render waypoint section when no waypoints");
 }
 

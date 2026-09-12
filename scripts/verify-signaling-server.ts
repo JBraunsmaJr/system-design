@@ -32,7 +32,6 @@
  * to be from reading the code.
  */
 import { spawn, type ChildProcess } from "child_process";
-// @ts-expect-error ws lacks typescript definitions in devDependencies
 import WebSocket from "ws";
 
 let failures = 0;

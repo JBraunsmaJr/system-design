@@ -36,10 +36,7 @@ export function generateSessionKey(): string {
     crypto.getRandomValues(bytes);
     return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
   }
-  return (
-    Math.random().toString(36).slice(2) +
-    Math.random().toString(36).slice(2)
-  );
+  throw new Error("Secure random generation (crypto.getRandomValues) is not available in this environment.");
 }
 
 /**

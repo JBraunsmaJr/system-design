@@ -14,8 +14,16 @@ SIGNALING_URL="${RELAY:-${RELAY_URL:-${SIGNALING_URL:-${VITE_SIGNALING_URL:-${VI
 APP_URL="${APP_URL:-${BASE_URL:-${VITE_APP_URL:-${VITE_BASE_URL:-}}}}"
 ICE_SERVERS="${ICE_SERVERS:-${VITE_ICE_SERVERS:-}}"
 
-# Escape backslashes and double quotes for valid JavaScript string literal
+# Escape backslashes and double quotes for valid JavaScript string literal, rejecting CR and LF
 escape_js() {
+  CR="$(printf '\r')"
+  LF="$(printf '\n')"
+  case "$1" in
+    *"$CR"*|*"$LF"*)
+      echo "Error: line-feed and carriage-return characters are not allowed in configuration values" >&2
+      exit 1
+      ;;
+  esac
   printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
 }
 

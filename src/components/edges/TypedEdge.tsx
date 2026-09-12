@@ -340,6 +340,7 @@ export function TypedEdge({
       const handleUp = () => {
         document.removeEventListener("pointermove", handleMove);
         document.removeEventListener("pointerup", handleUp);
+        document.removeEventListener("pointercancel", handleUp);
 
         // If the pointer did not drag, track double-click timing as a reliable fallback
         if (!moved) {
@@ -357,6 +358,7 @@ export function TypedEdge({
 
       document.addEventListener("pointermove", handleMove);
       document.addEventListener("pointerup", handleUp);
+      document.addEventListener("pointercancel", handleUp);
     },
     [id, onMoveEdgeWaypoint, onRemoveEdgeWaypoint, resolveDragPosition, screenToFlowPosition]
   );
@@ -405,9 +407,11 @@ export function TypedEdge({
       const handleUp = () => {
         document.removeEventListener("pointermove", handleMove);
         document.removeEventListener("pointerup", handleUp);
+        document.removeEventListener("pointercancel", handleUp);
       };
       document.addEventListener("pointermove", handleMove);
       document.addEventListener("pointerup", handleUp);
+      document.addEventListener("pointercancel", handleUp);
     },
     [id, onAddEdgeWaypoint, onMoveEdgeWaypoint, resolveDragPosition, screenToFlowPosition]
   );

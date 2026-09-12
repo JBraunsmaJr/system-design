@@ -496,18 +496,38 @@ function App() {
   // state, not an empty workbook.
   const startNewSession = useCallback(
     (explicitKey?: string) => {
+      let seedRequirements = requirements;
+      let seedProgramIncrements = programIncrements;
+      let seedRoot = root;
+      let seedMilestones = diagram.milestones ?? [];
+      let seedTeam = team;
+
       if (activeSessionRef.current) {
-        activeSessionRef.current.session.disconnect();
+        const current = activeSessionRef.current;
+        seedTeam = current.teamStore.getSnapshot();
+        seedRequirements = current.requirementsStore.getSnapshot();
+        seedProgramIncrements = current.programIncrementsStore.getSnapshot();
+        seedMilestones = current.milestonesStore.getSnapshot();
+        const finalDiagramSnapshot = current.diagramStore.getSnapshot();
+        seedRoot = unflattenToSubDiagram(finalDiagramSnapshot.nodes, finalDiagramSnapshot.edges);
+
+        setTeam(() => seedTeam);
+        setRequirements(() => seedRequirements);
+        setProgramIncrements(() => seedProgramIncrements);
+        setMilestones(() => seedMilestones);
+        setRoot(() => seedRoot);
+
+        current.session.disconnect();
       }
       const roomName = `session-${Math.random().toString(36).slice(2, 10)}`;
       const sessionKey = explicitKey && explicitKey.trim() ? explicitKey.trim() : generateSessionKey();
       const doc = new Y.Doc();
-      seedYjsRequirementsDoc(doc, requirements);
-      seedYjsProgramIncrementsDoc(doc, programIncrements);
-      seedYjsDiagramDoc(doc, root);
-      seedYjsMilestonesDoc(doc, diagram.milestones ?? []);
+      seedYjsRequirementsDoc(doc, seedRequirements);
+      seedYjsProgramIncrementsDoc(doc, seedProgramIncrements);
+      seedYjsDiagramDoc(doc, seedRoot);
+      seedYjsMilestonesDoc(doc, seedMilestones);
       const teamStore = createYjsTeamStore(doc);
-      seedTeamStore(teamStore, team);
+      seedTeamStore(teamStore, seedTeam);
       const requirementsStoreForSession = createYjsRequirementsStore(doc);
       const programIncrementsStoreForSession = createYjsProgramIncrementsStore(doc);
       const diagramStoreForSession = createYjsDiagramStore(doc);
@@ -555,7 +575,7 @@ function App() {
           });
       }
     },
-    [requirements, programIncrements, team, root, diagram.milestones, signalingUrls, signalingUrlsInput, buildTimeSignalingDefault, iceServers, displayName, showToast]
+    [requirements, programIncrements, team, root, diagram.milestones, setTeam, setRequirements, setProgramIncrements, setMilestones, setRoot, signalingUrls, signalingUrlsInput, buildTimeSignalingDefault, iceServers, displayName, showToast]
   );
 
   // Joins an existing session by room name - starts from an EMPTY doc
@@ -565,7 +585,14 @@ function App() {
   const joinSession = useCallback(
     (roomName: string, passwordOrKey?: string, relayOverride?: string) => {
       if (activeSessionRef.current) {
-        activeSessionRef.current.session.disconnect();
+        const current = activeSessionRef.current;
+        setTeam(() => current.teamStore.getSnapshot());
+        setRequirements(() => current.requirementsStore.getSnapshot());
+        setProgramIncrements(() => current.programIncrementsStore.getSnapshot());
+        setMilestones(() => current.milestonesStore.getSnapshot());
+        const finalDiagramSnapshot = current.diagramStore.getSnapshot();
+        setRoot(() => unflattenToSubDiagram(finalDiagramSnapshot.nodes, finalDiagramSnapshot.edges));
+        current.session.disconnect();
       }
       let effectiveSignalingUrls = signalingUrls;
       if (relayOverride && relayOverride.trim()) {
@@ -574,6 +601,17 @@ function App() {
         effectiveSignalingUrls = parseSignalingUrls(trimmedRelay);
       }
       const effectiveKey = passwordOrKey && passwordOrKey.trim() ? passwordOrKey.trim() : undefined;
+
+      if(effectiveKey === undefined) {
+        /*
+          Every session this app creates is encrypted with its own key.
+          Joining without one connects but can never decrypt a single
+          update, which reads as "the session is empty".
+         */
+        showToast("This session link has no key, so the session cannot be opened.", "error")
+        return
+      }
+
       const doc = new Y.Doc();
       const teamStore = createYjsTeamStore(doc);
       const requirementsStoreForSession = createYjsRequirementsStore(doc);
@@ -605,7 +643,7 @@ function App() {
         milestonesStore: milestonesStoreForSession,
       });
     },
-    [signalingUrls, setSignalingUrlsInput, iceServers, displayName]
+    [setTeam, setRequirements, setProgramIncrements, setMilestones, setRoot, signalingUrls, setSignalingUrlsInput, iceServers, displayName, showToast]
   );
 
   // Auto-join if a session link is present in the URL on initial mount or hash change
@@ -1995,6 +2033,53 @@ function App() {
     []
   );
 
+  const canvasElement = (
+    <Canvas
+      nodes={nodes}
+      edges={edges}
+      onNodesChange={onNodesChange}
+      onEdgesChange={onEdgesChange}
+      peers={
+        !activeSession
+          ? []
+          : presencePeers.map((p) => {
+              const onSamePath = p.diagramPath === path.join("/");
+              const shouldShowCursor = showPeerCursors && onSamePath;
+              return p.cursor === null || shouldShowCursor ? p : { ...p, cursor: null };
+            })
+      }
+      onCursorMove={onCursorMove}
+      onConnect={onConnect}
+      onAddNode={onAddNode}
+      onAddGroup={onAddGroup}
+      onAddText={onAddText}
+      onAddShape={onAddShape}
+      onAddCode={onAddCode}
+      onUpdateNode={onUpdateNode}
+      onUpdateEdge={onUpdateEdge}
+      onReconnectEdge={onReconnectEdge}
+      onAddEdgeWaypoint={onAddEdgeWaypoint}
+      onMoveEdgeWaypoint={onMoveEdgeWaypoint}
+      onRemoveEdgeWaypoint={onRemoveEdgeWaypoint}
+      onReparentNode={onReparentNode}
+      onAdoptIntoGroup={onAdoptIntoGroup}
+      onZOrderCommand={onZOrderCommand}
+      presentation={presentation}
+      previewFocus={previewFocus}
+      focusNodeId={pendingNodeFocus}
+      onFocusHandled={onFocusNodeHandled}
+      onPresentNext={onPresentNext}
+      onPresentPrev={onPresentPrev}
+      onExitPresenting={onExitPresenting}
+      breadcrumbLabels={breadcrumbLabels}
+      onDrillInto={onDrillInto}
+      onNavigateToRoot={onNavigateToRoot}
+      onNavigateToPathIndex={onNavigateToPathIndex}
+      isSelectMode={isSelectMode}
+      onToggleSelectMode={() => setIsSelectMode((v) => !v)}
+    />
+  );
+
   return (
     <div className="app">
       {appVersion && (
@@ -2083,96 +2168,10 @@ function App() {
           <ReactFlowProvider>
             {isPerfInstrumentationActive() ? (
               <Profiler id="CanvasProfiler" onRender={onCanvasProfilerRender}>
-                <Canvas
-                  nodes={nodes}
-                  edges={edges}
-                  onNodesChange={onNodesChange}
-                  onEdgesChange={onEdgesChange}
-                  peers={
-                    !activeSession
-                      ? []
-                      : presencePeers.map((p) => {
-                          const onSamePath = p.diagramPath === path.join("/");
-                          const shouldShowCursor = showPeerCursors && onSamePath;
-                          return p.cursor === null || shouldShowCursor ? p : { ...p, cursor: null };
-                        })
-                  }
-                  onCursorMove={onCursorMove}
-                  onConnect={onConnect}
-                  onAddNode={onAddNode}
-                  onAddGroup={onAddGroup}
-                  onAddText={onAddText}
-                  onAddShape={onAddShape}
-                  onAddCode={onAddCode}
-                  onUpdateNode={onUpdateNode}
-                  onUpdateEdge={onUpdateEdge}
-                  onReconnectEdge={onReconnectEdge}
-                  onAddEdgeWaypoint={onAddEdgeWaypoint}
-                  onMoveEdgeWaypoint={onMoveEdgeWaypoint}
-                  onRemoveEdgeWaypoint={onRemoveEdgeWaypoint}
-                  onReparentNode={onReparentNode}
-                  onAdoptIntoGroup={onAdoptIntoGroup}
-                  onZOrderCommand={onZOrderCommand}
-                  presentation={presentation}
-                  previewFocus={previewFocus}
-                  focusNodeId={pendingNodeFocus}
-                  onFocusHandled={onFocusNodeHandled}
-                  onPresentNext={onPresentNext}
-                  onPresentPrev={onPresentPrev}
-                  onExitPresenting={onExitPresenting}
-                  breadcrumbLabels={breadcrumbLabels}
-                  onDrillInto={onDrillInto}
-                  onNavigateToRoot={onNavigateToRoot}
-                  onNavigateToPathIndex={onNavigateToPathIndex}
-                  isSelectMode={isSelectMode}
-                  onToggleSelectMode={() => setIsSelectMode((v) => !v)}
-                />
+                {canvasElement}
               </Profiler>
             ) : (
-              <Canvas
-                nodes={nodes}
-                edges={edges}
-                onNodesChange={onNodesChange}
-                onEdgesChange={onEdgesChange}
-                peers={
-                  !activeSession
-                    ? []
-                    : presencePeers.map((p) => {
-                        const onSamePath = p.diagramPath === path.join("/");
-                        const shouldShowCursor = showPeerCursors && onSamePath;
-                        return p.cursor === null || shouldShowCursor ? p : { ...p, cursor: null };
-                      })
-                }
-                onCursorMove={onCursorMove}
-                onConnect={onConnect}
-                onAddNode={onAddNode}
-                onAddGroup={onAddGroup}
-                onAddText={onAddText}
-                onAddShape={onAddShape}
-                onAddCode={onAddCode}
-                onUpdateNode={onUpdateNode}
-                onUpdateEdge={onUpdateEdge}
-                onReconnectEdge={onReconnectEdge}
-                onAddEdgeWaypoint={onAddEdgeWaypoint}
-                onMoveEdgeWaypoint={onMoveEdgeWaypoint}
-                onRemoveEdgeWaypoint={onRemoveEdgeWaypoint}
-                onReparentNode={onReparentNode}
-                onAdoptIntoGroup={onAdoptIntoGroup}
-                onZOrderCommand={onZOrderCommand}
-                presentation={presentation}
-                previewFocus={previewFocus}
-                focusNodeId={pendingNodeFocus}
-                onFocusHandled={onFocusNodeHandled}
-                onPresentNext={onPresentNext}
-                onPresentPrev={onPresentPrev}
-                onExitPresenting={onExitPresenting}
-                breadcrumbLabels={breadcrumbLabels}
-                onDrillInto={onDrillInto}
-                onNavigateToRoot={onNavigateToRoot}
-                onNavigateToPathIndex={onNavigateToPathIndex}
-                isSelectMode={isSelectMode}
-                onToggleSelectMode={() => setIsSelectMode((v) => !v)}
-              />
+              canvasElement
             )}
           </ReactFlowProvider>
         </div>

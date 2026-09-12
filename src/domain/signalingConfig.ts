@@ -26,25 +26,31 @@ export function getDefaultSignalingUrl(): string {
       }
     ).__APP_CONFIG__;
     if (runtimeConfig) {
-      const val =
-        runtimeConfig.SIGNALING_URL ||
-        runtimeConfig.RELAY_URL ||
-        runtimeConfig.RELAY ||
-        runtimeConfig.signalingUrl ||
-        runtimeConfig.relayUrl ||
-        runtimeConfig.relay;
-      if (val && typeof val === "string" && val.trim()) {
-        return val.trim();
+      const candidates = [
+        runtimeConfig.SIGNALING_URL,
+        runtimeConfig.RELAY_URL,
+        runtimeConfig.RELAY,
+        runtimeConfig.signalingUrl,
+        runtimeConfig.relayUrl,
+        runtimeConfig.relay,
+      ];
+      for (const candidate of candidates) {
+        if (typeof candidate === "string" && candidate.trim()) {
+          return candidate.trim();
+        }
       }
     }
   }
   if (typeof import.meta !== "undefined" && typeof import.meta.env !== "undefined") {
-    const envVal =
-      (import.meta.env.VITE_SIGNALING_URL as string | undefined) ||
-      (import.meta.env.VITE_RELAY_URL as string | undefined) ||
-      (import.meta.env.VITE_RELAY as string | undefined);
-    if (envVal && typeof envVal === "string" && envVal.trim()) {
-      return envVal.trim();
+    const envCandidates = [
+      import.meta.env.VITE_SIGNALING_URL as string | undefined,
+      import.meta.env.VITE_RELAY_URL as string | undefined,
+      import.meta.env.VITE_RELAY as string | undefined,
+    ];
+    for (const envVal of envCandidates) {
+      if (typeof envVal === "string" && envVal.trim()) {
+        return envVal.trim();
+      }
     }
   }
   return "";

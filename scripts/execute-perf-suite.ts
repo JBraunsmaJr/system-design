@@ -161,6 +161,10 @@ async function runSuite() {
       filterArg ? s.id.toLowerCase().includes(filterArg.toLowerCase()) : true
     );
 
+    if (scenariosToRun.length === 0) {
+      throw new Error(`No performance scenarios found matching filter: "${filterArg}"`);
+    }
+
     console.log(`📋 Running ${scenariosToRun.length} scenario(s) with ${repeatsCount} repeat(s) each...\n`);
 
     const scenarioResults: Record<string, ScenarioResult> = {};

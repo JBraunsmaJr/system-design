@@ -415,8 +415,8 @@ export function createLocalDiagramStore(initial?: {
               ...e,
               source: endpoints.source,
               target: endpoints.target,
-              sourceHandle: endpoints.sourceHandle,
-              targetHandle: endpoints.targetHandle,
+              sourceHandle: endpoints.sourceHandle ?? null,
+              targetHandle: endpoints.targetHandle ?? null,
             }
           : e
       );
