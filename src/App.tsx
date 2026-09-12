@@ -2225,6 +2225,7 @@ function App() {
                     onUpdateNode={onUpdateNode}
                     onUpdateEdge={onUpdateEdge}
                     onClearEdgeWaypoints={onClearEdgeWaypoints}
+                    onRemoveEdgeWaypoint={onRemoveEdgeWaypoint}
                     onDeleteNode={onDeleteNode}
                     onDeleteEdge={onDeleteEdge}
                     onDrillInto={onDrillInto}

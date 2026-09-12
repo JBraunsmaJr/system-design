@@ -304,25 +304,71 @@ export function TypedEdge({
     []
   );
 
+  const lastWaypointClickRef = useRef<{ id: string; time: number }>({ id: "", time: 0 });
+
   const onWaypointPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>, waypointId: string) => {
       if (!onMoveEdgeWaypoint) return;
       event.stopPropagation();
-      event.preventDefault();
+
+      // Alt-click or Meta-click directly removes the waypoint
+      if ((event.altKey || event.metaKey) && onRemoveEdgeWaypoint) {
+        event.preventDefault();
+        onRemoveEdgeWaypoint(id, waypointId);
+        return;
+      }
+
+      // Only handle primary pointer (left button) for dragging
+      if (event.button !== 0) return;
+
+      const startClientX = event.clientX;
+      const startClientY = event.clientY;
+      let moved = false;
 
       const handleMove = (moveEvent: PointerEvent) => {
+        if (!moved) {
+          const dx = moveEvent.clientX - startClientX;
+          const dy = moveEvent.clientY - startClientY;
+          if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+          moved = true;
+        }
         const flowPoint = screenToFlowPosition({ x: moveEvent.clientX, y: moveEvent.clientY });
         const next = resolveDragPosition(waypointId, flowPoint);
         if (next) onMoveEdgeWaypoint(id, waypointId, next);
       };
+
       const handleUp = () => {
         document.removeEventListener("pointermove", handleMove);
         document.removeEventListener("pointerup", handleUp);
+
+        // If the pointer did not drag, track double-click timing as a reliable fallback
+        if (!moved) {
+          const now = Date.now();
+          if (lastWaypointClickRef.current.id === waypointId && now - lastWaypointClickRef.current.time < 350) {
+            if (onRemoveEdgeWaypoint) {
+              onRemoveEdgeWaypoint(id, waypointId);
+            }
+            lastWaypointClickRef.current = { id: "", time: 0 };
+          } else {
+            lastWaypointClickRef.current = { id: waypointId, time: now };
+          }
+        }
       };
+
       document.addEventListener("pointermove", handleMove);
       document.addEventListener("pointerup", handleUp);
     },
-    [id, onMoveEdgeWaypoint, resolveDragPosition, screenToFlowPosition]
+    [id, onMoveEdgeWaypoint, onRemoveEdgeWaypoint, resolveDragPosition, screenToFlowPosition]
+  );
+
+  const onWaypointContextMenu = useCallback(
+    (event: ReactMouseEvent<HTMLDivElement>, waypointId: string) => {
+      if (!onRemoveEdgeWaypoint) return;
+      event.preventDefault();
+      event.stopPropagation();
+      onRemoveEdgeWaypoint(id, waypointId);
+    },
+    [id, onRemoveEdgeWaypoint]
   );
 
   /**
@@ -508,7 +554,8 @@ export function TypedEdge({
               }}
               onPointerDown={(event) => onWaypointPointerDown(event, waypoint.id)}
               onDoubleClick={(event) => onWaypointDoubleClick(event, waypoint.id)}
-              title="Drag to move this bend, double-click to remove it"
+              onContextMenu={(event) => onWaypointContextMenu(event, waypoint.id)}
+              title="Drag to move this bend. Double-click, right-click, or Alt-click to remove."
             />
           ))}
         </EdgeLabelRenderer>

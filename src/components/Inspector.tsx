@@ -54,6 +54,7 @@ interface InspectorProps {
    * Its own callback rather than an onUpdateEdge patch because
    * waypoints deliberately aren't patchable - see ArchEdgeDataPatch. */
   onClearEdgeWaypoints: (edgeId: string) => void;
+  onRemoveEdgeWaypoint?: (edgeId: string, waypointId: string) => void;
   onDeleteNode: (id: string) => void;
   onDeleteEdge: (id: string) => void;
   onDrillInto: (id: string) => void;
@@ -66,6 +67,7 @@ export function Inspector({
   selectedNode,
   selectedEdge,
   onClearEdgeWaypoints,
+  onRemoveEdgeWaypoint,
   onUpdateNode,
   onUpdateEdge,
   onDeleteNode,
@@ -471,17 +473,6 @@ export function Inspector({
         <span>Hide label on canvas</span>
       </label>
 
-      {(data.labelOffsetX || data.labelOffsetY) && (
-        <button
-          type="button"
-          className="color-field__reset"
-          style={{ marginBottom: 16 }}
-          onClick={() => onUpdateEdge(edge.id, { labelOffsetX: undefined, labelOffsetY: undefined })}
-        >
-          Reset label position
-        </button>
-      )}
-
       {(data.labelAnchorT !== undefined || data.labelOffsetX || data.labelOffsetY) && (
         <button
           type="button"
@@ -496,20 +487,43 @@ export function Inspector({
       )}
 
       {(data.waypoints?.length ?? 0) > 0 && (
-        <>
+        <div className="inspector__field">
+          <span>Bends / Waypoints ({data.waypoints!.length})</span>
+          <div className="waypoint-list">
+            {data.waypoints!.map((wp, index) => (
+              <div className="waypoint-row" key={wp.id}>
+                <span className="waypoint-row__label">
+                  Bend {index + 1}
+                  <span className="waypoint-row__coords">
+                    ({Math.round(wp.x)}, {Math.round(wp.y)})
+                  </span>
+                </span>
+                {onRemoveEdgeWaypoint && (
+                  <button
+                    type="button"
+                    className="waypoint-row__remove"
+                    onClick={() => onRemoveEdgeWaypoint(edge.id, wp.id)}
+                    title={`Remove Bend ${index + 1}`}
+                    aria-label={`Remove Bend ${index + 1}`}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
           <button
             type="button"
             className="color-field__reset"
-            style={{ marginBottom: 8 }}
+            style={{ marginTop: 6, marginBottom: 8 }}
             onClick={() => onClearEdgeWaypoints(edge.id)}
           >
-            Straighten edge ({data.waypoints!.length} bend{data.waypoints!.length === 1 ? "" : "s"})
+            Straighten edge (remove all bends)
           </button>
           <p className="inspector__hint" style={{ marginTop: 0 }}>
-            Bends are pinned to the canvas rather than to either end, so moving a node a long way can
-            leave them somewhere unhelpful. Straightening returns this edge to automatic routing.
+            Bends are pinned to the canvas rather than to either end. Double-click, right-click, or Alt-click any bend handle on the canvas, or click × above, to remove individual waypoints.
           </p>
-        </>
+        </div>
       )}
 
       <PropertyEditor
