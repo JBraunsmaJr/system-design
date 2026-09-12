@@ -80,7 +80,18 @@ async function run() {
 
     // Open collab panel and start session on custom relay
     await page1.click(".collab-panel__trigger");
-    await page1.click(".collab-panel__settings-toggle");
+    // The Settings section starts EXPANDED when no relay is configured and
+    // COLLAPSED when one is (CollabPanel.tsx: useState(() => !signalingConfigured)).
+    // A dev machine with VITE_SIGNALING_URL in a local .env gets the collapsed
+    // case, CI gets the expanded one - so a blind click opens it locally and
+    // closes it on CI. Drive it to the state we need instead of toggling.
+    const settingsToggle = page1.locator(".collab-panel__settings-toggle");
+    await settingsToggle.waitFor();
+    if ((await settingsToggle.getAttribute("aria-expanded")) !== "true") {
+      await settingsToggle.click();
+    }
+    await page1.waitForSelector("#collab-panel-signaling-url", { timeout: 10000 });
+
     await page1.fill("#collab-panel-signaling-url", `ws://localhost:${SIGNALING_PORT}`);
     await page1.click(".collab-panel__primary-action");
 
