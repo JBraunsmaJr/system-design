@@ -5,20 +5,33 @@ import { connect } from "net";
 const SIGNALING_PORT = 14447;
 const VITE_PORT = 5180;
 
-/** Resolves once something is accepting connections on `port`, or throws after `timeoutMs`. */
+function tryConnect(host: string, port: number): Promise<boolean> {
+  return new Promise<boolean>((res) => {
+    const socket = connect({ host, port });
+    socket.setTimeout(1000);
+    const done = (ok: boolean) => { socket.destroy(); res(ok); };
+    socket.once("connect", () => done(true));
+    socket.once("timeout", () => done(false));
+    socket.once("error", () => done(false));
+  });
+}
+
+/**
+ * Resolves once something is accepting connections on `port`, or throws after
+ * `timeoutMs`.
+ *
+ * Probes IPv4 and IPv6 loopback separately and accepts either. Vite binds to
+ * whatever "localhost" resolves to first, which is ::1 on GitHub Actions
+ * runners and 127.0.0.1 on most dev machines - checking only one family makes
+ * this hang for the full timeout against a server that is already up.
+ */
 async function waitForPort(port: number, timeoutMs = 60000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
-    const open = await new Promise<boolean>((res) => {
-      const socket = connect({ host: "127.0.0.1", port });
-      socket.setTimeout(1000);
-      socket.once("connect", () => { socket.destroy(); res(true); });
-      socket.once("timeout", () => { socket.destroy(); res(false); });
-      socket.once("error", () => { socket.destroy(); res(false); });
-    });
-    if (open) return;
+    const results = await Promise.all([tryConnect("127.0.0.1", port), tryConnect("::1", port)]);
+    if (results.some(Boolean)) return;
     if (Date.now() > deadline) {
-      throw new Error(`Timed out after ${timeoutMs}ms waiting for port ${port} to accept connections`);
+      throw new Error(`Timed out after ${timeoutMs}ms waiting for port ${port} on either 127.0.0.1 or ::1`);
     }
     await new Promise((res) => setTimeout(res, 250));
   }
