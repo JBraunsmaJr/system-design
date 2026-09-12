@@ -21,6 +21,27 @@ const ICE_SERVERS_KEY = "system-design-editor:ice-servers";
 export const NO_ICE_SERVERS = "none";
 
 /**
+ * Gets the deployment default ICE servers.
+ *
+ * Checks in order:
+ * 1. Runtime config injected into `window.__APP_CONFIG__.ICE_SERVERS` (e.g. from Docker container environment variables)
+ * 2. Build-time environment variable `import.meta.env.VITE_ICE_SERVERS`
+ * 3. Empty string if unset
+ */
+export function getDefaultIceServers(): string {
+  if (typeof window !== "undefined") {
+    const runtimeConfig = (window as unknown as { __APP_CONFIG__?: { ICE_SERVERS?: string } }).__APP_CONFIG__;
+    if (runtimeConfig?.ICE_SERVERS) {
+      return runtimeConfig.ICE_SERVERS;
+    }
+  }
+  if (typeof import.meta !== "undefined" && typeof import.meta.env !== "undefined") {
+    return (import.meta.env.VITE_ICE_SERVERS as string | undefined) ?? "";
+  }
+  return "";
+}
+
+/**
  * Reads this person's own, runtime-configured ICE server list, if
  * they've ever set one. Same storage convention and same null-vs-empty
  * distinction as loadSignalingUrls - null means "never configured, fall

@@ -5,6 +5,7 @@ import { BidirectionalHandles } from "./BidirectionalHandles";
 import { IconRenderer } from "../IconRenderer";
 import type { ArchNodeData } from "../../domain/types";
 import { useCanvasContext } from "../CanvasContext";
+import { recordNodeRender } from "../../perf/instrumentation";
 
 type TypedNodeType = Node<ArchNodeData, "typed">;
 
@@ -15,6 +16,7 @@ interface TypedNodeProps extends NodeProps<TypedNodeType> {
 const VISIBLE_PROPERTY_CHIPS = 2;
 
 export function TypedNode({ id, data, selected, onDrillInto: propOnDrillInto }: TypedNodeProps) {
+  recordNodeRender();
   const canvasContext = useCanvasContext();
   const onDrillInto = canvasContext?.isPresenting ? undefined : (propOnDrillInto ?? canvasContext?.onDrillInto);
   const def = getNodeType(data.nodeType);

@@ -4,6 +4,7 @@ import { getGroupType } from "../../domain/groupRegistry";
 import { BidirectionalHandles } from "./BidirectionalHandles";
 import type { ArchNodeData } from "../../domain/types";
 import { useCanvasContext } from "../CanvasContext";
+import { recordNodeRender } from "../../perf/instrumentation";
 
 type GroupNodeType = Node<ArchNodeData, "group">;
 
@@ -45,6 +46,7 @@ export function GroupNode({
   selected,
   onAdoptIntoGroup: propOnAdoptIntoGroup,
 }: GroupNodeProps) {
+  recordNodeRender();
   const canvasContext = useCanvasContext();
   const onAdoptIntoGroup = propOnAdoptIntoGroup ?? canvasContext?.onAdoptIntoGroup;
   const { getIntersectingNodes } = useReactFlow<Node<ArchNodeData>>();

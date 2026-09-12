@@ -4,6 +4,59 @@
 const SIGNALING_URLS_KEY = "system-design-editor:signaling-urls";
 
 /**
+ * Gets the deployment default signaling URL(s).
+ *
+ * Checks in order:
+ * 1. Runtime config injected into `window.__APP_CONFIG__` (e.g. from Docker container environment variables: RELAY, RELAY_URL, SIGNALING_URL)
+ * 2. Build-time environment variable `import.meta.env.VITE_SIGNALING_URL` or `VITE_RELAY_URL` or `VITE_RELAY`
+ * 3. Empty string if unset
+ */
+export function getDefaultSignalingUrl(): string {
+  if (typeof window !== "undefined") {
+    const runtimeConfig = (
+      window as unknown as {
+        __APP_CONFIG__?: {
+          SIGNALING_URL?: string;
+          RELAY_URL?: string;
+          RELAY?: string;
+          signalingUrl?: string;
+          relayUrl?: string;
+          relay?: string;
+        };
+      }
+    ).__APP_CONFIG__;
+    if (runtimeConfig) {
+      const candidates = [
+        runtimeConfig.SIGNALING_URL,
+        runtimeConfig.RELAY_URL,
+        runtimeConfig.RELAY,
+        runtimeConfig.signalingUrl,
+        runtimeConfig.relayUrl,
+        runtimeConfig.relay,
+      ];
+      for (const candidate of candidates) {
+        if (typeof candidate === "string" && candidate.trim()) {
+          return candidate.trim();
+        }
+      }
+    }
+  }
+  if (typeof import.meta !== "undefined" && typeof import.meta.env !== "undefined") {
+    const envCandidates = [
+      import.meta.env.VITE_SIGNALING_URL as string | undefined,
+      import.meta.env.VITE_RELAY_URL as string | undefined,
+      import.meta.env.VITE_RELAY as string | undefined,
+    ];
+    for (const envVal of envCandidates) {
+      if (typeof envVal === "string" && envVal.trim()) {
+        return envVal.trim();
+      }
+    }
+  }
+  return "";
+}
+
+/**
  * Reads this person's own, runtime-configured signaling server URL(s),
  * if they've ever set one - stored as a single, comma-separated string,
  * the same format VITE_SIGNALING_URL itself uses.

@@ -94,7 +94,7 @@ try {
   clientB.send(JSON.stringify({ type: "subscribe", topics: [ROOM] }));
 
   let receivedByB: { data: unknown } | null = null;
-  clientB.on("message", (raw) => {
+  clientB.on("message", (raw: { toString: () => string }) => {
     const msg = JSON.parse(raw.toString());
     if (msg.type === "publish") receivedByB = msg;
   });

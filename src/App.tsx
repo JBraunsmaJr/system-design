@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ChangeEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, Profiler, type ProfilerOnRenderCallback, type ChangeEvent } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useUndoableState } from "./hooks/useUndoableState";
 import {
@@ -33,7 +33,7 @@ import { toDiagramFile, downloadDiagram, parseDiagramFile } from "./domain/seria
 import { loadAutosave, saveAutosave } from "./domain/autosave";
 import { downloadRequirementsMarkdown } from "./domain/requirementsExport";
 import { exportDiagramAsPng, exportDiagramAsSvg } from "./domain/imageExport";
-import type { ArchNodeData, ArchEdgeData, Scenario, ScenarioStep, SubDiagram } from "./domain/types";
+import type { ArchNodeData, ArchEdgeData, ArchEdgeDataPatch, EdgeWaypoint, Scenario, ScenarioStep, SubDiagram } from "./domain/types";
 import type { RequirementsDocument } from "./domain/requirementsTypes";
 import { EMPTY_REQUIREMENTS_DOCUMENT } from "./domain/requirementsTypes";
 import {
@@ -55,6 +55,7 @@ import type { RequirementsStore } from "./collab/requirementsStore";
 import { createAdapterProgramIncrementsStore } from "./collab/programIncrementsStore";
 import { createAdapterDiagramStore } from "./collab/adapterDiagramStore";
 import { getNodesAtPath, getEdgesAtPath, unflattenToSubDiagram, hasSubDiagram } from "./collab/diagramStore";
+import type { EdgeEndpoints } from "./domain/edgeReconnect";
 import type { DiagramStore } from "./collab/diagramStore";
 import { createYjsDiagramStore, seedYjsDiagramDoc } from "./collab/yjsDiagramStore";
 import { createYjsProgramIncrementsStore, seedYjsProgramIncrementsDoc } from "./collab/yjsProgramIncrementsStore";
@@ -64,10 +65,14 @@ import { createAdapterMilestonesStore, type MilestonesStore } from "./collab/mil
 import { createYjsMilestonesStore, seedYjsMilestonesDoc } from "./collab/yjsMilestonesStore";
 import { startCollabSession, type CollabSession, type PresenceInfo, type LocalPresenceInfo } from "./collab/session";
 import { loadPresenceName, savePresenceName, loadShowPeerCursors, saveShowPeerCursors } from "./domain/presenceIdentity";
-import { loadSignalingUrls, saveSignalingUrls, parseSignalingUrls } from "./domain/signalingConfig";
-import { loadIceServers, saveIceServers, parseIceServers } from "./domain/iceServerConfig";
+import { loadSignalingUrls, saveSignalingUrls, parseSignalingUrls, getDefaultSignalingUrl } from "./domain/signalingConfig";
+import { loadIceServers, saveIceServers, parseIceServers, getDefaultIceServers } from "./domain/iceServerConfig";
+import { createSessionLink, parseSessionLink, generateSessionKey, sanitizeCurrentUrl } from "./domain/sessionLink";
+import { Toast, type ToastType } from "./components/Toast";
 import { applyZOrderCommand, computeEffectiveZIndices, type ZOrderCommand } from "./domain/zOrder";
 import { classifyNodeChanges, applySelectionChanges, isAutoSizedNodeType, type PendingNodeUpdate, type CurrentNodeGeometry } from "./domain/nodeChangeBatching";
+import { recordCommit, isPerfInstrumentationActive } from "./perf/instrumentation";
+import { getStandardFixture, type FixtureName } from "./perf/fixtures";
 import "./App.css";
 
 let idSeed = 0;
@@ -303,6 +308,7 @@ function App() {
     doc: Y.Doc;
     session: CollabSession;
     roomName: string;
+    password?: string;
     teamStore: TeamStore;
     requirementsStore: RequirementsStore;
     programIncrementsStore: ProgramIncrementsStore;
@@ -342,6 +348,19 @@ function App() {
    * Active" identically in both cases.
    */
   const [relayConnected, setRelayConnected] = useState<boolean | null>(null);
+  const [toast, setToast] = useState<{
+    id?: number;
+    message: string;
+    description?: string;
+    type?: ToastType;
+  } | null>(null);
+
+  const showToast = useCallback(
+    (message: string, type: ToastType = "success", description?: string) => {
+      setToast({ id: Date.now(), message, type, description });
+    },
+    []
+  );
   useEffect(() => {
     if (!activeSession) return;
     const unsubscribePresence = activeSession.session.subscribeToPresence(setPresencePeers);
@@ -427,23 +446,24 @@ function App() {
     };
   }, []);
 
-  // The deployer's own default, baked in at build time - still useful
-  // as a starting point, but no longer the only way to set this: see
-  // signalingUrlsInput/setSignalingUrlsRaw below for the runtime
-  // override that doesn't require a rebuild to change.
-  const buildTimeSignalingDefault = useMemo(() => (import.meta.env.VITE_SIGNALING_URL as string | undefined) ?? "", []);
+  // The deployer's own default, baked in at build time or injected via
+  // container environment variables - still useful as a starting point,
+  // but no longer the only way to set this: see signalingUrlsInput/
+  // setSignalingUrlsRaw below for the runtime override.
+  const buildTimeSignalingDefault = useMemo(() => getDefaultSignalingUrl(), []);
 
   const appVersion = useMemo(() => (import.meta.env.VITE_APP_VERSION as string | undefined) ?? "Development", [])
 
   // The raw, comma-separated string as typed/edited in CollabPanel -
   // this person's own runtime override if they've ever set one,
-  // otherwise the deployer's build-time default. Kept as the raw
+  // otherwise the deployer's build-time/container default. Kept as the raw
   // string (not pre-parsed into an array) specifically so the input
   // field in CollabPanel can be a normal, directly-editable controlled
   // input without needing to serialize/deserialize on every keystroke.
-  const [signalingUrlsInput, setSignalingUrlsInputState] = useState(
-    () => loadSignalingUrls() ?? buildTimeSignalingDefault
-  );
+  const [signalingUrlsInput, setSignalingUrlsInputState] = useState(() => {
+    const saved = loadSignalingUrls();
+    return saved !== null && saved.trim() !== "" ? saved : buildTimeSignalingDefault;
+  });
   const setSignalingUrlsInput = useCallback((raw: string) => {
     setSignalingUrlsInputState(raw);
     saveSignalingUrls(raw);
@@ -451,8 +471,8 @@ function App() {
   const signalingUrls = useMemo(() => parseSignalingUrls(signalingUrlsInput), [signalingUrlsInput]);
 
   // ICE servers, configured exactly like the signaling URLs above: a
-  // build-time default the deployer bakes in, overridable at runtime
-  // per browser without a rebuild.
+  // build-time or container-injected default the deployer provides,
+  // overridable at runtime per browser without a rebuild.
   //
   // Separate from the signaling URL because they solve different halves
   // of the connection and fail independently - the relay is how peers
@@ -460,8 +480,11 @@ function App() {
   // have a perfectly working relay and still never form a peer
   // connection, which is precisely the case on a segmented internal
   // network with no route to the public STUN servers WebRTC ships with.
-  const buildTimeIceServersDefault = useMemo(() => (import.meta.env.VITE_ICE_SERVERS as string | undefined) ?? "", []);
-  const [iceServersInput, setIceServersInputState] = useState(() => loadIceServers() ?? buildTimeIceServersDefault);
+  const buildTimeIceServersDefault = useMemo(() => getDefaultIceServers(), []);
+  const [iceServersInput, setIceServersInputState] = useState(() => {
+    const saved = loadIceServers();
+    return saved !== null && saved.trim() !== "" ? saved : buildTimeIceServersDefault;
+  });
   const setIceServersInput = useCallback((raw: string) => {
     setIceServersInputState(raw);
     saveIceServers(raw);
@@ -472,20 +495,44 @@ function App() {
   // nothing is lost - the new session's initial state IS the current local
   // state, not an empty workbook.
   const startNewSession = useCallback(
-    (password: string) => {
+    (explicitKey?: string) => {
+      let seedRequirements = requirements;
+      let seedProgramIncrements = programIncrements;
+      let seedRoot = root;
+      let seedMilestones = diagram.milestones ?? [];
+      let seedTeam = team;
+
+      if (activeSessionRef.current) {
+        const current = activeSessionRef.current;
+        seedTeam = current.teamStore.getSnapshot();
+        seedRequirements = current.requirementsStore.getSnapshot();
+        seedProgramIncrements = current.programIncrementsStore.getSnapshot();
+        seedMilestones = current.milestonesStore.getSnapshot();
+        const finalDiagramSnapshot = current.diagramStore.getSnapshot();
+        seedRoot = unflattenToSubDiagram(finalDiagramSnapshot.nodes, finalDiagramSnapshot.edges);
+
+        setTeam(() => seedTeam);
+        setRequirements(() => seedRequirements);
+        setProgramIncrements(() => seedProgramIncrements);
+        setMilestones(() => seedMilestones);
+        setRoot(() => seedRoot);
+
+        current.session.disconnect();
+      }
       const roomName = `session-${Math.random().toString(36).slice(2, 10)}`;
+      const sessionKey = explicitKey && explicitKey.trim() ? explicitKey.trim() : generateSessionKey();
       const doc = new Y.Doc();
-      seedYjsRequirementsDoc(doc, requirements);
-      seedYjsProgramIncrementsDoc(doc, programIncrements);
-      seedYjsDiagramDoc(doc, root);
-      seedYjsMilestonesDoc(doc, diagram.milestones ?? []);
+      seedYjsRequirementsDoc(doc, seedRequirements);
+      seedYjsProgramIncrementsDoc(doc, seedProgramIncrements);
+      seedYjsDiagramDoc(doc, seedRoot);
+      seedYjsMilestonesDoc(doc, seedMilestones);
       const teamStore = createYjsTeamStore(doc);
-      seedTeamStore(teamStore, team);
+      seedTeamStore(teamStore, seedTeam);
       const requirementsStoreForSession = createYjsRequirementsStore(doc);
       const programIncrementsStoreForSession = createYjsProgramIncrementsStore(doc);
       const diagramStoreForSession = createYjsDiagramStore(doc);
       const milestonesStoreForSession = createYjsMilestonesStore(doc);
-      const session = startCollabSession(doc, roomName, { signalingUrls, password: password || undefined, iceServers });
+      const session = startCollabSession(doc, roomName, { signalingUrls, password: sessionKey, iceServers });
       const initialPresence: LocalPresenceInfo = {
         name: displayName.trim() || "Guest",
         color: PRESENCE_COLORS[Math.floor(Math.random() * PRESENCE_COLORS.length)],
@@ -502,14 +549,33 @@ function App() {
         doc,
         session,
         roomName,
+        password: sessionKey,
         teamStore,
         requirementsStore: requirementsStoreForSession,
         programIncrementsStore: programIncrementsStoreForSession,
         diagramStore: diagramStoreForSession,
         milestonesStore: milestonesStoreForSession,
       });
+
+      // Auto-copy shareable session link to clipboard
+      const shareLink = createSessionLink({
+        roomName,
+        key: sessionKey,
+        signalingUrlsInput,
+        defaultSignalingUrls: buildTimeSignalingDefault,
+      });
+      if (typeof navigator !== "undefined" && typeof navigator.clipboard?.writeText === "function") {
+        navigator.clipboard
+          .writeText(shareLink)
+          .then(() => {
+            showToast("Session link copied to clipboard");
+          })
+          .catch(() => {
+            // Silently ignore clipboard write failures (e.g. non-HTTPS, unfocused window)
+          });
+      }
     },
-    [requirements, programIncrements, team, root, diagram.milestones, signalingUrls, iceServers, displayName]
+    [requirements, programIncrements, team, root, diagram.milestones, setTeam, setRequirements, setProgramIncrements, setMilestones, setRoot, signalingUrls, signalingUrlsInput, buildTimeSignalingDefault, iceServers, displayName, showToast]
   );
 
   // Joins an existing session by room name - starts from an EMPTY doc
@@ -517,14 +583,42 @@ function App() {
   // to receive whatever the session already has from other peers, not to
   // impose this browser's own local state onto it.
   const joinSession = useCallback(
-    (roomName: string, password: string) => {
+    (roomName: string, passwordOrKey?: string, relayOverride?: string) => {
+      if (activeSessionRef.current) {
+        const current = activeSessionRef.current;
+        setTeam(() => current.teamStore.getSnapshot());
+        setRequirements(() => current.requirementsStore.getSnapshot());
+        setProgramIncrements(() => current.programIncrementsStore.getSnapshot());
+        setMilestones(() => current.milestonesStore.getSnapshot());
+        const finalDiagramSnapshot = current.diagramStore.getSnapshot();
+        setRoot(() => unflattenToSubDiagram(finalDiagramSnapshot.nodes, finalDiagramSnapshot.edges));
+        current.session.disconnect();
+      }
+      let effectiveSignalingUrls = signalingUrls;
+      if (relayOverride && relayOverride.trim()) {
+        const trimmedRelay = relayOverride.trim();
+        setSignalingUrlsInput(trimmedRelay);
+        effectiveSignalingUrls = parseSignalingUrls(trimmedRelay);
+      }
+      const effectiveKey = passwordOrKey && passwordOrKey.trim() ? passwordOrKey.trim() : undefined;
+
+      if(effectiveKey === undefined) {
+        /*
+          Every session this app creates is encrypted with its own key.
+          Joining without one connects but can never decrypt a single
+          update, which reads as "the session is empty".
+         */
+        showToast("This session link has no key, so the session cannot be opened.", "error")
+        return
+      }
+
       const doc = new Y.Doc();
       const teamStore = createYjsTeamStore(doc);
       const requirementsStoreForSession = createYjsRequirementsStore(doc);
       const programIncrementsStoreForSession = createYjsProgramIncrementsStore(doc);
       const diagramStoreForSession = createYjsDiagramStore(doc);
       const milestonesStoreForSession = createYjsMilestonesStore(doc);
-      const session = startCollabSession(doc, roomName, { signalingUrls, password: password || undefined, iceServers });
+      const session = startCollabSession(doc, roomName, { signalingUrls: effectiveSignalingUrls, password: effectiveKey, iceServers });
       const initialPresence: LocalPresenceInfo = {
         name: displayName.trim() || "Guest",
         color: PRESENCE_COLORS[Math.floor(Math.random() * PRESENCE_COLORS.length)],
@@ -541,6 +635,7 @@ function App() {
         doc,
         session,
         roomName,
+        password: effectiveKey,
         teamStore,
         requirementsStore: requirementsStoreForSession,
         programIncrementsStore: programIncrementsStoreForSession,
@@ -548,8 +643,30 @@ function App() {
         milestonesStore: milestonesStoreForSession,
       });
     },
-    [signalingUrls, iceServers, displayName]
+    [setTeam, setRequirements, setProgramIncrements, setMilestones, setRoot, signalingUrls, setSignalingUrlsInput, iceServers, displayName, showToast]
   );
+
+  // Auto-join if a session link is present in the URL on initial mount or hash change
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleUrlSession = () => {
+      const currentHref = window.location.href;
+      const parsed = parseSessionLink(currentHref);
+      if (parsed.roomName && parsed.roomName !== currentHref) {
+        joinSession(parsed.roomName, parsed.password || parsed.key || "", parsed.relay);
+        showToast(`Joined session: ${parsed.roomName}`, "info");
+        sanitizeCurrentUrl();
+      }
+    };
+
+    handleUrlSession();
+
+    window.addEventListener("hashchange", handleUrlSession);
+    return () => {
+      window.removeEventListener("hashchange", handleUrlSession);
+    };
+  }, [joinSession, showToast]);
 
   // Leaving a session writes its final state back into the local,
   // undo-tracked snapshot before disconnecting - so whatever happened
@@ -657,6 +774,54 @@ function App() {
     broadcastPresence({ diagramPath: path.join("/") });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSession, path]);
+
+  // Expose test harness helper hooks onto window.__PERF__ when active
+  useEffect(() => {
+    if (typeof window !== "undefined" && (window as unknown as Record<string, unknown>).__PERF__) {
+      const perfObj = (window as unknown as Record<string, unknown>).__PERF__ as Record<string, unknown>;
+      perfObj.Y = Y;
+      (window as unknown as Record<string, unknown>).Y = Y;
+      perfObj.loadFixture = (name: FixtureName) => {
+        const fixture = getStandardFixture(name);
+        setRoot(fixture);
+        return fixture;
+      };
+      perfObj.setDiagram = (diagram: SubDiagram) => {
+        setRoot(diagram);
+      };
+      perfObj.setPath = (newPath: string[]) => {
+        setPath(newPath);
+      };
+      perfObj.setSelectedNodes = (nodeIds: string[]) => {
+        setSelectedNodeIds(nodeIds);
+      };
+      perfObj.setSelectedEdges = (edgeIds: string[]) => {
+        setSelectedEdgeIds(edgeIds);
+      };
+      perfObj.startCollabSessionWithDoc = (doc: Y.Doc) => {
+        const roomName = `perf-room-${Math.random().toString(36).slice(2, 8)}`;
+        const teamStore = createYjsTeamStore(doc);
+        const requirementsStoreForSession = createYjsRequirementsStore(doc);
+        const programIncrementsStoreForSession = createYjsProgramIncrementsStore(doc);
+        const diagramStoreForSession = createYjsDiagramStore(doc);
+        const milestonesStoreForSession = createYjsMilestonesStore(doc);
+        const session = startCollabSession(doc, roomName, { signalingUrls, iceServers });
+        setActiveSession({
+          doc,
+          session,
+          roomName,
+          teamStore,
+          requirementsStore: requirementsStoreForSession,
+          programIncrementsStore: programIncrementsStoreForSession,
+          diagramStore: diagramStoreForSession,
+          milestonesStore: milestonesStoreForSession,
+        });
+      };
+      perfObj.leaveCollabSession = () => {
+        leaveSession();
+      };
+    }
+  }, [setRoot, setPath, signalingUrls, iceServers, leaveSession]);
 
   const breadcrumbLabels = useMemo(() => getBreadcrumbLabels(liveRoot, path), [liveRoot, path]);
 
@@ -1168,11 +1333,52 @@ function App() {
   );
 
   const onUpdateEdge = useCallback(
-    (id: string, patch: Partial<ArchEdgeData>) => {
+    (id: string, patch: ArchEdgeDataPatch) => {
       diagramStoreRef.current.updateEdge(id, patch);
     },
     []
   );
+
+  /**
+   * Edge manipulation - moving an edge's ends onto different nodes, and
+   * bending its route with waypoints.
+   *
+   * All five go through diagramStoreRef rather than `diagramStore`
+   * directly, for the same reason onUpdateNode/onUpdateEdge already do:
+   * they're called from event handlers (some of them on every frame of a
+   * drag), and the ref is what decides whether the write lands in local
+   * state or the session's shared document without every one of these
+   * needing to be rebuilt when a session starts or ends.
+   *
+   * Each one is a distinct named store operation rather than a patch of
+   * the edge's data. Endpoints can't be expressed as a data patch at all
+   * - they're top-level React Flow Edge fields - and waypoints must not
+   * be, because replacing the whole list is exactly what stops
+   * concurrent edits to it from merging. See DiagramStore for the full
+   * reasoning.
+   */
+  const onReconnectEdge = useCallback((edgeId: string, endpoints: EdgeEndpoints) => {
+    diagramStoreRef.current.reconnectEdge(edgeId, endpoints);
+  }, []);
+
+  const onAddEdgeWaypoint = useCallback((edgeId: string, index: number, waypoint: EdgeWaypoint) => {
+    diagramStoreRef.current.addEdgeWaypoint(edgeId, index, waypoint);
+  }, []);
+
+  const onMoveEdgeWaypoint = useCallback(
+    (edgeId: string, waypointId: string, position: { x: number; y: number }) => {
+      diagramStoreRef.current.moveEdgeWaypoint(edgeId, waypointId, position);
+    },
+    []
+  );
+
+  const onRemoveEdgeWaypoint = useCallback((edgeId: string, waypointId: string) => {
+    diagramStoreRef.current.removeEdgeWaypoint(edgeId, waypointId);
+  }, []);
+
+  const onClearEdgeWaypoints = useCallback((edgeId: string) => {
+    diagramStoreRef.current.clearEdgeWaypoints(edgeId);
+  }, []);
 
   // Deleting a node also drops any edges attached to it. Deleting a group
   // releases the nodes inside it (converted back to absolute position)
@@ -1820,6 +2026,60 @@ function App() {
   const selectedNode = nodes.find((n) => n.id === selectedNodeId) ?? null;
   const selectedEdge = edges.find((e) => e.id === selectedEdgeId) ?? null;
   const canAddStep = selectedNodeIds.length > 0 || selectedEdgeIds.length > 0;
+  const onCanvasProfilerRender: ProfilerOnRenderCallback = useCallback(
+    (_id, _phase, actualDuration) => {
+      recordCommit(actualDuration);
+    },
+    []
+  );
+
+  const canvasElement = (
+    <Canvas
+      nodes={nodes}
+      edges={edges}
+      onNodesChange={onNodesChange}
+      onEdgesChange={onEdgesChange}
+      peers={
+        !activeSession
+          ? []
+          : presencePeers.map((p) => {
+              const onSamePath = p.diagramPath === path.join("/");
+              const shouldShowCursor = showPeerCursors && onSamePath;
+              return p.cursor === null || shouldShowCursor ? p : { ...p, cursor: null };
+            })
+      }
+      onCursorMove={onCursorMove}
+      onConnect={onConnect}
+      onAddNode={onAddNode}
+      onAddGroup={onAddGroup}
+      onAddText={onAddText}
+      onAddShape={onAddShape}
+      onAddCode={onAddCode}
+      onUpdateNode={onUpdateNode}
+      onUpdateEdge={onUpdateEdge}
+      onReconnectEdge={onReconnectEdge}
+      onAddEdgeWaypoint={onAddEdgeWaypoint}
+      onMoveEdgeWaypoint={onMoveEdgeWaypoint}
+      onRemoveEdgeWaypoint={onRemoveEdgeWaypoint}
+      onReparentNode={onReparentNode}
+      onAdoptIntoGroup={onAdoptIntoGroup}
+      onZOrderCommand={onZOrderCommand}
+      presentation={presentation}
+      previewFocus={previewFocus}
+      focusNodeId={pendingNodeFocus}
+      onFocusHandled={onFocusNodeHandled}
+      onPresentNext={onPresentNext}
+      onPresentPrev={onPresentPrev}
+      onExitPresenting={onExitPresenting}
+      breadcrumbLabels={breadcrumbLabels}
+      onDrillInto={onDrillInto}
+      onNavigateToRoot={onNavigateToRoot}
+      onNavigateToPathIndex={onNavigateToPathIndex}
+      isSelectMode={isSelectMode}
+      onToggleSelectMode={() => setIsSelectMode((v) => !v)}
+    />
+  );
+
   return (
     <div className="app">
       {appVersion && (
@@ -1857,7 +2117,17 @@ function App() {
               iceServersInput={iceServersInput}
               onIceServersInputChange={setIceServersInput}
               buildTimeIceServersDefault={buildTimeIceServersDefault}
-              activeSession={activeSession ? { roomName: activeSession.roomName, isSynced: () => activeSession.session.isSynced(), relayConnected, peers: presencePeers } : null}
+              activeSession={
+                activeSession
+                  ? {
+                      roomName: activeSession.roomName,
+                      password: activeSession.password,
+                      isSynced: () => activeSession.session.isSynced(),
+                      relayConnected,
+                      peers: presencePeers,
+                    }
+                  : null
+              }
               displayName={displayName}
               onDisplayNameChange={onDisplayNameChange}
               showPeerCursors={showPeerCursors}
@@ -1865,6 +2135,7 @@ function App() {
               onStartSession={startNewSession}
               onJoinSession={joinSession}
               onLeaveSession={leaveSession}
+              onCopyLink={() => showToast("Session link copied to clipboard")}
             />
           }
         />
@@ -1895,46 +2166,13 @@ function App() {
         )}
         <div className="app__canvas-column">
           <ReactFlowProvider>
-            <Canvas
-              nodes={nodes}
-              edges={edges}
-              onNodesChange={onNodesChange}
-              onEdgesChange={onEdgesChange}
-              peers={
-                !activeSession
-                  ? []
-                  : presencePeers.map((p) => {
-                      const onSamePath = p.diagramPath === path.join("/");
-                      const shouldShowCursor = showPeerCursors && onSamePath;
-                      return p.cursor === null || shouldShowCursor ? p : { ...p, cursor: null };
-                    })
-              }
-              onCursorMove={onCursorMove}
-              onConnect={onConnect}
-              onAddNode={onAddNode}
-              onAddGroup={onAddGroup}
-              onAddText={onAddText}
-              onAddShape={onAddShape}
-              onAddCode={onAddCode}
-              onUpdateNode={onUpdateNode}
-              onUpdateEdge={onUpdateEdge}
-              onReparentNode={onReparentNode}
-              onAdoptIntoGroup={onAdoptIntoGroup}
-              onZOrderCommand={onZOrderCommand}
-              presentation={presentation}
-              previewFocus={previewFocus}
-              focusNodeId={pendingNodeFocus}
-              onFocusHandled={onFocusNodeHandled}
-              onPresentNext={onPresentNext}
-              onPresentPrev={onPresentPrev}
-              onExitPresenting={onExitPresenting}
-              breadcrumbLabels={breadcrumbLabels}
-              onDrillInto={onDrillInto}
-              onNavigateToRoot={onNavigateToRoot}
-              onNavigateToPathIndex={onNavigateToPathIndex}
-              isSelectMode={isSelectMode}
-              onToggleSelectMode={() => setIsSelectMode((v) => !v)}
-            />
+            {isPerfInstrumentationActive() ? (
+              <Profiler id="CanvasProfiler" onRender={onCanvasProfilerRender}>
+                {canvasElement}
+              </Profiler>
+            ) : (
+              canvasElement
+            )}
           </ReactFlowProvider>
         </div>
         {!isPresenting && (
@@ -1985,6 +2223,8 @@ function App() {
                     selectedEdge={selectedEdge}
                     onUpdateNode={onUpdateNode}
                     onUpdateEdge={onUpdateEdge}
+                    onClearEdgeWaypoints={onClearEdgeWaypoints}
+                    onRemoveEdgeWaypoint={onRemoveEdgeWaypoint}
                     onDeleteNode={onDeleteNode}
                     onDeleteEdge={onDeleteEdge}
                     onDrillInto={onDrillInto}
@@ -2050,6 +2290,15 @@ function App() {
         isOpen={isLibraryModalOpen}
         onClose={() => setIsLibraryModalOpen(false)}
       />
+      {toast && (
+        <Toast
+          key={toast.id}
+          message={toast.message}
+          description={toast.description}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 }

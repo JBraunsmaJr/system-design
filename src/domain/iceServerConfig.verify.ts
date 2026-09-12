@@ -1,7 +1,7 @@
 /**
  * Run with: npx tsx --tsconfig tsconfig.app.json src/domain/iceServerConfig.verify.ts
  */
-import { parseIceServers, NO_ICE_SERVERS } from "./iceServerConfig";
+import { parseIceServers, NO_ICE_SERVERS, getDefaultIceServers } from "./iceServerConfig";
 
 let failures = 0;
 function assert(condition: boolean, message: string) {
@@ -95,6 +95,21 @@ function assert(condition: boolean, message: string) {
   const result = parseIceServers("turns:turn.internal:5349?transport=tcp|user|pass");
   assert(result?.[0].urls === "turns:turn.internal:5349?transport=tcp", "a URL with query parameters survives intact alongside credentials");
   assert(result?.[0].username === "user", "and the credentials still split correctly");
+}
+
+// === Part 10: getDefaultIceServers ===
+{
+  (globalThis as unknown as { window?: { __APP_CONFIG__?: { ICE_SERVERS?: string } } }).window = undefined;
+  assert(getDefaultIceServers() === "", "unconfigured window returns empty string default");
+
+  (globalThis as unknown as { window: { __APP_CONFIG__?: { ICE_SERVERS?: string } } }).window = {
+    __APP_CONFIG__: {
+      ICE_SERVERS: "stun:stun.runtime.internal:3478",
+    },
+  };
+  assert(getDefaultIceServers() === "stun:stun.runtime.internal:3478", "returns runtime config when set");
+
+  (globalThis as unknown as { window?: { __APP_CONFIG__?: { ICE_SERVERS?: string } } }).window = undefined;
 }
 
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);

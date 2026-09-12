@@ -42,6 +42,19 @@ VITE_SIGNALING_URL="wss://relay.example.com" npm run build
 properly, TLS and reverse proxy configuration, access control, running in
 restricted or air-gapped networks, and troubleshooting.
 
+## Running with Docker
+
+Pre-built Docker images are published to GitHub Container Registry:
+
+```bash
+docker run -d -p 8080:80 \
+  -e RELAY="wss://relay.example.com" \
+  -e APP_URL="https://design.example.com" \
+  ghcr.io/jbraunsmajr/system-design:latest
+```
+
+See **[docs/container-configuration.md](docs/container-configuration.md)** for full container documentation, including environment variable reference, Docker Compose examples, and reverse proxy guidelines.
+
 ## Stack
 
 - React + TypeScript, built with Vite

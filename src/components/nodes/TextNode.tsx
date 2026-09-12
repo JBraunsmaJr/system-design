@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { NodeResizer, type NodeProps, type Node } from "@xyflow/react";
 import type { ArchNodeData } from "../../domain/types";
 import { useCanvasContext } from "../CanvasContext";
+import { recordNodeRender } from "../../perf/instrumentation";
 
 type TextNodeType = Node<ArchNodeData, "text">;
 
@@ -25,6 +26,7 @@ export function TextNode({
   onFinishEditing: propOnFinishEditing,
   onChangeText: propOnChangeText,
 }: TextNodeProps) {
+  recordNodeRender();
   const canvasContext = useCanvasContext();
   const isEditing = propIsEditing ?? (canvasContext?.editingLabelNodeId === id);
   const onStartEditing = propOnStartEditing ?? (canvasContext?.isPresenting ? undefined : canvasContext?.setEditingLabelNodeId);

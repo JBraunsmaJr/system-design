@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Users, Copy, Check, LogOut, X, Wifi, WifiOff, Settings, ChevronRight, ChevronDown, ExternalLink } from "lucide-react";
+import { Users, Copy, Check, LogOut, X, Wifi, WifiOff, Settings, ChevronRight, ChevronDown, ExternalLink, Clipboard } from "lucide-react";
 import { computeFlippedPosition } from "../domain/popoverPosition";
+import { createSessionLink, parseSessionLink } from "../domain/sessionLink";
 import type { PresenceInfo } from "../collab/session";
 
 const DROPDOWN_WIDTH = 300;
 
 export interface ActiveSessionInfo {
   roomName: string;
+  password?: string;
   isSynced: () => boolean;
   /** Whether a signaling relay is currently reachable. Null before the
    * first status arrives. Distinct from isSynced() - see session.ts's
@@ -56,10 +58,9 @@ interface CollabPanelProps {
    * where it's stored. */
   displayName: string;
   onDisplayNameChange: (name: string) => void;
-  /** Password is "" when the field was left blank, meaning an
-   * unencrypted room. */
-  onStartSession: (password: string) => void;
-  onJoinSession: (roomName: string, password: string) => void;
+  /** Starts a new collaborative session with an automatically generated encryption key. */
+  onStartSession: (key?: string) => void;
+  onJoinSession: (roomName: string, passwordOrKey?: string, relayOverride?: string) => void;
   onLeaveSession: () => void;
   /** Whether to render OTHER peers' live cursors - a purely local,
    * display-side preference (see presenceIdentity.ts's own doc comment
@@ -67,6 +68,8 @@ interface CollabPanelProps {
    * cursor, which keeps broadcasting to everyone else regardless. */
   showPeerCursors: boolean;
   onShowPeerCursorsChange: (show: boolean) => void;
+  /** Optional callback invoked when the session link is copied to clipboard. */
+  onCopyLink?: (link: string) => void;
 }
 
 /**
@@ -96,10 +99,10 @@ export function CollabPanel({
   onLeaveSession,
   showPeerCursors,
   onShowPeerCursorsChange,
+  onCopyLink,
 }: CollabPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [joinRoomName, setJoinRoomName] = useState("");
-  const [password, setPassword] = useState("");
   // Starts open only when there's nothing configured yet, since the
   // panel can't do anything useful in that state and the fix is in
   // here. Otherwise collapsed: these are set once and rarely revisited.
@@ -186,21 +189,85 @@ export function CollabPanel({
 
   const handleCopy = () => {
     if (!activeSession) return;
-    navigator.clipboard.writeText(activeSession.roomName).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+    const link = createSessionLink({
+      roomName: activeSession.roomName,
+      key: activeSession.password,
+      signalingUrlsInput,
+      defaultSignalingUrls: buildTimeSignalingDefault,
     });
+
+    const fallbackCopy = (text: string) => {
+      try {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed";
+        textArea.style.opacity = "0";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        const successful = document.execCommand("copy");
+        document.body.removeChild(textArea);
+        if (successful) {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+          onCopyLink?.(text);
+        }
+      } catch {
+        // Copy failed
+      }
+    };
+
+    if (typeof navigator !== "undefined" && typeof navigator.clipboard?.writeText === "function") {
+      navigator.clipboard
+        .writeText(link)
+        .then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+          onCopyLink?.(link);
+        })
+        .catch(() => {
+          fallbackCopy(link);
+        });
+    } else {
+      fallbackCopy(link);
+    }
+  };
+
+  const handlePasteFromClipboard = async () => {
+    try {
+      if (typeof navigator !== "undefined" && typeof navigator.clipboard?.readText === "function") {
+        const text = await navigator.clipboard.readText();
+        if (text && text.trim()) {
+          setJoinRoomName(text.trim());
+        }
+      }
+    } catch {
+      // Silently ignore clipboard read failures (e.g. permission denied)
+    }
+  };
+
+  const handleStartSession = () => {
+    onStartSession();
+    close();
   };
 
   const handleJoin = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = joinRoomName.trim();
     if (!trimmed) return;
-    onJoinSession(trimmed, password);
+    const parsed = parseSessionLink(trimmed);
+    if (!parsed.roomName) return;
+    const effectiveKey = parsed.key || parsed.password;
+    if (!parsed.relay && !signalingConfigured) {
+      setShowSettings(true);
+      return;
+    }
+    onJoinSession(parsed.roomName, effectiveKey, parsed.relay);
     setJoinRoomName("");
-    setPassword("");
     close();
   };
+
+  const parsedJoin = parseSessionLink(joinRoomName);
 
   return (
     <div className="collab-panel">
@@ -232,13 +299,7 @@ export function CollabPanel({
               </button>
             </div>
 
-            {!signalingConfigured && (
-              <p className="collab-panel__notice">
-                No relay server configured. Open Settings below to add one.
-              </p>
-            )}
-
-            {signalingConfigured && !activeSession && (
+            {!activeSession && (
               <>
                 <label className="collab-panel__field-label" htmlFor="collab-panel-display-name">
                   Your name
@@ -252,47 +313,67 @@ export function CollabPanel({
                   className="collab-panel__name-input"
                 />
 
-                <label className="collab-panel__field-label" htmlFor="collab-panel-room-password">
-                  Room password <span className="collab-panel__label-optional">(optional)</span>
-                </label>
-                <input
-                  id="collab-panel-room-password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Leave blank for an open room"
-                  className="collab-panel__name-input"
-                  autoComplete="off"
-                />
-                <p className="collab-panel__hint">
-                  Encrypts the room so the relay can't read it. Everyone must enter the same
-                  password, and it can't be changed once the session is running.
-                </p>
+                {signalingConfigured ? (
+                  <button
+                    type="button"
+                    className="collab-panel__primary-action"
+                    onClick={handleStartSession}
+                  >
+                    Start a new session
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="collab-panel__primary-action is-disabled"
+                    onClick={() => setShowSettings(true)}
+                  >
+                    Configure relay in Settings to start
+                  </button>
+                )}
 
-                <button
-                  type="button"
-                  className="collab-panel__primary-action"
-                  onClick={() => {
-                    onStartSession(password);
-                    setPassword("");
-                    close();
-                  }}
-                >
-                  Start a new session
-                </button>
                 <div className="collab-panel__divider">or join an existing one</div>
                 <form className="collab-panel__join-form" onSubmit={handleJoin}>
-                  <input
-                    type="text"
-                    value={joinRoomName}
-                    onChange={(e) => setJoinRoomName(e.target.value)}
-                    placeholder="Paste a session code"
-                    className="collab-panel__join-input"
-                  />
+                  <div className="collab-panel__join-input-wrap">
+                    <input
+                      type="text"
+                      value={joinRoomName}
+                      onChange={(e) => setJoinRoomName(e.target.value)}
+                      placeholder="Paste a session link or code"
+                      className="collab-panel__join-input"
+                    />
+                    {typeof navigator !== "undefined" && typeof navigator.clipboard?.readText === "function" && (
+                      <button
+                        type="button"
+                        className="collab-panel__paste-button"
+                        onClick={handlePasteFromClipboard}
+                        title="Paste from clipboard"
+                      >
+                        <Clipboard size={13} />
+                      </button>
+                    )}
+                  </div>
                   <button type="submit" className="collab-panel__join-button" disabled={!joinRoomName.trim()}>
                     Join
                   </button>
                 </form>
+
+                {joinRoomName.trim() && parsedJoin.roomName && (parsedJoin.key || parsedJoin.password || parsedJoin.relay || parsedJoin.roomName !== joinRoomName.trim()) && (
+                  <div className="collab-panel__extracted-info">
+                    <span className="collab-panel__extracted-pill">
+                      Session: <strong>{parsedJoin.roomName}</strong>
+                    </span>
+                    {(parsedJoin.key || parsedJoin.password) && (
+                      <span className="collab-panel__extracted-pill">
+                        Encrypted: <strong>included</strong>
+                      </span>
+                    )}
+                    {parsedJoin.relay && (
+                      <span className="collab-panel__extracted-pill">
+                        Relay: <strong>{parsedJoin.relay}</strong>
+                      </span>
+                    )}
+                  </div>
+                )}
               </>
             )}
 
@@ -308,10 +389,15 @@ export function CollabPanel({
                         : "Relay unreachable - check the URL in Settings, and that the server is running and reachable from this network"}
                   </span>
                 </div>
-                <p className="collab-panel__hint">Share this code with anyone you want to collaborate with:</p>
+                <p className="collab-panel__hint">Share this link with anyone you want to collaborate with:</p>
                 <div className="collab-panel__room-code">
                   <code>{activeSession.roomName}</code>
-                  <button type="button" className="collab-panel__copy-button" onClick={handleCopy} title="Copy session code">
+                  <button
+                    type="button"
+                    className="collab-panel__copy-button"
+                    onClick={handleCopy}
+                    title={copied ? "Link copied!" : "Copy session link"}
+                  >
                     {copied ? <Check size={13} /> : <Copy size={13} />}
                   </button>
                 </div>

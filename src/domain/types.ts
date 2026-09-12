@@ -107,6 +107,27 @@ export interface ArchNodeData extends Record<string, unknown> {
 }
 
 /**
+ * A user-placed bend in an edge's route - draw.io's "waypoint".
+ *
+ * Coordinates are absolute flow coordinates, the same space React Flow
+ * hands a custom edge component its own sourceX/sourceY in, so they need
+ * no conversion at render time. The trade-off is that a waypoint doesn't
+ * follow a boundary that gets moved - it's pinned to the canvas, not to
+ * either endpoint - which matches how draw.io behaves and is why the
+ * Inspector offers a one-click way to clear them again.
+ *
+ * `id` is not display data and is never shown. It exists so waypoints
+ * can be moved and removed BY IDENTITY rather than by array index, which
+ * is what makes concurrent edits to the same edge merge sensibly - see
+ * DiagramStore.moveEdgeWaypoint for the full reasoning.
+ */
+export interface EdgeWaypoint {
+  id: string;
+  x: number;
+  y: number;
+}
+
+/**
  * Per-instance data stored on a React Flow edge.
  * `edgeType` points back into the EDGE_TYPES registry. `direction` lets an
  * edge's animated flow (Presentation Mode only) run against its drawn
@@ -141,6 +162,22 @@ export interface ArchEdgeData extends Record<string, unknown> {
   labelOffsetX?: number;
   labelOffsetY?: number;
   /**
+   * Bends the person has dragged into this edge's route, in order from
+   * source to target. Undefined or empty both mean "route this edge
+   * automatically", which is the only behaviour that existed before
+   * waypoints did - so every diagram saved without them keeps rendering
+   * exactly as it always has.
+   *
+   * Deliberately NOT written through updateEdge the way every other
+   * field here is. updateEdge replaces a field wholesale, and replacing
+   * this array wholesale is precisely what breaks collaborative editing
+   * of it; there are dedicated store operations instead
+   * (addEdgeWaypoint/moveEdgeWaypoint/removeEdgeWaypoint/
+   * clearEdgeWaypoints) for the same reason node position has
+   * updatePosition rather than going through updateNode.
+   */
+  waypoints?: EdgeWaypoint[];
+  /**
    * Transient, display-only - true when the Scenario panel's currently
    * active step includes this edge, so TypedEdge can draw a highlight.
    * Unlike the fields above, this is never something the user sets or that
@@ -153,6 +190,31 @@ export interface ArchEdgeData extends Record<string, unknown> {
    */
   isStepMember?: boolean;
   properties: Record<string, string>;
+}
+
+/**
+ * What updateEdge (and every onUpdateEdge callback above it) is allowed
+ * to change: any edge field EXCEPT waypoints.
+ *
+ * Excluding waypoints at the type level rather than filtering them out
+ * at runtime is deliberate. updateEdge replaces a field wholesale, which
+ * would flatten the bends back into a plain array and undo the entire
+ * reason they're stored as a nested shared type in the collaborative
+ * case. Making that a compile error means it can't be reintroduced later
+ * by someone reasonably assuming waypoints work like every other field
+ * here.
+ */
+export interface ArchEdgeDataPatch {
+  edgeType?: string;
+  label?: string;
+  direction?: "forward" | "reverse" | "both";
+  hideLabel?: boolean;
+  color?: string;
+  labelAnchorT?: number;
+  labelOffsetX?: number;
+  labelOffsetY?: number;
+  isStepMember?: boolean;
+  properties?: Record<string, string>;
 }
 
 /**

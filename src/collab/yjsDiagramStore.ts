@@ -1,8 +1,9 @@
 import * as Y from "yjs";
 import type { Node, Edge } from "@xyflow/react";
-import type { ArchNodeData, ArchEdgeData, SubDiagram } from "../domain/types";
+import type { ArchNodeData, ArchEdgeData, EdgeWaypoint, SubDiagram } from "../domain/types";
 import type { DiagramStore } from "./diagramStore";
 import { flattenSubDiagramTree } from "./diagramStore";
+import { recordSnapshotBuild, recordStoreWrite } from "../perf/instrumentation";
 
 /** Node and edge ids are purely internal (never displayed - React Flow
  * uses them as keys and connection endpoints, nothing more), so - same
@@ -29,6 +30,12 @@ const NODE_DATA_FIELDS = [
   "zIndex",
 ] as const;
 
+/**
+ * Deliberately does NOT include `waypoints`. Every field listed here is
+ * stored as a plain value and replaced wholesale on each edit, which is
+ * exactly the wrong thing for a list several people can be editing
+ * different parts of at once - see WAYPOINTS_KEY below.
+ */
 const EDGE_DATA_FIELDS = [
   "edgeType",
   "label",
@@ -40,6 +47,89 @@ const EDGE_DATA_FIELDS = [
   "labelOffsetY",
   "properties",
 ] as const;
+
+/**
+ * An edge's bends live under this key as a `Y.Array<Y.Map>` - a real
+ * nested shared type, not a plain array value.
+ *
+ * This is the one place in the diagram schema where that distinction
+ * earns its keep, so it's worth being explicit about what each layer
+ * buys:
+ *
+ *  - Y.ARRAY rather than a plain array, because insertion position is
+ *    meaningful. Two people adding a bend to the same edge at the same
+ *    time is an ordinary thing to do; with a plain array, whoever's
+ *    write lands second replaces the whole list and the other bend
+ *    simply vanishes. Y.Array merges both inserts and keeps them in a
+ *    consistent order on every peer.
+ *
+ *  - Y.MAP per waypoint rather than a plain {x, y} object, because a
+ *    drag is a continuous stream of writes to ONE bend. Nested maps mean
+ *    those writes touch only that bend's own x/y - so two people
+ *    dragging two different bends on the same edge simultaneously both
+ *    keep their changes, instead of each frame of one drag reverting the
+ *    other. Two people dragging the SAME bend still resolves
+ *    last-writer-wins, which is the only sensible answer and matches
+ *    what already happens for node position.
+ *
+ *  - A stable `id` INSIDE each map, because it gives each bend an
+ *    identity that survives its neighbours being inserted or removed.
+ *    That's what lets moveEdgeWaypoint/removeEdgeWaypoint address a bend
+ *    without using an index that a concurrent edit may already have
+ *    shifted out from under them.
+ *
+ * This follows the same rule the rest of this file already applies -
+ * nest when field-level patch operations exist, stay a plain value when
+ * the whole thing is replaced at once (properties, parentPath). Bends
+ * have four dedicated patch operations, so they nest.
+ */
+const WAYPOINTS_KEY = "waypoints";
+
+function makeWaypointMap(waypoint: EdgeWaypoint): Y.Map<unknown> {
+  const m = new Y.Map<unknown>();
+  m.set("id", waypoint.id);
+  m.set("x", waypoint.x);
+  m.set("y", waypoint.y);
+  return m;
+}
+
+function readWaypointArray(edgeMap: Y.Map<unknown>): Y.Array<Y.Map<unknown>> | undefined {
+  const value = edgeMap.get(WAYPOINTS_KEY);
+  return value instanceof Y.Array ? (value as Y.Array<Y.Map<unknown>>) : undefined;
+}
+
+/** Must be called inside a transaction: the array is set on the edge map
+ * and then read back, so that what's returned is the INTEGRATED shared
+ * type rather than the detached one that was just handed over.
+ *
+ * This is a FALLBACK, not the normal path. Creating the container lazily
+ * is itself a last-writer-wins write to the edge map's `waypoints` key,
+ * so two peers adding the very first bend to the same edge at the same
+ * moment would each create their own array, and whichever lost the key
+ * would take its owner's bend down with it - the exact failure the
+ * nested schema exists to prevent, reintroduced one level up. Every edge
+ * this code creates therefore gets its (empty) array up front at
+ * creation and seeding time instead, so there is nothing left to race
+ * over. What remains here covers an edge that somehow arrived without
+ * one. */
+function ensureWaypointArray(edgeMap: Y.Map<unknown>): Y.Array<Y.Map<unknown>> {
+  const existing = readWaypointArray(edgeMap);
+  if (existing) return existing;
+  edgeMap.set(WAYPOINTS_KEY, new Y.Array<Y.Map<unknown>>());
+  return readWaypointArray(edgeMap)!;
+}
+
+/** The current index of the bend with this id, or -1. Re-resolved on
+ * every single operation rather than cached anywhere, which is the whole
+ * point: an index is only valid for as long as nobody else has inserted
+ * or removed a bend earlier in the same edge. */
+function waypointIndexById(array: Y.Array<Y.Map<unknown>>, waypointId: string): number {
+  const items = array.toArray();
+  for (let i = 0; i < items.length; i++) {
+    if (items[i]?.get("id") === waypointId) return i;
+  }
+  return -1;
+}
 
 /**
  * Populates a Y.Doc directly from an existing, already-populated
@@ -96,6 +186,16 @@ export function seedYjsDiagramDoc(doc: Y.Doc, root: SubDiagram): void {
       for (const field of EDGE_DATA_FIELDS) {
         m.set(field, (edge.data as Record<string, unknown>)[field]);
       }
+      // Bends carried in from local state have to be rebuilt as real
+      // nested shared types, not set as the plain array they arrive as -
+      // otherwise an edge that was bent before the session started would
+      // be the one edge in the document that doesn't merge properly.
+      // The array is created for EVERY edge, empty or not, so that no
+      // two peers ever race to create it later (see ensureWaypointArray).
+      const array = new Y.Array<Y.Map<unknown>>();
+      const waypoints = (edge.data as ArchEdgeData | undefined)?.waypoints;
+      if (waypoints && waypoints.length > 0) array.push(waypoints.map(makeWaypointMap));
+      m.set(WAYPOINTS_KEY, array);
       edgesMap.set(edge.id, m);
       edgeOrder.push([edge.id]);
     }
@@ -165,6 +265,22 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
       const value = m.get(field);
       if (value !== undefined) data[field] = value;
     }
+    // Only surfaced when there's actually something in it. An edge whose
+    // bends were all cleared keeps an empty Y.Array (see
+    // clearEdgeWaypoints on why it isn't deleted outright), and that has
+    // to be indistinguishable from an edge that was never bent - both in
+    // what gets saved to a file and in diagramStore.verify.ts's check
+    // that the local and Yjs stores emit the same set of data keys.
+    const waypointArray = readWaypointArray(m);
+    if (waypointArray && waypointArray.length > 0) {
+      data.waypoints = waypointArray.toArray().map(
+        (w): EdgeWaypoint => ({
+          id: w.get("id") as string,
+          x: w.get("x") as number,
+          y: w.get("y") as number,
+        })
+      );
+    }
     const edge: Edge<ArchEdgeData> = {
       id,
       source: m.get("source") as string,
@@ -180,6 +296,7 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
   }
 
   function buildSnapshot(): { nodes: Node<ArchNodeData>[]; edges: Edge<ArchEdgeData>[] } {
+    recordSnapshotBuild();
     return {
       nodes: nodeOrder
         .toArray()
@@ -224,6 +341,7 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
     },
 
     addNode: (parentPath, type, position, data) => {
+      recordStoreWrite();
       const id = collisionResistantId("node");
       doc.transact(() => {
         const m = new Y.Map<unknown>();
@@ -240,6 +358,7 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
     },
 
     updateNode: (id, patch) => {
+      recordStoreWrite();
       const m = nodesMap.get(id);
       if (!m) return;
       doc.transact(() => {
@@ -250,11 +369,13 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
     },
 
     updatePosition: (id, position) => {
+      recordStoreWrite();
       const m = nodesMap.get(id);
       if (m) m.set("position", position);
     },
 
     updateParentId: (id, parentId, position) => {
+      recordStoreWrite();
       const m = nodesMap.get(id);
       if (!m) return;
       doc.transact(() => {
@@ -264,6 +385,7 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
     },
 
     updateDimensions: (id, width, height) => {
+      recordStoreWrite();
       const m = nodesMap.get(id);
       if (!m) return;
       doc.transact(() => {
@@ -273,6 +395,7 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
     },
 
     deleteNode: (id) => {
+      recordStoreWrite();
       const targetM = nodesMap.get(id);
       if (!targetM) return;
       const targetParentPath = (targetM.get("parentPath") as string[]) ?? [];
@@ -305,6 +428,7 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
     },
 
     addEdge: (parentPath, source, target, data, sourceHandle, targetHandle) => {
+      recordStoreWrite();
       const id = collisionResistantId("edge");
       doc.transact(() => {
         const m = new Y.Map<unknown>();
@@ -317,6 +441,13 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
         for (const field of EDGE_DATA_FIELDS) {
           m.set(field, (data as Record<string, unknown>)[field]);
         }
+        // Empty, but present from the start - so that two peers bending
+        // this edge for the first time at the same moment insert into
+        // one shared array rather than each creating their own and one
+        // of them losing the key (see ensureWaypointArray). An empty
+        // array reads back as no waypoints at all, so nothing
+        // downstream can tell it's there.
+        m.set(WAYPOINTS_KEY, new Y.Array<Y.Map<unknown>>());
         edgesMap.set(id, m);
         edgeOrder.push([id]);
       });
@@ -324,21 +455,100 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
     },
 
     updateEdge: (id, patch) => {
+      recordStoreWrite();
       const m = edgesMap.get(id);
       if (!m) return;
       doc.transact(() => {
         for (const [key, value] of Object.entries(patch)) {
+          if (key === WAYPOINTS_KEY) continue;
           m.set(key, value);
         }
       });
     },
 
     deleteEdge: (id) => {
+      recordStoreWrite();
       doc.transact(() => {
         edgesMap.delete(id);
         const idx = edgeOrder.toArray().indexOf(id);
         if (idx !== -1) edgeOrder.delete(idx, 1);
       });
+    },
+
+    reconnectEdge: (id, endpoints) => {
+      recordStoreWrite();
+      const m = edgesMap.get(id);
+      if (!m) return;
+      // One transaction, so no peer can ever observe the new target
+      // paired with the old source. Concurrent reconnections of the SAME
+      // edge by two people resolve last-writer-wins, same as any other
+      // field - and because all four keys are written together by both
+      // peers, Yjs's per-key resolution lands them on the same winner
+      // rather than splicing one person's source onto the other's
+      // target.
+      doc.transact(() => {
+        m.set("source", endpoints.source);
+        m.set("target", endpoints.target);
+        m.set("sourceHandle", endpoints.sourceHandle ?? null);
+        m.set("targetHandle", endpoints.targetHandle ?? null);
+      });
+    },
+
+    addEdgeWaypoint: (edgeId, index, waypoint) => {
+      recordStoreWrite();
+      const m = edgesMap.get(edgeId);
+      if (!m) return;
+      doc.transact(() => {
+        const array = ensureWaypointArray(m);
+        const clamped = Math.max(0, Math.min(index, array.length));
+        array.insert(clamped, [makeWaypointMap(waypoint)]);
+      });
+    },
+
+    moveEdgeWaypoint: (edgeId, waypointId, position) => {
+      recordStoreWrite();
+      const m = edgesMap.get(edgeId);
+      if (!m) return;
+      const array = readWaypointArray(m);
+      if (!array) return;
+      const index = waypointIndexById(array, waypointId);
+      if (index === -1) return; // removed by a peer mid-drag; nothing to move
+      const waypointMap = array.get(index);
+      if (!waypointMap) return;
+      // Writes land on the waypoint's OWN map. Nothing here touches the
+      // array, so a peer inserting or removing a different bend during
+      // this drag neither conflicts with it nor gets overwritten by it.
+      doc.transact(() => {
+        waypointMap.set("x", position.x);
+        waypointMap.set("y", position.y);
+      });
+    },
+
+    removeEdgeWaypoint: (edgeId, waypointId) => {
+      recordStoreWrite();
+      const m = edgesMap.get(edgeId);
+      if (!m) return;
+      const array = readWaypointArray(m);
+      if (!array) return;
+      const index = waypointIndexById(array, waypointId);
+      if (index === -1) return; // already removed by a peer
+      doc.transact(() => array.delete(index, 1));
+    },
+
+    clearEdgeWaypoints: (edgeId) => {
+      recordStoreWrite();
+      const m = edgesMap.get(edgeId);
+      if (!m) return;
+      const array = readWaypointArray(m);
+      if (!array || array.length === 0) return;
+      // Empties the array rather than deleting the key. If the key went
+      // away, a peer who was mid-drag would be holding a reference to an
+      // array that's no longer attached to anything, and their remaining
+      // writes would land somewhere nobody can see. Emptying leaves the
+      // container in place, so a concurrent "add a bend" still arrives
+      // somewhere real. An empty array reads back as no waypoints at all
+      // (see edgeMapToPlain), so nothing downstream can tell.
+      doc.transact(() => array.delete(0, array.length));
     },
   };
 }
