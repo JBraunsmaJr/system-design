@@ -65,8 +65,10 @@ import { createAdapterMilestonesStore, type MilestonesStore } from "./collab/mil
 import { createYjsMilestonesStore, seedYjsMilestonesDoc } from "./collab/yjsMilestonesStore";
 import { startCollabSession, type CollabSession, type PresenceInfo, type LocalPresenceInfo } from "./collab/session";
 import { loadPresenceName, savePresenceName, loadShowPeerCursors, saveShowPeerCursors } from "./domain/presenceIdentity";
-import { loadSignalingUrls, saveSignalingUrls, parseSignalingUrls } from "./domain/signalingConfig";
-import { loadIceServers, saveIceServers, parseIceServers } from "./domain/iceServerConfig";
+import { loadSignalingUrls, saveSignalingUrls, parseSignalingUrls, getDefaultSignalingUrl } from "./domain/signalingConfig";
+import { loadIceServers, saveIceServers, parseIceServers, getDefaultIceServers } from "./domain/iceServerConfig";
+import { createSessionLink, parseSessionLink, generateSessionKey } from "./domain/sessionLink";
+import { Toast, type ToastType } from "./components/Toast";
 import { applyZOrderCommand, computeEffectiveZIndices, type ZOrderCommand } from "./domain/zOrder";
 import { classifyNodeChanges, applySelectionChanges, isAutoSizedNodeType, type PendingNodeUpdate, type CurrentNodeGeometry } from "./domain/nodeChangeBatching";
 import { recordCommit, isPerfInstrumentationActive } from "./perf/instrumentation";
@@ -306,6 +308,7 @@ function App() {
     doc: Y.Doc;
     session: CollabSession;
     roomName: string;
+    password?: string;
     teamStore: TeamStore;
     requirementsStore: RequirementsStore;
     programIncrementsStore: ProgramIncrementsStore;
@@ -345,6 +348,19 @@ function App() {
    * Active" identically in both cases.
    */
   const [relayConnected, setRelayConnected] = useState<boolean | null>(null);
+  const [toast, setToast] = useState<{
+    id?: number;
+    message: string;
+    description?: string;
+    type?: ToastType;
+  } | null>(null);
+
+  const showToast = useCallback(
+    (message: string, type: ToastType = "success", description?: string) => {
+      setToast({ id: Date.now(), message, type, description });
+    },
+    []
+  );
   useEffect(() => {
     if (!activeSession) return;
     const unsubscribePresence = activeSession.session.subscribeToPresence(setPresencePeers);
@@ -430,23 +446,24 @@ function App() {
     };
   }, []);
 
-  // The deployer's own default, baked in at build time - still useful
-  // as a starting point, but no longer the only way to set this: see
-  // signalingUrlsInput/setSignalingUrlsRaw below for the runtime
-  // override that doesn't require a rebuild to change.
-  const buildTimeSignalingDefault = useMemo(() => (import.meta.env.VITE_SIGNALING_URL as string | undefined) ?? "", []);
+  // The deployer's own default, baked in at build time or injected via
+  // container environment variables - still useful as a starting point,
+  // but no longer the only way to set this: see signalingUrlsInput/
+  // setSignalingUrlsRaw below for the runtime override.
+  const buildTimeSignalingDefault = useMemo(() => getDefaultSignalingUrl(), []);
 
   const appVersion = useMemo(() => (import.meta.env.VITE_APP_VERSION as string | undefined) ?? "Development", [])
 
   // The raw, comma-separated string as typed/edited in CollabPanel -
   // this person's own runtime override if they've ever set one,
-  // otherwise the deployer's build-time default. Kept as the raw
+  // otherwise the deployer's build-time/container default. Kept as the raw
   // string (not pre-parsed into an array) specifically so the input
   // field in CollabPanel can be a normal, directly-editable controlled
   // input without needing to serialize/deserialize on every keystroke.
-  const [signalingUrlsInput, setSignalingUrlsInputState] = useState(
-    () => loadSignalingUrls() ?? buildTimeSignalingDefault
-  );
+  const [signalingUrlsInput, setSignalingUrlsInputState] = useState(() => {
+    const saved = loadSignalingUrls();
+    return saved !== null && saved.trim() !== "" ? saved : buildTimeSignalingDefault;
+  });
   const setSignalingUrlsInput = useCallback((raw: string) => {
     setSignalingUrlsInputState(raw);
     saveSignalingUrls(raw);
@@ -454,8 +471,8 @@ function App() {
   const signalingUrls = useMemo(() => parseSignalingUrls(signalingUrlsInput), [signalingUrlsInput]);
 
   // ICE servers, configured exactly like the signaling URLs above: a
-  // build-time default the deployer bakes in, overridable at runtime
-  // per browser without a rebuild.
+  // build-time or container-injected default the deployer provides,
+  // overridable at runtime per browser without a rebuild.
   //
   // Separate from the signaling URL because they solve different halves
   // of the connection and fail independently - the relay is how peers
@@ -463,8 +480,11 @@ function App() {
   // have a perfectly working relay and still never form a peer
   // connection, which is precisely the case on a segmented internal
   // network with no route to the public STUN servers WebRTC ships with.
-  const buildTimeIceServersDefault = useMemo(() => (import.meta.env.VITE_ICE_SERVERS as string | undefined) ?? "", []);
-  const [iceServersInput, setIceServersInputState] = useState(() => loadIceServers() ?? buildTimeIceServersDefault);
+  const buildTimeIceServersDefault = useMemo(() => getDefaultIceServers(), []);
+  const [iceServersInput, setIceServersInputState] = useState(() => {
+    const saved = loadIceServers();
+    return saved !== null && saved.trim() !== "" ? saved : buildTimeIceServersDefault;
+  });
   const setIceServersInput = useCallback((raw: string) => {
     setIceServersInputState(raw);
     saveIceServers(raw);
@@ -475,8 +495,12 @@ function App() {
   // nothing is lost - the new session's initial state IS the current local
   // state, not an empty workbook.
   const startNewSession = useCallback(
-    (password: string) => {
+    (explicitKey?: string) => {
+      if (activeSessionRef.current) {
+        activeSessionRef.current.session.disconnect();
+      }
       const roomName = `session-${Math.random().toString(36).slice(2, 10)}`;
+      const sessionKey = explicitKey && explicitKey.trim() ? explicitKey.trim() : generateSessionKey();
       const doc = new Y.Doc();
       seedYjsRequirementsDoc(doc, requirements);
       seedYjsProgramIncrementsDoc(doc, programIncrements);
@@ -488,7 +512,7 @@ function App() {
       const programIncrementsStoreForSession = createYjsProgramIncrementsStore(doc);
       const diagramStoreForSession = createYjsDiagramStore(doc);
       const milestonesStoreForSession = createYjsMilestonesStore(doc);
-      const session = startCollabSession(doc, roomName, { signalingUrls, password: password || undefined, iceServers });
+      const session = startCollabSession(doc, roomName, { signalingUrls, password: sessionKey, iceServers });
       const initialPresence: LocalPresenceInfo = {
         name: displayName.trim() || "Guest",
         color: PRESENCE_COLORS[Math.floor(Math.random() * PRESENCE_COLORS.length)],
@@ -505,14 +529,33 @@ function App() {
         doc,
         session,
         roomName,
+        password: sessionKey,
         teamStore,
         requirementsStore: requirementsStoreForSession,
         programIncrementsStore: programIncrementsStoreForSession,
         diagramStore: diagramStoreForSession,
         milestonesStore: milestonesStoreForSession,
       });
+
+      // Auto-copy shareable session link to clipboard
+      const shareLink = createSessionLink({
+        roomName,
+        key: sessionKey,
+        signalingUrlsInput,
+        defaultSignalingUrls: buildTimeSignalingDefault,
+      });
+      if (typeof navigator !== "undefined" && typeof navigator.clipboard?.writeText === "function") {
+        navigator.clipboard
+          .writeText(shareLink)
+          .then(() => {
+            showToast("Session link copied to clipboard");
+          })
+          .catch(() => {
+            // Silently ignore clipboard write failures (e.g. non-HTTPS, unfocused window)
+          });
+      }
     },
-    [requirements, programIncrements, team, root, diagram.milestones, signalingUrls, iceServers, displayName]
+    [requirements, programIncrements, team, root, diagram.milestones, signalingUrls, signalingUrlsInput, buildTimeSignalingDefault, iceServers, displayName, showToast]
   );
 
   // Joins an existing session by room name - starts from an EMPTY doc
@@ -520,14 +563,24 @@ function App() {
   // to receive whatever the session already has from other peers, not to
   // impose this browser's own local state onto it.
   const joinSession = useCallback(
-    (roomName: string, password: string) => {
+    (roomName: string, passwordOrKey?: string, relayOverride?: string) => {
+      if (activeSessionRef.current) {
+        activeSessionRef.current.session.disconnect();
+      }
+      let effectiveSignalingUrls = signalingUrls;
+      if (relayOverride && relayOverride.trim()) {
+        const trimmedRelay = relayOverride.trim();
+        setSignalingUrlsInput(trimmedRelay);
+        effectiveSignalingUrls = parseSignalingUrls(trimmedRelay);
+      }
+      const effectiveKey = passwordOrKey && passwordOrKey.trim() ? passwordOrKey.trim() : undefined;
       const doc = new Y.Doc();
       const teamStore = createYjsTeamStore(doc);
       const requirementsStoreForSession = createYjsRequirementsStore(doc);
       const programIncrementsStoreForSession = createYjsProgramIncrementsStore(doc);
       const diagramStoreForSession = createYjsDiagramStore(doc);
       const milestonesStoreForSession = createYjsMilestonesStore(doc);
-      const session = startCollabSession(doc, roomName, { signalingUrls, password: password || undefined, iceServers });
+      const session = startCollabSession(doc, roomName, { signalingUrls: effectiveSignalingUrls, password: effectiveKey, iceServers });
       const initialPresence: LocalPresenceInfo = {
         name: displayName.trim() || "Guest",
         color: PRESENCE_COLORS[Math.floor(Math.random() * PRESENCE_COLORS.length)],
@@ -544,6 +597,7 @@ function App() {
         doc,
         session,
         roomName,
+        password: effectiveKey,
         teamStore,
         requirementsStore: requirementsStoreForSession,
         programIncrementsStore: programIncrementsStoreForSession,
@@ -551,8 +605,20 @@ function App() {
         milestonesStore: milestonesStoreForSession,
       });
     },
-    [signalingUrls, iceServers, displayName]
+    [signalingUrls, setSignalingUrlsInput, iceServers, displayName]
   );
+
+  // Auto-join if a session link is present in the URL on initial mount
+  const initialUrlJoinedRef = useRef(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || initialUrlJoinedRef.current) return;
+    const currentHref = window.location.href;
+    const parsed = parseSessionLink(currentHref);
+    if (parsed.roomName && parsed.roomName !== currentHref) {
+      initialUrlJoinedRef.current = true;
+      joinSession(parsed.roomName, parsed.password || "", parsed.relay);
+    }
+  }, [joinSession]);
 
   // Leaving a session writes its final state back into the local,
   // undo-tracked snapshot before disconnecting - so whatever happened
@@ -1956,7 +2022,17 @@ function App() {
               iceServersInput={iceServersInput}
               onIceServersInputChange={setIceServersInput}
               buildTimeIceServersDefault={buildTimeIceServersDefault}
-              activeSession={activeSession ? { roomName: activeSession.roomName, isSynced: () => activeSession.session.isSynced(), relayConnected, peers: presencePeers } : null}
+              activeSession={
+                activeSession
+                  ? {
+                      roomName: activeSession.roomName,
+                      password: activeSession.password,
+                      isSynced: () => activeSession.session.isSynced(),
+                      relayConnected,
+                      peers: presencePeers,
+                    }
+                  : null
+              }
               displayName={displayName}
               onDisplayNameChange={onDisplayNameChange}
               showPeerCursors={showPeerCursors}
@@ -1964,6 +2040,7 @@ function App() {
               onStartSession={startNewSession}
               onJoinSession={joinSession}
               onLeaveSession={leaveSession}
+              onCopyLink={() => showToast("Session link copied to clipboard")}
             />
           }
         />
@@ -2203,6 +2280,15 @@ function App() {
         isOpen={isLibraryModalOpen}
         onClose={() => setIsLibraryModalOpen(false)}
       />
+      {toast && (
+        <Toast
+          key={toast.id}
+          message={toast.message}
+          description={toast.description}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 }

@@ -37,7 +37,7 @@ class MockStorage {
 
 (globalThis as unknown as { localStorage: MockStorage }).localStorage = new MockStorage();
 
-const { loadSignalingUrls, saveSignalingUrls, parseSignalingUrls } = await import("./signalingConfig");
+const { loadSignalingUrls, saveSignalingUrls, parseSignalingUrls, getDefaultSignalingUrl } = await import("./signalingConfig");
 
 // === parseSignalingUrls - pure parsing logic ===
 {
@@ -72,6 +72,35 @@ const { loadSignalingUrls, saveSignalingUrls, parseSignalingUrls } = await impor
 
   saveSignalingUrls("");
   assert(loadSignalingUrls() === "", "explicitly saving an empty string (clearing the override) is distinguishable from never having saved anything at all - loadSignalingUrls returns '', not null, once something (even nothing) has actually been saved");
+}
+
+// === getDefaultSignalingUrl ===
+{
+  (globalThis as unknown as { window?: { __APP_CONFIG__?: { SIGNALING_URL?: string; RELAY_URL?: string; RELAY?: string } } }).window = undefined;
+  assert(getDefaultSignalingUrl() === "", "when no window or runtime config exists, returns empty default or build-time env");
+
+  (globalThis as unknown as { window: { __APP_CONFIG__?: { SIGNALING_URL?: string; RELAY_URL?: string; RELAY?: string } } }).window = {
+    __APP_CONFIG__: {
+      SIGNALING_URL: "wss://runtime-relay.example.com",
+    },
+  };
+  assert(getDefaultSignalingUrl() === "wss://runtime-relay.example.com", "when window.__APP_CONFIG__.SIGNALING_URL is set, returns runtime config");
+
+  (globalThis as unknown as { window: { __APP_CONFIG__?: { SIGNALING_URL?: string; RELAY_URL?: string; RELAY?: string } } }).window = {
+    __APP_CONFIG__: {
+      RELAY: "wss://relay-env.example.com",
+    },
+  };
+  assert(getDefaultSignalingUrl() === "wss://relay-env.example.com", "when window.__APP_CONFIG__.RELAY is set, returns runtime config");
+
+  (globalThis as unknown as { window: { __APP_CONFIG__?: { SIGNALING_URL?: string; RELAY_URL?: string; RELAY?: string } } }).window = {
+    __APP_CONFIG__: {
+      RELAY_URL: "wss://relay-url-env.example.com",
+    },
+  };
+  assert(getDefaultSignalingUrl() === "wss://relay-url-env.example.com", "when window.__APP_CONFIG__.RELAY_URL is set, returns runtime config");
+
+  (globalThis as unknown as { window?: { __APP_CONFIG__?: { SIGNALING_URL?: string } } }).window = undefined;
 }
 
 // === Storage failures are swallowed, not thrown - matching presenceIdentity.ts's own established contract ===
