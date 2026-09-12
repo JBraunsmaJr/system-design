@@ -33,7 +33,7 @@ import { toDiagramFile, downloadDiagram, parseDiagramFile } from "./domain/seria
 import { loadAutosave, saveAutosave } from "./domain/autosave";
 import { downloadRequirementsMarkdown } from "./domain/requirementsExport";
 import { exportDiagramAsPng, exportDiagramAsSvg } from "./domain/imageExport";
-import type { ArchNodeData, ArchEdgeData, Scenario, ScenarioStep, SubDiagram } from "./domain/types";
+import type { ArchNodeData, ArchEdgeData, ArchEdgeDataPatch, EdgeWaypoint, Scenario, ScenarioStep, SubDiagram } from "./domain/types";
 import type { RequirementsDocument } from "./domain/requirementsTypes";
 import { EMPTY_REQUIREMENTS_DOCUMENT } from "./domain/requirementsTypes";
 import {
@@ -55,6 +55,7 @@ import type { RequirementsStore } from "./collab/requirementsStore";
 import { createAdapterProgramIncrementsStore } from "./collab/programIncrementsStore";
 import { createAdapterDiagramStore } from "./collab/adapterDiagramStore";
 import { getNodesAtPath, getEdgesAtPath, unflattenToSubDiagram, hasSubDiagram } from "./collab/diagramStore";
+import type { EdgeEndpoints } from "./domain/edgeReconnect";
 import type { DiagramStore } from "./collab/diagramStore";
 import { createYjsDiagramStore, seedYjsDiagramDoc } from "./collab/yjsDiagramStore";
 import { createYjsProgramIncrementsStore, seedYjsProgramIncrementsDoc } from "./collab/yjsProgramIncrementsStore";
@@ -1168,11 +1169,52 @@ function App() {
   );
 
   const onUpdateEdge = useCallback(
-    (id: string, patch: Partial<ArchEdgeData>) => {
+    (id: string, patch: ArchEdgeDataPatch) => {
       diagramStoreRef.current.updateEdge(id, patch);
     },
     []
   );
+
+  /**
+   * Edge manipulation - moving an edge's ends onto different nodes, and
+   * bending its route with waypoints.
+   *
+   * All five go through diagramStoreRef rather than `diagramStore`
+   * directly, for the same reason onUpdateNode/onUpdateEdge already do:
+   * they're called from event handlers (some of them on every frame of a
+   * drag), and the ref is what decides whether the write lands in local
+   * state or the session's shared document without every one of these
+   * needing to be rebuilt when a session starts or ends.
+   *
+   * Each one is a distinct named store operation rather than a patch of
+   * the edge's data. Endpoints can't be expressed as a data patch at all
+   * - they're top-level React Flow Edge fields - and waypoints must not
+   * be, because replacing the whole list is exactly what stops
+   * concurrent edits to it from merging. See DiagramStore for the full
+   * reasoning.
+   */
+  const onReconnectEdge = useCallback((edgeId: string, endpoints: EdgeEndpoints) => {
+    diagramStoreRef.current.reconnectEdge(edgeId, endpoints);
+  }, []);
+
+  const onAddEdgeWaypoint = useCallback((edgeId: string, index: number, waypoint: EdgeWaypoint) => {
+    diagramStoreRef.current.addEdgeWaypoint(edgeId, index, waypoint);
+  }, []);
+
+  const onMoveEdgeWaypoint = useCallback(
+    (edgeId: string, waypointId: string, position: { x: number; y: number }) => {
+      diagramStoreRef.current.moveEdgeWaypoint(edgeId, waypointId, position);
+    },
+    []
+  );
+
+  const onRemoveEdgeWaypoint = useCallback((edgeId: string, waypointId: string) => {
+    diagramStoreRef.current.removeEdgeWaypoint(edgeId, waypointId);
+  }, []);
+
+  const onClearEdgeWaypoints = useCallback((edgeId: string) => {
+    diagramStoreRef.current.clearEdgeWaypoints(edgeId);
+  }, []);
 
   // Deleting a node also drops any edges attached to it. Deleting a group
   // releases the nodes inside it (converted back to absolute position)
@@ -1918,6 +1960,10 @@ function App() {
               onAddCode={onAddCode}
               onUpdateNode={onUpdateNode}
               onUpdateEdge={onUpdateEdge}
+              onReconnectEdge={onReconnectEdge}
+              onAddEdgeWaypoint={onAddEdgeWaypoint}
+              onMoveEdgeWaypoint={onMoveEdgeWaypoint}
+              onRemoveEdgeWaypoint={onRemoveEdgeWaypoint}
               onReparentNode={onReparentNode}
               onAdoptIntoGroup={onAdoptIntoGroup}
               onZOrderCommand={onZOrderCommand}
@@ -1985,6 +2031,7 @@ function App() {
                     selectedEdge={selectedEdge}
                     onUpdateNode={onUpdateNode}
                     onUpdateEdge={onUpdateEdge}
+                    onClearEdgeWaypoints={onClearEdgeWaypoints}
                     onDeleteNode={onDeleteNode}
                     onDeleteEdge={onDeleteEdge}
                     onDrillInto={onDrillInto}

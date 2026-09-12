@@ -28,6 +28,8 @@ import {
   type OnConnect,
   type OnConnectStart,
   type OnNodeDrag,
+  type OnReconnect,
+  type HandleType,
   type NodeMouseHandler,
   type NodeTypes,
   type EdgeTypes,
@@ -51,7 +53,14 @@ import { computeAlignment, type AlignBox, type AlignmentGuide } from "../domain/
 import type { ZOrderCommand } from "../domain/zOrder";
 import { toAbsolutePosition } from "../domain/graphUtils";
 import { DRAG_MIME_TYPE, GROUP_DRAG_MIME_TYPE, TEXT_DRAG_MIME_TYPE, SHAPE_DRAG_MIME_TYPE, CODE_DRAG_MIME_TYPE } from "./Palette";
-import type { ArchNodeData, ArchEdgeData, Scenario, ScenarioStep } from "../domain/types";
+import type { ArchNodeData, ArchEdgeData, ArchEdgeDataPatch, EdgeWaypoint, Scenario, ScenarioStep } from "../domain/types";
+import {
+  normalizeReconnection,
+  validateReconnection,
+  isSameEndpoints,
+  type EdgeEnd,
+  type EdgeEndpoints,
+} from "../domain/edgeReconnect";
 import type { PresenceInfo } from "../collab/session";
 import { CanvasContext, type CanvasContextValue } from "./CanvasContext";
 
@@ -123,7 +132,15 @@ interface CanvasProps {
   /** Creates a code snippet node and returns its id, so the caller can immediately put it into edit mode. */
   onAddCode: (position: { x: number; y: number }) => string;
   onUpdateNode: (id: string, patch: Partial<ArchNodeData>) => void;
-  onUpdateEdge: (id: string, patch: Partial<ArchEdgeData>) => void;
+  onUpdateEdge: (id: string, patch: ArchEdgeDataPatch) => void;
+  /** Moves one of an edge's ends onto a different node/handle. Given
+   * already-resolved endpoints rather than React Flow's own Connection,
+   * because working out what that Connection actually means is this
+   * component's job - see handleReconnect. */
+  onReconnectEdge: (edgeId: string, endpoints: EdgeEndpoints) => void;
+  onAddEdgeWaypoint: (edgeId: string, index: number, waypoint: EdgeWaypoint) => void;
+  onMoveEdgeWaypoint: (edgeId: string, waypointId: string, position: { x: number; y: number }) => void;
+  onRemoveEdgeWaypoint: (edgeId: string, waypointId: string) => void;
   onReparentNode: (nodeId: string, newParentId: string | null) => void;
   onAdoptIntoGroup: (groupId: string, nodeIds: string[], groupPosition?: { x: number; y: number }) => void;
   /** Applies a stacking command. targetIds is explicit rather than
@@ -174,6 +191,10 @@ export function Canvas({
   onAddCode,
   onUpdateNode,
   onUpdateEdge,
+  onReconnectEdge,
+  onAddEdgeWaypoint,
+  onMoveEdgeWaypoint,
+  onRemoveEdgeWaypoint,
   onReparentNode,
   onAdoptIntoGroup,
   onZOrderCommand,
@@ -275,8 +296,22 @@ export function Canvas({
       onChangeCodeNode,
       onUpdateEdge,
       onAdoptIntoGroup,
+      onAddEdgeWaypoint,
+      onMoveEdgeWaypoint,
+      onRemoveEdgeWaypoint,
     }),
-    [isPresenting, onDrillInto, editingLabelNodeId, onChangeTextNode, onChangeCodeNode, onUpdateEdge, onAdoptIntoGroup]
+    [
+      isPresenting,
+      onDrillInto,
+      editingLabelNodeId,
+      onChangeTextNode,
+      onChangeCodeNode,
+      onUpdateEdge,
+      onAdoptIntoGroup,
+      onAddEdgeWaypoint,
+      onMoveEdgeWaypoint,
+      onRemoveEdgeWaypoint,
+    ]
   );
 
   const pathKey = breadcrumbLabels.join(">");
@@ -312,6 +347,57 @@ export function Canvas({
       onConnect(connection);
     },
     [onConnect]
+  );
+
+  /**
+   * Which END of the edge is being dragged. React Flow reports it to
+   * onReconnectStart and then doesn't mention it again, but onReconnect
+   * can't be interpreted without it - see handleReconnect. Same ref
+   * pattern, and for much the same reason, as connectStartNodeId above.
+   */
+  const reconnectEndRef = useRef<EdgeEnd | null>(null);
+
+  const handleReconnectStart = useCallback(
+    (_event: ReactMouseEvent, _edge: Edge<ArchEdgeData>, handleType: HandleType) => {
+      reconnectEndRef.current = handleType === "source" ? "source" : "target";
+    },
+    []
+  );
+
+  /**
+   * Endpoint reconnection, with the same correction edge CREATION needs
+   * just above.
+   *
+   * Every node stacks a source-type and a target-type handle at each
+   * position, so React Flow labels the two ends of the resulting
+   * Connection from the handle types it landed on rather than from which
+   * end was dragged - which means taking it at face value can silently
+   * reverse the edge as a side effect of moving one of its ends.
+   * normalizeReconnection pins the end that WASN'T dragged to what it
+   * already was and reads the other end off the Connection.
+   *
+   * Two guards before anything is written. A drag released back where it
+   * started still fires this, and writing that would sync a no-op to
+   * every peer and put an entry in undo history for a gesture that
+   * changed nothing. And both ends have to be nodes at this level of the
+   * sub-diagram tree - React Flow only renders one level so a drag
+   * shouldn't be able to reach off it, but an edge that did would be
+   * invisible from every level rather than visibly wrong.
+   */
+  const handleReconnect = useCallback<OnReconnect<Edge<ArchEdgeData>>>(
+    (oldEdge, connection) => {
+      const draggedEnd = reconnectEndRef.current ?? "target";
+      reconnectEndRef.current = null;
+
+      const next = normalizeReconnection(oldEdge, connection, draggedEnd);
+      if (isSameEndpoints(oldEdge, next)) return;
+
+      const check = validateReconnection(next, new Set(nodesRef.current.map((n) => n.id)));
+      if (!check.ok) return;
+
+      onReconnectEdge(oldEdge.id, next);
+    },
+    [onReconnectEdge]
   );
 
   const onDragOver = useCallback((event: DragEvent) => {
@@ -683,6 +769,8 @@ export function Canvas({
           onEdgesChange={onEdgesChange}
           onConnect={handleConnect}
           onConnectStart={handleConnectStartWithDoc}
+          onReconnect={handleReconnect}
+          onReconnectStart={handleReconnectStart}
           onNodeContextMenu={onNodeContextMenu}
           onSelectionContextMenu={onSelectionContextMenu}
           onNodeMouseEnter={docHover.handleNodeMouseEnter}
@@ -705,6 +793,7 @@ export function Canvas({
           deleteKeyCode={null}
           nodesDraggable={!isPresenting}
           nodesConnectable={!isPresenting}
+          edgesReconnectable={!isPresenting}
           elementsSelectable={!isPresenting}
           panOnDrag={!isSelectMode}
           selectionOnDrag={isSelectMode}

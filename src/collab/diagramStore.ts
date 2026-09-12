@@ -1,5 +1,6 @@
 import type { Node, Edge } from "@xyflow/react";
-import type { ArchNodeData, ArchEdgeData, SubDiagram } from "../domain/types";
+import type { ArchNodeData, ArchEdgeData, ArchEdgeDataPatch, EdgeWaypoint, SubDiagram } from "../domain/types";
+import type { EdgeEndpoints } from "../domain/edgeReconnect";
 
 /**
  * DiagramStore is the same kind of seam TeamStore, RequirementsStore, and
@@ -109,8 +110,105 @@ export interface DiagramStore {
     sourceHandle?: string | null,
     targetHandle?: string | null
   ): string;
-  updateEdge(id: string, patch: Partial<ArchEdgeData>): void;
+  updateEdge(id: string, patch: ArchEdgeDataPatch): void;
   deleteEdge(id: string): void;
+
+  /**
+   * Moves one or both of an edge's ends onto different nodes/handles -
+   * draw.io-style endpoint dragging.
+   *
+   * Its own operation rather than part of updateEdge because
+   * source/target/sourceHandle/targetHandle are top-level React Flow
+   * Edge fields, not ArchEdgeData fields, so updateEdge's
+   * ArchEdgeDataPatch can't express them at all. (The note on
+   * addEdge above, that nothing changes an edge's handles after
+   * creation, is what this operation changes.)
+   *
+   * All four fields move together in ONE transaction. Half-applied
+   * endpoints - a new target with the old source - is a state that
+   * should never be observable by a peer, and in the Yjs implementation
+   * a transaction is what guarantees that.
+   */
+  reconnectEdge(id: string, endpoints: EdgeEndpoints): void;
+
+  /** Inserts a bend at `index` in the edge's waypoint order (0 puts it
+   * between the source and the first existing bend). */
+  addEdgeWaypoint(edgeId: string, index: number, waypoint: EdgeWaypoint): void;
+
+  /**
+   * Moves an existing bend. By waypoint ID, not by index, and this is
+   * the single most important detail in the whole waypoint design.
+   *
+   * A drag is a stream of these calls, one per pointermove. If they were
+   * index-addressed and a collaborator inserted or removed a bend
+   * earlier in the same edge partway through that drag, every index
+   * after theirs shifts by one - and the rest of the drag would silently
+   * start moving a DIFFERENT bend than the one under the cursor. Ids
+   * don't shift, so the drag keeps hold of the bend it started on no
+   * matter what else arrives mid-gesture.
+   */
+  moveEdgeWaypoint(edgeId: string, waypointId: string, position: { x: number; y: number }): void;
+
+  /** Removes a single bend by id - same identity-over-index reasoning as
+   * moveEdgeWaypoint. */
+  removeEdgeWaypoint(edgeId: string, waypointId: string): void;
+
+  /** Drops every bend, returning the edge to automatic routing. */
+  clearEdgeWaypoints(edgeId: string): void;
+}
+
+/**
+ * The waypoint transforms, written once against a plain ArchEdgeData
+ * and shared by the local store and the tree adapter - the two
+ * implementations that hold waypoints as an ordinary JS array. (The Yjs
+ * store deliberately does NOT use these: its whole point is that it
+ * holds waypoints as real shared types instead, so it implements the
+ * same four operations directly against those.)
+ *
+ * All four keep one invariant that matters beyond tidiness: when no
+ * waypoints remain, the `waypoints` KEY is removed entirely rather than
+ * left as an empty array. An edge that has never been bent and an edge
+ * whose bends were all removed should be indistinguishable - both in the
+ * saved file, and in diagramStore.verify.ts's own check that the local
+ * and Yjs stores produce edge data with the identical set of keys.
+ */
+export function withWaypointAdded(data: ArchEdgeData, index: number, waypoint: EdgeWaypoint): ArchEdgeData {
+  const current = data.waypoints ?? [];
+  const clamped = Math.max(0, Math.min(index, current.length));
+  const next = [...current.slice(0, clamped), waypoint, ...current.slice(clamped)];
+  return { ...data, waypoints: next };
+}
+
+export function withWaypointMoved(
+  data: ArchEdgeData,
+  waypointId: string,
+  position: { x: number; y: number }
+): ArchEdgeData {
+  const current = data.waypoints ?? [];
+  if (!current.some((w) => w.id === waypointId)) return data;
+  return {
+    ...data,
+    waypoints: current.map((w) => (w.id === waypointId ? { ...w, x: position.x, y: position.y } : w)),
+  };
+}
+
+export function withWaypointRemoved(data: ArchEdgeData, waypointId: string): ArchEdgeData {
+  const current = data.waypoints ?? [];
+  const next = current.filter((w) => w.id !== waypointId);
+  if (next.length === current.length) return data;
+  return withWaypointsOrNone(data, next);
+}
+
+export function withWaypointsCleared(data: ArchEdgeData): ArchEdgeData {
+  if (data.waypoints === undefined) return data;
+  return withWaypointsOrNone(data, []);
+}
+
+function withWaypointsOrNone(data: ArchEdgeData, waypoints: EdgeWaypoint[]): ArchEdgeData {
+  if (waypoints.length > 0) return { ...data, waypoints };
+  const rest = { ...data };
+  delete rest.waypoints;
+  return rest;
 }
 
 export function getNodesAtPath(nodes: Node<ArchNodeData>[], path: string[]): Node<ArchNodeData>[] {
@@ -295,6 +393,49 @@ export function createLocalDiagramStore(initial?: {
 
     deleteEdge: (id) => {
       edges = edges.filter((e) => e.id !== id);
+      notify();
+    },
+
+    reconnectEdge: (id, endpoints) => {
+      edges = edges.map((e) =>
+        e.id === id
+          ? {
+              ...e,
+              source: endpoints.source,
+              target: endpoints.target,
+              sourceHandle: endpoints.sourceHandle,
+              targetHandle: endpoints.targetHandle,
+            }
+          : e
+      );
+      notify();
+    },
+
+    addEdgeWaypoint: (edgeId, index, waypoint) => {
+      edges = edges.map((e) =>
+        e.id === edgeId ? { ...e, data: withWaypointAdded(e.data as ArchEdgeData, index, waypoint) } : e
+      );
+      notify();
+    },
+
+    moveEdgeWaypoint: (edgeId, waypointId, position) => {
+      edges = edges.map((e) =>
+        e.id === edgeId ? { ...e, data: withWaypointMoved(e.data as ArchEdgeData, waypointId, position) } : e
+      );
+      notify();
+    },
+
+    removeEdgeWaypoint: (edgeId, waypointId) => {
+      edges = edges.map((e) =>
+        e.id === edgeId ? { ...e, data: withWaypointRemoved(e.data as ArchEdgeData, waypointId) } : e
+      );
+      notify();
+    },
+
+    clearEdgeWaypoints: (edgeId) => {
+      edges = edges.map((e) =>
+        e.id === edgeId ? { ...e, data: withWaypointsCleared(e.data as ArchEdgeData) } : e
+      );
       notify();
     },
   };

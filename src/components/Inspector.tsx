@@ -8,7 +8,7 @@ import { CODE_LANGUAGES } from "../domain/codeRegistry";
 import { EDGE_TYPES, STYLE_GROUP_LABELS } from "../domain/edgeRegistry";
 import { IconPicker } from "./IconPicker";
 import { RequirementLinker } from "./requirements/RequirementLinker";
-import type { ArchNodeData, ArchEdgeData } from "../domain/types";
+import type { ArchNodeData, ArchEdgeData, ArchEdgeDataPatch } from "../domain/types";
 import type { ZOrderCommand } from "../domain/zOrder";
 import type { RequirementsDocument } from "../domain/requirementsTypes";
 
@@ -49,7 +49,11 @@ interface InspectorProps {
   selectedNode: Node<ArchNodeData> | null;
   selectedEdge: Edge<ArchEdgeData> | null;
   onUpdateNode: (id: string, patch: Partial<ArchNodeData>) => void;
-  onUpdateEdge: (id: string, patch: Partial<ArchEdgeData>) => void;
+  onUpdateEdge: (id: string, patch: ArchEdgeDataPatch) => void;
+  /** Drops every bend from an edge, returning it to automatic routing.
+   * Its own callback rather than an onUpdateEdge patch because
+   * waypoints deliberately aren't patchable - see ArchEdgeDataPatch. */
+  onClearEdgeWaypoints: (edgeId: string) => void;
   onDeleteNode: (id: string) => void;
   onDeleteEdge: (id: string) => void;
   onDrillInto: (id: string) => void;
@@ -61,6 +65,7 @@ interface InspectorProps {
 export function Inspector({
   selectedNode,
   selectedEdge,
+  onClearEdgeWaypoints,
   onUpdateNode,
   onUpdateEdge,
   onDeleteNode,
@@ -488,6 +493,23 @@ export function Inspector({
         >
           Reset label position
         </button>
+      )}
+
+      {(data.waypoints?.length ?? 0) > 0 && (
+        <>
+          <button
+            type="button"
+            className="color-field__reset"
+            style={{ marginBottom: 8 }}
+            onClick={() => onClearEdgeWaypoints(edge.id)}
+          >
+            Straighten edge ({data.waypoints!.length} bend{data.waypoints!.length === 1 ? "" : "s"})
+          </button>
+          <p className="inspector__hint" style={{ marginTop: 0 }}>
+            Bends are pinned to the canvas rather than to either end, so moving a node a long way can
+            leave them somewhere unhelpful. Straightening returns this edge to automatic routing.
+          </p>
+        </>
       )}
 
       <PropertyEditor

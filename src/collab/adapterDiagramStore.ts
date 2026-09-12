@@ -2,7 +2,13 @@ import type { Node, Edge } from "@xyflow/react";
 import type { ArchNodeData, ArchEdgeData, SubDiagram } from "../domain/types";
 import { updateSubDiagramAtPath } from "../domain/subDiagramTree";
 import type { DiagramStore } from "./diagramStore";
-import { flattenSubDiagramTree } from "./diagramStore";
+import {
+  flattenSubDiagramTree,
+  withWaypointAdded,
+  withWaypointMoved,
+  withWaypointRemoved,
+  withWaypointsCleared,
+} from "./diagramStore";
 
 /**
  * A DiagramStore that owns no state of its own - same purpose as
@@ -89,6 +95,21 @@ export function createAdapterDiagramStore(
       return null;
     }
     return walk(root, []);
+  }
+
+
+  /** Locates whichever level of the tree an edge actually lives at and
+   * replaces it there - the find-then-update dance every one of the
+   * operations above otherwise repeats verbatim. */
+  function updateEdgeInTree(id: string, transform: (edge: Edge<ArchEdgeData>) => Edge<ArchEdgeData>): void {
+    setRoot((root) => {
+      const path = findEdgePath(root, id);
+      if (path === null) return root;
+      return updateSubDiagramAtPath(root, path, (sd) => ({
+        ...sd,
+        edges: sd.edges.map((e) => (e.id === id ? transform(e) : e)),
+      }));
+    });
   }
 
   return {
@@ -204,6 +225,49 @@ export function createAdapterDiagramStore(
         if (path === null) return root;
         return updateSubDiagramAtPath(root, path, (sd) => ({ ...sd, edges: sd.edges.filter((e) => e.id !== id) }));
       });
+    },
+
+    reconnectEdge: (id, endpoints) => {
+      updateEdgeInTree(id, (edge) => ({
+        ...edge,
+        source: endpoints.source,
+        target: endpoints.target,
+        sourceHandle: endpoints.sourceHandle,
+        targetHandle: endpoints.targetHandle,
+      }));
+    },
+
+    // The four waypoint operations share their transforms with the local
+    // store (see diagramStore.ts) rather than reimplementing them, so
+    // the two representations that hold waypoints as a plain array can't
+    // drift apart on the details - particularly the "drop the key when
+    // the last bend goes" rule, which is easy to get subtly wrong twice.
+    addEdgeWaypoint: (edgeId, index, waypoint) => {
+      updateEdgeInTree(edgeId, (edge) => ({
+        ...edge,
+        data: withWaypointAdded(edge.data as ArchEdgeData, index, waypoint),
+      }));
+    },
+
+    moveEdgeWaypoint: (edgeId, waypointId, position) => {
+      updateEdgeInTree(edgeId, (edge) => ({
+        ...edge,
+        data: withWaypointMoved(edge.data as ArchEdgeData, waypointId, position),
+      }));
+    },
+
+    removeEdgeWaypoint: (edgeId, waypointId) => {
+      updateEdgeInTree(edgeId, (edge) => ({
+        ...edge,
+        data: withWaypointRemoved(edge.data as ArchEdgeData, waypointId),
+      }));
+    },
+
+    clearEdgeWaypoints: (edgeId) => {
+      updateEdgeInTree(edgeId, (edge) => ({
+        ...edge,
+        data: withWaypointsCleared(edge.data as ArchEdgeData),
+      }));
     },
   };
 }
