@@ -924,7 +924,15 @@ function App() {
         const programIncrementsStoreForSession = createYjsProgramIncrementsStore(doc);
         const diagramStoreForSession = createYjsDiagramStore(doc);
         const milestonesStoreForSession = createYjsMilestonesStore(doc);
-        const session = startCollabSession(doc, roomName, { signalingUrls, iceServers });
+        const session = startCollabSession(doc, roomName, {
+          signalingUrls,
+          iceServers,
+          // The harness measures the editing path, not the storage layer.
+          // Leaving persistence on also makes runs non-deterministic, since
+          // each one would find whatever the previous one left in IndexedDB
+          // under a room name that is random per run.
+          persist: false,
+        });
         setActiveSession({
           doc,
           session,

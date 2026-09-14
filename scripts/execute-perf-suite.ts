@@ -1,6 +1,7 @@
 import { chromium, type Browser } from "playwright";
 import { spawn, spawnSync, type ChildProcess } from "child_process";
-import { writeFileSync, mkdirSync, existsSync } from "fs";
+import { writeFileSync, mkdirSync, existsSync, readFileSync } from "fs";
+import { createHash } from "crypto";
 import { resolve, join } from "path";
 import * as os from "os";
 import * as http from "http";
@@ -24,6 +25,13 @@ const outputDirArg = getArgValue("--output-dir", join(rootDir, "dist"));
 const filterArg = getArgValue("--filter", "");
 const repeatsCount = parseInt(getArgValue("--repeats", "3"), 10);
 const previewPort = parseInt(getArgValue("--port", "4173"), 10);
+/** Opt in to measuring a server this harness did not start. Off by default:
+ * a reused server may be serving anything. */
+const reuseServer = args.includes("--reuse-server");
+/** Skip the rebuild when the stamp already matches the working tree. Saves a
+ * build during repeated runs of an unchanged tree; never skips when the
+ * fingerprint differs. */
+const skipRebuild = args.includes("--no-rebuild");
 
 function getGitCommitSha(): string {
   try {
@@ -56,6 +64,87 @@ async function findWorkingHost(port: number): Promise<string | null> {
   return null;
 }
 
+/**
+ * Fingerprint of the code a bundle was built from.
+ *
+ * `dirty` is a digest of `git status --porcelain`, so uncommitted edits count
+ * as a different fingerprint. Without that, the commit SHA alone would call a
+ * bundle current while the working tree had moved on - which is exactly the
+ * situation that makes a stale measurement look like a real one.
+ */
+function workingTreeFingerprint(): { sha: string; dirty: string } {
+  const sha = getGitCommitSha();
+  const status = spawnSync("git", ["status", "--porcelain"], {
+    encoding: "utf-8",
+    cwd: rootDir,
+  });
+  const raw = status.status === 0 ? (status.stdout ?? "") : `unknown-${Date.now()}`;
+  return { sha, dirty: createHash("sha256").update(raw).digest("hex").slice(0, 16) };
+}
+
+/**
+ * Rebuilds unless dist/ demonstrably came from this exact working tree with
+ * instrumentation enabled.
+ *
+ * The harness previously built only when dist/index.html was ABSENT, so every
+ * subsequent run measured whatever was already there. A perf gate that
+ * silently measures a stale bundle is worse than no gate: it passes while a
+ * branch regresses, and it fails on code that is fine. Both happened.
+ *
+ * The instrumentation flag is part of the stamp because `npm run build`
+ * produces a bundle with the counters compiled out. Reusing one of those
+ * yields plausible-looking zeros rather than an obvious failure.
+ */
+function ensureFreshBuild() {
+  const stampPath = join(rootDir, "dist", ".perf-build-stamp.json");
+  const indexPath = join(rootDir, "dist", "index.html");
+  const fingerprint = workingTreeFingerprint();
+
+  let reason = "no previous instrumented build";
+  if (existsSync(indexPath) && existsSync(stampPath)) {
+    try {
+      const stamp = JSON.parse(readFileSync(stampPath, "utf-8")) as {
+        sha?: string;
+        dirty?: string;
+        instrumented?: boolean;
+      };
+      if (!stamp.instrumented) {
+        reason = "existing build has instrumentation compiled out";
+      } else if (stamp.sha !== fingerprint.sha) {
+        reason = `existing build is from ${String(stamp.sha).slice(0, 8)}, working tree is ${fingerprint.sha.slice(0, 8)}`;
+      } else if (stamp.dirty !== fingerprint.dirty) {
+        reason = "working tree has changed since the existing build";
+      } else if (skipRebuild) {
+        console.log("📦 Reusing current instrumented build (--no-rebuild).");
+        return;
+      } else {
+        reason = "rebuilding to guarantee the bundle matches the working tree";
+      }
+    } catch {
+      reason = "build stamp unreadable";
+    }
+  }
+
+  console.log(`📦 Building instrumented production bundle (${reason})...`);
+  const buildRes = spawnSync("npx", ["vite", "build", "--base=./"], {
+    cwd: rootDir,
+    env: { ...process.env, VITE_PERF_INSTRUMENTATION: "1" },
+    stdio: "inherit",
+    shell: true,
+  });
+  if (buildRes.status !== 0) {
+    throw new Error("Failed to build production assets.");
+  }
+  writeFileSync(
+    stampPath,
+    JSON.stringify(
+      { ...fingerprint, instrumented: true, builtAt: new Date().toISOString() },
+      null,
+      2
+    )
+  );
+}
+
 async function ensurePreviewServer(): Promise<{ process: ChildProcess | null; url: string }> {
   const explicitBase = getArgValue("--base-url", "");
   if (explicitBase) {
@@ -65,23 +154,19 @@ async function ensurePreviewServer(): Promise<{ process: ChildProcess | null; ur
   const existingHost = await findWorkingHost(previewPort);
   if (existingHost) {
     const existingUrl = `http://${existingHost}:${previewPort}`;
-    console.log(`📡 Using existing preview server running at ${existingUrl}`);
+    if (!reuseServer) {
+      throw new Error(
+        `A server is already listening on port ${previewPort}. Refusing to measure ` +
+          `it, because there is no way to tell what build it is serving - a stale ` +
+          `one silently produces results for code that is not in the working tree. ` +
+          `Stop it, or pass --reuse-server if you are certain it is current.`
+      );
+    }
+    console.log(`📡 Reusing server at ${existingUrl} (--reuse-server; build NOT verified)`);
     return { process: null, url: existingUrl };
   }
 
-  // Check if dist/index.html exists
-  if (!existsSync(join(rootDir, "dist", "index.html"))) {
-    console.log("📦 Building production bundle with VITE_PERF_INSTRUMENTATION=1...");
-    const buildRes = spawnSync("npx", ["vite", "build", "--base=./"], {
-      cwd: rootDir,
-      env: { ...process.env, VITE_PERF_INSTRUMENTATION: "1" },
-      stdio: "inherit",
-      shell: true,
-    });
-    if (buildRes.status !== 0) {
-      throw new Error("Failed to build production assets.");
-    }
-  }
+  ensureFreshBuild();
 
   console.log(`🚀 Starting Vite preview server on port ${previewPort} (host: 0.0.0.0)...`);
   const server = spawn(
@@ -196,8 +281,38 @@ async function runSuite() {
           throw new Error("Performance instrumentation is unavailable. Build with VITE_PERF_INSTRUMENTATION=1.");
         }
 
+        /**
+         * WS4-R4: CRDT storage overhead.
+         *
+         * Measured here rather than in the app because it needs no app code -
+         * the scenario already owns the doc. Reported as a permille of the
+         * plain JSON size so it stays an integer counter the existing
+         * threshold logic can compare; 1000 means the document costs exactly
+         * what its JSON form does.
+         *
+         * This is the counter that catches the Y.Map tombstone problem:
+         * overwriting a key leaves ~10 unreclaimed bytes unless the writes are
+         * consecutive on the same key, so a multi-node drag writing keys
+         * round-robin every frame inflates this without changing any render
+         * count.
+         */
+        const docOverheadPermille = await page.evaluate(() => {
+          const w = window as unknown as Record<string, unknown>;
+          const Y = w.Y as { encodeStateAsUpdate?: (d: unknown) => Uint8Array } | undefined;
+          const doc = w.__perfAppDoc as { toJSON?: () => unknown } | undefined;
+          if (!Y?.encodeStateAsUpdate || !doc?.toJSON) return 0;
+          try {
+            const encoded = Y.encodeStateAsUpdate(doc).byteLength;
+            const plain = JSON.stringify(doc.toJSON()).length;
+            return plain > 0 ? Math.round((encoded / plain) * 1000) : 0;
+          } catch {
+            return 0;
+          }
+        });
+
         repeatMetrics.push({
           ...metrics,
+          docOverheadPermille,
           durationMs: elapsed,
         });
 
@@ -245,6 +360,9 @@ async function runSuite() {
           actualDurationMs: Number(minActualDuration.toFixed(2)),
           longestCommitMs: Number(minLongestCommit.toFixed(2)),
           commitDurations: firstRun.commitDurations || [],
+          // Zero for scenarios with no session document, which is honest
+          // rather than absent: there is no CRDT overhead to report.
+          docOverheadPermille: firstRun.docOverheadPermille ?? 0,
           scenarioDurationMs: Number(minDuration.toFixed(2)),
           p95FrameIntervalMs: 16.6,
           longTasksCount: 0,

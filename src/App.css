@@ -11690,3 +11690,103 @@ option {
     animation: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Durability indicator (WS13-R8/R9)
+
+   Quiet by default, insistent on failure. The alert state is the only thing in
+   the toolbar allowed to hold colour, because it is the only thing there that
+   means the user is about to lose work.
+   --------------------------------------------------------------------------- */
+.durability {
+  position: relative;
+  display: inline-flex;
+}
+
+.durability__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--chrome-text-dim);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.durability__chip:hover {
+  color: var(--chrome-text);
+}
+
+.durability__chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.durability--alert .durability__chip {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.durability--caution .durability__chip {
+  color: var(--chrome-text);
+}
+
+.durability__detail {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  width: 264px;
+  padding: 10px 12px;
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-md);
+  background: var(--chrome-bg-raised);
+  color: var(--chrome-text);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+
+.durability--alert .durability__detail {
+  border-color: var(--danger);
+}
+
+.durability__detail p {
+  margin: 0;
+}
+
+.durability__action {
+  margin-top: 8px;
+  padding: 5px 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--accent-text);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.durability__action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.durability__icon--spin {
+  animation: durability-spin 1.1s linear infinite;
+}
+
+@keyframes durability-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .durability__icon--spin {
+    animation: none;
+  }
+}

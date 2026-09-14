@@ -31,6 +31,9 @@ export const GATING_COUNTERS: (keyof ScenarioResult["metrics"])[] = [
   "storeWrites",
   "snapshotBuilds",
   "unflattenCalls",
+  // Un-baselined until someone records it; the gate reports it without
+  // failing in the meantime (see the baseVal === undefined branch below).
+  "docOverheadPermille",
 ];
 
 export const REQUIREMENT_MAPPING: Record<string, string> = {
@@ -106,6 +109,27 @@ export function evaluateGate(
     for (const metric of GATING_COUNTERS) {
       const measured = scenario.metrics?.[metric];
       const baseVal = baseScenario.metrics?.[metric];
+
+      // A metric the baseline predates is NOT a failure. Adding a counter
+      // would otherwise fail every scenario until someone re-recorded the
+      // baseline - which pressures people into recording a baseline to make
+      // the gate green, the one habit this gate exists to prevent.
+      if (baseVal === undefined && typeof measured === "number") {
+        evaluations.push({
+          scenarioId: id,
+          metric,
+          baseline: NaN,
+          measured,
+          delta: NaN,
+          pctDelta: NaN,
+          gating: false,
+          passed: true,
+          improvement: false,
+          requirementId,
+        });
+        passedCount++;
+        continue;
+      }
 
       if (typeof measured !== "number" || typeof baseVal !== "number" || Number.isNaN(measured) || Number.isNaN(baseVal)) {
         failedCount++;

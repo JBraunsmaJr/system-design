@@ -17,6 +17,16 @@ export interface PerfCounters {
 }
 
 export interface PerfMetrics extends PerfCounters {
+  /**
+   * CRDT storage overhead as a permille of the document's plain JSON size
+   * (WS4-R4). 1000 means the Y.Doc encodes to exactly the size of its JSON
+   * form; 3000 means three times that.
+   *
+   * Measured by the harness from the scenario's own document rather than
+   * recorded from inside the app, so it costs nothing at runtime. Zero for
+   * scenarios with no session document.
+   */
+  docOverheadPermille?: number;
   actualDurationMs: number;
   longestCommitMs: number;
   commitDurations: number[];

@@ -121,7 +121,7 @@ console.log("=== 5. Newer and unrecognised versions are refused ===");
   assert(caught instanceof SchemaVersionError, "a newer version throws SchemaVersionError");
   assert(
     caught?.message.includes("99.0") === true &&
-      caught?.message.includes(SCHEMA_VERSION),
+      caught?.message.includes(SCHEMA_VERSION) === true,
     "the message names both the file's version and this build's",
   );
   assert(
