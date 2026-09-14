@@ -59,6 +59,18 @@ export interface LocalPresenceInfo {
    * nothing specific is focused (browsing a list, or on a view/domain
    * that doesn't track this). */
   focusedItemId: string | null;
+  /**
+   * Whether this peer holds its own persisted copy of the document
+   * (WS13-R10).
+   *
+   * Counts replicas, not connections. A peer whose browser refused storage is
+   * connected but holds nothing, so counting connections would tell the last
+   * person in the room that their copy is safely duplicated when it is not.
+   *
+   * Absent is treated as false rather than true: a peer running a build that
+   * predates this field cannot be assumed to be persisting anything.
+   */
+  hasPersistedReplica?: boolean;
   /** This peer's current position within the diagram's own sub-diagram
    * nesting - the same DiagramPath (array of node ids) App.tsx tracks
    * as `path`, joined into a single string for easy equality
@@ -221,7 +233,26 @@ export function parsePresenceState(clientId: number, state: unknown): PresenceIn
     viewMode: typeof candidate.viewMode === "string" ? candidate.viewMode : null,
     focusedItemId: typeof candidate.focusedItemId === "string" ? candidate.focusedItemId : null,
     diagramPath: typeof candidate.diagramPath === "string" ? candidate.diagramPath : "",
+    // Anything other than an explicit true means "no replica known". See the
+    // field's own comment - assuming otherwise is the dangerous direction.
+    hasPersistedReplica: candidate.hasPersistedReplica === true,
   };
+}
+
+/**
+ * How many participants in this session - including this one - hold their own
+ * persisted copy (WS13-R10).
+ *
+ * `self` is passed separately because subscribeToPresence deliberately never
+ * includes this peer, and the question being answered here is "how many copies
+ * of this document exist", which very much includes ours.
+ */
+export function countPersistedReplicas(
+  peers: PresenceInfo[],
+  selfHasReplica: boolean,
+): number {
+  const others = peers.filter((p) => p.hasPersistedReplica).length;
+  return others + (selfHasReplica ? 1 : 0);
 }
 
 /**
