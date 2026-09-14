@@ -805,7 +805,8 @@ function App() {
         const programIncrementsStoreForSession = createYjsProgramIncrementsStore(doc);
         const diagramStoreForSession = createYjsDiagramStore(doc);
         const milestonesStoreForSession = createYjsMilestonesStore(doc);
-        const session = startCollabSession(doc, roomName, { signalingUrls, iceServers });
+        const effectiveSignalingUrls = signalingUrls.length > 0 ? signalingUrls : ["ws://127.0.0.1:4444"];
+        const session = startCollabSession(doc, roomName, { signalingUrls: effectiveSignalingUrls, iceServers });
         setActiveSession({
           doc,
           session,
