@@ -54,6 +54,10 @@ interface ToolbarProps {
    * whatever space the rest of the toolbar's own content actually
    * needs at a given width. */
   collabPanel: ReactNode;
+  /** Whether the document is actually being stored, and what to do if not
+   * (WS13-R8/R9). Sits beside the collab panel because both answer "is this
+   * document safe right now" - one about other people, one about storage. */
+  durabilityIndicator?: ReactNode;
 }
 
 function navigateToGithubSource() {
@@ -85,6 +89,7 @@ export function Toolbar({
   hasAutosaved,
   isInSession,
   collabPanel,
+  durabilityIndicator,
 }: ToolbarProps) {
   return (
     <header className="toolbar">
@@ -159,6 +164,7 @@ export function Toolbar({
             <Save size={14} />
             <span className="toolbar__label">Save</span>
           </button>
+          {durabilityIndicator}
           {collabPanel}
           <button type="button" title={"View source on GitHub"} onClick={navigateToGithubSource}>
             <FontAwesomeIcon icon={faGithub} size={"lg"} />

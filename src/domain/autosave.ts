@@ -1,6 +1,10 @@
 import type { DiagramFile } from "./serialization";
 import { parseDiagramFile } from "./serialization";
 import { SchemaVersionError } from "./schemaMigrations.ts";
+import {
+  classifyStorageError,
+  type StorageFailureReason,
+} from "./documentStore.ts";
 
 // Namespaced to avoid colliding with anything else that might use this
 // browser's localStorage for this origin.
@@ -56,12 +60,37 @@ export function loadAutosave(): DiagramFile | null {
  * autosave is a convenience on top of explicit Save, not a guarantee, so
  * a failure here shouldn't surface as a user-facing error or block
  * anything else from working. */
+/** The last write failure, or null if the last write succeeded.
+ *
+ * Previously a failed save was swallowed entirely, so someone whose storage
+ * was full or disabled kept working in the belief their changes were being
+ * kept (WS2-R4). The failure is classified rather than reported raw, because
+ * "no space left" and "storage is switched off" need different things said to
+ * the user. */
+let lastSaveFailure: { reason: StorageFailureReason; message: string } | null =
+  null;
+
+export function getAutosaveFailure(): {
+  reason: StorageFailureReason;
+  message: string;
+} | null {
+  return lastSaveFailure;
+}
+
 export function saveAutosave(file: DiagramFile): void {
   // Never clobber an intact draft this build simply can't read.
   if (autosaveBlockedReason !== null) return;
   try {
     localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(file));
-  } catch {
-    // Same reasoning as above - silently skip this save.
+    lastSaveFailure = null;
+  } catch (error) {
+    const reason = classifyStorageError(error);
+    lastSaveFailure = {
+      reason,
+      message:
+        reason === "quota"
+          ? "There is no space left to save. Export a copy before making more changes."
+          : "This browser is not allowing storage, so changes are not being saved.",
+    };
   }
 }

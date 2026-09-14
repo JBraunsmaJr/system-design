@@ -30,7 +30,16 @@ import {
   type DiagramPath,
 } from "./domain/subDiagramTree";
 import { toDiagramFile, downloadDiagram, parseDiagramFile } from "./domain/serialization";
-import { loadAutosave, saveAutosave } from "./domain/autosave";
+import {
+  loadAutosave,
+  saveAutosave,
+  getAutosaveFailure,
+  getAutosaveBlockedReason,
+} from "./domain/autosave";
+import { DurabilityIndicator } from "./components/DurabilityIndicator";
+import { installUnloadGuard } from "./domain/unloadGuard";
+import type { DurabilitySignals } from "./domain/durability";
+import { countPersistedReplicas } from "./collab/session";
 import { downloadRequirementsMarkdown } from "./domain/requirementsExport";
 import { exportDiagramAsPng, exportDiagramAsSvg } from "./domain/imageExport";
 import type { ArchNodeData, ArchEdgeData, ArchEdgeDataPatch, EdgeWaypoint, Scenario, ScenarioStep, SubDiagram } from "./domain/types";
@@ -338,6 +347,16 @@ function App() {
   // calling setState directly and unconditionally in an effect body,
   // which is exactly the pattern React's own linting steers away from.
   const [presencePeers, setPresencePeers] = useState<PresenceInfo[]>([]);
+  /** Local persistence for the session document, as CONFIRMED - starts as
+   * loading rather than assuming success (NFR-10). */
+  /** Confirmed local-persistence state for the session document, tagged with
+   * the session it belongs to. Tagging rather than resetting means a new
+   * session cannot inherit the previous one's result, and avoids a
+   * synchronous state reset inside an effect (NFR-10). */
+  const [sessionPersistence, setSessionPersistence] = useState<{
+    session: object | null;
+    state: "active" | "loading" | "unavailable";
+  }>({ session: null, state: "loading" });
   /**
    * Whether the current session can actually reach a signaling relay.
    * Null outside a session, or before the first status arrives. Kept
@@ -361,6 +380,26 @@ function App() {
     },
     []
   );
+  // Reports the session document's local persistence once it has actually
+  // loaded. Reset to "loading" on every session change so a new session never
+  // inherits the previous one's confirmed state.
+  useEffect(() => {
+    if (!activeSession) return;
+    let cancelled = false;
+    const { persistence } = activeSession.session;
+    const owner = activeSession.session;
+    void persistence.whenSynced.then(() => {
+      if (cancelled) return;
+      // whenSynced resolves even when the database could not be opened - the
+      // provider reports that by never having stored anything - so this is the
+      // point where the state becomes known either way.
+      setSessionPersistence({ session: owner, state: "active" });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSession]);
+
   useEffect(() => {
     if (!activeSession) return;
     const unsubscribePresence = activeSession.session.subscribeToPresence(setPresencePeers);
@@ -767,6 +806,8 @@ function App() {
   // the rest of the session - there's no real value in a live-ticking
   // "saved 3s ago" here, just confidence that it's happening at all.
   const [hasAutosaved, setHasAutosaved] = useState(false);
+  const [autosaveFailure, setAutosaveFailure] = useState(getAutosaveFailure);
+  const [autosaveBlocked, setAutosaveBlocked] = useState(getAutosaveBlockedReason);
   useEffect(() => {
     const timer = setTimeout(() => {
       saveAutosave(
@@ -782,9 +823,63 @@ function App() {
         )
       );
       setHasAutosaved(true);
+      // Read after the write, so the indicator reflects a confirmed outcome
+      // rather than an attempt (NFR-10).
+      setAutosaveFailure(getAutosaveFailure());
+      setAutosaveBlocked(getAutosaveBlockedReason());
     }, 1000);
     return () => clearTimeout(timer);
   }, [title, liveRoot, scenarios, requirementsSnapshot, programIncrementsSnapshot, teamSnapshot, milestonesSnapshot]);
+
+  /**
+   * What the app currently knows about whether this document is safe
+   * (WS13-R8/R9). Every field is a CONFIRMED observation, never an intention:
+   * the indicator is the one thing in the UI that must not be optimistic.
+   */
+  const durabilitySignals: DurabilitySignals = useMemo(() => {
+    const inSession = activeSession !== null;
+    return {
+      localPersistence: inSession
+        ? sessionPersistence.session === activeSession.session
+          ? sessionPersistence.state
+          : "loading"
+        : autosaveFailure?.reason === "unavailable"
+          ? "unavailable"
+          : hasAutosaved
+            ? "active"
+            : "loading",
+      storageFailure: autosaveFailure,
+      autosaveBlockedReason: autosaveBlocked,
+      // Counted only in a session; outside one there is nobody else to count,
+      // and claiming "you are the only person with a copy" to a solo user
+      // would be noise rather than a warning.
+      replicaCount: inSession
+        ? countPersistedReplicas(
+            presencePeers,
+            sessionPersistence.session === activeSession.session &&
+              sessionPersistence.state === "active",
+          )
+        : undefined,
+    };
+  }, [
+    activeSession,
+    sessionPersistence,
+    autosaveFailure,
+    autosaveBlocked,
+    hasAutosaved,
+    presencePeers,
+  ]);
+
+  // WS13-R7. Read live rather than captured, so the prompt reflects the state
+  // at the moment of closing.
+  const durabilityRef = useRef(durabilitySignals);
+  useEffect(() => {
+    durabilityRef.current = durabilitySignals;
+  }, [durabilitySignals]);
+  useEffect(() => {
+    const guard = installUnloadGuard(() => durabilityRef.current);
+    return () => guard.release();
+  }, []);
 
   const [path, setPath] = useState<DiagramPath>([]);
 
@@ -2131,6 +2226,12 @@ function App() {
           canExportRequirements={requirementsSnapshot.items.length > 0}
           onManageLibraries={() => setIsLibraryModalOpen(true)}
           hasAutosaved={hasAutosaved}
+          durabilityIndicator={
+            <DurabilityIndicator
+              signals={durabilitySignals}
+              onExport={onSave}
+            />
+          }
           isInSession={!!activeSession}
           collabPanel={
             <CollabPanel
