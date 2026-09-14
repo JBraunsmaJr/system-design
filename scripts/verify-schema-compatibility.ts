@@ -165,6 +165,39 @@ console.log("=== 5. Unknown fields from a newer minor version survive ===");
     preserved,
     "an unrecognised node field is preserved rather than dropped on load",
   );
+
+  // The destructive case: open a file from a newer patch release in this
+  // build, save it, and the newer build's data must still be there.
+  const withTopLevel = { ...base, somethingFromANewerPatch: { keep: true } };
+  let topLevelSurvives: boolean;
+  try {
+    const parsed = parseDiagramFile(JSON.stringify(withTopLevel)) as unknown as
+      Record<string, unknown>;
+    const roundTripped = JSON.parse(JSON.stringify(parsed)) as Record<
+      string,
+      unknown
+    >;
+    topLevelSurvives =
+      (roundTripped.somethingFromANewerPatch as Record<string, unknown>)
+        ?.keep === true;
+  } catch {
+    topLevelSurvives = false;
+  }
+  assert(
+    topLevelSurvives,
+    "an unrecognised top-level field survives a load-and-save round trip",
+  );
+}
+
+console.log("=== 6. Loading upgrades the declared version ===");
+{
+  const oldest = readFileSync(join(fixturesDir, "schema-0.1.json"), "utf8");
+  const parsed = parseDiagramFile(oldest);
+  assert(
+    parsed.schemaVersion === SCHEMA_VERSION,
+    `a ${JSON.parse(oldest).schemaVersion} file reports ${SCHEMA_VERSION} after loading, ` +
+      "so re-saving writes a current-format file",
+  );
 }
 
 if (failures > 0) {

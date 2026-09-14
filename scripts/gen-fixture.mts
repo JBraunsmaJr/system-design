@@ -192,7 +192,7 @@ const programIncrements = [
       {
         id: "cr-1",
         name: "Risk buffer",
-        unit: "percent",
+        unit: "percentage",
         value: 20,
         category: "risk",
       },
