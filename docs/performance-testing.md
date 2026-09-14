@@ -50,12 +50,12 @@ The container image encapsulates:
 
 ### Command Reference
 
-| Command | Environment | Description |
-| --- | --- | --- |
-| `npm run test:perf` | Docker Container | **Default Standard**. Builds and executes the test harness inside Docker, outputting `dist/perf-results.json`. |
-| `npm run test:perf:local` | Host Machine | Local developer bypass. Runs against a locally built preview server if Playwright is installed on the host. |
-| `npm run test:perf:gate` | Host Machine / CI | Compares `dist/perf-results.json` against `baselines/perf-baseline.json` and evaluates gating thresholds. |
-| `npm run tests` | Host Machine / CI | Runs all unit and Layer 1 complexity guard verification tests. |
+| Command                   | Environment       | Description                                                                                                    |
+|---------------------------|-------------------|----------------------------------------------------------------------------------------------------------------|
+| `npm run test:perf`       | Docker Container  | **Default Standard**. Builds and executes the test harness inside Docker, outputting `dist/perf-results.json`. |
+| `npm run test:perf:local` | Host Machine      | Local developer bypass. Runs against a locally built preview server if Playwright is installed on the host.    |
+| `npm run test:perf:gate`  | Host Machine / CI | Compares `dist/perf-results.json` against `baselines/perf-baseline.json` and evaluates gating thresholds.      |
+| `npm run tests`           | Host Machine / CI | Runs all unit and Layer 1 complexity guard verification tests.                                                 |
 
 ---
 
@@ -63,13 +63,13 @@ The container image encapsulates:
 
 Workload fixtures are generated deterministically using a seeded pseudo-random number generator (PRNG) in `src/perf/fixtures.ts`. For a given seed and parameter set, the generator produces byte-identical `SubDiagram` models across platforms:
 
-| Fixture Name | Node Count | Edge Count | Structure | Primary Verification Area |
-| --- | --- | --- | --- | --- |
-| `small` | 25 | 30 | Flat | Fast feedback & sanity checks |
-| `medium` | 150 | 220 | Flat | Typical representative diagram |
-| `large` | 400 | 600 | Flat | Stress testing and regression detection |
-| `nested` | 300 total | 400 | 4 levels | Sub-diagram drill-in/out & `parentPath` filters |
-| `grouped` | 200 | 250 | 20 boundaries | Group boundary geometry and containment |
+| Fixture Name | Node Count | Edge Count | Structure     | Primary Verification Area                       |
+|--------------|------------|------------|---------------|-------------------------------------------------|
+| `small`      | 25         | 30         | Flat          | Fast feedback & sanity checks                   |
+| `medium`     | 150        | 220        | Flat          | Typical representative diagram                  |
+| `large`      | 400        | 600        | Flat          | Stress testing and regression detection         |
+| `nested`     | 300 total  | 400        | 4 levels      | Sub-diagram drill-in/out & `parentPath` filters |
+| `grouped`    | 200        | 250        | 20 boundaries | Group boundary geometry and containment         |
 
 ---
 

@@ -248,12 +248,12 @@ stun:global.stun.twilio.com:3478
 **In an environment with no internet access, these are unreachable.**
 What that costs you depends on your network:
 
-| Situation | Works without STUN? |
-|---|---|
-| All users on the same flat LAN / subnet | **Yes.** Host candidates are sufficient — the browsers can see each other's local addresses directly. |
-| Users across subnets, with routing between them | **Usually.** Depends on whether the routed addresses appear as host candidates. Test it. |
-| Users behind NAT from each other | **No.** Requires STUN to discover external addresses, and often TURN to relay when a direct connection can't be made. |
-| Users on different sites / VPN split tunnels | **No.** Requires TURN. |
+| Situation                                       | Works without STUN?                                                                                                   |
+|-------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|
+| All users on the same flat LAN / subnet         | **Yes.** Host candidates are sufficient — the browsers can see each other's local addresses directly.                 |
+| Users across subnets, with routing between them | **Usually.** Depends on whether the routed addresses appear as host candidates. Test it.                              |
+| Users behind NAT from each other                | **No.** Requires STUN to discover external addresses, and often TURN to relay when a direct connection can't be made. |
+| Users on different sites / VPN split tunnels    | **No.** Requires TURN.                                                                                                |
 
 Even in the cases that work, leaving unreachable STUN servers configured
 is not free: every connection attempt waits for them to time out before
@@ -290,11 +290,11 @@ connection time.
 There are three meaningful states, and the difference between the last
 two matters:
 
-| Value | Result |
-|---|---|
+| Value         | Result                                                  |
+|---------------|---------------------------------------------------------|
 | unset / blank | The library's own defaults stay in place (public STUN). |
-| `none` | **No ICE servers at all.** Host candidates only. |
-| a list | Exactly those servers, replacing the defaults. |
+| `none`        | **No ICE servers at all.** Host candidates only.        |
+| a list        | Exactly those servers, replacing the defaults.          |
 
 `none` is the right answer for a single-site isolated deployment where
 everyone shares a LAN. It is not a way of switching ICE off so much as a
