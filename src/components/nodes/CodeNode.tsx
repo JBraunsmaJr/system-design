@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useRef, type KeyboardEvent as ReactKeyboardEvent, type UIEvent as ReactUIEvent } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  type ChangeEvent as ReactChangeEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type UIEvent as ReactUIEvent,
+} from "react";
 import { NodeResizer, type NodeProps, type Node } from "@xyflow/react";
 import * as Icons from "lucide-react";
 import { getCodeLanguage } from "../../domain/codeRegistry";
@@ -50,10 +58,32 @@ export function CodeNode({
   const highlightedHtml = useMemo(() => highlightCode(code, languageId), [code, languageId]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const highlightRef = useRef<HTMLPreElement>(null);
+  const cursorRef = useRef<{ start: number; end: number } | null>(null);
 
   useEffect(() => {
     if (isEditing) textareaRef.current?.focus();
   }, [isEditing]);
+
+  // When code changes (from typing, Tab, or external updates), restore the
+  // textarea's selection/caret position if an edit originated locally.
+  // Otherwise, React re-applying `value={code}` on the controlled textarea
+  // would cause the browser to push the cursor to the end of the text.
+  useLayoutEffect(() => {
+    if (cursorRef.current && textareaRef.current) {
+      const { start, end } = cursorRef.current;
+      textareaRef.current.setSelectionRange(start, end);
+    }
+    cursorRef.current = null;
+  }, [code]);
+
+  const onCodeChange = (event: ReactChangeEvent<HTMLTextAreaElement>) => {
+    const textarea = event.currentTarget;
+    cursorRef.current = {
+      start: textarea.selectionStart,
+      end: textarea.selectionEnd,
+    };
+    onChangeCode?.(id, textarea.value);
+  };
 
   const onCodeKeyDown = (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Escape") {
@@ -65,11 +95,14 @@ export function CodeNode({
     const textarea = event.currentTarget;
     const { selectionStart: start, selectionEnd: end } = textarea;
     const nextValue = textarea.value.slice(0, start) + INDENT + textarea.value.slice(end);
+    const nextCursor = start + INDENT.length;
+    cursorRef.current = { start: nextCursor, end: nextCursor };
     onChangeCode(id, nextValue);
-    // The DOM value won't reflect nextValue until React re-renders with it -
-    // restoring the cursor has to wait for that, not happen synchronously.
+    // In case rendering is deferred, also ensure next frame sets the cursor.
     requestAnimationFrame(() => {
-      textarea.selectionStart = textarea.selectionEnd = start + INDENT.length;
+      if (textareaRef.current) {
+        textareaRef.current.selectionStart = textareaRef.current.selectionEnd = nextCursor;
+      }
     });
   };
 
@@ -120,7 +153,7 @@ export function CodeNode({
               className="code-node__editor-textarea"
               spellCheck={false}
               value={code}
-              onChange={(e) => onChangeCode?.(id, e.target.value)}
+              onChange={onCodeChange}
               onKeyDown={onCodeKeyDown}
               onScroll={onEditorScroll}
               onBlur={() => onFinishEditing?.()}
