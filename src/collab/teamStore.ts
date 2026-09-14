@@ -231,11 +231,27 @@ export function createAdapterTeamStore(
  * the seeding mechanism.
  */
 export function seedTeamStore(store: TeamStore, initial: TeamDocument): void {
+  // Skip anything already present so seeding is safe to attempt against a
+  // store whose document persistence has already restored (WS1-R6). addMember
+  // appends unconditionally, so without this a second seed pass produces a
+  // duplicate of every member.
+  const current = store.getSnapshot();
+  const existingMembers = new Set(current.members.map((m) => m.id));
+  const existingExtras = new Set(
+    current.settings.extraDaysOff.map((e) => e.id),
+  );
+
   for (const member of initial.members) {
+    if (existingMembers.has(member.id)) continue;
     store.addMember({ ...member, ptoSpans: [] });
     for (const pto of member.ptoSpans) store.addPtoSpan(member.id, pto);
+    existingMembers.add(member.id);
   }
-  for (const extra of initial.settings.extraDaysOff) store.addExtraDayOff(extra);
+  for (const extra of initial.settings.extraDaysOff) {
+    if (existingExtras.has(extra.id)) continue;
+    store.addExtraDayOff(extra);
+    existingExtras.add(extra.id);
+  }
   store.updateSettings({
     defaultPointsPerDay: initial.settings.defaultPointsPerDay,
     excludeUsHolidays: initial.settings.excludeUsHolidays,

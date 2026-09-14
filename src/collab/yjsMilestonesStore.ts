@@ -1,4 +1,5 @@
 import * as Y from "yjs";
+import { orderIdSet, pushIfAbsent } from "./seedGuards.ts";
 import type { Milestone } from "../domain/milestones";
 import { sanitizeRelatedItemIds } from "../domain/milestones";
 import type { MilestonesStore } from "./milestonesStore";
@@ -12,9 +13,11 @@ function nextMilestoneId(prefix = "milestone"): string {
 export function seedYjsMilestonesDoc(doc: Y.Doc, initial: Milestone[]): void {
   const milestoneOrder = doc.getArray<string>("milestoneOrder");
   const milestones = doc.getMap<Y.Map<unknown>>("milestones");
+  const seen = orderIdSet(milestoneOrder);
 
   doc.transact(() => {
     for (const m of initial) {
+      if (seen.has(m.id) || milestones.has(m.id)) continue;
       const mM = new Y.Map<unknown>();
       mM.set("type", m.type);
       mM.set("name", m.name);
@@ -33,7 +36,7 @@ export function seedYjsMilestonesDoc(doc: Y.Doc, initial: Milestone[]): void {
       if (m.updatedAt) mM.set("updatedAt", m.updatedAt);
 
       milestones.set(m.id, mM);
-      milestoneOrder.push([m.id]);
+      pushIfAbsent(milestoneOrder, seen, m.id);
     }
   });
 }

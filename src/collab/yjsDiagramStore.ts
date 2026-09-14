@@ -1,4 +1,5 @@
 import * as Y from "yjs";
+import { orderIdSet, pushIfAbsent } from "./seedGuards.ts";
 import type { Node, Edge } from "@xyflow/react";
 import type { ArchNodeData, ArchEdgeData, EdgeWaypoint, SubDiagram } from "../domain/types";
 import type { DiagramStore } from "./diagramStore";
@@ -159,9 +160,14 @@ export function seedYjsDiagramDoc(doc: Y.Doc, root: SubDiagram): void {
   const nodesMap = doc.getMap<Y.Map<unknown>>("nodes");
   const edgeOrder = doc.getArray<string>("edgeOrder");
   const edgesMap = doc.getMap<Y.Map<unknown>>("edges");
+  // Seeding must be safe to attempt against a document that persistence has
+  // already restored - see seedGuards.ts.
+  const seenNodes = orderIdSet(nodeOrder);
+  const seenEdges = orderIdSet(edgeOrder);
 
   doc.transact(() => {
     for (const node of nodes) {
+      if (seenNodes.has(node.id) || nodesMap.has(node.id)) continue;
       const m = new Y.Map<unknown>();
       m.set("type", node.type);
       m.set("position", node.position);
@@ -173,9 +179,10 @@ export function seedYjsDiagramDoc(doc: Y.Doc, root: SubDiagram): void {
         m.set(field, (node.data as Record<string, unknown>)[field]);
       }
       nodesMap.set(node.id, m);
-      nodeOrder.push([node.id]);
+      pushIfAbsent(nodeOrder, seenNodes, node.id);
     }
     for (const edge of edges) {
+      if (seenEdges.has(edge.id) || edgesMap.has(edge.id)) continue;
       const m = new Y.Map<unknown>();
       m.set("source", edge.source);
       m.set("target", edge.target);
@@ -197,7 +204,7 @@ export function seedYjsDiagramDoc(doc: Y.Doc, root: SubDiagram): void {
       if (waypoints && waypoints.length > 0) array.push(waypoints.map(makeWaypointMap));
       m.set(WAYPOINTS_KEY, array);
       edgesMap.set(edge.id, m);
-      edgeOrder.push([edge.id]);
+      pushIfAbsent(edgeOrder, seenEdges, edge.id);
     }
   });
 }

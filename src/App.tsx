@@ -522,17 +522,36 @@ function App() {
       const roomName = `session-${Math.random().toString(36).slice(2, 10)}`;
       const sessionKey = explicitKey && explicitKey.trim() ? explicitKey.trim() : generateSessionKey();
       const doc = new Y.Doc();
-      seedYjsRequirementsDoc(doc, seedRequirements);
-      seedYjsProgramIncrementsDoc(doc, seedProgramIncrements);
-      seedYjsDiagramDoc(doc, seedRoot);
-      seedYjsMilestonesDoc(doc, seedMilestones);
       const teamStore = createYjsTeamStore(doc);
-      seedTeamStore(teamStore, seedTeam);
       const requirementsStoreForSession = createYjsRequirementsStore(doc);
       const programIncrementsStoreForSession = createYjsProgramIncrementsStore(doc);
       const diagramStoreForSession = createYjsDiagramStore(doc);
       const milestonesStoreForSession = createYjsMilestonesStore(doc);
       const session = startCollabSession(doc, roomName, { signalingUrls, password: sessionKey, iceServers });
+
+      /**
+       * WS2-R2: seed only after local persistence has finished replaying, and
+       * only if it found nothing.
+       *
+       * Starting a session generates a fresh room name, so in practice the
+       * replica is empty and this seeds - but the check is what makes the
+       * ordering safe rather than incidental. Deciding to seed before
+       * persistence has loaded would, against a restored document, seed on top
+       * of content that is about to arrive.
+       *
+       * The seeds are individually idempotent too (WS1-R6), so a caller that
+       * gets this wrong degrades to a no-op rather than to a duplicated
+       * document.
+       */
+      void session.persistence.whenSynced.then(() => {
+        if (!session.persistence.wasEmptyOnLoad()) return;
+        seedYjsRequirementsDoc(doc, seedRequirements);
+        seedYjsProgramIncrementsDoc(doc, seedProgramIncrements);
+        seedYjsDiagramDoc(doc, seedRoot);
+        seedYjsMilestonesDoc(doc, seedMilestones);
+        seedTeamStore(teamStore, seedTeam);
+      });
+
       const initialPresence: LocalPresenceInfo = {
         name: displayName.trim() || "Guest",
         color: PRESENCE_COLORS[Math.floor(Math.random() * PRESENCE_COLORS.length)],
@@ -578,10 +597,15 @@ function App() {
     [requirements, programIncrements, team, root, diagram.milestones, setTeam, setRequirements, setProgramIncrements, setMilestones, setRoot, signalingUrls, signalingUrlsInput, buildTimeSignalingDefault, iceServers, displayName, showToast]
   );
 
-  // Joins an existing session by room name - starts from an EMPTY doc
-  // rather than seeding local state, since the whole point of joining is
-  // to receive whatever the session already has from other peers, not to
-  // impose this browser's own local state onto it.
+  // Joins an existing session by room name - never seeds from local state,
+  // since the whole point of joining is to receive whatever the session
+  // already has rather than imposing this browser's own state onto it.
+  //
+  // The document is no longer necessarily empty at this point: if this browser
+  // has been in this room before, local persistence restores it immediately,
+  // so the session opens with content on screen before any peer connects and
+  // works offline. That restored copy and the peers' copy converge on sync the
+  // same way two live peers do (WS2-R1).
   const joinSession = useCallback(
     (roomName: string, passwordOrKey?: string, relayOverride?: string) => {
       if (activeSessionRef.current) {
@@ -805,8 +829,7 @@ function App() {
         const programIncrementsStoreForSession = createYjsProgramIncrementsStore(doc);
         const diagramStoreForSession = createYjsDiagramStore(doc);
         const milestonesStoreForSession = createYjsMilestonesStore(doc);
-        const effectiveSignalingUrls = signalingUrls.length > 0 ? signalingUrls : ["ws://127.0.0.1:4444"];
-        const session = startCollabSession(doc, roomName, { signalingUrls: effectiveSignalingUrls, iceServers });
+        const session = startCollabSession(doc, roomName, { signalingUrls, iceServers });
         setActiveSession({
           doc,
           session,

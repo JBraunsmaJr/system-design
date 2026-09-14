@@ -1,4 +1,5 @@
 import * as Y from "yjs";
+import { orderIdSet, pushIfAbsent } from "./seedGuards.ts";
 import type {
   RequirementsDocument,
   RequirementItem,
@@ -61,9 +62,22 @@ export function seedYjsRequirementsDoc(doc: Y.Doc, initial: RequirementsDocument
   const relationshipTypesMap = doc.getMap<RelationshipType>("relationshipTypes");
   const relationshipsMap = doc.getMap<RequirementRelationship>("relationships");
   const nextSequenceMap = doc.getMap<number>("nextSequence");
+  const seenItemTypes = orderIdSet(itemTypeOrder);
+  const seenCategories = orderIdSet(categoryOrder);
+  // Items are keyed by a generated storage key rather than by their own id,
+  // so presence has to be checked against the id INSIDE each stored map.
+  // Checking the storage key would never match and every re-seed would
+  // duplicate the entire backlog.
+  const seenItemIds = new Set<string>();
+  for (const key of itemOrder.toArray()) {
+    const existing = itemsMap.get(key);
+    const id = existing?.get("id");
+    if (typeof id === "string") seenItemIds.add(id);
+  }
 
   doc.transact(() => {
     for (const t of initial.itemTypes) {
+      if (seenItemTypes.has(t.id) || itemTypesMap.has(t.id)) continue;
       const m = new Y.Map<unknown>();
       m.set("label", t.label);
       m.set("prefix", t.prefix);
@@ -71,13 +85,15 @@ export function seedYjsRequirementsDoc(doc: Y.Doc, initial: RequirementsDocument
       m.set("isBuiltIn", t.isBuiltIn);
       m.set("isWorkable", t.isWorkable);
       itemTypesMap.set(t.id, m);
-      itemTypeOrder.push([t.id]);
+      pushIfAbsent(itemTypeOrder, seenItemTypes, t.id);
     }
     for (const c of initial.categories) {
+      if (seenCategories.has(c.id) || categoriesMap.has(c.id)) continue;
       categoriesMap.set(c.id, c);
-      categoryOrder.push([c.id]);
+      pushIfAbsent(categoryOrder, seenCategories, c.id);
     }
     for (const item of initial.items) {
+      if (seenItemIds.has(item.id)) continue;
       const storageKey = collisionResistantId("item");
       const m = new Y.Map<unknown>();
       m.set("id", item.id);
@@ -91,6 +107,7 @@ export function seedYjsRequirementsDoc(doc: Y.Doc, initial: RequirementsDocument
       m.set("status", item.status);
       itemsMap.set(storageKey, m);
       itemOrder.push([storageKey]);
+      seenItemIds.add(item.id);
     }
     for (const t of initial.relationshipTypes) {
       relationshipTypesMap.set(t.id, t);

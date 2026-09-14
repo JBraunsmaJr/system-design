@@ -1,5 +1,11 @@
 import { WebrtcProvider } from "y-webrtc";
 import type * as Y from "yjs";
+import {
+  attachPersistence,
+  createNullPersistence,
+  persistenceKeyForRoom,
+  type DocPersistence,
+} from "./persistence.ts";
 
 /**
  * Wires a Y.Doc to a WebRTC-based collaborative session. This is the
@@ -83,6 +89,14 @@ export interface PresenceInfo extends LocalPresenceInfo {
 
 export interface CollabSession {
   provider: WebrtcProvider;
+  /**
+   * The local replica of this room's document.
+   *
+   * Callers MUST await `persistence.whenSynced` before deciding whether to
+   * seed the document - see WS2-R2. Seeding a document that persistence is
+   * about to populate is how a restored session ends up duplicated.
+   */
+  persistence: DocPersistence;
   /** True once at least one other peer (or, on the same machine, another
    * browser tab via BroadcastChannel) has been found and initial sync
    * has completed - not the same as "actively connected right now",
@@ -162,6 +176,15 @@ export interface CollabSessionOptions {
    * host candidates that were sufficient all along.
    */
   iceServers?: RTCIceServer[];
+  /**
+   * Persist this room's document locally (WS2-R1). On by default: without it,
+   * the document exists only in connected browsers' memory and the last
+   * participant to leave takes the session's work with them.
+   *
+   * Turned off by the perf harness and by tests that want a clean document
+   * every run rather than whatever a previous run left behind.
+   */
+  persist?: boolean;
 }
 
 /**
@@ -234,8 +257,14 @@ export function startCollabSession(doc: Y.Doc, roomName: string, options: Collab
     ...(options.iceServers === undefined ? {} : { peerOpts: { config: { iceServers: options.iceServers } } }),
   });
 
+  const persistence =
+    options.persist === false
+      ? createNullPersistence(doc)
+      : attachPersistence(doc, persistenceKeyForRoom(roomName));
+
   return {
     provider,
+    persistence,
     isSynced: () => provider.room?.synced ?? false,
     disconnect: () => {
       /**
@@ -246,6 +275,10 @@ export function startCollabSession(doc: Y.Doc, roomName: string, options: Collab
        * - neither of which plain disconnect() does on its own.
        */
       provider.destroy();
+      // Deliberately does NOT clear the local replica. Leaving a session and
+      // discarding the only copy of the work must never be the same gesture -
+      // persistence.forget() is the separate, confirmed action (WS2-R6).
+      void persistence.destroy();
     },
     setLocalPresence: (info) => {
       provider.awareness.setLocalState(info);
