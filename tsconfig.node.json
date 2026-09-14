@@ -20,5 +20,9 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["vite.config.ts", "scripts/**/*"]
+  "include": ["vite.config.ts", "scripts/**/*"],
+  /* gen-fixture.mts runs inside worktrees of historical commits, where the
+     surrounding types differ by design. Typechecking it against HEAD would
+     be meaningless and would break whenever an old shape diverges. */
+  "exclude": ["scripts/gen-fixture.mts"]
 }

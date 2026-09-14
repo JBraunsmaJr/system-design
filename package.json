@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "test": "tsx scripts/run-tests.ts",
     "tests": "tsx scripts/run-tests.ts",
+    "fixtures:generate": "bash scripts/generate-fixtures.sh",
     "test:perf": "tsx scripts/run-perf.ts",
     "test:perf:local": "tsx scripts/run-perf.ts --local",
     "test:perf:gate": "tsx scripts/perf-gate.ts",
