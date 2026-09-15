@@ -1,4 +1,5 @@
 import { WebrtcProvider } from "y-webrtc";
+import { buildPeerOpts } from "./transport.ts";
 import type * as Y from "yjs";
 import {
   attachPersistence,
@@ -285,7 +286,7 @@ export function startCollabSession(doc: Y.Doc, roomName: string, options: Collab
      * override the defaults with nothing, quietly turning "I didn't
      * configure this" into "use no ICE servers at all".
      */
-    ...(options.iceServers === undefined ? {} : { peerOpts: { config: { iceServers: options.iceServers } } }),
+    ...buildPeerOpts(options.iceServers),
   });
 
   const persistence =
