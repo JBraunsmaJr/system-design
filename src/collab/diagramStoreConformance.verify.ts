@@ -1,12 +1,21 @@
 /**
- * Standalone verification for createAdapterDiagramStore - proving the
+ * Conformance: the in-memory and Yjs DiagramStore implementations must behave
+ * identically under the same sequences.
+ *
+ * This file began as the adapter store's own verification. The adapter is gone
+ * (WS1 Step 4), but the sequences it exercised were never really about that
+ * implementation - they pin behaviour any DiagramStore has to satisfy, which
+ * is worth more now that the Yjs store is the only one the app uses.
+ *
+ * Originally: proving the
  * bridge between the flat DiagramStore interface and the app's actual
  * recursive tree representation works correctly. Run with:
  *
  *   npx tsx src/collab/adapterDiagramStore.verify.ts
  */
-import { createLocalDiagramStore, getNodesAtPath, getEdgesAtPath, hasSubDiagram } from "./diagramStore";
-import { createAdapterDiagramStore } from "./adapterDiagramStore";
+import { createLocalDiagramStore, getNodesAtPath, getEdgesAtPath, hasSubDiagram, unflattenToSubDiagram } from "./diagramStore";
+import { createYjsDiagramStore } from "./yjsDiagramStore";
+import * as Y from "yjs";
 import type { DiagramStore } from "./diagramStore";
 import type { ArchNodeData, ArchEdgeData, SubDiagram } from "../domain/types";
 
@@ -29,14 +38,21 @@ function mkEdgeData(): ArchEdgeData {
 }
 
 function makeAdapterStore(): { store: DiagramStore; getRoot: () => SubDiagram } {
-  let root: SubDiagram = { nodes: [], edges: [] };
-  const store = createAdapterDiagramStore(
-    () => root,
-    (updater) => {
-      root = updater(root);
-    }
-  );
-  return { store, getRoot: () => root };
+  const store = createYjsDiagramStore(new Y.Doc());
+  return {
+    store,
+    /**
+     * The tree form, derived. The retired adapter stored this shape natively;
+     * the Yjs store stores nodes flat with a parentPath and the tree is a
+     * view. Assertions below that inspect nesting are still meaningful - they
+     * check that an edit at depth lands at the right place in the hierarchy,
+     * which is the property that mattered, not which representation holds it.
+     */
+    getRoot: () => {
+      const snapshot = store.getSnapshot();
+      return unflattenToSubDiagram(snapshot.nodes, snapshot.edges);
+    },
+  };
 }
 
 function canonicalJSON(value: unknown): string {
@@ -81,7 +97,7 @@ function canonicalJSON(value: unknown): string {
 
   assert(
     canonicalJSON(stripIds(localSnap)) === canonicalJSON(stripIds(adapterSnap)),
-    "the tree-backed adapter produces structurally identical results to the flat-native local store after the same sequence of operations - the two representations agree despite being fundamentally different internally"
+    "the Yjs store produces structurally identical results to the in-memory local store after the same sequence of operations - the two representations agree despite being fundamentally different internally"
   );
 }
 
