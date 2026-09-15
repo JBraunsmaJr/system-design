@@ -503,19 +503,22 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
     for (const listener of listeners) listener();
   };
 
-  itemTypeOrder.observeDeep(recomputeAndNotify);
-  itemTypes.observeDeep(recomputeAndNotify);
-  categoryOrder.observeDeep(recomputeAndNotify);
-  categories.observeDeep(recomputeAndNotify);
-  itemOrder.observeDeep(recomputeAndNotify);
-  items.observeDeep(recomputeAndNotify);
-  relationshipTypes.observeDeep(recomputeAndNotify);
-  relationships.observeDeep(recomputeAndNotify);
-  nextSequence.observeDeep(recomputeAndNotify);
+  /** Kept so destroy() can detach exactly what was attached - listing them
+   * again by hand would drift the moment a collection is added. */
+  const observed = [itemTypeOrder, itemTypes, categoryOrder, categories, itemOrder, items, relationshipTypes, relationships, nextSequence];
+  for (const target of observed) target.observeDeep(recomputeAndNotify);
+  let destroyed = false;
 
   return {
     getSnapshot: () => cached,
 
+    /** Detaches the observers registered above. Idempotent: a second call is a
+     * no-op rather than an error, so teardown paths can be defensive. */
+    destroy: () => {
+      if (destroyed) return;
+      destroyed = true;
+      for (const target of observed) target.unobserveDeep(recomputeAndNotify);
+    },
     subscribe: (listener) => {
       listeners.add(listener);
       return () => listeners.delete(listener);

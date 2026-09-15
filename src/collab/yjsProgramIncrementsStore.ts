@@ -137,8 +137,11 @@ export function createYjsProgramIncrementsStore(doc: Y.Doc): ProgramIncrementsSt
     for (const listener of listeners) listener();
   };
 
-  piOrder.observeDeep(recomputeAndNotify);
-  pis.observeDeep(recomputeAndNotify);
+  /** Kept so destroy() can detach exactly what was attached - listing them
+   * again by hand would drift the moment a collection is added. */
+  const observed = [piOrder, pis];
+  for (const target of observed) target.observeDeep(recomputeAndNotify);
+  let destroyed = false;
 
   function getPIMap(piId: string): Y.Map<unknown> | undefined {
     return pis.get(piId);
@@ -147,6 +150,13 @@ export function createYjsProgramIncrementsStore(doc: Y.Doc): ProgramIncrementsSt
   return {
     getSnapshot: () => cached,
 
+    /** Detaches the observers registered above. Idempotent: a second call is a
+     * no-op rather than an error, so teardown paths can be defensive. */
+    destroy: () => {
+      if (destroyed) return;
+      destroyed = true;
+      for (const target of observed) target.unobserveDeep(recomputeAndNotify);
+    },
     subscribe: (listener) => {
       listeners.add(listener);
       return () => listeners.delete(listener);

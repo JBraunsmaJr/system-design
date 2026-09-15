@@ -105,14 +105,22 @@ export function createYjsTeamStore(doc: Y.Doc): TeamStore {
   // order change) - covers every mutation path below, and just as
   // importantly, changes that arrive from syncing with a remote peer,
   // not only ones made through this store's own methods.
-  memberOrder.observeDeep(recomputeAndNotify);
-  members.observeDeep(recomputeAndNotify);
-  extraDaysOff.observeDeep(recomputeAndNotify);
-  settings.observeDeep(recomputeAndNotify);
+  /** Kept so destroy() can detach exactly what was attached - listing them
+   * again by hand would drift the moment a collection is added. */
+  const observed = [memberOrder, members, extraDaysOff, settings];
+  for (const target of observed) target.observeDeep(recomputeAndNotify);
+  let destroyed = false;
 
   return {
     getSnapshot: () => cached,
 
+    /** Detaches the observers registered above. Idempotent: a second call is a
+     * no-op rather than an error, so teardown paths can be defensive. */
+    destroy: () => {
+      if (destroyed) return;
+      destroyed = true;
+      for (const target of observed) target.unobserveDeep(recomputeAndNotify);
+    },
     subscribe: (listener) => {
       listeners.add(listener);
       return () => listeners.delete(listener);

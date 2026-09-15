@@ -117,6 +117,9 @@ export function createAdapterDiagramStore(
   return {
     getSnapshot,
 
+    /** Holds no document resources, so there is nothing to detach. Present so
+     * every implementation of the seam has the same shape. */
+    destroy: () => {},
     subscribe: () => () => {},
 
     addNode: (parentPath, type, position, data) => {

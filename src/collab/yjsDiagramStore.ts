@@ -329,10 +329,11 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
     for (const listener of listeners) listener();
   };
 
-  nodeOrder.observeDeep(recomputeAndNotify);
-  nodesMap.observeDeep(recomputeAndNotify);
-  edgeOrder.observeDeep(recomputeAndNotify);
-  edgesMap.observeDeep(recomputeAndNotify);
+  /** Kept so destroy() can detach exactly what was attached - listing them
+   * again by hand would drift the moment a collection is added. */
+  const observed = [nodeOrder, nodesMap, edgeOrder, edgesMap];
+  for (const target of observed) target.observeDeep(recomputeAndNotify);
+  let destroyed = false;
 
   function isPathAtOrBelow(path: string[], ancestorPrefix: string[]): boolean {
     if (path.length < ancestorPrefix.length) return false;
@@ -342,6 +343,13 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
   return {
     getSnapshot: () => cached,
 
+    /** Detaches the observers registered above. Idempotent: a second call is a
+     * no-op rather than an error, so teardown paths can be defensive. */
+    destroy: () => {
+      if (destroyed) return;
+      destroyed = true;
+      for (const target of observed) target.unobserveDeep(recomputeAndNotify);
+    },
     subscribe: (listener) => {
       listeners.add(listener);
       return () => listeners.delete(listener);

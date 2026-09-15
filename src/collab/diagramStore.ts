@@ -73,6 +73,21 @@ import { recordUnflattenCall, recordStoreWrite } from "../perf/instrumentation";
  * were never part of the recursive-nesting problem this store solves.
  */
 export interface DiagramStore {
+  /**
+   * Detaches every observer this store attached to the document (WS1 Step 1).
+   *
+   * The Yjs implementations register observeDeep handlers at construction and
+   * previously had no way to remove them. That was survivable while a store
+   * was built once per session, but the unified document model builds one per
+   * DOCUMENT - so opening and closing documents would accumulate live
+   * observers on documents still in memory, each rebuilding a snapshot on
+   * every change.
+   *
+   * Safe to call more than once. Implementations that hold no document
+   * resources may no-op.
+   */
+  destroy(): void;
+
   /** Every node across the entire tree, at any depth, each carrying its
    * own parentPath. Use getNodesAtPath to filter to one level. */
   getSnapshot(): { nodes: Node<ArchNodeData>[]; edges: Edge<ArchEdgeData>[] };
@@ -322,6 +337,9 @@ export function createLocalDiagramStore(initial?: {
   return {
     getSnapshot: () => ({ nodes, edges }),
 
+    /** Holds no document resources, so there is nothing to detach. Present so
+     * every implementation of the seam has the same shape. */
+    destroy: () => {},
     subscribe: (listener) => {
       listeners.add(listener);
       return () => listeners.delete(listener);

@@ -33,6 +33,21 @@ import { EMPTY_TEAM_DOCUMENT } from "../domain/teamTypes";
  * without stale-closure bugs.
  */
 export interface TeamStore {
+  /**
+   * Detaches every observer this store attached to the document (WS1 Step 1).
+   *
+   * The Yjs implementations register observeDeep handlers at construction and
+   * previously had no way to remove them. That was survivable while a store
+   * was built once per session, but the unified document model builds one per
+   * DOCUMENT - so opening and closing documents would accumulate live
+   * observers on documents still in memory, each rebuilding a snapshot on
+   * every change.
+   *
+   * Safe to call more than once. Implementations that hold no document
+   * resources may no-op.
+   */
+  destroy(): void;
+
   getSnapshot(): TeamDocument;
   subscribe(listener: () => void): () => void;
 
@@ -64,6 +79,9 @@ export function createLocalTeamStore(initial: TeamDocument = EMPTY_TEAM_DOCUMENT
   return {
     getSnapshot: () => doc,
 
+    /** Holds no document resources, so there is nothing to detach. Present so
+     * every implementation of the seam has the same shape. */
+    destroy: () => {},
     subscribe: (listener) => {
       listeners.add(listener);
       return () => listeners.delete(listener);
@@ -165,6 +183,9 @@ export function createAdapterTeamStore(
   return {
     getSnapshot,
 
+    /** Holds no document resources, so there is nothing to detach. Present so
+     * every implementation of the seam has the same shape. */
+    destroy: () => {},
     subscribe: () => () => {},
 
     addMember: (member) => {
