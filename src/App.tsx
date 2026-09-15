@@ -41,7 +41,7 @@ import { installUnloadGuard } from "./domain/unloadGuard";
 import type { DurabilitySignals } from "./domain/durability";
 import { countPersistedReplicas } from "./collab/session";
 import {
-  openDocument,
+  openDocumentNow,
   replaceDocumentContents,
   type OpenDocument,
 } from "./collab/localDocument";
@@ -61,14 +61,11 @@ import type { ProgramIncrement } from "./domain/programIncrements";
 import type { TeamDocument } from "./domain/teamTypes";
 import { EMPTY_TEAM_DOCUMENT } from "./domain/teamTypes";
 import * as Y from "yjs";
-import { createAdapterTeamStore, seedTeamStore } from "./collab/teamStore";
+import { seedTeamStore } from "./collab/teamStore";
 import { createYjsTeamStore } from "./collab/yjsTeamStore";
 import type { TeamStore } from "./collab/teamStore";
-import { createAdapterRequirementsStore } from "./collab/requirementsStore";
 import { createYjsRequirementsStore, seedYjsRequirementsDoc } from "./collab/yjsRequirementsStore";
 import type { RequirementsStore } from "./collab/requirementsStore";
-import { createAdapterProgramIncrementsStore } from "./collab/programIncrementsStore";
-import { createAdapterDiagramStore } from "./collab/adapterDiagramStore";
 import { getNodesAtPath, getEdgesAtPath, unflattenToSubDiagram, flattenSubDiagramTree, hasSubDiagram } from "./collab/diagramStore";
 import type { EdgeEndpoints } from "./domain/edgeReconnect";
 import type { DiagramStore } from "./collab/diagramStore";
@@ -76,7 +73,7 @@ import { createYjsDiagramStore, seedYjsDiagramDoc } from "./collab/yjsDiagramSto
 import { createYjsProgramIncrementsStore, seedYjsProgramIncrementsDoc } from "./collab/yjsProgramIncrementsStore";
 import type { ProgramIncrementsStore } from "./collab/programIncrementsStore";
 import type { Milestone } from "./domain/milestones";
-import { createAdapterMilestonesStore, type MilestonesStore } from "./collab/milestonesStore";
+import { type MilestonesStore } from "./collab/milestonesStore";
 import { createYjsMilestonesStore, seedYjsMilestonesDoc } from "./collab/yjsMilestonesStore";
 import { startCollabSession, type CollabSession, type PresenceInfo, type LocalPresenceInfo } from "./collab/session";
 import { loadPresenceName, savePresenceName, loadShowPeerCursors, saveShowPeerCursors } from "./domain/presenceIdentity";
@@ -200,14 +197,6 @@ function App() {
       })),
     [setDiagram]
   );
-  const setRoot = useCallback(
-    (updater: SubDiagram | ((prev: SubDiagram) => SubDiagram)) =>
-      setDiagram((prev) => ({
-        ...prev,
-        root: typeof updater === "function" ? (updater as (p: SubDiagram) => SubDiagram)(prev.root) : updater,
-      })),
-    [setDiagram]
-  );
   // rootRef always holds the CURRENT root, updated on every render (a
   // plain ref mutation during render, not a state update - safe, and
   // exactly the pattern React itself recommends for "keep a ref in sync
@@ -235,22 +224,6 @@ function App() {
   // sign anything is wrong with it now.
   // eslint-disable-next-line react-hooks/refs
   rootRef.current = root;
-  // Deliberately NOT depending on `root` here - only on `setRoot`
-  // (itself stable across renders, since it only depends on setDiagram).
-  // The adapter's own getSnapshot has a cache keyed on root's identity
-  // (see adapterDiagramStore.ts), but that cache lives INSIDE the
-  // closure created by createAdapterDiagramStore - if this useMemo
-  // depended on `root` and recreated the store on every edit, each new
-  // instance would start with an empty cache and immediately re-flatten
-  // from scratch anyway, defeating that fix in practice. A single,
-  // long-lived instance is what lets the cache (and, just as
-  // importantly, stable object references for every node that DIDN'T
-  // change) actually persist between edits rather than being thrown
-  // away every single time. getRoot's own read of rootRef.current
-  // happens later, inside store method calls triggered from event
-  // handlers, never during render - see the note above.
-  // eslint-disable-next-line react-hooks/refs
-  const localDiagramStore = useMemo(() => createAdapterDiagramStore(() => rootRef.current, setRoot), [setRoot]);
   const setScenarios = useCallback(
     (updater: Scenario[] | ((prev: Scenario[]) => Scenario[])) =>
       setDiagram((prev) => ({
@@ -259,45 +232,9 @@ function App() {
       })),
     [setDiagram]
   );
-  const setRequirements = useCallback(
-    (updater: (prev: RequirementsDocument) => RequirementsDocument) =>
-      setDiagram((prev) => ({ ...prev, requirements: updater(prev.requirements) })),
-    [setDiagram]
-  );
-  const localRequirementsStore = useMemo(
-    () => createAdapterRequirementsStore(() => requirements, setRequirements),
-    [requirements, setRequirements]
-  );
 
-  const setProgramIncrements = useCallback(
-    (updater: (prev: ProgramIncrement[]) => ProgramIncrement[]) =>
-      setDiagram((prev) => ({ ...prev, programIncrements: updater(prev.programIncrements) })),
-    [setDiagram]
-  );
-  const localProgramIncrementsStore = useMemo(
-    () => createAdapterProgramIncrementsStore(() => programIncrements, setProgramIncrements),
-    [programIncrements, setProgramIncrements]
-  );
 
-  const setTeam = useCallback(
-    (updater: (prev: TeamDocument) => TeamDocument) =>
-      setDiagram((prev) => ({ ...prev, team: updater(prev.team) })),
-    [setDiagram]
-  );
-  const localTeamStore = useMemo(() => createAdapterTeamStore(() => team, setTeam), [team, setTeam]);
 
-  const setMilestones = useCallback(
-    (updater: Milestone[] | ((prev: Milestone[]) => Milestone[])) =>
-      setDiagram((prev) => ({
-        ...prev,
-        milestones: typeof updater === "function" ? (updater as (p: Milestone[]) => Milestone[])(prev.milestones) : updater,
-      })),
-    [setDiagram]
-  );
-  const localMilestonesStore = useMemo(
-    () => createAdapterMilestonesStore(() => diagram.milestones, setMilestones),
-    [diagram.milestones, setMilestones]
-  );
 
   // --- Collaborative sessions -----------------------------------------------
   //
@@ -366,44 +303,38 @@ function App() {
    * seams here is the change under test; deleting the fallback is a separate
    * step, and keeping it means a revert is one line.
    */
-  const [openDoc, setOpenDoc] = useState<OpenDocument | null>(null);
-  const openDocRef = useRef<OpenDocument | null>(null);
-  /** Read once, by the mount effect below, to seed the document. A ref rather
-   * than a dependency: re-running that effect would open a second document. */
-  const bootSnapshotRef = useRef(diagram);
-  useEffect(() => {
-    let cancelled = false;
-    const bootSnapshot = bootSnapshotRef.current;
-    const bootFlat = flattenSubDiagramTree(bootSnapshot.root);
-    void openDocument({
+  /**
+   * The open document. Created by a lazy initialiser so it exists from the
+   * first render - which is what lets the seams below drop their adapter
+   * fallback entirely (WS1 Step 4). The initialiser runs exactly once, so
+   * `diagram` is read at boot and never again.
+   */
+  const [openDoc] = useState(() => {
+    const flat = flattenSubDiagramTree(diagram.root);
+    return openDocumentNow({
       docId: "local",
       initial: buildDiagramFile(
-        bootSnapshot.title,
-        bootFlat.nodes,
-        bootFlat.edges,
-        bootSnapshot.scenarios,
-        bootSnapshot.requirements,
-        bootSnapshot.programIncrements,
-        bootSnapshot.team,
-        bootSnapshot.milestones ?? []
+        diagram.title,
+        flat.nodes,
+        flat.edges,
+        diagram.scenarios,
+        diagram.requirements,
+        diagram.programIncrements,
+        diagram.team,
+        diagram.milestones ?? []
       ),
-    }).then((doc) => {
-      if (cancelled) {
-        void doc.close();
-        return;
-      }
-      openDocRef.current = doc;
-      setOpenDoc(doc);
     });
+  });
+  const openDocRef = useRef<OpenDocument | null>(openDoc);
+  // The document exists from the first render; this only has to release it.
+  useEffect(() => {
+    const held = openDoc;
     return () => {
-      cancelled = true;
       // Step 1 exists for this: without it every remount leaves observers
       // rebuilding snapshots against a document nobody reads.
-      const held = openDocRef.current;
-      openDocRef.current = null;
-      if (held) void held.close();
+      void held.close();
     };
-  }, []);
+  }, [openDoc]);
   /** Local persistence for the session document, as CONFIRMED - starts as
    * loading rather than assuming success (NFR-10). */
   /** Confirmed local-persistence state for the session document, tagged with
@@ -821,14 +752,13 @@ function App() {
    * the same schema. The adapter fallback covers only the few frames before
    * the document finishes opening; deleting it is Step 4.
    */
-  const teamStore = activeSession?.teamStore ?? openDoc?.stores.team ?? localTeamStore;
+  const teamStore = activeSession?.teamStore ?? openDoc.stores.team;
   const requirementsStore =
-    activeSession?.requirementsStore ?? openDoc?.stores.requirements ?? localRequirementsStore;
+    activeSession?.requirementsStore ?? openDoc.stores.requirements;
   const programIncrementsStore =
-    activeSession?.programIncrementsStore ?? openDoc?.stores.programIncrements ?? localProgramIncrementsStore;
-  const milestonesStore =
-    activeSession?.milestonesStore ?? openDoc?.stores.milestones ?? localMilestonesStore;
-  const diagramStore = activeSession?.diagramStore ?? openDoc?.stores.diagram ?? localDiagramStore;
+    activeSession?.programIncrementsStore ?? openDoc.stores.programIncrements;
+  const milestonesStore = activeSession?.milestonesStore ?? openDoc.stores.milestones;
+  const diagramStore = activeSession?.diagramStore ?? openDoc.stores.diagram;
   const diagramStoreRef = useRef(diagramStore);
 
   // Subscribed via useSyncExternalStore (not just a plain useMemo keyed

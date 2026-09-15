@@ -90,6 +90,62 @@ export interface OpenDocumentOptions {
   createPersistence?: (doc: Y.Doc, key: string) => DocPersistence;
 }
 
+/**
+ * Opens a document synchronously, with loading and seeding resolving after.
+ *
+ * `openDocument` below awaits persistence before it returns, which leaves a
+ * window during which the app has no document and the seams need a fallback.
+ * Keeping that fallback means keeping the adapter stores alive purely to cover
+ * a few frames, and it means two code paths can render the canvas.
+ *
+ * The document and its stores exist immediately here; `ready` resolves once
+ * persistence has replayed and the seed decision has been made. Consumers
+ * subscribe to the stores as usual and simply see content appear - which is
+ * what they already do for remote updates, so nothing downstream is special.
+ */
+export function openDocumentNow(options: OpenDocumentOptions): OpenDocument & {
+  ready: Promise<void>;
+} {
+  const doc = new Y.Doc();
+  const key = persistenceKeyForDocument(options.docId);
+
+  const persistence =
+    options.persist === false
+      ? createNullPersistence(doc)
+      : (options.createPersistence ?? ((d, k) => attachPersistence(d, k)))(
+          doc,
+          key
+        );
+
+  const stores: OpenDocumentStores = {
+    diagram: createYjsDiagramStore(doc),
+    requirements: createYjsRequirementsStore(doc),
+    programIncrements: createYjsProgramIncrementsStore(doc),
+    team: createYjsTeamStore(doc),
+    milestones: createYjsMilestonesStore(doc),
+  };
+
+  const handle: OpenDocument & { ready: Promise<void> } = {
+    docId: options.docId,
+    doc,
+    stores,
+    persistence,
+    // Not known yet; set when `ready` resolves. Callers that care must await.
+    wasSeeded: false,
+    ready: persistence.whenSynced.then(() => {
+      if (isYjsDocEmpty(doc) && options.initial) {
+        seedDocument(doc, options.initial, stores.team);
+        handle.wasSeeded = true;
+      }
+    }),
+    async close() {
+      for (const store of Object.values(stores)) store.destroy();
+      await persistence.destroy();
+    },
+  };
+  return handle;
+}
+
 export async function openDocument(
   options: OpenDocumentOptions
 ): Promise<OpenDocument> {
