@@ -704,7 +704,7 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: RequirementsStore } {
     const dep1 = store.convertItemType(req2, "dependency");
     assert(dep1 === "DEP-1", `[${label}] REQ-2 converted to dependency becomes DEP-1`);
 
-    let snap = store.getSnapshot();
+    const snap = store.getSnapshot();
     const updatedRefItem = snap.items.find((i) => i.id === refItem);
     assert(
       updatedRefItem?.body === "This depends on #DEP-1 and has a link [#DEP-1](#ref:DEP-1) inside text.",

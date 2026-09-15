@@ -709,7 +709,7 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
         for (const key of itemOrder.toArray()) {
           const itemMap = items.get(key);
           if (itemMap) {
-            let body = itemMap.get("body") as string | undefined;
+            const body = itemMap.get("body") as string | undefined;
             if (body) {
               let updated = body;
               for (const { oldId, newId } of conversions) {
