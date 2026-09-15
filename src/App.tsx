@@ -40,6 +40,12 @@ import { DurabilityIndicator } from "./components/DurabilityIndicator";
 import { installUnloadGuard } from "./domain/unloadGuard";
 import type { DurabilitySignals } from "./domain/durability";
 import { countPersistedReplicas } from "./collab/session";
+import {
+  openDocument,
+  replaceDocumentContents,
+  type OpenDocument,
+} from "./collab/localDocument";
+import { toDiagramFile as buildDiagramFile } from "./domain/serialization";
 import { downloadRequirementsMarkdown } from "./domain/requirementsExport";
 import { exportDiagramAsPng, exportDiagramAsSvg } from "./domain/imageExport";
 import type { ArchNodeData, ArchEdgeData, ArchEdgeDataPatch, EdgeWaypoint, Scenario, ScenarioStep, SubDiagram } from "./domain/types";
@@ -63,7 +69,7 @@ import { createYjsRequirementsStore, seedYjsRequirementsDoc } from "./collab/yjs
 import type { RequirementsStore } from "./collab/requirementsStore";
 import { createAdapterProgramIncrementsStore } from "./collab/programIncrementsStore";
 import { createAdapterDiagramStore } from "./collab/adapterDiagramStore";
-import { getNodesAtPath, getEdgesAtPath, unflattenToSubDiagram, hasSubDiagram } from "./collab/diagramStore";
+import { getNodesAtPath, getEdgesAtPath, unflattenToSubDiagram, flattenSubDiagramTree, hasSubDiagram } from "./collab/diagramStore";
 import type { EdgeEndpoints } from "./domain/edgeReconnect";
 import type { DiagramStore } from "./collab/diagramStore";
 import { createYjsDiagramStore, seedYjsDiagramDoc } from "./collab/yjsDiagramStore";
@@ -347,6 +353,57 @@ function App() {
   // calling setState directly and unconditionally in an effect body,
   // which is exactly the pattern React's own linting steers away from.
   const [presencePeers, setPresencePeers] = useState<PresenceInfo[]>([]);
+
+  /**
+   * The single document this browser has open (WS1-R1).
+   *
+   * Opened once, seeded from whatever the app booted with - a restored
+   * autosave, or the default. Until it resolves the seams below fall back to
+   * the adapter stores, so the first frames render the same content either
+   * way rather than a blank canvas.
+   *
+   * The adapter stores are deliberately left in place for now. Pointing the
+   * seams here is the change under test; deleting the fallback is a separate
+   * step, and keeping it means a revert is one line.
+   */
+  const [openDoc, setOpenDoc] = useState<OpenDocument | null>(null);
+  const openDocRef = useRef<OpenDocument | null>(null);
+  /** Read once, by the mount effect below, to seed the document. A ref rather
+   * than a dependency: re-running that effect would open a second document. */
+  const bootSnapshotRef = useRef(diagram);
+  useEffect(() => {
+    let cancelled = false;
+    const bootSnapshot = bootSnapshotRef.current;
+    const bootFlat = flattenSubDiagramTree(bootSnapshot.root);
+    void openDocument({
+      docId: "local",
+      initial: buildDiagramFile(
+        bootSnapshot.title,
+        bootFlat.nodes,
+        bootFlat.edges,
+        bootSnapshot.scenarios,
+        bootSnapshot.requirements,
+        bootSnapshot.programIncrements,
+        bootSnapshot.team,
+        bootSnapshot.milestones ?? []
+      ),
+    }).then((doc) => {
+      if (cancelled) {
+        void doc.close();
+        return;
+      }
+      openDocRef.current = doc;
+      setOpenDoc(doc);
+    });
+    return () => {
+      cancelled = true;
+      // Step 1 exists for this: without it every remount leaves observers
+      // rebuilding snapshots against a document nobody reads.
+      const held = openDocRef.current;
+      openDocRef.current = null;
+      if (held) void held.close();
+    };
+  }, []);
   /** Local persistence for the session document, as CONFIRMED - starts as
    * loading rather than assuming success (NFR-10). */
   /** Confirmed local-persistence state for the session document, tagged with
@@ -535,32 +592,32 @@ function App() {
   // state, not an empty workbook.
   const startNewSession = useCallback(
     (explicitKey?: string) => {
-      let seedRequirements = requirements;
-      let seedProgramIncrements = programIncrements;
-      let seedRoot = root;
-      let seedMilestones = diagram.milestones ?? [];
-      let seedTeam = team;
+      // Only reached by the defensive floor below, if the open document turns
+      // out to be empty. Constants now that nothing reassigns them - the
+      // session hand-off that used to is gone.
+      const seedRequirements = requirements;
+      const seedProgramIncrements = programIncrements;
+      const seedRoot = root;
+      const seedMilestones = diagram.milestones ?? [];
+      const seedTeam = team;
 
+      /**
+       * Restarting a session used to mean copying the old session's content
+       * back into React state before building a fresh document. With one
+       * document there is nothing to copy - the content is already where it
+       * needs to be, so this only has to drop the old provider.
+       */
       if (activeSessionRef.current) {
-        const current = activeSessionRef.current;
-        seedTeam = current.teamStore.getSnapshot();
-        seedRequirements = current.requirementsStore.getSnapshot();
-        seedProgramIncrements = current.programIncrementsStore.getSnapshot();
-        seedMilestones = current.milestonesStore.getSnapshot();
-        const finalDiagramSnapshot = current.diagramStore.getSnapshot();
-        seedRoot = unflattenToSubDiagram(finalDiagramSnapshot.nodes, finalDiagramSnapshot.edges);
-
-        setTeam(() => seedTeam);
-        setRequirements(() => seedRequirements);
-        setProgramIncrements(() => seedProgramIncrements);
-        setMilestones(() => seedMilestones);
-        setRoot(() => seedRoot);
-
-        current.session.disconnect();
+        activeSessionRef.current.session.disconnect();
       }
       const roomName = `session-${Math.random().toString(36).slice(2, 10)}`;
       const sessionKey = explicitKey && explicitKey.trim() ? explicitKey.trim() : generateSessionKey();
-      const doc = new Y.Doc();
+      /**
+       * WS1-R4: the document the user has open BECOMES the session document.
+       * Starting a session is a provider attachment, not a migration - which
+       * is why there is no seeding here and no visible transition.
+       */
+      const doc = openDocRef.current?.doc ?? new Y.Doc();
       const teamStore = createYjsTeamStore(doc);
       const requirementsStoreForSession = createYjsRequirementsStore(doc);
       const programIncrementsStoreForSession = createYjsProgramIncrementsStore(doc);
@@ -584,6 +641,11 @@ function App() {
        */
       void session.persistence.whenSynced.then(() => {
         if (!session.persistence.wasEmptyOnLoad()) return;
+        // Reached only if the open document was somehow empty - normally it
+        // holds the user's content and there is nothing to seed. Kept as a
+        // floor rather than deleted: a session that silently starts blank is
+        // worse than one that seeds defensively, and the seeds are idempotent
+        // (WS1-R6).
         seedYjsRequirementsDoc(doc, seedRequirements);
         seedYjsProgramIncrementsDoc(doc, seedProgramIncrements);
         seedYjsDiagramDoc(doc, seedRoot);
@@ -633,7 +695,7 @@ function App() {
           });
       }
     },
-    [requirements, programIncrements, team, root, diagram.milestones, setTeam, setRequirements, setProgramIncrements, setMilestones, setRoot, signalingUrls, signalingUrlsInput, buildTimeSignalingDefault, iceServers, displayName, showToast]
+    [requirements, programIncrements, team, root, diagram.milestones, signalingUrls, signalingUrlsInput, buildTimeSignalingDefault, iceServers, displayName, showToast]
   );
 
   // Joins an existing session by room name - never seeds from local state,
@@ -647,15 +709,10 @@ function App() {
   // same way two live peers do (WS2-R1).
   const joinSession = useCallback(
     (roomName: string, passwordOrKey?: string, relayOverride?: string) => {
+      // Switching sessions no longer means copying the old one's content
+      // anywhere - dropping the provider is the whole job.
       if (activeSessionRef.current) {
-        const current = activeSessionRef.current;
-        setTeam(() => current.teamStore.getSnapshot());
-        setRequirements(() => current.requirementsStore.getSnapshot());
-        setProgramIncrements(() => current.programIncrementsStore.getSnapshot());
-        setMilestones(() => current.milestonesStore.getSnapshot());
-        const finalDiagramSnapshot = current.diagramStore.getSnapshot();
-        setRoot(() => unflattenToSubDiagram(finalDiagramSnapshot.nodes, finalDiagramSnapshot.edges));
-        current.session.disconnect();
+        activeSessionRef.current.session.disconnect();
       }
       let effectiveSignalingUrls = signalingUrls;
       if (relayOverride && relayOverride.trim()) {
@@ -706,7 +763,7 @@ function App() {
         milestonesStore: milestonesStoreForSession,
       });
     },
-    [setTeam, setRequirements, setProgramIncrements, setMilestones, setRoot, signalingUrls, setSignalingUrlsInput, iceServers, displayName, showToast]
+    [signalingUrls, setSignalingUrlsInput, iceServers, displayName, showToast]
   );
 
   // Auto-join if a session link is present in the URL on initial mount or hash change
@@ -731,22 +788,20 @@ function App() {
     };
   }, [joinSession, showToast]);
 
-  // Leaving a session writes its final state back into the local,
-  // undo-tracked snapshot before disconnecting - so whatever happened
-  // during the session (your own edits, or anything synced in from
-  // collaborators) is preserved going forward, not silently discarded the
-  // moment the connection ends.
+  /**
+   * Leaving a session used to copy its final state back into local React
+   * state, so that edits made during the session - yours and collaborators' -
+   * were not discarded when the connection ended.
+   *
+   * With one document that copy is unnecessary and would be actively wrong:
+   * the session was editing the document directly, so everything is already
+   * where it belongs. Disconnecting drops the provider and nothing else.
+   */
   const leaveSession = useCallback(() => {
     if (!activeSession) return;
-    setTeam(() => activeSession.teamStore.getSnapshot());
-    setRequirements(() => activeSession.requirementsStore.getSnapshot());
-    setProgramIncrements(() => activeSession.programIncrementsStore.getSnapshot());
-    setMilestones(() => activeSession.milestonesStore.getSnapshot());
-    const finalDiagramSnapshot = activeSession.diagramStore.getSnapshot();
-    setRoot(() => unflattenToSubDiagram(finalDiagramSnapshot.nodes, finalDiagramSnapshot.edges));
     activeSession.session.disconnect();
     setActiveSession(null);
-  }, [activeSession, setTeam, setRequirements, setProgramIncrements, setMilestones, setRoot]);
+  }, [activeSession]);
 
   useEffect(() => {
     return () => {
@@ -758,11 +813,22 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const teamStore = activeSession?.teamStore ?? localTeamStore;
-  const requirementsStore = activeSession?.requirementsStore ?? localRequirementsStore;
-  const programIncrementsStore = activeSession?.programIncrementsStore ?? localProgramIncrementsStore;
-  const milestonesStore = activeSession?.milestonesStore ?? localMilestonesStore;
-  const diagramStore = activeSession?.diagramStore ?? localDiagramStore;
+  /**
+   * The active store set (WS1-R1).
+   *
+   * One document, so this is no longer a choice between two representations -
+   * a session's stores and the open document's stores are both Yjs stores over
+   * the same schema. The adapter fallback covers only the few frames before
+   * the document finishes opening; deleting it is Step 4.
+   */
+  const teamStore = activeSession?.teamStore ?? openDoc?.stores.team ?? localTeamStore;
+  const requirementsStore =
+    activeSession?.requirementsStore ?? openDoc?.stores.requirements ?? localRequirementsStore;
+  const programIncrementsStore =
+    activeSession?.programIncrementsStore ?? openDoc?.stores.programIncrements ?? localProgramIncrementsStore;
+  const milestonesStore =
+    activeSession?.milestonesStore ?? openDoc?.stores.milestones ?? localMilestonesStore;
+  const diagramStore = activeSession?.diagramStore ?? openDoc?.stores.diagram ?? localDiagramStore;
   const diagramStoreRef = useRef(diagramStore);
 
   // Subscribed via useSyncExternalStore (not just a plain useMemo keyed
@@ -2146,6 +2212,16 @@ function App() {
       try {
         const text = await file.text();
         const parsed = parseDiagramFile(text);
+        // Into the document, not into React state: the canvas reads the
+        // document, so writing state here would leave the old diagram on
+        // screen with no error to explain it.
+        const target = openDocRef.current;
+        if (target) {
+          replaceDocumentContents(target.doc, parsed);
+        }
+        // Still reset the local snapshot: title and scenarios do not live in
+        // the document yet, and undo history must not survive a file load
+        // (WS3-R4).
         resetDiagramHistory(diagramFileToSnapshot(parsed));
         setPath([]);
         setActiveScenarioId(null);

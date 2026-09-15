@@ -73,6 +73,34 @@ export function evaluateGate(
   let failedCount = 0;
   let passedCount = 0;
 
+  /**
+   * Counter baselines are environment-specific.
+   *
+   * Measured render and commit counts differ between machines - device pixel
+   * ratio and font metrics change measured node sizes, which feeds z-ordering
+   * and how much re-renders. Each environment is internally deterministic and
+   * they disagree with each other, so a baseline recorded on a developer
+   * machine will fail in CI and vice versa.
+   *
+   * That is not discoverable from the repository, and the cost of not knowing
+   * it is hours of bisecting a regression that is really a change of venue.
+   * The container is authoritative because it is what CI runs.
+   */
+  if (
+    baseline?.os &&
+    results?.os &&
+    (baseline.os !== results.os || baseline.cpuModel !== results.cpuModel)
+  ) {
+    console.warn(
+      `\n⚠️  Baseline was recorded on a different machine.\n` +
+        `      baseline: ${baseline.os} / ${baseline.cpuModel ?? "unknown CPU"}\n` +
+        `      this run: ${results.os} / ${results.cpuModel ?? "unknown CPU"}\n` +
+        `    Counter differences below may be environmental rather than real.\n` +
+        `    The containerized environment is authoritative - it is what CI runs.\n` +
+        `    Do NOT re-record from a different environment to make this green.\n`
+    );
+  }
+
   const resultScenarios = results?.scenarios ?? {};
   const baselineScenarios = baseline?.scenarios ?? {};
 
