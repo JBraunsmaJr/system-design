@@ -1,5 +1,13 @@
 import type { ScenarioDefinition } from "./types";
-import { setupFixture, resetCounters, settleCanvas, dragCoordinates } from "./helpers";
+import {
+  setupFixture,
+  resetCounters,
+  settleCanvas,
+  dragCoordinates,
+  recordViewportBeforeDrag,
+  assertViewportTranslated,
+  findEmptyCanvasPoint,
+} from "./helpers";
 
 export const idleScenario: ScenarioDefinition = {
   id: "idle",
@@ -110,8 +118,14 @@ export const panScenario: ScenarioDefinition = {
     await setupFixture(page, "large");
     await resetCounters(page);
 
-    // Drag canvas background
-    await dragCoordinates(page, 500, 400, 500, 0, 50);
+    // Drag canvas background. Verified afterwards: a pan that silently
+    // delivers fewer steps renders less and reads as an improvement.
+    // Must start on empty pane: a drag beginning on a node drags the node,
+    // which is what this scenario was silently doing before.
+    const origin = await findEmptyCanvasPoint(page);
+    await recordViewportBeforeDrag(page);
+    await dragCoordinates(page, origin.x, origin.y, 500, 0, 50);
+    await assertViewportTranslated(page, 500, 0);
   },
 };
 
