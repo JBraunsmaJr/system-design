@@ -7,7 +7,6 @@ import {
   recordViewportBeforeDrag,
   assertViewportTranslated,
   findEmptyCanvasPoint,
-  settleViewport,
 } from "./helpers";
 
 export const idleScenario: ScenarioDefinition = {
@@ -272,7 +271,7 @@ export const drillInOutScenario: ScenarioDefinition = {
         }
       })()
     `);
-    await settleViewport(page);
+    await settleCanvas(page, 2);
 
     // Drill out
     await page.evaluate(`
@@ -283,7 +282,7 @@ export const drillInOutScenario: ScenarioDefinition = {
         }
       })()
     `);
-    await settleViewport(page);
+    await settleCanvas(page, 2);
   },
 };
 

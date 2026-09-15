@@ -133,55 +133,6 @@ export async function recordViewportBeforeDrag(page: Page): Promise<void> {
   })) ?? { x: 0, y: 0 };
 }
 
-/**
- * Waits until the viewport transform has stopped changing.
- *
- * `settleCanvas(n)` waits a FIXED number of frames, which is only equivalent to
- * "settled" if the machine renders at a predictable rate. It does not: the same
- * scenario produces one set of counts on a fast desktop and another in a
- * container, deterministically in each, because the camera-fit animation has
- * progressed a different distance by the time counting starts. That makes the
- * baseline environment-specific for no good reason.
- *
- * Waiting on the transform itself removes the machine from the measurement.
- */
-export async function settleViewport(
-  page: Page,
-  options: { stableFrames?: number; timeoutMs?: number } = {}
-): Promise<void> {
-  const stableFrames = options.stableFrames ?? 3;
-  const timeoutMs = options.timeoutMs ?? 2000;
-
-  await page.evaluate(
-    ({ stableFrames, timeoutMs }) =>
-      new Promise<void>((resolve) => {
-        const read = () => {
-          const viewport = document.querySelector(".react-flow__viewport");
-          return viewport ? getComputedStyle(viewport).transform : "none";
-        };
-        let previous = read();
-        let unchanged = 0;
-        const deadline = performance.now() + timeoutMs;
-
-        const step = () => {
-          const current = read();
-          unchanged = current === previous ? unchanged + 1 : 0;
-          previous = current;
-          // Resolving on timeout rather than rejecting: a scenario whose
-          // viewport genuinely never settles should still produce a
-          // measurement, and the counters will show it.
-          if (unchanged >= stableFrames || performance.now() > deadline) {
-            resolve();
-            return;
-          }
-          requestAnimationFrame(step);
-        };
-        requestAnimationFrame(step);
-      }),
-    { stableFrames, timeoutMs }
-  );
-}
-
 export async function settleCanvas(page: Page, framesToWait: number = 3): Promise<void> {
   await page.evaluate(`
     new Promise((resolve) => {
