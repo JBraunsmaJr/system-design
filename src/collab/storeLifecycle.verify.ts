@@ -142,3 +142,42 @@ if (failures > 0) {
   throw new Error(`${failures} store lifecycle check(s) failed`);
 }
 console.log("\nAll store lifecycle checks passed.");
+
+console.log("=== replaceAll swaps the whole diagram (WS1 Step 3) ===");
+{
+  const doc = new Y.Doc();
+  seedYjsDiagramDoc(doc, root);
+  const store = createYjsDiagramStore(doc);
+
+  // What matters is not how many times subscribers are told, but whether any
+  // of them can observe the intermediate empty state. Inside one transaction
+  // observers run after it commits, so the blank canvas should never be
+  // visible - which is the property worth pinning.
+  const observedCounts: number[] = [];
+  store.subscribe(() => observedCounts.push(store.getSnapshot().nodes.length));
+
+  const replacement = {
+    nodes: [
+      {
+        id: "replacement",
+        type: "typed",
+        position: { x: 5, y: 5 },
+        data: { nodeType: "database", label: "Replacement" },
+      },
+    ],
+    edges: [],
+  } as unknown as SubDiagram;
+
+  store.replaceAll(replacement);
+
+  const snapshot = store.getSnapshot();
+  assert(
+    snapshot.nodes.length === 1 && snapshot.nodes[0].id === "replacement",
+    "the previous contents are gone, not merged with the new ones",
+  );
+  assert(
+    observedCounts.length > 0 && observedCounts.every((n) => n > 0),
+    `no subscriber ever observed the empty intermediate state (saw ${JSON.stringify(observedCounts)})`,
+  );
+  store.destroy();
+}

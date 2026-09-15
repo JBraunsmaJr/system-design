@@ -74,6 +74,19 @@ import { recordUnflattenCall, recordStoreWrite } from "../perf/instrumentation";
  */
 export interface DiagramStore {
   /**
+   * Replaces the entire diagram, at every nesting level, in one operation
+   * (WS1 Step 3).
+   *
+   * Exists so that whole-document writes - loading a file, installing a perf
+   * fixture - go through the seam rather than around it. While the local path
+   * still wrote React state directly, those writers would silently stop
+   * affecting the canvas the moment the seam pointed at a Y.Doc: nothing
+   * throws, the canvas just stops updating. Routing them here first makes that
+   * swap a change of implementation rather than a change of behaviour.
+   */
+  replaceAll(root: SubDiagram): void;
+
+  /**
    * Detaches every observer this store attached to the document (WS1 Step 1).
    *
    * The Yjs implementations register observeDeep handlers at construction and
@@ -340,6 +353,12 @@ export function createLocalDiagramStore(initial?: {
     /** Holds no document resources, so there is nothing to detach. Present so
      * every implementation of the seam has the same shape. */
     destroy: () => {},
+    replaceAll: (next) => {
+      const flattened = flattenSubDiagramTree(next);
+      nodes = flattened.nodes;
+      edges = flattened.edges;
+      notify();
+    },
     subscribe: (listener) => {
       listeners.add(listener);
       return () => listeners.delete(listener);

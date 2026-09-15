@@ -900,13 +900,23 @@ function App() {
       const perfObj = (window as unknown as Record<string, unknown>).__PERF__ as Record<string, unknown>;
       perfObj.Y = Y;
       (window as unknown as Record<string, unknown>).Y = Y;
+      /**
+       * Through the seam, not through React state (WS1 Step 3).
+       *
+       * These are the highest-consequence writers in the app, because their
+       * failure is silent: a fixture that does not load leaves an empty
+       * canvas, and zero renders reads as a green IMPROVEMENT in the perf
+       * gate rather than as a failure. Routing them through diagramStore now
+       * means the later swap to a Y.Doc changes the implementation under
+       * them rather than quietly bypassing them.
+       */
       perfObj.loadFixture = (name: FixtureName) => {
         const fixture = getStandardFixture(name);
-        setRoot(fixture);
+        diagramStore.replaceAll(fixture);
         return fixture;
       };
       perfObj.setDiagram = (diagram: SubDiagram) => {
-        setRoot(diagram);
+        diagramStore.replaceAll(diagram);
       };
       perfObj.setPath = (newPath: string[]) => {
         setPath(newPath);
@@ -948,7 +958,7 @@ function App() {
         leaveSession();
       };
     }
-  }, [setRoot, setPath, signalingUrls, iceServers, leaveSession]);
+  }, [diagramStore, setPath, signalingUrls, iceServers, leaveSession]);
 
   const breadcrumbLabels = useMemo(() => getBreadcrumbLabels(liveRoot, path), [liveRoot, path]);
 

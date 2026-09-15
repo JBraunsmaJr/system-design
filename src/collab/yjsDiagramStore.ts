@@ -350,6 +350,19 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
       destroyed = true;
       for (const target of observed) target.unobserveDeep(recomputeAndNotify);
     },
+    replaceAll: (next) => {
+      recordStoreWrite();
+      // One transaction so observers see a single change rather than an empty
+      // diagram followed by a populated one - the intermediate state would
+      // render as a blank canvas for a frame.
+      doc.transact(() => {
+        nodeOrder.delete(0, nodeOrder.length);
+        nodesMap.clear();
+        edgeOrder.delete(0, edgeOrder.length);
+        edgesMap.clear();
+        seedYjsDiagramDoc(doc, next);
+      });
+    },
     subscribe: (listener) => {
       listeners.add(listener);
       return () => listeners.delete(listener);
