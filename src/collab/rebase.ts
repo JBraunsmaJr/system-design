@@ -42,6 +42,7 @@ import {
 import { createYjsTeamStore } from "./yjsTeamStore.ts";
 import { seedTeamStore } from "./teamStore.ts";
 import { unflattenToSubDiagram } from "./diagramStore.ts";
+import { createYjsDocumentMetaStore, seedYjsDocumentMeta, type DocumentMeta } from "./yjsDocumentMetaStore.ts";
 
 export interface DocumentContents {
   root: SubDiagram;
@@ -49,17 +50,28 @@ export interface DocumentContents {
   programIncrements: ProgramIncrement[];
   team: TeamDocument;
   milestones: Milestone[];
+  meta: DocumentMeta;
 }
 
 /** Reads every collection as plain values, with no CRDT metadata attached. */
 export function readDocumentContents(doc: Y.Doc): DocumentContents {
-  const snapshot = createYjsDiagramStore(doc).getSnapshot();
+  // Each store attaches observers to the document, which may well stay open,
+  // so every one is destroyed once read (WS1 Step 1).
+  const read = <T,>(store: { getSnapshot(): T; destroy(): void }): T => {
+    try {
+      return store.getSnapshot();
+    } finally {
+      store.destroy();
+    }
+  };
+  const snapshot = read(createYjsDiagramStore(doc));
   return {
     root: unflattenToSubDiagram(snapshot.nodes, snapshot.edges),
-    requirements: createYjsRequirementsStore(doc).getSnapshot(),
-    programIncrements: createYjsProgramIncrementsStore(doc).getSnapshot(),
-    team: createYjsTeamStore(doc).getSnapshot(),
-    milestones: createYjsMilestonesStore(doc).getSnapshot(),
+    requirements: read(createYjsRequirementsStore(doc)),
+    programIncrements: read(createYjsProgramIncrementsStore(doc)),
+    team: read(createYjsTeamStore(doc)),
+    milestones: read(createYjsMilestonesStore(doc)),
+    meta: read(createYjsDocumentMetaStore(doc)),
   };
 }
 
@@ -89,7 +101,10 @@ export function rebaseDocument(source: Y.Doc): RebaseResult {
   seedYjsProgramIncrementsDoc(doc, contents.programIncrements);
   seedYjsDiagramDoc(doc, contents.root);
   seedYjsMilestonesDoc(doc, contents.milestones);
-  seedTeamStore(createYjsTeamStore(doc), contents.team);
+  const team = createYjsTeamStore(doc);
+  seedTeamStore(team, contents.team);
+  team.destroy();
+  seedYjsDocumentMeta(doc, contents.meta);
 
   return {
     doc,

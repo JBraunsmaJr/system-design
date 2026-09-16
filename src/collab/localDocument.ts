@@ -39,8 +39,13 @@ import {
   createYjsMilestonesStore,
 } from "./yjsMilestonesStore.ts";
 import { createYjsTeamStore } from "./yjsTeamStore.ts";
+import {
+  createYjsDocumentMetaStore,
+  seedYjsDocumentMeta,
+  META_MAP,
+  type DocumentMetaStore,
+} from "./yjsDocumentMetaStore.ts";
 import { seedTeamStore } from "./teamStore.ts";
-import { unflattenToSubDiagram } from "./diagramStore.ts";
 import type { DiagramStore } from "./diagramStore.ts";
 import type { RequirementsStore } from "./requirementsStore.ts";
 import type { ProgramIncrementsStore } from "./programIncrementsStore.ts";
@@ -59,6 +64,26 @@ export interface OpenDocumentStores {
   programIncrements: ProgramIncrementsStore;
   team: TeamStore;
   milestones: MilestonesStore;
+  /** Title and scenarios (WS1-R7). */
+  meta: DocumentMetaStore;
+}
+
+/** Every store over `doc`. The single place the set is built, so a session and
+ * a local document cannot end up with different ones. */
+export function createDocumentStores(doc: Y.Doc): OpenDocumentStores {
+  return {
+    diagram: createYjsDiagramStore(doc),
+    requirements: createYjsRequirementsStore(doc),
+    programIncrements: createYjsProgramIncrementsStore(doc),
+    team: createYjsTeamStore(doc),
+    milestones: createYjsMilestonesStore(doc),
+    meta: createYjsDocumentMetaStore(doc),
+  };
+}
+
+/** Detaches every store in the set (WS1 Step 1). */
+export function destroyDocumentStores(stores: OpenDocumentStores): void {
+  for (const store of Object.values(stores)) store.destroy();
 }
 
 export interface OpenDocument {
@@ -117,13 +142,7 @@ export function openDocumentNow(options: OpenDocumentOptions): OpenDocument & {
           key
         );
 
-  const stores: OpenDocumentStores = {
-    diagram: createYjsDiagramStore(doc),
-    requirements: createYjsRequirementsStore(doc),
-    programIncrements: createYjsProgramIncrementsStore(doc),
-    team: createYjsTeamStore(doc),
-    milestones: createYjsMilestonesStore(doc),
-  };
+  const stores = createDocumentStores(doc);
 
   const handle: OpenDocument & { ready: Promise<void> } = {
     docId: options.docId,
@@ -136,10 +155,12 @@ export function openDocumentNow(options: OpenDocumentOptions): OpenDocument & {
       if (isYjsDocEmpty(doc) && options.initial) {
         seedDocument(doc, options.initial, stores.team);
         handle.wasSeeded = true;
+      } else if (options.initial) {
+        seedMetaFrom(doc, options.initial);
       }
     }),
     async close() {
-      for (const store of Object.values(stores)) store.destroy();
+      destroyDocumentStores(stores);
       await persistence.destroy();
     },
   };
@@ -169,16 +190,12 @@ export async function openDocument(
   const empty = isYjsDocEmpty(doc);
   const wasSeeded = empty && options.initial !== undefined;
 
-  const stores: OpenDocumentStores = {
-    diagram: createYjsDiagramStore(doc),
-    requirements: createYjsRequirementsStore(doc),
-    programIncrements: createYjsProgramIncrementsStore(doc),
-    team: createYjsTeamStore(doc),
-    milestones: createYjsMilestonesStore(doc),
-  };
+  const stores = createDocumentStores(doc);
 
   if (wasSeeded && options.initial) {
     seedDocument(doc, options.initial, stores.team);
+  } else if (options.initial) {
+    seedMetaFrom(doc, options.initial);
   }
 
   return {
@@ -190,7 +207,7 @@ export async function openDocument(
     async close() {
       // Stores first: a store that is still observing while persistence tears
       // down would rebuild snapshots nobody is going to read.
-      for (const store of Object.values(stores)) store.destroy();
+      destroyDocumentStores(stores);
       await persistence.destroy();
     },
   };
@@ -210,13 +227,36 @@ export function seedDocument(
 ): void {
   seedYjsRequirementsDoc(doc, file.requirements);
   seedYjsProgramIncrementsDoc(doc, file.programIncrements ?? []);
-  // DiagramFile stores nodes FLAT with a parentPath; seedYjsDiagramDoc takes
-  // the tree form and flattens it itself. Handing it the flat list would
-  // re-flatten an already-flat structure and hoist every nested node to the
-  // root, silently collapsing the sub-diagram hierarchy.
-  seedYjsDiagramDoc(doc, unflattenToSubDiagram(file.nodes, file.edges));
+  // The import boundary (WS1-R3): the one place a file's diagram becomes the
+  // canonical flat schema. DiagramFile holds the NESTED tree (`data.subDiagram`)
+  // - see its own doc comment - and seedYjsDiagramDoc flattens it here.
+  //
+  // This used to unflatten first, on the belief that files were flat. Files
+  // are not, so unflattening a nested file kept only root-level entries and
+  // dropped every sub-diagram on load. Flattening is now idempotent, so a
+  // caller holding an already-flat list is handled too.
+  seedYjsDiagramDoc(doc, { nodes: file.nodes, edges: file.edges });
   seedYjsMilestonesDoc(doc, file.milestones ?? []);
   if (file.team) seedTeamStore(teamStore, file.team);
+  seedMetaFrom(doc, file);
+}
+
+/**
+ * Title and scenarios from a file, filling only what the document lacks.
+ *
+ * Also run against documents that were NOT seeded: one persisted before
+ * title and scenarios moved into the document reopens populated but without
+ * them, and the restored autosave is the only place they still exist.
+ */
+function seedMetaFrom(doc: Y.Doc, file: DiagramFile): void {
+  seedYjsDocumentMeta(doc, {
+    title: file.title,
+    // Files saved before cross-diagram scenarios have no step paths.
+    scenarios: (file.scenarios ?? []).map((sc) => ({
+      ...sc,
+      steps: sc.steps.map((st) => ({ ...st, path: st.path ?? [] })),
+    })),
+  });
 }
 
 /**
@@ -238,7 +278,7 @@ export function replaceDocumentContents(doc: Y.Doc, file: DiagramFile): void {
     for (const name of ["itemTypeOrder", "categoryOrder", "itemOrder", "piOrder", "milestoneOrder", "memberOrder"]) {
       doc.getArray(name).delete(0, doc.getArray(name).length);
     }
-    for (const name of ["itemTypes", "categories", "items", "relationshipTypes", "relationships", "nextSequence", "pis", "milestones", "members", "extraDaysOff"]) {
+    for (const name of ["itemTypes", "categories", "items", "relationshipTypes", "relationships", "nextSequence", "pis", "milestones", "members", "extraDaysOff", META_MAP]) {
       doc.getMap(name).clear();
     }
   });

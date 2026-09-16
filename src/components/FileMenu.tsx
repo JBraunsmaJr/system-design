@@ -112,8 +112,15 @@ export function FileMenu({ onNew, onLoadClick, onManageLibraries, isInSession }:
             className="export-menu__dropdown"
             style={{ position: "fixed", top: dropdownPos.top, left: dropdownPos.left, minWidth: DROPDOWN_WIDTH }}
           >
+            {/*
+              Both replace the whole document, and during a session the document
+              on screen is the shared one - so either would replace it for
+              everyone in the session, not just for this user.
+            */}
             <button
               type="button"
+              disabled={isInSession}
+              title={isInSession ? "New is disabled during a collaborative session - it would clear the diagram for everyone in it" : undefined}
               onClick={() => {
                 onNew();
                 close();
@@ -124,7 +131,7 @@ export function FileMenu({ onNew, onLoadClick, onManageLibraries, isInSession }:
             <button
               type="button"
               disabled={isInSession}
-              title={isInSession ? "Open is disabled during a collaborative session - loading a file wouldn't be visible until the session ends" : undefined}
+              title={isInSession ? "Open is disabled during a collaborative session - it would replace the diagram for everyone in it" : undefined}
               onClick={() => {
                 onLoadClick();
                 close();

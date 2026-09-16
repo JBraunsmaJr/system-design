@@ -31,7 +31,7 @@
  * is the content-blind relay its own source suggests, not just assumed
  * to be from reading the code.
  */
-import { spawn, type ChildProcess } from "child_process";
+import { spawn, spawnSync, type ChildProcess } from "child_process";
 import WebSocket from "ws";
 
 let failures = 0;
@@ -56,6 +56,19 @@ function waitFor(cond: () => boolean, timeoutMs = 3000): Promise<void> {
   });
 }
 
+function killServer(proc: ChildProcess | null) {
+  if (!proc || proc.pid === undefined) return;
+  if (process.platform === "win32") {
+    try {
+      spawnSync("taskkill", ["/pid", String(proc.pid), "/T", "/F"], { stdio: "ignore" });
+    } catch {
+      proc.kill("SIGKILL");
+    }
+  } else {
+    proc.kill("SIGKILL");
+  }
+}
+
 const PORT = 14444;
 let server: ChildProcess | null = null;
 
@@ -64,12 +77,12 @@ let server: ChildProcess | null = null;
 // process (or the spawned server) running indefinitely.
 const hardExit = setTimeout(() => {
   console.error("HARD TIMEOUT - forcing exit");
-  server?.kill("SIGKILL");
+  killServer(server);
   process.exit(1);
 }, 8000);
 
 try {
-  server = spawn("node", ["node_modules/y-webrtc/bin/server.js"], {
+  server = spawn(process.execPath, ["node_modules/y-webrtc/bin/server.js"], {
     cwd: process.cwd(),
     env: { ...process.env, PORT: String(PORT) },
   });
@@ -132,7 +145,7 @@ try {
   failures++;
 } finally {
   clearTimeout(hardExit);
-  server?.kill("SIGKILL");
+  killServer(server);
 }
 
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);

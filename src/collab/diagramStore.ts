@@ -273,33 +273,55 @@ export function flattenSubDiagramTree(root: SubDiagram): { nodes: Node<ArchNodeD
   function walk(sd: SubDiagram, path: string[]) {
     for (const node of sd.nodes) {
       const { subDiagram, ...restData } = node.data;
-      nodes.push({ ...node, data: { ...restData, parentPath: path } as ArchNodeData });
-      if (subDiagram) walk(subDiagram, [...path, node.id]);
+      const level = levelFor(path, (restData as { parentPath?: unknown }).parentPath);
+      nodes.push({ ...node, data: { ...restData, parentPath: level } as ArchNodeData });
+      if (subDiagram) walk(subDiagram, [...level, node.id]);
     }
     for (const edge of sd.edges) {
-      edges.push({ ...edge, data: { ...(edge.data as ArchEdgeData), parentPath: path } as ArchEdgeData });
+      const level = levelFor(path, (edge.data as { parentPath?: unknown } | undefined)?.parentPath);
+      edges.push({ ...edge, data: { ...(edge.data as ArchEdgeData), parentPath: level } as ArchEdgeData });
     }
   }
   walk(root, []);
   return { nodes, edges };
 }
 
+/**
+ * Which tree level an entry belongs to while flattening (WS1-R3, WS5-R9).
+ *
+ * Position in the tree is authoritative, with one exception: an entry sitting
+ * in the ROOT array that already carries a parentPath is an already-flat
+ * entry, and its own tag is the only record of where it lives. Overwriting it
+ * with `[]` - which is what this function did before - hoists every nested
+ * node to the root and silently collapses the hierarchy.
+ *
+ * That made flattening non-idempotent, so every caller had to know which of
+ * the two shapes it was holding. Two did not agree: the boot path pre-flattened
+ * and the file-load path did not, and loading any file with a sub-diagram
+ * dropped every nested node. With this rule flatten(flatten(x)) = flatten(x),
+ * so handing either shape to an import boundary is safe.
+ *
+ * Nested positions ignore a stale tag: a node inside a subDiagram is where the
+ * tree says it is, whatever it claims.
+ */
+function levelFor(treePath: string[], ownTag: unknown): string[] {
+  if (treePath.length > 0) return treePath;
+  return Array.isArray(ownTag) && ownTag.every((s) => typeof s === "string") ? (ownTag as string[]) : treePath;
+}
+
 /** The inverse of flattenSubDiagramTree - rebuilds a recursive
- * SubDiagram tree from a flat, parentPath-tagged node/edge list. Used
- * when leaving a collaborative session: the session's Yjs-backed
- * DiagramStore only ever produces the flat shape, but the app's own
- * local state (root: SubDiagram, read/written via
- * createAdapterDiagramStore) needs the recursive shape back, so
- * whatever happened during the session - the person's own edits, or
- * anything synced in from collaborators - is preserved going forward
- * rather than discarded the moment the connection ends (the same
- * principle already applied to team/requirements/programIncrements'
- * own leaveSession handling).
+ * SubDiagram tree from a flat, parentPath-tagged node/edge list.
+ *
+ * An EXPORT boundary (WS1-R3): the flat schema is canonical, and the tree
+ * exists only because the file format and a few read-only views are shaped
+ * that way. It walks every level of the document, so calling it per change is
+ * O(document) per remote update - which is what the perf harness's
+ * `unflattenCalls` counter watches for. Call it when saving, autosaving, or
+ * rendering a view that genuinely needs the tree; not on every snapshot.
  *
  * parentPath itself is dropped from each node/edge's data on the way
  * back out - it only ever existed to support the flat representation;
- * position in the rebuilt tree is what encodes nesting once again,
- * exactly as it does everywhere else in the app. */
+ * position in the rebuilt tree is what encodes nesting once again. */
 export function unflattenToSubDiagram(nodes: Node<ArchNodeData>[], edges: Edge<ArchEdgeData>[]): SubDiagram {
   recordUnflattenCall();
   function buildLevel(path: string[]): SubDiagram {
@@ -317,6 +339,34 @@ export function unflattenToSubDiagram(nodes: Node<ArchNodeData>[], edges: Edge<A
     return { nodes: levelNodes, edges: levelEdges };
   }
   return buildLevel([]);
+}
+
+/**
+ * Breadcrumb labels for `path`, read straight from the flat schema.
+ *
+ * Equivalent to subDiagramTree's getBreadcrumbLabels on the unflattened tree,
+ * without building the tree: the breadcrumb is on screen permanently, so
+ * deriving it from the tree meant a full unflatten on every change, local or
+ * remote. A segment resolves only if a node with that id lives at exactly the
+ * preceding level, mirroring the tree walk, so a stale or foreign path renders
+ * "Untitled" the same way it always has.
+ */
+export function getBreadcrumbLabelsFlat(nodes: Node<ArchNodeData>[], path: string[]): string[] {
+  if (path.length === 0) return [];
+  const byId = new Map<string, Node<ArchNodeData>>();
+  for (const n of nodes) byId.set(n.id, n);
+  let resolved = true;
+  return path.map((id, i) => {
+    const node = resolved ? byId.get(id) : undefined;
+    const level = (node?.data as (ArchNodeData & { parentPath?: string[] }) | undefined)?.parentPath ?? [];
+    if (!node || !arraysEqual(level, path.slice(0, i))) {
+      // Once a segment fails to resolve, the tree walk descends into an empty
+      // sub-diagram, so every later segment is unresolvable too.
+      resolved = false;
+      return "Untitled";
+    }
+    return node.data.label ?? "Untitled";
+  });
 }
 
 function arraysEqual(a: string[], b: string[]): boolean {

@@ -36,7 +36,7 @@
  */
 import * as Y from "yjs";
 import { encodeAwarenessUpdate, applyAwarenessUpdate } from "y-protocols/awareness";
-import { spawn, type ChildProcess } from "child_process";
+import { spawn, spawnSync, type ChildProcess } from "child_process";
 import { startCollabSession, parsePresenceState } from "../src/collab/session";
 
 let failures = 0;
@@ -116,16 +116,29 @@ function waitFor(cond: () => boolean, timeoutMs = 3000): Promise<void> {
   });
 }
 
+function killServer(proc: ChildProcess | null) {
+  if (!proc || proc.pid === undefined) return;
+  if (process.platform === "win32") {
+    try {
+      spawnSync("taskkill", ["/pid", String(proc.pid), "/T", "/F"], { stdio: "ignore" });
+    } catch {
+      proc.kill("SIGKILL");
+    }
+  } else {
+    proc.kill("SIGKILL");
+  }
+}
+
 const PORT = 14449;
 let server: ChildProcess | null = null;
 const hardExit = setTimeout(() => {
   console.error("HARD TIMEOUT - forcing exit");
-  server?.kill("SIGKILL");
+  killServer(server);
   process.exit(1);
 }, 10000);
 
 try {
-  server = spawn("node", ["node_modules/y-webrtc/bin/server.js"], {
+  server = spawn(process.execPath, ["node_modules/y-webrtc/bin/server.js"], {
     cwd: process.cwd(),
     env: { ...process.env, PORT: String(PORT) },
   });
@@ -195,7 +208,7 @@ try {
   failures++;
 } finally {
   clearTimeout(hardExit);
-  server?.kill("SIGKILL");
+  killServer(server);
 }
 
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);

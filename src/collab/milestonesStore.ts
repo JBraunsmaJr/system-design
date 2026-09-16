@@ -198,7 +198,7 @@ export function createLocalMilestonesStore(initial: Milestone[] = []): Milestone
 }
 
 /**
- * Adapter over external React state updater (e.g. useUndoableState DiagramSnapshot).
+ * Adapter over an external React state updater. Unused by the app since the unified document model (WS1-R2).
  */
 export function createAdapterMilestonesStore(
   getMilestones: () => Milestone[],

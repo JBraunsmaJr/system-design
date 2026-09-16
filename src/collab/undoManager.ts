@@ -62,6 +62,8 @@ const TRACKED_MAPS = [
   "members",
   "extraDaysOff",
   "settings",
+  // Title and scenarios (yjsDocumentMetaStore.ts).
+  "meta",
 ] as const;
 
 export interface UndoController {
@@ -69,7 +71,7 @@ export interface UndoController {
   readonly origin: object;
   /** Runs `fn` in a transaction tagged with the local origin. All local
    * mutations must go through this, or they will not be undoable. */
-  transact(fn: () => void): void;
+  transact<T>(fn: () => T): T;
   undo(): void;
   redo(): void;
   canUndo(): boolean;
@@ -126,8 +128,10 @@ export function createUndoController(
 
   return {
     origin,
-    transact(fn) {
-      doc.transact(fn, origin);
+    transact<T>(fn: () => T): T {
+      // A store method's own doc.transact nests inside this one and inherits
+      // its origin, which is what makes wrapping at the seam sufficient.
+      return doc.transact(fn, origin);
     },
     undo() {
       manager.undo();
@@ -153,4 +157,62 @@ export function createUndoController(
       manager.destroy();
     },
   };
+}
+
+/**
+ * Methods that are not local edits, and so are never wrapped.
+ *
+ * `replaceAll` is a whole-document replacement - a file load or a perf fixture
+ * - which is a document boundary (WS3-R4), not something to undo back across.
+ */
+const NOT_EDITS = new Set(["getSnapshot", "subscribe", "destroy", "replaceAll"]);
+
+/**
+ * Returns `store` with every mutating method run under `undo.transact`.
+ *
+ * Wrapping the seam, rather than each call site, is what makes "every local
+ * mutation is undoable" structural instead of a discipline: App.tsx and every
+ * view receive only wrapped stores, so there is no call site that can forget.
+ * An edit made through an UNWRAPPED store is not undoable, by design - that is
+ * how seeding, persistence replay and file loads stay out of history.
+ *
+ * `getSnapshot` and `subscribe` are passed through by identity, since
+ * useSyncExternalStore resubscribes whenever they change.
+ */
+export function undoableStore<S extends object>(store: S, undo: Pick<UndoController, "transact">): S {
+  const wrapped = {} as Record<string, unknown>;
+  for (const [key, value] of Object.entries(store)) {
+    wrapped[key] =
+      typeof value === "function" && !NOT_EDITS.has(key)
+        ? (...args: unknown[]) => undo.transact(() => (value as (...a: unknown[]) => unknown)(...args))
+        : value;
+  }
+  return wrapped as S;
+}
+
+const controllers = new WeakMap<Y.Doc, UndoController>();
+
+/**
+ * The one undo controller for `doc`, created on first request.
+ *
+ * Cached per document so that a render which is thrown away (StrictMode,
+ * interrupted renders) cannot leave a second UndoManager observing the same
+ * document - two controllers would each track only their own origin, and
+ * edits made under one would be invisible to the other's undo.
+ */
+export function undoControllerFor(doc: Y.Doc, options?: UndoControllerOptions): UndoController {
+  let controller = controllers.get(doc);
+  if (!controller) {
+    controller = createUndoController(doc, options);
+    controllers.set(doc, controller);
+  }
+  return controller;
+}
+
+/** Destroys and forgets `doc`'s controller, when the document is closed. */
+export function releaseUndoController(doc: Y.Doc): void {
+  const controller = controllers.get(doc);
+  if (!controller) return;
+  controllers.delete(doc);
+  controller.destroy();
 }

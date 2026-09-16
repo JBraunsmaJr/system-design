@@ -170,12 +170,12 @@ async function ensurePreviewServer(): Promise<{ process: ChildProcess | null; ur
 
   console.log(`🚀 Starting Vite preview server on port ${previewPort} (host: 0.0.0.0)...`);
   const server = spawn(
-    "npx",
-    ["vite", "preview", "--host", "0.0.0.0", "--port", String(previewPort), "--strictPort"],
+    process.execPath,
+    ["node_modules/vite/bin/vite.js", "preview", "--host", "0.0.0.0", "--port", String(previewPort), "--strictPort"],
     {
       cwd: rootDir,
       stdio: "pipe",
-      shell: true,
+      detached: process.platform !== "win32",
     }
   );
 
@@ -209,7 +209,21 @@ async function ensurePreviewServer(): Promise<{ process: ChildProcess | null; ur
     await new Promise((r) => setTimeout(r, 200));
   }
 
-  server.kill();
+  if (server.pid !== undefined) {
+    if (process.platform === "win32") {
+      try {
+        spawnSync("taskkill", ["/pid", String(server.pid), "/T", "/F"], { stdio: "ignore" });
+      } catch {
+        server.kill();
+      }
+    } else {
+      try {
+        process.kill(-server.pid, "SIGTERM");
+      } catch {
+        server.kill();
+      }
+    }
+  }
   throw new Error(`Timeout waiting for preview server on port ${previewPort}.\nCaptured output:\n${serverOutput || "(none)"}`);
 }
 
@@ -411,11 +425,19 @@ async function runSuite() {
         // ignore
       }
     }
-    if (previewServerProcess) {
-      try {
-        previewServerProcess.kill("SIGKILL");
-      } catch {
-        // ignore
+    if (previewServerProcess?.pid !== undefined) {
+      if (process.platform === "win32") {
+        try {
+          spawnSync("taskkill", ["/pid", String(previewServerProcess.pid), "/T", "/F"], { stdio: "ignore" });
+        } catch {
+          previewServerProcess.kill();
+        }
+      } else {
+        try {
+          process.kill(-previewServerProcess.pid, "SIGTERM");
+        } catch {
+          previewServerProcess.kill("SIGKILL");
+        }
       }
     }
   }
