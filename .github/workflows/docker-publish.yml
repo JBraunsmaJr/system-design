@@ -16,7 +16,54 @@ permissions:
   packages: write
 
 jobs:
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run tests
+        run: npm run tests
+
+  file-saving-firefox:
+    name: File saving suite (Firefox)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Firefox
+        run: npx playwright install --with-deps firefox
+
+      - name: Run the suite in Firefox
+        run: npx tsx scripts/verify-file-saving.ts
+        env:
+          E2E_BROWSER: firefox
+
   build-and-publish:
+    needs: [test, file-saving-firefox]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
