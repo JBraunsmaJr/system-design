@@ -125,9 +125,14 @@ async function launchBrowser(): Promise<Browser> {
   }
 }
 
-/** Makes a renderer crash a named failure instead of a later "page closed". */
+/** Makes a renderer crash, or the page or browser going away, a named
+ * failure with a time, instead of a later "page closed". */
 function watchForCrash(page: Page, label: string) {
-  page.on("crash", () => check(false, `the page crashed (${label})`));
+  const at = () => new Date().toISOString().slice(11, 23);
+  page.on("crash", () => check(false, `the page crashed (${label}) at ${at()}`));
+  page.on("close", () => console.log(`  [${at()}] ${label}: page closed`));
+  page.context().on("close", () => console.log(`  [${at()}] ${label}: context closed`));
+  page.context().browser()?.on("disconnected", () => console.log(`  [${at()}] browser disconnected`));
 }
 
 async function run() {
