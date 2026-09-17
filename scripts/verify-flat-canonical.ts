@@ -174,6 +174,45 @@ for (const { name, file } of fixtures) {
   assert(mismatches === 0, `${name}: ${paths.length} paths agree`);
 }
 
+console.log("\n=== WS5-R9: lossless at four levels deep ===");
+{
+  // The corpus nests one level. WS5-R9 asks for three or more, so build a
+  // tree four levels deep, with edges and several nodes at every level.
+  type AnyNode = Node<ArchNodeData>;
+  const level = (prefix: string, depth: number): { nodes: AnyNode[]; edges: Edge<ArchEdgeData>[] } => {
+    const nodes: AnyNode[] = [0, 1, 2].map((i) => ({
+      id: `${prefix}${i}`,
+      type: "typed",
+      position: { x: i * 100 + depth, y: depth * 10 },
+      data: {
+        nodeType: "service",
+        label: `${prefix}${i}`,
+        ...(i === 0 && depth < 4 ? { subDiagram: level(`${prefix}${i}.`, depth + 1) } : {}),
+      } as ArchNodeData,
+    }));
+    const edges = [
+      { id: `${prefix}e`, source: `${prefix}0`, target: `${prefix}1`, type: "typed", data: { edgeType: "sync" } as ArchEdgeData },
+      { id: `${prefix}f`, source: `${prefix}1`, target: `${prefix}2`, type: "typed", data: { edgeType: "sync" } as ArchEdgeData },
+    ];
+    return { nodes, edges };
+  };
+  const tree = level("n", 1);
+  const flat = flattenSubDiagramTree(tree as never);
+  const deepest = flat.nodes.filter((n) => ((n.data as { parentPath?: string[] }).parentPath ?? []).length === 3);
+  assert(flat.nodes.length === 12 && flat.edges.length === 8 && deepest.length === 3, `four levels flatten to 12 nodes and 8 edges (${deepest.length} at depth 4)`);
+  const rebuilt = unflattenToSubDiagram(flat.nodes, flat.edges);
+  const strip = (x: unknown): unknown => JSON.parse(JSON.stringify(x));
+  assert(JSON.stringify(strip(rebuilt)) === JSON.stringify(strip(tree)), "flatten then rebuild yields the original tree exactly");
+
+  const deepFile = { ...fixtures[fixtures.length - 1].file, nodes: tree.nodes, edges: tree.edges } as DiagramFile;
+  const doc = new Y.Doc();
+  replaceDocumentContents(doc, deepFile);
+  const loaded = createYjsDiagramStore(doc).getSnapshot();
+  assert(sameSet(loaded.nodes.map(nodeKey), flat.nodes.map(nodeKey)) && sameSet(loaded.edges.map(edgeKey), flat.edges.map(edgeKey)), "and a file that deep loads into a document at every level");
+  const back = unflattenToSubDiagram(loaded.nodes, loaded.edges);
+  assert(JSON.stringify(strip(back)) === JSON.stringify(strip(tree)), "and comes back out of the document unchanged");
+}
+
 console.log("\n=== WS1-R3: flattening only at import boundaries ===");
 {
   // The acceptance criterion, pinned. Adding a caller means deciding it is an
