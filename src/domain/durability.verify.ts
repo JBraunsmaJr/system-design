@@ -108,8 +108,8 @@ console.log("=== Ordinary states ===");
     "a synced document reports synced",
   );
   assert(
-    deriveDurability({ ...base, fileBacked: false }).action === "choose-file",
-    "browser-only storage offers to attach a file",
+    deriveDurability({ ...base, fileBacked: false, fileAccess: "available" }).action === "choose-file",
+    "browser-only storage offers to attach a file where the browser can",
   );
 }
 
@@ -214,6 +214,57 @@ console.log("=== Every state has usable copy ===");
       );
     }),
     "every state yields a chip-length sentence-case label and a detail line",
+  );
+}
+
+console.log("=== WS13-R8/R13: capability x permission x attachment matrix ===");
+{
+  const ready = { localPersistence: "active" as const };
+  type Attachment = NonNullable<Parameters<typeof deriveDurability>[0]["fileAttachment"]>;
+  const attachments: (Attachment | null)[] = [
+    null,
+    { fileName: "plan.json", status: "needs-permission" },
+    { fileName: "plan.json", status: "denied" },
+    { fileName: "plan.json", status: "conflict" },
+    { fileName: "plan.json", status: "failed", message: "Could not write to plan.json." },
+  ];
+  for (const fileAccess of ["available", "unavailable", undefined] as const) {
+    for (const fileAttachment of attachments) {
+      for (const fileBacked of [false, true]) {
+        // A file is only ever written - and so only ever "file-backed" - where
+        // the capability exists and nothing stands in the way.
+        if (fileBacked && (fileAccess !== "available" || fileAttachment)) continue;
+        const label = `access=${fileAccess ?? "absent"} attachment=${fileAttachment?.status ?? "none"} backed=${fileBacked}`;
+        const state = deriveDurability({ ...ready, fileAccess, fileAttachment, fileBacked });
+        const text = `${state.label} ${state.detail}`;
+
+        if (fileAccess !== "available") {
+          assert(
+            state.action !== "choose-file" && state.action !== "resume-file" && state.action !== "resolve-conflict",
+            `${label}: never offers file saving without the capability`,
+          );
+          assert(!/file you chose|Saved to file|plan\.json/i.test(text), `${label}: never implies continuous file saving`);
+        }
+        if (fileBacked) {
+          assert(state.level === "file", `${label}: reports file`);
+        } else {
+          assert(state.level !== "file", `${label}: never claims the file is being written`);
+        }
+        if (fileAccess === "available" && fileAttachment?.status === "needs-permission") {
+          assert(state.action === "resume-file" && /resumes once you allow/.test(state.detail), `${label}: one click to resume (WS13-R2)`);
+        }
+        if (fileAccess === "available" && fileAttachment?.status === "denied") {
+          assert(/declined/.test(state.detail) && /not being updated/.test(state.detail), `${label}: says the file is not being updated`);
+        }
+        if (fileAccess === "available" && fileAttachment?.status === "conflict") {
+          assert(state.tone === "alert" && state.persistent && state.action === "resolve-conflict", `${label}: a conflict demands a decision (WS13-R4)`);
+        }
+      }
+    }
+  }
+  assert(
+    deriveDurability({ ...ready, storageFailure: { reason: "quota", message: "full" }, fileAttachment: { fileName: "x", status: "conflict" } }).level === "at-risk",
+    "a storage failure still outranks a file conflict",
   );
 }
 

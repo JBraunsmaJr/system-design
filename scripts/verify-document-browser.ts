@@ -346,7 +346,12 @@ async function run() {
 
     await a.click(".collab-panel__trigger");
     await a.click(".collab-panel__leave-button");
+    // B has gone, so A holds the only saved copy: leaving asks first (WS13-R11).
+    const guarded = await a.waitForSelector(".leave-guard", { timeout: 3000 }).then(() => true, () => false);
+    check(guarded, "A, now the only holder of a saved copy, is asked before leaving");
+    if (guarded) await a.click(".leave-guard__leave");
     await sleep(300);
+    check((await a.locator(".leave-guard").count()) === 0, "and leaves once confirmed");
     check((await nodeCount(a)) === before, "A keeps the document after leaving (WS2-R6)");
     const docBefore = new URL(a.url()).searchParams.get("doc");
     await a.click('button[title="File"]');

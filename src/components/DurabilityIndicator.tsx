@@ -36,6 +36,14 @@ export interface DurabilityIndicatorProps {
   onExport?: () => void;
   onChooseFile?: () => void;
   onRetry?: () => void;
+  /** Re-grants write permission to the attached file (WS13-R2). */
+  onResumeFile?: () => void;
+  /** The two answers to an external change (WS13-R4). */
+  onReloadFromFile?: () => void;
+  onOverwriteFile?: () => void;
+  /** Stops saving to the attached file. */
+  onStopFile?: () => void;
+  fileName?: string | null;
 }
 
 export function DurabilityIndicator({
@@ -43,6 +51,11 @@ export function DurabilityIndicator({
   onExport,
   onChooseFile,
   onRetry,
+  onResumeFile,
+  onReloadFromFile,
+  onOverwriteFile,
+  onStopFile,
+  fileName,
 }: DurabilityIndicatorProps) {
   const state = deriveDurability(signals);
   const [open, setOpen] = useState(false);
@@ -59,7 +72,9 @@ export function DurabilityIndicator({
         ? onChooseFile
         : state.action === "retry"
           ? onRetry
-          : undefined;
+          : state.action === "resume-file"
+            ? onResumeFile
+            : undefined;
 
   const actionLabel =
     state.action === "export"
@@ -68,7 +83,11 @@ export function DurabilityIndicator({
         ? "Save to a file"
         : state.action === "retry"
           ? "Try again"
-          : null;
+          : state.action === "resume-file"
+            ? fileName
+              ? `Resume saving to ${fileName}`
+              : "Resume saving to file"
+            : null;
 
   // An alert is not something to go looking for: it opens itself and stays.
   const expanded = state.persistent || open;
@@ -199,6 +218,32 @@ export function DurabilityIndicator({
                 }}
               >
                 {actionLabel}
+              </button>
+            )}
+            {state.action === "resolve-conflict" && (
+              <div className="durability__choices">
+                {onReloadFromFile && (
+                  <button type="button" className="durability__action durability__reload" onClick={onReloadFromFile}>
+                    Reload from file
+                  </button>
+                )}
+                {onOverwriteFile && (
+                  <button type="button" className="durability__action durability__overwrite" onClick={onOverwriteFile}>
+                    Overwrite file
+                  </button>
+                )}
+              </div>
+            )}
+            {onStopFile && state.level === "file" && (
+              <button
+                type="button"
+                className="durability__secondary durability__stop-file"
+                onClick={() => {
+                  onStopFile();
+                  closeDropdown();
+                }}
+              >
+                {fileName ? `Stop saving to ${fileName}` : "Stop saving to file"}
               </button>
             )}
           </div>,

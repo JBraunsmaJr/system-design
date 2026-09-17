@@ -42,6 +42,9 @@ import { DurabilityIndicator } from "./components/DurabilityIndicator";
 import { installUnloadGuard } from "./domain/unloadGuard";
 import type { DurabilitySignals } from "./domain/durability";
 import { countPersistedReplicas } from "./collab/session";
+import { isSoleReplicaHolder } from "./domain/durability";
+import { useFileSaving } from "./hooks/useFileSaving";
+import { LeaveGuardDialog } from "./components/LeaveGuardDialog";
 import {
   acquireDocument,
   replaceDocumentContents,
@@ -227,6 +230,8 @@ function App() {
   const [documentStore] = useState(() => createDocumentStore(createIndexedDbBackend()));
   const [documentLibrary] = useState(() => createDocumentLibrary({ store: documentStore }));
   const [isDocumentManagerOpen, setIsDocumentManagerOpen] = useState(false);
+  /** The file this document is continuously saved to, if any (WS13-R1). */
+  const fileSaving = useFileSaving(openDocId);
 
   /**
    * Switches this tab to another stored document by navigating, so the open
@@ -426,6 +431,20 @@ function App() {
     localPresenceRef.current = { ...localPresenceRef.current, ...patch };
     session.setLocalPresence(localPresenceRef.current);
   }, []);
+
+  /**
+   * WS13-R10: tell the others this participant holds a saved copy, once its
+   * local persistence is confirmed. Other peers count replicas from exactly
+   * this flag - nothing set it before, so every participant counted everyone
+   * else as holding nothing, and the leave guard warned people who were not
+   * the only holder.
+   */
+  useEffect(() => {
+    if (!activeSession) return;
+    const confirmed =
+      sessionPersistence.session === activeSession.session && sessionPersistence.state === "active";
+    if (confirmed) broadcastPresence({ hasPersistedReplica: true });
+  }, [activeSession, sessionPersistence, broadcastPresence]);
 
   // Rebroadcasts this peer's own selection whenever it changes - moved
   // below, right after selectedNodeIds/selectedEdgeIds are actually
@@ -819,6 +838,10 @@ function App() {
   const [autosaveFailure, setAutosaveFailure] = useState<{ reason: StorageFailureReason; message: string } | null>(null);
   const [autosaveBlocked] = useState(getAutosaveBlockedReason);
   const legacyDraftPending = useRef(hasLegacyAutosave());
+  const writeToFile = fileSaving.write;
+  // Bumped when an attached file becomes writable, so it is written straight
+  // away rather than on the next edit.
+  const fileWriteEpoch = fileSaving.writeEpoch;
 
   /**
    * The stored-document id for what is on screen: the open document, or - in
@@ -853,6 +876,9 @@ function App() {
       // failure the durability indicator reports (WS2-R4). It replaces the
       // localStorage draft (WS2-R1).
       const origin = activeRoom !== null ? ({ origin: "session", sessionRoom: activeRoom } as const) : ({ origin: "local" } as const);
+      // WS13-R1: the attached file belongs to the open local document, never
+      // to a joined session's content.
+      if (activeDocId === openDocId) void writeToFile(JSON.stringify(file, null, 2));
       void documentStore.writeDocument(activeDocId, file, origin).then((result) => {
         if (cancelled) return;
         // Set from the confirmed outcome, never the attempt (NFR-10).
@@ -874,7 +900,7 @@ function App() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [title, diagramSnapshot, scenarios, requirementsSnapshot, programIncrementsSnapshot, teamSnapshot, milestonesSnapshot, documentStore, activeDocId, activeRoom, openDocId]);
+  }, [title, diagramSnapshot, scenarios, requirementsSnapshot, programIncrementsSnapshot, teamSnapshot, milestonesSnapshot, documentStore, activeDocId, activeRoom, openDocId, writeToFile, fileWriteEpoch]);
 
   /**
    * What the app currently knows about whether this document is safe
@@ -883,7 +909,13 @@ function App() {
    */
   const durabilitySignals: DurabilitySignals = useMemo(() => {
     const inSession = activeSession !== null;
+    // The file belongs to the local document. A joined session is another
+    // document, and describing it as saved to that file would be false.
+    const file = activeSession?.ownsDocument
+      ? { fileAccess: fileSaving.signals.fileAccess, fileAttachment: null, fileBacked: false }
+      : fileSaving.signals;
     return {
+      ...file,
       localPersistence: inSession
         ? sessionPersistence.session === activeSession.session
           ? sessionPersistence.state
@@ -913,6 +945,7 @@ function App() {
     autosaveBlocked,
     hasAutosaved,
     presencePeers,
+    fileSaving.signals,
   ]);
 
   // WS13-R7. Read live rather than captured, so the prompt reflects the state
@@ -2270,21 +2303,62 @@ function App() {
   // Always saves the full tree from the root, regardless of which level
   // you're currently viewing - a save from inside a drilled-down sub-diagram
   // must not lose everything above/beside it.
-  const onSave = useCallback(() => {
+  /** The document on screen as a DiagramFile - an export boundary. */
+  const buildCurrentFile = useCallback(() => {
     const tree = unflattenToSubDiagram(diagramSnapshot.nodes, diagramSnapshot.edges);
-    downloadDiagram(
-      toDiagramFile(
-        title,
-        tree.nodes,
-        tree.edges,
-        scenarios,
-        requirementsSnapshot,
-        programIncrementsSnapshot,
-        teamSnapshot,
-        milestonesSnapshot
-      )
+    return toDiagramFile(
+      title,
+      tree.nodes,
+      tree.edges,
+      scenarios,
+      requirementsSnapshot,
+      programIncrementsSnapshot,
+      teamSnapshot,
+      milestonesSnapshot
     );
   }, [title, diagramSnapshot, scenarios, requirementsSnapshot, programIncrementsSnapshot, teamSnapshot, milestonesSnapshot]);
+
+  const onSave = useCallback(() => {
+    downloadDiagram(buildCurrentFile());
+  }, [buildCurrentFile]);
+
+  const onChooseFile = useCallback(() => {
+    const safeName = title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    void fileSaving.attach(`${safeName || "diagram"}.json`);
+  }, [title, fileSaving]);
+
+  /** WS13-R4: the file changed elsewhere. Overwrite it with what is on screen. */
+  const onOverwriteFile = useCallback(() => {
+    void fileSaving.overwrite(JSON.stringify(buildCurrentFile(), null, 2));
+  }, [fileSaving, buildCurrentFile]);
+
+  /** WS13-R4: the file changed elsewhere. Load its version instead - a
+   * whole-document replacement, so undo history is cleared (WS3-R4). */
+  const onReloadFromFile = useCallback(async () => {
+    const text = await fileSaving.reloadExternal();
+    if (text === null) {
+      showToast("Could not read the file", "error");
+      return;
+    }
+    try {
+      const parsed = parseDiagramFile(text);
+      replaceDocumentContents(openDoc.doc, snapshotToDiagramFile(diagramFileToSnapshot(parsed)));
+      undo.clear();
+      showToast("Reloaded from file");
+    } catch (err) {
+      showToast("The file could not be loaded", "error", (err as Error).message);
+    }
+  }, [fileSaving, openDoc, undo, showToast]);
+
+  /**
+   * WS13-R11: leaving when nobody else here holds a saved copy needs an
+   * explicit confirmation that says what that means.
+   */
+  const [isLeaveGuardOpen, setIsLeaveGuardOpen] = useState(false);
+  const requestLeave = useCallback(() => {
+    if (isSoleReplicaHolder(durabilitySignals)) setIsLeaveGuardOpen(true);
+    else leaveSession();
+  }, [durabilitySignals, leaveSession]);
 
   // Exports export the CURRENT view (whatever level you're looking at),
   // unlike Save - drilling into a node and exporting just that sub-diagram
@@ -2421,6 +2495,12 @@ function App() {
             <DurabilityIndicator
               signals={durabilitySignals}
               onExport={onSave}
+              onChooseFile={onChooseFile}
+              onResumeFile={() => void fileSaving.resume()}
+              onReloadFromFile={() => void onReloadFromFile()}
+              onOverwriteFile={onOverwriteFile}
+              onStopFile={fileSaving.fileName && !activeSession?.ownsDocument ? () => void fileSaving.detach() : undefined}
+              fileName={activeSession?.ownsDocument ? null : fileSaving.fileName}
             />
           }
           isInSession={!!activeSession}
@@ -2450,7 +2530,7 @@ function App() {
               onShowPeerCursorsChange={setShowPeerCursors}
               onStartSession={startNewSession}
               onJoinSession={joinSession}
-              onLeaveSession={leaveSession}
+              onLeaveSession={requestLeave}
               onCopyLink={() => showToast("Session link copied to clipboard")}
             />
           }
@@ -2602,6 +2682,19 @@ function App() {
           />
         )}
       </div>
+      <LeaveGuardDialog
+        isOpen={isLeaveGuardOpen}
+        onStay={() => setIsLeaveGuardOpen(false)}
+        onExportAndLeave={() => {
+          onSave();
+          setIsLeaveGuardOpen(false);
+          leaveSession();
+        }}
+        onLeave={() => {
+          setIsLeaveGuardOpen(false);
+          leaveSession();
+        }}
+      />
       <DocumentManager
         isOpen={isDocumentManagerOpen}
         onClose={() => setIsDocumentManagerOpen(false)}

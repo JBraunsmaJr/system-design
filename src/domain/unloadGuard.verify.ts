@@ -30,6 +30,14 @@ console.log("=== The guard stays quiet when nothing is at risk ===");
 {
   assert(!shouldBlockUnload(safe), "a document at rest in browser storage does not prompt");
   assert(
+    shouldBlockUnload({ ...safe, fileAccess: "available", fileAttachment: { fileName: "a.json", status: "conflict" } }),
+    "an unresolved file conflict prompts: the chosen file is behind (WS13-R4)",
+  );
+  assert(
+    !shouldBlockUnload({ ...safe, fileAccess: "available", fileAttachment: { fileName: "a.json", status: "needs-permission" } }),
+    "a paused file does not prompt: every change is still saved in the browser",
+  );
+  assert(
     !shouldBlockUnload({ ...safe, fileBacked: true }),
     "a file-backed document does not prompt",
   );

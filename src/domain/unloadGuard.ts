@@ -39,6 +39,10 @@ export function shouldBlockUnload(signals: DurabilitySignals): boolean {
   if (signals.storageFailure) return true;
   if (signals.autosaveBlockedReason) return true;
 
+  // The file the user chose as their copy has changed elsewhere and has not
+  // been written since; closing leaves it behind without them deciding.
+  if (signals.fileAccess === "available" && signals.fileAttachment?.status === "conflict") return true;
+
   // Nothing is being written at all.
   if (signals.localPersistence === "unavailable") return true;
 
