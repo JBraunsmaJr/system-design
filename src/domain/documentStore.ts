@@ -101,6 +101,10 @@ export interface DocumentIndexEntry {
    * participant can host the same room again and the original link still
    * works (WS13-R12). Local storage only, like the content it protects. */
   sessionKey?: string;
+  /** When this document was last saved while in a session: the latest time any
+   * other participant may have received it. Rebase is blocked within the
+   * reconciliation window of this (WS4-R8). */
+  lastSessionAt?: string;
   /** Approximate serialized size, for surfacing storage pressure. */
   sizeBytes: number;
 }
@@ -321,6 +325,11 @@ export function createDocumentStore(backend: DocumentBackend): DocumentStore {
             ...(options?.sessionKey ?? existing?.sessionKey
               ? { sessionKey: options?.sessionKey ?? existing?.sessionKey }
               : {}),
+            ...(options?.origin === "session"
+              ? { lastSessionAt: now }
+              : existing?.lastSessionAt
+                ? { lastSessionAt: existing.lastSessionAt }
+                : {}),
             sizeBytes: serialized.length,
           };
           written = entry;

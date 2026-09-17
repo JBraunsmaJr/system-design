@@ -44,6 +44,20 @@ export interface DocPersistence {
    * from destroy() is the point: leaving a session must never be the same
    * gesture as discarding the only copy of the work. */
   forget(): Promise<void>;
+  /**
+   * Compaction (WS4-R7): replaces the stored update log with one equivalent
+   * state update. Document identity and CRDT state are unchanged, so a client
+   * that was offline merges exactly as before - which is what makes this safe
+   * to run at any time, with no coordination. It never rebases; that is a
+   * separate, deliberate operation (rebase.ts).
+   */
+  compact?(): Promise<CompactionResult>;
+}
+
+export interface CompactionResult {
+  /** Stored update records before and after. */
+  updatesBefore: number;
+  updatesAfter: number;
 }
 
 export interface AttachPersistenceOptions {
@@ -115,5 +129,40 @@ export function attachPersistence(
       // clearData() destroys the provider as part of its work.
       await provider.clearData();
     },
+    async compact() {
+      await whenSynced;
+      const db = (provider as unknown as { db: IDBDatabase | null }).db;
+      if (!db) return { updatesBefore: 0, updatesAfter: 0 };
+      // Done here rather than with y-indexeddb's storeState, which resolves
+      // before its own write has happened. One readwrite transaction: IndexedDB
+      // serialises it against the provider's own writes, and the state is
+      // encoded INSIDE it, so every update about to be deleted is already in
+      // that state - the provider applies an update to the doc before storing it.
+      const updatesBefore = await new Promise<number>((resolve, reject) => {
+        const tx = db.transaction([UPDATES_STORE], "readwrite");
+        const store = tx.objectStore(UPDATES_STORE);
+        let count = 0;
+        const keys = store.getAllKeys();
+        keys.onsuccess = () => {
+          const found = keys.result as IDBValidKey[];
+          count = found.length;
+          if (count <= 1) return;
+          const last = found[found.length - 1];
+          store.add(Y.encodeStateAsUpdate(doc));
+          store.delete(IDBKeyRange.upperBound(last));
+        };
+        tx.oncomplete = () => resolve(count);
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error ?? new Error("Compaction aborted."));
+      });
+      const updatesAfter = Math.min(updatesBefore, 1);
+      // The provider trims on its own once this passes a threshold; keep its
+      // count honest so it does not trim again straight away.
+      (provider as unknown as { _dbsize: number })._dbsize = updatesAfter;
+      return { updatesBefore, updatesAfter };
+    },
   };
 }
+
+/** y-indexeddb's object store for the update log. */
+const UPDATES_STORE = "updates";

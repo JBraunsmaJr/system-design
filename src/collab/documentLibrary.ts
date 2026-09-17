@@ -15,7 +15,8 @@ import type { DocumentIndexEntry, DocumentStore, StorageResult } from "../domain
 import { newDocumentId } from "../domain/documentStore.ts";
 import { toDiagramFile, type DiagramFile } from "../domain/serialization.ts";
 import { openDocument, storageKeyForDocument, type OpenDocument } from "./localDocument.ts";
-import { readDocumentContents } from "./rebase.ts";
+import { readDocumentContents, rebaseDocument, canRebase, type RebaseEligibility } from "./rebase.ts";
+import type { CompactionResult } from "./persistence.ts";
 
 export interface DocumentLibraryDeps {
   store: DocumentStore;
@@ -38,6 +39,30 @@ export interface DocumentLibrary {
   /** WS2-R6: irreversible. Removes the index entry, the snapshot and the
    * content database. Never called for the document open in this tab. */
   forget(entry: DocumentIndexEntry): Promise<StorageResult<DeleteOutcome>>;
+  /**
+   * WS4-R7 compaction: the same document, its stored update log collapsed into
+   * one update. Safe at any time. Never rebases.
+   */
+  compact(entry: DocumentIndexEntry): Promise<StorageResult<CompactionResult>>;
+  /** WS4-R8: whether rebasing `entry` could orphan someone's work. */
+  rebaseEligibility(entry: DocumentIndexEntry, now?: number): RebaseEligibility;
+  /**
+   * WS4-R6 rebase: a NEW document (new id, no history, no session identity)
+   * built from the current values. The original is kept, relabelled, so the
+   * operation loses nothing even when forced. Never compacts.
+   */
+  rebase(entry: DocumentIndexEntry): Promise<StorageResult<RebaseOutcome>>;
+}
+
+export interface RebaseOutcome {
+  entry: DocumentIndexEntry;
+  bytesBefore: number;
+  bytesAfter: number;
+}
+
+export interface DocumentLibraryOptions {
+  /** WS8-R11, in milliseconds. */
+  reconciliationWindowMs: number;
 }
 
 /** The content database a document's live replica is kept in: its document
@@ -73,7 +98,10 @@ function defaultDeleteDatabase(name: string): Promise<DeleteOutcome> {
 
 const failed = <T,>(message: string): StorageResult<T> => ({ ok: false, reason: "unknown", message });
 
-export function createDocumentLibrary(deps: DocumentLibraryDeps): DocumentLibrary {
+export function createDocumentLibrary(
+  deps: DocumentLibraryDeps,
+  options: DocumentLibraryOptions = { reconciliationWindowMs: 30 * 86_400_000 },
+): DocumentLibrary {
   const { store } = deps;
   const open = deps.open ?? ((docId: string, initial?: DiagramFile) => openDocument({ docId, initial }));
   const deleteDatabase = deps.deleteDatabase ?? defaultDeleteDatabase;
@@ -88,7 +116,7 @@ export function createDocumentLibrary(deps: DocumentLibraryDeps): DocumentLibrar
     }
   }
 
-  return {
+  const library: DocumentLibrary = {
     async list() {
       const listed = await store.listDocuments();
       if (!listed.ok) return listed;
@@ -124,6 +152,62 @@ export function createDocumentLibrary(deps: DocumentLibraryDeps): DocumentLibrar
       }
     },
 
+    async compact(entry) {
+      const opened = await open(entry.docId);
+      try {
+        if (!opened.persistence.compact) return failed("This document is not stored in a way that can be compacted.");
+        return { ok: true, value: await opened.persistence.compact() };
+      } catch (error) {
+        return failed(`Could not compact "${entry.title}": ${String(error)}`);
+      } finally {
+        await opened.close();
+      }
+    },
+
+    rebaseEligibility(entry, now) {
+      // The last moment anyone else could have received this document. A
+      // shared document from before lastSessionAt was recorded falls back to
+      // its last save, which is at least as late.
+      const lastShared = entry.lastSessionAt ?? (entry.sessionRoom ? entry.updatedAt : undefined);
+      const at = lastShared ? Date.parse(lastShared) : Number.NaN;
+      return canRebase({
+        connectedPeerCount: 0,
+        lastSyncedAt: Number.isFinite(at) ? [at] : [],
+        reconciliationWindowMs: options.reconciliationWindowMs,
+        now,
+      });
+    },
+
+    async rebase(entry) {
+      const source = await open(entry.docId);
+      let rebased: ReturnType<typeof rebaseDocument>;
+      try {
+        rebased = rebaseDocument(source.doc);
+      } finally {
+        await source.close();
+      }
+      const docId = newDocumentId();
+      const target = await open(docId);
+      let file: DiagramFile;
+      try {
+        // The rebased state itself, not a re-seed of it, so what is stored is
+        // exactly the compact document that was measured.
+        Y.applyUpdate(target.doc, Y.encodeStateAsUpdate(rebased.doc));
+        file = fileFromDoc(target.doc);
+      } finally {
+        await target.close();
+      }
+      rebased.doc.destroy();
+      // A fresh document: no session room or key, since nobody holding the old
+      // one can sync with it.
+      const written = await store.writeDocument(docId, file, { origin: "local" });
+      if (!written.ok) return written;
+      // The original stays, clearly labelled, rather than being deleted.
+      const relabelled = await library.rename(entry, `${file.title || "Untitled Diagram"} (before rebase)`);
+      if (!relabelled.ok) return relabelled;
+      return { ok: true, value: { entry: written.value, bytesBefore: rebased.bytesBefore, bytesAfter: rebased.bytesAfter } };
+    },
+
     async forget(entry) {
       const removed = await store.deleteDocument(entry.docId);
       if (!removed.ok) return removed;
@@ -136,4 +220,5 @@ export function createDocumentLibrary(deps: DocumentLibraryDeps): DocumentLibrar
       }
     },
   };
+  return library;
 }

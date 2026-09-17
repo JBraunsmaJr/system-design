@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Copy, FileText, FolderOpen, Pencil, Plus, Trash2, Users, X } from "lucide-react";
+import { Copy, FileText, FolderOpen, Minimize2, Pencil, Plus, RefreshCcw, Trash2, Users, X } from "lucide-react";
 import type { DocumentIndexEntry, StorageHealth } from "../domain/documentStore";
 import { requestPersistentStorage } from "../domain/documentStore";
 import type { DocumentLibrary } from "../collab/documentLibrary";
@@ -165,6 +165,53 @@ export function DocumentManager({
       });
     },
     [library, run]
+  );
+
+  /** WS4-R7: safe at any time, so no confirmation. */
+  const compact = useCallback(
+    (entry: DocumentIndexEntry) =>
+      run(async () => {
+        const result = await library.compact(entry);
+        if (!result.ok) setError(result.message);
+        else
+          setNotice(
+            result.value.updatesBefore > 1
+              ? `Compacted "${entry.title}": ${result.value.updatesBefore} stored updates became 1.`
+              : `"${entry.title}" is already compact.`
+          );
+      }),
+    [library, run]
+  );
+
+  /**
+   * WS4-R6 / R8: always asked first. Inside the reconciliation window the
+   * question says why it is blocked and what forcing it would do.
+   */
+  const rebase = useCallback(
+    (entry: DocumentIndexEntry) => {
+      const eligibility = library.rebaseEligibility(entry);
+      const question = eligibility.allowed
+        ? `Rebase "${entry.title}"?\n\n` +
+          `This creates a new, smaller document with the same content and no editing history, and opens it. ` +
+          `The original is kept as "${entry.title} (before rebase)".`
+        : `Rebasing "${entry.title}" is blocked: ${eligibility.reason}\n\n` +
+          `Forcing it creates a new document with no shared history. Anyone who still has the old one ` +
+          `cannot sync into the new one, and changes they have not shared stay in the old document only. ` +
+          `The original is kept here as "${entry.title} (before rebase)".\n\n` +
+          `Rebase anyway?`;
+      if (!window.confirm(question)) return;
+      void run(async () => {
+        const result = await library.rebase(entry);
+        if (!result.ok) {
+          setError(result.message);
+          return;
+        }
+        const kb = (n: number) => `${(n / 1024).toFixed(1)} KB`;
+        setNotice(`Rebased "${entry.title}": ${kb(result.value.bytesBefore)} became ${kb(result.value.bytesAfter)}.`);
+        if (entry.docId === currentDocId) onOpenDocument(result.value.entry.docId);
+      });
+    },
+    [library, run, currentDocId, onOpenDocument]
   );
 
   if (!isOpen) return null;
@@ -371,6 +418,26 @@ export function DocumentManager({
                     title="Duplicate"
                   >
                     <Copy size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    className="document-manager__compact"
+                    disabled={busy}
+                    onClick={() => void compact(entry)}
+                    aria-label={`Compact ${entry.title}`}
+                    title="Compact storage (safe at any time)"
+                  >
+                    <Minimize2 size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    className="document-manager__rebase"
+                    disabled={busy}
+                    onClick={() => rebase(entry)}
+                    aria-label={`Rebase ${entry.title}`}
+                    title="Rebase - a new document without editing history"
+                  >
+                    <RefreshCcw size={14} />
                   </button>
                   <button
                     type="button"

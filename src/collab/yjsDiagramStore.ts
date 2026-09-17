@@ -154,6 +154,31 @@ function waypointIndexById(array: Y.Array<Y.Map<unknown>>, waypointId: string): 
  * pass to avoid silently breaking those references, which preserving
  * the originals avoids needing at all.
  */
+/**
+ * Writes only the fields that have a value. Every Y.Map entry is stored with
+ * its key, for every node, forever - and most data fields are unset on most
+ * nodes. Writing them as `undefined` cost 11 stored entries per node: a
+ * freshly seeded 50-node diagram was 19KB, which was also the floor any
+ * rebase could reach (WS4-R6). Readers already treat a missing key and an
+ * undefined one alike.
+ */
+/**
+ * The level a new entry lives at. The root level - where most entries are -
+ * is stored as no key at all, and read back as `[]`: an empty array stored on
+ * every root node was the largest remaining per-node cost. Every reader
+ * already treats a missing level as the root.
+ */
+function setLevel(m: Y.Map<unknown>, parentPath: string[] | undefined): void {
+  if (parentPath && parentPath.length > 0) m.set("parentPath", parentPath);
+}
+
+function setDefinedFields(m: Y.Map<unknown>, fields: readonly string[], source: Record<string, unknown>): void {
+  for (const field of fields) {
+    const value = source[field];
+    if (value !== undefined) m.set(field, value);
+  }
+}
+
 export function seedYjsDiagramDoc(doc: Y.Doc, root: SubDiagram): void {
   const { nodes, edges } = flattenSubDiagramTree(root);
   const nodeOrder = doc.getArray<string>("nodeOrder");
@@ -171,13 +196,11 @@ export function seedYjsDiagramDoc(doc: Y.Doc, root: SubDiagram): void {
       const m = new Y.Map<unknown>();
       m.set("type", node.type);
       m.set("position", node.position);
-      m.set("parentPath", (node.data as ArchNodeData & { parentPath?: string[] }).parentPath ?? []);
+      setLevel(m, (node.data as ArchNodeData & { parentPath?: string[] }).parentPath);
       if (node.parentId !== undefined) m.set("parentId", node.parentId);
       if (node.width !== undefined) m.set("width", node.width);
       if (node.height !== undefined) m.set("height", node.height);
-      for (const field of NODE_DATA_FIELDS) {
-        m.set(field, (node.data as Record<string, unknown>)[field]);
-      }
+      setDefinedFields(m, NODE_DATA_FIELDS, node.data as Record<string, unknown>);
       nodesMap.set(node.id, m);
       pushIfAbsent(nodeOrder, seenNodes, node.id);
     }
@@ -187,12 +210,10 @@ export function seedYjsDiagramDoc(doc: Y.Doc, root: SubDiagram): void {
       m.set("source", edge.source);
       m.set("target", edge.target);
       m.set("type", edge.type ?? "typed");
-      m.set("parentPath", (edge.data as ArchEdgeData & { parentPath?: string[] }).parentPath ?? []);
+      setLevel(m, (edge.data as ArchEdgeData & { parentPath?: string[] }).parentPath);
       if (edge.sourceHandle !== undefined) m.set("sourceHandle", edge.sourceHandle);
       if (edge.targetHandle !== undefined) m.set("targetHandle", edge.targetHandle);
-      for (const field of EDGE_DATA_FIELDS) {
-        m.set(field, (edge.data as Record<string, unknown>)[field]);
-      }
+      setDefinedFields(m, EDGE_DATA_FIELDS, (edge.data ?? {}) as Record<string, unknown>);
       // Bends carried in from local state have to be rebuilt as real
       // nested shared types, not set as the plain array they arrive as -
       // otherwise an edge that was bent before the session started would
@@ -246,7 +267,8 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
   const edgesMap = doc.getMap<Y.Map<unknown>>("edges");
 
   function nodeMapToPlain(id: string, m: Y.Map<unknown>): Node<ArchNodeData> {
-    const data: Record<string, unknown> = { parentPath: m.get("parentPath") as string[] };
+    // Absent means the root level - see setLevel.
+    const data: Record<string, unknown> = { parentPath: (m.get("parentPath") as string[] | undefined) ?? [] };
     for (const field of NODE_DATA_FIELDS) {
       const value = m.get(field);
       if (value !== undefined) data[field] = value;
@@ -267,7 +289,8 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
   }
 
   function edgeMapToPlain(id: string, m: Y.Map<unknown>): Edge<ArchEdgeData> {
-    const data: Record<string, unknown> = { parentPath: m.get("parentPath") as string[] };
+    // Absent means the root level - see setLevel.
+    const data: Record<string, unknown> = { parentPath: (m.get("parentPath") as string[] | undefined) ?? [] };
     for (const field of EDGE_DATA_FIELDS) {
       const value = m.get(field);
       if (value !== undefined) data[field] = value;
@@ -452,10 +475,8 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
         const m = new Y.Map<unknown>();
         m.set("type", type);
         m.set("position", position);
-        m.set("parentPath", parentPath);
-        for (const field of NODE_DATA_FIELDS) {
-          m.set(field, (data as Record<string, unknown>)[field]);
-        }
+        setLevel(m, parentPath);
+        setDefinedFields(m, NODE_DATA_FIELDS, data as Record<string, unknown>);
         nodesMap.set(id, m);
         nodeOrder.push([id]);
       });
@@ -540,12 +561,10 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
         m.set("source", source);
         m.set("target", target);
         m.set("type", "typed");
-        m.set("parentPath", parentPath);
+        setLevel(m, parentPath);
         if (sourceHandle !== undefined) m.set("sourceHandle", sourceHandle);
         if (targetHandle !== undefined) m.set("targetHandle", targetHandle);
-        for (const field of EDGE_DATA_FIELDS) {
-          m.set(field, (data as Record<string, unknown>)[field]);
-        }
+        setDefinedFields(m, EDGE_DATA_FIELDS, data as Record<string, unknown>);
         // Empty, but present from the start - so that two peers bending
         // this edge for the first time at the same moment insert into
         // one shared array rather than each creating their own and one

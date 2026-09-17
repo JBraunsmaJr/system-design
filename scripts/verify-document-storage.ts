@@ -282,6 +282,79 @@ async function run() {
       check(local?.title === "Guest local work", `joining did not overwrite the guest's own document entry (title: ${local?.title})`);
     }
 
+    console.log("\n=== WS4-R6/R7/R8: compact and rebase from the document list ===");
+    {
+      const ctx = await newContext();
+      const p = await ctx.newPage();
+      p.on("pageerror", (e) => check(false, `page threw: ${e.message}`));
+      const openManager = async () => {
+        await p.click('button[title="File"]');
+        await p.click('.export-menu__dropdown button:has-text("Documents")');
+        await p.waitForSelector(".document-manager__row");
+      };
+      const row = (id: string) => p.locator(`.document-manager__row[data-doc-id="${id}"]`);
+
+      await p.goto(`${app}?doc=rebase-local`);
+      await ready(p);
+      await p.evaluate(`window.__PERF__.loadFixture("small")`);
+      await p.fill('[aria-label="Diagram title"]', "Rebase me");
+      for (let i = 0; i < 20; i++) await p.fill('[aria-label="Diagram title"]', i % 2 ? "Rebase me" : "Rebase me!");
+      await p.fill('[aria-label="Diagram title"]', "Rebase me");
+      await sleep(SAVE_WAIT);
+
+      await openManager();
+      await row("rebase-local").locator(".document-manager__compact").click();
+      await p.waitForSelector('.document-manager__notice:has-text("Rebase me")');
+      check(/Compacted|already compact/.test((await p.textContent(".document-manager__notice")) ?? ""), "compaction runs without asking and reports the result (R7)");
+
+      let question = "";
+      p.once("dialog", (d) => {
+        question = d.message();
+        void d.accept();
+      });
+      await Promise.all([p.waitForNavigation(), row("rebase-local").locator(".document-manager__rebase").click()]);
+      await ready(p);
+      const newId = new URL(p.url()).searchParams.get("doc");
+      check(/no editing history/.test(question), "rebase asks first and says what it does");
+      check(!!newId && newId !== "rebase-local", `the rebased document opens under a new id (${newId})`);
+      check((await nodeCount(p)) === 25 && (await titleOf(p)) === "Rebase me", "with the same content and name (R6)");
+      await openManager();
+      check(
+        ((await row("rebase-local").locator(".document-manager__title").textContent()) ?? "") === "Rebase me (before rebase)",
+        "the original is kept, labelled"
+      );
+      await p.keyboard.press("Escape");
+
+      // A document shared moments ago: blocked, and forcing names the cost.
+      await p.goto(`${app}?doc=rebase-shared`);
+      await ready(p);
+      await p.evaluate(`window.__PERF__.loadFixture("small")`);
+      await p.click(".collab-panel__trigger");
+      const toggle = p.locator(".collab-panel__settings-toggle");
+      await toggle.waitFor();
+      if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
+      await p.fill("#collab-panel-signaling-url", servers!.relayUrl);
+      await p.click(".collab-panel__primary-action:not(.collab-panel__resume)");
+      await sleep(SAVE_WAIT);
+      await p.click(".collab-panel__trigger");
+      await p.click(".collab-panel__leave-button");
+      if (await p.waitForSelector(".leave-guard", { timeout: 2000 }).then(() => true, () => false)) {
+        await p.click(".leave-guard__leave");
+      }
+      await openManager();
+      let blockedQuestion = "";
+      p.once("dialog", (d) => {
+        blockedQuestion = d.message();
+        void d.dismiss();
+      });
+      await row("rebase-shared").locator(".document-manager__rebase").click();
+      await sleep(500);
+      check(/blocked/.test(blockedQuestion) && /30 days/.test(blockedQuestion), "a recently shared document is blocked, naming the window (R8)");
+      check(/cannot sync/.test(blockedQuestion), "and forcing it names the consequence");
+      check(new URL(p.url()).searchParams.get("doc") === "rebase-shared", "declining changes nothing");
+      await ctx.close();
+    }
+
     console.log("\n=== WS13-R12: rehosting a room everyone has left ===");
     {
       const startSession = async (page: Page) => {

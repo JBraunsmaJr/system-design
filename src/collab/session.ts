@@ -241,6 +241,7 @@ function borrowPersistence(owned: DocPersistence): DocPersistence {
     wasEmptyOnLoad: () => owned.wasEmptyOnLoad(),
     destroy: async () => {},
     forget: async () => {},
+    compact: owned.compact ? () => owned.compact!() : undefined,
   };
 }
 

@@ -44,6 +44,7 @@ import {
 } from "./domain/currentDocument";
 import { createDocumentStore, newDocumentId, requestPersistentStorage, type StorageFailureReason } from "./domain/documentStore";
 import { createDocumentLibrary } from "./collab/documentLibrary";
+import { reconciliationWindowMs } from "./domain/reconciliationWindow";
 import { DocumentManager } from "./components/DocumentManager";
 import { createIndexedDbBackend } from "./domain/indexedDbBackend";
 import { DurabilityIndicator } from "./components/DurabilityIndicator";
@@ -236,7 +237,9 @@ function App() {
 
   /** The catalogue of stored documents and their snapshots (WS2-R3). */
   const [documentStore] = useState(() => createDocumentStore(createIndexedDbBackend()));
-  const [documentLibrary] = useState(() => createDocumentLibrary({ store: documentStore }));
+  const [documentLibrary] = useState(() =>
+    createDocumentLibrary({ store: documentStore }, { reconciliationWindowMs: reconciliationWindowMs() })
+  );
   const [isDocumentManagerOpen, setIsDocumentManagerOpen] = useState(false);
   /** The file this document is continuously saved to, if any (WS13-R1). */
   const fileSaving = useFileSaving(openDocId);
