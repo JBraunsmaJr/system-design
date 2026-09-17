@@ -272,6 +272,53 @@ async function run() {
       check((await edgeLabel("e1")) === originalLabel, "one undo reverts the reconnection");
     }
 
+    console.log("\n=== Bends: one write per gesture, one undo each (WS4-R1/R2 for edges) ===");
+    {
+      const bendCount = () => a.locator('.react-flow__edge[data-id="e2"] .typed-edge__waypoint, .typed-edge__waypoint').count();
+      await a.evaluate(`window.__PERF__.setSelectedEdges(["e2"])`);
+      await sleep(250);
+      const before = await bendCount();
+      const dot = await a.locator(".typed-edge__insert-dot").first().boundingBox();
+      if (!dot) throw new Error("no insertion handle on the selected edge");
+      await a.evaluate(`window.__PERF__.reset()`);
+      const dx = dot.x + dot.width / 2;
+      const dy = dot.y + dot.height / 2;
+      await a.mouse.move(dx, dy);
+      await a.mouse.down();
+      for (let i = 1; i <= 12; i++) await a.mouse.move(dx + i * 3, dy + i * 6);
+      check((await storeWrites(a)) === 0, "dragging a new bend out writes nothing while held");
+      await a.mouse.up();
+      await sleep(250);
+      check((await bendCount()) === before + 1, "the bend exists after release");
+      check((await storeWrites(a)) === 1, `creating it is one write (wrote ${await storeWrites(a)})`);
+      await sleep(700); // a separate undo step from the next gesture
+
+      const bend = await a.locator(".typed-edge__waypoint").first().boundingBox();
+      if (!bend) throw new Error("bend handle not found");
+      const bx = bend.x + bend.width / 2;
+      const by = bend.y + bend.height / 2;
+      const edgePath = () => a.getAttribute('.react-flow__edge[data-id="e2"] path.react-flow__edge-path', "d");
+      const createdPath = await edgePath();
+      await a.evaluate(`window.__PERF__.reset()`);
+      await a.mouse.move(bx, by);
+      await a.mouse.down();
+      for (let i = 1; i <= 15; i++) await a.mouse.move(bx + i * 4, by - i * 2);
+      await a.mouse.up();
+      await sleep(250);
+      check((await edgePath()) !== createdPath, "moving the bend reshapes the edge");
+      check((await storeWrites(a)) === 1, `a 15-step bend drag is one write (wrote ${await storeWrites(a)})`);
+      await a.click(".react-flow__pane", { position: { x: 5, y: 5 } });
+      await a.keyboard.press("Control+z");
+      await sleep(250);
+      check((await edgePath()) === createdPath, "one undo reverts the whole bend drag");
+      await a.keyboard.press("Control+z");
+      await sleep(250);
+      await a.evaluate(`window.__PERF__.setSelectedEdges(["e2"])`);
+      await sleep(200);
+      check((await bendCount()) === before, "and one more removes the bend it created");
+      await a.evaluate(`window.__PERF__.setSelectedEdges([])`);
+    }
+
     console.log("\n=== Starting a session leaves the canvas unchanged (WS1-R4) ===");
     const before = await nodeCount(a);
     await a.click(".collab-panel__trigger");
@@ -334,6 +381,30 @@ async function run() {
     await a.keyboard.press("Control+z");
     await sleep(1000);
     check((await transformOf(a, DRAGGED)) === home, "A's undo reverts A's drag");
+
+    // A bend moving under A's pointer is visible to B before A lets go.
+    {
+      const pathOf = (p: Page) => p.getAttribute('.react-flow__edge[data-id="e2"] path.react-flow__edge-path', "d");
+      await a.evaluate(`window.__PERF__.setSelectedEdges(["e2"])`);
+      await sleep(250);
+      const dot = await a.locator(".typed-edge__insert-dot").first().boundingBox();
+      if (dot) {
+        const bPathBefore = await pathOf(b);
+        const dx = dot.x + dot.width / 2;
+        const dy = dot.y + dot.height / 2;
+        await a.mouse.move(dx, dy);
+        await a.mouse.down();
+        for (let i = 1; i <= 10; i++) await a.mouse.move(dx + i * 3, dy + i * 8);
+        await sleep(1000);
+        check((await pathOf(b)) !== bPathBefore, "B sees A's new bend while A is still dragging it");
+        await a.mouse.up();
+        await sleep(1000);
+        check((await pathOf(b)) === (await pathOf(a)), "and the same bend once A releases");
+      } else {
+        check(false, "the insertion handle is on screen for the peer check");
+      }
+      await a.evaluate(`window.__PERF__.setSelectedEdges([])`);
+    }
     check((await transformOf(b, DRAGGED)) === home, "...for B too");
     check((await titleOf(a)) === "Renamed by B" && (await titleOf(b)) === "Renamed by B", "B's rename survives A's undo");
 

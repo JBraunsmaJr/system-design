@@ -108,6 +108,7 @@ export function TypedEdge({
   const onAddEdgeWaypoint = isEditable ? canvasContext?.onAddEdgeWaypoint : undefined;
   const onMoveEdgeWaypoint = isEditable ? canvasContext?.onMoveEdgeWaypoint : undefined;
   const onRemoveEdgeWaypoint = isEditable ? canvasContext?.onRemoveEdgeWaypoint : undefined;
+  const onEndEdgeGesture = canvasContext?.onEndEdgeGesture;
   const canBend = Boolean(onAddEdgeWaypoint && onMoveEdgeWaypoint && onRemoveEdgeWaypoint);
   const { screenToFlowPosition } = useReactFlow();
   const def = getEdgeType(data?.edgeType ?? "generic");
@@ -341,6 +342,8 @@ export function TypedEdge({
         document.removeEventListener("pointermove", handleMove);
         document.removeEventListener("pointerup", handleUp);
         document.removeEventListener("pointercancel", handleUp);
+        // Moves were previews; this writes the bend once (WS4-R1, R2).
+        if (moved) onEndEdgeGesture?.(id);
 
         // If the pointer did not drag, track double-click timing as a reliable fallback
         if (!moved) {
@@ -360,7 +363,7 @@ export function TypedEdge({
       document.addEventListener("pointerup", handleUp);
       document.addEventListener("pointercancel", handleUp);
     },
-    [id, onMoveEdgeWaypoint, onRemoveEdgeWaypoint, resolveDragPosition, screenToFlowPosition]
+    [id, onMoveEdgeWaypoint, onRemoveEdgeWaypoint, onEndEdgeGesture, resolveDragPosition, screenToFlowPosition]
   );
 
   const onWaypointContextMenu = useCallback(
@@ -408,12 +411,14 @@ export function TypedEdge({
         document.removeEventListener("pointermove", handleMove);
         document.removeEventListener("pointerup", handleUp);
         document.removeEventListener("pointercancel", handleUp);
+        // The new bend and its moves were previews; this writes it once.
+        if (createdId !== null) onEndEdgeGesture?.(id);
       };
       document.addEventListener("pointermove", handleMove);
       document.addEventListener("pointerup", handleUp);
       document.addEventListener("pointercancel", handleUp);
     },
-    [id, onAddEdgeWaypoint, onMoveEdgeWaypoint, resolveDragPosition, screenToFlowPosition]
+    [id, onAddEdgeWaypoint, onMoveEdgeWaypoint, onEndEdgeGesture, resolveDragPosition, screenToFlowPosition]
   );
 
   const onWaypointDoubleClick = useCallback(

@@ -87,7 +87,20 @@ import { loadIceServers, saveIceServers, parseIceServers, getDefaultIceServers }
 import { createSessionLink, parseSessionLink, generateSessionKey, sanitizeCurrentUrl } from "./domain/sessionLink";
 import { Toast, type ToastType } from "./components/Toast";
 import { applyZOrderCommand, computeEffectiveZIndices, type ZOrderCommand } from "./domain/zOrder";
-import { mergeInFlight, applyInFlight, remoteInFlight, toBroadcast, NO_IN_FLIGHT, type InFlightMap } from "./domain/gestureGeometry";
+import {
+  mergeInFlight,
+  applyInFlight,
+  remoteInFlight,
+  toBroadcast,
+  NO_IN_FLIGHT,
+  type InFlightMap,
+  applyEdgeGesture,
+  edgeGestureWrites,
+  remoteEdgeGestures,
+  NO_EDGE_GESTURES,
+  type EdgeGesture,
+  type EdgeGestureMap,
+} from "./domain/gestureGeometry";
 import { classifyNodeChanges, applySelectionChanges, isAutoSizedNodeType, type PendingNodeUpdate, type CurrentNodeGeometry } from "./domain/nodeChangeBatching";
 import { recordCommit, isPerfInstrumentationActive, isPerfAutosaveSuppressed } from "./perf/instrumentation";
 import { getStandardFixture, type FixtureName } from "./perf/fixtures";
@@ -1119,6 +1132,14 @@ function App() {
    */
   const [inFlight, setInFlight] = useState<InFlightMap>(NO_IN_FLIGHT);
   const inFlightRef = useRef<InFlightMap>(NO_IN_FLIGHT);
+  /** Edge bends being dragged by this user, rendered but not yet written. */
+  const [edgeInFlight, setEdgeInFlight] = useState<EdgeGestureMap>(NO_EDGE_GESTURES);
+  const edgeGesturesRef = useRef(new Map<string, EdgeGesture>());
+  /** Other peers' in-flight bends at this level. */
+  const peerEdgeInFlight = useMemo(
+    () => (activeSession ? remoteEdgeGestures(presencePeers, path.join("/")) : new Map()),
+    [activeSession, presencePeers, path]
+  );
   /** Other peers' in-flight geometry at this level (WS4-R3). */
   const peerInFlight = useMemo(
     () => (activeSession ? remoteInFlight(presencePeers, path.join("/")) : NO_IN_FLIGHT),
@@ -1183,13 +1204,22 @@ function App() {
       edges: rawEdges.map((e) => {
         const selected = selectedEdges.has(e.id);
         const hit = derivedEdges.get(e);
-        if (hit && hit.selected === selected) return hit.out;
-        const out = { ...e, selected };
-        derivedEdges.set(e, { selected, out });
-        return out;
+        let out: Edge<ArchEdgeData>;
+        if (hit && hit.selected === selected) {
+          out = hit.out;
+        } else {
+          out = { ...e, selected };
+          derivedEdges.set(e, { selected, out });
+        }
+        // In-flight bends, this user's first; only those edges get new objects.
+        const own = edgeInFlight.get(e.id);
+        const peer = own ? undefined : peerEdgeInFlight.get(e.id);
+        if (!own && !peer) return out;
+        const waypoints = own ? applyEdgeGesture(out.data?.waypoints, own) : peer;
+        return { ...out, data: { ...(out.data as ArchEdgeData), waypoints } };
       }),
     };
-  }, [diagramSnapshot, subDiagramLevels, path, selectedNodeIds, selectedEdgeIds, measuredDimensions, inFlight, peerInFlight]);
+  }, [diagramSnapshot, subDiagramLevels, path, selectedNodeIds, selectedEdgeIds, measuredDimensions, inFlight, peerInFlight, edgeInFlight, peerEdgeInFlight]);
 
   // Only position/dimensions changes need to reach the store - selection
   // changes are handled separately (and more robustly, since it's the
@@ -1735,15 +1765,67 @@ function App() {
     diagramStoreRef.current.reconnectEdge(edgeId, endpoints);
   }, []);
 
+  /**
+   * Bend drags are gestures (WS4-R1): adding and moving record into the edge's
+   * in-flight gesture, shown once per frame and broadcast to peers, and
+   * onEndEdgeGesture writes the result once (WS4-R2).
+   */
+  const edgeFlushHandle = useRef<number | null>(null);
+  const publishEdgeGestures = useCallback(() => {
+    edgeFlushHandle.current = null;
+    const snapshot = new Map(edgeGesturesRef.current);
+    setEdgeInFlight(snapshot.size ? snapshot : NO_EDGE_GESTURES);
+    const edges: Record<string, EdgeWaypoint[]> = {};
+    for (const [edgeId, gesture] of snapshot) {
+      const stored = diagramStoreRef.current.getSnapshot().edges.find((e) => e.id === edgeId)?.data?.waypoints;
+      edges[edgeId] = applyEdgeGesture(stored, gesture);
+    }
+    broadcastPresence({ edgeGesture: snapshot.size ? { path: path.join("/"), edges } : null });
+  }, [broadcastPresence, path]);
+  const scheduleEdgePublish = useCallback(() => {
+    if (edgeFlushHandle.current === null) edgeFlushHandle.current = requestAnimationFrame(publishEdgeGestures);
+  }, [publishEdgeGestures]);
+
   const onAddEdgeWaypoint = useCallback((edgeId: string, index: number, waypoint: EdgeWaypoint) => {
-    diagramStoreRef.current.addEdgeWaypoint(edgeId, index, waypoint);
-  }, []);
+    const current = edgeGesturesRef.current.get(edgeId);
+    edgeGesturesRef.current.set(edgeId, {
+      created: { index, waypoint },
+      moved: current?.moved ?? new Map(),
+    });
+    scheduleEdgePublish();
+  }, [scheduleEdgePublish]);
 
   const onMoveEdgeWaypoint = useCallback(
     (edgeId: string, waypointId: string, position: { x: number; y: number }) => {
-      diagramStoreRef.current.moveEdgeWaypoint(edgeId, waypointId, position);
+      const current = edgeGesturesRef.current.get(edgeId);
+      const moved = new Map(current?.moved ?? []);
+      moved.set(waypointId, position);
+      edgeGesturesRef.current.set(edgeId, { created: current?.created, moved });
+      scheduleEdgePublish();
     },
-    []
+    [scheduleEdgePublish]
+  );
+
+  const onEndEdgeGesture = useCallback(
+    (edgeId: string) => {
+      const gesture = edgeGesturesRef.current.get(edgeId);
+      if (!gesture) return;
+      edgeGesturesRef.current.delete(edgeId);
+      if (edgeFlushHandle.current !== null) {
+        cancelAnimationFrame(edgeFlushHandle.current);
+        edgeFlushHandle.current = null;
+      }
+      const { add, moves } = edgeGestureWrites(gesture);
+      // One transaction under the undo origin: one sync update, one undo step.
+      undo.transact(() => {
+        if (add) diagramStore.addEdgeWaypoint(edgeId, add.index, add.waypoint);
+        for (const m of moves) diagramStore.moveEdgeWaypoint(edgeId, m.id, { x: m.x, y: m.y });
+      });
+      // Cleared in the same batch as the store notification: no frame shows
+      // the bend back where it started.
+      publishEdgeGestures();
+    },
+    [undo, diagramStore, publishEdgeGestures]
   );
 
   const onRemoveEdgeWaypoint = useCallback((edgeId: string, waypointId: string) => {
@@ -2514,6 +2596,7 @@ function App() {
       onReconnectEdge={onReconnectEdge}
       onAddEdgeWaypoint={onAddEdgeWaypoint}
       onMoveEdgeWaypoint={onMoveEdgeWaypoint}
+      onEndEdgeGesture={onEndEdgeGesture}
       onRemoveEdgeWaypoint={onRemoveEdgeWaypoint}
       onReparentNode={onReparentNode}
       onAdoptIntoGroup={onAdoptIntoGroup}

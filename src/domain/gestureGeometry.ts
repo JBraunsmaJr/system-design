@@ -125,3 +125,109 @@ export function remoteInFlight(
   }
   return result ?? NO_IN_FLIGHT;
 }
+
+// ---------------------------------------------------------------------------
+// Edge bends (WS4-R1 applied to waypoints): dragging a bend, or dragging a
+// new one out of an edge, is a gesture like dragging a node. It used to write
+// the waypoint on every pointer move.
+
+export interface WaypointLike {
+  id: string;
+  x: number;
+  y: number;
+}
+
+/** One edge's in-flight bend gesture. */
+export interface EdgeGesture {
+  /** A bend created by this gesture: not in the document until it ends. */
+  created?: { index: number; waypoint: WaypointLike };
+  /** Current positions of bends moved by this gesture, by id. */
+  moved: ReadonlyMap<string, { x: number; y: number }>;
+}
+
+export type EdgeGestureMap = ReadonlyMap<string, EdgeGesture>;
+export const NO_EDGE_GESTURES: EdgeGestureMap = new Map();
+
+/** The waypoints to draw for an edge mid-gesture. */
+export function applyEdgeGesture<W extends WaypointLike>(base: readonly W[] | undefined, gesture: EdgeGesture): W[] {
+  const list: W[] = [...(base ?? [])];
+  const created = gesture.created;
+  if (created && !list.some((w) => w.id === created.waypoint.id)) {
+    list.splice(Math.max(0, Math.min(created.index, list.length)), 0, { ...created.waypoint } as W);
+  }
+  return list.map((w) => {
+    const at = gesture.moved.get(w.id);
+    return at ? ({ ...w, x: at.x, y: at.y } as W) : w;
+  });
+}
+
+/**
+ * What ending the gesture writes: a created bend once, at its final place;
+ * each other moved bend once, at its final place (WS4-R2).
+ */
+export function edgeGestureWrites(gesture: EdgeGesture): {
+  add?: { index: number; waypoint: WaypointLike };
+  moves: { id: string; x: number; y: number }[];
+} {
+  const createdId = gesture.created?.waypoint.id;
+  const add = gesture.created
+    ? {
+        index: gesture.created.index,
+        waypoint: { ...gesture.created.waypoint, ...(gesture.moved.get(gesture.created.waypoint.id) ?? {}) },
+      }
+    : undefined;
+  const moves = [...gesture.moved]
+    .filter(([id]) => id !== createdId)
+    .map(([id, at]) => ({ id, x: at.x, y: at.y }));
+  return { add, moves };
+}
+
+/** Presence form: each in-flight edge's full waypoint list at `path`. */
+export interface EdgeGestureBroadcast {
+  path: string;
+  edges: Record<string, WaypointLike[]>;
+}
+
+const MAX_BROADCAST_EDGES = 100;
+const MAX_WAYPOINTS_PER_EDGE = 200;
+
+export function parseEdgeGestureBroadcast(raw: unknown): EdgeGestureBroadcast | null {
+  if (!raw || typeof raw !== "object") return null;
+  const candidate = raw as { path?: unknown; edges?: unknown };
+  if (typeof candidate.path !== "string" || !candidate.edges || typeof candidate.edges !== "object") return null;
+  const edges: Record<string, WaypointLike[]> = {};
+  let count = 0;
+  for (const [edgeId, value] of Object.entries(candidate.edges as Record<string, unknown>)) {
+    if (count >= MAX_BROADCAST_EDGES) break;
+    if (!Array.isArray(value) || value.length > MAX_WAYPOINTS_PER_EDGE) continue;
+    const list: WaypointLike[] = [];
+    let valid = true;
+    for (const w of value) {
+      const p = w as { id?: unknown; x?: unknown; y?: unknown };
+      if (typeof p?.id !== "string" || !finite(p.x) || !finite(p.y)) {
+        valid = false;
+        break;
+      }
+      list.push({ id: p.id, x: p.x, y: p.y });
+    }
+    if (!valid) continue;
+    edges[edgeId] = list;
+    count++;
+  }
+  return count > 0 ? { path: candidate.path, edges } : null;
+}
+
+/** Peers' in-flight waypoint lists at `path`, by edge id. */
+export function remoteEdgeGestures(
+  peers: ReadonlyArray<{ edgeGesture?: EdgeGestureBroadcast | null }>,
+  path: string
+): ReadonlyMap<string, WaypointLike[]> {
+  let result: Map<string, WaypointLike[]> | null = null;
+  for (const peer of peers) {
+    if (!peer.edgeGesture || peer.edgeGesture.path !== path) continue;
+    result ??= new Map();
+    for (const [id, list] of Object.entries(peer.edgeGesture.edges)) result.set(id, list);
+  }
+  return result ?? NO_REMOTE_EDGES;
+}
+const NO_REMOTE_EDGES: ReadonlyMap<string, WaypointLike[]> = new Map();

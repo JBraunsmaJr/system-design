@@ -142,6 +142,7 @@ interface CanvasProps {
   onReconnectEdge: (edgeId: string, endpoints: EdgeEndpoints) => void;
   onAddEdgeWaypoint: (edgeId: string, index: number, waypoint: EdgeWaypoint) => void;
   onMoveEdgeWaypoint: (edgeId: string, waypointId: string, position: { x: number; y: number }) => void;
+  onEndEdgeGesture?: (edgeId: string) => void;
   onRemoveEdgeWaypoint: (edgeId: string, waypointId: string) => void;
   onReparentNode: (nodeId: string, newParentId: string | null) => void;
   onAdoptIntoGroup: (groupId: string, nodeIds: string[], groupPosition?: { x: number; y: number }) => void;
@@ -196,6 +197,7 @@ export function Canvas({
   onReconnectEdge,
   onAddEdgeWaypoint,
   onMoveEdgeWaypoint,
+  onEndEdgeGesture,
   onRemoveEdgeWaypoint,
   onReparentNode,
   onAdoptIntoGroup,
@@ -311,6 +313,7 @@ export function Canvas({
       onAdoptIntoGroup,
       onAddEdgeWaypoint,
       onMoveEdgeWaypoint,
+  onEndEdgeGesture,
       onRemoveEdgeWaypoint,
     }),
     [
@@ -323,6 +326,7 @@ export function Canvas({
       onAdoptIntoGroup,
       onAddEdgeWaypoint,
       onMoveEdgeWaypoint,
+  onEndEdgeGesture,
       onRemoveEdgeWaypoint,
     ]
   );

@@ -1,4 +1,9 @@
-import { parseGestureBroadcast, type GestureBroadcast } from "../domain/gestureGeometry.ts";
+import {
+  parseGestureBroadcast,
+  parseEdgeGestureBroadcast,
+  type GestureBroadcast,
+  type EdgeGestureBroadcast,
+} from "../domain/gestureGeometry.ts";
 import { WebrtcProvider } from "y-webrtc";
 import { buildPeerOpts } from "./transport.ts";
 import type * as Y from "yjs";
@@ -91,6 +96,8 @@ export interface LocalPresenceInfo {
    * receives each node once when the gesture ends. Null when idle.
    */
   gesture?: GestureBroadcast | null;
+  /** Edge bends this peer is dragging right now, as full waypoint lists. */
+  edgeGesture?: EdgeGestureBroadcast | null;
 }
 
 /** What you observe about ANOTHER peer - everything they set about
@@ -264,6 +271,7 @@ export function parsePresenceState(clientId: number, state: unknown): PresenceIn
     diagramPath: typeof candidate.diagramPath === "string" ? candidate.diagramPath : "",
     // Untrusted and rendered directly, so validated rather than passed on.
     gesture: parseGestureBroadcast(candidate.gesture),
+    edgeGesture: parseEdgeGestureBroadcast(candidate.edgeGesture),
     // Anything other than an explicit true means "no replica known". See the
     // field's own comment - assuming otherwise is the dangerous direction.
     hasPersistedReplica: candidate.hasPersistedReplica === true,

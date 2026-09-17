@@ -10,6 +10,11 @@ import {
   NO_IN_FLIGHT,
   MAX_BROADCAST_NODES,
   type GestureBroadcast,
+  applyEdgeGesture,
+  edgeGestureWrites,
+  parseEdgeGestureBroadcast,
+  remoteEdgeGestures,
+  type EdgeGestureBroadcast,
 } from "./gestureGeometry.ts";
 import { classifyNodeChanges, type PendingNodeUpdate } from "./nodeChangeBatching.ts";
 import type { NodeChange } from "@xyflow/react";
@@ -105,6 +110,37 @@ console.log("\n=== Recognising the release (WS4-R2) ===");
     geometry
   );
   assert(resizeEnd.gestureEnded, "a resize release ends the gesture too");
+}
+
+console.log("\n=== Edge bends ===");
+{
+  const base = [
+    { id: "a", x: 0, y: 0 },
+    { id: "b", x: 10, y: 10 },
+  ];
+  const moving = { moved: new Map([["b", { x: 50, y: 60 }]]) };
+  const drawn = applyEdgeGesture(base, moving);
+  assert(drawn[1].x === 50 && drawn[0] === base[0] && base[1].x === 10, "a moved bend is drawn at its new place; others and the document are untouched");
+  const creating = { created: { index: 1, waypoint: { id: "new", x: 5, y: 5 } }, moved: new Map([["new", { x: 7, y: 8 }]]) };
+  const withNew = applyEdgeGesture(base, creating);
+  assert(withNew.map((w) => w.id).join() === "a,new,b" && withNew[1].x === 7, "a bend being created is drawn in place, at its latest position");
+  assert(applyEdgeGesture([...base, { id: "new", x: 1, y: 1 }], creating).length === 3, "never drawn twice once the document has it");
+  assert(applyEdgeGesture(undefined, creating).length === 1 && applyEdgeGesture(base, { created: { index: 99, waypoint: { id: "z", x: 0, y: 0 } }, moved: new Map() })[2].id === "z", "an out-of-range index is clamped");
+
+  const create = edgeGestureWrites(creating);
+  assert(create.add?.waypoint.x === 7 && create.add.waypoint.y === 8 && create.moves.length === 0, "a created bend is written once, at its final place (WS4-R2)");
+  const move = edgeGestureWrites({ moved: new Map([["a", { x: 1, y: 2 }], ["b", { x: 3, y: 4 }]]) });
+  assert(!move.add && move.moves.length === 2, "each moved bend is written once");
+
+  const wire: EdgeGestureBroadcast = { path: "", edges: { e1: drawn } };
+  assert(JSON.stringify(parseEdgeGestureBroadcast(JSON.parse(JSON.stringify(wire)))) === JSON.stringify(wire), "a bend broadcast survives the wire");
+  const hostile = parseEdgeGestureBroadcast({
+    path: "",
+    edges: { bad: [{ id: "x", x: NaN, y: 0 }], huge: Array.from({ length: 500 }, (_, i) => ({ id: `w${i}`, x: 0, y: 0 })), ok: [{ id: "w", x: 1, y: 1 }] },
+  });
+  assert(hostile !== null && Object.keys(hostile.edges).join() === "ok", "malformed or oversized bend lists are dropped");
+  const peers = remoteEdgeGestures([{ edgeGesture: wire }, { edgeGesture: { path: "x", edges: { e2: [] } } }, {}], "");
+  assert(peers.size === 1 && peers.has("e1"), "only bends at the viewed level apply");
 }
 
 if (failures > 0) {
