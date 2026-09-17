@@ -137,8 +137,17 @@ export interface WaypointLike {
   y: number;
 }
 
-/** One edge's in-flight bend gesture. */
+/** Where an edge's label sits: a point along the path plus an offset. */
+export interface LabelPlacement {
+  labelAnchorT: number;
+  labelOffsetX: number;
+  labelOffsetY: number;
+}
+
+/** One edge's in-flight gesture: bends and/or its label. */
 export interface EdgeGesture {
+  /** The label being dragged, when it is. Written once when the drag ends. */
+  label?: LabelPlacement;
   /** A bend created by this gesture: not in the document until it ends. */
   created?: { index: number; waypoint: WaypointLike };
   /** Current positions of bends moved by this gesture, by id. */
@@ -168,6 +177,7 @@ export function applyEdgeGesture<W extends WaypointLike>(base: readonly W[] | un
 export function edgeGestureWrites(gesture: EdgeGesture): {
   add?: { index: number; waypoint: WaypointLike };
   moves: { id: string; x: number; y: number }[];
+  label?: LabelPlacement;
 } {
   const createdId = gesture.created?.waypoint.id;
   const add = gesture.created
@@ -179,13 +189,20 @@ export function edgeGestureWrites(gesture: EdgeGesture): {
   const moves = [...gesture.moved]
     .filter(([id]) => id !== createdId)
     .map(([id, at]) => ({ id, x: at.x, y: at.y }));
-  return { add, moves };
+  return { add, moves, label: gesture.label };
+}
+
+/** Whether a gesture changes bends at all (a label-only drag does not). */
+export function changesWaypoints(gesture: EdgeGesture): boolean {
+  return gesture.created !== undefined || gesture.moved.size > 0;
 }
 
 /** Presence form: each in-flight edge's full waypoint list at `path`. */
 export interface EdgeGestureBroadcast {
   path: string;
   edges: Record<string, WaypointLike[]>;
+  /** Labels being dragged, by edge id. */
+  labels?: Record<string, LabelPlacement>;
 }
 
 const MAX_BROADCAST_EDGES = 100;
@@ -196,7 +213,17 @@ export function parseEdgeGestureBroadcast(raw: unknown): EdgeGestureBroadcast | 
   const candidate = raw as { path?: unknown; edges?: unknown };
   if (typeof candidate.path !== "string" || !candidate.edges || typeof candidate.edges !== "object") return null;
   const edges: Record<string, WaypointLike[]> = {};
+  const labels: Record<string, LabelPlacement> = {};
   let count = 0;
+  if (candidate && typeof (candidate as { labels?: unknown }).labels === "object" && (candidate as { labels?: unknown }).labels) {
+    for (const [edgeId, value] of Object.entries((candidate as { labels: Record<string, unknown> }).labels)) {
+      if (count >= MAX_BROADCAST_EDGES) break;
+      const l = value as Partial<LabelPlacement> | null;
+      if (!l || !finite(l.labelAnchorT) || l.labelAnchorT < 0 || l.labelAnchorT > 1 || !finite(l.labelOffsetX) || !finite(l.labelOffsetY)) continue;
+      labels[edgeId] = { labelAnchorT: l.labelAnchorT, labelOffsetX: l.labelOffsetX, labelOffsetY: l.labelOffsetY };
+      count++;
+    }
+  }
   for (const [edgeId, value] of Object.entries(candidate.edges as Record<string, unknown>)) {
     if (count >= MAX_BROADCAST_EDGES) break;
     if (!Array.isArray(value) || value.length > MAX_WAYPOINTS_PER_EDGE) continue;
@@ -214,8 +241,25 @@ export function parseEdgeGestureBroadcast(raw: unknown): EdgeGestureBroadcast | 
     edges[edgeId] = list;
     count++;
   }
-  return count > 0 ? { path: candidate.path, edges } : null;
+  if (count === 0) return null;
+  return Object.keys(labels).length > 0 ? { path: candidate.path, edges, labels } : { path: candidate.path, edges };
 }
+
+/** Peers' in-flight label placements at `path`, by edge id. */
+export function remoteEdgeLabels(
+  peers: ReadonlyArray<{ edgeGesture?: EdgeGestureBroadcast | null }>,
+  path: string
+): ReadonlyMap<string, LabelPlacement> {
+  let result: Map<string, LabelPlacement> | null = null;
+  for (const peer of peers) {
+    const labels = peer.edgeGesture?.path === path ? peer.edgeGesture.labels : undefined;
+    if (!labels) continue;
+    result ??= new Map();
+    for (const [id, placement] of Object.entries(labels)) result.set(id, placement);
+  }
+  return result ?? NO_REMOTE_LABELS;
+}
+const NO_REMOTE_LABELS: ReadonlyMap<string, LabelPlacement> = new Map();
 
 /** Peers' in-flight waypoint lists at `path`, by edge id. */
 export function remoteEdgeGestures(

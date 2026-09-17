@@ -20,6 +20,11 @@ export interface CanvasContextValue {
   onMoveEdgeWaypoint?: (edgeId: string, waypointId: string, position: { x: number; y: number }) => void;
   /** Ends a bend drag: the edge's in-flight bends are written once (WS4-R2). */
   onEndEdgeGesture?: (edgeId: string) => void;
+  /** Previews a label drag; onEndEdgeGesture writes it once. */
+  onPreviewEdgeLabel?: (
+    edgeId: string,
+    placement: { labelAnchorT: number; labelOffsetX: number; labelOffsetY: number }
+  ) => void;
   onRemoveEdgeWaypoint?: (edgeId: string, waypointId: string) => void;
 }
 

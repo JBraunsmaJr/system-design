@@ -109,6 +109,9 @@ export function TypedEdge({
   const onMoveEdgeWaypoint = isEditable ? canvasContext?.onMoveEdgeWaypoint : undefined;
   const onRemoveEdgeWaypoint = isEditable ? canvasContext?.onRemoveEdgeWaypoint : undefined;
   const onEndEdgeGesture = canvasContext?.onEndEdgeGesture;
+  // Only for canvas edges: an edge given its own onUpdateEdge writes directly.
+  const onPreviewEdgeLabel =
+    isEditable && !propOnUpdateEdge && onEndEdgeGesture ? canvasContext?.onPreviewEdgeLabel : undefined;
   const canBend = Boolean(onAddEdgeWaypoint && onMoveEdgeWaypoint && onRemoveEdgeWaypoint);
   const { screenToFlowPosition } = useReactFlow();
   const def = getEdgeType(data?.edgeType ?? "generic");
@@ -461,22 +464,27 @@ export function TypedEdge({
 
         const flowPoint = screenToFlowPosition({ x: moveEvent.clientX, y: moveEvent.clientY });
         const closest = findClosestPointOnPath(pathEl, flowPoint.x, flowPoint.y);
-        onUpdateEdge(id, {
+        const placement = {
           labelAnchorT: closest.t,
           labelOffsetX: flowPoint.x - closest.x,
           labelOffsetY: flowPoint.y - closest.y,
-        });
+        };
+        // A preview on the canvas (written once on release, WS4-R1/R2);
+        // written directly only where there is no gesture support.
+        if (onPreviewEdgeLabel) onPreviewEdgeLabel(id, placement);
+        else onUpdateEdge(id, placement);
       };
 
       const handleUp = () => {
         document.removeEventListener("pointermove", handleMove);
         document.removeEventListener("pointerup", handleUp);
+        if (moved && onPreviewEdgeLabel) onEndEdgeGesture?.(id);
       };
 
       document.addEventListener("pointermove", handleMove);
       document.addEventListener("pointerup", handleUp);
     },
-    [id, onUpdateEdge, screenToFlowPosition]
+    [id, onUpdateEdge, onPreviewEdgeLabel, onEndEdgeGesture, screenToFlowPosition]
   );
 
   const onLabelDoubleClick = useCallback(

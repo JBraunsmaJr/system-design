@@ -317,6 +317,29 @@ async function run() {
       await sleep(200);
       check((await bendCount()) === before, "and one more removes the bend it created");
       await a.evaluate(`window.__PERF__.setSelectedEdges([])`);
+
+      // A label drag is a gesture too.
+      await sleep(700);
+      const label = a.locator('.react-flow__edge-labels .typed-edge__label, .typed-edge__label').first();
+      const lbox = await label.boundingBox();
+      if (!lbox) throw new Error("no edge label on screen");
+      const lx = lbox.x + lbox.width / 2;
+      const ly = lbox.y + lbox.height / 2;
+      await a.evaluate(`window.__PERF__.reset()`);
+      await a.mouse.move(lx, ly);
+      await a.mouse.down();
+      for (let i = 1; i <= 15; i++) await a.mouse.move(lx + i * 3, ly + i * 3);
+      check((await storeWrites(a)) === 0, "dragging an edge label writes nothing while held");
+      await a.mouse.up();
+      await sleep(250);
+      const moved = await label.boundingBox();
+      check(!!moved && Math.hypot(moved.x - lbox.x, moved.y - lbox.y) > 10, "the label moves");
+      check((await storeWrites(a)) === 1, `a 15-step label drag is one write (wrote ${await storeWrites(a)})`);
+      await a.click(".react-flow__pane", { position: { x: 5, y: 5 } });
+      await a.keyboard.press("Control+z");
+      await sleep(250);
+      const back = await label.boundingBox();
+      check(!!back && Math.hypot(back.x - lbox.x, back.y - lbox.y) < 2, "one undo puts the label back");
     }
 
     console.log("\n=== Starting a session leaves the canvas unchanged (WS1-R4) ===");

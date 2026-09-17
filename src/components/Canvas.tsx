@@ -152,6 +152,10 @@ interface CanvasProps {
   onAddEdgeWaypoint: (edgeId: string, index: number, waypoint: EdgeWaypoint) => void;
   onMoveEdgeWaypoint: (edgeId: string, waypointId: string, position: { x: number; y: number }) => void;
   onEndEdgeGesture?: (edgeId: string) => void;
+  onPreviewEdgeLabel?: (
+    edgeId: string,
+    placement: { labelAnchorT: number; labelOffsetX: number; labelOffsetY: number }
+  ) => void;
   onRemoveEdgeWaypoint: (edgeId: string, waypointId: string) => void;
   onReparentNode: (nodeId: string, newParentId: string | null) => void;
   onAdoptIntoGroup: (groupId: string, nodeIds: string[], groupPosition?: { x: number; y: number }) => void;
@@ -207,6 +211,7 @@ export function Canvas({
   onAddEdgeWaypoint,
   onMoveEdgeWaypoint,
   onEndEdgeGesture,
+  onPreviewEdgeLabel,
   onRemoveEdgeWaypoint,
   onReparentNode,
   onAdoptIntoGroup,
@@ -323,6 +328,7 @@ export function Canvas({
       onAddEdgeWaypoint,
       onMoveEdgeWaypoint,
   onEndEdgeGesture,
+  onPreviewEdgeLabel,
       onRemoveEdgeWaypoint,
     }),
     [
@@ -336,6 +342,7 @@ export function Canvas({
       onAddEdgeWaypoint,
       onMoveEdgeWaypoint,
   onEndEdgeGesture,
+  onPreviewEdgeLabel,
       onRemoveEdgeWaypoint,
     ]
   );

@@ -14,6 +14,8 @@ import {
   edgeGestureWrites,
   parseEdgeGestureBroadcast,
   remoteEdgeGestures,
+  remoteEdgeLabels,
+  changesWaypoints,
   type EdgeGestureBroadcast,
 } from "./gestureGeometry.ts";
 import { classifyNodeChanges, type PendingNodeUpdate } from "./nodeChangeBatching.ts";
@@ -141,6 +143,28 @@ console.log("\n=== Edge bends ===");
   assert(hostile !== null && Object.keys(hostile.edges).join() === "ok", "malformed or oversized bend lists are dropped");
   const peers = remoteEdgeGestures([{ edgeGesture: wire }, { edgeGesture: { path: "x", edges: { e2: [] } } }, {}], "");
   assert(peers.size === 1 && peers.has("e1"), "only bends at the viewed level apply");
+}
+
+console.log("\n=== Edge labels ===");
+{
+  const placement = { labelAnchorT: 0.25, labelOffsetX: 4, labelOffsetY: -6 };
+  const labelOnly = { moved: new Map(), label: placement };
+  assert(!changesWaypoints(labelOnly), "a label drag does not touch bends");
+  const writes = edgeGestureWrites(labelOnly);
+  assert(!writes.add && writes.moves.length === 0 && writes.label === placement, "and ends in a single label write (WS4-R2)");
+  assert(changesWaypoints({ moved: new Map([["a", { x: 1, y: 1 }]]) }), "a bend drag does");
+
+  const wire = { path: "", edges: {}, labels: { e1: placement } };
+  const parsed = parseEdgeGestureBroadcast(JSON.parse(JSON.stringify(wire)));
+  assert(JSON.stringify(parsed?.labels) === JSON.stringify(wire.labels), "a label broadcast survives the wire");
+  const hostile = parseEdgeGestureBroadcast({
+    path: "",
+    edges: {},
+    labels: { outside: { labelAnchorT: 3, labelOffsetX: 0, labelOffsetY: 0 }, nan: { labelAnchorT: 0.5, labelOffsetX: NaN, labelOffsetY: 0 }, ok: placement },
+  });
+  assert(Object.keys(hostile?.labels ?? {}).join() === "ok", "labels off the path or with bad offsets are dropped");
+  const peers = remoteEdgeLabels([{ edgeGesture: wire }, { edgeGesture: { path: "x", edges: {}, labels: { e2: placement } } }], "");
+  assert(peers.size === 1 && peers.get("e1")?.labelAnchorT === 0.25, "only labels at the viewed level apply");
 }
 
 if (failures > 0) {
