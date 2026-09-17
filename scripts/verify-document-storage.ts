@@ -151,6 +151,83 @@ async function run() {
       check(ids.includes("alpha") && ids.includes("beta"), `both are in the index (${ids.join(", ")})`);
     }
 
+    console.log("\n=== The document manager (WS2-R3, WS2-R5, WS2-R6) ===");
+    {
+      const ctx = await newContext();
+      const p = await ctx.newPage();
+      p.on("pageerror", (e) => check(false, `page threw: ${e.message}`));
+      await p.goto(`${app}?doc=manager-one`);
+      await ready(p);
+      await p.evaluate(`window.__PERF__.loadFixture("small")`);
+      await p.fill('[aria-label="Diagram title"]', "Doc one");
+      await sleep(SAVE_WAIT);
+
+      await p.click('button[title="File"]');
+      await Promise.all([p.waitForNavigation(), p.click('.export-menu__dropdown button:has-text("New")')]);
+      await ready(p);
+      const secondId = new URL(p.url()).searchParams.get("doc") ?? "";
+      check(secondId !== "manager-one" && (await nodeCount(p)) === 0, "File > New opens a new, empty document");
+      await p.fill('[aria-label="Diagram title"]', "Doc two");
+      await sleep(SAVE_WAIT);
+
+      const openManager = async () => {
+        await p.click('button[title="File"]');
+        await p.click('.export-menu__dropdown button:has-text("Documents")');
+        await p.waitForSelector(".document-manager__row");
+      };
+      const row = (id: string) => p.locator(`.document-manager__row[data-doc-id="${id}"]`);
+      await openManager();
+      check((await row("manager-one").count()) === 1 && (await row(secondId).count()) === 1, "both documents are listed");
+      check((await row(secondId).locator(".document-manager__current").count()) === 1, "the open one is marked");
+      check(await row(secondId).locator(".document-manager__forget").isDisabled(), "the open document cannot be forgotten from its own tab");
+      const storageText = (await p.textContent(".document-manager__storage")) ?? "";
+      check(/Using .+ of .+ available/.test(storageText), `storage usage is shown (WS2-R5): "${storageText.slice(0, 60)}..."`);
+
+      // Rename a document that is not open.
+      await row("manager-one").locator(".document-manager__rename").click();
+      await p.fill(".document-manager__rename-input", "Doc one renamed");
+      await p.keyboard.press("Enter");
+      await p.waitForFunction(() =>
+        [...document.querySelectorAll(".document-manager__title")].some((e) => e.textContent === "Doc one renamed")
+      );
+      check(true, "renaming a closed document updates the list");
+
+      // Rename the open document: goes through its live title.
+      await row(secondId).locator(".document-manager__rename").click();
+      await p.fill(".document-manager__rename-input", "Doc two renamed");
+      await p.keyboard.press("Enter");
+      await sleep(200);
+      check((await titleOf(p)) === "Doc two renamed", "renaming the open document renames it in the editor too");
+
+      // Duplicate, then forget the copy.
+      await row("manager-one").locator(".document-manager__duplicate").click();
+      await p.waitForSelector('.document-manager__title:text-is("Copy of Doc one renamed")');
+      const copyId = await p
+        .locator('.document-manager__row:has(.document-manager__title:text-is("Copy of Doc one renamed"))')
+        .getAttribute("data-doc-id");
+      check(!!copyId, "duplicating adds a copy");
+      let confirmText = "";
+      p.once("dialog", (d) => {
+        confirmText = d.message();
+        void d.accept();
+      });
+      await row(copyId ?? "").locator(".document-manager__forget").click();
+      await p.waitForFunction((id) => !document.querySelector(`.document-manager__row[data-doc-id="${id}"]`), copyId);
+      check(/permanently deletes/.test(confirmText) && /cannot be undone/.test(confirmText), "forgetting asks first, and says it is irreversible (WS2-R6)");
+      await sleep(300);
+      const dbs = await databaseNames(p);
+      check(!dbs.includes(`system-design:doc:${copyId}`), "the forgotten document's database is deleted");
+      check(dbs.includes("system-design:doc:manager-one"), "the original's database is untouched");
+
+      // Open the renamed document from the list.
+      await Promise.all([p.waitForNavigation(), row("manager-one").locator(".document-manager__open").click()]);
+      await ready(p);
+      check(
+        new URL(p.url()).searchParams.get("doc") === "manager-one" && (await titleOf(p)) === "Doc one renamed" && (await nodeCount(p)) === 25,
+        "opening it from the list shows its content under its new name"
+      );
+    }
+
     console.log("\n=== Sessions and local replicas ===");
     {
       const ctx = await newContext();

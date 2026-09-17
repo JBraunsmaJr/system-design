@@ -1,10 +1,12 @@
-import { useId, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { HardDrive, Cloud, FileDown, Loader, TriangleAlert } from "lucide-react";
 import {
   deriveDurability,
   type DurabilitySignals,
   type DurabilityLevel,
 } from "../domain/durability.ts";
+import { computeFlippedPosition } from "../domain/popoverPosition";
 
 /**
  * Tells the user whether their work is actually safe (WS13-R8, WS13-R9).
@@ -27,6 +29,8 @@ const ICONS: Record<DurabilityLevel, typeof HardDrive> = {
   loading: Loader,
 };
 
+const DETAIL_WIDTH = 264;
+
 export interface DurabilityIndicatorProps {
   signals: DurabilitySignals;
   onExport?: () => void;
@@ -42,7 +46,10 @@ export function DurabilityIndicator({
 }: DurabilityIndicatorProps) {
   const state = deriveDurability(signals);
   const [open, setOpen] = useState(false);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
   const detailId = useId();
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const Icon = ICONS[state.level];
 
   const handler =
@@ -66,35 +73,137 @@ export function DurabilityIndicator({
   // An alert is not something to go looking for: it opens itself and stays.
   const expanded = state.persistent || open;
 
+  const openDropdown = () => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    setDropdownPos({ top: rect.bottom + 6, left: Math.max(8, rect.right - DETAIL_WIDTH) });
+    setOpen(true);
+  };
+  const closeDropdown = () => setOpen(false);
+
+  useLayoutEffect(() => {
+    if (!expanded) return;
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const triggerRect = trigger.getBoundingClientRect();
+    const dropdown = dropdownRef.current;
+    const width = dropdown ? dropdown.getBoundingClientRect().width : DETAIL_WIDTH;
+    const height = dropdown ? dropdown.getBoundingClientRect().height : 100;
+    const next = computeFlippedPosition(
+      triggerRect,
+      { width, height },
+      { width: window.innerWidth, height: window.innerHeight },
+      6
+    );
+    setDropdownPos((prev) => (prev && prev.top === next.top && prev.left === next.left ? prev : next));
+  }, [expanded, state.detail, actionLabel]);
+
+  const reposition = useCallback(() => {
+    const trigger = triggerRef.current;
+    const dropdown = dropdownRef.current;
+    if (!trigger || !dropdown) return;
+    const triggerRect = trigger.getBoundingClientRect();
+    const dropdownRect = dropdown.getBoundingClientRect();
+    setDropdownPos(
+      computeFlippedPosition(
+        triggerRect,
+        { width: dropdownRect.width, height: dropdownRect.height },
+        { width: window.innerWidth, height: window.innerHeight },
+        6
+      )
+    );
+  }, []);
+
+  useEffect(() => {
+    if (!expanded) return;
+    const handleMouseDown = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (triggerRef.current?.contains(target)) return;
+      if (dropdownRef.current?.contains(target)) return;
+      if (!state.persistent) {
+        closeDropdown();
+      }
+    };
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !state.persistent) closeDropdown();
+    };
+    document.addEventListener("mousedown", handleMouseDown);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleMouseDown);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [expanded, state.persistent]);
+
+  useEffect(() => {
+    if (!expanded) return;
+    window.addEventListener("scroll", reposition, true);
+    window.addEventListener("resize", reposition);
+    return () => {
+      window.removeEventListener("scroll", reposition, true);
+      window.removeEventListener("resize", reposition);
+    };
+  }, [expanded, reposition]);
+
   return (
     <div
       className={`durability durability--${state.tone}${expanded ? " durability--expanded" : ""}`}
     >
       <button
+        ref={triggerRef}
         type="button"
         className="durability__chip"
         aria-expanded={expanded}
         aria-describedby={expanded ? detailId : undefined}
-        onClick={() => setOpen((v) => !v)}
+        title={state.label}
+        onClick={() => {
+          if (open) {
+            closeDropdown();
+          } else {
+            openDropdown();
+          }
+        }}
       >
         <Icon
           size={14}
           aria-hidden="true"
           className={state.level === "loading" ? "durability__icon--spin" : undefined}
         />
-        <span>{state.label}</span>
+        <span className="toolbar__label">{state.label}</span>
       </button>
 
-      {expanded && (
-        <div className="durability__detail" id={detailId} role="status">
-          <p>{state.detail}</p>
-          {actionLabel && handler && (
-            <button type="button" className="durability__action" onClick={handler}>
-              {actionLabel}
-            </button>
-          )}
-        </div>
-      )}
+      {expanded &&
+        dropdownPos &&
+        createPortal(
+          <div
+            ref={dropdownRef}
+            className={`durability__detail durability--${state.tone}`}
+            id={detailId}
+            role="status"
+            style={{
+              position: "fixed",
+              top: dropdownPos.top,
+              left: dropdownPos.left,
+              width: DETAIL_WIDTH,
+            }}
+          >
+            <p>{state.detail}</p>
+            {actionLabel && handler && (
+              <button
+                type="button"
+                className="durability__action"
+                onClick={() => {
+                  handler();
+                  if (!state.persistent) closeDropdown();
+                }}
+              >
+                {actionLabel}
+              </button>
+            )}
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

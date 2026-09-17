@@ -108,6 +108,35 @@ export function createIndexedDbBackend(
       });
     },
 
+    async modify(key, mutate): Promise<void> {
+      const database = await db();
+      // Read, compute and write inside ONE readwrite transaction. IndexedDB
+      // serialises overlapping readwrite transactions, so two tabs updating
+      // the index cannot both read the old value.
+      let failure: unknown = null;
+      await new Promise<void>((resolve, reject) => {
+        const tx = database.transaction(STORE_NAME, "readwrite");
+        const store = tx.objectStore(STORE_NAME);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(failure ?? tx.error);
+        tx.onabort = () => reject(failure ?? tx.error ?? new Error("Transaction aborted."));
+        const get = store.get(key);
+        get.onsuccess = () => {
+          try {
+            // Synchronous by contract: awaiting here would let the
+            // transaction auto-commit before the writes are queued.
+            const result = mutate(typeof get.result === "string" ? get.result : null);
+            store.put(result.value, key);
+            for (const e of result.also ?? []) store.put(e.value, e.key);
+            for (const k of result.remove ?? []) store.delete(k);
+          } catch (error) {
+            failure = error;
+            tx.abort();
+          }
+        };
+      });
+    },
+
     async deleteAll(keys: string[]): Promise<void> {
       await transact("readwrite", (store) => {
         for (const key of keys) store.delete(key);

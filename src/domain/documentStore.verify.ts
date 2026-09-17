@@ -164,28 +164,60 @@ console.log("=== Atomicity: a failed write leaves no dangling index entry ===");
 {
   // Fails only on the document body, never on the index, so a non-atomic
   // implementation would leave an entry pointing at nothing.
-  const flaky: DocumentBackend = {
+  const quotaError = () => {
+    const error = new Error("simulated full disk");
+    error.name = "QuotaExceededError";
+    return error;
+  };
+  // Both write paths: the atomic modify() the real backends use, and the
+  // read-then-writeAll fallback for a backend without it.
+  const withModify: DocumentBackend = {
     ...createMemoryBackend(),
-    async writeAll(entries) {
-      if (entries.some((e) => e.key.startsWith("doc:"))) {
-        const error = new Error("simulated full disk");
-        error.name = "QuotaExceededError";
-        throw error;
-      }
+    async modify(_key, mutate) {
+      // Computes the change, then fails before applying any of it - which is
+      // what an aborted IndexedDB transaction does.
+      const result = mutate(null);
+      if ((result.also ?? []).some((e) => e.key.startsWith("doc:"))) throw quotaError();
     },
   };
-  const store = createDocumentStore(flaky);
-  const result = await store.writeDocument(newDocumentId(), makeFile("Doomed"));
-  assert(!result.ok && result.reason === "quota", "a quota failure is reported as quota");
-  assert(
-    !result.ok && /no space left/i.test(result.message),
-    "the message tells the user what to do, rather than being generic (WS2-R4)",
-  );
-  const listed = await store.listDocuments();
-  assert(
-    listed.ok && listed.value.length === 0,
-    "no index entry is left pointing at a document that was never written",
-  );
+  const fallback: DocumentBackend = { ...createMemoryBackend() };
+  delete fallback.modify;
+  fallback.writeAll = async (entries) => {
+    if (entries.some((e) => e.key.startsWith("doc:"))) throw quotaError();
+  };
+  for (const [label, backend] of [["atomic modify", withModify], ["writeAll fallback", fallback]] as const) {
+    const store = createDocumentStore(backend);
+    const result = await store.writeDocument(newDocumentId(), makeFile("Doomed"));
+    assert(!result.ok && result.reason === "quota", `${label}: a quota failure is reported as quota`);
+    assert(
+      !result.ok && /no space left/i.test(result.message),
+      `${label}: the message tells the user what to do, rather than being generic (WS2-R4)`,
+    );
+    const listed = await store.listDocuments();
+    assert(
+      listed.ok && listed.value.length === 0,
+      `${label}: no index entry is left pointing at a document that was never written`,
+    );
+  }
+}
+
+console.log("=== Concurrent saves of different documents keep both entries (WS2-R3) ===");
+{
+  // Two tabs share one database. Each save reads the index and writes it
+  // back; done as two separate steps, the later write drops the earlier
+  // entry. Both stores here share a single backend, as two tabs do.
+  for (const [label, backend] of [
+    ["memory", createMemoryBackend()],
+    ["indexeddb", createIndexedDbBackend()],
+  ] as const) {
+    const tabA = createDocumentStore(backend);
+    const tabB = createDocumentStore(backend);
+    const ids = Array.from({ length: 20 }, () => newDocumentId());
+    await Promise.all(ids.map((id, i) => (i % 2 ? tabA : tabB).writeDocument(id, makeFile(`Doc ${i}`))));
+    const listed = await tabA.listDocuments();
+    const found = listed.ok ? ids.filter((id) => listed.value.some((e) => e.docId === id)).length : 0;
+    assert(found === ids.length, `${label}: all ${ids.length} concurrently saved documents are indexed (found ${found})`);
+  }
 }
 
 console.log("=== Error classification ===");

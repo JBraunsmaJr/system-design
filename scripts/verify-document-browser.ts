@@ -88,13 +88,19 @@ async function run() {
     check((await titleOf(a)) === fixture.title, "title comes from the file");
     check(await undoDisabled(a), "undo is disabled right after opening a file (WS3-R4)");
     await a.evaluate(`window.__PERF__.setPath(${JSON.stringify([NESTED.id])})`);
-    await sleep(200);
+    // Waits for the level to render rather than a fixed delay, which was too
+    // short when the whole suite loads the machine.
+    await a
+      .waitForFunction((n) => document.querySelectorAll(".react-flow__node").length === n, NESTED.data.subDiagram!.nodes.length, { timeout: 5000 })
+      .catch(() => {});
     check(
       (await nodeCount(a)) === NESTED.data.subDiagram!.nodes.length,
       `drilling into ${NESTED.id} shows its ${NESTED.data.subDiagram!.nodes.length} nested nodes`
     );
     await a.evaluate(`window.__PERF__.setPath([])`);
-    await sleep(200);
+    await a
+      .waitForFunction((n) => document.querySelectorAll(".react-flow__node").length === n, fixture.nodes.length, { timeout: 5000 })
+      .catch(() => {});
 
     console.log("\n=== A drag takes exactly one undo (WS3-R3), and one write (WS4-R2) ===");
     const home = await transformOf(a, DRAGGED);
@@ -342,11 +348,14 @@ async function run() {
     await a.click(".collab-panel__leave-button");
     await sleep(300);
     check((await nodeCount(a)) === before, "A keeps the document after leaving (WS2-R6)");
-    a.once("dialog", (d) => void d.accept());
+    const docBefore = new URL(a.url()).searchParams.get("doc");
     await a.click('button[title="File"]');
-    await a.click('.export-menu__dropdown button:has-text("New")');
+    await Promise.all([a.waitForNavigation(), a.click('.export-menu__dropdown button:has-text("New")')]);
+    await a.waitForSelector(".collab-panel__trigger");
     await sleep(300);
-    check((await nodeCount(a)) === 0, "New clears the canvas");
+    const docAfter = new URL(a.url()).searchParams.get("doc");
+    check(!!docAfter && docAfter !== docBefore, `New opens a different document (${docBefore} -> ${docAfter})`);
+    check((await nodeCount(a)) === 0, "New shows an empty canvas");
     check(await undoDisabled(a), "New leaves nothing to undo");
   } catch (err) {
     failures++;

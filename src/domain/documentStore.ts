@@ -122,8 +122,26 @@ export interface BackendEntry {
  * the two leaves an index entry pointing at nothing, or an orphaned document
  * invisible to the list.
  */
+/** What a `modify` callback returns: the key's new value, plus anything else
+ * to write or delete in the same atomic step. */
+export interface BackendModification {
+  value: string;
+  also?: BackendEntry[];
+  remove?: string[];
+}
+
 export interface DocumentBackend {
   read(key: string): Promise<string | null>;
+  /**
+   * Reads `key`, computes its replacement synchronously, and writes it -
+   * together with `also` and `remove` - in ONE atomic step.
+   *
+   * Optional, but without it index updates are read-then-write across two
+   * steps, and two tabs saving different documents at the same moment can
+   * each write an index missing the other's entry (WS2-R3). The document
+   * itself survives either way; reconcile() finds it.
+   */
+  modify?(key: string, mutate: (current: string | null) => BackendModification): Promise<void>;
   writeAll(entries: BackendEntry[]): Promise<void>;
   deleteAll(keys: string[]): Promise<void>;
   listKeys(prefix: string): Promise<string[]>;
@@ -145,6 +163,12 @@ export function createMemoryBackend(): DocumentBackend & {
     },
     async writeAll(entries) {
       for (const { key, value } of entries) map.set(key, value);
+    },
+    async modify(key, mutate) {
+      const result = mutate(map.has(key) ? (map.get(key) as string) : null);
+      map.set(key, result.value);
+      for (const e of result.also ?? []) map.set(e.key, e.value);
+      for (const k of result.remove ?? []) map.delete(k);
     },
     async deleteAll(keys) {
       for (const key of keys) map.delete(key);
@@ -181,7 +205,30 @@ export interface DocumentStore {
 
 export function createDocumentStore(backend: DocumentBackend): DocumentStore {
   async function readIndex(): Promise<DocumentIndex> {
-    const raw = await backend.read(INDEX_KEY);
+    return parseIndex(await backend.read(INDEX_KEY));
+  }
+
+  /**
+   * Applies `build` to the current index and writes the result, atomically
+   * where the backend supports it. `build` must be synchronous: it runs inside
+   * a storage transaction.
+   */
+  async function updateIndex(
+    build: (index: DocumentIndex) => { index: DocumentIndex; also?: BackendEntry[]; remove?: string[] },
+  ): Promise<void> {
+    if (backend.modify) {
+      await backend.modify(INDEX_KEY, (raw) => {
+        const result = build(parseIndex(raw));
+        return { value: JSON.stringify(result.index), also: result.also, remove: result.remove };
+      });
+      return;
+    }
+    const result = build(await readIndex());
+    await backend.writeAll([...(result.also ?? []), { key: INDEX_KEY, value: JSON.stringify(result.index) }]);
+    if (result.remove?.length) await backend.deleteAll(result.remove);
+  }
+
+  function parseIndex(raw: string | null): DocumentIndex {
     if (raw === null) return { ...EMPTY_INDEX, entries: [] };
     try {
       const parsed = JSON.parse(raw) as DocumentIndex;
@@ -250,28 +297,29 @@ export function createDocumentStore(backend: DocumentBackend): DocumentStore {
     async writeDocument(docId, file, options) {
       const serialized = JSON.stringify(file);
       const now = new Date().toISOString();
+      let written: DocumentIndexEntry | null = null;
       try {
-        const index = await readIndex();
-        const existing = index.entries.find((e) => e.docId === docId);
-        const entry: DocumentIndexEntry = {
-          docId,
-          title: file.title || "Untitled Diagram",
-          createdAt: existing?.createdAt ?? now,
-          updatedAt: now,
-          schemaVersion: file.schemaVersion ?? SCHEMA_VERSION,
-          origin: options?.origin ?? existing?.origin ?? "local",
-          ...(options?.sessionRoom ?? existing?.sessionRoom
-            ? { sessionRoom: options?.sessionRoom ?? existing?.sessionRoom }
-            : {}),
-          sizeBytes: serialized.length,
-        };
         // Atomic: an index entry pointing at a document that failed to write
-        // is worse than no entry at all.
-        await backend.writeAll([
-          { key: DOC_PREFIX + docId, value: serialized },
-          { key: INDEX_KEY, value: JSON.stringify(upsert(index, entry)) },
-        ]);
-        return { ok: true, value: entry };
+        // is worse than no entry at all - and the index is read inside the
+        // same step, so a concurrent save of another document is kept.
+        await updateIndex((index) => {
+          const existing = index.entries.find((e) => e.docId === docId);
+          const entry: DocumentIndexEntry = {
+            docId,
+            title: file.title || "Untitled Diagram",
+            createdAt: existing?.createdAt ?? now,
+            updatedAt: now,
+            schemaVersion: file.schemaVersion ?? SCHEMA_VERSION,
+            origin: options?.origin ?? existing?.origin ?? "local",
+            ...(options?.sessionRoom ?? existing?.sessionRoom
+              ? { sessionRoom: options?.sessionRoom ?? existing?.sessionRoom }
+              : {}),
+            sizeBytes: serialized.length,
+          };
+          written = entry;
+          return { index: upsert(index, entry), also: [{ key: DOC_PREFIX + docId, value: serialized }] };
+        });
+        return { ok: true, value: written as unknown as DocumentIndexEntry };
       } catch (error) {
         const reason = classifyStorageError(error);
         return fail(
@@ -284,21 +332,16 @@ export function createDocumentStore(backend: DocumentBackend): DocumentStore {
     },
 
     async renameDocument(docId, title) {
+      let renamed: DocumentIndexEntry | null = null;
       try {
-        const index = await readIndex();
-        const existing = index.entries.find((e) => e.docId === docId);
-        if (!existing) {
-          return fail("not-found", `No stored document with id ${docId}.`);
-        }
-        const entry: DocumentIndexEntry = {
-          ...existing,
-          title,
-          updatedAt: new Date().toISOString(),
-        };
-        await backend.writeAll([
-          { key: INDEX_KEY, value: JSON.stringify(upsert(index, entry)) },
-        ]);
-        return { ok: true, value: entry };
+        await updateIndex((index) => {
+          const existing = index.entries.find((e) => e.docId === docId);
+          if (!existing) return { index };
+          renamed = { ...existing, title, updatedAt: new Date().toISOString() };
+          return { index: upsert(index, renamed) };
+        });
+        if (!renamed) return fail("not-found", `No stored document with id ${docId}.`);
+        return { ok: true, value: renamed };
       } catch (error) {
         return fail(classifyStorageError(error), `Could not rename ${docId}.`);
       }
@@ -306,15 +349,10 @@ export function createDocumentStore(backend: DocumentBackend): DocumentStore {
 
     async deleteDocument(docId) {
       try {
-        const index = await readIndex();
-        const remaining = index.entries.filter((e) => e.docId !== docId);
-        await backend.writeAll([
-          {
-            key: INDEX_KEY,
-            value: JSON.stringify({ version: 1, entries: remaining }),
-          },
-        ]);
-        await backend.deleteAll([DOC_PREFIX + docId]);
+        await updateIndex((index) => ({
+          index: { version: 1, entries: index.entries.filter((e) => e.docId !== docId) },
+          remove: [DOC_PREFIX + docId],
+        }));
         return { ok: true, value: undefined };
       } catch (error) {
         return fail(classifyStorageError(error), `Could not delete ${docId}.`);

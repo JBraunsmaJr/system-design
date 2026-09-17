@@ -34,7 +34,9 @@ import {
   sessionDocumentId,
   LAST_DOCUMENT_KEY,
 } from "./domain/currentDocument";
-import { createDocumentStore, type StorageFailureReason } from "./domain/documentStore";
+import { createDocumentStore, newDocumentId, requestPersistentStorage, type StorageFailureReason } from "./domain/documentStore";
+import { createDocumentLibrary } from "./collab/documentLibrary";
+import { DocumentManager } from "./components/DocumentManager";
 import { createIndexedDbBackend } from "./domain/indexedDbBackend";
 import { DurabilityIndicator } from "./components/DurabilityIndicator";
 import { installUnloadGuard } from "./domain/unloadGuard";
@@ -223,6 +225,19 @@ function App() {
 
   /** The catalogue of stored documents and their snapshots (WS2-R3). */
   const [documentStore] = useState(() => createDocumentStore(createIndexedDbBackend()));
+  const [documentLibrary] = useState(() => createDocumentLibrary({ store: documentStore }));
+  const [isDocumentManagerOpen, setIsDocumentManagerOpen] = useState(false);
+
+  /**
+   * Switches this tab to another stored document by navigating, so the open
+   * document is closed and released exactly as on any unload. Any session
+   * link is dropped - opening a document must not rejoin a session.
+   */
+  const openDocumentInTab = useCallback((docId: string) => {
+    const url = new URL(withDocumentParam(window.location.href, docId));
+    url.hash = "";
+    window.location.assign(url.toString());
+  }, []);
 
   // --- Collaborative sessions -----------------------------------------------
   //
@@ -844,6 +859,8 @@ function App() {
         if (result.ok) {
           setHasAutosaved(true);
           setAutosaveFailure(null);
+          // WS2-R5: ask for durable storage when a document is first stored.
+          if (result.value.createdAt === result.value.updatedAt) void requestPersistentStorage();
           if (legacyDraftPending.current && activeDocId === openDocId) {
             legacyDraftPending.current = false;
             clearLegacyAutosave();
@@ -2241,22 +2258,14 @@ function App() {
 
   // --- File / diagram lifecycle -------------------------------------------
 
+  /**
+   * A new, empty document in this tab (WS2-R3). The current one is already
+   * stored and stays in the document list, so nothing is cleared or lost -
+   * this used to wipe the only document the app had.
+   */
   const onNew = useCallback(() => {
-    if (diagramSnapshot.nodes.length > 0 && !window.confirm("Clear the current diagram? Unsaved changes will be lost.")) {
-      return;
-    }
-    // The canvas reads the document, so New has to clear the document.
-    // Resetting React state alone - all this did after the unification -
-    // left the old diagram on screen.
-    // Written outside the undo origin, then history cleared: a new document is
-    // a boundary, not an edit (WS3-R4).
-    replaceDocumentContents(activeDoc, snapshotToDiagramFile(DEFAULT_SNAPSHOT));
-    undo.clear();
-    setPath([]);
-    setActiveScenarioId(null);
-    setActiveStepIndex(0);
-    setIsPresenting(false);
-  }, [diagramSnapshot.nodes.length, activeDoc, undo]);
+    openDocumentInTab(newDocumentId());
+  }, [openDocumentInTab]);
 
   // Always saves the full tree from the root, regardless of which level
   // you're currently viewing - a save from inside a drilled-down sub-diagram
@@ -2390,6 +2399,7 @@ function App() {
           title={title}
           onTitleChange={setTitle}
           onNew={onNew}
+          onOpenDocuments={() => setIsDocumentManagerOpen(true)}
           onSave={onSave}
           onLoadClick={onLoadClick}
           isScenarioPanelOpen={isScenarioPanelOpen}
@@ -2592,6 +2602,15 @@ function App() {
           />
         )}
       </div>
+      <DocumentManager
+        isOpen={isDocumentManagerOpen}
+        onClose={() => setIsDocumentManagerOpen(false)}
+        library={documentLibrary}
+        currentDocId={openDocId}
+        onRenameCurrent={setTitle}
+        onOpenDocument={openDocumentInTab}
+        onNewDocument={onNew}
+      />
       <LibraryManagerModal
         isOpen={isLibraryModalOpen}
         onClose={() => setIsLibraryModalOpen(false)}

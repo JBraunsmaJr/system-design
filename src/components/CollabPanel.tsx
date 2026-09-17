@@ -279,7 +279,7 @@ export function CollabPanel({
         title={activeSession ? `In session: ${activeSession.roomName}` : "Collaborate"}
       >
         <Users size={14} />
-        <span>{activeSession ? "Session Active" : "Collaborate"}</span>
+        <span className="toolbar__label">{activeSession ? "Session Active" : "Collaborate"}</span>
       </button>
 
       {isOpen &&
