@@ -1,4 +1,5 @@
 import React from "react";
+import { flattenSubDiagramTree } from "../collab/diagramStore";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ScenarioPanel } from "./ScenarioPanel";
 import type { Scenario, SubDiagram } from "../domain/types";
@@ -82,7 +83,7 @@ const sampleScenarios: Scenario[] = [
       canAddStep: false,
       activeStepId: null,
       onSelectStep: () => {},
-      root: mockRoot,
+      diagramNodes: flattenSubDiagramTree(mockRoot).nodes,
       currentPath: [],
       onClose: () => {},
     })
@@ -113,7 +114,7 @@ const sampleScenarios: Scenario[] = [
       canAddStep: true,
       activeStepId: "step-2",
       onSelectStep: () => {},
-      root: mockRoot,
+      diagramNodes: flattenSubDiagramTree(mockRoot).nodes,
       currentPath: ["node-service-a"],
       onClose: () => {},
     })

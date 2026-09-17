@@ -1,5 +1,42 @@
 import type { ScenarioDefinition } from "./types";
-import { setupFixture, resetCounters, settleCanvas, dragCoordinates } from "./helpers";
+import {
+  setupFixture,
+  resetCounters,
+  settleCanvas,
+  dragCoordinates,
+  recordViewportBeforeDrag,
+  assertViewportTranslated,
+  findEmptyCanvasPoint,
+  frameNodes,
+  pointOnTarget,
+  assertGestureCommitted,
+  findGrabbableUpdater,
+} from "./helpers";
+
+const nodeSelector = (id: string) => `.react-flow__node[data-id="${id}"]`;
+
+/**
+ * Nodes whose bounding box covers edge-hub-1 (node-0 -> node-1) and both of
+ * its fixture waypoints, which sit near y 410-470 - so every edge scenario
+ * frames the same region.
+ */
+const EDGE_HUB_1_REGION = ["node-0", "node-1", "node-62"];
+
+/** Reconnect target. Inside EDGE_HUB_1_REGION, so the whole gesture is on
+ * screen at zoom 1; node-10 (the previous target) is 2200px away. */
+const RECONNECT_TARGET = "node-42";
+
+async function selectEdgeHub1(page: Parameters<ScenarioDefinition["run"]>[0]) {
+  await page.evaluate(`
+    (() => {
+      const perfObj = window.__PERF__;
+      if (perfObj && typeof perfObj.setSelectedEdges === "function") {
+        perfObj.setSelectedEdges(["edge-hub-1"]);
+      }
+    })()
+  `);
+  await settleCanvas(page, 2);
+}
 
 export const idleScenario: ScenarioDefinition = {
   id: "idle",
@@ -23,18 +60,12 @@ export const dragNodeScenario: ScenarioDefinition = {
   description: "Drag one node 200px in 20 discrete 10px steps. Protects single-node render isolation.",
   run: async (page) => {
     await setupFixture(page, "large");
+    await frameNodes(page, ["node-50"]);
+    const start = await pointOnTarget(page, nodeSelector("node-50"));
     await resetCounters(page);
 
-    // Locate node-50 (or any standard node)
-    const nodeEl = page.locator('.react-flow__node[data-id="node-50"]');
-    const box = await nodeEl.boundingBox();
-    if (!box) {
-      throw new Error("Could not find bounding box for node-50");
-    }
-
-    const startX = box.x + box.width / 2;
-    const startY = box.y + box.height / 2;
-    await dragCoordinates(page, startX, startY, 200, 0, 20);
+    await dragCoordinates(page, start.x, start.y, 200, 0, 20);
+    await assertGestureCommitted(page, "Dragging node-50");
   },
 };
 
@@ -45,17 +76,12 @@ export const dragHubNodeScenario: ScenarioDefinition = {
   description: "Drag hub node with >=25 attached edges 200px. Protects edge re-render fan-out.",
   run: async (page) => {
     await setupFixture(page, "large");
+    await frameNodes(page, ["node-0"]);
+    const start = await pointOnTarget(page, nodeSelector("node-0"));
     await resetCounters(page);
 
-    const nodeEl = page.locator('.react-flow__node[data-id="node-0"]');
-    const box = await nodeEl.boundingBox();
-    if (!box) {
-      throw new Error("Could not find bounding box for hub node-0");
-    }
-    const startX = box.x + box.width / 2;
-    const startY = box.y + box.height / 2;
-
-    await dragCoordinates(page, startX, startY, 200, 0, 20);
+    await dragCoordinates(page, start.x, start.y, 200, 0, 20);
+    await assertGestureCommitted(page, "Dragging hub node-0");
   },
 };
 
@@ -66,18 +92,13 @@ export const dragGroupScenario: ScenarioDefinition = {
   description: "Drag a boundary containing >=10 child nodes 150px. Protects group child geometry caching.",
   run: async (page) => {
     await setupFixture(page, "grouped");
+    await frameNodes(page, ["group-0"]);
+    // The top edge hit area is what drags a group boundary.
+    const start = await pointOnTarget(page, `${nodeSelector("group-0")} .group-node__edge-hit--top`);
     await resetCounters(page);
 
-    // Target the top edge hit area of group-0
-    const groupHitEl = page.locator('.react-flow__node[data-id="group-0"] .group-node__edge-hit--top');
-    const box = await groupHitEl.boundingBox();
-    if (!box) {
-      throw new Error("Could not find bounding box for group-0 top edge hit area");
-    }
-    const startX = box.x + box.width / 2;
-    const startY = box.y + 10;
-
-    await dragCoordinates(page, startX, startY, 150, 0, 15);
+    await dragCoordinates(page, start.x, start.y, 150, 0, 15);
+    await assertGestureCommitted(page, "Dragging group-0");
   },
 };
 
@@ -88,16 +109,46 @@ export const marqueeSelectScenario: ScenarioDefinition = {
   description: "Marquee-select ~100 nodes across canvas. Protects selection change fan-out.",
   run: async (page) => {
     await setupFixture(page, "large");
-    // Switch to select mode via UI or keyboard
-    const selectBtn = page.locator('button[aria-label="Select mode"]');
-    if (await selectBtn.isVisible()) {
-      await selectBtn.click();
-      await settleCanvas(page, 2);
-    }
+    // Fit the whole fixture so a 600x400 marquee covers a large share of it.
+    await frameNodes(page, ["node-0", "node-399"]);
+
+    // The toggle is titled by its CURRENT mode. The old selector looked for an
+    // aria-label that does not exist and skipped the click when it was not
+    // found, so this scenario was measuring a pan, not a selection.
+    const toggle = page.locator('.react-flow__controls button[title^="Pan mode"]');
+    await toggle.click();
+    await page.locator('.react-flow__controls button[title^="Select mode"]').waitFor();
+    await settleCanvas(page, 2);
+
+    // Start from the first genuinely empty pane point near the top-left, so
+    // the marquee has room to extend right and down. Fixed offsets land on
+    // floating UI (breadcrumb, panels) depending on layout.
+    const region = await page.evaluate(() => {
+      const el = document.querySelector(".react-flow__pane");
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      for (let y = r.top + 20; y < r.top + 240; y += 10) {
+        for (let x = r.left + 20; x < r.left + 240; x += 10) {
+          const hit = document.elementFromPoint(x, y);
+          if (hit && hit.classList.contains("react-flow__pane")) {
+            return { x, y, right: r.right, bottom: r.bottom };
+          }
+        }
+      }
+      return null;
+    });
+    if (!region) throw new Error("No empty canvas pane point near the top-left to start a marquee from");
+    const start = { x: region.x, y: region.y };
+    const width = Math.min(600, region.right - start.x - 30);
+    const height = Math.min(400, region.bottom - start.y - 30);
 
     await resetCounters(page);
-    // Drag marquee selection over wide canvas region
-    await dragCoordinates(page, 100, 100, 600, 400, 20);
+    await dragCoordinates(page, start.x, start.y, width, height, 20);
+
+    const selected = await page.$$eval(".react-flow__node.selected", (els) => els.length);
+    if (selected < 20) {
+      throw new Error(`Marquee selected ${selected} nodes; expected a large share of the fixture.`);
+    }
   },
 };
 
@@ -110,8 +161,14 @@ export const panScenario: ScenarioDefinition = {
     await setupFixture(page, "large");
     await resetCounters(page);
 
-    // Drag canvas background
-    await dragCoordinates(page, 500, 400, 500, 0, 50);
+    // Drag canvas background. Verified afterwards: a pan that silently
+    // delivers fewer steps renders less and reads as an improvement.
+    // Must start on empty pane: a drag beginning on a node drags the node,
+    // which is what this scenario was silently doing before.
+    const origin = await findEmptyCanvasPoint(page);
+    await recordViewportBeforeDrag(page);
+    await dragCoordinates(page, origin.x, origin.y, 500, 0, 50);
+    await assertViewportTranslated(page, 500, 0);
   },
 };
 
@@ -141,28 +198,13 @@ export const dragWaypointScenario: ScenarioDefinition = {
   description: "Drag existing edge waypoint 150px in 15 steps. Protects waypoint coalescing and routing.",
   run: async (page) => {
     await setupFixture(page, "large");
-    // Select edge-hub-1 which carries waypoints
-    await page.evaluate(`
-      (() => {
-        const perfObj = window.__PERF__;
-        if (perfObj && typeof perfObj.setSelectedEdges === "function") {
-          perfObj.setSelectedEdges(["edge-hub-1"]);
-        }
-      })()
-    `);
-    await settleCanvas(page, 2);
-
+    await frameNodes(page, EDGE_HUB_1_REGION);
+    await selectEdgeHub1(page);
+    const start = await pointOnTarget(page, ".typed-edge__waypoint");
     await resetCounters(page);
 
-    const handleEl = page.locator(".typed-edge__waypoint").first();
-    const box = await handleEl.boundingBox();
-    if (!box) {
-      throw new Error("Could not find bounding box for waypoint handle");
-    }
-    const startX = box.x + box.width / 2;
-    const startY = box.y + box.height / 2;
-
-    await dragCoordinates(page, startX, startY, 150, 0, 15);
+    await dragCoordinates(page, start.x, start.y, 150, 0, 15);
+    await assertGestureCommitted(page, "Dragging a waypoint of edge-hub-1");
   },
 };
 
@@ -173,27 +215,13 @@ export const createWaypointScenario: ScenarioDefinition = {
   description: "Drag an insertion handle 100px into a new bend. Protects insertion drag path.",
   run: async (page) => {
     await setupFixture(page, "large");
-    await page.evaluate(`
-      (() => {
-        const perfObj = window.__PERF__;
-        if (perfObj && typeof perfObj.setSelectedEdges === "function") {
-          perfObj.setSelectedEdges(["edge-hub-1"]);
-        }
-      })()
-    `);
-    await settleCanvas(page, 2);
-
+    await frameNodes(page, EDGE_HUB_1_REGION);
+    await selectEdgeHub1(page);
+    const start = await pointOnTarget(page, ".typed-edge__insert-dot");
     await resetCounters(page);
 
-    const insertHandleEl = page.locator(".typed-edge__insert-dot").first();
-    const box = await insertHandleEl.boundingBox();
-    if (!box) {
-      throw new Error("Could not find bounding box for waypoint insert handle");
-    }
-    const startX = box.x + box.width / 2;
-    const startY = box.y + box.height / 2;
-
-    await dragCoordinates(page, startX, startY, 100, 50, 10);
+    await dragCoordinates(page, start.x, start.y, 100, 50, 10);
+    await assertGestureCommitted(page, "Creating a waypoint on edge-hub-1");
   },
 };
 
@@ -204,38 +232,26 @@ export const reconnectEdgeScenario: ScenarioDefinition = {
   description: "Drag edge endpoint to another node. Protects reconnection validation path.",
   run: async (page) => {
     await setupFixture(page, "large");
-    await page.evaluate(`
-      (() => {
-        const perfObj = window.__PERF__;
-        if (perfObj && typeof perfObj.setSelectedEdges === "function") {
-          perfObj.setSelectedEdges(["edge-hub-1"]);
-        }
-      })()
-    `);
-    await settleCanvas(page, 2);
+    await frameNodes(page, EDGE_HUB_1_REGION);
+    await selectEdgeHub1(page);
 
+    // Some edge's endpoint updater - see findGrabbableUpdater for why not a
+    // specific one. assertGestureCommitted below proves a reconnect happened.
+    const start = await findGrabbableUpdater(page);
+    // Released over a connection HANDLE, not the node body: React Flow only
+    // completes a reconnect within connectionRadius of a handle, so a drop on
+    // the middle of a node (what this scenario used to do) connects nothing.
+    const target = await page.evaluate((sel) => {
+      const handle = document.querySelector(sel);
+      if (!handle) return null;
+      const r = handle.getBoundingClientRect();
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    }, `${nodeSelector(RECONNECT_TARGET)} .react-flow__handle`);
+    if (!target) throw new Error(`${RECONNECT_TARGET} has no connection handle to reconnect onto`);
     await resetCounters(page);
 
-    // Locate the reconnect handle for the selected edge
-    const reconnectHandle = page.locator(".react-flow__edgeupdater").first();
-    const handleBox = await reconnectHandle.boundingBox();
-    if (!handleBox) {
-      throw new Error("Could not find bounding box for edge reconnect handle");
-    }
-
-    // Reconnect endpoint to node-10
-    const targetNode = page.locator('.react-flow__node[data-id="node-10"]');
-    const targetBox = await targetNode.boundingBox();
-    if (!targetBox) {
-      throw new Error("Could not find bounding box for target node-10");
-    }
-
-    const startX = handleBox.x + handleBox.width / 2;
-    const startY = handleBox.y + handleBox.height / 2;
-    const targetX = targetBox.x + targetBox.width / 2;
-    const targetY = targetBox.y + targetBox.height / 2;
-
-    await dragCoordinates(page, startX, startY, targetX - startX, targetY - startY, 10);
+    await dragCoordinates(page, start.x, start.y, target.x - start.x, target.y - start.y, 10);
+    await assertGestureCommitted(page, `Reconnecting an edge endpoint to ${RECONNECT_TARGET}`);
   },
 };
 
@@ -257,7 +273,7 @@ export const drillInOutScenario: ScenarioDefinition = {
         }
       })()
     `);
-    await settleCanvas(page, 3);
+    await settleCanvas(page, 2);
 
     // Drill out
     await page.evaluate(`
@@ -268,7 +284,7 @@ export const drillInOutScenario: ScenarioDefinition = {
         }
       })()
     `);
-    await settleCanvas(page, 3);
+    await settleCanvas(page, 2);
   },
 };
 

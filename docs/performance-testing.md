@@ -109,6 +109,16 @@ The harness tests 13 core interaction scenarios:
 8. `drag-waypoint`: Drag an edge bend by 150px. Protects waypoint drag coalescing and routing.
 9. `create-waypoint`: Drag an edge insertion handle to create a bend. Protects insertion drag path.
 10. `reconnect-edge`: Drag an edge endpoint to reconnect to another node. Protects reconnection validation.
+
+Every drag scenario frames its target with `__PERF__.frameNodes` before
+measuring, checks with `elementFromPoint` that the target really is under the
+pointer, and fails if the gesture wrote nothing to the document. Fixtures are
+installed after React Flow's initial fit, so without framing most targets are
+off-screen: until this was added, every drag scenario dragged empty space and
+recorded zeros that read as a perfect score. `reconnect-edge` grabs whichever
+endpoint updater is topmost in the framed region and releases just inside a
+handle of `node-42`. Autosave is suppressed for the whole run so its debounce
+timer cannot land inside a measurement window.
 11. `drill-in-out`: Drill into a nested sub-diagram and back out. Protects level transitions and camera fit.
 12. `remote-burst`: Apply 120 remote Yjs updates at ~60Hz while idle locally. Protects remote change ingestion.
 13. `remote-during-drag`: Apply 120 remote Yjs updates while actively dragging a node locally. Protects the worst-case live collaborative interaction path.
@@ -120,8 +130,8 @@ The harness tests 13 core interaction scenarios:
 ### Initial Baseline Creation
 To capture and commit a fresh baseline:
 ```bash
-npm run test:perf
-node scripts/perf-gate.ts --record baselines/perf-baseline.json
+npm run test:perf                        # check the log says it ran in Docker
+npx tsx scripts/perf-gate.ts --record    # writes baselines/perf-baseline.json
 ```
 
 ### Reviewing Gating Violations

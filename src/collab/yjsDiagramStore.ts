@@ -1,4 +1,5 @@
 import * as Y from "yjs";
+import { orderIdSet, pushIfAbsent } from "./seedGuards.ts";
 import type { Node, Edge } from "@xyflow/react";
 import type { ArchNodeData, ArchEdgeData, EdgeWaypoint, SubDiagram } from "../domain/types";
 import type { DiagramStore } from "./diagramStore";
@@ -153,39 +154,66 @@ function waypointIndexById(array: Y.Array<Y.Map<unknown>>, waypointId: string): 
  * pass to avoid silently breaking those references, which preserving
  * the originals avoids needing at all.
  */
+/**
+ * Writes only the fields that have a value. Every Y.Map entry is stored with
+ * its key, for every node, forever - and most data fields are unset on most
+ * nodes. Writing them as `undefined` cost 11 stored entries per node: a
+ * freshly seeded 50-node diagram was 19KB, which was also the floor any
+ * rebase could reach (WS4-R6). Readers already treat a missing key and an
+ * undefined one alike.
+ */
+/**
+ * The level a new entry lives at. The root level - where most entries are -
+ * is stored as no key at all, and read back as `[]`: an empty array stored on
+ * every root node was the largest remaining per-node cost. Every reader
+ * already treats a missing level as the root.
+ */
+function setLevel(m: Y.Map<unknown>, parentPath: string[] | undefined): void {
+  if (parentPath && parentPath.length > 0) m.set("parentPath", parentPath);
+}
+
+function setDefinedFields(m: Y.Map<unknown>, fields: readonly string[], source: Record<string, unknown>): void {
+  for (const field of fields) {
+    const value = source[field];
+    if (value !== undefined) m.set(field, value);
+  }
+}
+
 export function seedYjsDiagramDoc(doc: Y.Doc, root: SubDiagram): void {
   const { nodes, edges } = flattenSubDiagramTree(root);
   const nodeOrder = doc.getArray<string>("nodeOrder");
   const nodesMap = doc.getMap<Y.Map<unknown>>("nodes");
   const edgeOrder = doc.getArray<string>("edgeOrder");
   const edgesMap = doc.getMap<Y.Map<unknown>>("edges");
+  // Seeding must be safe to attempt against a document that persistence has
+  // already restored - see seedGuards.ts.
+  const seenNodes = orderIdSet(nodeOrder);
+  const seenEdges = orderIdSet(edgeOrder);
 
   doc.transact(() => {
     for (const node of nodes) {
+      if (seenNodes.has(node.id) || nodesMap.has(node.id)) continue;
       const m = new Y.Map<unknown>();
       m.set("type", node.type);
       m.set("position", node.position);
-      m.set("parentPath", (node.data as ArchNodeData & { parentPath?: string[] }).parentPath ?? []);
+      setLevel(m, (node.data as ArchNodeData & { parentPath?: string[] }).parentPath);
       if (node.parentId !== undefined) m.set("parentId", node.parentId);
       if (node.width !== undefined) m.set("width", node.width);
       if (node.height !== undefined) m.set("height", node.height);
-      for (const field of NODE_DATA_FIELDS) {
-        m.set(field, (node.data as Record<string, unknown>)[field]);
-      }
+      setDefinedFields(m, NODE_DATA_FIELDS, node.data as Record<string, unknown>);
       nodesMap.set(node.id, m);
-      nodeOrder.push([node.id]);
+      pushIfAbsent(nodeOrder, seenNodes, node.id);
     }
     for (const edge of edges) {
+      if (seenEdges.has(edge.id) || edgesMap.has(edge.id)) continue;
       const m = new Y.Map<unknown>();
       m.set("source", edge.source);
       m.set("target", edge.target);
       m.set("type", edge.type ?? "typed");
-      m.set("parentPath", (edge.data as ArchEdgeData & { parentPath?: string[] }).parentPath ?? []);
+      setLevel(m, (edge.data as ArchEdgeData & { parentPath?: string[] }).parentPath);
       if (edge.sourceHandle !== undefined) m.set("sourceHandle", edge.sourceHandle);
       if (edge.targetHandle !== undefined) m.set("targetHandle", edge.targetHandle);
-      for (const field of EDGE_DATA_FIELDS) {
-        m.set(field, (edge.data as Record<string, unknown>)[field]);
-      }
+      setDefinedFields(m, EDGE_DATA_FIELDS, (edge.data ?? {}) as Record<string, unknown>);
       // Bends carried in from local state have to be rebuilt as real
       // nested shared types, not set as the plain array they arrive as -
       // otherwise an edge that was bent before the session started would
@@ -197,7 +225,7 @@ export function seedYjsDiagramDoc(doc: Y.Doc, root: SubDiagram): void {
       if (waypoints && waypoints.length > 0) array.push(waypoints.map(makeWaypointMap));
       m.set(WAYPOINTS_KEY, array);
       edgesMap.set(edge.id, m);
-      edgeOrder.push([edge.id]);
+      pushIfAbsent(edgeOrder, seenEdges, edge.id);
     }
   });
 }
@@ -239,7 +267,8 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
   const edgesMap = doc.getMap<Y.Map<unknown>>("edges");
 
   function nodeMapToPlain(id: string, m: Y.Map<unknown>): Node<ArchNodeData> {
-    const data: Record<string, unknown> = { parentPath: m.get("parentPath") as string[] };
+    // Absent means the root level - see setLevel.
+    const data: Record<string, unknown> = { parentPath: (m.get("parentPath") as string[] | undefined) ?? [] };
     for (const field of NODE_DATA_FIELDS) {
       const value = m.get(field);
       if (value !== undefined) data[field] = value;
@@ -260,7 +289,8 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
   }
 
   function edgeMapToPlain(id: string, m: Y.Map<unknown>): Edge<ArchEdgeData> {
-    const data: Record<string, unknown> = { parentPath: m.get("parentPath") as string[] };
+    // Absent means the root level - see setLevel.
+    const data: Record<string, unknown> = { parentPath: (m.get("parentPath") as string[] | undefined) ?? [] };
     for (const field of EDGE_DATA_FIELDS) {
       const value = m.get(field);
       if (value !== undefined) data[field] = value;
@@ -295,37 +325,111 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
     return edge;
   }
 
+  /**
+   * Plain objects from the last snapshot, reused for every node and edge whose
+   * shared type did not change (WS1-R8, migration plan hazard 2.4).
+   *
+   * Rebuilding every object on every change made each write - one frame of a
+   * drag, one remote update - hand React Flow a brand new object for every
+   * node and edge. React Flow keeps its internal node only when the object is
+   * IDENTICAL to last time, so all of them re-rendered: a 20-step drag of one
+   * node rendered 16,000 nodes. Only the entries a transaction touched are
+   * rebuilt now; everything else keeps its identity.
+   */
+  const nodeCache = new Map<string, { source: Y.Map<unknown>; plain: Node<ArchNodeData> }>();
+  const edgeCache = new Map<string, { source: Y.Map<unknown>; plain: Edge<ArchEdgeData> }>();
+  const dirtyNodes = new Set<string>();
+  const dirtyEdges = new Set<string>();
+
+  function reuse<T>(
+    cache: Map<string, { source: Y.Map<unknown>; plain: T }>,
+    dirty: Set<string>,
+    id: string,
+    source: Y.Map<unknown>,
+    build: (id: string, m: Y.Map<unknown>) => T
+  ): T {
+    const hit = cache.get(id);
+    if (hit && hit.source === source && !dirty.has(id)) return hit.plain;
+    const plain = build(id, source);
+    cache.set(id, { source, plain });
+    return plain;
+  }
+
   function buildSnapshot(): { nodes: Node<ArchNodeData>[]; edges: Edge<ArchEdgeData>[] } {
     recordSnapshotBuild();
-    return {
-      nodes: nodeOrder
-        .toArray()
-        .map((id) => {
-          const m = nodesMap.get(id);
-          return m ? nodeMapToPlain(id, m) : null;
-        })
-        .filter((n): n is Node<ArchNodeData> => n !== null),
-      edges: edgeOrder
-        .toArray()
-        .map((id) => {
-          const m = edgesMap.get(id);
-          return m ? edgeMapToPlain(id, m) : null;
-        })
-        .filter((e): e is Edge<ArchEdgeData> => e !== null),
-    };
+    const nodeIds = nodeOrder.toArray();
+    const edgeIds = edgeOrder.toArray();
+    const nodes: Node<ArchNodeData>[] = [];
+    for (const id of nodeIds) {
+      const m = nodesMap.get(id);
+      if (m) nodes.push(reuse(nodeCache, dirtyNodes, id, m, nodeMapToPlain));
+    }
+    const edges: Edge<ArchEdgeData>[] = [];
+    for (const id of edgeIds) {
+      const m = edgesMap.get(id);
+      if (m) edges.push(reuse(edgeCache, dirtyEdges, id, m, edgeMapToPlain));
+    }
+    // Forget entries that are no longer in the document, so the caches cannot
+    // grow without bound across deletes.
+    if (nodeCache.size > nodes.length) {
+      const live = new Set(nodeIds);
+      for (const id of nodeCache.keys()) if (!live.has(id)) nodeCache.delete(id);
+    }
+    if (edgeCache.size > edges.length) {
+      const live = new Set(edgeIds);
+      for (const id of edgeCache.keys()) if (!live.has(id)) edgeCache.delete(id);
+    }
+    dirtyNodes.clear();
+    dirtyEdges.clear();
+    return { nodes, edges };
   }
 
   let cached = buildSnapshot();
+  let changed = false;
   const listeners = new Set<() => void>();
-  const recomputeAndNotify = () => {
+
+  /**
+   * Records which entries a transaction touched. `event.path` is relative to
+   * the observed root, so for anything nested inside an entry (a node's
+   * fields, an edge's waypoint array) its first segment is the entry's id.
+   * A change to the root map itself names the ids in `changes.keys`. Order
+   * arrays touch no entry's content, only the sequence.
+   */
+  const trackChanges = (dirty: Set<string>) => (events: Array<Y.YEvent<Y.AbstractType<unknown>>>) => {
+    for (const event of events) {
+      const [first] = event.path;
+      if (typeof first === "string") {
+        dirty.add(first);
+      } else if (event.path.length === 0 && event.target instanceof Y.Map) {
+        for (const key of event.changes.keys.keys()) dirty.add(key);
+      }
+    }
+    changed = true;
+  };
+  const onNodesChange = trackChanges(dirtyNodes);
+  const onEdgesChange = trackChanges(dirtyEdges);
+  const onOrderChange = () => {
+    changed = true;
+  };
+
+  /**
+   * One rebuild and one notification per transaction, however many of the
+   * four observed types it touched. afterTransaction fires once observers have
+   * run, so every change is already recorded.
+   */
+  const flush = () => {
+    if (!changed) return;
+    changed = false;
     cached = buildSnapshot();
     for (const listener of listeners) listener();
   };
 
-  nodeOrder.observeDeep(recomputeAndNotify);
-  nodesMap.observeDeep(recomputeAndNotify);
-  edgeOrder.observeDeep(recomputeAndNotify);
-  edgesMap.observeDeep(recomputeAndNotify);
+  nodesMap.observeDeep(onNodesChange);
+  edgesMap.observeDeep(onEdgesChange);
+  nodeOrder.observe(onOrderChange);
+  edgeOrder.observe(onOrderChange);
+  doc.on("afterTransaction", flush);
+  let destroyed = false;
 
   function isPathAtOrBelow(path: string[], ancestorPrefix: string[]): boolean {
     if (path.length < ancestorPrefix.length) return false;
@@ -335,6 +439,30 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
   return {
     getSnapshot: () => cached,
 
+    /** Detaches the observers registered above. Idempotent: a second call is a
+     * no-op rather than an error, so teardown paths can be defensive. */
+    destroy: () => {
+      if (destroyed) return;
+      destroyed = true;
+      nodesMap.unobserveDeep(onNodesChange);
+      edgesMap.unobserveDeep(onEdgesChange);
+      nodeOrder.unobserve(onOrderChange);
+      edgeOrder.unobserve(onOrderChange);
+      doc.off("afterTransaction", flush);
+    },
+    replaceAll: (next) => {
+      recordStoreWrite();
+      // One transaction so observers see a single change rather than an empty
+      // diagram followed by a populated one - the intermediate state would
+      // render as a blank canvas for a frame.
+      doc.transact(() => {
+        nodeOrder.delete(0, nodeOrder.length);
+        nodesMap.clear();
+        edgeOrder.delete(0, edgeOrder.length);
+        edgesMap.clear();
+        seedYjsDiagramDoc(doc, next);
+      });
+    },
     subscribe: (listener) => {
       listeners.add(listener);
       return () => listeners.delete(listener);
@@ -347,10 +475,8 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
         const m = new Y.Map<unknown>();
         m.set("type", type);
         m.set("position", position);
-        m.set("parentPath", parentPath);
-        for (const field of NODE_DATA_FIELDS) {
-          m.set(field, (data as Record<string, unknown>)[field]);
-        }
+        setLevel(m, parentPath);
+        setDefinedFields(m, NODE_DATA_FIELDS, data as Record<string, unknown>);
         nodesMap.set(id, m);
         nodeOrder.push([id]);
       });
@@ -435,12 +561,10 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
         m.set("source", source);
         m.set("target", target);
         m.set("type", "typed");
-        m.set("parentPath", parentPath);
+        setLevel(m, parentPath);
         if (sourceHandle !== undefined) m.set("sourceHandle", sourceHandle);
         if (targetHandle !== undefined) m.set("targetHandle", targetHandle);
-        for (const field of EDGE_DATA_FIELDS) {
-          m.set(field, (data as Record<string, unknown>)[field]);
-        }
+        setDefinedFields(m, EDGE_DATA_FIELDS, data as Record<string, unknown>);
         // Empty, but present from the start - so that two peers bending
         // this edge for the first time at the same moment insert into
         // one shared array rather than each creating their own and one

@@ -26,6 +26,7 @@ function assert(condition: boolean, message: string) {
     console.log(`ok: ${message}`);
   } else {
     failures++;
+    (globalThis as unknown as { process: { exitCode: number } }).process.exitCode = 1; // run-tests.ts reads the exit status
     console.error(`FAIL: ${message}`);
   }
 }

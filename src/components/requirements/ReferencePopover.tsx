@@ -1,6 +1,7 @@
 import { forwardRef } from "react";
 import { getItemType } from "../../domain/requirementsRegistry";
 import type { RequirementItem, RequirementsDocument } from "../../domain/requirementsTypes";
+import { HighlightedText, HighlightedTitle } from "./HighlightText";
 
 interface ReferencePopoverProps {
   doc: RequirementsDocument;
@@ -11,13 +12,14 @@ interface ReferencePopoverProps {
   position: { top: number; left: number };
   onSelect: (item: RequirementItem) => void;
   onHoverIndex: (index: number) => void;
+  searchQuery?: string;
 }
 
 // forwardRef so RequirementEditor can measure this popover's actual
 // rendered size (via getBoundingClientRect) to decide whether it needs to
 // flip above the caret instead of below - see the useLayoutEffect there.
 export const ReferencePopover = forwardRef<HTMLDivElement, ReferencePopoverProps>(function ReferencePopover(
-  { doc, candidates, selectedIndex, position, onSelect, onHoverIndex },
+  { doc, candidates, selectedIndex, position, onSelect, onHoverIndex, searchQuery },
   ref
 ) {
   return (
@@ -40,9 +42,13 @@ export const ReferencePopover = forwardRef<HTMLDivElement, ReferencePopoverProps
             onMouseEnter={() => onHoverIndex(index)}
           >
             <span className="reference-popover__id" style={{ color: type?.color ?? "var(--chrome-text-dim)" }}>
-              {item.id}
+              <HighlightedText text={item.id} search={searchQuery} />
             </span>
-            <span className="reference-popover__title">{item.title || "(untitled)"}</span>
+            <HighlightedTitle
+              className="reference-popover__title"
+              text={item.title || "(untitled)"}
+              search={searchQuery}
+            />
           </div>
         );
       })}

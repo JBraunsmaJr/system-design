@@ -17,6 +17,16 @@ export interface PerfCounters {
 }
 
 export interface PerfMetrics extends PerfCounters {
+  /**
+   * CRDT storage overhead as a permille of the document's plain JSON size
+   * (WS4-R4). 1000 means the Y.Doc encodes to exactly the size of its JSON
+   * form; 3000 means three times that.
+   *
+   * Measured by the harness from the scenario's own document rather than
+   * recorded from inside the app, so it costs nothing at runtime. Zero for
+   * scenarios with no session document.
+   */
+  docOverheadPermille?: number;
   actualDurationMs: number;
   longestCommitMs: number;
   commitDurations: number[];
@@ -98,6 +108,51 @@ export function getPerfMetrics(): PerfMetrics {
   };
 }
 
+/**
+ * Harness-only viewport control.
+ *
+ * Fixtures are installed after React Flow's initial fitView has already run
+ * against an empty canvas, so the viewport never frames them - most fixture
+ * nodes sit off-screen, and a drag aimed at one moves the mouse over nothing.
+ * Every drag scenario recorded zeros for that reason. Canvas registers its
+ * fitView here so scenarios can frame their targets before measuring.
+ */
+type ViewportFramer = (nodeIds: string[]) => void;
+let viewportFramer: ViewportFramer | null = null;
+
+export function registerPerfViewportFramer(framer: ViewportFramer): () => void {
+  if (!isEnabled) return () => {};
+  viewportFramer = framer;
+  return () => {
+    if (viewportFramer === framer) viewportFramer = null;
+  };
+}
+
+function frameNodes(nodeIds: string[]): boolean {
+  if (!viewportFramer) return false;
+  viewportFramer(nodeIds);
+  return true;
+}
+
+/**
+ * Whether the harness has asked the app not to autosave.
+ *
+ * Autosave is debounced by a second, so after a fixture loads it fires at
+ * whatever point the scenario happens to have reached - sometimes inside the
+ * measurement window, sometimes not - adding a commit, a canvas render and an
+ * unflatten at random. The harness measures the editing path, not autosave,
+ * for the same reason its sessions do not persist.
+ */
+let autosaveSuppressed = false;
+
+export function isPerfAutosaveSuppressed(): boolean {
+  return isEnabled && autosaveSuppressed;
+}
+
+function suppressAutosave(suppressed: boolean): void {
+  autosaveSuppressed = suppressed;
+}
+
 export function resetPerfCounters(): void {
   counters.commits = 0;
   counters.nodeRenders = 0;
@@ -125,5 +180,7 @@ if (typeof window !== "undefined") {
     recordStoreWrite,
     recordSnapshotBuild,
     recordUnflattenCall,
+    frameNodes,
+    suppressAutosave,
   };
 }

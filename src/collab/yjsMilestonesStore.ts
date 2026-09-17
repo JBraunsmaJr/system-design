@@ -1,4 +1,5 @@
 import * as Y from "yjs";
+import { orderIdSet, pushIfAbsent } from "./seedGuards.ts";
 import type { Milestone } from "../domain/milestones";
 import { sanitizeRelatedItemIds } from "../domain/milestones";
 import type { MilestonesStore } from "./milestonesStore";
@@ -12,9 +13,11 @@ function nextMilestoneId(prefix = "milestone"): string {
 export function seedYjsMilestonesDoc(doc: Y.Doc, initial: Milestone[]): void {
   const milestoneOrder = doc.getArray<string>("milestoneOrder");
   const milestones = doc.getMap<Y.Map<unknown>>("milestones");
+  const seen = orderIdSet(milestoneOrder);
 
   doc.transact(() => {
     for (const m of initial) {
+      if (seen.has(m.id) || milestones.has(m.id)) continue;
       const mM = new Y.Map<unknown>();
       mM.set("type", m.type);
       mM.set("name", m.name);
@@ -33,7 +36,7 @@ export function seedYjsMilestonesDoc(doc: Y.Doc, initial: Milestone[]): void {
       if (m.updatedAt) mM.set("updatedAt", m.updatedAt);
 
       milestones.set(m.id, mM);
-      milestoneOrder.push([m.id]);
+      pushIfAbsent(milestoneOrder, seen, m.id);
     }
   });
 }
@@ -79,12 +82,22 @@ export function createYjsMilestonesStore(doc: Y.Doc): MilestonesStore {
     for (const listener of listeners) listener();
   };
 
-  milestoneOrder.observeDeep(recomputeAndNotify);
-  milestones.observeDeep(recomputeAndNotify);
+  /** Kept so destroy() can detach exactly what was attached - listing them
+   * again by hand would drift the moment a collection is added. */
+  const observed = [milestoneOrder, milestones];
+  for (const target of observed) target.observeDeep(recomputeAndNotify);
+  let destroyed = false;
 
   const store: MilestonesStore = {
     getSnapshot: () => cached,
 
+    /** Detaches the observers registered above. Idempotent: a second call is a
+     * no-op rather than an error, so teardown paths can be defensive. */
+    destroy: () => {
+      if (destroyed) return;
+      destroyed = true;
+      for (const target of observed) target.unobserveDeep(recomputeAndNotify);
+    },
     subscribe: (listener) => {
       listeners.add(listener);
       return () => listeners.delete(listener);

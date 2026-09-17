@@ -31,6 +31,9 @@ export const GATING_COUNTERS: (keyof ScenarioResult["metrics"])[] = [
   "storeWrites",
   "snapshotBuilds",
   "unflattenCalls",
+  // Un-baselined until someone records it; the gate reports it without
+  // failing in the meantime (see the baseVal === undefined branch below).
+  "docOverheadPermille",
 ];
 
 export const REQUIREMENT_MAPPING: Record<string, string> = {
@@ -70,6 +73,34 @@ export function evaluateGate(
   let failedCount = 0;
   let passedCount = 0;
 
+  /**
+   * Counter baselines are environment-specific.
+   *
+   * Measured render and commit counts differ between machines - device pixel
+   * ratio and font metrics change measured node sizes, which feeds z-ordering
+   * and how much re-renders. Each environment is internally deterministic and
+   * they disagree with each other, so a baseline recorded on a developer
+   * machine will fail in CI and vice versa.
+   *
+   * That is not discoverable from the repository, and the cost of not knowing
+   * it is hours of bisecting a regression that is really a change of venue.
+   * The container is authoritative because it is what CI runs.
+   */
+  if (
+    baseline?.os &&
+    results?.os &&
+    (baseline.os !== results.os || baseline.cpuModel !== results.cpuModel)
+  ) {
+    console.warn(
+      `\n⚠️  Baseline was recorded on a different machine.\n` +
+        `      baseline: ${baseline.os} / ${baseline.cpuModel ?? "unknown CPU"}\n` +
+        `      this run: ${results.os} / ${results.cpuModel ?? "unknown CPU"}\n` +
+        `    Counter differences below may be environmental rather than real.\n` +
+        `    The containerized environment is authoritative - it is what CI runs.\n` +
+        `    Do NOT re-record from a different environment to make this green.\n`
+    );
+  }
+
   const resultScenarios = results?.scenarios ?? {};
   const baselineScenarios = baseline?.scenarios ?? {};
 
@@ -106,6 +137,27 @@ export function evaluateGate(
     for (const metric of GATING_COUNTERS) {
       const measured = scenario.metrics?.[metric];
       const baseVal = baseScenario.metrics?.[metric];
+
+      // A metric the baseline predates is NOT a failure. Adding a counter
+      // would otherwise fail every scenario until someone re-recorded the
+      // baseline - which pressures people into recording a baseline to make
+      // the gate green, the one habit this gate exists to prevent.
+      if (baseVal === undefined && typeof measured === "number") {
+        evaluations.push({
+          scenarioId: id,
+          metric,
+          baseline: NaN,
+          measured,
+          delta: NaN,
+          pctDelta: NaN,
+          gating: false,
+          passed: true,
+          improvement: false,
+          requirementId,
+        });
+        passedCount++;
+        continue;
+      }
 
       if (typeof measured !== "number" || typeof baseVal !== "number" || Number.isNaN(measured) || Number.isNaN(baseVal)) {
         failedCount++;

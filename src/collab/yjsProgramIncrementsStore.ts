@@ -1,4 +1,5 @@
 import * as Y from "yjs";
+import { orderIdSet, pushIfAbsent } from "./seedGuards.ts";
 import type { ProgramIncrement, Sprint, CapacityReservation } from "../domain/programIncrements";
 import { updateSprintEndDate, getNextPIStartDate, DEFAULT_SPRINT_DURATION_DAYS } from "../domain/programIncrements";
 import type { ProgramIncrementsStore } from "./programIncrementsStore";
@@ -34,9 +35,11 @@ function collisionResistantId(prefix: string): string {
 export function seedYjsProgramIncrementsDoc(doc: Y.Doc, initial: ProgramIncrement[]): void {
   const piOrder = doc.getArray<string>("piOrder");
   const pis = doc.getMap<Y.Map<unknown>>("pis");
+  const seen = orderIdSet(piOrder);
 
   doc.transact(() => {
     for (const pi of initial) {
+      if (seen.has(pi.id) || pis.has(pi.id)) continue;
       const sprintsMap = new Y.Map<Y.Map<unknown>>();
       const sprintOrderArr = new Y.Array<string>();
       for (const sprint of pi.sprints) {
@@ -60,7 +63,7 @@ export function seedYjsProgramIncrementsDoc(doc: Y.Doc, initial: ProgramIncremen
       piM.set("reservations", reservationsMap);
 
       pis.set(pi.id, piM);
-      piOrder.push([pi.id]);
+      pushIfAbsent(piOrder, seen, pi.id);
     }
   });
 }
@@ -134,8 +137,11 @@ export function createYjsProgramIncrementsStore(doc: Y.Doc): ProgramIncrementsSt
     for (const listener of listeners) listener();
   };
 
-  piOrder.observeDeep(recomputeAndNotify);
-  pis.observeDeep(recomputeAndNotify);
+  /** Kept so destroy() can detach exactly what was attached - listing them
+   * again by hand would drift the moment a collection is added. */
+  const observed = [piOrder, pis];
+  for (const target of observed) target.observeDeep(recomputeAndNotify);
+  let destroyed = false;
 
   function getPIMap(piId: string): Y.Map<unknown> | undefined {
     return pis.get(piId);
@@ -144,6 +150,13 @@ export function createYjsProgramIncrementsStore(doc: Y.Doc): ProgramIncrementsSt
   return {
     getSnapshot: () => cached,
 
+    /** Detaches the observers registered above. Idempotent: a second call is a
+     * no-op rather than an error, so teardown paths can be defensive. */
+    destroy: () => {
+      if (destroyed) return;
+      destroyed = true;
+      for (const target of observed) target.unobserveDeep(recomputeAndNotify);
+    },
     subscribe: (listener) => {
       listeners.add(listener);
       return () => listeners.delete(listener);

@@ -22,6 +22,7 @@ interface ToolbarProps {
   title: string;
   onTitleChange: (title: string) => void;
   onNew: () => void;
+  onOpenDocuments?: () => void;
   onSave: () => void;
   onLoadClick: () => void;
   isScenarioPanelOpen: boolean;
@@ -54,6 +55,10 @@ interface ToolbarProps {
    * whatever space the rest of the toolbar's own content actually
    * needs at a given width. */
   collabPanel: ReactNode;
+  /** Whether the document is actually being stored, and what to do if not
+   * (WS13-R8/R9). Sits beside the collab panel because both answer "is this
+   * document safe right now" - one about other people, one about storage. */
+  durabilityIndicator?: ReactNode;
 }
 
 function navigateToGithubSource() {
@@ -66,6 +71,7 @@ export function Toolbar({
   title,
   onTitleChange,
   onNew,
+  onOpenDocuments,
   onSave,
   onLoadClick,
   isScenarioPanelOpen,
@@ -85,6 +91,7 @@ export function Toolbar({
   hasAutosaved,
   isInSession,
   collabPanel,
+  durabilityIndicator,
 }: ToolbarProps) {
   return (
     <header className="toolbar">
@@ -101,7 +108,7 @@ export function Toolbar({
         />
         {hasAutosaved && (
           <span className="toolbar__autosave-indicator" title="Your work is automatically saved in this browser">
-            <Check size={12} />
+            <Check size={14} />
             <span className="toolbar__label">Autosaved</span>
           </span>
         )}
@@ -114,7 +121,7 @@ export function Toolbar({
             title="Undo (Ctrl+Z)"
             aria-label="Undo"
           >
-            <Undo2 size={15} />
+            <Undo2 size={14} />
           </button>
           <button
             type="button"
@@ -124,7 +131,7 @@ export function Toolbar({
             title="Redo (Ctrl+Shift+Z or Ctrl+Y)"
             aria-label="Redo"
           >
-            <Redo2 size={15} />
+            <Redo2 size={14} />
           </button>
           {viewMode === "diagram" && (
             <button
@@ -154,14 +161,21 @@ export function Toolbar({
               <span className="toolbar__label">Export Markdown</span>
             </button>
           )}
-          <FileMenu onNew={onNew} onLoadClick={onLoadClick} onManageLibraries={onManageLibraries} isInSession={isInSession} />
+          <FileMenu onNew={onNew} onOpenDocuments={onOpenDocuments} onLoadClick={onLoadClick} onManageLibraries={onManageLibraries} isInSession={isInSession} />
           <button type="button" className="primary" onClick={onSave} title="Save">
             <Save size={14} />
             <span className="toolbar__label">Save</span>
           </button>
+          {durabilityIndicator}
           {collabPanel}
-          <button type="button" title={"View source on GitHub"} onClick={navigateToGithubSource}>
-            <FontAwesomeIcon icon={faGithub} size={"lg"} />
+          <button
+            type="button"
+            className="toolbar__icon-button"
+            title="View source on GitHub"
+            aria-label="View source on GitHub"
+            onClick={navigateToGithubSource}
+          >
+            <FontAwesomeIcon icon={faGithub} style={{ width: 14, height: 14 }} />
           </button>
         </div>
       </div>

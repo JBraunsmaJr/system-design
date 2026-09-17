@@ -4,7 +4,10 @@ import { ChevronDown, FilePlus2 } from "lucide-react";
 import { computeFlippedPosition } from "../domain/popoverPosition";
 
 interface FileMenuProps {
+  /** Opens a new, empty document. The current one stays stored. */
   onNew: () => void;
+  /** Opens the document manager (WS2-R3). */
+  onOpenDocuments?: () => void;
   onLoadClick: () => void;
   onManageLibraries?: () => void;
   /** Whether a collaborative session is currently active - see
@@ -23,7 +26,7 @@ const DROPDOWN_WIDTH = 150;
 // in Toolbar itself: as the single most-used action of the three, it
 // benefits from staying a direct, one-click target rather than being
 // buried behind an extra click.
-export function FileMenu({ onNew, onLoadClick, onManageLibraries, isInSession }: FileMenuProps) {
+export function FileMenu({ onNew, onOpenDocuments, onLoadClick, onManageLibraries, isInSession }: FileMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -112,8 +115,15 @@ export function FileMenu({ onNew, onLoadClick, onManageLibraries, isInSession }:
             className="export-menu__dropdown"
             style={{ position: "fixed", top: dropdownPos.top, left: dropdownPos.left, minWidth: DROPDOWN_WIDTH }}
           >
+            {/*
+              During a session the document on screen is the shared one. Open
+              would replace it for everyone; New and Documents navigate this tab
+              to another document, which ends the session.
+            */}
             <button
               type="button"
+              disabled={isInSession}
+              title={isInSession ? "New is disabled during a collaborative session - opening another document would end it" : undefined}
               onClick={() => {
                 onNew();
                 close();
@@ -121,10 +131,23 @@ export function FileMenu({ onNew, onLoadClick, onManageLibraries, isInSession }:
             >
               New
             </button>
+            {onOpenDocuments && (
+              <button
+                type="button"
+                disabled={isInSession}
+                title={isInSession ? "Documents is disabled during a collaborative session - opening another document would end it" : undefined}
+                onClick={() => {
+                  onOpenDocuments();
+                  close();
+                }}
+              >
+                Documents...
+              </button>
+            )}
             <button
               type="button"
               disabled={isInSession}
-              title={isInSession ? "Open is disabled during a collaborative session - loading a file wouldn't be visible until the session ends" : undefined}
+              title={isInSession ? "Open is disabled during a collaborative session - it would replace the diagram for everyone in it" : undefined}
               onClick={() => {
                 onLoadClick();
                 close();

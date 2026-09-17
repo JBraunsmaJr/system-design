@@ -14,15 +14,15 @@
  * this in the repo; nothing else depends on it.
  */
 import * as Y from "yjs";
-import { createLocalTeamStore, createAdapterTeamStore, seedTeamStore } from "./teamStore";
+import { createLocalTeamStore, seedTeamStore } from "./teamStore";
 import { createYjsTeamStore } from "./yjsTeamStore";
 import type { TeamStore } from "./teamStore";
-import type { TeamMember, TeamDocument } from "../domain/teamTypes";
-import { EMPTY_TEAM_DOCUMENT } from "../domain/teamTypes";
+import type { TeamMember } from "../domain/teamTypes";
 
 let failures = 0;
 function assert(cond: boolean, msg: string) {
   if (!cond) {
+    (globalThis as unknown as { process: { exitCode: number } }).process.exitCode = 1; // run-tests.ts reads the exit status
     console.error("FAIL:", msg);
     failures++;
   } else {
@@ -74,18 +74,10 @@ function canonicalJSON(value: unknown): string {
   const localSnap = runSequence(createLocalTeamStore());
   const yjsSnap = runSequence(createYjsTeamStore(new Y.Doc()));
 
-  let adapterDoc: TeamDocument = { ...EMPTY_TEAM_DOCUMENT, settings: { ...EMPTY_TEAM_DOCUMENT.settings } };
-  const adapterSnap = runSequence(
-    createAdapterTeamStore(
-      () => adapterDoc,
-      (updater) => {
-        adapterDoc = updater(adapterDoc);
-      }
-    )
+  assert(
+    canonicalJSON(localSnap) === canonicalJSON(yjsSnap),
+    "the in-memory and Yjs team stores produce an IDENTICAL snapshot from the same sequence of named operations - the adapter arm that used to sit here is gone with the adapter itself (WS1 Step 4), but the equivalence it guarded is the part that matters"
   );
-
-  assert(canonicalJSON(localSnap) === canonicalJSON(yjsSnap), "local and Yjs stores produce an IDENTICAL snapshot after the same sequence of operations - the Yjs implementation is a faithful drop-in for single-user use");
-  assert(canonicalJSON(localSnap) === canonicalJSON(adapterSnap), "the adapter store (delegating to an externally-owned setSnapshot, matching how App.tsx's undoable state works) produces an IDENTICAL snapshot too - it's a faithful translation of the same named operations into the same inline-transform pattern TeamView used to write by hand");
 }
 
 // === Part 2: the actual point - concurrent, independent edits from different peers ===

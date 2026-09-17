@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, Profiler, type ProfilerOnRenderCallback, type ChangeEvent } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useUndoableState } from "./hooks/useUndoableState";
 import {
   ReactFlowProvider,
   type Node,
@@ -25,12 +24,44 @@ import { NODE_TYPES } from "./domain/nodeRegistry";
 import { GROUP_TYPES } from "./domain/groupRegistry";
 import { SHAPE_TYPES, globalShapeRegistry } from "./domain/shapeRegistry";
 import { reorderWithGroupsFirst, toAbsolutePosition } from "./domain/graphUtils";
+import type { DiagramPath } from "./domain/subDiagramTree";
+import { toDiagramFile, downloadDiagram, downloadDiagramAs, parseDiagramFile } from "./domain/serialization";
 import {
-  getBreadcrumbLabels,
-  type DiagramPath,
-} from "./domain/subDiagramTree";
-import { toDiagramFile, downloadDiagram, parseDiagramFile } from "./domain/serialization";
-import { loadAutosave, saveAutosave } from "./domain/autosave";
+  loadTimedCopies,
+  saveTimedCopies,
+  timedCopyFileName,
+  isCopyDue,
+  TIMED_COPIES_TEST_SECONDS_KEY,
+  type TimedCopiesSettings,
+} from "./domain/timedCopies";
+import { loadAutosave, clearLegacyAutosave, hasLegacyAutosave, getAutosaveBlockedReason } from "./domain/autosave";
+import {
+  resolveDocumentId,
+  readDocumentParam,
+  withDocumentParam,
+  sessionDocumentId,
+  LAST_DOCUMENT_KEY,
+} from "./domain/currentDocument";
+import { createDocumentStore, newDocumentId, requestPersistentStorage, type StorageFailureReason } from "./domain/documentStore";
+import { createDocumentLibrary } from "./collab/documentLibrary";
+import { reconciliationWindowMs } from "./domain/reconciliationWindow";
+import { DocumentManager } from "./components/DocumentManager";
+import { createIndexedDbBackend } from "./domain/indexedDbBackend";
+import { DurabilityIndicator } from "./components/DurabilityIndicator";
+import { installUnloadGuard } from "./domain/unloadGuard";
+import type { DurabilitySignals } from "./domain/durability";
+import { countPersistedReplicas } from "./collab/session";
+import { isSoleReplicaHolder } from "./domain/durability";
+import { useFileSaving } from "./hooks/useFileSaving";
+import { LeaveGuardDialog } from "./components/LeaveGuardDialog";
+import {
+  acquireDocument,
+  replaceDocumentContents,
+  createDocumentStores,
+  destroyDocumentStores,
+  type OpenDocumentStores,
+} from "./collab/localDocument";
+import { undoableStore, undoControllerFor, releaseUndoController } from "./collab/undoManager";
 import { downloadRequirementsMarkdown } from "./domain/requirementsExport";
 import { exportDiagramAsPng, exportDiagramAsSvg } from "./domain/imageExport";
 import type { ArchNodeData, ArchEdgeData, ArchEdgeDataPatch, EdgeWaypoint, Scenario, ScenarioStep, SubDiagram } from "./domain/types";
@@ -46,23 +77,9 @@ import type { ProgramIncrement } from "./domain/programIncrements";
 import type { TeamDocument } from "./domain/teamTypes";
 import { EMPTY_TEAM_DOCUMENT } from "./domain/teamTypes";
 import * as Y from "yjs";
-import { createAdapterTeamStore, seedTeamStore } from "./collab/teamStore";
-import { createYjsTeamStore } from "./collab/yjsTeamStore";
-import type { TeamStore } from "./collab/teamStore";
-import { createAdapterRequirementsStore } from "./collab/requirementsStore";
-import { createYjsRequirementsStore, seedYjsRequirementsDoc } from "./collab/yjsRequirementsStore";
-import type { RequirementsStore } from "./collab/requirementsStore";
-import { createAdapterProgramIncrementsStore } from "./collab/programIncrementsStore";
-import { createAdapterDiagramStore } from "./collab/adapterDiagramStore";
-import { getNodesAtPath, getEdgesAtPath, unflattenToSubDiagram, hasSubDiagram } from "./collab/diagramStore";
+import { getNodesAtPath, getEdgesAtPath, unflattenToSubDiagram, getBreadcrumbLabelsFlat, levelKey, populatedLevels } from "./collab/diagramStore";
 import type { EdgeEndpoints } from "./domain/edgeReconnect";
-import type { DiagramStore } from "./collab/diagramStore";
-import { createYjsDiagramStore, seedYjsDiagramDoc } from "./collab/yjsDiagramStore";
-import { createYjsProgramIncrementsStore, seedYjsProgramIncrementsDoc } from "./collab/yjsProgramIncrementsStore";
-import type { ProgramIncrementsStore } from "./collab/programIncrementsStore";
 import type { Milestone } from "./domain/milestones";
-import { createAdapterMilestonesStore, type MilestonesStore } from "./collab/milestonesStore";
-import { createYjsMilestonesStore, seedYjsMilestonesDoc } from "./collab/yjsMilestonesStore";
 import { startCollabSession, type CollabSession, type PresenceInfo, type LocalPresenceInfo } from "./collab/session";
 import { loadPresenceName, savePresenceName, loadShowPeerCursors, saveShowPeerCursors } from "./domain/presenceIdentity";
 import { loadSignalingUrls, saveSignalingUrls, parseSignalingUrls, getDefaultSignalingUrl } from "./domain/signalingConfig";
@@ -70,19 +87,55 @@ import { loadIceServers, saveIceServers, parseIceServers, getDefaultIceServers }
 import { createSessionLink, parseSessionLink, generateSessionKey, sanitizeCurrentUrl } from "./domain/sessionLink";
 import { Toast, type ToastType } from "./components/Toast";
 import { applyZOrderCommand, computeEffectiveZIndices, type ZOrderCommand } from "./domain/zOrder";
+import {
+  mergeInFlight,
+  applyInFlight,
+  remoteInFlight,
+  toBroadcast,
+  NO_IN_FLIGHT,
+  type InFlightMap,
+  applyEdgeGesture,
+  edgeGestureWrites,
+  remoteEdgeGestures,
+  remoteEdgeLabels,
+  changesWaypoints,
+  type LabelPlacement,
+  NO_EDGE_GESTURES,
+  type EdgeGesture,
+  type EdgeGestureMap,
+} from "./domain/gestureGeometry";
 import { classifyNodeChanges, applySelectionChanges, isAutoSizedNodeType, type PendingNodeUpdate, type CurrentNodeGeometry } from "./domain/nodeChangeBatching";
-import { recordCommit, isPerfInstrumentationActive } from "./perf/instrumentation";
+import { recordCommit, isPerfInstrumentationActive, isPerfAutosaveSuppressed } from "./perf/instrumentation";
 import { getStandardFixture, type FixtureName } from "./perf/fixtures";
 import "./App.css";
+
+/**
+ * The objects the canvas was last handed for each store node/edge, reused
+ * while every derived input is unchanged. Keyed by the store's own object,
+ * which the store itself keeps stable for anything a change did not touch
+ * (yjsDiagramStore.ts) - so a drag re-renders the dragged node, not all of
+ * them. Weak, so entries go when the store drops the source object.
+ */
+const derivedNodes = new WeakMap<
+  Node<ArchNodeData>,
+  { zIndex: number | undefined; measured: Node["measured"]; selected: boolean; hasSub: boolean; out: Node<ArchNodeData> }
+>();
+const derivedEdges = new WeakMap<Edge<ArchEdgeData>, { selected: boolean; out: Edge<ArchEdgeData> }>();
+/**
+ * The `data` object handed to each node, kept separately so that a change to
+ * only its measured size, selection or stacking - which gives the node a new
+ * object - does not also give it new `data`. Memoised node components compare
+ * `data` by identity, so this is what lets them skip those renders.
+ */
+const derivedNodeData = new WeakMap<Node<ArchNodeData>, { hasSub: boolean; data: ArchNodeData }>();
 
 let idSeed = 0;
 const nextId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${idSeed++}`;
 
 const EMPTY_DIAGRAM: SubDiagram = { nodes: [], edges: [] };
 
-/** The undoable "document" - everything a user would think of as "my
- * content", as opposed to transient UI state like which panel is open or
- * what's currently selected (neither of which belongs in undo history). */
+/** A document's content as plain values - the shape a file or autosave is
+ * normalised into before it seeds a Y.Doc. Not live state: the Y.Doc is. */
 interface DiagramSnapshot {
   title: string;
   root: SubDiagram;
@@ -145,6 +198,21 @@ const DEFAULT_SNAPSHOT: DiagramSnapshot = {
   milestones: [],
 };
 
+/** The inverse of diagramFileToSnapshot, for whole-document writes that start
+ * from a snapshot rather than a parsed file (New). */
+function snapshotToDiagramFile(snapshot: DiagramSnapshot) {
+  return toDiagramFile(
+    snapshot.title,
+    snapshot.root.nodes,
+    snapshot.root.edges,
+    snapshot.scenarios,
+    snapshot.requirements,
+    snapshot.programIncrements,
+    snapshot.team,
+    snapshot.milestones
+  );
+}
+
 // Small, fixed palette for presence colors - not shared with team's own
 // AVATAR_COLORS (TeamView.tsx) since that's module-private and this is
 // a genuinely separate concept (a person's presence color for a
@@ -153,167 +221,80 @@ const DEFAULT_SNAPSHOT: DiagramSnapshot = {
 const PRESENCE_COLORS = ["#5b7cfa", "#9061f9", "#0fa36b", "#f0578c", "#f59e0b", "#06b6d4", "#ec4899", "#8b5cf6"];
 
 function App() {
-  const {
-    present: diagram,
-    set: setDiagram,
-    undo: undoDiagram,
-    redo: redoDiagram,
-    resetHistory: resetDiagramHistory,
-    canUndo,
-    canRedo,
-  } = useUndoableState<DiagramSnapshot>(() => {
-    // Lazy init (a function, not a direct value) so this - including the
-    // localStorage read - only ever runs once, on the very first render,
-    // rather than on every render the way a plain object literal argument
-    // would be recomputed (even though only the first one is ever used).
+  /**
+   * What the app booted with: a restored autosave, or the default. Read once,
+   * to seed the open document when it turns out to be empty; the document is
+   * the model from then on (WS1-R1), including for title and scenarios.
+   */
+  const [bootSnapshot] = useState<DiagramSnapshot>(() => {
+    // The retired localStorage draft, read once (WS2-R1). It only seeds the
+    // document if the document turns out to be empty, and is cleared after
+    // the first successful save to the document store.
     const autosave = loadAutosave();
     return autosave ? diagramFileToSnapshot(autosave) : DEFAULT_SNAPSHOT;
   });
-  const { title, root, scenarios, requirements, programIncrements, team } = diagram;
 
-  // Thin wrappers matching the exact shape of the plain useState setters
-  // they replace (value OR updater-function), so every existing call site
-  // below - setTitle(...), setRoot(...), setScenarios(...) - keeps working
-  // completely unchanged; only how these three pieces of state are STORED
-  // changed (one combined, undoable container instead of three separate
-  // useState calls), not how anything calls into them.
-  const setTitle = useCallback(
-    (updater: string | ((prev: string) => string)) =>
-      setDiagram((prev) => ({
-        ...prev,
-        title: typeof updater === "function" ? (updater as (p: string) => string)(prev.title) : updater,
-      })),
-    [setDiagram]
-  );
-  const setRoot = useCallback(
-    (updater: SubDiagram | ((prev: SubDiagram) => SubDiagram)) =>
-      setDiagram((prev) => ({
-        ...prev,
-        root: typeof updater === "function" ? (updater as (p: SubDiagram) => SubDiagram)(prev.root) : updater,
-      })),
-    [setDiagram]
-  );
-  // rootRef always holds the CURRENT root, updated on every render (a
-  // plain ref mutation during render, not a state update - safe, and
-  // exactly the pattern React itself recommends for "keep a ref in sync
-  // with the latest value" situations). getRoot reads from this ref
-  // rather than closing over `root` directly, which is what lets
-  // localDiagramStore itself stay a single, stable instance below
-  // instead of being torn down and rebuilt on every edit.
-  const rootRef = useRef(root);
-  // Deliberate, safe use of the well-known "keep a ref fresh for a
-  // stable callback" pattern. This mutation always completes before
-  // anything else in this same render pass could read it (getRoot below
-  // is only ever CALLED later, from event handlers via the store's own
-  // methods, never during render itself) - JS execution within one
-  // function call is strictly sequential, so there's no actual
-  // staleness risk in React's current runtime. The alternative -
-  // updating this via useEffect instead - would introduce a REAL bug:
-  // effects run only after the render phase completes, so getSnapshot
-  // (called synchronously during render, via useSyncExternalStore
-  // below) would read one-render-stale data on exactly the render where
-  // root just changed. This lint rule exists to guard against a future
-  // React Compiler reordering/memoizing parts of a render in ways that
-  // could break that sequencing guarantee - this project doesn't use
-  // the compiler today, and if it ever does, this specific pattern is
-  // exactly the kind of thing that would need re-examining then, not a
-  // sign anything is wrong with it now.
-  // eslint-disable-next-line react-hooks/refs
-  rootRef.current = root;
-  // Deliberately NOT depending on `root` here - only on `setRoot`
-  // (itself stable across renders, since it only depends on setDiagram).
-  // The adapter's own getSnapshot has a cache keyed on root's identity
-  // (see adapterDiagramStore.ts), but that cache lives INSIDE the
-  // closure created by createAdapterDiagramStore - if this useMemo
-  // depended on `root` and recreated the store on every edit, each new
-  // instance would start with an empty cache and immediately re-flatten
-  // from scratch anyway, defeating that fix in practice. A single,
-  // long-lived instance is what lets the cache (and, just as
-  // importantly, stable object references for every node that DIDN'T
-  // change) actually persist between edits rather than being thrown
-  // away every single time. getRoot's own read of rootRef.current
-  // happens later, inside store method calls triggered from event
-  // handlers, never during render - see the note above.
-  // eslint-disable-next-line react-hooks/refs
-  const localDiagramStore = useMemo(() => createAdapterDiagramStore(() => rootRef.current, setRoot), [setRoot]);
-  const setScenarios = useCallback(
-    (updater: Scenario[] | ((prev: Scenario[]) => Scenario[])) =>
-      setDiagram((prev) => ({
-        ...prev,
-        scenarios: typeof updater === "function" ? (updater as (p: Scenario[]) => Scenario[])(prev.scenarios) : updater,
-      })),
-    [setDiagram]
-  );
-  const setRequirements = useCallback(
-    (updater: (prev: RequirementsDocument) => RequirementsDocument) =>
-      setDiagram((prev) => ({ ...prev, requirements: updater(prev.requirements) })),
-    [setDiagram]
-  );
-  const localRequirementsStore = useMemo(
-    () => createAdapterRequirementsStore(() => requirements, setRequirements),
-    [requirements, setRequirements]
-  );
+  /**
+   * Which document this tab has open (WS2-R3): the URL's `?doc=`, else the
+   * last one opened in this browser, else "local". Written back to the URL so
+   * a reload reopens it and another tab can hold a different one.
+   */
+  const [openDocId] = useState(() => {
+    let lastDocId: string | null = null;
+    try {
+      lastDocId = localStorage.getItem(LAST_DOCUMENT_KEY);
+    } catch {
+      // Storage unavailable: fall through to the default document.
+    }
+    return resolveDocumentId({ urlDocId: readDocumentParam(window.location.href), lastDocId }).docId;
+  });
+  useEffect(() => {
+    const next = withDocumentParam(window.location.href, openDocId);
+    if (next !== window.location.href) window.history.replaceState(window.history.state, "", next);
+    try {
+      localStorage.setItem(LAST_DOCUMENT_KEY, openDocId);
+    } catch {
+      // A preference; losing it only means a bare URL opens the default.
+    }
+  }, [openDocId]);
 
-  const setProgramIncrements = useCallback(
-    (updater: (prev: ProgramIncrement[]) => ProgramIncrement[]) =>
-      setDiagram((prev) => ({ ...prev, programIncrements: updater(prev.programIncrements) })),
-    [setDiagram]
+  /** The catalogue of stored documents and their snapshots (WS2-R3). */
+  const [documentStore] = useState(() => createDocumentStore(createIndexedDbBackend()));
+  const [documentLibrary] = useState(() =>
+    createDocumentLibrary({ store: documentStore }, { reconciliationWindowMs: reconciliationWindowMs() })
   );
-  const localProgramIncrementsStore = useMemo(
-    () => createAdapterProgramIncrementsStore(() => programIncrements, setProgramIncrements),
-    [programIncrements, setProgramIncrements]
-  );
+  const [isDocumentManagerOpen, setIsDocumentManagerOpen] = useState(false);
+  /** The file this document is continuously saved to, if any (WS13-R1). */
+  const fileSaving = useFileSaving(openDocId);
 
-  const setTeam = useCallback(
-    (updater: (prev: TeamDocument) => TeamDocument) =>
-      setDiagram((prev) => ({ ...prev, team: updater(prev.team) })),
-    [setDiagram]
-  );
-  const localTeamStore = useMemo(() => createAdapterTeamStore(() => team, setTeam), [team, setTeam]);
-
-  const setMilestones = useCallback(
-    (updater: Milestone[] | ((prev: Milestone[]) => Milestone[])) =>
-      setDiagram((prev) => ({
-        ...prev,
-        milestones: typeof updater === "function" ? (updater as (p: Milestone[]) => Milestone[])(prev.milestones) : updater,
-      })),
-    [setDiagram]
-  );
-  const localMilestonesStore = useMemo(
-    () => createAdapterMilestonesStore(() => diagram.milestones, setMilestones),
-    [diagram.milestones, setMilestones]
-  );
+  /**
+   * Switches this tab to another stored document by navigating, so the open
+   * document is closed and released exactly as on any unload. Any session
+   * link is dropped - opening a document must not rejoin a session.
+   */
+  const openDocumentInTab = useCallback((docId: string) => {
+    const url = new URL(withDocumentParam(window.location.href, docId));
+    url.hash = "";
+    window.location.assign(url.toString());
+  }, []);
 
   // --- Collaborative sessions -----------------------------------------------
   //
-  // A session covers all four domains - team, requirements, program
-  // increments, and now the diagram itself, once its own DiagramStore got
-  // real UI wiring (createAdapterDiagramStore/createYjsDiagramStore).
-  // Starting or joining a session switches every one of them over
-  // together; there's no partial-session state where some domains are
-  // collaborative and others aren't.
-  //
-  // Undo/redo is a known, deliberate limitation while a session is active:
-  // team/requirements/programIncrements stop flowing through setTeam/
-  // setRequirements/setProgramIncrements for the duration (those calls are
-  // what feeds the undo-tracked `diagram` snapshot), so the app's own
-  // undo stack is simply frozen with respect to collaborative edits until
-  // the session ends - pressing undo won't touch anything a collaborator
-  // (or you) just changed, but it also can't corrupt anything, since
-  // nothing collaborative is being fed into that history at all. A real
-  // per-edit undo during an active session would mean adopting Yjs's own
-  // UndoManager, which the original collaboration plan already called out
-  // as a separate, later decision - not attempted here.
+  // A session is a provider on a document (WS1-R4), covering every domain the
+  // document holds at once. Undo keeps working throughout (WS3-R2): it is
+  // scoped to this user's transaction origin, so it reverts only their own
+  // edits and never a collaborator's.
   interface ActiveCollabSession {
     doc: Y.Doc;
     session: CollabSession;
     roomName: string;
     password?: string;
-    teamStore: TeamStore;
-    requirementsStore: RequirementsStore;
-    programIncrementsStore: ProgramIncrementsStore;
-    diagramStore: DiagramStore;
-    milestonesStore: MilestonesStore;
+    /** The stores over `doc`. For a session started from the open document
+     * these ARE the open document's stores, not a second set. */
+    stores: OpenDocumentStores;
+    /** Whether this session owns `doc` and its stores - true for a joined
+     * session, which must release them when it ends (WS1 Step 1). */
+    ownsDocument: boolean;
   }
   const [activeSession, setActiveSession] = useState<ActiveCollabSession | null>(null);
 
@@ -338,6 +319,59 @@ function App() {
   // calling setState directly and unconditionally in an effect body,
   // which is exactly the pattern React's own linting steers away from.
   const [presencePeers, setPresencePeers] = useState<PresenceInfo[]>([]);
+
+  /**
+   * The open document (WS1-R1). Created by a lazy initialiser so it exists from the
+   * first render - which is what lets the seams below drop their adapter
+   * fallback entirely (WS1 Step 4). The initialiser runs exactly once, so
+   * `diagram` is read at boot and never again.
+   */
+  const [openDoc] = useState(() => {
+    // The restored autosave is a DiagramFile, so its root is the nested tree,
+    // and openDocumentNow's seed is the import boundary that flattens it
+    // (WS1-R3). Passing it through unchanged is the point: flattening here as
+    // well is how the two load paths came to disagree about the shape.
+    // acquireDocument, not openDocumentNow: StrictMode runs this initializer
+    // twice, and a second live provider on the same database corrupts it.
+    return acquireDocument({
+      docId: openDocId,
+      initial: snapshotToDiagramFile(bootSnapshot),
+    });
+  });
+  // The document exists from the first render; this only has to release it.
+  //
+  // The close is deferred by a task, and cancelled if the effect runs again
+  // first. StrictMode (dev only) runs this cleanup and the effect back to back
+  // at mount while keeping the same state - so an immediate close destroyed
+  // the stores of a document the app went on using, and no local edit ever
+  // reached the canvas in dev. A real unmount still closes, one task later.
+  const pendingClose = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    const held = openDoc;
+    if (pendingClose.current !== null) {
+      clearTimeout(pendingClose.current);
+      pendingClose.current = null;
+    }
+    return () => {
+      pendingClose.current = setTimeout(() => {
+        pendingClose.current = null;
+        // Step 1 exists for this: without it every remount leaves observers
+        // rebuilding snapshots against a document nobody reads.
+        releaseUndoController(held.doc);
+        void held.close();
+      }, 0);
+    };
+  }, [openDoc]);
+  /** Local persistence for the session document, as CONFIRMED - starts as
+   * loading rather than assuming success (NFR-10). */
+  /** Confirmed local-persistence state for the session document, tagged with
+   * the session it belongs to. Tagging rather than resetting means a new
+   * session cannot inherit the previous one's result, and avoids a
+   * synchronous state reset inside an effect (NFR-10). */
+  const [sessionPersistence, setSessionPersistence] = useState<{
+    session: object | null;
+    state: "active" | "loading" | "unavailable";
+  }>({ session: null, state: "loading" });
   /**
    * Whether the current session can actually reach a signaling relay.
    * Null outside a session, or before the first status arrives. Kept
@@ -361,6 +395,26 @@ function App() {
     },
     []
   );
+  // Reports the session document's local persistence once it has actually
+  // loaded. Reset to "loading" on every session change so a new session never
+  // inherits the previous one's confirmed state.
+  useEffect(() => {
+    if (!activeSession) return;
+    let cancelled = false;
+    const { persistence } = activeSession.session;
+    const owner = activeSession.session;
+    void persistence.whenSynced.then(() => {
+      if (cancelled) return;
+      // whenSynced resolves even when the database could not be opened - the
+      // provider reports that by never having stored anything - so this is the
+      // point where the state becomes known either way.
+      setSessionPersistence({ session: owner, state: "active" });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSession]);
+
   useEffect(() => {
     if (!activeSession) return;
     const unsubscribePresence = activeSession.session.subscribeToPresence(setPresencePeers);
@@ -411,6 +465,20 @@ function App() {
     localPresenceRef.current = { ...localPresenceRef.current, ...patch };
     session.setLocalPresence(localPresenceRef.current);
   }, []);
+
+  /**
+   * WS13-R10: tell the others this participant holds a saved copy, once its
+   * local persistence is confirmed. Other peers count replicas from exactly
+   * this flag - nothing set it before, so every participant counted everyone
+   * else as holding nothing, and the leave guard warned people who were not
+   * the only holder.
+   */
+  useEffect(() => {
+    if (!activeSession) return;
+    const confirmed =
+      sessionPersistence.session === activeSession.session && sessionPersistence.state === "active";
+    if (confirmed) broadcastPresence({ hasPersistedReplica: true });
+  }, [activeSession, sessionPersistence, broadcastPresence]);
 
   // Rebroadcasts this peer's own selection whenever it changes - moved
   // below, right after selectedNodeIds/selectedEdgeIds are actually
@@ -491,48 +559,63 @@ function App() {
   }, []);
   const iceServers = useMemo(() => parseIceServers(iceServersInput), [iceServersInput]);
 
-  // Starts a brand-new session, seeding it with whatever's already here so
-  // nothing is lost - the new session's initial state IS the current local
-  // state, not an empty workbook.
-  const startNewSession = useCallback(
-    (explicitKey?: string) => {
-      let seedRequirements = requirements;
-      let seedProgramIncrements = programIncrements;
-      let seedRoot = root;
-      let seedMilestones = diagram.milestones ?? [];
-      let seedTeam = team;
-
-      if (activeSessionRef.current) {
-        const current = activeSessionRef.current;
-        seedTeam = current.teamStore.getSnapshot();
-        seedRequirements = current.requirementsStore.getSnapshot();
-        seedProgramIncrements = current.programIncrementsStore.getSnapshot();
-        seedMilestones = current.milestonesStore.getSnapshot();
-        const finalDiagramSnapshot = current.diagramStore.getSnapshot();
-        seedRoot = unflattenToSubDiagram(finalDiagramSnapshot.nodes, finalDiagramSnapshot.edges);
-
-        setTeam(() => seedTeam);
-        setRequirements(() => seedRequirements);
-        setProgramIncrements(() => seedProgramIncrements);
-        setMilestones(() => seedMilestones);
-        setRoot(() => seedRoot);
-
-        current.session.disconnect();
+  /**
+   * Drops a session's provider and, for a joined session, releases the
+   * document it opened: its stores' observers and its undo controller.
+   *
+   * Leaving a joined session puts the local document back on screen. That is a
+   * document boundary, so the local document's undo history is cleared rather
+   * than resumed (WS3-R4) - undo must never act on a document the user was not
+   * just looking at.
+   */
+  const endSession = useCallback(
+    (ending: ActiveCollabSession) => {
+      ending.session.disconnect();
+      if (ending.ownsDocument) {
+        destroyDocumentStores(ending.stores);
+        releaseUndoController(ending.doc);
+        undoControllerFor(openDoc.doc).clear();
       }
-      const roomName = `session-${Math.random().toString(36).slice(2, 10)}`;
+    },
+    [openDoc]
+  );
+
+  // Starts a brand-new session on the document already open (WS1-R4).
+  const startNewSession = useCallback(
+    (explicitKey?: string, explicitRoom?: string) => {
+      /**
+       * Restarting a session used to mean copying the old session's content
+       * back into React state before building a fresh document. With one
+       * document there is nothing to copy - the content is already where it
+       * needs to be, so this only has to drop the old provider.
+       */
+      if (activeSessionRef.current) {
+        endSession(activeSessionRef.current);
+      }
+      // An explicit room is a rehost (WS13-R12): the same room and key, so the
+      // original session link works again.
+      const roomName = explicitRoom ?? `session-${Math.random().toString(36).slice(2, 10)}`;
       const sessionKey = explicitKey && explicitKey.trim() ? explicitKey.trim() : generateSessionKey();
-      const doc = new Y.Doc();
-      seedYjsRequirementsDoc(doc, seedRequirements);
-      seedYjsProgramIncrementsDoc(doc, seedProgramIncrements);
-      seedYjsDiagramDoc(doc, seedRoot);
-      seedYjsMilestonesDoc(doc, seedMilestones);
-      const teamStore = createYjsTeamStore(doc);
-      seedTeamStore(teamStore, seedTeam);
-      const requirementsStoreForSession = createYjsRequirementsStore(doc);
-      const programIncrementsStoreForSession = createYjsProgramIncrementsStore(doc);
-      const diagramStoreForSession = createYjsDiagramStore(doc);
-      const milestonesStoreForSession = createYjsMilestonesStore(doc);
-      const session = startCollabSession(doc, roomName, { signalingUrls, password: sessionKey, iceServers });
+      /**
+       * WS1-R4: the document the user has open BECOMES the session document,
+       * with the stores already built over it. Starting a session is a provider
+       * attachment: no seeding, no second store set, no visible transition, and
+       * undo history carries straight across.
+       *
+       * There used to be a "defensive" seed here for an empty document. It
+       * seeded from values captured at boot, so on an emptied document it would
+       * have resurrected stale content. An empty document is simply an empty
+       * session.
+       */
+      const doc = openDoc.doc;
+      const session = startCollabSession(doc, roomName, {
+        signalingUrls,
+        password: sessionKey,
+        iceServers,
+        // Already persisted under its document key - don't store it twice.
+        existingPersistence: openDoc.persistence,
+      });
+
       const initialPresence: LocalPresenceInfo = {
         name: displayName.trim() || "Guest",
         color: PRESENCE_COLORS[Math.floor(Math.random() * PRESENCE_COLORS.length)],
@@ -550,11 +633,8 @@ function App() {
         session,
         roomName,
         password: sessionKey,
-        teamStore,
-        requirementsStore: requirementsStoreForSession,
-        programIncrementsStore: programIncrementsStoreForSession,
-        diagramStore: diagramStoreForSession,
-        milestonesStore: milestonesStoreForSession,
+        stores: openDoc.stores,
+        ownsDocument: false,
       });
 
       // Auto-copy shareable session link to clipboard
@@ -575,24 +655,24 @@ function App() {
           });
       }
     },
-    [requirements, programIncrements, team, root, diagram.milestones, setTeam, setRequirements, setProgramIncrements, setMilestones, setRoot, signalingUrls, signalingUrlsInput, buildTimeSignalingDefault, iceServers, displayName, showToast]
+    [openDoc, endSession, signalingUrls, signalingUrlsInput, buildTimeSignalingDefault, iceServers, displayName, showToast]
   );
 
-  // Joins an existing session by room name - starts from an EMPTY doc
-  // rather than seeding local state, since the whole point of joining is
-  // to receive whatever the session already has from other peers, not to
-  // impose this browser's own local state onto it.
+  // Joins an existing session by room name - never seeds from local state,
+  // since the whole point of joining is to receive whatever the session
+  // already has rather than imposing this browser's own state onto it.
+  //
+  // The document is no longer necessarily empty at this point: if this browser
+  // has been in this room before, local persistence restores it immediately,
+  // so the session opens with content on screen before any peer connects and
+  // works offline. That restored copy and the peers' copy converge on sync the
+  // same way two live peers do (WS2-R1).
   const joinSession = useCallback(
     (roomName: string, passwordOrKey?: string, relayOverride?: string) => {
+      // Switching sessions no longer means copying the old one's content
+      // anywhere - dropping the provider is the whole job.
       if (activeSessionRef.current) {
-        const current = activeSessionRef.current;
-        setTeam(() => current.teamStore.getSnapshot());
-        setRequirements(() => current.requirementsStore.getSnapshot());
-        setProgramIncrements(() => current.programIncrementsStore.getSnapshot());
-        setMilestones(() => current.milestonesStore.getSnapshot());
-        const finalDiagramSnapshot = current.diagramStore.getSnapshot();
-        setRoot(() => unflattenToSubDiagram(finalDiagramSnapshot.nodes, finalDiagramSnapshot.edges));
-        current.session.disconnect();
+        endSession(activeSessionRef.current);
       }
       let effectiveSignalingUrls = signalingUrls;
       if (relayOverride && relayOverride.trim()) {
@@ -612,12 +692,9 @@ function App() {
         return
       }
 
+      // WS1-R5: a separate document, never merged into the open one.
       const doc = new Y.Doc();
-      const teamStore = createYjsTeamStore(doc);
-      const requirementsStoreForSession = createYjsRequirementsStore(doc);
-      const programIncrementsStoreForSession = createYjsProgramIncrementsStore(doc);
-      const diagramStoreForSession = createYjsDiagramStore(doc);
-      const milestonesStoreForSession = createYjsMilestonesStore(doc);
+      const stores = createDocumentStores(doc);
       const session = startCollabSession(doc, roomName, { signalingUrls: effectiveSignalingUrls, password: effectiveKey, iceServers });
       const initialPresence: LocalPresenceInfo = {
         name: displayName.trim() || "Guest",
@@ -636,14 +713,11 @@ function App() {
         session,
         roomName,
         password: effectiveKey,
-        teamStore,
-        requirementsStore: requirementsStoreForSession,
-        programIncrementsStore: programIncrementsStoreForSession,
-        diagramStore: diagramStoreForSession,
-        milestonesStore: milestonesStoreForSession,
+        stores,
+        ownsDocument: true,
       });
     },
-    [setTeam, setRequirements, setProgramIncrements, setMilestones, setRoot, signalingUrls, setSignalingUrlsInput, iceServers, displayName, showToast]
+    [endSession, signalingUrls, setSignalingUrlsInput, iceServers, displayName, showToast]
   );
 
   // Auto-join if a session link is present in the URL on initial mount or hash change
@@ -668,26 +742,24 @@ function App() {
     };
   }, [joinSession, showToast]);
 
-  // Leaving a session writes its final state back into the local,
-  // undo-tracked snapshot before disconnecting - so whatever happened
-  // during the session (your own edits, or anything synced in from
-  // collaborators) is preserved going forward, not silently discarded the
-  // moment the connection ends.
+  /**
+   * Leaving a session used to copy its final state back into local React
+   * state, so that edits made during the session - yours and collaborators' -
+   * were not discarded when the connection ended.
+   *
+   * With one document that copy is unnecessary and would be actively wrong:
+   * the session was editing the document directly, so everything is already
+   * where it belongs. Disconnecting drops the provider and nothing else.
+   */
   const leaveSession = useCallback(() => {
     if (!activeSession) return;
-    setTeam(() => activeSession.teamStore.getSnapshot());
-    setRequirements(() => activeSession.requirementsStore.getSnapshot());
-    setProgramIncrements(() => activeSession.programIncrementsStore.getSnapshot());
-    setMilestones(() => activeSession.milestonesStore.getSnapshot());
-    const finalDiagramSnapshot = activeSession.diagramStore.getSnapshot();
-    setRoot(() => unflattenToSubDiagram(finalDiagramSnapshot.nodes, finalDiagramSnapshot.edges));
-    activeSession.session.disconnect();
+    endSession(activeSession);
     setActiveSession(null);
-  }, [activeSession, setTeam, setRequirements, setProgramIncrements, setMilestones, setRoot]);
+  }, [activeSession, endSession]);
 
   useEffect(() => {
     return () => {
-      activeSession?.session.disconnect();
+      if (activeSession) endSession(activeSession);
     };
     // Only ever runs on unmount - intentionally not re-running when
     // activeSession itself changes, since that would disconnect and
@@ -695,11 +767,65 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const teamStore = activeSession?.teamStore ?? localTeamStore;
-  const requirementsStore = activeSession?.requirementsStore ?? localRequirementsStore;
-  const programIncrementsStore = activeSession?.programIncrementsStore ?? localProgramIncrementsStore;
-  const milestonesStore = activeSession?.milestonesStore ?? localMilestonesStore;
-  const diagramStore = activeSession?.diagramStore ?? localDiagramStore;
+  /**
+   * The active store set (WS1-R1).
+   *
+   * One document, so this is no longer a choice between two representations -
+   * a session's stores and the open document's stores are both Yjs stores over
+   * the same schema. The adapter fallback covers only the few frames before
+   * the document finishes opening; deleting it is Step 4.
+   */
+  /**
+   * The document the user is looking at: the joined session's while in one,
+   * otherwise the open local document (which is also the shared one after
+   * starting a session). Whole-document writes - load, New - target this, so
+   * they change what is on screen rather than a document nobody can see.
+   */
+  const activeDoc = activeSession?.doc ?? openDoc.doc;
+  const rawStores = activeSession?.stores ?? openDoc.stores;
+
+  /**
+   * Undo for the document on screen (WS3-R1, WS3-R2). Scoped by origin, so it
+   * works identically in and out of a session and never reverts a peer's edit.
+   */
+  const undo = useMemo(() => undoControllerFor(activeDoc), [activeDoc]);
+  const canUndo = useSyncExternalStore(undo.subscribe, undo.canUndo);
+  const canRedo = useSyncExternalStore(undo.subscribe, undo.canRedo);
+
+  /**
+   * The seams everything reads and writes through. Every mutating method runs
+   * under the undo origin (undoableStore), so no call site can make an edit
+   * that silently falls outside history. Memoised on the underlying store set,
+   * so identities are stable for useSyncExternalStore and memoised children.
+   */
+  const teamStore = useMemo(() => undoableStore(rawStores.team, undo), [rawStores, undo]);
+  const requirementsStore = useMemo(() => undoableStore(rawStores.requirements, undo), [rawStores, undo]);
+  const programIncrementsStore = useMemo(
+    () => undoableStore(rawStores.programIncrements, undo),
+    [rawStores, undo]
+  );
+  const milestonesStore = useMemo(() => undoableStore(rawStores.milestones, undo), [rawStores, undo]);
+  const diagramStore = useMemo(() => undoableStore(rawStores.diagram, undo), [rawStores, undo]);
+  const metaStore = useMemo(() => undoableStore(rawStores.meta, undo), [rawStores, undo]);
+  const metaSnapshot = useSyncExternalStore(metaStore.subscribe, metaStore.getSnapshot);
+  const { title, scenarios } = metaSnapshot;
+
+  // Same value-or-updater shape as the useState setters these replaced, so
+  // every existing call site is unchanged.
+  const setTitle = useCallback(
+    (updater: string | ((prev: string) => string)) =>
+      metaStore.setTitle(
+        typeof updater === "function" ? updater(metaStore.getSnapshot().title) : updater
+      ),
+    [metaStore]
+  );
+  const setScenarios = useCallback(
+    (updater: Scenario[] | ((prev: Scenario[]) => Scenario[])) =>
+      metaStore.setScenarios(
+        typeof updater === "function" ? updater(metaStore.getSnapshot().scenarios) : updater
+      ),
+    [metaStore]
+  );
   const diagramStoreRef = useRef(diagramStore);
 
   // Subscribed via useSyncExternalStore (not just a plain useMemo keyed
@@ -718,10 +844,12 @@ function App() {
   const programIncrementsSnapshot = useSyncExternalStore(programIncrementsStore.subscribe, programIncrementsStore.getSnapshot);
   const milestonesSnapshot = useSyncExternalStore(milestonesStore.subscribe, milestonesStore.getSnapshot);
 
-  const liveRoot = useMemo(
-    () => unflattenToSubDiagram(diagramSnapshot.nodes, diagramSnapshot.edges),
-    [diagramSnapshot]
-  );
+
+  // No tree is derived here (WS1-R3). The flat snapshot is canonical; the
+  // recursive tree is built only at export boundaries (save, autosave) and for
+  // the views that are written against it - see diagramTree further down.
+  // Deriving it unconditionally cost a full unflatten per document change,
+  // which the perf gate recorded as one per remote update.
 
   // Layout effect rather than a render-phase assignment, for the same
   // reason as activeSessionRef above - and with the same consequence if
@@ -743,24 +871,154 @@ function App() {
   // the rest of the session - there's no real value in a live-ticking
   // "saved 3s ago" here, just confidence that it's happening at all.
   const [hasAutosaved, setHasAutosaved] = useState(false);
+  const [autosaveFailure, setAutosaveFailure] = useState<{ reason: StorageFailureReason; message: string } | null>(null);
+  const [autosaveBlocked] = useState(getAutosaveBlockedReason);
+  const legacyDraftPending = useRef(hasLegacyAutosave());
+  const writeToFile = fileSaving.write;
+  // Bumped when an attached file becomes writable, so it is written straight
+  // away rather than on the next edit.
+  const fileWriteEpoch = fileSaving.writeEpoch;
+
+  /**
+   * The stored-document id for what is on screen: the open document, or - in
+   * a joined session - that session's own replica entry, so joining never
+   * overwrites the local document's snapshot (WS1-R5).
+   */
+  const activeDocId =
+    activeSession && activeSession.ownsDocument ? sessionDocumentId(activeSession.roomName) : openDocId;
+  const activeRoom = activeSession?.roomName ?? null;
+  const activeKey = activeSession?.password ?? null;
+
   useEffect(() => {
+    // The perf harness measures editing, not autosave - see
+    // isPerfAutosaveSuppressed. Always false outside instrumented builds.
+    if (isPerfAutosaveSuppressed()) return;
+    let cancelled = false;
     const timer = setTimeout(() => {
-      saveAutosave(
-        toDiagramFile(
-          title,
-          liveRoot.nodes,
-          liveRoot.edges,
-          scenarios,
-          requirementsSnapshot,
-          programIncrementsSnapshot,
-          teamSnapshot,
-          milestonesSnapshot
-        )
+      // Export boundary: built once per debounced write, not once per change.
+      const tree = unflattenToSubDiagram(diagramSnapshot.nodes, diagramSnapshot.edges);
+      const file = toDiagramFile(
+        title,
+        tree.nodes,
+        tree.edges,
+        scenarios,
+        requirementsSnapshot,
+        programIncrementsSnapshot,
+        teamSnapshot,
+        milestonesSnapshot
       );
-      setHasAutosaved(true);
+      // A snapshot in the document store, alongside the live y-indexeddb
+      // replica: it keeps the index's title and time current (WS2-R3), is a
+      // readable fallback if the replica is damaged, and is the write whose
+      // failure the durability indicator reports (WS2-R4). It replaces the
+      // localStorage draft (WS2-R1).
+      const origin =
+        activeRoom !== null
+          ? ({ origin: "session", sessionRoom: activeRoom, sessionKey: activeKey ?? undefined } as const)
+          : ({ origin: "local" } as const);
+      // WS13-R1: the attached file belongs to the open local document, never
+      // to a joined session's content.
+      if (activeDocId === openDocId) void writeToFile(JSON.stringify(file, null, 2));
+      void documentStore.writeDocument(activeDocId, file, origin).then((result) => {
+        if (cancelled) return;
+        // Set from the confirmed outcome, never the attempt (NFR-10).
+        if (result.ok) {
+          setHasAutosaved(true);
+          setAutosaveFailure(null);
+          // WS2-R5: ask for durable storage when a document is first stored.
+          if (result.value.createdAt === result.value.updatedAt) void requestPersistentStorage();
+          if (legacyDraftPending.current && activeDocId === openDocId) {
+            legacyDraftPending.current = false;
+            clearLegacyAutosave();
+          }
+        } else {
+          setAutosaveFailure({ reason: result.reason, message: result.message });
+        }
+      });
     }, 1000);
-    return () => clearTimeout(timer);
-  }, [title, liveRoot, scenarios, requirementsSnapshot, programIncrementsSnapshot, teamSnapshot, milestonesSnapshot]);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [title, diagramSnapshot, scenarios, requirementsSnapshot, programIncrementsSnapshot, teamSnapshot, milestonesSnapshot, documentStore, activeDocId, activeRoom, activeKey, openDocId, writeToFile, fileWriteEpoch]);
+
+  /**
+   * WS13-R12: the session this document was last shared in, if its room and
+   * key were kept - offered as "Resume session" so a former participant can
+   * host it again after everyone has left.
+   */
+  const [resumableSession, setResumableSession] = useState<{ room: string; key: string } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void documentStore.listDocuments().then((listed) => {
+      if (cancelled || !listed.ok) return;
+      const entry = listed.value.find((e) => e.docId === openDocId);
+      setResumableSession(
+        entry?.sessionRoom && entry.sessionKey ? { room: entry.sessionRoom, key: entry.sessionKey } : null
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Re-read when a session ends, which is when a room first becomes resumable.
+  }, [documentStore, openDocId, activeRoom]);
+
+  /**
+   * What the app currently knows about whether this document is safe
+   * (WS13-R8/R9). Every field is a CONFIRMED observation, never an intention:
+   * the indicator is the one thing in the UI that must not be optimistic.
+   */
+  const durabilitySignals: DurabilitySignals = useMemo(() => {
+    const inSession = activeSession !== null;
+    // The file belongs to the local document. A joined session is another
+    // document, and describing it as saved to that file would be false.
+    const file = activeSession?.ownsDocument
+      ? { fileAccess: fileSaving.signals.fileAccess, fileAttachment: null, fileBacked: false }
+      : fileSaving.signals;
+    return {
+      ...file,
+      localPersistence: inSession
+        ? sessionPersistence.session === activeSession.session
+          ? sessionPersistence.state
+          : "loading"
+        : autosaveFailure?.reason === "unavailable"
+          ? "unavailable"
+          : hasAutosaved
+            ? "active"
+            : "loading",
+      storageFailure: autosaveFailure,
+      autosaveBlockedReason: autosaveBlocked,
+      // Counted only in a session; outside one there is nobody else to count,
+      // and claiming "you are the only person with a copy" to a solo user
+      // would be noise rather than a warning.
+      replicaCount: inSession
+        ? countPersistedReplicas(
+            presencePeers,
+            sessionPersistence.session === activeSession.session &&
+              sessionPersistence.state === "active",
+          )
+        : undefined,
+    };
+  }, [
+    activeSession,
+    sessionPersistence,
+    autosaveFailure,
+    autosaveBlocked,
+    hasAutosaved,
+    presencePeers,
+    fileSaving.signals,
+  ]);
+
+  // WS13-R7. Read live rather than captured, so the prompt reflects the state
+  // at the moment of closing.
+  const durabilityRef = useRef(durabilitySignals);
+  useEffect(() => {
+    durabilityRef.current = durabilitySignals;
+  }, [durabilitySignals]);
+  useEffect(() => {
+    const guard = installUnloadGuard(() => durabilityRef.current);
+    return () => guard.release();
+  }, []);
 
   const [path, setPath] = useState<DiagramPath>([]);
 
@@ -781,13 +1039,23 @@ function App() {
       const perfObj = (window as unknown as Record<string, unknown>).__PERF__ as Record<string, unknown>;
       perfObj.Y = Y;
       (window as unknown as Record<string, unknown>).Y = Y;
+      /**
+       * Through the seam, not through React state (WS1 Step 3).
+       *
+       * These are the highest-consequence writers in the app, because their
+       * failure is silent: a fixture that does not load leaves an empty
+       * canvas, and zero renders reads as a green IMPROVEMENT in the perf
+       * gate rather than as a failure. Routing them through diagramStore now
+       * means the later swap to a Y.Doc changes the implementation under
+       * them rather than quietly bypassing them.
+       */
       perfObj.loadFixture = (name: FixtureName) => {
         const fixture = getStandardFixture(name);
-        setRoot(fixture);
+        diagramStore.replaceAll(fixture);
         return fixture;
       };
       perfObj.setDiagram = (diagram: SubDiagram) => {
-        setRoot(diagram);
+        diagramStore.replaceAll(diagram);
       };
       perfObj.setPath = (newPath: string[]) => {
         setPath(newPath);
@@ -800,31 +1068,37 @@ function App() {
       };
       perfObj.startCollabSessionWithDoc = (doc: Y.Doc) => {
         const roomName = `perf-room-${Math.random().toString(36).slice(2, 8)}`;
-        const teamStore = createYjsTeamStore(doc);
-        const requirementsStoreForSession = createYjsRequirementsStore(doc);
-        const programIncrementsStoreForSession = createYjsProgramIncrementsStore(doc);
-        const diagramStoreForSession = createYjsDiagramStore(doc);
-        const milestonesStoreForSession = createYjsMilestonesStore(doc);
-        const effectiveSignalingUrls = signalingUrls.length > 0 ? signalingUrls : ["ws://127.0.0.1:4444"];
-        const session = startCollabSession(doc, roomName, { signalingUrls: effectiveSignalingUrls, iceServers });
+        const stores = createDocumentStores(doc);
+        const session = startCollabSession(doc, roomName, {
+          signalingUrls,
+          iceServers,
+          // The harness measures the editing path, not the storage layer.
+          // Leaving persistence on also makes runs non-deterministic, since
+          // each one would find whatever the previous one left in IndexedDB
+          // under a room name that is random per run.
+          persist: false,
+        });
         setActiveSession({
           doc,
           session,
           roomName,
-          teamStore,
-          requirementsStore: requirementsStoreForSession,
-          programIncrementsStore: programIncrementsStoreForSession,
-          diagramStore: diagramStoreForSession,
-          milestonesStore: milestonesStoreForSession,
+          stores,
+          ownsDocument: true,
         });
       };
       perfObj.leaveCollabSession = () => {
         leaveSession();
       };
+      // Encoded size of the document on screen - how WS4-R1 is checked
+      // ("a drag adds no more than 1KB").
+      perfObj.docBytes = () => Y.encodeStateAsUpdate(activeDoc).byteLength;
     }
-  }, [setRoot, setPath, signalingUrls, iceServers, leaveSession]);
+  }, [diagramStore, setPath, signalingUrls, iceServers, leaveSession, activeDoc]);
 
-  const breadcrumbLabels = useMemo(() => getBreadcrumbLabels(liveRoot, path), [liveRoot, path]);
+  const breadcrumbLabels = useMemo(
+    () => getBreadcrumbLabelsFlat(diagramSnapshot.nodes, path),
+    [diagramSnapshot, path]
+  );
 
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
   const [selectedEdgeIds, setSelectedEdgeIds] = useState<string[]>([]);
@@ -861,6 +1135,32 @@ function App() {
   // instead, using selectedNodeIds/selectedEdgeIds as the sole source of
   // truth. This replaces what used to be tracked as a `.selected` field
   // persisted directly on the node/edge objects themselves.
+  /**
+   * Geometry of nodes this user is dragging or resizing right now (WS4-R1).
+   * Rendered over the document and broadcast to peers, but not written to the
+   * document until the gesture ends - see flushPendingNodeUpdates.
+   */
+  const [inFlight, setInFlight] = useState<InFlightMap>(NO_IN_FLIGHT);
+  const inFlightRef = useRef<InFlightMap>(NO_IN_FLIGHT);
+  /** Edge bends being dragged by this user, rendered but not yet written. */
+  const [edgeInFlight, setEdgeInFlight] = useState<EdgeGestureMap>(NO_EDGE_GESTURES);
+  const edgeGesturesRef = useRef(new Map<string, EdgeGesture>());
+  /** Other peers' in-flight bends and labels at this level. */
+  const peerEdgeInFlight = useMemo(
+    () => (activeSession ? remoteEdgeGestures(presencePeers, path.join("/")) : new Map()),
+    [activeSession, presencePeers, path]
+  );
+  const peerEdgeLabels = useMemo(
+    () => (activeSession ? remoteEdgeLabels(presencePeers, path.join("/")) : new Map<string, LabelPlacement>()),
+    [activeSession, presencePeers, path]
+  );
+  /** Other peers' in-flight geometry at this level (WS4-R3). */
+  const peerInFlight = useMemo(
+    () => (activeSession ? remoteInFlight(presencePeers, path.join("/")) : NO_IN_FLIGHT),
+    [activeSession, presencePeers, path]
+  );
+
+  const subDiagramLevels = useMemo(() => populatedLevels(diagramSnapshot.nodes), [diagramSnapshot]);
   const { nodes, edges } = useMemo(() => {
     const rawNodes = reorderWithGroupsFirst(getNodesAtPath(diagramSnapshot.nodes, path));
     const rawEdges = getEdgesAtPath(diagramSnapshot.edges, path);
@@ -881,34 +1181,69 @@ function App() {
       }))
     );
 
+    const selectedNodes = new Set(selectedNodeIds);
+    const selectedEdges = new Set(selectedEdgeIds);
+
     return {
-      nodes: rawNodes.map((n) => ({
-        ...n,
-        // Stacking order, folded into this existing pass rather than
-        // computed again downstream - see domain/zOrder.ts for the rule.
-        // Derived from live geometry so a rectangle enlarged to enclose
-        // more nodes drops behind them without anyone reordering
-        // anything.
-        zIndex: zIndices.get(n.id),
-        // Re-attached on every snapshot because the store mints brand
-        // new node objects on any write, and React Flow reads `measured`
-        // EXCLUSIVELY off the node object the app hands it
-        // (adoptUserNodes: `measured: { width: userNode.measured?.width,
-        // ... }`) - it does not carry its own previously-measured value
-        // forward. Without this, every remote edit anywhere in the
-        // diagram wipes every node's measured size back to undefined,
-        // dropping geometry onto the `?? node.width ?? 0` fallback until
-        // a re-measure lands a frame later. This is each client's OWN
-        // measurement of its OWN DOM, deliberately never sent over the
-        // session - see isAutoSizedNodeType for why sharing it is what
-        // caused the mismatched connectors and selection outlines.
-        measured: measuredDimensions.get(n.id) ?? n.measured,
-        selected: selectedNodeIds.includes(n.id),
-        data: { ...n.data, hasSubDiagram: hasSubDiagram(diagramSnapshot.nodes, path, n.id) },
-      })),
-      edges: rawEdges.map((e) => ({ ...e, selected: selectedEdgeIds.includes(e.id) })),
+      nodes: rawNodes.map((n) => {
+        // Stacking order, folded into this existing pass rather than computed
+        // again downstream - see domain/zOrder.ts for the rule. Derived from
+        // live geometry so a rectangle enlarged to enclose more nodes drops
+        // behind them without anyone reordering anything.
+        const zIndex = zIndices.get(n.id);
+        // Re-attached because React Flow reads `measured` EXCLUSIVELY off the
+        // node object the app hands it (adoptUserNodes) and does not carry its
+        // own previous value forward - so a node the store rebuilds would
+        // otherwise lose its measured size until a re-measure a frame later.
+        // This is each client's OWN measurement of its OWN DOM, deliberately
+        // never sent over the session - see isAutoSizedNodeType.
+        const measured = measuredDimensions.get(n.id) ?? n.measured;
+        const selected = selectedNodes.has(n.id);
+        const hasSub = subDiagramLevels.has(levelKey([...path, n.id]));
+        // Same inputs, same object (WS1-R8): React Flow skips a node whose
+        // object is identical to last time, and re-renders it otherwise.
+        const hit = derivedNodes.get(n);
+        let out: Node<ArchNodeData>;
+        if (hit && hit.zIndex === zIndex && hit.measured === measured && hit.selected === selected && hit.hasSub === hasSub) {
+          out = hit.out;
+        } else {
+          let dataHit = derivedNodeData.get(n);
+          if (!dataHit || dataHit.hasSub !== hasSub) {
+            dataHit = { hasSub, data: { ...n.data, hasSubDiagram: hasSub } };
+            derivedNodeData.set(n, dataHit);
+          }
+          out = { ...n, zIndex, measured, selected, data: dataHit.data };
+          derivedNodes.set(n, { zIndex, measured, selected, hasSub, out });
+        }
+        // In-flight geometry over the document's (WS4-R1, WS4-R3): this
+        // user's own gesture first, since they are the one holding the node.
+        // Only the moving nodes get a new object, so only they re-render.
+        return applyInFlight(out, inFlight.get(n.id) ?? peerInFlight.get(n.id));
+      }),
+      edges: rawEdges.map((e) => {
+        const selected = selectedEdges.has(e.id);
+        const hit = derivedEdges.get(e);
+        let out: Edge<ArchEdgeData>;
+        if (hit && hit.selected === selected) {
+          out = hit.out;
+        } else {
+          out = { ...e, selected };
+          derivedEdges.set(e, { selected, out });
+        }
+        // In-flight bends and labels, this user's first; only those edges get
+        // new objects.
+        const own = edgeInFlight.get(e.id);
+        const peer = own ? undefined : peerEdgeInFlight.get(e.id);
+        const label = own ? own.label : peerEdgeLabels.get(e.id);
+        if (!own && !peer && !label) return out;
+        const data = { ...(out.data as ArchEdgeData) };
+        if (own && changesWaypoints(own)) data.waypoints = applyEdgeGesture(out.data?.waypoints, own);
+        else if (peer) data.waypoints = peer as EdgeWaypoint[];
+        if (label) Object.assign(data, label);
+        return { ...out, data };
+      }),
     };
-  }, [diagramSnapshot, path, selectedNodeIds, selectedEdgeIds, measuredDimensions]);
+  }, [diagramSnapshot, subDiagramLevels, path, selectedNodeIds, selectedEdgeIds, measuredDimensions, inFlight, peerInFlight, edgeInFlight, peerEdgeInFlight, peerEdgeLabels]);
 
   // Only position/dimensions changes need to reach the store - selection
   // changes are handled separately (and more robustly, since it's the
@@ -931,22 +1266,86 @@ function App() {
   // each other (only the latest position/size within the frame ever
   // gets committed) - correctly handles dragging several selected nodes
   // together too, since each gets its own independent pending entry.
+  const nodesRef = useRef(nodes);
+  useLayoutEffect(() => {
+    nodesRef.current = nodes;
+  }, [nodes]);
+
   const pendingNodeUpdates = useRef(new Map<string, PendingNodeUpdate>());
+  /** Reparents requested while a gesture's commit is pending (a node dropped
+   * into a group), applied last inside that commit - see onReparentNode. */
+  const pendingReparents = useRef(new Map<string, string | undefined>());
+  const commitScheduled = useRef(false);
   const pendingFlushHandle = useRef<number | null>(null);
 
+  /**
+   * Folds this frame's pending geometry into the in-flight overlay and
+   * broadcasts it - nothing reaches the document mid-gesture (WS4-R1).
+   */
   const flushPendingNodeUpdates = useCallback(() => {
     pendingFlushHandle.current = null;
     const pending = pendingNodeUpdates.current;
     if (pending.size === 0) return;
-    for (const [id, update] of pending) {
-      if (update.type === "position") {
-        diagramStore.updatePosition(id, update.position);
-      } else {
-        diagramStore.updateDimensions(id, update.width, update.height);
-      }
-    }
+    const next = mergeInFlight(inFlightRef.current, pending);
     pending.clear();
-  }, [diagramStore]);
+    inFlightRef.current = next;
+    setInFlight(next);
+    broadcastPresence({ gesture: toBroadcast(path.join("/"), next) });
+  }, [broadcastPresence, path]);
+
+  /**
+   * Ends a gesture: every node it moved or resized is written exactly once
+   * (WS4-R2), in ONE transaction under the undo origin, so peers receive one
+   * update and the whole gesture is one undo step. Also the path for
+   * standalone changes (an arrow-key nudge, a snap correction), which have no
+   * overlay and simply commit.
+   */
+  const commitNodeGesture = useCallback(() => {
+    commitScheduled.current = false;
+    const pending = pendingNodeUpdates.current;
+    const final = mergeInFlight(inFlightRef.current, pending);
+    pending.clear();
+    const reparents = new Map(pendingReparents.current);
+    pendingReparents.current.clear();
+    if (final.size > 0 || reparents.size > 0) {
+      undo.transact(() => {
+        for (const [id, g] of final) {
+          // A reparented node's position is written by updateParentId below,
+          // relative to its new parent - writing it here as well would be a
+          // second write for the same node.
+          if (g.position && !reparents.has(id)) diagramStore.updatePosition(id, g.position);
+          if (g.width !== undefined || g.height !== undefined) diagramStore.updateDimensions(id, g.width, g.height);
+        }
+        // Relative positions are derived here, from the geometry this commit
+        // is writing - the last rendered frame can be a frame or two behind
+        // the release, which put the node visibly off from where it was
+        // dropped.
+        const rendered = nodesRef.current;
+        const withFinal = (n: Node<ArchNodeData>) => {
+          const g = final.get(n.id);
+          return g?.position ? { ...n, position: g.position } : n;
+        };
+        const current = rendered.map(withFinal);
+        for (const [id, parentId] of reparents) {
+          const node = current.find((n) => n.id === id);
+          if (!node) continue;
+          const absolute = toAbsolutePosition(node, current, node.parentId);
+          const parent = parentId ? current.find((n) => n.id === parentId) : undefined;
+          const position = parent
+            ? { x: absolute.x - parent.position.x, y: absolute.y - parent.position.y }
+            : absolute;
+          diagramStore.updateParentId(id, parentId, position);
+        }
+      });
+    }
+    // Cleared in the same batch as the store notification above, so no frame
+    // shows the node back at its old position.
+    if (inFlightRef.current.size > 0) {
+      inFlightRef.current = NO_IN_FLIGHT;
+      setInFlight(NO_IN_FLIGHT);
+      broadcastPresence({ gesture: null });
+    }
+  }, [undo, diagramStore, broadcastPresence]);
 
   // Cancels any still-pending animation frame if the component unmounts
   // mid-gesture, so a stale callback can never fire against a store that
@@ -957,11 +1356,6 @@ function App() {
       if (pendingFlushHandle.current !== null) cancelAnimationFrame(pendingFlushHandle.current);
     };
   }, []);
-
-  const nodesRef = useRef(nodes);
-  useLayoutEffect(() => {
-    nodesRef.current = nodes;
-  }, [nodes]);
 
   const onNodesChange = useCallback<OnNodesChange<Node<ArchNodeData>>>(
     (changes) => {
@@ -1009,26 +1403,35 @@ function App() {
           { position: n.position, width: n.width, height: n.height, isAutoSized: isAutoSizedNodeType(n.type) },
         ])
       );
-      const { isActiveGesture } = classifyNodeChanges(changes, pendingNodeUpdates.current, currentNodeGeometry);
+      const { isActiveGesture, gestureEnded } = classifyNodeChanges(changes, pendingNodeUpdates.current, currentNodeGeometry);
+      const gestureInProgress = inFlightRef.current.size > 0;
       if (isActiveGesture) {
         if (pendingFlushHandle.current === null) {
           pendingFlushHandle.current = requestAnimationFrame(flushPendingNodeUpdates);
         }
-      } else if (pendingNodeUpdates.current.size > 0) {
-        // The gesture just ended (dragging/resizing became false), or
-        // this is a standalone change with no dragging flag at all (an
-        // arrow-key nudge, or onNodeDragStop's own alignment-snap
-        // correction) - either way, commit right away rather than
-        // waiting up to one frame for something that isn't part of an
-        // in-progress, high-frequency gesture.
+      } else if (gestureEnded) {
+        // Released. Committed in a microtask rather than here, because React
+        // Flow calls onNodeDragStop right after this - and its alignment-snap
+        // correction and drop-into-group reparent belong to the same gesture.
+        // Folding them in keeps it to one write per node (WS4-R2) and one
+        // transaction. A microtask still runs before the next paint.
         if (pendingFlushHandle.current !== null) {
           cancelAnimationFrame(pendingFlushHandle.current);
           pendingFlushHandle.current = null;
         }
-        flushPendingNodeUpdates();
+        if (!commitScheduled.current) {
+          commitScheduled.current = true;
+          queueMicrotask(commitNodeGesture);
+        }
+      } else if (!gestureInProgress && !commitScheduled.current && pendingNodeUpdates.current.size > 0) {
+        // A standalone change with no gesture open (an arrow-key nudge).
+        // Anything arriving while a gesture is open or awaiting its commit -
+        // a snap correction, a stray batch mid-drag - stays pending and is
+        // folded into that commit instead of committing on its own.
+        commitNodeGesture();
       }
     },
-    [flushPendingNodeUpdates]
+    [flushPendingNodeUpdates, commitNodeGesture]
   );
 
   // Edges have no position/dimensions concept, so the only thing this
@@ -1052,6 +1455,19 @@ function App() {
   // requirements document. Deliberately NOT part of the undoable
   // DiagramSnapshot: switching pages isn't an edit to the content itself.
   const [viewMode, setViewModeRaw] = useState<"diagram" | "requirements" | "timeline" | "team" | "skill-tree">("diagram");
+  /**
+   * The recursive tree, for the views still written against it
+   * (requirements, timeline, skill tree - all to find linked nodes).
+   *
+   * Built only while one of them is showing. None of them is mounted in the
+   * diagram view, which is where editing and remote bursts happen, so the
+   * common path never pays for an unflatten (WS1-R3).
+   */
+  const viewNeedsTree = viewMode === "requirements" || viewMode === "timeline" || viewMode === "skill-tree";
+  const diagramTree = useMemo(
+    () => (viewNeedsTree ? unflattenToSubDiagram(diagramSnapshot.nodes, diagramSnapshot.edges) : EMPTY_DIAGRAM),
+    [viewNeedsTree, diagramSnapshot]
+  );
 
   // Which requirements/timeline item this peer currently has open -
   // null when browsing a list without anything specific focused, or on
@@ -1263,6 +1679,13 @@ function App() {
         ? { x: absolute.x - newParent.position.x, y: absolute.y - newParent.position.y }
         : absolute;
 
+      // Dropped at the end of a gesture whose commit is still pending: apply
+      // it inside that commit, after the positions, so this node is written
+      // once and its position is the one relative to its new parent.
+      if (commitScheduled.current) {
+        pendingReparents.current.set(nodeId, newParentId ?? undefined);
+        return;
+      }
       diagramStore.updateParentId(nodeId, newParentId ?? undefined, nextPosition);
     },
     [nodes, diagramStore]
@@ -1276,19 +1699,23 @@ function App() {
   // same math as onReparentNode).
   const onAdoptIntoGroup = useCallback(
     (groupId: string, nodeIds: string[], groupPosition?: { x: number; y: number }) => {
-      const group = nodes.find((n) => n.id === groupId);
+      // Read at call time, not captured: this callback travels through
+      // CanvasContext, so depending on `nodes` gave it a new identity on every
+      // change, and every node and edge component re-rendered with it (WS1-R8).
+      const current = nodesRef.current;
+      const group = current.find((n) => n.id === groupId);
       if (!group) return;
       const groupPos = groupPosition ?? group.position;
       for (const nodeId of nodeIds) {
         if (nodeId === groupId) continue;
-        const n = nodes.find((nn) => nn.id === nodeId);
+        const n = current.find((nn) => nn.id === nodeId);
         if (!n) continue;
-        const absolute = toAbsolutePosition(n, nodes, n.parentId);
+        const absolute = toAbsolutePosition(n, current, n.parentId);
         const relative = { x: absolute.x - groupPos.x, y: absolute.y - groupPos.y };
         diagramStore.updateParentId(nodeId, groupId, relative);
       }
     },
-    [nodes, diagramStore]
+    [diagramStore]
   );
 
   const onUpdateNode = useCallback(
@@ -1362,15 +1789,83 @@ function App() {
     diagramStoreRef.current.reconnectEdge(edgeId, endpoints);
   }, []);
 
+  /**
+   * Bend drags are gestures (WS4-R1): adding and moving record into the edge's
+   * in-flight gesture, shown once per frame and broadcast to peers, and
+   * onEndEdgeGesture writes the result once (WS4-R2).
+   */
+  const edgeFlushHandle = useRef<number | null>(null);
+  const publishEdgeGestures = useCallback(() => {
+    edgeFlushHandle.current = null;
+    const snapshot = new Map(edgeGesturesRef.current);
+    setEdgeInFlight(snapshot.size ? snapshot : NO_EDGE_GESTURES);
+    const edges: Record<string, EdgeWaypoint[]> = {};
+    const labels: Record<string, LabelPlacement> = {};
+    for (const [edgeId, gesture] of snapshot) {
+      if (changesWaypoints(gesture)) {
+        const stored = diagramStoreRef.current.getSnapshot().edges.find((e) => e.id === edgeId)?.data?.waypoints;
+        edges[edgeId] = applyEdgeGesture(stored, gesture);
+      }
+      if (gesture.label) labels[edgeId] = gesture.label;
+    }
+    broadcastPresence({ edgeGesture: snapshot.size ? { path: path.join("/"), edges, labels } : null });
+  }, [broadcastPresence, path]);
+  const scheduleEdgePublish = useCallback(() => {
+    if (edgeFlushHandle.current === null) edgeFlushHandle.current = requestAnimationFrame(publishEdgeGestures);
+  }, [publishEdgeGestures]);
+
   const onAddEdgeWaypoint = useCallback((edgeId: string, index: number, waypoint: EdgeWaypoint) => {
-    diagramStoreRef.current.addEdgeWaypoint(edgeId, index, waypoint);
-  }, []);
+    const current = edgeGesturesRef.current.get(edgeId);
+    edgeGesturesRef.current.set(edgeId, {
+      ...current,
+      created: { index, waypoint },
+      moved: current?.moved ?? new Map(),
+    });
+    scheduleEdgePublish();
+  }, [scheduleEdgePublish]);
 
   const onMoveEdgeWaypoint = useCallback(
     (edgeId: string, waypointId: string, position: { x: number; y: number }) => {
-      diagramStoreRef.current.moveEdgeWaypoint(edgeId, waypointId, position);
+      const current = edgeGesturesRef.current.get(edgeId);
+      const moved = new Map(current?.moved ?? []);
+      moved.set(waypointId, position);
+      edgeGesturesRef.current.set(edgeId, { ...current, created: current?.created, moved });
+      scheduleEdgePublish();
     },
-    []
+    [scheduleEdgePublish]
+  );
+
+  /** A label being dragged: previewed like a bend, written once at the end. */
+  const onPreviewEdgeLabel = useCallback(
+    (edgeId: string, placement: LabelPlacement) => {
+      const current = edgeGesturesRef.current.get(edgeId);
+      edgeGesturesRef.current.set(edgeId, { ...current, moved: current?.moved ?? new Map(), label: placement });
+      scheduleEdgePublish();
+    },
+    [scheduleEdgePublish]
+  );
+
+  const onEndEdgeGesture = useCallback(
+    (edgeId: string) => {
+      const gesture = edgeGesturesRef.current.get(edgeId);
+      if (!gesture) return;
+      edgeGesturesRef.current.delete(edgeId);
+      if (edgeFlushHandle.current !== null) {
+        cancelAnimationFrame(edgeFlushHandle.current);
+        edgeFlushHandle.current = null;
+      }
+      const { add, moves, label } = edgeGestureWrites(gesture);
+      // One transaction under the undo origin: one sync update, one undo step.
+      undo.transact(() => {
+        if (add) diagramStore.addEdgeWaypoint(edgeId, add.index, add.waypoint);
+        for (const m of moves) diagramStore.moveEdgeWaypoint(edgeId, m.id, { x: m.x, y: m.y });
+        if (label) diagramStore.updateEdge(edgeId, label);
+      });
+      // Cleared in the same batch as the store notification: no frame shows
+      // the bend back where it started.
+      publishEdgeGestures();
+    },
+    [undo, diagramStore, publishEdgeGestures]
   );
 
   const onRemoveEdgeWaypoint = useCallback((edgeId: string, waypointId: string) => {
@@ -1864,17 +2359,17 @@ function App() {
 
   const onUndo = useCallback(() => {
     if (isPresenting) return;
-    undoDiagram();
+    undo.undo();
     setSelectedNodeIds([]);
     setSelectedEdgeIds([]);
-  }, [isPresenting, undoDiagram]);
+  }, [isPresenting, undo]);
 
   const onRedo = useCallback(() => {
     if (isPresenting) return;
-    redoDiagram();
+    undo.redo();
     setSelectedNodeIds([]);
     setSelectedEdgeIds([]);
-  }, [isPresenting, redoDiagram]);
+  }, [isPresenting, undo]);
 
   // Copy/paste: Ctrl+C / Cmd+C and Ctrl+V / Cmd+V, same guards as delete -
   // never while presenting, never while typing in a field (so normal text
@@ -1956,34 +2451,107 @@ function App() {
 
   // --- File / diagram lifecycle -------------------------------------------
 
+  /**
+   * A new, empty document in this tab (WS2-R3). The current one is already
+   * stored and stays in the document list, so nothing is cleared or lost -
+   * this used to wipe the only document the app had.
+   */
   const onNew = useCallback(() => {
-    if (liveRoot.nodes.length > 0 && !window.confirm("Clear the current diagram? Unsaved changes will be lost.")) {
-      return;
-    }
-    resetDiagramHistory(DEFAULT_SNAPSHOT);
-    setPath([]);
-    setActiveScenarioId(null);
-    setActiveStepIndex(0);
-    setIsPresenting(false);
-  }, [liveRoot.nodes.length, resetDiagramHistory]);
+    openDocumentInTab(newDocumentId());
+  }, [openDocumentInTab]);
 
   // Always saves the full tree from the root, regardless of which level
   // you're currently viewing - a save from inside a drilled-down sub-diagram
   // must not lose everything above/beside it.
-  const onSave = useCallback(() => {
-    downloadDiagram(
-      toDiagramFile(
-        title,
-        liveRoot.nodes,
-        liveRoot.edges,
-        scenarios,
-        requirementsSnapshot,
-        programIncrementsSnapshot,
-        teamSnapshot,
-        milestonesSnapshot
-      )
+  /** The document on screen as a DiagramFile - an export boundary. */
+  const buildCurrentFile = useCallback(() => {
+    const tree = unflattenToSubDiagram(diagramSnapshot.nodes, diagramSnapshot.edges);
+    return toDiagramFile(
+      title,
+      tree.nodes,
+      tree.edges,
+      scenarios,
+      requirementsSnapshot,
+      programIncrementsSnapshot,
+      teamSnapshot,
+      milestonesSnapshot
     );
-  }, [title, liveRoot, scenarios, requirementsSnapshot, programIncrementsSnapshot, teamSnapshot, milestonesSnapshot]);
+  }, [title, diagramSnapshot, scenarios, requirementsSnapshot, programIncrementsSnapshot, teamSnapshot, milestonesSnapshot]);
+
+  const onSave = useCallback(() => {
+    downloadDiagram(buildCurrentFile());
+  }, [buildCurrentFile]);
+
+  /**
+   * Timed copies (WS13-R6): opt-in downloads at an interval, only when the
+   * document changed since the last one.
+   */
+  const [timedCopies, setTimedCopiesState] = useState<TimedCopiesSettings>(loadTimedCopies);
+  const setTimedCopies = useCallback((next: TimedCopiesSettings) => {
+    saveTimedCopies(next);
+    setTimedCopiesState(next);
+  }, []);
+  const buildCurrentFileRef = useRef(buildCurrentFile);
+  useLayoutEffect(() => {
+    buildCurrentFileRef.current = buildCurrentFile;
+  }, [buildCurrentFile]);
+  const lastCopied = useRef<string | null>(null);
+  useEffect(() => {
+    if (!timedCopies.enabled) return;
+    let intervalMs = timedCopies.minutes * 60_000;
+    if (isPerfInstrumentationActive()) {
+      // Instrumented builds only, so the browser suite need not wait minutes.
+      const seconds = Number(localStorage.getItem(TIMED_COPIES_TEST_SECONDS_KEY));
+      if (seconds > 0) intervalMs = seconds * 1000;
+    }
+    const timer = setInterval(() => {
+      const file = buildCurrentFileRef.current();
+      // metadata.updatedAt changes on every build; the content is what counts.
+      const content = JSON.stringify({ ...file, metadata: undefined });
+      if (!isCopyDue(content, lastCopied.current)) return;
+      lastCopied.current = content;
+      downloadDiagramAs(file, timedCopyFileName(file.title, new Date()));
+    }, intervalMs);
+    return () => clearInterval(timer);
+  }, [timedCopies]);
+
+  const onChooseFile = useCallback(() => {
+    const safeName = title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    void fileSaving.attach(`${safeName || "diagram"}.json`);
+  }, [title, fileSaving]);
+
+  /** WS13-R4: the file changed elsewhere. Overwrite it with what is on screen. */
+  const onOverwriteFile = useCallback(() => {
+    void fileSaving.overwrite(JSON.stringify(buildCurrentFile(), null, 2));
+  }, [fileSaving, buildCurrentFile]);
+
+  /** WS13-R4: the file changed elsewhere. Load its version instead - a
+   * whole-document replacement, so undo history is cleared (WS3-R4). */
+  const onReloadFromFile = useCallback(async () => {
+    const text = await fileSaving.reloadExternal();
+    if (text === null) {
+      showToast("Could not read the file", "error");
+      return;
+    }
+    try {
+      const parsed = parseDiagramFile(text);
+      replaceDocumentContents(openDoc.doc, snapshotToDiagramFile(diagramFileToSnapshot(parsed)));
+      undo.clear();
+      showToast("Reloaded from file");
+    } catch (err) {
+      showToast("The file could not be loaded", "error", (err as Error).message);
+    }
+  }, [fileSaving, openDoc, undo, showToast]);
+
+  /**
+   * WS13-R11: leaving when nobody else here holds a saved copy needs an
+   * explicit confirmation that says what that means.
+   */
+  const [isLeaveGuardOpen, setIsLeaveGuardOpen] = useState(false);
+  const requestLeave = useCallback(() => {
+    if (isSoleReplicaHolder(durabilitySignals)) setIsLeaveGuardOpen(true);
+    else leaveSession();
+  }, [durabilitySignals, leaveSession]);
 
   // Exports export the CURRENT view (whatever level you're looking at),
   // unlike Save - drilling into a node and exporting just that sub-diagram
@@ -2010,7 +2578,14 @@ function App() {
       try {
         const text = await file.text();
         const parsed = parseDiagramFile(text);
-        resetDiagramHistory(diagramFileToSnapshot(parsed));
+        // Into the document, not into React state: the canvas reads the
+        // document, so writing state here would leave the old diagram on
+        // screen with no error to explain it.
+        // Normalised through the snapshot so a file gets the same upgrades as a
+        // restored autosave (built-in requirement types, scenario step paths).
+        replaceDocumentContents(activeDoc, snapshotToDiagramFile(diagramFileToSnapshot(parsed)));
+        // Undo must not reach back across a file load (WS3-R4).
+        undo.clear();
         setPath([]);
         setActiveScenarioId(null);
         setActiveStepIndex(0);
@@ -2019,7 +2594,7 @@ function App() {
         window.alert(`Couldn't open that file: ${(err as Error).message}`);
       }
     },
-    [resetDiagramHistory]
+    [activeDoc, undo]
   );
 
   const selectedNodeId = selectedNodeIds[0] ?? null;
@@ -2061,6 +2636,8 @@ function App() {
       onReconnectEdge={onReconnectEdge}
       onAddEdgeWaypoint={onAddEdgeWaypoint}
       onMoveEdgeWaypoint={onMoveEdgeWaypoint}
+      onEndEdgeGesture={onEndEdgeGesture}
+      onPreviewEdgeLabel={onPreviewEdgeLabel}
       onRemoveEdgeWaypoint={onRemoveEdgeWaypoint}
       onReparentNode={onReparentNode}
       onAdoptIntoGroup={onAdoptIntoGroup}
@@ -2091,6 +2668,7 @@ function App() {
           title={title}
           onTitleChange={setTitle}
           onNew={onNew}
+          onOpenDocuments={() => setIsDocumentManagerOpen(true)}
           onSave={onSave}
           onLoadClick={onLoadClick}
           isScenarioPanelOpen={isScenarioPanelOpen}
@@ -2108,6 +2686,18 @@ function App() {
           canExportRequirements={requirementsSnapshot.items.length > 0}
           onManageLibraries={() => setIsLibraryModalOpen(true)}
           hasAutosaved={hasAutosaved}
+          durabilityIndicator={
+            <DurabilityIndicator
+              signals={durabilitySignals}
+              onExport={onSave}
+              onChooseFile={onChooseFile}
+              onResumeFile={() => void fileSaving.resume()}
+              onReloadFromFile={() => void onReloadFromFile()}
+              onOverwriteFile={onOverwriteFile}
+              onStopFile={fileSaving.fileName && !activeSession?.ownsDocument ? () => void fileSaving.detach() : undefined}
+              fileName={activeSession?.ownsDocument ? null : fileSaving.fileName}
+            />
+          }
           isInSession={!!activeSession}
           collabPanel={
             <CollabPanel
@@ -2134,8 +2724,12 @@ function App() {
               showPeerCursors={showPeerCursors}
               onShowPeerCursorsChange={setShowPeerCursors}
               onStartSession={startNewSession}
+              resumableRoom={resumableSession?.room ?? null}
+              onResumeSession={
+                resumableSession ? () => startNewSession(resumableSession.key, resumableSession.room) : undefined
+              }
               onJoinSession={joinSession}
-              onLeaveSession={leaveSession}
+              onLeaveSession={requestLeave}
               onCopyLink={() => showToast("Session link copied to clipboard")}
             />
           }
@@ -2200,7 +2794,7 @@ function App() {
                 canAddStep={canAddStep}
                 activeStepId={activeStepId}
                 onSelectStep={onSelectStep}
-                root={liveRoot}
+                diagramNodes={diagramSnapshot.nodes}
                 currentPath={path}
                 onClose={() => {
                   setIsScenarioPanelOpen(false);
@@ -2245,7 +2839,7 @@ function App() {
             requirementsStore={requirementsStore}
             programIncrements={programIncrementsSnapshot}
             team={teamSnapshot}
-            diagramRoot={liveRoot}
+            diagramRoot={diagramTree}
             onNavigateToNode={onNavigateToNode}
             onCreateLinkedNode={onCreateLinkedNode}
             focusItemId={pendingRequirementFocus}
@@ -2260,7 +2854,7 @@ function App() {
             requirementsStore={requirementsStore}
             milestonesStore={milestonesStore}
             team={teamSnapshot}
-            diagramRoot={liveRoot}
+            diagramRoot={diagramTree}
             onNavigateToNode={onNavigateToNode}
             onCreateLinkedNode={onCreateLinkedNode}
             onNavigateToRequirement={onNavigateToRequirement}
@@ -2280,13 +2874,37 @@ function App() {
             requirementsStore={requirementsStore}
             programIncrements={programIncrementsSnapshot}
             team={teamSnapshot}
-            diagramRoot={liveRoot}
+            diagramRoot={diagramTree}
             onNavigateToNode={onNavigateToNode}
             onCreateLinkedNode={onCreateLinkedNode}
             onNavigateToRequirement={onNavigateToRequirement}
           />
         )}
       </div>
+      <LeaveGuardDialog
+        isOpen={isLeaveGuardOpen}
+        onStay={() => setIsLeaveGuardOpen(false)}
+        onExportAndLeave={() => {
+          onSave();
+          setIsLeaveGuardOpen(false);
+          leaveSession();
+        }}
+        onLeave={() => {
+          setIsLeaveGuardOpen(false);
+          leaveSession();
+        }}
+      />
+      <DocumentManager
+        isOpen={isDocumentManagerOpen}
+        onClose={() => setIsDocumentManagerOpen(false)}
+        library={documentLibrary}
+        currentDocId={openDocId}
+        onRenameCurrent={setTitle}
+        timedCopies={timedCopies}
+        onTimedCopiesChange={setTimedCopies}
+        onOpenDocument={openDocumentInTab}
+        onNewDocument={onNew}
+      />
       <LibraryManagerModal
         isOpen={isLibraryModalOpen}
         onClose={() => setIsLibraryModalOpen(false)}

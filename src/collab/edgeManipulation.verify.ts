@@ -15,7 +15,6 @@
  */
 import * as Y from "yjs";
 import { createLocalDiagramStore } from "./diagramStore";
-import { createAdapterDiagramStore } from "./adapterDiagramStore";
 import { createYjsDiagramStore, seedYjsDiagramDoc } from "./yjsDiagramStore";
 import type { DiagramStore } from "./diagramStore";
 import type { ArchNodeData, ArchEdgeData, EdgeWaypoint, SubDiagram } from "../domain/types";
@@ -65,16 +64,17 @@ function ids(waypoints: EdgeWaypoint[]): string {
   return waypoints.map((w) => w.id).join(",");
 }
 
-/** A tree-adapter store backed by a plain mutable root, so the third
- * implementation can run the same sequences as the other two. */
-function makeAdapterStore(): DiagramStore {
-  let root: SubDiagram = { nodes: [], edges: [] };
-  return createAdapterDiagramStore(
-    () => root,
-    (updater) => {
-      root = updater(root);
-    }
-  );
+/**
+ * A Yjs-backed store, so the third implementation exercised here is the one
+ * that actually ships (WS1 Step 4).
+ *
+ * This slot used to hold the tree adapter. That implementation is gone, but
+ * the sequences below are not about it - they pin edge and waypoint behaviour
+ * that must hold identically whichever store is underneath, which is exactly
+ * the property worth keeping now that one of the two has been retired.
+ */
+function makeYjsStore(): DiagramStore {
+  return createYjsDiagramStore(new Y.Doc());
 }
 
 /** Builds the same two-node, one-edge starting point in any store. */
@@ -111,7 +111,7 @@ function seedEdge(store: DiagramStore): { a: string; b: string; c: string; edgeI
   const impls: { name: string; store: DiagramStore }[] = [
     { name: "local", store: createLocalDiagramStore() },
     { name: "yjs", store: createYjsDiagramStore(new Y.Doc()) },
-    { name: "adapter", store: makeAdapterStore() },
+    { name: "yjs", store: makeYjsStore() },
   ];
 
   const results = impls.map(({ name, store }) => {
@@ -131,7 +131,7 @@ function seedEdge(store: DiagramStore): { a: string; b: string; c: string; edgeI
 
   assert(
     results.every((r) => r.shape === results[0].shape),
-    `all three DiagramStore implementations produce an identical edge after the same sequence of waypoint and reconnect operations - ${results.map((r) => `${r.name}: ${r.shape}`).join(" | ")}`
+    `all DiagramStore implementations produce an identical edge after the same sequence of waypoint and reconnect operations - ${results.map((r) => `${r.name}: ${r.shape}`).join(" | ")}`
   );
 }
 
@@ -146,7 +146,7 @@ function seedEdge(store: DiagramStore): { a: string; b: string; c: string; edgeI
   for (const [name, store] of [
     ["local", createLocalDiagramStore()],
     ["yjs", createYjsDiagramStore(new Y.Doc())],
-    ["adapter", makeAdapterStore()],
+    ["yjs", makeYjsStore()],
   ] as const) {
     const { edgeId } = seedEdge(store);
 

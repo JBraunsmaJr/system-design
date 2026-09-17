@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { LayoutList, Search, Settings2, Tags, Waypoints, X } from "lucide-react";
+import { ChevronDown, ChevronUp, LayoutList, Search, Settings2, Tags, Waypoints, X } from "lucide-react";
 import { RequirementCard } from "./RequirementCard";
 import { ManageTypesModal } from "./ManageTypesModal";
 import { ManageRelationshipTypesModal } from "./ManageRelationshipTypesModal";
@@ -42,6 +42,7 @@ interface RequirementsViewProps {
   /** Reports which item this person currently has open for editing, for
    * presence broadcasting - null when nothing's being edited. */
   onFocusedItemChange?: (itemId: string | null) => void;
+  initialSearch?: string;
 }
 
 const HIGHLIGHT_DURATION_MS = 2000;
@@ -82,14 +83,21 @@ export function RequirementsView({
   onFocusHandled,
   peers = [],
   onFocusedItemChange,
+  initialSearch = "",
 }: RequirementsViewProps) {
-  const doc = useSyncExternalStore(requirementsStore.subscribe, requirementsStore.getSnapshot);
-  const [search, setSearch] = useState("");
+  const doc = useSyncExternalStore(
+    requirementsStore.subscribe,
+    requirementsStore.getSnapshot,
+    requirementsStore.getSnapshot
+  );
+  const [search, setSearch] = useState(initialSearch);
+  const [activeMatchItemId, setActiveMatchItemId] = useState<string | null>(null);
   const [groupBy, setGroupBy] = useState<GroupBy>("type");
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [isManagingTypes, setIsManagingTypes] = useState(false);
   const [isManagingRelationshipTypes, setIsManagingRelationshipTypes] = useState(false);
   const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   /**
    * Keep in sync on every render so useCallback-stabilized handlers can
    * always call the CURRENT store without needing requirementsStore in
@@ -247,6 +255,90 @@ export function RequirementsView({
     highlightTimer.current = setTimeout(() => setHighlightedId(null), HIGHLIGHT_DURATION_MS);
   }, []);
 
+  const visibleItems = useMemo(() => groups.flatMap((g) => g.items), [groups]);
+
+  const activeIndex = useMemo(() => {
+    if (!search.trim() || visibleItems.length === 0) return 0;
+    if (!activeMatchItemId) return 0;
+    const idx = visibleItems.findIndex((item) => item.id === activeMatchItemId);
+    return idx >= 0 ? idx : 0;
+  }, [search, visibleItems, activeMatchItemId]);
+
+  const activeItem = useMemo(() => {
+    if (!search.trim() || visibleItems.length === 0) return null;
+    return visibleItems[activeIndex] ?? null;
+  }, [search, visibleItems, activeIndex]);
+
+  const navigateToMatch = useCallback(
+    (index: number) => {
+      if (visibleItems.length === 0) return;
+      const normalizedIndex = ((index % visibleItems.length) + visibleItems.length) % visibleItems.length;
+      const targetItem = visibleItems[normalizedIndex];
+      if (!targetItem) return;
+      setActiveMatchItemId(targetItem.id);
+      onNavigateToItem(targetItem.id);
+    },
+    [visibleItems, onNavigateToItem]
+  );
+
+  const goToNextMatch = useCallback(() => {
+    if (visibleItems.length === 0) return;
+    if (activeMatchItemId === null) {
+      navigateToMatch(0);
+    } else {
+      navigateToMatch(activeIndex + 1);
+    }
+  }, [visibleItems.length, activeMatchItemId, activeIndex, navigateToMatch]);
+
+  const goToPrevMatch = useCallback(() => {
+    if (visibleItems.length === 0) return;
+    if (activeMatchItemId === null) {
+      navigateToMatch(visibleItems.length - 1);
+    } else {
+      navigateToMatch(activeIndex - 1);
+    }
+  }, [visibleItems.length, activeMatchItemId, activeIndex, navigateToMatch]);
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (e.shiftKey) {
+        goToPrevMatch();
+      } else {
+        goToNextMatch();
+      }
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setSearch("");
+      setActiveMatchItemId(null);
+      searchInputRef.current?.blur();
+    }
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+        return;
+      }
+      if (e.key === "F3" || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "g")) {
+        if (search.trim().length > 0) {
+          e.preventDefault();
+          if (e.shiftKey) {
+            goToPrevMatch();
+          } else {
+            goToNextMatch();
+          }
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [search, goToNextMatch, goToPrevMatch]);
+
   /*
    * Responds to a navigation request from OUTSIDE this view - e.g. the
    * user clicked a linked requirement pill in the Inspector while looking
@@ -318,34 +410,85 @@ export function RequirementsView({
             onOpenManageTypes={() => setIsManagingTypes(true)}
             itemCountsByType={itemCountsByType}
           />
-          <div className="requirements-view__search-wrap">
+          <div className={`requirements-view__search-wrap${search.trim() ? " has-query" : ""}`}>
             <Search size={13} className="requirements-view__search-icon" />
             <input
+              ref={searchInputRef}
               className="requirements-view__search-input"
               placeholder="Search requirements..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                if (!e.target.value.trim()) {
+                  setActiveMatchItemId(null);
+                }
+              }}
+              onKeyDown={handleSearchKeyDown}
             />
-            {search.length > 0 && (
+            {search.trim().length > 0 && (
+              <div className="requirements-view__search-actions">
+                <span className="requirements-view__search-counter">
+                  {visibleItems.length > 0
+                    ? `${activeIndex + 1} of ${visibleItems.length}`
+                    : "0 of 0"}
+                </span>
+                <button
+                  type="button"
+                  className="requirements-view__search-nav-btn"
+                  onClick={goToPrevMatch}
+                  onMouseDown={(e) => e.preventDefault()}
+                  disabled={visibleItems.length === 0}
+                  title="Previous match (Shift+Enter, Shift+F3)"
+                  aria-label="Previous match"
+                >
+                  <ChevronUp size={13} />
+                </button>
+                <button
+                  type="button"
+                  className="requirements-view__search-nav-btn"
+                  onClick={goToNextMatch}
+                  onMouseDown={(e) => e.preventDefault()}
+                  disabled={visibleItems.length === 0}
+                  title="Next match (Enter, F3)"
+                  aria-label="Next match"
+                >
+                  <ChevronDown size={13} />
+                </button>
+                <button
+                  type="button"
+                  className="requirements-view__search-clear"
+                  onClick={() => {
+                    setSearch("");
+                    setActiveMatchItemId(null);
+                    searchInputRef.current?.focus();
+                  }}
+                  title="Clear search (Escape)"
+                  aria-label="Clear search"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            )}
+            {search.length > 0 && search.trim().length === 0 && (
               <button
                 type="button"
                 className="requirements-view__search-clear"
-                onClick={() => setSearch("")}
+                onClick={() => {
+                  setSearch("");
+                  setActiveMatchItemId(null);
+                }}
                 title="Clear search"
+                aria-label="Clear search"
               >
                 <X size={12} />
               </button>
             )}
           </div>
-          {search.trim() ? (
-            <span className="requirements-view__count-badge">
-              {filteredItems.length} of {doc.items.length}
-            </span>
-          ) : doc.items.length > 0 ? (
+          {!search.trim() && doc.items.length > 0 && (
             <span className="requirements-view__count-badge">
               {doc.items.length} {doc.items.length === 1 ? "item" : "items"}
             </span>
-          ) : null}
+          )}
         </div>
 
         <div className="requirements-view__toolbar-right">
@@ -428,9 +571,10 @@ export function RequirementsView({
                   onDeleteCategory={onDeleteCategory}
                   onAddRelationship={onAddRelationship}
                   onDeleteRelationship={onDeleteRelationship}
-                  highlighted={highlightedId === item.id}
+                  highlighted={highlightedId === item.id || (Boolean(search.trim()) && activeItem?.id === item.id)}
                   peersHere={peers.length === 0 ? EMPTY_PEERS : peers.filter((p) => p.focusedItemId === item.id)}
                   onEditingChange={onEditingChange}
+                  searchQuery={search.trim()}
                 />
               ))}
             </section>

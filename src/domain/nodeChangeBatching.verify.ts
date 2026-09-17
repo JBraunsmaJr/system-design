@@ -214,7 +214,9 @@ function assert(cond: boolean, msg: string) {
 {
   const pending = new Map<string, PendingNodeUpdate>();
   const current = new Map<string, CurrentNodeGeometry>([["n1", { position: { x: 0, y: 0 }, width: 200, height: 100, isAutoSized: false }]]);
-  const changes: NodeChange[] = [{ id: "n1", type: "dimensions", dimensions: { width: 250, height: 100 } }]; // width genuinely changed
+  // resizing: true - a user resize. Passive measurements (no flag) are never
+  // queued at all; see Part 22.
+  const changes: NodeChange[] = [{ id: "n1", type: "dimensions", dimensions: { width: 250, height: 100 }, resizing: true }]; // width genuinely changed
   classifyNodeChanges(changes, pending, current);
 
   assert(pending.size === 1 && pending.get("n1")?.type === "dimensions", "a dimensions change that's genuinely different from the current value (even if only one of width/height changed) is still correctly queued - the no-op guard doesn't accidentally swallow real changes");
@@ -238,7 +240,7 @@ function assert(cond: boolean, msg: string) {
 {
   const pending = new Map<string, PendingNodeUpdate>();
   const current = new Map<string, CurrentNodeGeometry>(); // empty - "n1" unknown
-  const changes: NodeChange[] = [{ id: "n1", type: "dimensions", dimensions: { width: 100, height: 50 } }];
+  const changes: NodeChange[] = [{ id: "n1", type: "dimensions", dimensions: { width: 100, height: 50 }, resizing: true }];
   classifyNodeChanges(changes, pending, current);
 
   assert(pending.size === 1, "a change for a node with no current-geometry entry at all is still queued normally - there's no known 'current' value to compare against, so it can never be mistaken for a no-op");
@@ -268,8 +270,8 @@ function assert(cond: boolean, msg: string) {
     ["resized", { position: { x: 0, y: 0 }, width: 100, height: 50, isAutoSized: false }],
   ]);
   const changes: NodeChange[] = [
-    { id: "unchanged", type: "dimensions", dimensions: { width: 100, height: 50 } }, // no-op
-    { id: "resized", type: "dimensions", dimensions: { width: 150, height: 50 } }, // real change
+    { id: "unchanged", type: "dimensions", dimensions: { width: 100, height: 50 }, resizing: true }, // no-op
+    { id: "resized", type: "dimensions", dimensions: { width: 150, height: 50 }, resizing: true }, // real change
   ];
   classifyNodeChanges(changes, pending, current);
 
@@ -322,4 +324,21 @@ function assert(cond: boolean, msg: string) {
   assert(!isAutoSizedNodeType("code"), "code nodes carry an explicit user-chosen size");
 }
 
+// === Part 22: passive measurements are never queued, however different ===
+// React Flow's own ResizeObserver reports sizes with no `resizing` flag. They
+// are this client's rendering, not a user edit, and must never reach the
+// document (6bdc4cb). Parts 17, 19 and 21 predate that rule and silently
+// failed until they were given the flag a user resize actually carries.
+{
+  const pending = new Map<string, PendingNodeUpdate>();
+  const current = new Map<string, CurrentNodeGeometry>([["n1", { position: { x: 0, y: 0 }, width: 100, height: 50, isAutoSized: false }]]);
+  const changes: NodeChange[] = [{ id: "n1", type: "dimensions", dimensions: { width: 400, height: 300 } }];
+  classifyNodeChanges(changes, pending, current);
+  assert(pending.size === 0, "a passive measurement is not queued even when it differs from the stored size");
+}
+
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);
+// scripts/run-tests.ts reads the exit status; printing FAIL is not enough.
+if (failures > 0) {
+  (globalThis as unknown as { process: { exitCode: number } }).process.exitCode = 1;
+}

@@ -17,6 +17,7 @@ function assert(condition: boolean, message: string) {
     console.log(`ok: ${message}`);
   } else {
     failures++;
+    (globalThis as unknown as { process: { exitCode: number } }).process.exitCode = 1; // run-tests.ts reads the exit status
     console.error(`FAIL: ${message}`);
   }
 }
@@ -89,6 +90,21 @@ const breaks = (html: string) => (html.match(/<br\s*\/?>/g) ?? []).length;
   );
   assert(html.includes("REQ-1"), "an item reference still renders");
   assert(breaks(html) === 1, "and the newline after it still breaks");
+}
+
+// === Part 9: search match highlighting in markdown body ===
+{
+  const doc = { ...EMPTY_REQUIREMENTS_DOCUMENT, items: [{ id: "REQ-1", typeId: "requirement", title: "First", body: "" }] } as never;
+  const html = renderToStaticMarkup(
+    React.createElement(RequirementBody, {
+      text: "This has authentication details and `auth_token` in code.",
+      doc,
+      onNavigateToItem: () => {},
+      searchQuery: "auth",
+    })
+  );
+  assert(html.includes('<mark class="search-highlight">auth</mark>'), "matches are highlighted with search-highlight mark");
+  assert(html.includes('<mark class="search-highlight">Auth</mark>') || html.includes('<mark class="search-highlight">auth</mark>'), "case-insensitive matches in text and code");
 }
 
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);

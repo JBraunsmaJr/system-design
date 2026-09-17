@@ -4,6 +4,7 @@ import { Tag, Trash2, X } from "lucide-react";
 import { countItemsUsingCategory, findCategoryByLabel, getCategory } from "../../domain/requirementsRegistry";
 import { computeFlippedPosition } from "../../domain/popoverPosition";
 import type { RequirementsDocument } from "../../domain/requirementsTypes";
+import { HighlightedText } from "./HighlightText";
 
 interface CategoryPickerProps {
   doc: RequirementsDocument;
@@ -15,6 +16,7 @@ interface CategoryPickerProps {
    * store to hand) simply omit it and no delete affordance is rendered,
    * rather than showing a button that does nothing. */
   onDelete?: (categoryId: string) => void;
+  searchQuery?: string;
 }
 
 const DROPDOWN_WIDTH = 220;
@@ -41,7 +43,7 @@ const DROPDOWN_WIDTH = 220;
  * synchronously after the DOM commits but before the browser paints, so
  * any correction happens invisibly rather than as a visible jump.
  */
-export function CategoryPicker({ doc, categoryId, onAssign, onCreateAndAssign, onClear, onDelete }: CategoryPickerProps) {
+export function CategoryPicker({ doc, categoryId, onAssign, onCreateAndAssign, onClear, onDelete, searchQuery }: CategoryPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
   // Which row is showing its inline "really delete?" strip. An inline
@@ -153,7 +155,7 @@ export function CategoryPicker({ doc, categoryId, onAssign, onCreateAndAssign, o
         onClick={() => (isOpen ? close() : open())}
       >
         <Tag size={11} />
-        {current ? current.label : "Category"}
+        {current ? <HighlightedText text={current.label} search={searchQuery} /> : "Category"}
       </button>
 
       {isOpen &&

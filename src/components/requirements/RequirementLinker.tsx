@@ -4,6 +4,7 @@ import { Link2, X } from "lucide-react";
 import { getItemType } from "../../domain/requirementsRegistry";
 import { computeFlippedPosition } from "../../domain/popoverPosition";
 import type { RequirementsDocument } from "../../domain/requirementsTypes";
+import { HighlightedText, HighlightedTitle } from "./HighlightText";
 
 interface RequirementLinkerProps {
   linkedIds: string[];
@@ -174,9 +175,13 @@ export function RequirementLinker({ linkedIds, doc, onLink, onUnlink, onNavigate
                       className="requirement-linker__option-id"
                       style={{ color: type?.color ?? "var(--chrome-text-dim)" }}
                     >
-                      {item.id}
+                      <HighlightedText text={item.id} search={query.trim()} />
                     </span>
-                    <span className="requirement-linker__option-title">{item.title || "(untitled)"}</span>
+                    <HighlightedTitle
+                      className="requirement-linker__option-title"
+                      text={item.title || "(untitled)"}
+                      search={query.trim()}
+                    />
                   </button>
                 );
               })}

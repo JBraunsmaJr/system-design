@@ -11,6 +11,7 @@ import type { Milestone } from "./milestones.ts";
 import { sanitizeRelatedItemIds, validateMilestone } from "./milestones.ts";
 import { globalShapeRegistry, type ShapeDefinition } from "./shapeRegistry.ts";
 import { globalIconRegistry, type IconDefinition } from "./iconRegistry.ts";
+import { migrateToCurrent, type RawDiagramFile } from "./schemaMigrations.ts";
 
 export const SCHEMA_VERSION = "0.7";
 
@@ -101,12 +102,17 @@ export function toDiagramFile(
 
 /** Triggers a browser download of the diagram as a .json file. */
 export function downloadDiagram(file: DiagramFile): void {
+  const safeName = file.title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  downloadDiagramAs(file, `${safeName || "diagram"}.json`);
+}
+
+/** downloadDiagram under a caller-chosen file name (timed copies, WS13-R6). */
+export function downloadDiagramAs(file: DiagramFile, fileName: string): void {
   const blob = new Blob([JSON.stringify(file, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  const safeName = file.title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-  anchor.download = `${safeName || "diagram"}.json`;
+  anchor.download = fileName;
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
@@ -266,6 +272,9 @@ function parseMilestones(raw: unknown): Milestone[] {
     if (typeof m.id !== "string" || typeof m.name !== "string" || typeof m.scheduledAt !== "string") continue;
     const sanitizedIds = sanitizeRelatedItemIds(m.relatedItemIds ?? m.relatedWorkableItemIds);
     const candidate: Milestone = {
+      // Spread first so unrecognized per-milestone fields survive, for the same
+      // reason the top-level spread in parseDiagramFile exists.
+      ...m,
       id: m.id,
       type: typeof m.type === "string" && m.type.trim() !== "" ? m.type : "release",
       name: m.name.trim(),
@@ -323,18 +332,31 @@ export function parseDiagramFile(raw: string): DiagramFile {
     }
   }
 
+  // Bring the file forward before normalizing: migrations operate on raw file
+  // shapes, the normalizers below operate on current-version shapes. A file
+  // from a newer build throws here rather than being half-loaded.
+  const { file: upgraded } = migrateToCurrent(
+    parsed as RawDiagramFile,
+    SCHEMA_VERSION,
+  );
+
+  // Spread first so that any top-level key this build doesn't recognize - for
+  //  instance, a field added by a newer patch release - survives the round trip
+  // instead of being silently dropped and then lost on the next save. Known
+  // fields are overwritten by their normalized forms immediately below.
   return {
-    schemaVersion: parsed.schemaVersion ?? SCHEMA_VERSION,
-    title: parsed.title ?? "Untitled Diagram",
-    nodes: parsed.nodes,
-    edges: parsed.edges,
-    scenarios: Array.isArray(parsed.scenarios) ? parsed.scenarios : [],
-    requirements: parseRequirementsDocument(parsed.requirements),
-    programIncrements: parseProgramIncrements(parsed.programIncrements),
-    team: parseTeamDocument(parsed.team),
-    milestones: parseMilestones(parsed.milestones),
-    shapeFallbacks: parsed.shapeFallbacks,
-    iconFallbacks: parsed.iconFallbacks,
-    metadata: parsed.metadata ?? { updatedAt: new Date().toISOString() },
-  };
+    ...(upgraded as object),
+    schemaVersion: SCHEMA_VERSION,
+    title: upgraded.title ?? "Untitled Diagram",
+    nodes: upgraded.nodes,
+    edges: upgraded.edges,
+    scenarios: Array.isArray(upgraded.scenarios) ? upgraded.scenarios : [],
+    requirements: parseRequirementsDocument(upgraded.requirements),
+    programIncrements: parseProgramIncrements(upgraded.programIncrements),
+    team: parseTeamDocument(upgraded.team),
+    milestones: parseMilestones(upgraded.milestones),
+    shapeFallbacks: upgraded.shapeFallbacks,
+    iconFallbacks: upgraded.iconFallbacks,
+    metadata: upgraded.metadata ?? { updatedAt: new Date().toISOString() },
+  } as DiagramFile;
 }

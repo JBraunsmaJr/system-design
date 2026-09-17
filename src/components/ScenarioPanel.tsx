@@ -1,6 +1,7 @@
 import { Film, MapPin, X, Plus, Play, Trash2, ChevronUp, ChevronDown } from "lucide-react";
-import { getBreadcrumbLabels } from "../domain/subDiagramTree";
-import type { Scenario, ScenarioStep, SubDiagram } from "../domain/types";
+import type { Node } from "@xyflow/react";
+import { getBreadcrumbLabelsFlat } from "../collab/diagramStore";
+import type { ArchNodeData, Scenario, ScenarioStep } from "../domain/types";
 
 interface ScenarioPanelProps {
   scenarios: Scenario[];
@@ -21,10 +22,12 @@ interface ScenarioPanelProps {
    * AND previewed/highlighted on the canvas at the same time. */
   activeStepId: string | null;
   onSelectStep: (stepId: string) => void;
-  /** Full diagram tree and current drill-down path - used to resolve each
-   * step's own level into a readable label, and to tell whether a step's
-   * level matches where you're currently looking (which gates preview/edit). */
-  root: SubDiagram;
+  /** Every diagram node, flat and parentPath-tagged, plus the current
+   * drill-down path - used to resolve each step's own level into a readable
+   * label, and to tell whether a step's level matches where you're currently
+   * looking (which gates preview/edit). Flat rather than the tree so an open
+   * panel does not force a full unflatten on every document change (WS1-R3). */
+  diagramNodes: Node<ArchNodeData>[];
   currentPath: string[];
   onClose: () => void;
   height?: number;
@@ -35,8 +38,8 @@ function pathsEqual(a: string[], b: string[]): boolean {
   return a.length === b.length && a.every((id, i) => id === b[i]);
 }
 
-function levelLabel(root: SubDiagram, path: string[]): string {
-  const labels = getBreadcrumbLabels(root, path);
+function levelLabel(nodes: Node<ArchNodeData>[], path: string[]): string {
+  const labels = getBreadcrumbLabelsFlat(nodes, path);
   return labels.length === 0 ? "Root" : labels.join(" › ");
 }
 
@@ -57,12 +60,12 @@ export function ScenarioPanel({
   canAddStep,
   activeStepId,
   onSelectStep,
-  root,
+  diagramNodes,
   currentPath,
   onClose,
 }: ScenarioPanelProps) {
   const active = scenarios.find((s) => s.id === activeScenarioId) ?? null;
-  const currentLevelLabel = levelLabel(root, currentPath);
+  const currentLevelLabel = levelLabel(diagramNodes, currentPath);
   const activeStep = active?.steps.find((st) => st.id === activeStepId) ?? null;
   const activeStepIndex = active && activeStep ? active.steps.indexOf(activeStep) : -1;
   const activeStepEditable = activeStep ? pathsEqual(activeStep.path, currentPath) : false;
@@ -208,7 +211,7 @@ export function ScenarioPanel({
                 {active.steps.map((step, index) => {
                   const count = step.focusNodeIds.length + step.focusEdgeIds.length;
                   const isActive = step.id === activeStepId;
-                  const stepLocLabel = levelLabel(root, step.path);
+                  const stepLocLabel = levelLabel(diagramNodes, step.path);
                   const isSubDiagram = step.path.length > 0;
                   return (
                     <div
@@ -292,7 +295,7 @@ export function ScenarioPanel({
                 </span>
                 {activeStep.path.length > 0 && (
                   <span className="scenario-step-editor__location-badge">
-                    <MapPin size={10} /> {levelLabel(root, activeStep.path)}
+                    <MapPin size={10} /> {levelLabel(diagramNodes, activeStep.path)}
                   </span>
                 )}
               </div>

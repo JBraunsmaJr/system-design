@@ -61,6 +61,10 @@ interface CollabPanelProps {
   /** Starts a new collaborative session with an automatically generated encryption key. */
   onStartSession: (key?: string) => void;
   onJoinSession: (roomName: string, passwordOrKey?: string, relayOverride?: string) => void;
+  /** The room this document was last shared in, when it can be hosted again
+   * with its original link (WS13-R12). */
+  resumableRoom?: string | null;
+  onResumeSession?: () => void;
   onLeaveSession: () => void;
   /** Whether to render OTHER peers' live cursors - a purely local,
    * display-side preference (see presenceIdentity.ts's own doc comment
@@ -97,6 +101,8 @@ export function CollabPanel({
   onStartSession,
   onJoinSession,
   onLeaveSession,
+  resumableRoom,
+  onResumeSession,
   showPeerCursors,
   onShowPeerCursorsChange,
   onCopyLink,
@@ -279,7 +285,7 @@ export function CollabPanel({
         title={activeSession ? `In session: ${activeSession.roomName}` : "Collaborate"}
       >
         <Users size={14} />
-        <span>{activeSession ? "Session Active" : "Collaborate"}</span>
+        <span className="toolbar__label">{activeSession ? "Session Active" : "Collaborate"}</span>
       </button>
 
       {isOpen &&
@@ -313,6 +319,23 @@ export function CollabPanel({
                   className="collab-panel__name-input"
                 />
 
+                {signalingConfigured && resumableRoom && onResumeSession && (
+                  <>
+                    <button
+                      type="button"
+                      className="collab-panel__primary-action collab-panel__resume"
+                      onClick={() => {
+                        onResumeSession();
+                        close();
+                      }}
+                    >
+                      Resume session {resumableRoom}
+                    </button>
+                    <p className="collab-panel__hint">
+                      Hosts the session this document was shared in, so anyone with the original link can rejoin.
+                    </p>
+                  </>
+                )}
                 {signalingConfigured ? (
                   <button
                     type="button"

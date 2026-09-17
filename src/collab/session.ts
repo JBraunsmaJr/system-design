@@ -1,5 +1,18 @@
+import {
+  parseGestureBroadcast,
+  parseEdgeGestureBroadcast,
+  type GestureBroadcast,
+  type EdgeGestureBroadcast,
+} from "../domain/gestureGeometry.ts";
 import { WebrtcProvider } from "y-webrtc";
+import { buildPeerOpts } from "./transport.ts";
 import type * as Y from "yjs";
+import {
+  attachPersistence,
+  createNullPersistence,
+  persistenceKeyForRoom,
+  type DocPersistence,
+} from "./persistence.ts";
 
 /**
  * Wires a Y.Doc to a WebRTC-based collaborative session. This is the
@@ -53,6 +66,18 @@ export interface LocalPresenceInfo {
    * nothing specific is focused (browsing a list, or on a view/domain
    * that doesn't track this). */
   focusedItemId: string | null;
+  /**
+   * Whether this peer holds its own persisted copy of the document
+   * (WS13-R10).
+   *
+   * Counts replicas, not connections. A peer whose browser refused storage is
+   * connected but holds nothing, so counting connections would tell the last
+   * person in the room that their copy is safely duplicated when it is not.
+   *
+   * Absent is treated as false rather than true: a peer running a build that
+   * predates this field cannot be assumed to be persisting anything.
+   */
+  hasPersistedReplica?: boolean;
   /** This peer's current position within the diagram's own sub-diagram
    * nesting - the same DiagramPath (array of node ids) App.tsx tracks
    * as `path`, joined into a single string for easy equality
@@ -65,6 +90,14 @@ export interface LocalPresenceInfo {
    * completely different diagram level. Empty string represents the
    * root level, matching an empty DiagramPath array. */
   diagramPath: string;
+  /**
+   * Geometry of the nodes this peer is dragging or resizing right now
+   * (WS4-R1, WS4-R3). Sent here rather than written to the document, which
+   * receives each node once when the gesture ends. Null when idle.
+   */
+  gesture?: GestureBroadcast | null;
+  /** Edge bends this peer is dragging right now, as full waypoint lists. */
+  edgeGesture?: EdgeGestureBroadcast | null;
 }
 
 /** What you observe about ANOTHER peer - everything they set about
@@ -83,6 +116,14 @@ export interface PresenceInfo extends LocalPresenceInfo {
 
 export interface CollabSession {
   provider: WebrtcProvider;
+  /**
+   * The local replica of this room's document.
+   *
+   * Callers MUST await `persistence.whenSynced` before deciding whether to
+   * seed the document - see WS2-R2. Seeding a document that persistence is
+   * about to populate is how a restored session ends up duplicated.
+   */
+  persistence: DocPersistence;
   /** True once at least one other peer (or, on the same machine, another
    * browser tab via BroadcastChannel) has been found and initial sync
    * has completed - not the same as "actively connected right now",
@@ -162,6 +203,24 @@ export interface CollabSessionOptions {
    * host candidates that were sufficient all along.
    */
   iceServers?: RTCIceServer[];
+  /**
+   * Persist this room's document locally (WS2-R1). On by default: without it,
+   * the document exists only in connected browsers' memory and the last
+   * participant to leave takes the session's work with them.
+   *
+   * Turned off by the perf harness and by tests that want a clean document
+   * every run rather than whatever a previous run left behind.
+   */
+  persist?: boolean;
+  /**
+   * The document is already persisted by its owner - a local document that
+   * became a session (WS1-R4). The session reports that provider's state but
+   * never attaches a second one, and never destroys it: previously starting a
+   * session attached a room-keyed provider to a document already stored under
+   * its document key, so everything was stored twice, and leaving would have
+   * torn down persistence the document still needed.
+   */
+  existingPersistence?: DocPersistence;
 }
 
 /**
@@ -181,6 +240,18 @@ export interface CollabSessionOptions {
  * nature (anything a peer's own client chose to broadcast), and this is
  * the one place that decides what's trustworthy enough to surface.
  */
+/** A provider someone else owns: readable, but ending the session must not
+ * stop it or erase what it stored. */
+function borrowPersistence(owned: DocPersistence): DocPersistence {
+  return {
+    whenSynced: owned.whenSynced,
+    wasEmptyOnLoad: () => owned.wasEmptyOnLoad(),
+    destroy: async () => {},
+    forget: async () => {},
+    compact: owned.compact ? () => owned.compact!() : undefined,
+  };
+}
+
 export function parsePresenceState(clientId: number, state: unknown): PresenceInfo | null {
   const candidate = state as Partial<LocalPresenceInfo> | null;
   if (!candidate || typeof candidate.name !== "string" || typeof candidate.color !== "string") return null;
@@ -198,7 +269,29 @@ export function parsePresenceState(clientId: number, state: unknown): PresenceIn
     viewMode: typeof candidate.viewMode === "string" ? candidate.viewMode : null,
     focusedItemId: typeof candidate.focusedItemId === "string" ? candidate.focusedItemId : null,
     diagramPath: typeof candidate.diagramPath === "string" ? candidate.diagramPath : "",
+    // Untrusted and rendered directly, so validated rather than passed on.
+    gesture: parseGestureBroadcast(candidate.gesture),
+    edgeGesture: parseEdgeGestureBroadcast(candidate.edgeGesture),
+    // Anything other than an explicit true means "no replica known". See the
+    // field's own comment - assuming otherwise is the dangerous direction.
+    hasPersistedReplica: candidate.hasPersistedReplica === true,
   };
+}
+
+/**
+ * How many participants in this session - including this one - hold their own
+ * persisted copy (WS13-R10).
+ *
+ * `self` is passed separately because subscribeToPresence deliberately never
+ * includes this peer, and the question being answered here is "how many copies
+ * of this document exist", which very much includes ours.
+ */
+export function countPersistedReplicas(
+  peers: PresenceInfo[],
+  selfHasReplica: boolean,
+): number {
+  const others = peers.filter((p) => p.hasPersistedReplica).length;
+  return others + (selfHasReplica ? 1 : 0);
 }
 
 /**
@@ -231,11 +324,18 @@ export function startCollabSession(doc: Y.Doc, roomName: string, options: Collab
      * override the defaults with nothing, quietly turning "I didn't
      * configure this" into "use no ICE servers at all".
      */
-    ...(options.iceServers === undefined ? {} : { peerOpts: { config: { iceServers: options.iceServers } } }),
+    ...buildPeerOpts(options.iceServers),
   });
+
+  const persistence = options.existingPersistence
+    ? borrowPersistence(options.existingPersistence)
+    : options.persist === false
+      ? createNullPersistence(doc)
+      : attachPersistence(doc, persistenceKeyForRoom(roomName));
 
   return {
     provider,
+    persistence,
     isSynced: () => provider.room?.synced ?? false,
     disconnect: () => {
       /**
@@ -246,6 +346,10 @@ export function startCollabSession(doc: Y.Doc, roomName: string, options: Collab
        * - neither of which plain disconnect() does on its own.
        */
       provider.destroy();
+      // Deliberately does NOT clear the local replica. Leaving a session and
+      // discarding the only copy of the work must never be the same gesture -
+      // persistence.forget() is the separate, confirmed action (WS2-R6).
+      void persistence.destroy();
     },
     setLocalPresence: (info) => {
       provider.awareness.setLocalState(info);

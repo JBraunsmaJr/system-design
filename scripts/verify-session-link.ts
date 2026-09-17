@@ -1,65 +1,19 @@
 import { chromium } from "playwright";
-import { spawn } from "child_process";
-import { connect } from "net";
+import { startDevServers, type DevServers } from "./lib/devServers";
 
 const SIGNALING_PORT = 14447;
 const VITE_PORT = 5180;
 
-function tryConnect(host: string, port: number): Promise<boolean> {
-  return new Promise<boolean>((res) => {
-    const socket = connect({ host, port });
-    socket.setTimeout(1000);
-    const done = (ok: boolean) => { socket.destroy(); res(ok); };
-    socket.once("connect", () => done(true));
-    socket.once("timeout", () => done(false));
-    socket.once("error", () => done(false));
-  });
-}
-
-/**
- * Resolves once something is accepting connections on `port`, or throws after
- * `timeoutMs`.
- *
- * Probes IPv4 and IPv6 loopback separately and accepts either. Vite binds to
- * whatever "localhost" resolves to first, which is ::1 on GitHub Actions
- * runners and 127.0.0.1 on most dev machines - checking only one family makes
- * this hang for the full timeout against a server that is already up.
- */
-async function waitForPort(port: number, timeoutMs = 60000): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  for (;;) {
-    const results = await Promise.all([tryConnect("127.0.0.1", port), tryConnect("::1", port)]);
-    if (results.some(Boolean)) return;
-    if (Date.now() > deadline) {
-      throw new Error(`Timed out after ${timeoutMs}ms waiting for port ${port} on either 127.0.0.1 or ::1`);
-    }
-    await new Promise((res) => setTimeout(res, 250));
-  }
-}
-
 async function run() {
   console.log("Starting local signaling server and vite server...");
-  const signalingServer = spawn("node", ["node_modules/y-webrtc/bin/server.js"], {
-    env: { ...process.env, PORT: String(SIGNALING_PORT) },
-  });
-  signalingServer.stdout?.on("data", (d) => process.stdout.write(`[signaling] ${d}`));
-  signalingServer.stderr?.on("data", (d) => process.stderr.write(`[signaling] ${d}`));
-
-  // VITE_PERF_INSTRUMENTATION=1 is what defines window.__PERF__ (see
-  // src/perf/instrumentation.ts). Without it loadFixture() silently no-ops and
-  // the canvas stays empty, so the sync assertions below fail for the wrong
-  // reason. Do not rely on a local .env for this - it is gitignored.
-  const viteServer = spawn("npx", ["vite", "--port", String(VITE_PORT), "--strictPort"], {
-    shell: true,
-    env: { ...process.env, VITE_PERF_INSTRUMENTATION: "1" },
-  });
-  viteServer.stdout?.on("data", (d) => process.stdout.write(`[vite] ${d}`));
-  viteServer.stderr?.on("data", (d) => process.stderr.write(`[vite] ${d}`));
-
+  let servers: DevServers | undefined;
   let browser: import("playwright").Browser | undefined;
 
   try {
-    await Promise.all([waitForPort(SIGNALING_PORT), waitForPort(VITE_PORT)]);
+    // Shared with verify-document-browser.ts: refuses a port that is already
+    // serving (a leftover run would otherwise be tested instead of this
+    // checkout) and stops the whole process tree afterwards.
+    servers = await startDevServers({ vitePort: VITE_PORT, signalingPort: SIGNALING_PORT });
     console.log(`Signaling server on :${SIGNALING_PORT}, vite on :${VITE_PORT}`);
 
     browser = await chromium.launch({ headless: true });
@@ -95,7 +49,7 @@ async function run() {
     await page1.waitForSelector("#collab-panel-signaling-url", { timeout: 10000 });
 
     await page1.fill("#collab-panel-signaling-url", `ws://localhost:${SIGNALING_PORT}`);
-    await page1.click(".collab-panel__primary-action");
+    await page1.click(".collab-panel__primary-action:not(.collab-panel__resume)");
 
     // Open collab panel on page 1 to check active session
     await page1.click(".collab-panel__trigger");
@@ -187,8 +141,7 @@ async function run() {
     if (browser) {
       await browser.close().catch(() => {});
     }
-    viteServer.kill();
-    signalingServer.kill();
+    servers?.stop();
     process.exit(process.exitCode || 0);
   }
 }

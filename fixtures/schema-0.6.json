@@ -1,0 +1,398 @@
+{
+  "schemaVersion": "0.6",
+  "title": "Backward compatibility fixture",
+  "nodes": [
+    {
+      "id": "n-gateway",
+      "type": "typed",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "service",
+        "label": "API Gateway",
+        "description": "API Gateway description",
+        "properties": {
+          "owner": "platform-team",
+          "tier": "1"
+        },
+        "tags": [
+          "fixture"
+        ],
+        "color": "#4f46e5",
+        "zIndex": 2
+      }
+    },
+    {
+      "id": "n-auth",
+      "type": "typed",
+      "position": {
+        "x": 240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "service",
+        "label": "Auth Service",
+        "description": "Auth Service description",
+        "properties": {
+          "owner": "platform-team",
+          "tier": "1"
+        },
+        "tags": [
+          "fixture"
+        ],
+        "subDiagram": {
+          "nodes": [
+            {
+              "id": "l1-a",
+              "type": "typed",
+              "position": {
+                "x": 40,
+                "y": 40
+              },
+              "data": {
+                "nodeType": "service",
+                "label": "Credential Store",
+                "description": "Credential Store description",
+                "properties": {
+                  "owner": "platform-team",
+                  "tier": "1"
+                },
+                "tags": [
+                  "fixture"
+                ],
+                "subDiagram": {
+                  "nodes": [
+                    {
+                      "id": "l2-a",
+                      "type": "typed",
+                      "position": {
+                        "x": 40,
+                        "y": 40
+                      },
+                      "data": {
+                        "nodeType": "service",
+                        "label": "Token Validator",
+                        "description": "Token Validator description",
+                        "properties": {
+                          "owner": "platform-team",
+                          "tier": "1"
+                        },
+                        "tags": [
+                          "fixture"
+                        ]
+                      }
+                    }
+                  ],
+                  "edges": []
+                }
+              }
+            },
+            {
+              "id": "l1-b",
+              "type": "typed",
+              "position": {
+                "x": 260,
+                "y": 40
+              },
+              "data": {
+                "nodeType": "database",
+                "label": "Session Cache",
+                "description": "Session Cache description",
+                "properties": {
+                  "owner": "platform-team",
+                  "tier": "1"
+                },
+                "tags": [
+                  "fixture"
+                ]
+              }
+            }
+          ],
+          "edges": [
+            {
+              "id": "l1-e1",
+              "source": "l1-a",
+              "target": "l1-b",
+              "data": {
+                "label": "reads"
+              }
+            }
+          ]
+        },
+        "hasSubDiagram": true
+      }
+    },
+    {
+      "id": "n-db",
+      "type": "typed",
+      "position": {
+        "x": 480,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "database",
+        "label": "Primary Postgres",
+        "description": "Primary Postgres description",
+        "properties": {
+          "owner": "platform-team",
+          "tier": "1"
+        },
+        "tags": [
+          "fixture"
+        ]
+      }
+    },
+    {
+      "id": "n-note",
+      "type": "typed",
+      "position": {
+        "x": 0,
+        "y": 200
+      },
+      "data": {
+        "nodeType": "text",
+        "label": "Fixture annotation",
+        "description": "Fixture annotation description",
+        "properties": {
+          "owner": "platform-team",
+          "tier": "1"
+        },
+        "tags": [
+          "fixture"
+        ],
+        "textColor": "#111827",
+        "fontSize": 14
+      }
+    },
+    {
+      "id": "n-boundary",
+      "type": "typed",
+      "position": {
+        "x": -40,
+        "y": -60
+      },
+      "data": {
+        "nodeType": "group",
+        "label": "Trust Boundary",
+        "description": "Trust Boundary description",
+        "properties": {
+          "owner": "platform-team",
+          "tier": "1"
+        },
+        "tags": [
+          "fixture"
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "n-gateway",
+      "target": "n-auth",
+      "data": {
+        "label": "authenticates",
+        "edgeType": "sync"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "n-auth",
+      "target": "n-db",
+      "data": {
+        "label": "persists",
+        "edgeType": "async"
+      }
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "s1",
+      "title": "Login flow",
+      "steps": [
+        {
+          "id": "s1-1",
+          "title": "Request arrives",
+          "narration": "Client hits the gateway",
+          "path": [],
+          "focusNodeIds": [
+            "n-gateway"
+          ],
+          "focusEdgeIds": []
+        },
+        {
+          "id": "s1-2",
+          "title": "Validate",
+          "path": [],
+          "focusNodeIds": [
+            "n-auth"
+          ],
+          "focusEdgeIds": [
+            "e1"
+          ]
+        },
+        {
+          "id": "s1-3",
+          "title": "Check credentials",
+          "path": [
+            "n-auth"
+          ],
+          "focusNodeIds": [
+            "l1-a"
+          ],
+          "focusEdgeIds": [
+            "l1-e1"
+          ]
+        }
+      ]
+    }
+  ],
+  "requirements": {
+    "itemTypes": [
+      {
+        "id": "type-req",
+        "label": "Requirement",
+        "prefix": "REQ",
+        "color": "#7c3aed",
+        "isBuiltIn": true,
+        "isWorkable": false
+      },
+      {
+        "id": "type-ticket",
+        "label": "Ticket",
+        "prefix": "TICKET",
+        "color": "#2563eb",
+        "isBuiltIn": true,
+        "isWorkable": true
+      }
+    ],
+    "categories": [
+      {
+        "id": "cat-sec",
+        "label": "Security",
+        "color": "#dc2626"
+      }
+    ],
+    "items": [
+      {
+        "id": "REQ-1",
+        "typeId": "type-req",
+        "title": "Authentication overhaul",
+        "body": "Replace the legacy session mechanism. See #TICKET-1.",
+        "categoryId": "cat-sec"
+      },
+      {
+        "id": "TICKET-1",
+        "typeId": "type-ticket",
+        "title": "Token validation at the gateway",
+        "body": "Validate tokens before routing.",
+        "categoryId": "cat-sec",
+        "sprintId": "sp-1",
+        "assigneeId": "m-1",
+        "points": 5,
+        "status": "in-progress"
+      }
+    ],
+    "relationshipTypes": [
+      {
+        "id": "rt-blocks",
+        "label": "Blocks",
+        "inverseLabel": "Is blocked by",
+        "color": "#ef4444",
+        "isBuiltIn": true,
+        "isDependency": true
+      }
+    ],
+    "relationships": [
+      {
+        "id": "rel-1",
+        "typeId": "rt-blocks",
+        "fromItemId": "REQ-1",
+        "toItemId": "TICKET-1"
+      }
+    ],
+    "nextSequence": {
+      "type-req": 2,
+      "type-ticket": 2
+    }
+  },
+  "programIncrements": [
+    {
+      "id": "pi-1",
+      "name": "PI 2026.1",
+      "startDate": "2026-01-06",
+      "sprints": [
+        {
+          "id": "sp-1",
+          "name": "Sprint 1",
+          "durationDays": 14
+        },
+        {
+          "id": "sp-2",
+          "name": "Sprint 2",
+          "durationDays": 14
+        }
+      ],
+      "reservations": [
+        {
+          "id": "cr-1",
+          "name": "Risk buffer",
+          "unit": "percentage",
+          "value": 20,
+          "category": "risk"
+        },
+        {
+          "id": "cr-2",
+          "name": "Sprint 1 bug bash",
+          "unit": "points",
+          "value": 5,
+          "sprintId": "sp-1",
+          "category": "bugs"
+        }
+      ]
+    }
+  ],
+  "team": {
+    "members": [
+      {
+        "id": "m-1",
+        "name": "Fixture Engineer",
+        "role": "Engineer",
+        "avatarColor": "#0ea5e9",
+        "defaultPointsPerDay": 1.5,
+        "ptoSpans": [
+          {
+            "id": "pto-1",
+            "startDate": "2026-01-08",
+            "endDate": "2026-01-09",
+            "startHalfDay": "afternoon",
+            "endHalfDay": "full",
+            "note": "Appointment"
+          }
+        ]
+      },
+      {
+        "id": "m-2",
+        "name": "Second Member",
+        "ptoSpans": []
+      }
+    ],
+    "settings": {
+      "defaultPointsPerDay": 1,
+      "excludeUsHolidays": true,
+      "extraDaysOff": [
+        {
+          "id": "edo-1",
+          "name": "Company offsite",
+          "date": "2026-01-02",
+          "isHalfDay": false
+        }
+      ]
+    }
+  },
+  "metadata": {
+    "updatedAt": "2026-01-01T00:00:00.000Z"
+  }
+}

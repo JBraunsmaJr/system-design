@@ -8,6 +8,7 @@ import {
 } from "../../domain/milestones";
 import type { RequirementsDocument } from "../../domain/requirementsTypes";
 import { getItemType } from "../../domain/requirementsRegistry";
+import { HighlightedText, HighlightedTitle } from "../requirements/HighlightText";
 
 interface AddMilestoneModalProps {
   initialDate?: string;
@@ -295,14 +296,13 @@ export function AddMilestoneModal({
                           className="add-milestone-modal__item-id"
                           style={{ color: itemType?.color ?? "var(--accent)" }}
                         >
-                          {item.id}
+                          <HighlightedText text={item.id} search={itemSearch.trim()} />
                         </span>
-                        <span
+                        <HighlightedTitle
                           className="add-milestone-modal__item-title"
-                          title={item.title || "Untitled"}
-                        >
-                          {item.title || "Untitled"}
-                        </span>
+                          text={item.title || "Untitled"}
+                          search={itemSearch.trim()}
+                        />
                       </label>
                     );
                   })

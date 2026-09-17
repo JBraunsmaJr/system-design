@@ -14,6 +14,7 @@ import { BUILT_IN_ITEM_TYPES, BUILT_IN_RELATIONSHIP_TYPES } from "../domain/requ
 let failures = 0;
 function assert(cond: boolean, msg: string) {
   if (!cond) {
+    (globalThis as unknown as { process: { exitCode: number } }).process.exitCode = 1; // run-tests.ts reads the exit status
     console.error("FAIL:", msg);
     failures++;
   } else {
@@ -704,7 +705,7 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: RequirementsStore } {
     const dep1 = store.convertItemType(req2, "dependency");
     assert(dep1 === "DEP-1", `[${label}] REQ-2 converted to dependency becomes DEP-1`);
 
-    let snap = store.getSnapshot();
+    const snap = store.getSnapshot();
     const updatedRefItem = snap.items.find((i) => i.id === refItem);
     assert(
       updatedRefItem?.body === "This depends on #DEP-1 and has a link [#DEP-1](#ref:DEP-1) inside text.",
