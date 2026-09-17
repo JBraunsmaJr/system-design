@@ -37,6 +37,9 @@ const FILE = "file-doc-v1.json";
 // A string, not a function: tsx rewrites named functions with a helper that
 // does not exist inside the page.
 const FAKE_FILE_ACCESS = `(() => {
+  // Init scripts also run in documents without the file system API (the blank
+  // page a new tab starts on is not a secure context). Nothing to replace there.
+  if (typeof FileSystemHandle === "undefined" || !window.isSecureContext) return;
   const mode = () => localStorage.getItem("fake-permission") || "granted";
   const proto = FileSystemHandle.prototype;
   proto.queryPermission = async () => (mode() === "granted" ? "granted" : mode() === "denied" ? "denied" : "prompt");
@@ -105,6 +108,28 @@ async function waitForLabel(p: Page, label: string, timeout = 5000) {
     .then(() => true, () => false);
 }
 
+/**
+ * Full Chromium in headless mode where it is installed, rather than the
+ * stripped-down headless shell Playwright uses by default. Restoring a stored
+ * file handle closed the page under chrome-headless-shell on Windows; the
+ * File System Access paths this suite exercises belong to the full browser.
+ */
+async function launchBrowser(): Promise<Browser> {
+  try {
+    const full = await chromium.launch({ headless: true, channel: "chromium" });
+    console.log(`Using full Chromium ${full.version()} (headless)`);
+    return full;
+  } catch (error) {
+    console.log(`Full Chromium unavailable (${String(error).split("\n")[0]}); using the default headless browser.`);
+    return chromium.launch({ headless: true });
+  }
+}
+
+/** Makes a renderer crash a named failure instead of a later "page closed". */
+function watchForCrash(page: Page, label: string) {
+  page.on("crash", () => check(false, `the page crashed (${label})`));
+}
+
 async function run() {
   let servers: DevServers | undefined;
   let browser: Browser | undefined;
@@ -118,12 +143,13 @@ async function run() {
   };
   try {
     servers = await startDevServers({ vitePort: 5187, signalingPort: 14454, quiet: true });
-    browser = await chromium.launch({ headless: true });
+    browser = await launchBrowser();
     const app = `${servers.appUrl}/system-design/`;
 
     const ctx = await newContext();
     const p = await ctx.newPage();
     p.on("pageerror", (e) => check(false, `page threw: ${e.message}`));
+    watchForCrash(p, "main document page");
     await p.goto(`${app}?doc=filedoc`);
     await ready(p);
 

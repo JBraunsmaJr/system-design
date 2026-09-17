@@ -118,6 +118,13 @@ const derivedNodes = new WeakMap<
   { zIndex: number | undefined; measured: Node["measured"]; selected: boolean; hasSub: boolean; out: Node<ArchNodeData> }
 >();
 const derivedEdges = new WeakMap<Edge<ArchEdgeData>, { selected: boolean; out: Edge<ArchEdgeData> }>();
+/**
+ * The `data` object handed to each node, kept separately so that a change to
+ * only its measured size, selection or stacking - which gives the node a new
+ * object - does not also give it new `data`. Memoised node components compare
+ * `data` by identity, so this is what lets them skip those renders.
+ */
+const derivedNodeData = new WeakMap<Node<ArchNodeData>, { hasSub: boolean; data: ArchNodeData }>();
 
 let idSeed = 0;
 const nextId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${idSeed++}`;
@@ -1193,7 +1200,12 @@ function App() {
         if (hit && hit.zIndex === zIndex && hit.measured === measured && hit.selected === selected && hit.hasSub === hasSub) {
           out = hit.out;
         } else {
-          out = { ...n, zIndex, measured, selected, data: { ...n.data, hasSubDiagram: hasSub } };
+          let dataHit = derivedNodeData.get(n);
+          if (!dataHit || dataHit.hasSub !== hasSub) {
+            dataHit = { hasSub, data: { ...n.data, hasSubDiagram: hasSub } };
+            derivedNodeData.set(n, dataHit);
+          }
+          out = { ...n, zIndex, measured, selected, data: dataHit.data };
           derivedNodes.set(n, { zIndex, measured, selected, hasSub, out });
         }
         // In-flight geometry over the document's (WS4-R1, WS4-R3): this

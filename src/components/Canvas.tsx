@@ -1,4 +1,5 @@
 import {
+  memo,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -66,16 +67,24 @@ import type { PresenceInfo } from "../collab/session";
 import { CanvasContext, type CanvasContextValue } from "./CanvasContext";
 import { recordCanvasRender, registerPerfViewportFramer } from "../perf/instrumentation";
 
+/**
+ * Memoised, because React Flow renders a custom node or edge whenever it
+ * re-adopts it - including when only its measured size was handed back, which
+ * changes nothing the component draws. Unmemoised, every node rendered twice on
+ * mount (once, then again once measured), and how many of those second passes
+ * landed inside a short measurement window depended on timing: drill-in-out
+ * reported 450, 525 or 600 node renders from run to run.
+ */
 const CANVAS_NODE_TYPES: NodeTypes = {
-  typed: TypedNode,
-  group: GroupNode,
-  shape: ShapeNode,
-  text: TextNode,
-  code: CodeNode,
+  typed: memo(TypedNode),
+  group: memo(GroupNode),
+  shape: memo(ShapeNode),
+  text: memo(TextNode),
+  code: memo(CodeNode),
 };
 
 const CANVAS_EDGE_TYPES: EdgeTypes = {
-  typed: TypedEdge,
+  typed: memo(TypedEdge),
 };
 
 const DEFAULT_EDGE_OPTIONS = {
