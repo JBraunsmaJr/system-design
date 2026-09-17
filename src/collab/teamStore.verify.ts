@@ -22,6 +22,7 @@ import type { TeamMember } from "../domain/teamTypes";
 let failures = 0;
 function assert(cond: boolean, msg: string) {
   if (!cond) {
+    (globalThis as unknown as { process: { exitCode: number } }).process.exitCode = 1; // run-tests.ts reads the exit status
     console.error("FAIL:", msg);
     failures++;
   } else {
