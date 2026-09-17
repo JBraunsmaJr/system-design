@@ -59,11 +59,12 @@ import {
   validateReconnection,
   isSameEndpoints,
   type EdgeEnd,
+  draggedEndFromReconnectStart,
   type EdgeEndpoints,
 } from "../domain/edgeReconnect";
 import type { PresenceInfo } from "../collab/session";
 import { CanvasContext, type CanvasContextValue } from "./CanvasContext";
-import { recordCanvasRender } from "../perf/instrumentation";
+import { recordCanvasRender, registerPerfViewportFramer } from "../perf/instrumentation";
 
 const CANVAS_NODE_TYPES: NodeTypes = {
   typed: TypedNode,
@@ -217,6 +218,16 @@ export function Canvas({
 }: CanvasProps) {
   recordCanvasRender();
   const { screenToFlowPosition, getIntersectingNodes, fitView } = useReactFlow<Node<ArchNodeData>>();
+  // Perf harness only (a no-op unless instrumented): lets scenarios frame the
+  // nodes they are about to drag. Immediate rather than animated, and never
+  // zoomed past 1, so a single node is shown at its natural size.
+  useEffect(
+    () =>
+      registerPerfViewportFramer((nodeIds) => {
+        void fitView({ nodes: nodeIds.map((id) => ({ id })), padding: 0.25, maxZoom: 1, duration: 0 });
+      }),
+    [fitView]
+  );
   const updateNodeInternals = useUpdateNodeInternals();
   const nodesRef = useRef(nodes);
   useLayoutEffect(() => {
@@ -352,8 +363,8 @@ export function Canvas({
   );
 
   /**
-   * Which END of the edge is being dragged. React Flow reports it to
-   * onReconnectStart and then doesn't mention it again, but onReconnect
+   * Which END of the edge is being dragged. React Flow reports it (inverted)
+   * to onReconnectStart and then doesn't mention it again, but onReconnect
    * can't be interpreted without it - see handleReconnect. Same ref
    * pattern, and for much the same reason, as connectStartNodeId above.
    */
@@ -361,7 +372,9 @@ export function Canvas({
 
   const handleReconnectStart = useCallback(
     (_event: ReactMouseEvent, _edge: Edge<ArchEdgeData>, handleType: HandleType) => {
-      reconnectEndRef.current = handleType === "source" ? "source" : "target";
+      // handleType is the ANCHORED end's type, not the dragged end's - see
+      // draggedEndFromReconnectStart.
+      reconnectEndRef.current = draggedEndFromReconnectStart(handleType);
     },
     []
   );
@@ -796,6 +809,11 @@ export function Canvas({
           nodesDraggable={!isPresenting}
           nodesConnectable={!isPresenting}
           edgesReconnectable={!isPresenting}
+          // Raise the selected edge above the rest. React Flow renders endpoint
+          // updaters for every edge, and where two edges meet at one handle the
+          // later edge's updater covered the selected edge's - so dragging the
+          // end of the edge you had selected picked up a different edge.
+          elevateEdgesOnSelect
           elementsSelectable={!isPresenting}
           panOnDrag={!isSelectMode}
           selectionOnDrag={isSelectMode}

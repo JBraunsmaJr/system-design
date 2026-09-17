@@ -74,7 +74,7 @@ async function run() {
     for (const [name, p] of [["A", a], ["B", b]] as const) {
       p.on("pageerror", (e) => {
         failures++;
-        console.error(`  FAIL: page ${name} threw: ${e.message}`);
+        console.error(`  FAIL: page ${name} threw: ${e.message}\n${(e.stack ?? "").split("\n").slice(0, 8).join("\n")}`);
       });
     }
 
@@ -111,6 +111,59 @@ async function run() {
     await a.click('button[aria-label="Undo"]');
     await sleep(150);
     check((await titleOf(a)) === fixture.title, "Undo reverts the rename");
+
+    console.log("\n=== Dragging an edge end reconnects it ===");
+    // Regression: onReconnectStart's handleType is the ANCHORED end, and
+    // reading it as the dragged end made every reconnection a silent no-op.
+    const edgeLabel = (id: string) => a.getAttribute(`.react-flow__edge[data-id="${id}"]`, "aria-label");
+    const originalLabel = await edgeLabel("e1");
+    await a.evaluate(`window.__PERF__.setSelectedEdges(["e1"])`);
+    await sleep(200);
+    const grab = await a.evaluate(() => {
+      const el = document.querySelector('.react-flow__edge[data-id="e1"] .react-flow__edgeupdater-target');
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      for (const fx of [0.5, 0.3, 0.7]) for (const fy of [0.5, 0.3, 0.7]) {
+        const x = r.left + r.width * fx, y = r.top + r.height * fy;
+        if (document.elementFromPoint(x, y) === el) return { x, y };
+      }
+      return null;
+    });
+    // Just inside n-db from one of its handles: within React Flow's connection
+    // radius, but over the node body rather than on top of the stacked handles.
+    const drop = await a.evaluate(() => {
+      const node = document.querySelector('.react-flow__node[data-id="n-db"]');
+      const handle = node?.querySelector(".react-flow__handle");
+      if (!node || !handle) return null;
+      const n = node.getBoundingClientRect();
+      const h = handle.getBoundingClientRect();
+      const hx = h.left + h.width / 2, hy = h.top + h.height / 2;
+      const cx = n.left + n.width / 2, cy = n.top + n.height / 2;
+      const d = Math.hypot(cx - hx, cy - hy) || 1;
+      return { x: hx + ((cx - hx) / d) * 8, y: hy + ((cy - hy) / d) * 8 };
+    });
+    if (!grab) {
+      console.error("    e1 updater:", await a.evaluate(() => {
+        const el = document.querySelector('.react-flow__edge[data-id="e1"] .react-flow__edgeupdater-target');
+        if (!el) return "not rendered: " + Array.from(document.querySelectorAll('.react-flow__edge[data-id="e1"] *')).map((e) => (e as SVGElement).className?.baseVal ?? e.tagName).join(",");
+        const r = el.getBoundingClientRect();
+        const h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) as HTMLElement | null;
+        return `covered by ${h?.tagName}.${(h as unknown as SVGElement)?.className?.baseVal ?? h?.className} in node ${h?.closest(".react-flow__node")?.getAttribute("data-id") ?? "-"}`;
+      }));
+    }
+    check(grab !== null && drop !== null, "e1's target end and n-db are both reachable");
+    if (grab && drop) {
+      await a.mouse.move(grab.x, grab.y);
+      await a.mouse.down();
+      for (let i = 1; i <= 10; i++) await a.mouse.move(grab.x + ((drop.x - grab.x) * i) / 10, grab.y + ((drop.y - grab.y) * i) / 10);
+      await a.mouse.up();
+      await sleep(200);
+      check((await edgeLabel("e1")) === "Edge from n-gateway to n-db", `e1 now ends at n-db (was: ${originalLabel})`);
+      await a.click(".react-flow__pane", { position: { x: 5, y: 5 } });
+      await a.keyboard.press("Control+z");
+      await sleep(200);
+      check((await edgeLabel("e1")) === originalLabel, "one undo reverts the reconnection");
+    }
 
     console.log("\n=== Starting a session leaves the canvas unchanged (WS1-R4) ===");
     const before = await nodeCount(a);

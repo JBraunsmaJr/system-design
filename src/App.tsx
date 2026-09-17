@@ -70,7 +70,7 @@ import { createSessionLink, parseSessionLink, generateSessionKey, sanitizeCurren
 import { Toast, type ToastType } from "./components/Toast";
 import { applyZOrderCommand, computeEffectiveZIndices, type ZOrderCommand } from "./domain/zOrder";
 import { classifyNodeChanges, applySelectionChanges, isAutoSizedNodeType, type PendingNodeUpdate, type CurrentNodeGeometry } from "./domain/nodeChangeBatching";
-import { recordCommit, isPerfInstrumentationActive } from "./perf/instrumentation";
+import { recordCommit, isPerfInstrumentationActive, isPerfAutosaveSuppressed } from "./perf/instrumentation";
 import { getStandardFixture, type FixtureName } from "./perf/fixtures";
 import "./App.css";
 
@@ -748,6 +748,9 @@ function App() {
   const [autosaveFailure, setAutosaveFailure] = useState(getAutosaveFailure);
   const [autosaveBlocked, setAutosaveBlocked] = useState(getAutosaveBlockedReason);
   useEffect(() => {
+    // The perf harness measures editing, not autosave - see
+    // isPerfAutosaveSuppressed. Always false outside instrumented builds.
+    if (isPerfAutosaveSuppressed()) return;
     const timer = setTimeout(() => {
       // Export boundary: built once per debounced write, not once per change.
       const tree = unflattenToSubDiagram(diagramSnapshot.nodes, diagramSnapshot.edges);

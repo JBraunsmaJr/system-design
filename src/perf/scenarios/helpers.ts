@@ -157,6 +157,11 @@ export async function setupFixture(page: Page, fixtureName: FixtureName): Promis
   await page.evaluate(`
     (() => {
       const perfObj = window.__PERF__;
+      // Before the load, so the load itself never schedules an autosave that
+      // could land inside the measurement window.
+      if (perfObj && typeof perfObj.suppressAutosave === "function") {
+        perfObj.suppressAutosave(true);
+      }
       if (perfObj && typeof perfObj.loadFixture === "function") {
         perfObj.loadFixture("${fixtureName}");
       }
@@ -164,6 +169,96 @@ export async function setupFixture(page: Page, fixtureName: FixtureName): Promis
   `);
 
   await settleCanvas(page, 4);
+}
+
+/**
+ * Frames `nodeIds` in the viewport, at no more than zoom 1.
+ *
+ * Call before resetCounters: the viewport change renders, and that render is
+ * setup, not the work being measured. Throws if the app did not register the
+ * hook, rather than letting a scenario drag at off-screen coordinates - which
+ * is what every drag scenario was silently doing.
+ */
+export async function frameNodes(page: Page, nodeIds: string[]): Promise<void> {
+  const framed = await page.evaluate(
+    (ids) => (window as unknown as { __PERF__?: { frameNodes?: (ids: string[]) => boolean } }).__PERF__?.frameNodes?.(ids) ?? false,
+    nodeIds
+  );
+  if (!framed) {
+    throw new Error("window.__PERF__.frameNodes is unavailable - the canvas has not registered its viewport hook.");
+  }
+  await settleCanvas(page, 4);
+}
+
+/**
+ * The centre of the element matching `selector`, verified to be what the
+ * browser would actually deliver a pointer event to.
+ *
+ * `locator.boundingBox()` happily returns coordinates for an element that is
+ * off-screen or covered, so a drag aimed at them moves the mouse over nothing
+ * and the scenario reports zeros that read as a perfect score. This is the
+ * same check `findEmptyCanvasPoint` makes for pans, applied to drag targets.
+ */
+export async function pointOnTarget(
+  page: Page,
+  selector: string,
+  options: {
+    /** Also accept a hit on any element matching this selector - for targets
+     * that are interchangeable for what the scenario measures. */
+    orAnyOf?: string;
+  } = {}
+): Promise<{ x: number; y: number }> {
+  const result = await page.evaluate(({ sel, orAnyOf }) => {
+    const target = document.querySelector(sel);
+    if (!target) return { error: `no element matches ${sel}` };
+    const r = target.getBoundingClientRect();
+    const x = r.left + r.width / 2;
+    const y = r.top + r.height / 2;
+    const hits = (px: number, py: number) => {
+      const el = document.elementFromPoint(px, py);
+      return el !== null && (el === target || target.contains(el) || (orAnyOf !== undefined && el.matches(orAnyOf)));
+    };
+    if (hits(x, y)) return { x, y };
+    // Something may cover the centre (a hub node's edge labels do). Try a grid
+    // of interior points, nearest the centre first, before giving up.
+    const candidates: { x: number; y: number }[] = [];
+    // Dense along x, since some targets are thin strips (a group's edge hit
+    // area) crossed by edge paths at arbitrary points.
+    const fxs = Array.from({ length: 19 }, (_, i) => 0.5 + (i % 2 === 0 ? 1 : -1) * Math.ceil(i / 2) * 0.05);
+    for (const fx of fxs) {
+      for (const fy of [0.5, 0.3, 0.7, 0.15, 0.85]) {
+        candidates.push({ x: r.left + r.width * fx, y: r.top + r.height * fy });
+      }
+    }
+    const found = candidates.find((c) => hits(c.x, c.y));
+    if (found) return found;
+    const hit = document.elementFromPoint(x, y);
+    const describe = (el: Element | null) =>
+      el ? `${el.tagName.toLowerCase()}${el.className && typeof el.className === "string" ? "." + el.className.trim().split(/\s+/).join(".") : ""}` : "nothing (off-screen)";
+    return {
+      error:
+        `${sel} is not under the pointer at its centre (${Math.round(x)},${Math.round(y)}); ` +
+        `the browser would deliver the event to ${describe(hit)}. Frame it with frameNodes first.`,
+    };
+  }, { sel: selector, orAnyOf: options.orAnyOf });
+  if ("error" in result) throw new Error(result.error);
+  return result;
+}
+
+/**
+ * Fails when a drag that should have committed wrote nothing.
+ *
+ * Since gestures became ephemeral (WS4-R1/R2), a completed drag writes to the
+ * document exactly once, at the end. Zero writes therefore means the gesture
+ * never happened, and the scenario's other counters describe an idle page.
+ */
+export async function assertGestureCommitted(page: Page, what: string): Promise<void> {
+  const writes = await page.evaluate(
+    () => (window as unknown as { __PERF__: { getCounters: () => { storeWrites: number } } }).__PERF__.getCounters().storeWrites
+  );
+  if (writes === 0) {
+    throw new Error(`${what} wrote nothing to the document, so the gesture never took effect and this run measured nothing.`);
+  }
 }
 
 /**
@@ -245,4 +340,35 @@ export async function dragCoordinates(
 
   await page.mouse.up();
   await settleCanvas(page, 2);
+}
+
+/**
+ * A point where some edge's endpoint updater is genuinely the topmost element,
+ * searching updaters in DOM order (stable for a given fixture and viewport).
+ *
+ * React Flow renders an updater for every edge and does not raise the selected
+ * edge, so in a dense diagram a particular edge's endpoint is usually covered
+ * by another edge's updater, interaction path or label. Any updater exercises
+ * the same reconnection path, which is what the scenario protects.
+ */
+export async function findGrabbableUpdater(page: Page): Promise<{ x: number; y: number }> {
+  const point = await page.evaluate(() => {
+    const pane = document.querySelector(".react-flow__pane")?.getBoundingClientRect();
+    if (!pane) return null;
+    for (const el of Array.from(document.querySelectorAll(".react-flow__edgeupdater"))) {
+      const r = el.getBoundingClientRect();
+      if (r.width === 0 || r.left < pane.left + 20 || r.right > pane.right - 20 || r.top < pane.top + 20 || r.bottom > pane.bottom - 20) continue;
+      for (const fx of [0.5, 0.25, 0.75]) {
+        for (const fy of [0.5, 0.25, 0.75]) {
+          const x = r.left + r.width * fx;
+          const y = r.top + r.height * fy;
+          const hit = document.elementFromPoint(x, y);
+          if (hit && hit.classList.contains("react-flow__edgeupdater")) return { x, y };
+        }
+      }
+    }
+    return null;
+  });
+  if (!point) throw new Error("No edge endpoint updater is grabbable anywhere in the framed viewport.");
+  return point;
 }

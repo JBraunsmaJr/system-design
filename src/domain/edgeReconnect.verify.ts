@@ -16,6 +16,7 @@ import {
   normalizeReconnection,
   validateReconnection,
   isSameEndpoints,
+  draggedEndFromReconnectStart,
   type EdgeEndpoints,
 } from "./edgeReconnect";
 
@@ -209,6 +210,23 @@ const original: EdgeEndpoints = {
     !isSameEndpoints(original, { ...original, targetHandle: "top" }),
     "while a genuinely different handle does"
   );
+}
+
+console.log("\n=== onReconnectStart reports the ANCHORED end ===");
+{
+  // Pinned to what @xyflow/react actually does (EdgeUpdateAnchors passes
+  // oppositeHandle.type). If an upgrade changes that, this is where it shows.
+  assert(draggedEndFromReconnectStart("source") === "target", "dragging the target updater reports 'source' - the anchored end");
+  assert(draggedEndFromReconnectStart("target") === "source", "dragging the source updater reports 'target'");
+
+  // End to end through the no-op guard, as Canvas.handleReconnect runs it:
+  // the target end of api->db dragged onto cache.
+  const edge = { source: "api", sourceHandle: "right", target: "db", targetHandle: "left" };
+  const connection = { source: "api", sourceHandle: "right", target: "cache", targetHandle: "left" };
+  const next = normalizeReconnection(edge, connection, draggedEndFromReconnectStart("source"));
+  assert(!isSameEndpoints(edge, next) && next.target === "cache" && next.source === "api", "the dragged target end moves to cache");
+  const inverted = normalizeReconnection(edge, connection, "source");
+  assert(isSameEndpoints(edge, inverted), "(reading handleType as the dragged end rebuilds the original edge - the bug)");
 }
 
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);

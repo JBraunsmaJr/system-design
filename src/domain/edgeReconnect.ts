@@ -21,9 +21,25 @@ export interface EdgeEndpoints {
   targetHandle?: string | null;
 }
 
-/** Which end of the edge is being dragged - React Flow reports this to
- * onReconnectStart as its `handleType` argument. */
+/** Which end of the edge is being dragged. */
 export type EdgeEnd = "source" | "target";
+
+/**
+ * The end being dragged, from the `handleType` React Flow passes to
+ * `onReconnectStart`.
+ *
+ * React Flow passes the type of the OPPOSITE end - the one that stays put -
+ * not the end under the pointer: `onReconnectStart?.(event, edge,
+ * oppositeHandle.type)` in @xyflow/react's EdgeUpdateAnchors, where dragging
+ * the target updater anchors on `{ type: 'source' }`. Reading it as the
+ * dragged end inverted every reconnection: normalizeReconnection pinned the
+ * end that moved, rebuilt the original endpoints, and the no-op guard
+ * discarded the gesture - so dragging an edge end onto another node did
+ * nothing at all.
+ */
+export function draggedEndFromReconnectStart(anchoredHandleType: string | null | undefined): EdgeEnd {
+  return anchoredHandleType === "source" ? "target" : "source";
+}
 
 /** Handles are `string | null | undefined` depending on who produced
  * them; null and undefined both mean "the node's default handle". */
