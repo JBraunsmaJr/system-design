@@ -110,6 +110,14 @@ The harness tests 13 core interaction scenarios:
 9. `create-waypoint`: Drag an edge insertion handle to create a bend. Protects insertion drag path.
 10. `reconnect-edge`: Drag an edge endpoint to reconnect to another node. Protects reconnection validation.
 
+The harness starts its own signaling relay for the session scenarios
+(`remote-burst`, `remote-during-drag`) and stops it at the end, so no relay
+configuration is needed to run the suite anywhere - previously a developer's
+`VITE_SIGNALING_URL` supplied it, and CI, having none, failed at the first
+session scenario. Override the port with `PERF_RELAY_PORT` if 14459 is taken.
+No traffic leaves the machine: the relay is local and the scenarios have no
+second peer.
+
 Every drag scenario frames its target with `__PERF__.frameNodes` before
 measuring, checks with `elementFromPoint` that the target really is under the
 pointer, and fails if the gesture wrote nothing to the document. Fixtures are

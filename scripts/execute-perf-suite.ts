@@ -227,6 +227,66 @@ async function ensurePreviewServer(): Promise<{ process: ChildProcess | null; ur
   throw new Error(`Timeout waiting for preview server on port ${previewPort}.\nCaptured output:\n${serverOutput || "(none)"}`);
 }
 
+/** Terminates a spawned server and anything it started, on either platform. */
+function stopServer(child: ChildProcess | null): void {
+  if (!child || child.pid === undefined) return;
+  if (process.platform === "win32") {
+    try {
+      spawnSync("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+    } catch {
+      child.kill();
+    }
+  } else {
+    try {
+      process.kill(-child.pid, "SIGTERM");
+    } catch {
+      child.kill("SIGKILL");
+    }
+  }
+}
+
+/**
+ * The harness's own signaling relay.
+ *
+ * The session scenarios call startCollabSession, which refuses to run without
+ * a self-hosted relay URL rather than falling back to y-webrtc's public
+ * servers. Developers had been supplying one through the environment, so this
+ * only failed where nobody had: CI. The harness now starts its own on a
+ * private port, hands it to the page as runtime config, and stops it
+ * afterwards - no ambient configuration, and no traffic leaving the machine.
+ */
+async function startRelay(port: number): Promise<{ process: ChildProcess; url: string }> {
+  console.log(`📡 Starting signaling relay on port ${port}...`);
+  const relay = spawn(process.execPath, ["node_modules/y-webrtc/bin/server.js"], {
+    cwd: rootDir,
+    stdio: "pipe",
+    detached: process.platform !== "win32",
+    env: { ...process.env, PORT: String(port) },
+  });
+  let output = "";
+  relay.stdout?.on("data", (c) => (output += c.toString()));
+  relay.stderr?.on("data", (c) => (output += c.toString()));
+  let exited = false;
+  relay.on("exit", (code) => {
+    exited = true;
+    output += `\n(relay exited with code ${code})`;
+  });
+
+  const start = Date.now();
+  while (Date.now() - start < 15000) {
+    if (exited) throw new Error(`Signaling relay exited prematurely:\n${output}`);
+    const host = await findWorkingHost(port);
+    if (host) {
+      const url = `ws://${host}:${port}`;
+      console.log(`✅ Relay is ready at ${url}`);
+      return { process: relay, url };
+    }
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  stopServer(relay);
+  throw new Error(`Timeout waiting for the signaling relay on port ${port}.\nCaptured output:\n${output || "(none)"}`);
+}
+
 function calculateMedian(values: number[]): number {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((a, b) => a - b);
@@ -240,11 +300,17 @@ async function runSuite() {
   console.log("==================================================\n");
 
   let previewServerProcess: ChildProcess | null = null;
+  let relayProcess: ChildProcess | null = null;
   let browser: Browser | null = null;
 
   try {
     const { process: serverProc, url: resolvedBaseURL } = await ensurePreviewServer();
     previewServerProcess = serverProc;
+
+    // Its own relay, so the session scenarios need no ambient configuration.
+    const relayPort = Number(process.env.PERF_RELAY_PORT ?? 14459);
+    const { process: relayProc, url: relayUrl } = await startRelay(relayPort);
+    relayProcess = relayProc;
 
     console.log("⏱️  Running standalone CPU calibration benchmark (PERF-M-3)...");
     const cpuCalibrationMs = runCpuCalibration(2_000_000);
@@ -277,6 +343,8 @@ async function runSuite() {
         const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
         await page.addInitScript(`
           window.__name = function(target, name) { return target; };
+          // The relay this run started, as deployment config would supply it.
+          window.__APP_CONFIG__ = Object.assign({}, window.__APP_CONFIG__, { RELAY: ${JSON.stringify(relayUrl)} });
         `);
         await page.goto(resolvedBaseURL, { waitUntil: "networkidle" });
         await page.waitForSelector(".react-flow__pane", { timeout: 10000 });
@@ -425,21 +493,8 @@ async function runSuite() {
         // ignore
       }
     }
-    if (previewServerProcess?.pid !== undefined) {
-      if (process.platform === "win32") {
-        try {
-          spawnSync("taskkill", ["/pid", String(previewServerProcess.pid), "/T", "/F"], { stdio: "ignore" });
-        } catch {
-          previewServerProcess.kill();
-        }
-      } else {
-        try {
-          process.kill(-previewServerProcess.pid, "SIGTERM");
-        } catch {
-          previewServerProcess.kill("SIGKILL");
-        }
-      }
-    }
+    stopServer(previewServerProcess);
+    stopServer(relayProcess);
   }
 }
 
