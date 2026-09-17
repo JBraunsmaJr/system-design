@@ -42,6 +42,13 @@ if (allTestFiles.length === 0) {
 
 console.log(`\nRunning ${allTestFiles.length} test suite(s)...\n`);
 
+/**
+ * Failure lines the suites in this repo print. Anchored to the start of a
+ * line and upper-case, so descriptive text such as "a failing provider ..."
+ * does not match.
+ */
+const FAILURE_MARKERS = [/^\s*FAIL\b[:\s]/m, /^\s*\d+ FAILURE\(S\)/m, /^\s*\d+ assertion\(s\) failed/m, /^\s*\d+ check\(s\) failed/m];
+
 let passedCount = 0;
 let failedCount = 0;
 const failedSuites: { file: string; output: string }[] = [];
@@ -64,12 +71,21 @@ for (const filePath of allTestFiles) {
 
   const duration = ((Date.now() - startTime) / 1000).toFixed(2);
 
-  if (result.status === 0) {
+  const combined = (result.stdout || "") + (result.stderr || "");
+  // A suite that prints a failure but exits 0 still failed. Suites here use
+  // hand-rolled assert helpers, and one that forgot to set an exit code hid
+  // three failing assertions for weeks while this runner reported PASS.
+  const reportedFailure = FAILURE_MARKERS.some((re) => re.test(combined));
+
+  if (result.status === 0 && !reportedFailure) {
     passedCount++;
     console.log(` PASS  ${relPath} (${duration}s)`);
   } else {
     failedCount++;
-    console.error(` FAIL  ${relPath} (${duration}s)`);
+    console.error(
+      ` FAIL  ${relPath} (${duration}s)` +
+        (result.status === 0 ? " - exited 0 but printed a failure; the suite must set a non-zero exit code" : "")
+    );
     const output = (result.stdout || "") + (result.stderr || "");
     failedSuites.push({ file: relPath, output });
     if (output.trim()) {

@@ -69,6 +69,7 @@ import { loadIceServers, saveIceServers, parseIceServers, getDefaultIceServers }
 import { createSessionLink, parseSessionLink, generateSessionKey, sanitizeCurrentUrl } from "./domain/sessionLink";
 import { Toast, type ToastType } from "./components/Toast";
 import { applyZOrderCommand, computeEffectiveZIndices, type ZOrderCommand } from "./domain/zOrder";
+import { mergeInFlight, applyInFlight, remoteInFlight, toBroadcast, NO_IN_FLIGHT, type InFlightMap } from "./domain/gestureGeometry";
 import { classifyNodeChanges, applySelectionChanges, isAutoSizedNodeType, type PendingNodeUpdate, type CurrentNodeGeometry } from "./domain/nodeChangeBatching";
 import { recordCommit, isPerfInstrumentationActive, isPerfAutosaveSuppressed } from "./perf/instrumentation";
 import { getStandardFixture, type FixtureName } from "./perf/fixtures";
@@ -907,8 +908,11 @@ function App() {
       perfObj.leaveCollabSession = () => {
         leaveSession();
       };
+      // Encoded size of the document on screen - how WS4-R1 is checked
+      // ("a drag adds no more than 1KB").
+      perfObj.docBytes = () => Y.encodeStateAsUpdate(activeDoc).byteLength;
     }
-  }, [diagramStore, setPath, signalingUrls, iceServers, leaveSession]);
+  }, [diagramStore, setPath, signalingUrls, iceServers, leaveSession, activeDoc]);
 
   const breadcrumbLabels = useMemo(
     () => getBreadcrumbLabelsFlat(diagramSnapshot.nodes, path),
@@ -950,6 +954,19 @@ function App() {
   // instead, using selectedNodeIds/selectedEdgeIds as the sole source of
   // truth. This replaces what used to be tracked as a `.selected` field
   // persisted directly on the node/edge objects themselves.
+  /**
+   * Geometry of nodes this user is dragging or resizing right now (WS4-R1).
+   * Rendered over the document and broadcast to peers, but not written to the
+   * document until the gesture ends - see flushPendingNodeUpdates.
+   */
+  const [inFlight, setInFlight] = useState<InFlightMap>(NO_IN_FLIGHT);
+  const inFlightRef = useRef<InFlightMap>(NO_IN_FLIGHT);
+  /** Other peers' in-flight geometry at this level (WS4-R3). */
+  const peerInFlight = useMemo(
+    () => (activeSession ? remoteInFlight(presencePeers, path.join("/")) : NO_IN_FLIGHT),
+    [activeSession, presencePeers, path]
+  );
+
   const subDiagramLevels = useMemo(() => populatedLevels(diagramSnapshot.nodes), [diagramSnapshot]);
   const { nodes, edges } = useMemo(() => {
     const rawNodes = reorderWithGroupsFirst(getNodesAtPath(diagramSnapshot.nodes, path));
@@ -993,12 +1010,17 @@ function App() {
         // Same inputs, same object (WS1-R8): React Flow skips a node whose
         // object is identical to last time, and re-renders it otherwise.
         const hit = derivedNodes.get(n);
+        let out: Node<ArchNodeData>;
         if (hit && hit.zIndex === zIndex && hit.measured === measured && hit.selected === selected && hit.hasSub === hasSub) {
-          return hit.out;
+          out = hit.out;
+        } else {
+          out = { ...n, zIndex, measured, selected, data: { ...n.data, hasSubDiagram: hasSub } };
+          derivedNodes.set(n, { zIndex, measured, selected, hasSub, out });
         }
-        const out = { ...n, zIndex, measured, selected, data: { ...n.data, hasSubDiagram: hasSub } };
-        derivedNodes.set(n, { zIndex, measured, selected, hasSub, out });
-        return out;
+        // In-flight geometry over the document's (WS4-R1, WS4-R3): this
+        // user's own gesture first, since they are the one holding the node.
+        // Only the moving nodes get a new object, so only they re-render.
+        return applyInFlight(out, inFlight.get(n.id) ?? peerInFlight.get(n.id));
       }),
       edges: rawEdges.map((e) => {
         const selected = selectedEdges.has(e.id);
@@ -1009,7 +1031,7 @@ function App() {
         return out;
       }),
     };
-  }, [diagramSnapshot, subDiagramLevels, path, selectedNodeIds, selectedEdgeIds, measuredDimensions]);
+  }, [diagramSnapshot, subDiagramLevels, path, selectedNodeIds, selectedEdgeIds, measuredDimensions, inFlight, peerInFlight]);
 
   // Only position/dimensions changes need to reach the store - selection
   // changes are handled separately (and more robustly, since it's the
@@ -1032,22 +1054,86 @@ function App() {
   // each other (only the latest position/size within the frame ever
   // gets committed) - correctly handles dragging several selected nodes
   // together too, since each gets its own independent pending entry.
+  const nodesRef = useRef(nodes);
+  useLayoutEffect(() => {
+    nodesRef.current = nodes;
+  }, [nodes]);
+
   const pendingNodeUpdates = useRef(new Map<string, PendingNodeUpdate>());
+  /** Reparents requested while a gesture's commit is pending (a node dropped
+   * into a group), applied last inside that commit - see onReparentNode. */
+  const pendingReparents = useRef(new Map<string, string | undefined>());
+  const commitScheduled = useRef(false);
   const pendingFlushHandle = useRef<number | null>(null);
 
+  /**
+   * Folds this frame's pending geometry into the in-flight overlay and
+   * broadcasts it - nothing reaches the document mid-gesture (WS4-R1).
+   */
   const flushPendingNodeUpdates = useCallback(() => {
     pendingFlushHandle.current = null;
     const pending = pendingNodeUpdates.current;
     if (pending.size === 0) return;
-    for (const [id, update] of pending) {
-      if (update.type === "position") {
-        diagramStore.updatePosition(id, update.position);
-      } else {
-        diagramStore.updateDimensions(id, update.width, update.height);
-      }
-    }
+    const next = mergeInFlight(inFlightRef.current, pending);
     pending.clear();
-  }, [diagramStore]);
+    inFlightRef.current = next;
+    setInFlight(next);
+    broadcastPresence({ gesture: toBroadcast(path.join("/"), next) });
+  }, [broadcastPresence, path]);
+
+  /**
+   * Ends a gesture: every node it moved or resized is written exactly once
+   * (WS4-R2), in ONE transaction under the undo origin, so peers receive one
+   * update and the whole gesture is one undo step. Also the path for
+   * standalone changes (an arrow-key nudge, a snap correction), which have no
+   * overlay and simply commit.
+   */
+  const commitNodeGesture = useCallback(() => {
+    commitScheduled.current = false;
+    const pending = pendingNodeUpdates.current;
+    const final = mergeInFlight(inFlightRef.current, pending);
+    pending.clear();
+    const reparents = new Map(pendingReparents.current);
+    pendingReparents.current.clear();
+    if (final.size > 0 || reparents.size > 0) {
+      undo.transact(() => {
+        for (const [id, g] of final) {
+          // A reparented node's position is written by updateParentId below,
+          // relative to its new parent - writing it here as well would be a
+          // second write for the same node.
+          if (g.position && !reparents.has(id)) diagramStore.updatePosition(id, g.position);
+          if (g.width !== undefined || g.height !== undefined) diagramStore.updateDimensions(id, g.width, g.height);
+        }
+        // Relative positions are derived here, from the geometry this commit
+        // is writing - the last rendered frame can be a frame or two behind
+        // the release, which put the node visibly off from where it was
+        // dropped.
+        const rendered = nodesRef.current;
+        const withFinal = (n: Node<ArchNodeData>) => {
+          const g = final.get(n.id);
+          return g?.position ? { ...n, position: g.position } : n;
+        };
+        const current = rendered.map(withFinal);
+        for (const [id, parentId] of reparents) {
+          const node = current.find((n) => n.id === id);
+          if (!node) continue;
+          const absolute = toAbsolutePosition(node, current, node.parentId);
+          const parent = parentId ? current.find((n) => n.id === parentId) : undefined;
+          const position = parent
+            ? { x: absolute.x - parent.position.x, y: absolute.y - parent.position.y }
+            : absolute;
+          diagramStore.updateParentId(id, parentId, position);
+        }
+      });
+    }
+    // Cleared in the same batch as the store notification above, so no frame
+    // shows the node back at its old position.
+    if (inFlightRef.current.size > 0) {
+      inFlightRef.current = NO_IN_FLIGHT;
+      setInFlight(NO_IN_FLIGHT);
+      broadcastPresence({ gesture: null });
+    }
+  }, [undo, diagramStore, broadcastPresence]);
 
   // Cancels any still-pending animation frame if the component unmounts
   // mid-gesture, so a stale callback can never fire against a store that
@@ -1058,11 +1144,6 @@ function App() {
       if (pendingFlushHandle.current !== null) cancelAnimationFrame(pendingFlushHandle.current);
     };
   }, []);
-
-  const nodesRef = useRef(nodes);
-  useLayoutEffect(() => {
-    nodesRef.current = nodes;
-  }, [nodes]);
 
   const onNodesChange = useCallback<OnNodesChange<Node<ArchNodeData>>>(
     (changes) => {
@@ -1110,26 +1191,35 @@ function App() {
           { position: n.position, width: n.width, height: n.height, isAutoSized: isAutoSizedNodeType(n.type) },
         ])
       );
-      const { isActiveGesture } = classifyNodeChanges(changes, pendingNodeUpdates.current, currentNodeGeometry);
+      const { isActiveGesture, gestureEnded } = classifyNodeChanges(changes, pendingNodeUpdates.current, currentNodeGeometry);
+      const gestureInProgress = inFlightRef.current.size > 0;
       if (isActiveGesture) {
         if (pendingFlushHandle.current === null) {
           pendingFlushHandle.current = requestAnimationFrame(flushPendingNodeUpdates);
         }
-      } else if (pendingNodeUpdates.current.size > 0) {
-        // The gesture just ended (dragging/resizing became false), or
-        // this is a standalone change with no dragging flag at all (an
-        // arrow-key nudge, or onNodeDragStop's own alignment-snap
-        // correction) - either way, commit right away rather than
-        // waiting up to one frame for something that isn't part of an
-        // in-progress, high-frequency gesture.
+      } else if (gestureEnded) {
+        // Released. Committed in a microtask rather than here, because React
+        // Flow calls onNodeDragStop right after this - and its alignment-snap
+        // correction and drop-into-group reparent belong to the same gesture.
+        // Folding them in keeps it to one write per node (WS4-R2) and one
+        // transaction. A microtask still runs before the next paint.
         if (pendingFlushHandle.current !== null) {
           cancelAnimationFrame(pendingFlushHandle.current);
           pendingFlushHandle.current = null;
         }
-        flushPendingNodeUpdates();
+        if (!commitScheduled.current) {
+          commitScheduled.current = true;
+          queueMicrotask(commitNodeGesture);
+        }
+      } else if (!gestureInProgress && !commitScheduled.current && pendingNodeUpdates.current.size > 0) {
+        // A standalone change with no gesture open (an arrow-key nudge).
+        // Anything arriving while a gesture is open or awaiting its commit -
+        // a snap correction, a stray batch mid-drag - stays pending and is
+        // folded into that commit instead of committing on its own.
+        commitNodeGesture();
       }
     },
-    [flushPendingNodeUpdates]
+    [flushPendingNodeUpdates, commitNodeGesture]
   );
 
   // Edges have no position/dimensions concept, so the only thing this
@@ -1377,6 +1467,13 @@ function App() {
         ? { x: absolute.x - newParent.position.x, y: absolute.y - newParent.position.y }
         : absolute;
 
+      // Dropped at the end of a gesture whose commit is still pending: apply
+      // it inside that commit, after the positions, so this node is written
+      // once and its position is the one relative to its new parent.
+      if (commitScheduled.current) {
+        pendingReparents.current.set(nodeId, newParentId ?? undefined);
+        return;
+      }
       diagramStore.updateParentId(nodeId, newParentId ?? undefined, nextPosition);
     },
     [nodes, diagramStore]

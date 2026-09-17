@@ -43,6 +43,8 @@ const transformOf = (p: Page, id: string) =>
   p.$eval(`.react-flow__node[data-id="${id}"]`, (el) => (el as HTMLElement).style.transform);
 const undoDisabled = (p: Page) => p.$eval('button[aria-label="Undo"]', (el) => (el as HTMLButtonElement).disabled);
 const titleOf = (p: Page) => p.inputValue('[aria-label="Diagram title"]');
+const storeWrites = (p: Page) =>
+  p.evaluate<number>(`window.__PERF__.getCounters().storeWrites`);
 
 async function open(p: Page, url: string) {
   await p.goto(url);
@@ -50,14 +52,14 @@ async function open(p: Page, url: string) {
   await p.waitForFunction("typeof window.__PERF__?.loadFixture === 'function'", null, { timeout: 15000 });
 }
 
-async function drag(p: Page, id: string, dx: number) {
+async function drag(p: Page, id: string, dx: number, steps = 10) {
   const box = await p.locator(`.react-flow__node[data-id="${id}"]`).boundingBox();
   if (!box) throw new Error(`node ${id} not on screen`);
   const x = box.x + box.width / 2;
   const y = box.y + box.height / 2;
   await p.mouse.move(x, y);
   await p.mouse.down();
-  for (let i = 1; i <= 10; i++) await p.mouse.move(x + (dx * i) / 10, y);
+  for (let i = 1; i <= steps; i++) await p.mouse.move(x + (dx * i) / steps, y);
   await p.mouse.up();
   await sleep(150);
 }
@@ -94,9 +96,11 @@ async function run() {
     await a.evaluate(`window.__PERF__.setPath([])`);
     await sleep(200);
 
-    console.log("\n=== A drag takes exactly one undo (WS3-R3) ===");
+    console.log("\n=== A drag takes exactly one undo (WS3-R3), and one write (WS4-R2) ===");
     const home = await transformOf(a, DRAGGED);
+    await a.evaluate(`window.__PERF__.reset()`);
     await drag(a, DRAGGED, 120);
+    check((await storeWrites(a)) === 1, `a ten-frame drag of one node writes the document once (wrote ${await storeWrites(a)})`);
     const moved = await transformOf(a, DRAGGED);
     check(moved !== home, `the drag moved the node (${home} -> ${moved})`);
     check(!(await undoDisabled(a)), "undo becomes available");
@@ -104,6 +108,103 @@ async function run() {
     await sleep(150);
     check((await transformOf(a, DRAGGED)) === home, "one Ctrl+Z puts it back");
     check(await undoDisabled(a), "and nothing is left to undo");
+
+    console.log("\n=== A long multi-node drag barely grows the document (WS4-R1) ===");
+    const rootIds = fixture.nodes.map((n) => n.id);
+    await a.evaluate(`window.__PERF__.setSelectedNodes(${JSON.stringify(rootIds)})`);
+    await sleep(200);
+    const bytesBefore = await a.evaluate<number>(`window.__PERF__.docBytes()`);
+    await a.evaluate(`window.__PERF__.reset()`);
+    await drag(a, DRAGGED, 160, 150);
+    const grew = (await a.evaluate<number>(`window.__PERF__.docBytes()`)) - bytesBefore;
+    const multiWrites = await storeWrites(a);
+    check(multiWrites >= 2 && multiWrites <= rootIds.length, `a 150-frame drag of the selection writes once per moved node (${multiWrites} writes)`);
+    check(grew <= 1024, `and adds ${grew} bytes to the document (limit 1024)`);
+    await a.keyboard.press("Control+z");
+    await sleep(200);
+    check((await transformOf(a, DRAGGED)) === home, "one undo reverts the whole multi-node drag");
+    await a.evaluate(`window.__PERF__.setSelectedNodes([])`);
+    await sleep(100);
+
+    console.log("\n=== Dragging a node out of its group: one write, no jump ===");
+    {
+      // group-1 sits 900 flow px from the origin, so a reparent computed
+      // against the wrong parent is visibly off; around group-0 (at the
+      // origin) the same bug would be invisible.
+      // A fresh page: the reparent at drag stop is folded into the gesture's
+      // commit, and getting that order wrong makes the node jump by its old
+      // parent's offset the moment it is released.
+      const c = await (await browser.newContext({ ...perms, viewport: { width: 1600, height: 1000 } })).newPage();
+      await open(c, servers.appUrl);
+      await c.evaluate(`window.__PERF__.loadFixture("grouped")`);
+      await sleep(300);
+      await c.evaluate(`window.__PERF__.frameNodes(["group-1"])`);
+      await sleep(300);
+      // Room around the group to drop into, away from the auto-pan margin.
+      for (let i = 0; i < 3; i++) {
+        await c.click(".react-flow__controls-zoomout");
+        await sleep(150);
+      }
+      await sleep(300);
+      const nodeBox = () => c.locator('.react-flow__node[data-id="node-21"]').boundingBox();
+      const groupBoxOf = () => c.locator('.react-flow__node[data-id="group-1"]').boundingBox();
+      const viewport = () => c.$eval(".react-flow__viewport", (e) => (e as HTMLElement).style.transform);
+      const box = await nodeBox();
+      const groupBox = await groupBoxOf();
+      if (!box || !groupBox) throw new Error("grouped fixture not on screen");
+      const x = box.x + box.width / 2;
+      const y = box.y + box.height / 2;
+      // Straight down, clear of the group's bottom edge but well inside the
+      // pane: near a pane edge React Flow auto-pans, which moves everything on
+      // screen and makes any screen-space comparison meaningless.
+      const pane = await c.$eval(".react-flow__pane", (e) => {
+        const r = e.getBoundingClientRect();
+        return { right: r.right, bottom: r.bottom };
+      });
+      const down = { dx: 0, dy: groupBox.y + groupBox.height - box.y + 30 };
+      const right = { dx: groupBox.x + groupBox.width - box.x + 30, dy: 0 };
+      const margin = (m: { dx: number; dy: number }) =>
+        Math.min(pane.right - (box.x + box.width + m.dx), pane.bottom - (box.y + box.height + m.dy));
+      const move = margin(down) >= margin(right) ? down : right;
+      if (margin(move) < 80) {
+        throw new Error(`no drop point clear of the pane edge (best margin ${Math.round(margin(move))}px) - it would auto-pan`);
+      }
+      const { dx, dy } = move;
+      const viewportBefore = await viewport();
+      await c.evaluate(`window.__PERF__.reset()`);
+      await c.mouse.move(x, y);
+      await c.mouse.down();
+      for (let i = 1; i <= 15; i++) await c.mouse.move(x + (dx * i) / 15, y + (dy * i) / 15);
+      // Where the node is drawn while still held. Compared with where it ends
+      // up, not with the pointer: React Flow starts a drag on the first move
+      // and does not apply that first step, so the node trails the pointer by
+      // one step whatever this app does.
+      await sleep(150);
+      const held = await nodeBox();
+      await c.mouse.up();
+      await sleep(300);
+      check((await viewport()) === viewportBefore, "the viewport did not auto-pan (so screen positions are comparable)");
+      const after = await nodeBox();
+      // Tolerance covers the alignment snap (ALIGNMENT_THRESHOLD flow px,
+      // smaller on screen at this zoom); a reparent computed from the wrong
+      // geometry is off by the old parent's offset, far more than this.
+      const shift = held && after ? Math.hypot(after.x - held.x, after.y - held.y) : NaN;
+      check(shift < 6, `node-21 stays where it was dropped (moved ${shift.toFixed(1)}px on release)`);
+      check(
+        !!after && (after.y > groupBox.y + groupBox.height || after.x > groupBox.x + groupBox.width),
+        "and is outside the group"
+      );
+      check((await storeWrites(c)) === 1, `leaving the group is one write (wrote ${await storeWrites(c)})`);
+      await c.keyboard.press("Control+z");
+      await sleep(300);
+      const back = await nodeBox();
+      const groupNow = await groupBoxOf();
+      check(
+        !!back && !!groupNow && Math.abs(back.x - groupNow.x - (box.x - groupBox.x)) < 2 && Math.abs(back.y - groupNow.y - (box.y - groupBox.y)) < 2,
+        "one undo puts it back at its original place inside the group"
+      );
+      await c.close();
+    }
 
     console.log("\n=== Title edits are undoable ===");
     await a.fill('[aria-label="Diagram title"]', "Renamed locally");
@@ -200,7 +301,23 @@ async function run() {
     check(await undoDisabled(b), "B starts the session with nothing to undo");
 
     console.log("\n=== Undo in a session reverts only the local edit (WS3-R2) ===");
-    await drag(a, DRAGGED, 120);
+    // Held mid-gesture first: B must see the node moving before A lets go
+    // (WS4-R3), which now travels over Awareness rather than the document.
+    {
+      const box = await a.locator(`.react-flow__node[data-id="${DRAGGED}"]`).boundingBox();
+      if (!box) throw new Error("dragged node not on screen");
+      const x = box.x + box.width / 2;
+      const y = box.y + box.height / 2;
+      await a.mouse.move(x, y);
+      await a.mouse.down();
+      for (let i = 1; i <= 6; i++) await a.mouse.move(x + i * 10, y);
+      await sleep(1000);
+      const midB = await transformOf(b, DRAGGED);
+      check(midB !== home, `B sees A's node moving while A is still holding it (${midB})`);
+      for (let i = 7; i <= 12; i++) await a.mouse.move(x + i * 10, y);
+      await a.mouse.up();
+      await sleep(150);
+    }
     const aMoved = await transformOf(a, DRAGGED);
     await sleep(1000);
     check((await transformOf(b, DRAGGED)) === aMoved, "A's drag reaches B");

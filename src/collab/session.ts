@@ -1,3 +1,4 @@
+import { parseGestureBroadcast, type GestureBroadcast } from "../domain/gestureGeometry.ts";
 import { WebrtcProvider } from "y-webrtc";
 import { buildPeerOpts } from "./transport.ts";
 import type * as Y from "yjs";
@@ -84,6 +85,12 @@ export interface LocalPresenceInfo {
    * completely different diagram level. Empty string represents the
    * root level, matching an empty DiagramPath array. */
   diagramPath: string;
+  /**
+   * Geometry of the nodes this peer is dragging or resizing right now
+   * (WS4-R1, WS4-R3). Sent here rather than written to the document, which
+   * receives each node once when the gesture ends. Null when idle.
+   */
+  gesture?: GestureBroadcast | null;
 }
 
 /** What you observe about ANOTHER peer - everything they set about
@@ -234,6 +241,8 @@ export function parsePresenceState(clientId: number, state: unknown): PresenceIn
     viewMode: typeof candidate.viewMode === "string" ? candidate.viewMode : null,
     focusedItemId: typeof candidate.focusedItemId === "string" ? candidate.focusedItemId : null,
     diagramPath: typeof candidate.diagramPath === "string" ? candidate.diagramPath : "",
+    // Untrusted and rendered directly, so validated rather than passed on.
+    gesture: parseGestureBroadcast(candidate.gesture),
     // Anything other than an explicit true means "no replica known". See the
     // field's own comment - assuming otherwise is the dangerous direction.
     hasPersistedReplica: candidate.hasPersistedReplica === true,

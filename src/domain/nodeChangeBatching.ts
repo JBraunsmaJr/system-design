@@ -122,9 +122,15 @@ export function classifyNodeChanges(
   changes: NodeChange[],
   pending: Map<string, PendingNodeUpdate>,
   currentNodes: Map<string, CurrentNodeGeometry>
-): { isActiveGesture: boolean } {
+): { isActiveGesture: boolean; gestureEnded: boolean } {
   let isActiveGesture = false;
+  // Set by the release itself, even when the release lands exactly where the
+  // last frame left the node - that case is a no-op below, and without this
+  // the gesture it ends would never be committed.
+  let gestureEnded = false;
   for (const change of changes) {
+    if (change.type === "position" && change.dragging === false) gestureEnded = true;
+    if (change.type === "dimensions" && change.resizing === false) gestureEnded = true;
     if (change.type === "position" && change.position) {
       const current = currentNodes.get(change.id);
       const isNoOp = !!current && current.position.x === change.position.x && current.position.y === change.position.y;
@@ -153,5 +159,5 @@ export function classifyNodeChanges(
       }
     }
   }
-  return { isActiveGesture };
+  return { isActiveGesture, gestureEnded };
 }
