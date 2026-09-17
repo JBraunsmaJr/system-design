@@ -167,6 +167,34 @@ export function openDocumentNow(options: OpenDocumentOptions): OpenDocument & {
   return handle;
 }
 
+const liveHandles = new Map<string, OpenDocument & { ready: Promise<void> }>();
+
+/**
+ * openDocumentNow, but at most one live handle per document id.
+ *
+ * React StrictMode (development) calls a useState initializer twice and throws
+ * one result away. With openDocumentNow in an initializer, the discarded call
+ * still opened a second Y.Doc with its own IndexedDB provider on the SAME
+ * database, seeded it, and was never closed. Its seed then conflicted with the
+ * kept document's edits on the next load - Yjs resolves such concurrent writes
+ * by client id, not by time - so a typed title was lost about half the time.
+ *
+ * The handle is released by its own close(); opening the same id afterwards
+ * opens it afresh.
+ */
+export function acquireDocument(options: OpenDocumentOptions): OpenDocument & { ready: Promise<void> } {
+  const existing = liveHandles.get(options.docId);
+  if (existing) return existing;
+  const handle = openDocumentNow(options);
+  const close = handle.close;
+  handle.close = async () => {
+    if (liveHandles.get(options.docId) === handle) liveHandles.delete(options.docId);
+    await close();
+  };
+  liveHandles.set(options.docId, handle);
+  return handle;
+}
+
 export async function openDocument(
   options: OpenDocumentOptions
 ): Promise<OpenDocument> {

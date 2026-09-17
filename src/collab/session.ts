@@ -205,6 +205,15 @@ export interface CollabSessionOptions {
    * every run rather than whatever a previous run left behind.
    */
   persist?: boolean;
+  /**
+   * The document is already persisted by its owner - a local document that
+   * became a session (WS1-R4). The session reports that provider's state but
+   * never attaches a second one, and never destroys it: previously starting a
+   * session attached a room-keyed provider to a document already stored under
+   * its document key, so everything was stored twice, and leaving would have
+   * torn down persistence the document still needed.
+   */
+  existingPersistence?: DocPersistence;
 }
 
 /**
@@ -224,6 +233,17 @@ export interface CollabSessionOptions {
  * nature (anything a peer's own client chose to broadcast), and this is
  * the one place that decides what's trustworthy enough to surface.
  */
+/** A provider someone else owns: readable, but ending the session must not
+ * stop it or erase what it stored. */
+function borrowPersistence(owned: DocPersistence): DocPersistence {
+  return {
+    whenSynced: owned.whenSynced,
+    wasEmptyOnLoad: () => owned.wasEmptyOnLoad(),
+    destroy: async () => {},
+    forget: async () => {},
+  };
+}
+
 export function parsePresenceState(clientId: number, state: unknown): PresenceInfo | null {
   const candidate = state as Partial<LocalPresenceInfo> | null;
   if (!candidate || typeof candidate.name !== "string" || typeof candidate.color !== "string") return null;
@@ -298,8 +318,9 @@ export function startCollabSession(doc: Y.Doc, roomName: string, options: Collab
     ...buildPeerOpts(options.iceServers),
   });
 
-  const persistence =
-    options.persist === false
+  const persistence = options.existingPersistence
+    ? borrowPersistence(options.existingPersistence)
+    : options.persist === false
       ? createNullPersistence(doc)
       : attachPersistence(doc, persistenceKeyForRoom(roomName));
 

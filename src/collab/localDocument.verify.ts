@@ -7,6 +7,7 @@
  */
 import "fake-indexeddb/auto";
 import {
+  acquireDocument,
   openDocument,
   persistenceKeyForDocument,
   replaceDocumentContents,
@@ -219,6 +220,22 @@ console.log("=== persist: false keeps runs independent ===");
     "nothing carries over, so tests and the perf harness start clean",
   );
   await second.close();
+}
+
+console.log("\n=== acquireDocument: one live handle per document id ===");
+{
+  // React StrictMode runs a useState initializer twice; the discarded call
+  // used to leave a second provider live on the same database.
+  const a = acquireDocument({ docId: "acquire-once", persist: false });
+  const b = acquireDocument({ docId: "acquire-once", persist: false });
+  assert(a === b && a.doc === b.doc, "a second request for the same id returns the same handle");
+  const other = acquireDocument({ docId: "acquire-other", persist: false });
+  assert(other !== a, "a different id is a different document");
+  await a.close();
+  const c = acquireDocument({ docId: "acquire-once", persist: false });
+  assert(c !== a, "after close, the id opens afresh rather than returning a closed handle");
+  await c.close();
+  await other.close();
 }
 
 if (failures > 0) {

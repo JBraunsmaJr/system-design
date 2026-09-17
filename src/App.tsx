@@ -26,18 +26,22 @@ import { SHAPE_TYPES, globalShapeRegistry } from "./domain/shapeRegistry";
 import { reorderWithGroupsFirst, toAbsolutePosition } from "./domain/graphUtils";
 import type { DiagramPath } from "./domain/subDiagramTree";
 import { toDiagramFile, downloadDiagram, parseDiagramFile } from "./domain/serialization";
+import { loadAutosave, clearLegacyAutosave, hasLegacyAutosave, getAutosaveBlockedReason } from "./domain/autosave";
 import {
-  loadAutosave,
-  saveAutosave,
-  getAutosaveFailure,
-  getAutosaveBlockedReason,
-} from "./domain/autosave";
+  resolveDocumentId,
+  readDocumentParam,
+  withDocumentParam,
+  sessionDocumentId,
+  LAST_DOCUMENT_KEY,
+} from "./domain/currentDocument";
+import { createDocumentStore, type StorageFailureReason } from "./domain/documentStore";
+import { createIndexedDbBackend } from "./domain/indexedDbBackend";
 import { DurabilityIndicator } from "./components/DurabilityIndicator";
 import { installUnloadGuard } from "./domain/unloadGuard";
 import type { DurabilitySignals } from "./domain/durability";
 import { countPersistedReplicas } from "./collab/session";
 import {
-  openDocumentNow,
+  acquireDocument,
   replaceDocumentContents,
   createDocumentStores,
   destroyDocumentStores,
@@ -186,9 +190,39 @@ function App() {
    * the model from then on (WS1-R1), including for title and scenarios.
    */
   const [bootSnapshot] = useState<DiagramSnapshot>(() => {
+    // The retired localStorage draft, read once (WS2-R1). It only seeds the
+    // document if the document turns out to be empty, and is cleared after
+    // the first successful save to the document store.
     const autosave = loadAutosave();
     return autosave ? diagramFileToSnapshot(autosave) : DEFAULT_SNAPSHOT;
   });
+
+  /**
+   * Which document this tab has open (WS2-R3): the URL's `?doc=`, else the
+   * last one opened in this browser, else "local". Written back to the URL so
+   * a reload reopens it and another tab can hold a different one.
+   */
+  const [openDocId] = useState(() => {
+    let lastDocId: string | null = null;
+    try {
+      lastDocId = localStorage.getItem(LAST_DOCUMENT_KEY);
+    } catch {
+      // Storage unavailable: fall through to the default document.
+    }
+    return resolveDocumentId({ urlDocId: readDocumentParam(window.location.href), lastDocId }).docId;
+  });
+  useEffect(() => {
+    const next = withDocumentParam(window.location.href, openDocId);
+    if (next !== window.location.href) window.history.replaceState(window.history.state, "", next);
+    try {
+      localStorage.setItem(LAST_DOCUMENT_KEY, openDocId);
+    } catch {
+      // A preference; losing it only means a bare URL opens the default.
+    }
+  }, [openDocId]);
+
+  /** The catalogue of stored documents and their snapshots (WS2-R3). */
+  const [documentStore] = useState(() => createDocumentStore(createIndexedDbBackend()));
 
   // --- Collaborative sessions -----------------------------------------------
   //
@@ -243,8 +277,10 @@ function App() {
     // and openDocumentNow's seed is the import boundary that flattens it
     // (WS1-R3). Passing it through unchanged is the point: flattening here as
     // well is how the two load paths came to disagree about the shape.
-    return openDocumentNow({
-      docId: "local",
+    // acquireDocument, not openDocumentNow: StrictMode runs this initializer
+    // twice, and a second live provider on the same database corrupts it.
+    return acquireDocument({
+      docId: openDocId,
       initial: snapshotToDiagramFile(bootSnapshot),
     });
   });
@@ -502,7 +538,13 @@ function App() {
        * session.
        */
       const doc = openDoc.doc;
-      const session = startCollabSession(doc, roomName, { signalingUrls, password: sessionKey, iceServers });
+      const session = startCollabSession(doc, roomName, {
+        signalingUrls,
+        password: sessionKey,
+        iceServers,
+        // Already persisted under its document key - don't store it twice.
+        existingPersistence: openDoc.persistence,
+      });
 
       const initialPresence: LocalPresenceInfo = {
         name: displayName.trim() || "Guest",
@@ -759,35 +801,63 @@ function App() {
   // the rest of the session - there's no real value in a live-ticking
   // "saved 3s ago" here, just confidence that it's happening at all.
   const [hasAutosaved, setHasAutosaved] = useState(false);
-  const [autosaveFailure, setAutosaveFailure] = useState(getAutosaveFailure);
-  const [autosaveBlocked, setAutosaveBlocked] = useState(getAutosaveBlockedReason);
+  const [autosaveFailure, setAutosaveFailure] = useState<{ reason: StorageFailureReason; message: string } | null>(null);
+  const [autosaveBlocked] = useState(getAutosaveBlockedReason);
+  const legacyDraftPending = useRef(hasLegacyAutosave());
+
+  /**
+   * The stored-document id for what is on screen: the open document, or - in
+   * a joined session - that session's own replica entry, so joining never
+   * overwrites the local document's snapshot (WS1-R5).
+   */
+  const activeDocId =
+    activeSession && activeSession.ownsDocument ? sessionDocumentId(activeSession.roomName) : openDocId;
+  const activeRoom = activeSession?.roomName ?? null;
+
   useEffect(() => {
     // The perf harness measures editing, not autosave - see
     // isPerfAutosaveSuppressed. Always false outside instrumented builds.
     if (isPerfAutosaveSuppressed()) return;
+    let cancelled = false;
     const timer = setTimeout(() => {
       // Export boundary: built once per debounced write, not once per change.
       const tree = unflattenToSubDiagram(diagramSnapshot.nodes, diagramSnapshot.edges);
-      saveAutosave(
-        toDiagramFile(
-          title,
-          tree.nodes,
-          tree.edges,
-          scenarios,
-          requirementsSnapshot,
-          programIncrementsSnapshot,
-          teamSnapshot,
-          milestonesSnapshot
-        )
+      const file = toDiagramFile(
+        title,
+        tree.nodes,
+        tree.edges,
+        scenarios,
+        requirementsSnapshot,
+        programIncrementsSnapshot,
+        teamSnapshot,
+        milestonesSnapshot
       );
-      setHasAutosaved(true);
-      // Read after the write, so the indicator reflects a confirmed outcome
-      // rather than an attempt (NFR-10).
-      setAutosaveFailure(getAutosaveFailure());
-      setAutosaveBlocked(getAutosaveBlockedReason());
+      // A snapshot in the document store, alongside the live y-indexeddb
+      // replica: it keeps the index's title and time current (WS2-R3), is a
+      // readable fallback if the replica is damaged, and is the write whose
+      // failure the durability indicator reports (WS2-R4). It replaces the
+      // localStorage draft (WS2-R1).
+      const origin = activeRoom !== null ? ({ origin: "session", sessionRoom: activeRoom } as const) : ({ origin: "local" } as const);
+      void documentStore.writeDocument(activeDocId, file, origin).then((result) => {
+        if (cancelled) return;
+        // Set from the confirmed outcome, never the attempt (NFR-10).
+        if (result.ok) {
+          setHasAutosaved(true);
+          setAutosaveFailure(null);
+          if (legacyDraftPending.current && activeDocId === openDocId) {
+            legacyDraftPending.current = false;
+            clearLegacyAutosave();
+          }
+        } else {
+          setAutosaveFailure({ reason: result.reason, message: result.message });
+        }
+      });
     }, 1000);
-    return () => clearTimeout(timer);
-  }, [title, diagramSnapshot, scenarios, requirementsSnapshot, programIncrementsSnapshot, teamSnapshot, milestonesSnapshot]);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [title, diagramSnapshot, scenarios, requirementsSnapshot, programIncrementsSnapshot, teamSnapshot, milestonesSnapshot, documentStore, activeDocId, activeRoom, openDocId]);
 
   /**
    * What the app currently knows about whether this document is safe
