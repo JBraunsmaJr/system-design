@@ -23,6 +23,7 @@ import {
   attachPersistence,
   createNullPersistence,
   type DocPersistence,
+  persistenceKeyForRoom,
 } from "./persistence.ts";
 import { isYjsDocEmpty } from "./seedGuards.ts";
 import { seedYjsDiagramDoc, createYjsDiagramStore } from "./yjsDiagramStore.ts";
@@ -54,6 +55,20 @@ import type { MilestonesStore } from "./milestonesStore.ts";
 
 /** Namespaced apart from room keys so a document and a session can never
  * collide in IndexedDB, even if their identifiers happen to match. */
+/**
+ * The database a document's content lives in. A joined session's replica
+ * (`session:<room>`) was stored by the session under its room key, so opening
+ * it as a document reads that same database - which is what lets a former
+ * participant reopen it and host the room again (WS13-R12).
+ */
+export function storageKeyForDocument(docId: string): string {
+  return docId.startsWith(SESSION_DOC_PREFIX)
+    ? persistenceKeyForRoom(docId.slice(SESSION_DOC_PREFIX.length))
+    : persistenceKeyForDocument(docId);
+}
+
+const SESSION_DOC_PREFIX = "session:";
+
 export function persistenceKeyForDocument(docId: string): string {
   return `system-design:doc:${docId}`;
 }
@@ -132,7 +147,7 @@ export function openDocumentNow(options: OpenDocumentOptions): OpenDocument & {
   ready: Promise<void>;
 } {
   const doc = new Y.Doc();
-  const key = persistenceKeyForDocument(options.docId);
+  const key = storageKeyForDocument(options.docId);
 
   const persistence =
     options.persist === false
@@ -199,7 +214,7 @@ export async function openDocument(
   options: OpenDocumentOptions
 ): Promise<OpenDocument> {
   const doc = new Y.Doc();
-  const key = persistenceKeyForDocument(options.docId);
+  const key = storageKeyForDocument(options.docId);
 
   const persistence =
     options.persist === false

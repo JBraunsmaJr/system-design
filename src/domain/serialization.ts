@@ -102,12 +102,17 @@ export function toDiagramFile(
 
 /** Triggers a browser download of the diagram as a .json file. */
 export function downloadDiagram(file: DiagramFile): void {
+  const safeName = file.title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  downloadDiagramAs(file, `${safeName || "diagram"}.json`);
+}
+
+/** downloadDiagram under a caller-chosen file name (timed copies, WS13-R6). */
+export function downloadDiagramAs(file: DiagramFile, fileName: string): void {
   const blob = new Blob([JSON.stringify(file, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  const safeName = file.title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-  anchor.download = `${safeName || "diagram"}.json`;
+  anchor.download = fileName;
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();

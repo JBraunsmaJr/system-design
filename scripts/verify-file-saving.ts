@@ -239,6 +239,42 @@ async function run() {
       check(/cannot save to a file/.test(text), "says continuous file saving is not available");
       check((await q.locator('.durability__detail button:has-text("Save to a file")').count()) === 0, "never offers to save to a file");
       check((await q.locator('.durability__detail button:has-text("Export a copy")').count()) === 1, "offers an export instead");
+      check(/timed copies/.test(text), "and points to timed copies");
+
+      console.log("\n=== R6: timed copies ===");
+      const openManager = async () => {
+        await q.click('button[title="File"]');
+        await q.click('.export-menu__dropdown button:has-text("Documents")');
+        await q.waitForSelector(".document-manager__timed-copies");
+      };
+      await openManager();
+      const explain = (await q.textContent(".document-manager__timed-copies-explain")) ?? "";
+      check(
+        (await q.textContent(".document-manager__timed-copies-state")) === "Off" && /download folder/.test(explain) && /only if it changed/.test(explain),
+        "off by default, with what it will do explained before it is turned on"
+      );
+      await q.evaluate(() => localStorage.setItem("system-design-editor:timed-copies-test-seconds", "2"));
+      await q.click(".document-manager__timed-copies-toggle");
+      check((await q.textContent(".document-manager__timed-copies-state")) === "On", "turning it on is one click");
+      await q.keyboard.press("Escape");
+      const nextDownload = (timeout: number) => q.waitForEvent("download", { timeout }).then((d) => d, () => null);
+      const first = await nextDownload(8000);
+      const firstName = first?.suggestedFilename() ?? "";
+      check(/^no-files-here-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.json$/.test(firstName), `a timestamped copy is downloaded (${firstName})`);
+      if (first) {
+        const { readFileSync } = await import("fs");
+        const saved = JSON.parse(readFileSync((await first.path()) ?? "", "utf8")) as { title: string };
+        check(saved.title === "No files here", "holding the document");
+      }
+      check((await nextDownload(4500)) === null, "an unchanged document is not copied again");
+      await setTitle(q, "No files here, edited");
+      const second = await nextDownload(6000);
+      check(!!second && second.suggestedFilename().startsWith("no-files-here-edited-"), "a change is copied at the next interval");
+      await openManager();
+      await q.click(".document-manager__timed-copies-toggle");
+      await q.keyboard.press("Escape");
+      await setTitle(q, "Edited after turning off");
+      check((await nextDownload(4500)) === null, "turned off, nothing more is downloaded");
     }
 
     console.log("\n=== R3: an interrupted write leaves the previous file intact ===");
@@ -275,7 +311,7 @@ async function run() {
       await toggle.waitFor();
       if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
       await host.fill("#collab-panel-signaling-url", servers.relayUrl);
-      await host.click(".collab-panel__primary-action");
+      await host.click(".collab-panel__primary-action:not(.collab-panel__resume)");
       await sleep(500);
       await host.click(".collab-panel__trigger");
       await host.waitForSelector(".collab-panel__room-code");

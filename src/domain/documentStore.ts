@@ -97,6 +97,10 @@ export interface DocumentIndexEntry {
    * participant can rehost an empty room later (WS13-R12). */
   origin: "local" | "session";
   sessionRoom?: string;
+  /** The session's encryption key, kept with the local copy so a former
+   * participant can host the same room again and the original link still
+   * works (WS13-R12). Local storage only, like the content it protects. */
+  sessionKey?: string;
   /** Approximate serialized size, for surfacing storage pressure. */
   sizeBytes: number;
 }
@@ -185,7 +189,7 @@ export interface DocumentStore {
   writeDocument(
     docId: string,
     file: DiagramFile,
-    options?: { origin?: "local" | "session"; sessionRoom?: string },
+    options?: { origin?: "local" | "session"; sessionRoom?: string; sessionKey?: string },
   ): Promise<StorageResult<DocumentIndexEntry>>;
   renameDocument(
     docId: string,
@@ -313,6 +317,9 @@ export function createDocumentStore(backend: DocumentBackend): DocumentStore {
             origin: options?.origin ?? existing?.origin ?? "local",
             ...(options?.sessionRoom ?? existing?.sessionRoom
               ? { sessionRoom: options?.sessionRoom ?? existing?.sessionRoom }
+              : {}),
+            ...(options?.sessionKey ?? existing?.sessionKey
+              ? { sessionKey: options?.sessionKey ?? existing?.sessionKey }
               : {}),
             sizeBytes: serialized.length,
           };

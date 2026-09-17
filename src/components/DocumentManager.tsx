@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Copy, FileText, FolderOpen, Pencil, Plus, Trash2, Users, X } from "lucide-react";
 import type { DocumentIndexEntry, StorageHealth } from "../domain/documentStore";
 import { requestPersistentStorage } from "../domain/documentStore";
-import { isLocallyOpenable, type DocumentLibrary } from "../collab/documentLibrary";
+import type { DocumentLibrary } from "../collab/documentLibrary";
+import { TIMED_COPY_INTERVALS, type TimedCopiesSettings } from "../domain/timedCopies";
 
 interface DocumentManagerProps {
   isOpen: boolean;
@@ -16,6 +17,9 @@ interface DocumentManagerProps {
   onRenameCurrent: (title: string) => void;
   onOpenDocument: (docId: string) => void;
   onNewDocument: () => void;
+  /** WS13-R6: timed downloads, a browser-wide preference. */
+  timedCopies?: TimedCopiesSettings;
+  onTimedCopiesChange?: (next: TimedCopiesSettings) => void;
 }
 
 function formatBytes(bytes: number | undefined): string {
@@ -45,6 +49,8 @@ export function DocumentManager({
   onRenameCurrent,
   onOpenDocument,
   onNewDocument,
+  timedCopies,
+  onTimedCopiesChange,
 }: DocumentManagerProps) {
   const [entries, setEntries] = useState<DocumentIndexEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -222,6 +228,49 @@ export function DocumentManager({
           )}
         </div>
 
+        {timedCopies && onTimedCopiesChange && (
+          <div
+            className="document-manager__timed-copies"
+            style={{ padding: "8px 18px", fontSize: 12, borderBottom: "1px solid var(--border, #2d3342)", display: "grid", gap: 6 }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <strong>Timed copies</strong>
+              <span className="document-manager__timed-copies-state">{timedCopies.enabled ? "On" : "Off"}</span>
+              <label style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                every
+                <select
+                  aria-label="Minutes between copies"
+                  value={timedCopies.minutes}
+                  onChange={(e) => onTimedCopiesChange({ ...timedCopies, minutes: Number(e.target.value) })}
+                >
+                  {(TIMED_COPY_INTERVALS as readonly number[]).includes(timedCopies.minutes) ? null : (
+                    <option value={timedCopies.minutes}>{timedCopies.minutes}</option>
+                  )}
+                  {TIMED_COPY_INTERVALS.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+                minutes
+              </label>
+              <button
+                type="button"
+                className="document-manager__timed-copies-toggle"
+                onClick={() => onTimedCopiesChange({ ...timedCopies, enabled: !timedCopies.enabled })}
+              >
+                {timedCopies.enabled ? "Turn off" : "Turn on"}
+              </button>
+            </div>
+            <p className="document-manager__timed-copies-explain" style={{ margin: 0, color: "var(--text-muted, #9aa3b2)" }}>
+              When on, this browser downloads a copy of the open document at that interval, but only if it changed
+              since the last copy. Copies go to your download folder with the date and time in the name. If your
+              browser asks where to save each download, set it to save downloads automatically, or it will ask every
+              time.
+            </p>
+          </div>
+        )}
+
         {error && (
           <div role="alert" style={{ padding: "8px 18px", color: "var(--danger, #e5534b)", fontSize: 13 }}>
             {error}
@@ -241,7 +290,7 @@ export function DocumentManager({
           ) : (
             entries.map((entry) => {
               const isCurrent = entry.docId === currentDocId;
-              const openable = isLocallyOpenable(entry);
+              const fromSession = entry.origin === "session" && !!entry.sessionRoom;
               const isRenaming = renaming?.docId === entry.docId;
               return (
                 <div
@@ -282,36 +331,27 @@ export function DocumentManager({
                     )}
                     <div style={{ fontSize: 11, color: "var(--text-muted, #9aa3b2)", display: "flex", gap: 10, flexWrap: "wrap" }}>
                       {isCurrent && <span className="document-manager__current">Open in this tab</span>}
-                      {!openable && (
-                        <span title="A copy of a session you joined. Open a copy to edit it on its own.">
-                          <Users size={10} /> Session copy
+                      {fromSession && (
+                        <span
+                          className="document-manager__session"
+                          title="Shared in a session. Open it to resume hosting that session, so others can rejoin with the original link."
+                        >
+                          <Users size={10} /> From a session
                         </span>
                       )}
                       <span>Saved {formatWhen(entry.updatedAt)}</span>
                       <span>{formatBytes(entry.sizeBytes)}</span>
                     </div>
                   </div>
-                  {openable ? (
-                    <button
-                      type="button"
-                      className="document-manager__open"
-                      disabled={isCurrent || busy}
-                      onClick={() => onOpenDocument(entry.docId)}
-                      aria-label={`Open ${entry.title}`}
-                    >
-                      <FolderOpen size={14} /> Open
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className="document-manager__open-copy"
-                      disabled={busy}
-                      onClick={() => void duplicate(entry, true)}
-                      aria-label={`Open a copy of ${entry.title}`}
-                    >
-                      <FolderOpen size={14} /> Open a copy
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    className="document-manager__open"
+                    disabled={isCurrent || busy}
+                    onClick={() => onOpenDocument(entry.docId)}
+                    aria-label={`Open ${entry.title}`}
+                  >
+                    <FolderOpen size={14} /> Open
+                  </button>
                   <button
                     type="button"
                     className="document-manager__rename"

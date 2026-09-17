@@ -5,7 +5,7 @@
  * The document store keeps the index and a snapshot of each document; the
  * live content of a local document is its own y-indexeddb database
  * (`system-design:doc:<id>`), and a joined session's replica is keyed by room
- * (`system-design:room:<room>`). Every operation here keeps those in step:
+ * (`system-design:room:<room>`) and opens like any other document (WS13-R12). Every operation here keeps those in step:
  * renaming a closed document renames it inside its content too (or the next
  * save would put the old title back), and forgetting removes the content
  * database as well as the index entry.
@@ -14,8 +14,7 @@ import * as Y from "yjs";
 import type { DocumentIndexEntry, DocumentStore, StorageResult } from "../domain/documentStore.ts";
 import { newDocumentId } from "../domain/documentStore.ts";
 import { toDiagramFile, type DiagramFile } from "../domain/serialization.ts";
-import { openDocument, persistenceKeyForDocument, type OpenDocument } from "./localDocument.ts";
-import { persistenceKeyForRoom } from "./persistence.ts";
+import { openDocument, storageKeyForDocument, type OpenDocument } from "./localDocument.ts";
 import { readDocumentContents } from "./rebase.ts";
 
 export interface DocumentLibraryDeps {
@@ -41,22 +40,10 @@ export interface DocumentLibrary {
   forget(entry: DocumentIndexEntry): Promise<StorageResult<DeleteOutcome>>;
 }
 
-/** The content database a document's live replica is kept in. */
-export function contentDatabaseFor(entry: Pick<DocumentIndexEntry, "docId" | "origin" | "sessionRoom">): string {
-  // A joined session's replica is keyed by room. A local document that was
-  // shared keeps its document key - origin "session" with a doc id that is
-  // not a session id - so the id decides, not the origin alone.
-  if (entry.origin === "session" && entry.docId.startsWith("session:") && entry.sessionRoom) {
-    return persistenceKeyForRoom(entry.sessionRoom);
-  }
-  return persistenceKeyForDocument(entry.docId);
-}
-
-/** Whether an entry's live content can be opened as a local document. A
- * joined session's replica can only be copied: its content lives under the
- * room, and editing it outside the session would fork it silently. */
-export function isLocallyOpenable(entry: Pick<DocumentIndexEntry, "docId" | "origin">): boolean {
-  return !(entry.origin === "session" && entry.docId.startsWith("session:"));
+/** The content database a document's live replica is kept in: its document
+ * key, or - for a joined session's replica - the room key it was stored under. */
+export function contentDatabaseFor(entry: Pick<DocumentIndexEntry, "docId">): string {
+  return storageKeyForDocument(entry.docId);
 }
 
 function fileFromDoc(doc: Y.Doc): DiagramFile {
@@ -91,10 +78,8 @@ export function createDocumentLibrary(deps: DocumentLibraryDeps): DocumentLibrar
   const open = deps.open ?? ((docId: string, initial?: DiagramFile) => openDocument({ docId, initial }));
   const deleteDatabase = deps.deleteDatabase ?? defaultDeleteDatabase;
 
-  /** The content to copy or re-save: the live document where there is one,
-   * the stored snapshot otherwise. */
+  /** The live content of a stored document. */
   async function contentOf(entry: DocumentIndexEntry): Promise<StorageResult<DiagramFile>> {
-    if (!isLocallyOpenable(entry)) return store.readDocument(entry.docId);
     const opened = await open(entry.docId);
     try {
       return { ok: true, value: fileFromDoc(opened.doc) };
@@ -113,18 +98,15 @@ export function createDocumentLibrary(deps: DocumentLibraryDeps): DocumentLibrar
     async rename(entry, title) {
       const trimmed = title.trim();
       if (!trimmed) return failed("A document needs a name.");
-      if (isLocallyOpenable(entry)) {
-        // Inside the content as well: the title lives in the document, and
-        // the next save would otherwise restore the old one to the index.
-        const opened = await open(entry.docId);
-        try {
-          opened.stores.meta.setTitle(trimmed);
-          return await store.writeDocument(entry.docId, fileFromDoc(opened.doc));
-        } finally {
-          await opened.close();
-        }
+      // Inside the content as well: the title lives in the document, and the
+      // next save would otherwise restore the old one to the index.
+      const opened = await open(entry.docId);
+      try {
+        opened.stores.meta.setTitle(trimmed);
+        return await store.writeDocument(entry.docId, fileFromDoc(opened.doc));
+      } finally {
+        await opened.close();
       }
-      return store.renameDocument(entry.docId, trimmed);
     },
 
     async duplicate(entry) {

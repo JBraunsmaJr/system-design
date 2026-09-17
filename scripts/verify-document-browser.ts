@@ -279,7 +279,7 @@ async function run() {
     await toggle.waitFor();
     if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
     await a.fill("#collab-panel-signaling-url", servers.relayUrl);
-    await a.click(".collab-panel__primary-action");
+    await a.click(".collab-panel__primary-action:not(.collab-panel__resume)");
     await sleep(50);
     check((await nodeCount(a)) === before, `${before} nodes immediately after starting`);
     await a.click(".collab-panel__trigger");

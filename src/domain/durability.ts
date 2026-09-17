@@ -229,7 +229,7 @@ export function deriveDurability(signals: DurabilitySignals): DurabilityState {
     detail: describeReplicas(
       canUseFiles
         ? "Saved on this device. Clearing browser data will remove it."
-        : "Saved on this device. Clearing browser data will remove it. This browser cannot save to a file as you work; export a copy to keep one outside it.",
+        : "Saved on this device. Clearing browser data will remove it. This browser cannot save to a file as you work; export a copy to keep one outside it, or turn on timed copies under File > Documents.",
       signals.replicaCount,
     ),
     action: canUseFiles ? "choose-file" : "export",

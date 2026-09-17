@@ -240,7 +240,7 @@ async function run() {
       await toggle.waitFor();
       if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
       await host.fill("#collab-panel-signaling-url", servers.relayUrl);
-      await host.click(".collab-panel__primary-action");
+      await host.click(".collab-panel__primary-action:not(.collab-panel__resume)");
       await sleep(300);
       await host.click(".collab-panel__trigger");
       await host.waitForSelector(".collab-panel__room-code");
@@ -280,6 +280,93 @@ async function run() {
       );
       const local = guestIndex.find((e) => e.docId === "local");
       check(local?.title === "Guest local work", `joining did not overwrite the guest's own document entry (title: ${local?.title})`);
+    }
+
+    console.log("\n=== WS13-R12: rehosting a room everyone has left ===");
+    {
+      const startSession = async (page: Page) => {
+        await page.click(".collab-panel__trigger");
+        const toggle = page.locator(".collab-panel__settings-toggle");
+        await toggle.waitFor();
+        if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
+        await page.fill("#collab-panel-signaling-url", servers!.relayUrl);
+        await page.click(".collab-panel__primary-action:not(.collab-panel__resume)");
+        await sleep(300);
+      };
+      const hostCtx = await newContext();
+      const host = await hostCtx.newPage();
+      await host.goto(`${app}?doc=rehost-src`);
+      await ready(host);
+      await host.evaluate(`window.__PERF__.loadFixture("small")`);
+      await host.fill('[aria-label="Diagram title"]', "Rehost me");
+      await startSession(host);
+      await host.click(".collab-panel__trigger");
+      await host.waitForSelector(".collab-panel__room-code");
+      await host.click(".collab-panel__copy-button");
+      await sleep(200);
+      const link = await host.evaluate(() => navigator.clipboard.readText());
+      const room = new URLSearchParams(new URL(link).hash.slice(1)).get("session") ?? "";
+      await host.keyboard.press("Escape");
+
+      const guestCtx = await newContext();
+      const guest = await guestCtx.newPage();
+      await guest.goto(app);
+      await ready(guest);
+      await guest.click(".collab-panel__trigger");
+      await guest.fill(".collab-panel__join-input", link);
+      await guest.click(".collab-panel__join-button");
+      const joined = await guest
+        .waitForFunction(() => document.querySelectorAll(".react-flow__node").length === 25, null, { timeout: 15000 })
+        .then(() => true, () => false);
+      await guest.keyboard.press("Escape");
+      check(joined, "a participant joins");
+      await sleep(SAVE_WAIT);
+
+      // Everyone leaves: the guest, then the host (who is then the last holder).
+      await guest.click(".collab-panel__trigger");
+      await guest.click(".collab-panel__leave-button");
+      await sleep(300);
+      if (await guest.locator(".leave-guard").count()) await guest.click(".leave-guard__leave");
+      await host.click(".collab-panel__trigger");
+      await host.click(".collab-panel__leave-button");
+      if (await host.waitForSelector(".leave-guard", { timeout: 2000 }).then(() => true, () => false)) {
+        await host.click(".leave-guard__leave");
+      }
+      await hostCtx.close();
+
+      // The former participant reopens the session's copy from the document list...
+      await guest.click('button[title="File"]');
+      await guest.click('.export-menu__dropdown button:has-text("Documents")');
+      await guest.waitForSelector(".document-manager__row");
+      const sessionRow = guest.locator(`.document-manager__row[data-doc-id="session:${room}"]`);
+      check((await sessionRow.count()) === 1, `the session's copy is listed as a document (session:${room})`);
+      check((await sessionRow.locator(".document-manager__session").count()) === 1, "marked as coming from a session");
+      await Promise.all([guest.waitForNavigation(), sessionRow.locator(".document-manager__open").click()]);
+      await ready(guest);
+      check((await nodeCount(guest)) === 25 && (await titleOf(guest)) === "Rehost me", "and it opens with the session's content");
+
+      // ...and hosts the same room again.
+      await guest.click(".collab-panel__trigger");
+      const resume = guest.locator(".collab-panel__resume");
+      const offered = await resume.waitFor({ timeout: 3000 }).then(() => true, () => false);
+      check(offered && ((await resume.textContent()) ?? "").includes(room), "the collab panel offers to resume that room");
+      if (offered) await resume.click();
+      await sleep(500);
+
+      // Someone else rejoins with the ORIGINAL link.
+      const lateCtx = await newContext();
+      const late = await lateCtx.newPage();
+      await late.goto(app);
+      await ready(late);
+      await late.click(".collab-panel__trigger");
+      await late.fill(".collab-panel__join-input", link);
+      await late.click(".collab-panel__join-button");
+      const rejoined = await late
+        .waitForFunction(() => document.querySelectorAll(".react-flow__node").length === 25, null, { timeout: 15000 })
+        .then(() => true, () => false);
+      check(rejoined, "anyone with the original link rejoins and sees the content");
+      await late.keyboard.press("Escape");
+      check((await titleOf(late)) === "Rehost me", "including the title");
     }
   } catch (err) {
     failures++;

@@ -49,7 +49,7 @@ async function run() {
     await page1.waitForSelector("#collab-panel-signaling-url", { timeout: 10000 });
 
     await page1.fill("#collab-panel-signaling-url", `ws://localhost:${SIGNALING_PORT}`);
-    await page1.click(".collab-panel__primary-action");
+    await page1.click(".collab-panel__primary-action:not(.collab-panel__resume)");
 
     // Open collab panel on page 1 to check active session
     await page1.click(".collab-panel__trigger");

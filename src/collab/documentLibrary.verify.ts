@@ -9,7 +9,7 @@ import { EMPTY_REQUIREMENTS_DOCUMENT } from "../domain/requirementsTypes.ts";
 import { EMPTY_TEAM_DOCUMENT } from "../domain/teamTypes.ts";
 import { openDocument, persistenceKeyForDocument } from "./localDocument.ts";
 import { persistenceKeyForRoom } from "./persistence.ts";
-import { createDocumentLibrary, contentDatabaseFor, isLocallyOpenable, type DeleteOutcome } from "./documentLibrary.ts";
+import { createDocumentLibrary, contentDatabaseFor, type DeleteOutcome } from "./documentLibrary.ts";
 
 let failures = 0;
 function assert(condition: boolean, message: string) {
@@ -85,19 +85,15 @@ async function contentOf(docId: string) {
   return result;
 }
 
-console.log("=== Content database and openability ===");
-assert(contentDatabaseFor({ docId: "abc", origin: "local" }) === persistenceKeyForDocument("abc"), "a local document lives under its document key");
+console.log("=== Content database ===");
+assert(contentDatabaseFor({ docId: "abc" }) === persistenceKeyForDocument("abc"), "a local document lives under its document key");
 assert(
-  contentDatabaseFor({ docId: "hosted", origin: "session", sessionRoom: "r1" }) === persistenceKeyForDocument("hosted"),
+  contentDatabaseFor({ docId: "hosted" }) === persistenceKeyForDocument("hosted"),
   "a local document that was shared still lives under its document key"
 );
 assert(
-  contentDatabaseFor({ docId: "session:r1", origin: "session", sessionRoom: "r1" }) === persistenceKeyForRoom("r1"),
+  contentDatabaseFor({ docId: "session:r1" }) === persistenceKeyForRoom("r1"),
   "a joined session's replica lives under its room key"
-);
-assert(
-  isLocallyOpenable({ docId: "hosted", origin: "session" }) && !isLocallyOpenable({ docId: "session:r1", origin: "session" }),
-  "only a joined session's replica is copy-only"
 );
 
 console.log("\n=== Rename a closed document ===");
@@ -122,17 +118,32 @@ if (dup.ok) {
   assert(original.title === "Alpha renamed" && original.nodes === 3, "editing the copy leaves the original untouched");
 }
 
-console.log("\n=== Joined session replicas ===");
+console.log("\n=== Joined session replicas open like any document (WS13-R12) ===");
+// What a joined session leaves behind: content under the room key, plus an
+// index entry carrying the room and its key.
+{
+  const replica = await openDocument({ docId: "session:room-7", initial: makeFile("Team diagram") });
+  await replica.close();
+}
 const sessionEntry = await store.writeDocument("session:room-7", makeFile("Team diagram"), {
   origin: "session",
   sessionRoom: "room-7",
+  sessionKey: "k-123",
 });
 if (!sessionEntry.ok) throw new Error(sessionEntry.message);
-const sessionRename = await library.rename(sessionEntry.value, "Team (copy source)");
-assert(sessionRename.ok && sessionRename.value.title === "Team (copy source)", "renaming a session replica renames its entry only");
+assert(sessionEntry.value.sessionKey === "k-123", "the index keeps the session key, so the room can be hosted again");
+const again = await store.writeDocument("session:room-7", makeFile("Team diagram"));
+assert(again.ok && again.value.sessionKey === "k-123" && again.value.sessionRoom === "room-7", "and later saves keep room and key");
+{
+  const reopened = await contentOf("session:room-7");
+  assert(reopened.nodes === 3 && reopened.title === "Team diagram", "its content opens from the room database");
+}
+const sessionRename = await library.rename(sessionEntry.value, "Team (renamed)");
+assert(sessionRename.ok && sessionRename.value.title === "Team (renamed)", "renaming works like any document");
+assert((await contentOf("session:room-7")).title === "Team (renamed)", "including inside its content");
 const sessionCopy = await library.duplicate(sessionEntry.value);
-assert(sessionCopy.ok && sessionCopy.value.origin === "local", "a session replica can be copied into a local document");
-if (sessionCopy.ok) assert((await contentOf(sessionCopy.value.docId)).nodes === 3, "from its stored snapshot");
+assert(sessionCopy.ok && sessionCopy.value.origin === "local" && !sessionCopy.value.sessionRoom, "a copy is an ordinary local document, not tied to the room");
+if (sessionCopy.ok) assert((await contentOf(sessionCopy.value.docId)).nodes === 3, "with the full content");
 
 console.log("\n=== Forget (WS2-R6) ===");
 if (dup.ok) {

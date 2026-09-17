@@ -25,7 +25,15 @@ import { GROUP_TYPES } from "./domain/groupRegistry";
 import { SHAPE_TYPES, globalShapeRegistry } from "./domain/shapeRegistry";
 import { reorderWithGroupsFirst, toAbsolutePosition } from "./domain/graphUtils";
 import type { DiagramPath } from "./domain/subDiagramTree";
-import { toDiagramFile, downloadDiagram, parseDiagramFile } from "./domain/serialization";
+import { toDiagramFile, downloadDiagram, downloadDiagramAs, parseDiagramFile } from "./domain/serialization";
+import {
+  loadTimedCopies,
+  saveTimedCopies,
+  timedCopyFileName,
+  isCopyDue,
+  TIMED_COPIES_TEST_SECONDS_KEY,
+  type TimedCopiesSettings,
+} from "./domain/timedCopies";
 import { loadAutosave, clearLegacyAutosave, hasLegacyAutosave, getAutosaveBlockedReason } from "./domain/autosave";
 import {
   resolveDocumentId,
@@ -548,7 +556,7 @@ function App() {
 
   // Starts a brand-new session on the document already open (WS1-R4).
   const startNewSession = useCallback(
-    (explicitKey?: string) => {
+    (explicitKey?: string, explicitRoom?: string) => {
       /**
        * Restarting a session used to mean copying the old session's content
        * back into React state before building a fresh document. With one
@@ -558,7 +566,9 @@ function App() {
       if (activeSessionRef.current) {
         endSession(activeSessionRef.current);
       }
-      const roomName = `session-${Math.random().toString(36).slice(2, 10)}`;
+      // An explicit room is a rehost (WS13-R12): the same room and key, so the
+      // original session link works again.
+      const roomName = explicitRoom ?? `session-${Math.random().toString(36).slice(2, 10)}`;
       const sessionKey = explicitKey && explicitKey.trim() ? explicitKey.trim() : generateSessionKey();
       /**
        * WS1-R4: the document the user has open BECOMES the session document,
@@ -851,6 +861,7 @@ function App() {
   const activeDocId =
     activeSession && activeSession.ownsDocument ? sessionDocumentId(activeSession.roomName) : openDocId;
   const activeRoom = activeSession?.roomName ?? null;
+  const activeKey = activeSession?.password ?? null;
 
   useEffect(() => {
     // The perf harness measures editing, not autosave - see
@@ -875,7 +886,10 @@ function App() {
       // readable fallback if the replica is damaged, and is the write whose
       // failure the durability indicator reports (WS2-R4). It replaces the
       // localStorage draft (WS2-R1).
-      const origin = activeRoom !== null ? ({ origin: "session", sessionRoom: activeRoom } as const) : ({ origin: "local" } as const);
+      const origin =
+        activeRoom !== null
+          ? ({ origin: "session", sessionRoom: activeRoom, sessionKey: activeKey ?? undefined } as const)
+          : ({ origin: "local" } as const);
       // WS13-R1: the attached file belongs to the open local document, never
       // to a joined session's content.
       if (activeDocId === openDocId) void writeToFile(JSON.stringify(file, null, 2));
@@ -900,7 +914,28 @@ function App() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [title, diagramSnapshot, scenarios, requirementsSnapshot, programIncrementsSnapshot, teamSnapshot, milestonesSnapshot, documentStore, activeDocId, activeRoom, openDocId, writeToFile, fileWriteEpoch]);
+  }, [title, diagramSnapshot, scenarios, requirementsSnapshot, programIncrementsSnapshot, teamSnapshot, milestonesSnapshot, documentStore, activeDocId, activeRoom, activeKey, openDocId, writeToFile, fileWriteEpoch]);
+
+  /**
+   * WS13-R12: the session this document was last shared in, if its room and
+   * key were kept - offered as "Resume session" so a former participant can
+   * host it again after everyone has left.
+   */
+  const [resumableSession, setResumableSession] = useState<{ room: string; key: string } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void documentStore.listDocuments().then((listed) => {
+      if (cancelled || !listed.ok) return;
+      const entry = listed.value.find((e) => e.docId === openDocId);
+      setResumableSession(
+        entry?.sessionRoom && entry.sessionKey ? { room: entry.sessionRoom, key: entry.sessionKey } : null
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Re-read when a session ends, which is when a room first becomes resumable.
+  }, [documentStore, openDocId, activeRoom]);
 
   /**
    * What the app currently knows about whether this document is safe
@@ -2322,6 +2357,39 @@ function App() {
     downloadDiagram(buildCurrentFile());
   }, [buildCurrentFile]);
 
+  /**
+   * Timed copies (WS13-R6): opt-in downloads at an interval, only when the
+   * document changed since the last one.
+   */
+  const [timedCopies, setTimedCopiesState] = useState<TimedCopiesSettings>(loadTimedCopies);
+  const setTimedCopies = useCallback((next: TimedCopiesSettings) => {
+    saveTimedCopies(next);
+    setTimedCopiesState(next);
+  }, []);
+  const buildCurrentFileRef = useRef(buildCurrentFile);
+  useLayoutEffect(() => {
+    buildCurrentFileRef.current = buildCurrentFile;
+  }, [buildCurrentFile]);
+  const lastCopied = useRef<string | null>(null);
+  useEffect(() => {
+    if (!timedCopies.enabled) return;
+    let intervalMs = timedCopies.minutes * 60_000;
+    if (isPerfInstrumentationActive()) {
+      // Instrumented builds only, so the browser suite need not wait minutes.
+      const seconds = Number(localStorage.getItem(TIMED_COPIES_TEST_SECONDS_KEY));
+      if (seconds > 0) intervalMs = seconds * 1000;
+    }
+    const timer = setInterval(() => {
+      const file = buildCurrentFileRef.current();
+      // metadata.updatedAt changes on every build; the content is what counts.
+      const content = JSON.stringify({ ...file, metadata: undefined });
+      if (!isCopyDue(content, lastCopied.current)) return;
+      lastCopied.current = content;
+      downloadDiagramAs(file, timedCopyFileName(file.title, new Date()));
+    }, intervalMs);
+    return () => clearInterval(timer);
+  }, [timedCopies]);
+
   const onChooseFile = useCallback(() => {
     const safeName = title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
     void fileSaving.attach(`${safeName || "diagram"}.json`);
@@ -2529,6 +2597,10 @@ function App() {
               showPeerCursors={showPeerCursors}
               onShowPeerCursorsChange={setShowPeerCursors}
               onStartSession={startNewSession}
+              resumableRoom={resumableSession?.room ?? null}
+              onResumeSession={
+                resumableSession ? () => startNewSession(resumableSession.key, resumableSession.room) : undefined
+              }
               onJoinSession={joinSession}
               onLeaveSession={requestLeave}
               onCopyLink={() => showToast("Session link copied to clipboard")}
@@ -2701,6 +2773,8 @@ function App() {
         library={documentLibrary}
         currentDocId={openDocId}
         onRenameCurrent={setTitle}
+        timedCopies={timedCopies}
+        onTimedCopiesChange={setTimedCopies}
         onOpenDocument={openDocumentInTab}
         onNewDocument={onNew}
       />
