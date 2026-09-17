@@ -14,24 +14,27 @@ SIGNALING_URL="${RELAY:-${RELAY_URL:-${SIGNALING_URL:-${VITE_SIGNALING_URL:-${VI
 APP_URL="${APP_URL:-${BASE_URL:-${VITE_APP_URL:-${VITE_BASE_URL:-}}}}"
 ICE_SERVERS="${ICE_SERVERS:-${VITE_ICE_SERVERS:-}}"
 
-# Escape backslashes and double quotes for valid JavaScript string literal, rejecting CR and LF
+# Escape backslashes and double quotes for valid JavaScript string literal,
+# stripping carriage returns (e.g. from Windows CRLF env files or host environments)
+# and rejecting unescaped line feeds.
 escape_js() {
-  CR="$(printf '\r')"
-  LF="$(printf '\n')"
-  case "$1" in
-    *"$CR"*|*"$LF"*)
-      echo "Error: line-feed and carriage-return characters are not allowed in configuration values" >&2
+  CLEANED="$(printf '%s' "$1" | tr -d '\r')"
+  LF="$(printf '\nx')"
+  LF="${LF%x}"
+  case "$CLEANED" in
+    *"$LF"*)
+      echo "Error: line-feed characters are not allowed in configuration values" >&2
       exit 1
       ;;
   esac
-  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+  printf '%s' "$CLEANED" | sed 's/\\/\\\\/g; s/"/\\"/g'
 }
 
 ESC_SIGNALING="$(escape_js "$SIGNALING_URL")"
 ESC_APP_URL="$(escape_js "$APP_URL")"
 ESC_ICE="$(escape_js "$ICE_SERVERS")"
 
-TARGET_FILE="/usr/share/nginx/html/env-config.js"
+TARGET_FILE="${TARGET_FILE:-/usr/share/nginx/html/env-config.js}"
 
 cat <<EOF > "$TARGET_FILE"
 // Runtime environment configuration generated on container startup
