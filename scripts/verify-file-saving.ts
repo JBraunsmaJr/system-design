@@ -111,6 +111,7 @@ const writeExternal = (p: Page, name: string, mutate: (title: string) => string)
     [name, mutate("")] as const
   );
 
+const nodeCount = (p: Page) => p.$$eval(".react-flow__node", (els) => els.length);
 const chipLabel = (p: Page) => p.textContent(".durability__chip span");
 const chipDetail = async (p: Page) => {
   if ((await p.getAttribute(".durability__chip", "aria-expanded")) !== "true") await p.click(".durability__chip");
@@ -151,6 +152,11 @@ async function launchBrowser(): Promise<Browser> {
       firefoxUserPrefs: {
         "media.peerconnection.ice.obfuscate_host_addresses": false,
         "media.peerconnection.ice.loopback": true,
+        // Without a media permission Firefox offers only its default-route
+        // address, and may offer none usable between two local profiles.
+        "media.peerconnection.ice.default_address_only": false,
+        "media.peerconnection.ice.no_host": false,
+        "media.navigator.permission.disabled": true,
       },
     });
     console.log(`Using Firefox ${ff.version()} (headless)`);
@@ -427,6 +433,12 @@ async function run() {
       await guest.click(".collab-panel__trigger");
       await guest.fill(".collab-panel__join-input", link);
       await guest.click(".collab-panel__join-button");
+      // Connection first, then the count: if the peers never meet, the count
+      // cannot arrive, and the failure should say which of the two it was.
+      const connected = await guest
+        .waitForFunction(() => document.querySelectorAll(".react-flow__node").length === 25, null, { timeout: 20000 })
+        .then(() => true, () => false);
+      check(connected, `the guest connects and sees the host's document (${await nodeCount(guest)} nodes)`);
       const counted = await host
         .waitForFunction(
           // Synchronous on purpose: a predicate returning a Promise counts as
@@ -441,6 +453,21 @@ async function run() {
         )
         .then(() => true, () => false);
       check(counted, "the host sees two saved copies once the guest joins (R10)");
+      if (!counted) {
+        const detailOf = async (page: Page) => {
+          const chip = page.locator(".durability__chip");
+          if ((await chip.getAttribute("aria-expanded")) !== "true") await chip.click().catch(() => {});
+          // The saved-copy sentence comes last.
+          return ((await page.textContent(".durability__detail").catch(() => "")) ?? "").slice(-110);
+        };
+        console.log(`  DIAGNOSTIC host detail: ${await detailOf(host)}`);
+        console.log(`  DIAGNOSTIC guest detail: ${await detailOf(guest)}`);
+        await host.click(".collab-panel__trigger").catch(() => {});
+        const peers = await host.locator(".collab-panel__peer-name").allTextContents().catch(() => []);
+        const relay = ((await host.textContent(".collab-panel__relay-status").catch(() => "")) ?? "").trim();
+        console.log(`  DIAGNOSTIC host sees peers: [${peers.join(", ")}]; relay: ${relay || "unknown"}`);
+        await host.keyboard.press("Escape").catch(() => {});
+      }
       await host.click(".collab-panel__trigger");
       await host.click(".collab-panel__leave-button");
       await sleep(500);
