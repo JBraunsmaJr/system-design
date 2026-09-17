@@ -302,37 +302,110 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
     return edge;
   }
 
+  /**
+   * Plain objects from the last snapshot, reused for every node and edge whose
+   * shared type did not change (WS1-R8, migration plan hazard 2.4).
+   *
+   * Rebuilding every object on every change made each write - one frame of a
+   * drag, one remote update - hand React Flow a brand new object for every
+   * node and edge. React Flow keeps its internal node only when the object is
+   * IDENTICAL to last time, so all of them re-rendered: a 20-step drag of one
+   * node rendered 16,000 nodes. Only the entries a transaction touched are
+   * rebuilt now; everything else keeps its identity.
+   */
+  const nodeCache = new Map<string, { source: Y.Map<unknown>; plain: Node<ArchNodeData> }>();
+  const edgeCache = new Map<string, { source: Y.Map<unknown>; plain: Edge<ArchEdgeData> }>();
+  const dirtyNodes = new Set<string>();
+  const dirtyEdges = new Set<string>();
+
+  function reuse<T>(
+    cache: Map<string, { source: Y.Map<unknown>; plain: T }>,
+    dirty: Set<string>,
+    id: string,
+    source: Y.Map<unknown>,
+    build: (id: string, m: Y.Map<unknown>) => T
+  ): T {
+    const hit = cache.get(id);
+    if (hit && hit.source === source && !dirty.has(id)) return hit.plain;
+    const plain = build(id, source);
+    cache.set(id, { source, plain });
+    return plain;
+  }
+
   function buildSnapshot(): { nodes: Node<ArchNodeData>[]; edges: Edge<ArchEdgeData>[] } {
     recordSnapshotBuild();
-    return {
-      nodes: nodeOrder
-        .toArray()
-        .map((id) => {
-          const m = nodesMap.get(id);
-          return m ? nodeMapToPlain(id, m) : null;
-        })
-        .filter((n): n is Node<ArchNodeData> => n !== null),
-      edges: edgeOrder
-        .toArray()
-        .map((id) => {
-          const m = edgesMap.get(id);
-          return m ? edgeMapToPlain(id, m) : null;
-        })
-        .filter((e): e is Edge<ArchEdgeData> => e !== null),
-    };
+    const nodeIds = nodeOrder.toArray();
+    const edgeIds = edgeOrder.toArray();
+    const nodes: Node<ArchNodeData>[] = [];
+    for (const id of nodeIds) {
+      const m = nodesMap.get(id);
+      if (m) nodes.push(reuse(nodeCache, dirtyNodes, id, m, nodeMapToPlain));
+    }
+    const edges: Edge<ArchEdgeData>[] = [];
+    for (const id of edgeIds) {
+      const m = edgesMap.get(id);
+      if (m) edges.push(reuse(edgeCache, dirtyEdges, id, m, edgeMapToPlain));
+    }
+    // Forget entries that are no longer in the document, so the caches cannot
+    // grow without bound across deletes.
+    if (nodeCache.size > nodes.length) {
+      const live = new Set(nodeIds);
+      for (const id of nodeCache.keys()) if (!live.has(id)) nodeCache.delete(id);
+    }
+    if (edgeCache.size > edges.length) {
+      const live = new Set(edgeIds);
+      for (const id of edgeCache.keys()) if (!live.has(id)) edgeCache.delete(id);
+    }
+    dirtyNodes.clear();
+    dirtyEdges.clear();
+    return { nodes, edges };
   }
 
   let cached = buildSnapshot();
+  let changed = false;
   const listeners = new Set<() => void>();
-  const recomputeAndNotify = () => {
+
+  /**
+   * Records which entries a transaction touched. `event.path` is relative to
+   * the observed root, so for anything nested inside an entry (a node's
+   * fields, an edge's waypoint array) its first segment is the entry's id.
+   * A change to the root map itself names the ids in `changes.keys`. Order
+   * arrays touch no entry's content, only the sequence.
+   */
+  const trackChanges = (dirty: Set<string>) => (events: Array<Y.YEvent<Y.AbstractType<unknown>>>) => {
+    for (const event of events) {
+      const [first] = event.path;
+      if (typeof first === "string") {
+        dirty.add(first);
+      } else if (event.path.length === 0 && event.target instanceof Y.Map) {
+        for (const key of event.changes.keys.keys()) dirty.add(key);
+      }
+    }
+    changed = true;
+  };
+  const onNodesChange = trackChanges(dirtyNodes);
+  const onEdgesChange = trackChanges(dirtyEdges);
+  const onOrderChange = () => {
+    changed = true;
+  };
+
+  /**
+   * One rebuild and one notification per transaction, however many of the
+   * four observed types it touched. afterTransaction fires once observers have
+   * run, so every change is already recorded.
+   */
+  const flush = () => {
+    if (!changed) return;
+    changed = false;
     cached = buildSnapshot();
     for (const listener of listeners) listener();
   };
 
-  /** Kept so destroy() can detach exactly what was attached - listing them
-   * again by hand would drift the moment a collection is added. */
-  const observed = [nodeOrder, nodesMap, edgeOrder, edgesMap];
-  for (const target of observed) target.observeDeep(recomputeAndNotify);
+  nodesMap.observeDeep(onNodesChange);
+  edgesMap.observeDeep(onEdgesChange);
+  nodeOrder.observe(onOrderChange);
+  edgeOrder.observe(onOrderChange);
+  doc.on("afterTransaction", flush);
   let destroyed = false;
 
   function isPathAtOrBelow(path: string[], ancestorPrefix: string[]): boolean {
@@ -348,7 +421,11 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
     destroy: () => {
       if (destroyed) return;
       destroyed = true;
-      for (const target of observed) target.unobserveDeep(recomputeAndNotify);
+      nodesMap.unobserveDeep(onNodesChange);
+      edgesMap.unobserveDeep(onEdgesChange);
+      nodeOrder.unobserve(onOrderChange);
+      edgeOrder.unobserve(onOrderChange);
+      doc.off("afterTransaction", flush);
     },
     replaceAll: (next) => {
       recordStoreWrite();

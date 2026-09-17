@@ -59,7 +59,7 @@ import type { ProgramIncrement } from "./domain/programIncrements";
 import type { TeamDocument } from "./domain/teamTypes";
 import { EMPTY_TEAM_DOCUMENT } from "./domain/teamTypes";
 import * as Y from "yjs";
-import { getNodesAtPath, getEdgesAtPath, unflattenToSubDiagram, hasSubDiagram, getBreadcrumbLabelsFlat } from "./collab/diagramStore";
+import { getNodesAtPath, getEdgesAtPath, unflattenToSubDiagram, getBreadcrumbLabelsFlat, levelKey, populatedLevels } from "./collab/diagramStore";
 import type { EdgeEndpoints } from "./domain/edgeReconnect";
 import type { Milestone } from "./domain/milestones";
 import { startCollabSession, type CollabSession, type PresenceInfo, type LocalPresenceInfo } from "./collab/session";
@@ -73,6 +73,19 @@ import { classifyNodeChanges, applySelectionChanges, isAutoSizedNodeType, type P
 import { recordCommit, isPerfInstrumentationActive, isPerfAutosaveSuppressed } from "./perf/instrumentation";
 import { getStandardFixture, type FixtureName } from "./perf/fixtures";
 import "./App.css";
+
+/**
+ * The objects the canvas was last handed for each store node/edge, reused
+ * while every derived input is unchanged. Keyed by the store's own object,
+ * which the store itself keeps stable for anything a change did not touch
+ * (yjsDiagramStore.ts) - so a drag re-renders the dragged node, not all of
+ * them. Weak, so entries go when the store drops the source object.
+ */
+const derivedNodes = new WeakMap<
+  Node<ArchNodeData>,
+  { zIndex: number | undefined; measured: Node["measured"]; selected: boolean; hasSub: boolean; out: Node<ArchNodeData> }
+>();
+const derivedEdges = new WeakMap<Edge<ArchEdgeData>, { selected: boolean; out: Edge<ArchEdgeData> }>();
 
 let idSeed = 0;
 const nextId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${idSeed++}`;
@@ -937,6 +950,7 @@ function App() {
   // instead, using selectedNodeIds/selectedEdgeIds as the sole source of
   // truth. This replaces what used to be tracked as a `.selected` field
   // persisted directly on the node/edge objects themselves.
+  const subDiagramLevels = useMemo(() => populatedLevels(diagramSnapshot.nodes), [diagramSnapshot]);
   const { nodes, edges } = useMemo(() => {
     const rawNodes = reorderWithGroupsFirst(getNodesAtPath(diagramSnapshot.nodes, path));
     const rawEdges = getEdgesAtPath(diagramSnapshot.edges, path);
@@ -957,34 +971,45 @@ function App() {
       }))
     );
 
+    const selectedNodes = new Set(selectedNodeIds);
+    const selectedEdges = new Set(selectedEdgeIds);
+
     return {
-      nodes: rawNodes.map((n) => ({
-        ...n,
-        // Stacking order, folded into this existing pass rather than
-        // computed again downstream - see domain/zOrder.ts for the rule.
-        // Derived from live geometry so a rectangle enlarged to enclose
-        // more nodes drops behind them without anyone reordering
-        // anything.
-        zIndex: zIndices.get(n.id),
-        // Re-attached on every snapshot because the store mints brand
-        // new node objects on any write, and React Flow reads `measured`
-        // EXCLUSIVELY off the node object the app hands it
-        // (adoptUserNodes: `measured: { width: userNode.measured?.width,
-        // ... }`) - it does not carry its own previously-measured value
-        // forward. Without this, every remote edit anywhere in the
-        // diagram wipes every node's measured size back to undefined,
-        // dropping geometry onto the `?? node.width ?? 0` fallback until
-        // a re-measure lands a frame later. This is each client's OWN
-        // measurement of its OWN DOM, deliberately never sent over the
-        // session - see isAutoSizedNodeType for why sharing it is what
-        // caused the mismatched connectors and selection outlines.
-        measured: measuredDimensions.get(n.id) ?? n.measured,
-        selected: selectedNodeIds.includes(n.id),
-        data: { ...n.data, hasSubDiagram: hasSubDiagram(diagramSnapshot.nodes, path, n.id) },
-      })),
-      edges: rawEdges.map((e) => ({ ...e, selected: selectedEdgeIds.includes(e.id) })),
+      nodes: rawNodes.map((n) => {
+        // Stacking order, folded into this existing pass rather than computed
+        // again downstream - see domain/zOrder.ts for the rule. Derived from
+        // live geometry so a rectangle enlarged to enclose more nodes drops
+        // behind them without anyone reordering anything.
+        const zIndex = zIndices.get(n.id);
+        // Re-attached because React Flow reads `measured` EXCLUSIVELY off the
+        // node object the app hands it (adoptUserNodes) and does not carry its
+        // own previous value forward - so a node the store rebuilds would
+        // otherwise lose its measured size until a re-measure a frame later.
+        // This is each client's OWN measurement of its OWN DOM, deliberately
+        // never sent over the session - see isAutoSizedNodeType.
+        const measured = measuredDimensions.get(n.id) ?? n.measured;
+        const selected = selectedNodes.has(n.id);
+        const hasSub = subDiagramLevels.has(levelKey([...path, n.id]));
+        // Same inputs, same object (WS1-R8): React Flow skips a node whose
+        // object is identical to last time, and re-renders it otherwise.
+        const hit = derivedNodes.get(n);
+        if (hit && hit.zIndex === zIndex && hit.measured === measured && hit.selected === selected && hit.hasSub === hasSub) {
+          return hit.out;
+        }
+        const out = { ...n, zIndex, measured, selected, data: { ...n.data, hasSubDiagram: hasSub } };
+        derivedNodes.set(n, { zIndex, measured, selected, hasSub, out });
+        return out;
+      }),
+      edges: rawEdges.map((e) => {
+        const selected = selectedEdges.has(e.id);
+        const hit = derivedEdges.get(e);
+        if (hit && hit.selected === selected) return hit.out;
+        const out = { ...e, selected };
+        derivedEdges.set(e, { selected, out });
+        return out;
+      }),
     };
-  }, [diagramSnapshot, path, selectedNodeIds, selectedEdgeIds, measuredDimensions]);
+  }, [diagramSnapshot, subDiagramLevels, path, selectedNodeIds, selectedEdgeIds, measuredDimensions]);
 
   // Only position/dimensions changes need to reach the store - selection
   // changes are handled separately (and more robustly, since it's the
@@ -1365,19 +1390,23 @@ function App() {
   // same math as onReparentNode).
   const onAdoptIntoGroup = useCallback(
     (groupId: string, nodeIds: string[], groupPosition?: { x: number; y: number }) => {
-      const group = nodes.find((n) => n.id === groupId);
+      // Read at call time, not captured: this callback travels through
+      // CanvasContext, so depending on `nodes` gave it a new identity on every
+      // change, and every node and edge component re-rendered with it (WS1-R8).
+      const current = nodesRef.current;
+      const group = current.find((n) => n.id === groupId);
       if (!group) return;
       const groupPos = groupPosition ?? group.position;
       for (const nodeId of nodeIds) {
         if (nodeId === groupId) continue;
-        const n = nodes.find((nn) => nn.id === nodeId);
+        const n = current.find((nn) => nn.id === nodeId);
         if (!n) continue;
-        const absolute = toAbsolutePosition(n, nodes, n.parentId);
+        const absolute = toAbsolutePosition(n, current, n.parentId);
         const relative = { x: absolute.x - groupPos.x, y: absolute.y - groupPos.y };
         diagramStore.updateParentId(nodeId, groupId, relative);
       }
     },
-    [nodes, diagramStore]
+    [diagramStore]
   );
 
   const onUpdateNode = useCallback(

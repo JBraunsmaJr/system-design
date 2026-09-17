@@ -260,6 +260,28 @@ export function hasSubDiagram(nodes: Node<ArchNodeData>[], parentPath: string[],
   return getNodesAtPath(nodes, [...parentPath, nodeId]).length > 0;
 }
 
+/** A tree level as a single comparable string. NUL cannot appear in an id. */
+export function levelKey(path: readonly string[]): string {
+  return path.join("\u0000");
+}
+
+/**
+ * Every level that has at least one node, as levelKey strings - so "does node
+ * X at `path` have a populated sub-diagram" is
+ * `owners.has(levelKey([...path, X]))`.
+ *
+ * Built once per snapshot. Calling hasSubDiagram for every node on screen
+ * scans every node for each, which is quadratic per frame.
+ */
+export function populatedLevels(nodes: Node<ArchNodeData>[]): Set<string> {
+  const levels = new Set<string>();
+  for (const n of nodes) {
+    const parentPath = (n.data as ArchNodeData & { parentPath?: string[] }).parentPath ?? [];
+    if (parentPath.length > 0) levels.add(levelKey(parentPath));
+  }
+  return levels;
+}
+
 /** Flattens a recursive SubDiagram tree - root plus every nested
  * sub-diagram, at any depth - into the flat, parentPath-tagged shape
  * this whole module works with. Originally written inline inside
