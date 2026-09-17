@@ -141,6 +141,16 @@ async function waitForLabel(p: Page, label: string, timeout = 5000) {
  */
 const BROWSER = (process.env.E2E_BROWSER ?? "chromium").toLowerCase();
 const SIMULATE_NO_FILE_ACCESS = process.env.E2E_SIMULATE_NO_FILE_ACCESS === "1";
+/**
+ * Whether the two R10/R11 participants share one browser context (two tabs)
+ * instead of two. Same-context tabs sync over BroadcastChannel, with no WebRTC.
+ * On for Firefox: Playwright's Firefox never established a peer connection
+ * between two of its instances (Windows and CI Linux alike, relay connected),
+ * while the leave-guard logic this section covers does not depend on the
+ * transport. WebRTC between peers is covered in Chromium, which keeps two
+ * contexts, and by verify-session-link.ts.
+ */
+const PEERS_SAME_CONTEXT = BROWSER === "firefox" || process.env.E2E_PEERS_SAME_CONTEXT === "1";
 
 async function launchBrowser(): Promise<Browser> {
   if (BROWSER === "firefox") {
@@ -396,6 +406,33 @@ async function run() {
     }
 
     console.log("\n=== R11: the leave guard ===");
+    if (BROWSER === "firefox") {
+      // Informational: whether this browser can open a WebRTC data channel at
+      // all, between two connections in one page.
+      const rtc = await p
+        .evaluate(async () => {
+          if (typeof RTCPeerConnection !== "function") return "RTCPeerConnection is not available";
+          const a = new RTCPeerConnection();
+          const b = new RTCPeerConnection();
+          a.onicecandidate = (e) => e.candidate && b.addIceCandidate(e.candidate).catch(() => {});
+          b.onicecandidate = (e) => e.candidate && a.addIceCandidate(e.candidate).catch(() => {});
+          const opened = new Promise<string>((resolve) => {
+            b.ondatachannel = (e) => (e.channel.onopen = () => resolve("data channel opened"));
+            setTimeout(() => resolve(`no data channel after 8s (ice: ${a.iceConnectionState}/${b.iceConnectionState})`), 8000);
+          });
+          a.createDataChannel("probe");
+          await a.setLocalDescription(await a.createOffer());
+          await b.setRemoteDescription(a.localDescription!);
+          await b.setLocalDescription(await b.createAnswer());
+          await a.setRemoteDescription(b.localDescription!);
+          const result = await opened;
+          a.close();
+          b.close();
+          return result;
+        })
+        .catch((e) => `probe failed: ${String(e).slice(0, 120)}`);
+      console.log(`  INFO WebRTC in this Firefox: ${rtc}`);
+    }
     {
       const hostCtx = await newContext();
       const host = await hostCtx.newPage();
@@ -426,7 +463,8 @@ async function run() {
       check((await host.locator(".leave-guard").count()) === 0, "Stay keeps the session");
       await host.keyboard.press("Escape");
 
-      const guestCtx = await newContext();
+      const guestCtx = PEERS_SAME_CONTEXT ? hostCtx : await newContext();
+      if (PEERS_SAME_CONTEXT) console.log("  (guest is a second tab in the host's browser context: BroadcastChannel, no WebRTC)");
       const guest = await guestCtx.newPage();
       await guest.goto(`${app}?doc=guest-local`);
       await ready(guest);
