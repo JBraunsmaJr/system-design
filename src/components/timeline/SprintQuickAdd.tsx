@@ -4,6 +4,7 @@ import { Plus } from "lucide-react";
 import { getItemType } from "../../domain/requirementsRegistry";
 import { computeFlippedPosition } from "../../domain/popoverPosition";
 import type { RequirementItem, RequirementsDocument } from "../../domain/requirementsTypes";
+import { HighlightedText, HighlightedTitle } from "../requirements/HighlightText";
 
 interface SprintQuickAddProps {
   backlogItems: RequirementItem[];
@@ -166,9 +167,13 @@ export function SprintQuickAdd({ backlogItems, requirements, onAssign }: SprintQ
                     }}
                   >
                     <span className="sprint-quick-add__option-id" style={{ color: type?.color ?? "var(--chrome-text-dim)" }}>
-                      {item.id}
+                      <HighlightedText text={item.id} search={q} />
                     </span>
-                    <span className="sprint-quick-add__option-title">{item.title || "(untitled)"}</span>
+                    <HighlightedTitle
+                      className="sprint-quick-add__option-title"
+                      text={item.title || "(untitled)"}
+                      search={q}
+                    />
                   </button>
                 );
               })}

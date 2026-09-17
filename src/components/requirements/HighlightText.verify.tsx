@@ -61,7 +61,7 @@ console.log("\n=== HighlightedTitle ===");
   assert(!html.includes('search-highlight--ellipsis'), "ellipsis is not highlighted");
 }
 
-// Test 3: Truncated title with match AFTER the ... (in the truncated portion)
+// Test 3: Truncated title with match in the cut-off portion (reformatted to show searched text with context)
 {
   const html = renderToStaticMarkup(
     React.createElement(HighlightedTitle, {
@@ -71,13 +71,39 @@ console.log("\n=== HighlightedTitle ===");
     })
   );
   assert(
-    html.includes('<mark class="search-highlight search-highlight--ellipsis">...</mark>'),
-    "ellipsis is highlighted when match is after the ..."
+    html.includes('<mark class="search-highlight">SAML</mark>'),
+    "searched term in cut-off portion is rendered and highlighted"
   );
-  assert(!html.includes('<mark class="search-highlight">SAML</mark>'), "SAML is in hidden text so not directly rendered in visible text");
+  assert(
+    html.includes('<span class="search-ellipsis">...</span>'),
+    "leading ellipsis is rendered before the context"
+  );
+  assert(
+    html.includes("OAuth2 and"),
+    "context before the searched match is rendered"
+  );
 }
 
-// Test 4: Truncated title with matches both in visible portion and after the ...
+// Test 4: Truncated title with match in the middle of long text
+{
+  const html = renderToStaticMarkup(
+    React.createElement(HighlightedTitle, {
+      text: "User authentication system with OAuth2 and SAML 2.0 Single Sign-On",
+      search: "OAuth2",
+      fallbackMaxChars: 25,
+    })
+  );
+  assert(
+    html.includes('<mark class="search-highlight">OAuth2</mark>'),
+    "OAuth2 match in middle is rendered and highlighted"
+  );
+  assert(
+    html.includes('<span class="search-ellipsis">...</span>'),
+    "ellipses are rendered around the context snippet"
+  );
+}
+
+// Test 5: Truncated title with matches both at beginning and later
 {
   const html = renderToStaticMarkup(
     React.createElement(HighlightedTitle, {
@@ -87,13 +113,10 @@ console.log("\n=== HighlightedTitle ===");
     })
   );
   assert(html.includes('<mark class="search-highlight">Auth</mark>'), "visible Auth match is highlighted");
-  assert(
-    html.includes('<mark class="search-highlight search-highlight--ellipsis">...</mark>'),
-    "ellipsis is also highlighted for the Auth match after the ..."
-  );
+  assert(html.includes('<span class="search-ellipsis">...</span>'), "trailing ellipsis is rendered");
 }
 
-// Test 5: Truncated title with no match in title
+// Test 6: Truncated title with no match in title
 {
   const html = renderToStaticMarkup(
     React.createElement(HighlightedTitle, {

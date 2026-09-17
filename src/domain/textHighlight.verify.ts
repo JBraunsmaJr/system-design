@@ -47,7 +47,7 @@ const charMeasure = (s: string) => s.length;
   assert(!res.hasMatchInTruncated, "no match in truncated");
 }
 
-// Case 2: Truncated, match is only in visible part
+// Case 2: Truncated, match is near the beginning and fits in visible prefix
 {
   // availableWidth = 20, "..." takes 3 chars, so targetWidth = 17 chars fits "User authenticati"
   const title = "User authentication with OAuth2 and SAML";
@@ -55,38 +55,41 @@ const charMeasure = (s: string) => s.length;
   assert(res.isTruncated, "is truncated");
   assert(res.visibleText === "User authenticati", `visible text is truncated: ${res.visibleText}`);
   assert(res.hasMatchInVisible, "has match in visible");
-  assert(!res.hasMatchInTruncated, "no match in truncated");
+  assert(!res.leadingEllipsis, "no leading ellipsis");
+  assert(res.trailingEllipsis, "has trailing ellipsis");
 }
 
-// Case 3: Truncated, match is only after the ...
+// Case 3: Truncated, match is in the cut-off portion at the end
 {
   const title = "User authentication with OAuth2 and SAML";
   const res = computeTruncationWithHighlight(title, "SAML", 20, charMeasure);
   assert(res.isTruncated, "is truncated");
-  assert(res.visibleText === "User authenticati", "visible text prefix");
-  assert(!res.hasMatchInVisible, "no match in visible");
-  assert(res.hasMatchInTruncated, "has match in truncated (after the ...)");
+  assert(res.hasMatchInVisible, "has match in visible text");
+  assert(res.visibleText.includes("SAML"), `visible text includes searched term: ${res.visibleText}`);
+  assert(res.leadingEllipsis, "has leading ellipsis before context");
+  assert(!res.trailingEllipsis, "no trailing ellipsis since it reaches end of text");
 }
 
-// Case 4: Truncated, matches both in visible part and after the ...
+// Case 4: Truncated, match is in the middle of a long text
+{
+  const title = "User authentication system with OAuth2 and SAML 2.0 Single Sign-On";
+  const res = computeTruncationWithHighlight(title, "OAuth2", 25, charMeasure);
+  assert(res.isTruncated, "is truncated");
+  assert(res.hasMatchInVisible, "has match in visible");
+  assert(res.visibleText.includes("OAuth2"), `visible text includes searched term: ${res.visibleText}`);
+  assert(res.leadingEllipsis, "has leading ellipsis");
+  assert(res.trailingEllipsis, "has trailing ellipsis");
+}
+
+// Case 5: Truncated, multiple matches with first match at the beginning
 {
   const title = "Auth service with Auth token verification";
   const res = computeTruncationWithHighlight(title, "Auth", 20, charMeasure);
   assert(res.isTruncated, "is truncated");
   assert(res.hasMatchInVisible, "has match in visible");
-  assert(res.hasMatchInTruncated, "has match in truncated (after the ...)");
-}
-
-// Case 5: Truncated, match straddles across truncation boundary
-{
-  const title = "User authentication with OAuth2";
-  // cutIndex will fall in the middle of "authentication"
-  // e.g. targetWidth = 10 -> visibleText = "User authe"
-  const res = computeTruncationWithHighlight(title, "authentication", 13, charMeasure);
-  assert(res.isTruncated, "is truncated");
-  assert(res.visibleText === "User authe", `visibleText: ${res.visibleText}`);
-  assert(res.hasMatchInVisible, "straddling match is in visible");
-  assert(res.hasMatchInTruncated, "straddling match also extends into truncated (after ...)");
+  assert(res.visibleText === "Auth service with", `visibleText is: ${res.visibleText}`);
+  assert(!res.leadingEllipsis, "no leading ellipsis");
+  assert(res.trailingEllipsis, "has trailing ellipsis");
 }
 
 // Case 6: Truncated, query does not match title at all
@@ -95,7 +98,9 @@ const charMeasure = (s: string) => s.length;
   const res = computeTruncationWithHighlight(title, "Database", 20, charMeasure);
   assert(res.isTruncated, "is truncated");
   assert(!res.hasMatchInVisible, "no match in visible");
-  assert(!res.hasMatchInTruncated, "no match in truncated");
+  assert(res.visibleText === "User authenticati", `visibleText is: ${res.visibleText}`);
+  assert(!res.leadingEllipsis, "no leading ellipsis");
+  assert(res.trailingEllipsis, "has trailing ellipsis");
 }
 
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);

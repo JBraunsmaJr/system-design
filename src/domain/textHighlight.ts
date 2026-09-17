@@ -62,12 +62,15 @@ export interface TruncationHighlightResult {
   visibleText: string;
   hasMatchInVisible: boolean;
   hasMatchInTruncated: boolean;
+  leadingEllipsis: boolean;
+  trailingEllipsis: boolean;
   ellipsis: string;
 }
 
 /**
  * Computes how a text should be truncated given an available width and a width-measuring function.
- * Also determines whether search query matches appear in the visible text and/or in the truncated part (after the ellipsis).
+ * If a search query matches within a cut-off portion of the text, it reformats the visible slice
+ * to window around the search match with context and leading/trailing ellipses as appropriate.
  */
 export function computeTruncationWithHighlight(
   text: string,
@@ -82,6 +85,8 @@ export function computeTruncationWithHighlight(
       visibleText: "",
       hasMatchInVisible: false,
       hasMatchInTruncated: false,
+      leadingEllipsis: false,
+      trailingEllipsis: false,
       ellipsis,
     };
   }
@@ -97,54 +102,180 @@ export function computeTruncationWithHighlight(
       visibleText: text,
       hasMatchInVisible: hasAnyMatch,
       hasMatchInTruncated: false,
+      leadingEllipsis: false,
+      trailingEllipsis: false,
       ellipsis,
     };
   }
 
   const ellipsisWidth = measureText(ellipsis);
-  const targetWidth = Math.max(0, availableWidth - ellipsisWidth);
 
-  // Binary search for the maximum prefix that fits within targetWidth
+  if (!hasAnyMatch) {
+    const targetWidth = Math.max(0, availableWidth - ellipsisWidth);
+    let low = 0;
+    let high = text.length;
+    let cutIndex = 0;
+
+    while (low <= high) {
+      const mid = Math.floor((low + high) / 2);
+      const prefix = text.slice(0, mid);
+      const width = measureText(prefix);
+      if (width <= targetWidth) {
+        cutIndex = mid;
+        low = mid + 1;
+      } else {
+        high = mid - 1;
+      }
+    }
+
+    return {
+      isTruncated: true,
+      visibleText: text.slice(0, cutIndex),
+      hasMatchInVisible: false,
+      hasMatchInTruncated: false,
+      leadingEllipsis: false,
+      trailingEllipsis: true,
+      ellipsis,
+    };
+  }
+
+  // There is a match in the text.
+  const matchStart = lowerText.indexOf(lowerQuery);
+  const matchEnd = matchStart + lowerQuery.length;
+
+  // Check if standard prefix truncation starting from 0 includes the entire first match
+  const prefixTargetWidth = Math.max(0, availableWidth - ellipsisWidth);
   let low = 0;
   let high = text.length;
-  let cutIndex = 0;
+  let prefixCutIndex = 0;
 
   while (low <= high) {
     const mid = Math.floor((low + high) / 2);
     const prefix = text.slice(0, mid);
     const width = measureText(prefix);
-    if (width <= targetWidth) {
-      cutIndex = mid;
+    if (width <= prefixTargetWidth) {
+      prefixCutIndex = mid;
       low = mid + 1;
     } else {
       high = mid - 1;
     }
   }
 
-  const visibleText = text.slice(0, cutIndex);
-
-  let hasMatchInVisible = false;
-  let hasMatchInTruncated = false;
-
-  if (hasAnyMatch) {
-    let matchIdx = lowerText.indexOf(lowerQuery, 0);
-    while (matchIdx !== -1) {
-      const matchEnd = matchIdx + lowerQuery.length;
-      if (matchIdx < cutIndex) {
-        hasMatchInVisible = true;
-      }
-      if (matchEnd > cutIndex) {
+  if (prefixCutIndex >= matchEnd) {
+    let hasMatchInTruncated = false;
+    let nextMatch = lowerText.indexOf(lowerQuery, matchEnd);
+    while (nextMatch !== -1) {
+      if (nextMatch + lowerQuery.length > prefixCutIndex) {
         hasMatchInTruncated = true;
+        break;
       }
-      matchIdx = lowerText.indexOf(lowerQuery, matchIdx + 1);
+      nextMatch = lowerText.indexOf(lowerQuery, nextMatch + 1);
+    }
+
+    return {
+      isTruncated: true,
+      visibleText: text.slice(0, prefixCutIndex),
+      hasMatchInVisible: true,
+      hasMatchInTruncated,
+      leadingEllipsis: false,
+      trailingEllipsis: true,
+      ellipsis,
+    };
+  }
+
+  // The match is in the cut-off portion. Compute a snippet window centered/framed around the match.
+  const matchText = text.slice(matchStart, matchEnd);
+  const matchWidth = measureText(matchText);
+
+  // If the match itself plus two ellipses is wider than available width
+  if (matchWidth + 2 * ellipsisWidth >= availableWidth) {
+    const startIdx = matchStart;
+    const leadingEllipsis = startIdx > 0;
+    const requiredStartEllipsis = leadingEllipsis ? ellipsisWidth : 0;
+    let endIdx = matchStart;
+
+    while (endIdx < matchEnd) {
+      const candidateWidth =
+        requiredStartEllipsis +
+        measureText(text.slice(startIdx, endIdx + 1)) +
+        (endIdx + 1 < text.length ? ellipsisWidth : 0);
+      if (candidateWidth <= availableWidth) {
+        endIdx++;
+      } else {
+        break;
+      }
+    }
+
+    // Ensure at least 1 character if possible
+    if (endIdx === startIdx && endIdx < text.length) {
+      endIdx = startIdx + 1;
+    }
+
+    return {
+      isTruncated: true,
+      visibleText: text.slice(startIdx, endIdx),
+      hasMatchInVisible: true,
+      hasMatchInTruncated: endIdx < matchEnd || text.length > endIdx,
+      leadingEllipsis,
+      trailingEllipsis: endIdx < text.length,
+      ellipsis,
+    };
+  }
+
+  // Match fits within availableWidth with room for context
+  const remainingBudget = Math.max(0, availableWidth - matchWidth - 2 * ellipsisWidth);
+  const halfBudget = remainingBudget / 2;
+
+  let startIdx = matchStart;
+  // Step 1: Expand backwards from matchStart
+  while (startIdx > 0 && measureText(text.slice(startIdx - 1, matchStart)) <= halfBudget) {
+    startIdx--;
+  }
+
+  let endIdx = matchEnd;
+  // Step 2: Expand forwards from matchEnd
+  while (endIdx < text.length) {
+    const testLeading = startIdx > 0 ? ellipsisWidth : 0;
+    const testTrailing = endIdx + 1 < text.length ? ellipsisWidth : 0;
+    const totalWidth = testLeading + measureText(text.slice(startIdx, endIdx + 1)) + testTrailing;
+    if (totalWidth <= availableWidth) {
+      endIdx++;
+    } else {
+      break;
+    }
+  }
+
+  // Step 3: Reclaim any unused right space by expanding further backwards if startIdx > 0
+  while (startIdx > 0) {
+    const testLeading = startIdx - 1 > 0 ? ellipsisWidth : 0;
+    const testTrailing = endIdx < text.length ? ellipsisWidth : 0;
+    const totalWidth = testLeading + measureText(text.slice(startIdx - 1, endIdx)) + testTrailing;
+    if (totalWidth <= availableWidth) {
+      startIdx--;
+    } else {
+      break;
+    }
+  }
+
+  // Step 4: Reclaim any remaining space by expanding forwards
+  while (endIdx < text.length) {
+    const testLeading = startIdx > 0 ? ellipsisWidth : 0;
+    const testTrailing = endIdx + 1 < text.length ? ellipsisWidth : 0;
+    const totalWidth = testLeading + measureText(text.slice(startIdx, endIdx + 1)) + testTrailing;
+    if (totalWidth <= availableWidth) {
+      endIdx++;
+    } else {
+      break;
     }
   }
 
   return {
     isTruncated: true,
-    visibleText,
-    hasMatchInVisible,
-    hasMatchInTruncated,
+    visibleText: text.slice(startIdx, endIdx),
+    hasMatchInVisible: true,
+    hasMatchInTruncated: startIdx > 0 || endIdx < text.length,
+    leadingEllipsis: startIdx > 0,
+    trailingEllipsis: endIdx < text.length,
     ellipsis,
   };
 }

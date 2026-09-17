@@ -57,8 +57,8 @@ function getTextWidth(text: string, font: string): number {
 /**
  * Renders a requirement title with search match highlighting.
  * If the title overflows the container, it truncates with an ellipsis.
- * If the match (or any part of the match) is in the truncated portion after the ellipsis,
- * the ellipsis itself is highlighted (<mark className="search-highlight search-highlight--ellipsis">...</mark>).
+ * If the match is in a cut-off portion of the title, it reformats the text to render
+ * the search match with surrounding context and leading/trailing ellipses as needed.
  */
 export function HighlightedTitle({
   text,
@@ -80,9 +80,16 @@ export function HighlightedTitle({
     if (!el) return;
 
     const updateMeasurements = () => {
-      const width = el.clientWidth;
-      const style = window.getComputedStyle(el);
-      const font = `${style.fontWeight || "normal"} ${style.fontSize || "14px"} ${style.fontFamily || "sans-serif"}`;
+      let width = el.clientWidth;
+      if (width <= 0 && el.parentElement) {
+        width = el.parentElement.clientWidth;
+      }
+      if (width <= 0) {
+        const rect = el.getBoundingClientRect();
+        width = rect.width;
+      }
+      const computedStyle = window.getComputedStyle(el);
+      const font = `${computedStyle.fontWeight || "normal"} ${computedStyle.fontSize || "14px"} ${computedStyle.fontFamily || "sans-serif"}`;
       setContainerWidth(width);
       setComputedFont(font);
     };
@@ -94,6 +101,9 @@ export function HighlightedTitle({
         updateMeasurements();
       });
       observer.observe(el);
+      if (el.parentElement) {
+        observer.observe(el.parentElement);
+      }
       return () => observer.disconnect();
     }
   }, [displayText, trimmedSearch]);
@@ -124,7 +134,17 @@ export function HighlightedTitle({
 
   if (!displayText) {
     return (
-      <span ref={containerRef} className={className} style={style} title={placeholder}>
+      <span
+        ref={containerRef}
+        className={className}
+        style={{
+          display: "block",
+          width: "100%",
+          maxWidth: "100%",
+          ...style,
+        }}
+        title={placeholder}
+      >
         {placeholder}
       </span>
     );
@@ -136,10 +156,13 @@ export function HighlightedTitle({
         ref={containerRef}
         className={className}
         style={{
-          ...style,
+          display: "block",
+          width: "100%",
+          maxWidth: "100%",
           overflow: "hidden",
           textOverflow: "ellipsis",
           whiteSpace: "nowrap",
+          ...style,
         }}
         title={displayText}
       >
@@ -155,16 +178,20 @@ export function HighlightedTitle({
         ref={containerRef}
         className={className}
         style={{
-          ...style,
+          display: "block",
+          width: "100%",
+          maxWidth: "100%",
           overflow: "hidden",
           whiteSpace: "nowrap",
+          ...style,
         }}
         title={displayText}
       >
+        {truncationResult.leadingEllipsis && (
+          <span className="search-ellipsis">{truncationResult.ellipsis}</span>
+        )}
         <HighlightedText text={truncationResult.visibleText} search={trimmedSearch} />
-        {truncationResult.hasMatchInTruncated ? (
-          <mark className="search-highlight search-highlight--ellipsis">{truncationResult.ellipsis}</mark>
-        ) : (
+        {truncationResult.trailingEllipsis && (
           <span className="search-ellipsis">{truncationResult.ellipsis}</span>
         )}
       </span>
@@ -177,10 +204,13 @@ export function HighlightedTitle({
       ref={containerRef}
       className={className}
       style={{
-        ...style,
+        display: "block",
+        width: "100%",
+        maxWidth: "100%",
         overflow: "hidden",
         textOverflow: "ellipsis",
         whiteSpace: "nowrap",
+        ...style,
       }}
       title={displayText}
     >
