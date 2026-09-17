@@ -431,6 +431,7 @@ export function RequirementsView({
                   highlighted={highlightedId === item.id}
                   peersHere={peers.length === 0 ? EMPTY_PEERS : peers.filter((p) => p.focusedItemId === item.id)}
                   onEditingChange={onEditingChange}
+                  searchQuery={search.trim()}
                 />
               ))}
             </section>

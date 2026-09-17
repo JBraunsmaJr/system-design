@@ -9,8 +9,8 @@ import {
 } from "../../domain/milestones";
 import type { RequirementsDocument } from "../../domain/requirementsTypes";
 import { getItemType, isItemWorkable } from "../../domain/requirementsRegistry";
-import type { ProgramIncrement } from "../../domain/programIncrements";
-import { computeSprintDateRanges } from "../../domain/programIncrements";
+import { computeSprintDateRanges, type ProgramIncrement } from "../../domain/programIncrements";
+import { HighlightedText, HighlightedTitle } from "../requirements/HighlightText";
 import { RequirementBody } from "../requirements/RequirementBody";
 
 function formatTypeFilterLabel(label: string): string {
@@ -449,14 +449,13 @@ export function MilestoneDetailModal({
                             className="milestone-detail-modal__item-id"
                             style={{ color: itemType?.color ?? "var(--accent)" }}
                           >
-                            {item.id}
+                            <HighlightedText text={item.id} search={workableSearch.trim()} />
                           </span>
-                          <span
+                          <HighlightedTitle
                             className="milestone-detail-modal__item-title"
-                            title={item.title || "Untitled"}
-                          >
-                            {item.title || "Untitled"}
-                          </span>
+                            text={item.title || "Untitled"}
+                            search={workableSearch.trim()}
+                          />
                           {isItemWorkable(doc, item) && item.points !== undefined && (
                             <span className="milestone-detail-modal__item-pts">{item.points} pts</span>
                           )}

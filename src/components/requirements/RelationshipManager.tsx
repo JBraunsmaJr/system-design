@@ -10,6 +10,7 @@ import {
 } from "../../domain/requirementsRegistry";
 import { computeFlippedPosition } from "../../domain/popoverPosition";
 import type { RequirementsDocument } from "../../domain/requirementsTypes";
+import { HighlightedText, HighlightedTitle } from "./HighlightText";
 
 interface RelationshipManagerProps {
   itemId: string;
@@ -387,9 +388,13 @@ export function RelationshipManager({
                               : undefined
                           }
                         >
-                          {item.id}
+                          <HighlightedText text={item.id} search={query.trim()} />
                         </span>
-                        <span className="relationship-manager__option-title">{item.title || "(untitled)"}</span>
+                        <HighlightedTitle
+                          className="relationship-manager__option-title"
+                          text={item.title || "(untitled)"}
+                          search={query.trim()}
+                        />
                         <Plus size={13} className="relationship-manager__option-add" />
                       </button>
                     );

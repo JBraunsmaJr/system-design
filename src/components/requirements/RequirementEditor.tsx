@@ -337,6 +337,7 @@ export function RequirementEditor({ value, onChange, onDone, doc, autoFocus, pla
             position={popoverPos}
             onSelect={insertReference}
             onHoverIndex={setSelectedIndex}
+            searchQuery={trigger.query}
           />,
           document.body
         )}

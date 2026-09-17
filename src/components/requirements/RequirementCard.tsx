@@ -13,6 +13,7 @@ import { SprintPicker } from "./SprintPicker";
 import { RelationshipManager } from "./RelationshipManager";
 import { MemberPicker } from "../team/MemberPicker";
 import { PointsPicker } from "../team/PointsPicker";
+import { HighlightedText, HighlightedTitle } from "./HighlightText";
 import type { RequirementItem, RequirementsDocument } from "../../domain/requirementsTypes";
 import type { ProgramIncrement } from "../../domain/programIncrements";
 import type { TeamDocument } from "../../domain/teamTypes";
@@ -60,6 +61,7 @@ interface RequirementCardProps {
    * function identity on every render, so comparing it would disable
    * memoization for every card, permanently. */
   onEditingChange?: (itemId: string, isEditing: boolean) => void;
+  searchQuery?: string;
 }
 
 function RequirementCardImpl({
@@ -82,8 +84,10 @@ function RequirementCardImpl({
   highlighted,
   peersHere = [],
   onEditingChange,
+  searchQuery,
 }: RequirementCardProps) {
   const [isEditingBody, setIsEditingBody] = useState(false);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
   // Reports every genuine transition, not the initial mount - a card
   // that's never been edited shouldn't fire a spurious "not editing"
   // the moment it renders, since nothing changed yet.
@@ -108,7 +112,7 @@ function RequirementCardImpl({
       <div className="requirement-card__header">
         <div className="requirement-card__header-row">
           <span className="requirement-card__id" style={{ color: type?.color ?? "var(--chrome-text-dim)" }}>
-            {item.id}
+            <HighlightedText text={item.id} search={searchQuery} />
           </span>
           <TypePicker
             doc={doc}
@@ -117,7 +121,7 @@ function RequirementCardImpl({
               if (onConvertItemType) {
                 onConvertItemType(item.id, newTypeId);
               } else {
-                onUpdateItem(item.id, { typeId: newTypeId } as any);
+                onUpdateItem(item.id, { typeId: newTypeId });
               }
             }}
           />
@@ -140,6 +144,7 @@ function RequirementCardImpl({
             onCreateAndAssign={(label) => onCreateAndAssignCategory(item.id, label)}
             onClear={() => onUpdateItem(item.id, { categoryId: undefined })}
             onDelete={onDeleteCategory}
+            searchQuery={searchQuery}
           />
           {isItemWorkable(doc, item) && (
             <SprintPicker
@@ -173,13 +178,39 @@ function RequirementCardImpl({
             <Trash2 size={13} />
           </button>
         </div>
-        <input
-          className="requirement-card__title"
-          value={item.title}
-          placeholder="Untitled"
-          title={item.title || undefined}
-          onChange={(e) => onUpdateItem(item.id, { title: e.target.value })}
-        />
+        {isEditingTitle ? (
+          <input
+            className="requirement-card__title"
+            autoFocus
+            value={item.title}
+            placeholder="Untitled"
+            title={item.title || undefined}
+            onChange={(e) => onUpdateItem(item.id, { title: e.target.value })}
+            onBlur={() => setIsEditingTitle(false)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === "Escape") {
+                setIsEditingTitle(false);
+              }
+            }}
+          />
+        ) : (
+          <div
+            className="requirement-card__title requirement-card__title--display"
+            tabIndex={0}
+            role="textbox"
+            aria-label={`Title for ${item.id}`}
+            onClick={() => setIsEditingTitle(true)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setIsEditingTitle(true);
+              }
+            }}
+            title={item.title || undefined}
+          >
+            <HighlightedTitle text={item.title} search={searchQuery} />
+          </div>
+        )}
       </div>
       {isEditingBody ? (
         <RequirementEditor
@@ -192,7 +223,7 @@ function RequirementCardImpl({
         />
       ) : (
         <div onDoubleClick={() => setIsEditingBody(true)} className="requirement-card__body-wrap">
-          <RequirementBody text={item.body} doc={doc} onNavigateToItem={onNavigateToItem} />
+          <RequirementBody text={item.body} doc={doc} onNavigateToItem={onNavigateToItem} searchQuery={searchQuery} />
         </div>
       )}
       <RelationshipManager
@@ -254,6 +285,7 @@ function propsAreEqual(prev: RequirementCardProps, next: RequirementCardProps): 
     prev.diagramRoot === next.diagramRoot &&
     prev.linkedNodes === next.linkedNodes &&
     prev.highlighted === next.highlighted &&
+    prev.searchQuery === next.searchQuery &&
     prev.onNavigateToNode === next.onNavigateToNode &&
     prev.onCreateLinkedNode === next.onCreateLinkedNode &&
     prev.onUpdateItem === next.onUpdateItem &&
