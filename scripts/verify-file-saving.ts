@@ -48,6 +48,16 @@ const FAKE_FILE_ACCESS = `(() => {
     if (mode() === "prompt") localStorage.setItem("fake-permission", "granted");
     return mode() === "denied" ? "denied" : "granted";
   };
+  // Remembers the file by name rather than storing the handle: reading an
+  // origin-private handle back out of IndexedDB ends Chromium on Windows.
+  window.__TEST_FILE_HANDLE_STORE__ = {
+    get: async (docId) => {
+      const name = localStorage.getItem("test-file-handle:" + docId);
+      return name ? (await navigator.storage.getDirectory()).getFileHandle(name) : null;
+    },
+    set: async (docId, handle) => localStorage.setItem("test-file-handle:" + docId, handle.name),
+    delete: async (docId) => localStorage.removeItem("test-file-handle:" + docId),
+  };
   if (localStorage.getItem("no-file-access") === "1") {
     window.showSaveFilePicker = undefined;
   } else {
@@ -170,6 +180,11 @@ async function run() {
     await setTitle(p, "File doc v2");
     await sleep(SAVE_WAIT);
     check((await fileTitle(p, FILE)) === "File doc v2", "an edit reaches the file with no further action");
+    // The suite's name-based handle store is in use, so no origin-private
+    // handle is ever stored in IndexedDB - reading one back ends Chromium on
+    // Windows before any of the checks below can run.
+    const dbs = await p.evaluate(async () => (await indexedDB.databases()).map((d) => d.name));
+    check(!dbs.includes("system-design-file-handles"), "no file handle is stored in IndexedDB during the suite");
 
     console.log("\n=== R2 / R8: a fresh visit needs one click, and claims nothing until then ===");
     await p.evaluate(() => localStorage.setItem("fake-permission", "prompt"));

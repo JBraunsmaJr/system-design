@@ -18,6 +18,21 @@ import {
   type FileHandleStore,
 } from "../domain/fileBackedAutosave";
 import type { DurabilitySignals } from "../domain/durability";
+import { isPerfInstrumentationActive } from "../perf/instrumentation";
+
+/**
+ * Instrumented (test) builds only: a handle store supplied by the browser
+ * suite. Its stand-in save picker returns origin-private file handles, and on
+ * Windows Chromium (153) reading one of those back out of IndexedDB ends the
+ * browser - a Chromium defect, reproduced with no application code at all. The
+ * suite's store remembers the file name instead and reopens the file, so the
+ * app's restore logic is still exercised. Production builds never consult it.
+ */
+function testHandleStore(): FileHandleStore | null {
+  if (!isPerfInstrumentationActive()) return null;
+  const supplied = (globalThis as unknown as { __TEST_FILE_HANDLE_STORE__?: FileHandleStore }).__TEST_FILE_HANDLE_STORE__;
+  return supplied ?? null;
+}
 
 type Status =
   /** No file. */
@@ -70,7 +85,7 @@ function defaultPicker(suggestedName: string): Promise<FileHandleLike> {
 
 export function useFileSaving(docId: string, deps: FileSavingDeps = {}): FileSaving {
   const [autosave] = useState(() => deps.autosave ?? createFileBackedAutosave());
-  const [handles] = useState(() => deps.handles ?? createIndexedDbHandleStore());
+  const [handles] = useState(() => deps.handles ?? testHandleStore() ?? createIndexedDbHandleStore());
   const [supported] = useState(() => deps.supported ?? isFileAccessSupported());
   const pickFile = deps.pickFile ?? defaultPicker;
 

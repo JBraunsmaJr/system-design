@@ -3,10 +3,13 @@
  *
  *   npx tsx scripts/diagnose-handle-restore.ts
  *
- * verify-file-saving.ts loses its page on Windows right after the first reload
- * that restores a stored file handle. This walks that sequence one step at a
+ * verify-file-saving.ts lost its page on Windows right after the first reload
+ * that restored a stored file handle. This walks that sequence one step at a
  * time and reports, after each step, whether the page and browser are still
- * there - so the step that ends them is named.
+ * there - so the step that ends them is named. Result on Windows Chromium 153:
+ * reading an origin-private handle back from IndexedDB (step 1c) ends the
+ * browser. Parts 2 and 3 now use the suite's name-based handle store and
+ * should complete; part 1 runs last and is expected to stop at 1c there.
  */
 import { chromium, type Browser, type Page } from "playwright";
 import { startDevServers } from "./lib/devServers";
@@ -50,6 +53,16 @@ const PICKER = `(() => {
     if (mode() === "prompt") localStorage.setItem("fake-permission", "granted");
     return mode() === "denied" ? "denied" : "granted";
   };
+  // Remembers the file by name rather than storing the handle: reading an
+  // origin-private handle back out of IndexedDB ends Chromium on Windows.
+  window.__TEST_FILE_HANDLE_STORE__ = {
+    get: async (docId) => {
+      const name = localStorage.getItem("test-file-handle:" + docId);
+      return name ? (await navigator.storage.getDirectory()).getFileHandle(name) : null;
+    },
+    set: async (docId, handle) => localStorage.setItem("test-file-handle:" + docId, handle.name),
+    delete: async (docId) => localStorage.removeItem("test-file-handle:" + docId),
+  };
   window.showSaveFilePicker = async ({ suggestedName }) =>
     (await navigator.storage.getDirectory()).getFileHandle(suggestedName, { create: true });
 })();`;
@@ -61,66 +74,6 @@ async function main() {
   browser.on("disconnected", () => log("EVENT browser disconnected"));
   try {
     const app = `${servers.appUrl}/system-design/`;
-
-    // Part 1: the browser primitives alone, on the app's origin, no app code.
-    {
-      const ctx = await browser.newContext();
-      const page = await ctx.newPage();
-      page.on("crash", () => log("EVENT page crashed"));
-      page.on("close", () => log("EVENT page closed"));
-      await page.goto(`${servers.appUrl}/system-design/?doc=diag-blank`);
-      const ok =
-        (await step("1a store an OPFS handle in IndexedDB", page, browser, () =>
-          page.evaluate(async () => {
-            const handle = await (await navigator.storage.getDirectory()).getFileHandle("diag.json", { create: true });
-            const w = await handle.createWritable();
-            await w.write("{}");
-            await w.close();
-            const db: IDBDatabase = await new Promise((res, rej) => {
-              const r = indexedDB.open("diag-handles", 1);
-              r.onupgradeneeded = () => r.result.createObjectStore("h");
-              r.onsuccess = () => res(r.result);
-              r.onerror = () => rej(r.error);
-            });
-            await new Promise((res, rej) => {
-              const tx = db.transaction("h", "readwrite");
-              tx.objectStore("h").put(handle, "k");
-              tx.oncomplete = res;
-              tx.onerror = () => rej(tx.error);
-            });
-            db.close();
-            return "stored";
-          })
-        )) &&
-        (await step("1b reload", page, browser, () => page.reload().then(() => "reloaded"))) &&
-        (await step("1c read the handle back", page, browser, () =>
-          page.evaluate(async () => {
-            const db: IDBDatabase = await new Promise((res, rej) => {
-              const r = indexedDB.open("diag-handles", 1);
-              r.onsuccess = () => res(r.result);
-              r.onerror = () => rej(r.error);
-            });
-            const handle = await new Promise<FileSystemFileHandle>((res, rej) => {
-              const g = db.transaction("h").objectStore("h").get("k");
-              g.onsuccess = () => res(g.result);
-              g.onerror = () => rej(g.error);
-            });
-            (window as unknown as { __h: FileSystemFileHandle }).__h = handle;
-            return { name: handle?.name, kind: handle?.kind };
-          })
-        )) &&
-        (await step("1d queryPermission (real)", page, browser, () =>
-          page.evaluate(async () => {
-            const h = (window as unknown as { __h: FileSystemFileHandle & { queryPermission?: (d: unknown) => Promise<string> } }).__h;
-            return typeof h.queryPermission === "function" ? await h.queryPermission({ mode: "readwrite" }) : "no queryPermission";
-          })
-        )) &&
-        (await step("1e getFile", page, browser, () =>
-          page.evaluate(async () => (await (window as unknown as { __h: FileSystemFileHandle }).__h.getFile()).size)
-        ));
-      await ctx.close().catch(() => {});
-      if (!ok) return;
-    }
 
     // Part 2: the app, exactly as verify-file-saving.ts drives it.
     {
@@ -227,6 +180,69 @@ async function main() {
       if (ok) log("Part 3 completed: the suite's exact sequence survives here.");
       await ctx.close().catch(() => {});
     }
+    // Part 1 (last, because on Windows Chromium 153 it ends the browser): the
+    // primitive alone, no app code - store an origin-private file handle in
+    // IndexedDB, reload, and read it back. Step 1c is where Windows fails; the
+    // suite and parts 2-3 avoid it with a name-based test handle store.
+    {
+      const ctx = await browser.newContext();
+      const page = await ctx.newPage();
+      page.on("crash", () => log("EVENT page crashed"));
+      page.on("close", () => log("EVENT page closed"));
+      await page.goto(`${servers.appUrl}/system-design/?doc=diag-blank`);
+      const ok =
+        (await step("1a store an OPFS handle in IndexedDB", page, browser, () =>
+          page.evaluate(async () => {
+            const handle = await (await navigator.storage.getDirectory()).getFileHandle("diag.json", { create: true });
+            const w = await handle.createWritable();
+            await w.write("{}");
+            await w.close();
+            const db: IDBDatabase = await new Promise((res, rej) => {
+              const r = indexedDB.open("diag-handles", 1);
+              r.onupgradeneeded = () => r.result.createObjectStore("h");
+              r.onsuccess = () => res(r.result);
+              r.onerror = () => rej(r.error);
+            });
+            await new Promise((res, rej) => {
+              const tx = db.transaction("h", "readwrite");
+              tx.objectStore("h").put(handle, "k");
+              tx.oncomplete = res;
+              tx.onerror = () => rej(tx.error);
+            });
+            db.close();
+            return "stored";
+          })
+        )) &&
+        (await step("1b reload", page, browser, () => page.reload().then(() => "reloaded"))) &&
+        (await step("1c read the handle back", page, browser, () =>
+          page.evaluate(async () => {
+            const db: IDBDatabase = await new Promise((res, rej) => {
+              const r = indexedDB.open("diag-handles", 1);
+              r.onsuccess = () => res(r.result);
+              r.onerror = () => rej(r.error);
+            });
+            const handle = await new Promise<FileSystemFileHandle>((res, rej) => {
+              const g = db.transaction("h").objectStore("h").get("k");
+              g.onsuccess = () => res(g.result);
+              g.onerror = () => rej(g.error);
+            });
+            (window as unknown as { __h: FileSystemFileHandle }).__h = handle;
+            return { name: handle?.name, kind: handle?.kind };
+          })
+        )) &&
+        (await step("1d queryPermission (real)", page, browser, () =>
+          page.evaluate(async () => {
+            const h = (window as unknown as { __h: FileSystemFileHandle & { queryPermission?: (d: unknown) => Promise<string> } }).__h;
+            return typeof h.queryPermission === "function" ? await h.queryPermission({ mode: "readwrite" }) : "no queryPermission";
+          })
+        )) &&
+        (await step("1e getFile", page, browser, () =>
+          page.evaluate(async () => (await (window as unknown as { __h: FileSystemFileHandle }).__h.getFile()).size)
+        ));
+      await ctx.close().catch(() => {});
+      if (ok) log("Part 1 completed: this browser restores origin-private handles from IndexedDB.");
+    }
+
   } finally {
     await browser.close().catch(() => {});
     servers.stop();
