@@ -84,12 +84,13 @@ export function generateDocumentKeyHex(): string {
  *
  * `purpose` decides whether the private half can leave the browser:
  *
- * - `"device"` and `"recovery"`: non-extractable. A device key is the anchor
- *   of that browser's access and must never be copied elsewhere; the
- *   organization's recovery private key is generated and kept offline
- *   (WS7-R5, WS7-R10) and is never handled here at all.
+ * - `"device"`: non-extractable. A device key is the anchor of that browser's
+ *   access and must never be copied anywhere.
  * - `"user"`: extractable, because the user key is itself wrapped to each of
- *   that user's devices and to their recovery code. Its private half only
+ *   that user's devices and to their recovery code.
+ * - `"recovery"`: extractable, because first-run setup exports the private
+ *   half once to be kept offline (WS7-R5, WS7-R10). It must never be stored
+ *   by the application or the store. Its private half only
  *   ever exists wrapped, or in memory after an unlock.
  */
 export type KeyPairPurpose = "user" | "device" | "recovery";
@@ -102,9 +103,19 @@ export async function generateWrappingKeyPair(purpose: KeyPairPurpose = "device"
       publicExponent: new Uint8Array([1, 0, 1]),
       hash: "SHA-256",
     },
-    purpose === "user",
+    purpose !== "device",
     ["wrapKey", "unwrapKey"],
   ) as Promise<CryptoKeyPair>;
+}
+
+/** Exports a recovery private key, once, at first-run setup (WS7-R10). */
+export async function exportPrivateKey(key: CryptoKey): Promise<Uint8Array> {
+  return new Uint8Array(await subtle().exportKey("pkcs8", key));
+}
+
+/** Imports a recovery private key, for the offline recovery tool (WS7-R6). */
+export async function importRecoveryPrivateKey(pkcs8: Uint8Array): Promise<CryptoKey> {
+  return subtle().importKey("pkcs8", buffer(pkcs8), { name: "RSA-OAEP", hash: "SHA-256" }, false, ["unwrapKey"]);
 }
 
 export async function exportPublicKey(key: CryptoKey): Promise<Uint8Array> {
