@@ -1,0 +1,134 @@
+/**
+ * Sessions (WS10-R1).
+ *
+ * The browser holds one opaque cookie and nothing else: no token, no claims,
+ * no key material. A scripting bug on the page therefore cannot steal
+ * anything reusable, and the store can end a session at any moment by
+ * forgetting it.
+ *
+ * Signing in establishes identity only. It grants no access to document
+ * content: that still requires a device to be approved, or the recovery code,
+ * or an administrator (WS7-R11 to R13).
+ */
+import { randomBytes } from "crypto";
+import type { Identity, PendingLogin } from "./providers.ts";
+
+export const SESSION_COOKIE = "sd_session";
+
+export interface Session {
+  id: string;
+  issuer: string;
+  subject: string;
+  displayName?: string;
+  createdAt: number;
+  expiresAt: number;
+}
+
+export interface SessionStore {
+  create(identity: Identity): Session;
+  get(id: string | null): Session | null;
+  destroy(id: string): void;
+  /** Sign-ins that have started but not come back yet, by state. */
+  remember(pending: PendingLogin): void;
+  take(state: string | null): PendingLogin | null;
+}
+
+export interface SessionOptions {
+  /** Default eight hours: long enough for a working day, short enough that a
+   * forgotten session does not last indefinitely. */
+  ttlMs?: number;
+  /** A sign-in that never comes back is forgotten after this. */
+  pendingTtlMs?: number;
+  now?: () => number;
+}
+
+export function createSessionStore(options: SessionOptions = {}): SessionStore {
+  const sessions = new Map<string, Session>();
+  const pending = new Map<string, PendingLogin>();
+  const ttl = options.ttlMs ?? 8 * 60 * 60 * 1000;
+  const pendingTtl = options.pendingTtlMs ?? 10 * 60 * 1000;
+  const now = options.now ?? Date.now;
+
+  function sweep() {
+    const at = now();
+    for (const [id, session] of sessions) if (session.expiresAt <= at) sessions.delete(id);
+    for (const [state, login] of pending) if (login.createdAt + pendingTtl <= at) pending.delete(state);
+  }
+
+  return {
+    create(identity) {
+      sweep();
+      const session: Session = {
+        // 256 bits from the platform CSPRNG: the cookie is the credential.
+        id: randomBytes(32).toString("base64url"),
+        issuer: identity.issuer,
+        subject: identity.subject,
+        displayName: identity.displayName,
+        createdAt: now(),
+        expiresAt: now() + ttl,
+      };
+      sessions.set(session.id, session);
+      return session;
+    },
+
+    get(id) {
+      if (!id) return null;
+      const session = sessions.get(id);
+      if (!session) return null;
+      if (session.expiresAt <= now()) {
+        sessions.delete(id);
+        return null;
+      }
+      return session;
+    },
+
+    destroy(id) {
+      sessions.delete(id);
+    },
+
+    remember(login) {
+      sweep();
+      pending.set(login.state, login);
+    },
+
+    take(state) {
+      if (!state) return null;
+      const login = pending.get(state);
+      // Single use: a state that comes back twice is a replay.
+      if (login) pending.delete(state);
+      if (!login || login.createdAt + pendingTtl <= now()) return null;
+      return login;
+    },
+  };
+}
+
+export function parseCookies(header: string | undefined): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const part of (header ?? "").split(";")) {
+    const index = part.indexOf("=");
+    if (index === -1) continue;
+    out[part.slice(0, index).trim()] = decodeURIComponent(part.slice(index + 1).trim());
+  }
+  return out;
+}
+
+/**
+ * HttpOnly so page scripts cannot read it; SameSite=Lax so another site
+ * cannot cause an authenticated request while still allowing the provider's
+ * redirect back; Secure unless the deployment is plain HTTP for development.
+ */
+export function serializeSessionCookie(id: string, options: { secure: boolean; maxAgeSeconds: number }): string {
+  const parts = [
+    `${SESSION_COOKIE}=${encodeURIComponent(id)}`,
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Lax",
+    `Max-Age=${options.maxAgeSeconds}`,
+  ];
+  if (options.secure) parts.push("Secure");
+  return parts.join("; ");
+}
+
+export function expiredSessionCookie(secure: boolean): string {
+  return serializeSessionCookie("", { secure, maxAgeSeconds: 0 });
+}

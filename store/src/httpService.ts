@@ -22,6 +22,15 @@
  */
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "http";
 import { StoreError } from "./documentService.ts";
+import type { Provider } from "./auth/providers.ts";
+import {
+  SESSION_COOKIE,
+  expiredSessionCookie,
+  parseCookies,
+  serializeSessionCookie,
+  type Session,
+  type SessionStore,
+} from "./auth/sessions.ts";
 
 export interface AuditEntry {
   at: string;
@@ -69,8 +78,19 @@ export interface StoreBackend {
 export interface HttpServiceOptions {
   store: StoreBackend;
   audit?: AuditSink;
-  /** Until authentication lands, the caller must say so explicitly. */
-  allowUnauthenticated: boolean;
+  /**
+   * No sign-in required. Development and tests only: a deployment that sets
+   * this has no authentication at all (WS10-R1).
+   */
+  allowUnauthenticated?: boolean;
+  /** Sign-in providers, by id (WS10-R1). */
+  providers?: Provider[];
+  sessions?: SessionStore;
+  /** Where the provider sends the browser back to; also decides whether the
+   * session cookie is marked Secure. */
+  publicUrl?: string;
+  /** Where to send the browser after a completed sign-in. */
+  afterLoginUrl?: string;
   /** WS8-R8: refused before the body is read. */
   maxRequestBytes?: number;
 }
@@ -123,11 +143,15 @@ function positiveInt(value: string | null, field: string): number | undefined {
 }
 
 export function createHttpService(options: HttpServiceOptions): Server {
-  if (!options.allowUnauthenticated) {
+  const providers = new Map((options.providers ?? []).map((provider) => [provider.id, provider]));
+  const sessions = options.sessions;
+  if (!options.allowUnauthenticated && (providers.size === 0 || !sessions)) {
     throw new Error(
-      "This build of the store has no authentication yet. Start it with allowUnauthenticated: true if that is what you intend (development and tests only).",
+      "The store needs at least one sign-in provider and a session store. Pass allowUnauthenticated: true only for development and tests (WS10-R1).",
     );
   }
+  const publicUrl = options.publicUrl ?? "http://127.0.0.1";
+  const secureCookies = publicUrl.startsWith("https://");
   const maxRequestBytes = options.maxRequestBytes ?? 16 * 1024 * 1024;
   const audit = options.audit;
 
@@ -163,7 +187,8 @@ export function createHttpService(options: HttpServiceOptions): Server {
     const method = request.method ?? "GET";
     // Replaced by the authenticated subject in the next step; until then it
     // is only ever a label in the audit trail.
-    const subject = (request.headers["x-subject"] as string | undefined) ?? null;
+    const session = sessions?.get(parseCookies(request.headers.cookie)[SESSION_COOKIE] ?? null) ?? null;
+    const subject = session ? `${session.issuer}#${session.subject}` : options.allowUnauthenticated ? "anonymous" : null;
     let docId: string | null = null;
     let operation = `${method} ${url.pathname}`;
 
@@ -174,6 +199,18 @@ export function createHttpService(options: HttpServiceOptions): Server {
 
       if (parts[1] === "health" && method === "GET") {
         return send(response, 200, { status: "ok" });
+      }
+
+      if (parts[1] === "auth") {
+        return await handleAuth(parts, method, url, response, session);
+      }
+
+      // Everything below needs a signed-in subject (WS10-R1). Signing in
+      // proves identity only; it gives no access to document content, which
+      // still needs an approved device (WS7-R11).
+      if (!session && !options.allowUnauthenticated) {
+        await record({ operation, outcome: "denied", subject: null, docId: null, detail: { reason: "unauthenticated" } });
+        return send(response, 401, { error: { reason: "unauthenticated", message: "Sign in to use this store." } });
       }
 
       if (parts[1] !== "docs") throw new HttpError(404, "unsupported", `No route for ${url.pathname}.`);
@@ -302,6 +339,85 @@ export function createHttpService(options: HttpServiceOptions): Server {
       await record({ operation, outcome: status >= 500 ? "error" : "denied", subject, docId, detail: { reason, status } });
       return send(response, status, { error: { reason, message } });
     }
+  }
+
+  /**
+   * /v1/auth/providers, /v1/auth/:provider/start, /v1/auth/callback,
+   * /v1/auth/session, /v1/auth/logout.
+   */
+  async function handleAuth(
+    parts: string[],
+    method: string,
+    url: URL,
+    response: ServerResponse,
+    session: Session | null,
+  ) {
+    if (parts[2] === "providers" && method === "GET") {
+      return send(response, 200, { providers: [...providers.keys()] });
+    }
+
+    if (parts[2] === "session" && method === "GET") {
+      if (!session) return send(response, 401, { error: { reason: "unauthenticated", message: "Not signed in." } });
+      return send(response, 200, {
+        session: { issuer: session.issuer, subject: session.subject, displayName: session.displayName, expiresAt: session.expiresAt },
+      });
+    }
+
+    if (parts[2] === "logout" && method === "POST") {
+      if (session) sessions?.destroy(session.id);
+      await record({ operation: "logout", outcome: "ok", subject: session ? `${session.issuer}#${session.subject}` : null, docId: null });
+      response.writeHead(204, { "set-cookie": expiredSessionCookie(secureCookies) });
+      return response.end();
+    }
+
+    if (parts[3] === "start" && method === "GET") {
+      const provider = providers.get(parts[2]);
+      if (!provider || !sessions) throw new HttpError(404, "unsupported", `No sign-in provider named ${parts[2]}.`);
+      const { url: authorizeUrl, pending } = await provider.begin(`${publicUrl}/v1/auth/callback`);
+      sessions.remember(pending);
+      await record({ operation: "login-start", outcome: "ok", subject: null, docId: null, detail: { provider: provider.id } });
+      response.writeHead(302, { location: authorizeUrl });
+      return response.end();
+    }
+
+    if (parts[2] === "callback" && method === "GET") {
+      if (!sessions) throw new HttpError(404, "unsupported", "No sign-in is configured.");
+      const error = url.searchParams.get("error");
+      if (error) {
+        await record({ operation: "login", outcome: "denied", subject: null, docId: null, detail: { error } });
+        throw new HttpError(400, "bad-request", `The provider reported: ${error}`);
+      }
+      // Single-use, and unknown after ten minutes: a callback without a
+      // pending sign-in is a replay or a forgery, not a login.
+      const pending = sessions.take(url.searchParams.get("state"));
+      if (!pending) {
+        await record({ operation: "login", outcome: "denied", subject: null, docId: null, detail: { reason: "unknown-state" } });
+        throw new HttpError(400, "bad-request", "This sign-in did not start here, or it has expired. Try again.");
+      }
+      const provider = providers.get(pending.provider);
+      const code = url.searchParams.get("code");
+      if (!provider || !code) throw new HttpError(400, "bad-request", "The provider returned no authorization code.");
+
+      let identity;
+      try {
+        identity = await provider.complete(code, pending);
+      } catch (failure) {
+        await record({ operation: "login", outcome: "denied", subject: null, docId: null, detail: { provider: provider.id, message: String(failure).slice(0, 200) } });
+        throw new HttpError(401, "unauthenticated", "Sign-in failed. Please try again.");
+      }
+      const created = sessions.create(identity);
+      await record({ operation: "login", outcome: "ok", subject: `${identity.issuer}#${identity.subject}`, docId: null, detail: { provider: provider.id } });
+      response.writeHead(302, {
+        location: options.afterLoginUrl ?? "/",
+        "set-cookie": serializeSessionCookie(created.id, {
+          secure: secureCookies,
+          maxAgeSeconds: Math.max(1, Math.floor((created.expiresAt - Date.now()) / 1000)),
+        }),
+      });
+      return response.end();
+    }
+
+    throw new HttpError(404, "unsupported", `No route for ${url.pathname}.`);
   }
 
   function describe(error: unknown): { status: number; reason: string; message: string } {
