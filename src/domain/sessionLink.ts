@@ -11,6 +11,8 @@
  * and never sent over the wire to web servers during HTTP requests.
  */
 
+import { randomHex } from "../crypto/random.ts";
+
 export interface CreateSessionLinkOptions {
   roomName: string;
   password?: string;
@@ -28,15 +30,15 @@ export interface ParsedSessionInfo {
 }
 
 /**
- * Generates a cryptographically secure random session key for room encryption.
+ * Generates a session key: the document key (WS7-R1), 128 bits from the
+ * platform CSPRNG. Generated through src/crypto so all key material comes
+ * from one place (WS6-R1).
  */
 export function generateSessionKey(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
-    const bytes = new Uint8Array(16);
-    crypto.getRandomValues(bytes);
-    return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  if (typeof crypto === "undefined" || typeof crypto.getRandomValues !== "function") {
+    throw new Error("Secure random generation (crypto.getRandomValues) is not available in this environment.");
   }
-  throw new Error("Secure random generation (crypto.getRandomValues) is not available in this environment.");
+  return randomHex(16);
 }
 
 /**
