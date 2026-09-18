@@ -31,6 +31,8 @@ export interface PostgresStoreOptions {
   connectionString: string;
   /** WS8-R8. */
   maxBlobBytes?: number;
+  maxBlobsPerDocument?: number;
+  maxTotalBytes?: number;
   now?: () => Date;
 }
 
@@ -122,6 +124,8 @@ export function createPostgresStore(options: PostgresStoreOptions) {
   const pool = new pg.Pool({ connectionString: options.connectionString });
   const blobs = createPostgresBlobStore(pool);
   const maxBlobBytes = options.maxBlobBytes ?? 8 * 1024 * 1024;
+  const maxBlobsPerDocument = options.maxBlobsPerDocument ?? 100_000;
+  const maxTotalBytes = options.maxTotalBytes ?? Number.POSITIVE_INFINITY;
   const now = options.now ?? (() => new Date());
 
   async function inTransaction<T>(work: (tx: PgTx) => Promise<T>): Promise<T> {
@@ -212,6 +216,19 @@ export function createPostgresStore(options: PostgresStoreOptions) {
       }
       return inTransaction(async (tx) => {
         const row = await lockDocument(tx, request.docId);
+        const counted = await tx.query<{ count: string; total: string | null }>(
+          `SELECT COUNT(*) AS count, (SELECT SUM(LENGTH(bytes)) FROM blob_data) AS total FROM blobs WHERE doc_id = $1`,
+          [request.docId],
+        );
+        if (Number(counted.rows[0].count) >= maxBlobsPerDocument) {
+          throw new StoreError(
+            `Document ${request.docId} already holds ${counted.rows[0].count} blobs, the configured limit. Compact it before appending more.`,
+            "quota",
+          );
+        }
+        if (Number(counted.rows[0].total ?? 0) + request.bytes.length > maxTotalBytes) {
+          throw new StoreError(`This workspace has reached its storage quota.`, "quota");
+        }
         const current = Number(row.version);
         if (request.expectedVersion !== undefined && request.expectedVersion !== current) {
           throw new StoreError(`Expected version ${request.expectedVersion}, but ${request.docId} is at ${current}.`, "conflict");
@@ -253,6 +270,42 @@ export function createPostgresStore(options: PostgresStoreOptions) {
         record: toRecord(row, metas),
         blobs: result.rows.map((r, i) => ({ meta: metas[i], bytes: new Uint8Array(r.bytes) })),
       };
+    },
+
+    async updatesSince(docId: string, since: number, opts: ReadOptions = {}) {
+      const row = await requireRow(docId, opts);
+      const result = await pool.query<BlobRow & { bytes: Buffer }>(
+        `SELECT b.blob_id, b.kind, b.version, b.byte_length, b.created_at, d.bytes
+           FROM blobs b JOIN blob_data d ON d.doc_id = b.doc_id AND d.blob_id = b.blob_id
+          WHERE b.doc_id = $1 AND b.version > $2
+          ORDER BY b.created_at, b.blob_id`,
+        [docId, since],
+      );
+      const metas = result.rows.map(toMeta);
+      return {
+        record: toRecord(row, await blobsOf(docId)),
+        blobs: result.rows.map((r, i) => ({ meta: metas[i], bytes: new Uint8Array(r.bytes) })),
+      };
+    },
+
+    async getMeta(docId: string, opts: ReadOptions = {}): Promise<Uint8Array | null> {
+      await requireRow(docId, opts);
+      const result = await pool.query<{ sealed_meta: Buffer | null }>(`SELECT sealed_meta FROM documents WHERE doc_id = $1`, [docId]);
+      const sealed = result.rows[0]?.sealed_meta;
+      return sealed ? new Uint8Array(sealed) : null;
+    },
+
+    async setMeta(docId: string, sealed: Uint8Array): Promise<DocumentRecord> {
+      return inTransaction(async (tx) => {
+        const row = await lockDocument(tx, docId);
+        const at = now();
+        const version = Number(row.version) + 1;
+        const updated = await tx.query<DocumentRow>(
+          `UPDATE documents SET sealed_meta = $2, version = $3, updated_at = $4 WHERE doc_id = $1 RETURNING *`,
+          [docId, Buffer.from(sealed), version, at],
+        );
+        return toRecord(updated.rows[0], await blobsOf(docId, tx));
+      });
     },
 
     async head(docId: string, opts: ReadOptions = {}): Promise<DocumentRecord> {
@@ -336,6 +389,27 @@ export function createPostgresStore(options: PostgresStoreOptions) {
         );
         return toRecord(updated.rows[0], await blobsOf(docId, tx));
       });
+    },
+
+    /** WS10-R3: every request, appended to audit_log. */
+    audit: {
+      async record(entry: {
+        at: string;
+        subject: string | null;
+        docId: string | null;
+        operation: string;
+        outcome: string;
+        detail?: Record<string, unknown>;
+      }) {
+        await pool.query(
+          `INSERT INTO audit_log (at, subject, doc_id, operation, outcome, detail) VALUES ($1, $2, $3, $4, $5, $6)`,
+          [entry.at, entry.subject, entry.docId, entry.operation, entry.outcome, entry.detail ?? null],
+        );
+      },
+      async recent(limit = 100) {
+        const result = await pool.query(`SELECT at, subject, doc_id, operation, outcome, detail FROM audit_log ORDER BY id DESC LIMIT $1`, [limit]);
+        return result.rows;
+      },
     },
 
     /** For the contract suite's failure injection and measurements. */

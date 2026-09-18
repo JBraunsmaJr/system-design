@@ -1,0 +1,154 @@
+# The store's HTTP surface (WS8-R2). Routes marked "planned" are specified but
+# not implemented yet; they arrive with the steps named beside them.
+#
+# Everything the store holds is opaque to it: blob bodies and sealed metadata
+# are ciphertext (WS6), and `docId` is SHA-256 of the room name (WS8-R3), so a
+# database dump yields nothing that can read a document or join a session.
+openapi: 3.1.0
+info:
+  title: system-design store
+  version: 0.1.0
+  description: |
+    Per-document sealed storage. The service never parses, orders, or merges
+    blobs, and never sees plaintext.
+
+    Every response about a document carries `X-Document-Version`. A client
+    sends the highest version it has seen as `If-Document-Version`; a response
+    older than that is refused with 409 `stale-version` (WS8-R15).
+
+servers:
+  - url: /v1
+
+components:
+  parameters:
+    DocId:
+      name: docId
+      in: path
+      required: true
+      schema: { type: string }
+      description: SHA-256 of the room name (WS8-R3).
+    IfDocumentVersion:
+      name: If-Document-Version
+      in: header
+      required: false
+      schema: { type: integer, minimum: 0 }
+      description: The highest version this client has seen (WS8-R15).
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            reason:
+              type: string
+              enum: [not-found, deleted, conflict, stale-version, too-large, quota, bad-request, unsupported, internal]
+            message: { type: string }
+    Document:
+      type: object
+      properties:
+        docId: { type: string }
+        version: { type: integer }
+        updatedAt: { type: string, format: date-time }
+        deletedAt: { type: string, format: date-time, nullable: true }
+        keys:
+          type: object
+          properties:
+            wrappedForWorkspace: { type: string, description: base64, wrapped under the workspace key }
+            wrappedForRecovery: { type: string, description: base64, wrapped to the recovery key (WS7-R4) }
+    Blob:
+      type: object
+      properties:
+        blobId: { type: string }
+        kind: { type: string }
+        version: { type: integer }
+        bytes: { type: string, description: base64 ciphertext; opaque to the store }
+
+paths:
+  /health:
+    get:
+      summary: Liveness
+      responses: { "200": { description: The service is running } }
+
+  /docs:
+    get:
+      summary: List documents
+      parameters:
+        - { name: includeDeleted, in: query, schema: { type: boolean }, description: Administrators only (WS9-R6) }
+      responses: { "200": { description: Documents } }
+    post:
+      summary: Create a document
+      responses:
+        "201": { description: Created }
+        "400": { description: Missing wrapped keys, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "409": { description: Already exists }
+
+  /docs/{docId}:
+    parameters: [{ $ref: "#/components/parameters/DocId" }, { $ref: "#/components/parameters/IfDocumentVersion" }]
+    get:
+      summary: Read a document and all its blobs
+      responses:
+        "200": { description: Document and blobs }
+        "404": { description: No such document }
+        "409": { description: The store offered a version older than the client has seen (WS8-R15) }
+        "410": { description: Soft-deleted (WS10-R4) }
+    delete:
+      summary: Soft-delete (WS10-R4)
+      responses: { "200": { description: Deleted } }
+
+  /docs/{docId}/updates:
+    parameters: [{ $ref: "#/components/parameters/DocId" }, { $ref: "#/components/parameters/IfDocumentVersion" }]
+    get:
+      summary: Blobs written after a version
+      parameters: [{ name: since, in: query, schema: { type: integer, minimum: 0 } }]
+      responses: { "200": { description: Blobs } }
+    post:
+      summary: Append one sealed blob
+      responses:
+        "201": { description: Appended }
+        "409": { description: expectedVersion does not match the document's version }
+        "413": { description: The blob exceeds the configured size limit (WS8-R8) }
+        "507": { description: A document or workspace quota is exhausted (WS8-R8) }
+
+  /docs/{docId}/compact:
+    post:
+      summary: Replace the log with a snapshot (WS8-R5)
+      parameters: [{ $ref: "#/components/parameters/DocId" }]
+      responses: { "200": { description: Compacted } }
+
+  /docs/{docId}/restore:
+    post:
+      summary: Restore a soft-deleted document (WS10-R4)
+      parameters: [{ $ref: "#/components/parameters/DocId" }]
+      responses: { "200": { description: Restored } }
+
+  /docs/{docId}/meta:
+    parameters: [{ $ref: "#/components/parameters/DocId" }, { $ref: "#/components/parameters/IfDocumentVersion" }]
+    get:
+      summary: Sealed per-document metadata (WS9-R1)
+      responses: { "200": { description: Sealed metadata, or null } }
+    put:
+      summary: Replace sealed per-document metadata
+      responses: { "200": { description: Stored } }
+
+  /docs/{docId}/hold:
+    put:
+      summary: Place a legal hold (planned - retention step, WS10-R8)
+      parameters: [{ $ref: "#/components/parameters/DocId" }]
+      responses: { "501": { description: Not implemented yet } }
+    delete:
+      summary: Release a legal hold (planned - retention step, WS10-R8)
+      parameters: [{ $ref: "#/components/parameters/DocId" }]
+      responses: { "501": { description: Not implemented yet } }
+
+  /users/{userId}/devices:
+    get:
+      summary: List device public keys (planned - device enrollment, WS7-R11)
+      parameters: [{ name: userId, in: path, required: true, schema: { type: string } }]
+      responses: { "501": { description: Not implemented yet } }
+
+  /workspaces/{wsId}/index:
+    get:
+      summary: Sealed workspace index (planned - WS9-R1)
+      parameters: [{ name: wsId, in: path, required: true, schema: { type: string } }]
+      responses: { "501": { description: Not implemented yet } }

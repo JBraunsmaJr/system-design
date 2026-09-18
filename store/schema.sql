@@ -24,8 +24,9 @@ CREATE TABLE IF NOT EXISTS documents (
     -- WS7-R3 and R4, opaque to the store.
     wrapped_for_workspace   BYTEA       NOT NULL,
     wrapped_for_recovery    BYTEA,
-    -- WS9-R1: the title is sealed; the store cannot enumerate titles.
-    sealed_title            BYTEA
+    -- WS9-R1: sealed per-document metadata (the title among it). The store
+    -- cannot enumerate titles; this is ciphertext to it.
+    sealed_meta             BYTEA
 );
 
 -- Purge sweeps and the deleted-items view (WS9-R6) both read this.

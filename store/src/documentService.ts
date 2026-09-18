@@ -56,7 +56,7 @@ export interface AppendRequest {
   expectedVersion?: number;
 }
 
-export type StoreErrorReason = "not-found" | "conflict" | "stale-version" | "deleted" | "too-large";
+export type StoreErrorReason = "not-found" | "conflict" | "stale-version" | "deleted" | "too-large" | "quota";
 
 export class StoreError extends Error {
   reason: StoreErrorReason;
@@ -78,6 +78,8 @@ export interface DocumentServiceOptions<Tx> {
   now?: () => Date;
   /** WS8-R8. */
   maxBlobBytes?: number;
+  maxBlobsPerDocument?: number;
+  maxTotalBytes?: number;
 }
 
 export interface CreateRequest {
@@ -95,6 +97,8 @@ export interface ReadOptions {
 interface Row {
   record: DocumentRecord;
   blobIds: string[];
+  /** Sealed metadata (WS9-R1). Ciphertext to the store. */
+  meta?: Uint8Array;
 }
 
 let blobCounter = 0;
@@ -108,6 +112,8 @@ export function createDocumentService<Tx>(options: DocumentServiceOptions<Tx>) {
   const rows = new Map<string, Row>();
   const now = options.now ?? (() => new Date());
   const maxBlobBytes = options.maxBlobBytes ?? 8 * 1024 * 1024;
+  const maxBlobsPerDocument = options.maxBlobsPerDocument ?? 100_000;
+  const maxTotalBytes = options.maxTotalBytes ?? Number.POSITIVE_INFINITY;
 
   function require(docId: string, opts: ReadOptions = {}): Row {
     const row = rows.get(docId);
@@ -146,6 +152,15 @@ export function createDocumentService<Tx>(options: DocumentServiceOptions<Tx>) {
       if (request.bytes.length > maxBlobBytes) {
         throw new StoreError(`A blob of ${request.bytes.length} bytes exceeds the ${maxBlobBytes}-byte limit.`, "too-large");
       }
+      if (row.record.blobs.length >= maxBlobsPerDocument) {
+        throw new StoreError(
+          `Document ${request.docId} already holds ${row.record.blobs.length} blobs, the configured limit. Compact it before appending more.`,
+          "quota",
+        );
+      }
+      if ((await options.blobs.totalBytes()) + request.bytes.length > maxTotalBytes) {
+        throw new StoreError(`This workspace has reached its storage quota.`, "quota");
+      }
       if (request.expectedVersion !== undefined && request.expectedVersion !== row.record.version) {
         throw new StoreError(
           `Expected version ${request.expectedVersion}, but ${request.docId} is at ${row.record.version}.`,
@@ -170,6 +185,32 @@ export function createDocumentService<Tx>(options: DocumentServiceOptions<Tx>) {
         await options.rollback(tx);
         throw error;
       }
+    },
+
+    /** WS8-R2: blobs written after `since`, for a client catching up. */
+    async updatesSince(docId: string, since: number, opts: ReadOptions = {}) {
+      const row = require(docId, opts);
+      const wanted = row.record.blobs.filter((meta) => meta.version > since);
+      const out: { meta: StoredBlobMeta; bytes: Uint8Array }[] = [];
+      for (const meta of wanted) {
+        const bytes = await options.blobs.get({ docId, blobId: meta.blobId });
+        if (bytes) out.push({ meta, bytes });
+      }
+      return { record: structuredClone(row.record), blobs: out };
+    },
+
+    /** WS8-R2, WS9-R1: sealed per-document metadata, opaque to the store. */
+    async getMeta(docId: string, opts: ReadOptions = {}): Promise<Uint8Array | null> {
+      const row = require(docId, opts);
+      return row.meta ? new Uint8Array(row.meta) : null;
+    },
+
+    async setMeta(docId: string, sealed: Uint8Array): Promise<DocumentRecord> {
+      const row = require(docId);
+      row.meta = new Uint8Array(sealed);
+      row.record.version += 1;
+      row.record.updatedAt = now().toISOString();
+      return structuredClone(row.record);
     },
 
     async read(docId: string, opts: ReadOptions = {}): Promise<{ record: DocumentRecord; blobs: { meta: StoredBlobMeta; bytes: Uint8Array }[] }> {
