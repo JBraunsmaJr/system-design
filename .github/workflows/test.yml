@@ -60,3 +60,43 @@ jobs:
         run: npx tsx scripts/verify-file-saving.ts
         env:
           E2E_BROWSER: firefox
+
+  # WS8-R16/R17: the store contract against a real PostgreSQL, and the size
+  # and latency table the storage decision rests on (OQ-17). The suite also
+  # runs in-memory in the main job; both must pass the same checks.
+  store-contract-postgres:
+    name: Store contract (PostgreSQL)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: store
+          POSTGRES_USER: store
+          POSTGRES_DB: store
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U store"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run the store contract against PostgreSQL
+        run: npx tsx scripts/verify-store-contract.ts
+        env:
+          DATABASE_URL: postgresql://store:store@localhost:5432/store
