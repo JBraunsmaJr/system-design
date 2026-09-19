@@ -24,7 +24,7 @@ function start(env: Record<string, string>): { child: ChildProcess; output: () =
   const child = spawn(process.execPath, ["--experimental-strip-types", "store/src/main.ts"], {
     cwd: root,
     env: { ...process.env, ...env },
-    stdio: ["ignore", "pipe", "pipe"],
+    stdio: ["ignore", "pipe", "pipe", "ipc"],
   });
   let output = "";
   child.stdout?.on("data", (chunk) => (output += String(chunk)));
@@ -71,7 +71,11 @@ console.log("=== It starts, serves, and stops ===");
     "and which storage it is using"
   );
 
-  running.child.kill("SIGTERM");
+  if (process.platform === "win32" && running.child.send) {
+    running.child.send("SIGTERM");
+  } else {
+    running.child.kill("SIGTERM");
+  }
   const code = await running.exit;
   check(code === 0, `SIGTERM shuts it down cleanly (exit ${code})`);
   check(/shutting down/.test(running.output()), "saying so");

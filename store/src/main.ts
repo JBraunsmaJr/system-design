@@ -111,6 +111,11 @@ async function main() {
   };
   process.on("SIGTERM", () => void shutdown("SIGTERM"));
   process.on("SIGINT", () => void shutdown("SIGINT"));
+  process.on("message", (msg) => {
+    if (msg === "SIGTERM" || msg === "SIGINT" || msg === "shutdown") {
+      void shutdown(typeof msg === "string" && msg.startsWith("SIG") ? msg : "SIGTERM");
+    }
+  });
 }
 
 void main();
