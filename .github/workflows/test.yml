@@ -135,3 +135,78 @@ jobs:
         run: npx tsx scripts/verify-device-identity.ts
         env:
           DATABASE_URL: postgresql://store:store@localhost:5432/store
+
+  # WS10-R1, OQ-18: sign-in against a real Keycloak, which is what a
+  # government deployment will use. The in-process provider in
+  # verify-store-auth.ts covers the protocol logic; this covers the
+  # assumptions - discovery, a real login page, a real token.
+  auth-keycloak:
+    name: Sign-in (Keycloak)
+    runs-on: ubuntu-latest
+
+    services:
+      keycloak:
+        image: quay.io/keycloak/keycloak:26.0
+        env:
+          KC_BOOTSTRAP_ADMIN_USERNAME: admin
+          KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+          KC_HEALTH_ENABLED: "true"
+        ports:
+          - 8081:8080
+        options: >-
+          --health-cmd "exec 3<>/dev/tcp/127.0.0.1/8080 && echo -e 'GET /health/ready HTTP/1.1\nhost: localhost\n' >&3 && cat <&3 | grep -q '200 OK'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 30
+          --health-start-period 30s
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      # A realm, a confidential client for the store, and one person to sign
+      # in as. Created through the admin API rather than an imported file, so
+      # the job needs nothing mounted into the service container.
+      - name: Configure Keycloak
+        run: |
+          set -euo pipefail
+          KC=http://localhost:8081
+          for i in $(seq 1 60); do
+            if curl -sf "$KC/realms/master/.well-known/openid-configuration" >/dev/null; then break; fi
+            sleep 2
+          done
+          TOKEN=$(curl -sf -X POST "$KC/realms/master/protocol/openid-connect/token" \
+            -d "client_id=admin-cli" -d "username=admin" -d "password=admin" -d "grant_type=password" \
+            | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).access_token))")
+          auth="Authorization: Bearer $TOKEN"
+          curl -sf -X POST "$KC/admin/realms" -H "$auth" -H "content-type: application/json" \
+            -d '{"realm":"system-design","enabled":true}'
+          curl -sf -X POST "$KC/admin/realms/system-design/clients" -H "$auth" -H "content-type: application/json" \
+            -d '{"clientId":"system-design-store","enabled":true,"protocol":"openid-connect","publicClient":false,
+                 "secret":"store-secret","standardFlowEnabled":true,"directAccessGrantsEnabled":false,
+                 "redirectUris":["http://127.0.0.1:8090/v1/auth/callback"],"webOrigins":["+"]}'
+          curl -sf -X POST "$KC/admin/realms/system-design/users" -H "$auth" -H "content-type: application/json" \
+            -d '{"username":"tester","enabled":true,"emailVerified":true,"firstName":"Test","lastName":"User",
+                 "credentials":[{"type":"password","value":"tester-password","temporary":false}]}'
+
+      - name: Sign in through Keycloak
+        run: npx tsx scripts/verify-store-auth-keycloak.ts
+        env:
+          KEYCLOAK_ISSUER: http://localhost:8081/realms/system-design
+          KEYCLOAK_CLIENT_ID: system-design-store
+          KEYCLOAK_CLIENT_SECRET: store-secret
+          KEYCLOAK_USERNAME: tester
+          KEYCLOAK_PASSWORD: tester-password
+          AUTH_TEST_PORT: "8090"
