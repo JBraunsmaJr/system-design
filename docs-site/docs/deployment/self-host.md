@@ -17,7 +17,9 @@ reverse proxy terminates TLS for both the editor and the relay.
 :::
 
 ::: details Environment Variable Example
+```env
 <!--@include: @/files/example.env -->
+```
 :::
 
 
