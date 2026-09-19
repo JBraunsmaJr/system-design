@@ -105,3 +105,8 @@ jobs:
         run: npx tsx scripts/verify-store-http.ts
         env:
           DATABASE_URL: postgresql://store:store@localhost:5432/store
+
+      - name: Run device enrollment against PostgreSQL
+        run: npx tsx scripts/verify-store-devices.ts
+        env:
+          DATABASE_URL: postgresql://store:store@localhost:5432/store

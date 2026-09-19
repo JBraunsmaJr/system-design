@@ -19,6 +19,9 @@ export interface Session {
   id: string;
   issuer: string;
   subject: string;
+  /** The directory record behind (issuer, subject), resolved once at
+   * sign-in rather than on every request. */
+  userId?: string;
   displayName?: string;
   createdAt: number;
   expiresAt: number;

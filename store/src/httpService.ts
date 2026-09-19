@@ -23,6 +23,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "http";
 import { StoreError } from "./documentService.ts";
 import type { Provider } from "./auth/providers.ts";
+import { DirectoryError, verificationCodeFor, type UserDirectory } from "./userDirectory.ts";
 import {
   SESSION_COOKIE,
   expiredSessionCookie,
@@ -87,10 +88,14 @@ export interface HttpServiceOptions {
   providers?: Provider[];
   sessions?: SessionStore;
   /** Where the provider sends the browser back to; also decides whether the
-   * session cookie is marked Secure. */
-  publicUrl?: string;
+   * session cookie is marked Secure. A function, for a caller that only
+   * knows its own address once it is listening (tests, and a deployment
+   * behind a port chosen at runtime). */
+  publicUrl?: string | (() => string);
   /** Where to send the browser after a completed sign-in. */
   afterLoginUrl?: string;
+  /** Users, devices, and wrapped keys (WS7-R8, R11, R12, R14). */
+  directory?: UserDirectory;
   /** WS8-R8: refused before the body is read. */
   maxRequestBytes?: number;
 }
@@ -105,6 +110,9 @@ const STATUS: Record<string, number> = {
   "bad-request": 400,
   unsupported: 404,
   "too-many-bytes": 413,
+  revoked: 403,
+  "not-approved": 403,
+  unauthenticated: 401,
 };
 
 class HttpError extends Error {
@@ -150,8 +158,8 @@ export function createHttpService(options: HttpServiceOptions): Server {
       "The store needs at least one sign-in provider and a session store. Pass allowUnauthenticated: true only for development and tests (WS10-R1).",
     );
   }
-  const publicUrl = options.publicUrl ?? "http://127.0.0.1";
-  const secureCookies = publicUrl.startsWith("https://");
+  const publicUrl = () => (typeof options.publicUrl === "function" ? options.publicUrl() : options.publicUrl ?? "http://127.0.0.1");
+  const secureCookies = () => publicUrl().startsWith("https://");
   const maxRequestBytes = options.maxRequestBytes ?? 16 * 1024 * 1024;
   const audit = options.audit;
 
@@ -211,6 +219,10 @@ export function createHttpService(options: HttpServiceOptions): Server {
       if (!session && !options.allowUnauthenticated) {
         await record({ operation, outcome: "denied", subject: null, docId: null, detail: { reason: "unauthenticated" } });
         return send(response, 401, { error: { reason: "unauthenticated", message: "Sign in to use this store." } });
+      }
+
+      if (parts[1] === "users") {
+        return await handleUsers(parts, method, request, response, session);
       }
 
       if (parts[1] !== "docs") throw new HttpError(404, "unsupported", `No route for ${url.pathname}.`);
@@ -366,14 +378,14 @@ export function createHttpService(options: HttpServiceOptions): Server {
     if (parts[2] === "logout" && method === "POST") {
       if (session) sessions?.destroy(session.id);
       await record({ operation: "logout", outcome: "ok", subject: session ? `${session.issuer}#${session.subject}` : null, docId: null });
-      response.writeHead(204, { "set-cookie": expiredSessionCookie(secureCookies) });
+      response.writeHead(204, { "set-cookie": expiredSessionCookie(secureCookies()) });
       return response.end();
     }
 
     if (parts[3] === "start" && method === "GET") {
       const provider = providers.get(parts[2]);
       if (!provider || !sessions) throw new HttpError(404, "unsupported", `No sign-in provider named ${parts[2]}.`);
-      const { url: authorizeUrl, pending } = await provider.begin(`${publicUrl}/v1/auth/callback`);
+      const { url: authorizeUrl, pending } = await provider.begin(`${publicUrl()}/v1/auth/callback`);
       sessions.remember(pending);
       await record({ operation: "login-start", outcome: "ok", subject: null, docId: null, detail: { provider: provider.id } });
       response.writeHead(302, { location: authorizeUrl });
@@ -406,11 +418,13 @@ export function createHttpService(options: HttpServiceOptions): Server {
         throw new HttpError(401, "unauthenticated", "Sign-in failed. Please try again.");
       }
       const created = sessions.create(identity);
+      // Resolved once, here, rather than on every request.
+      if (options.directory) created.userId = (await options.directory.upsertUser(identity)).userId;
       await record({ operation: "login", outcome: "ok", subject: `${identity.issuer}#${identity.subject}`, docId: null, detail: { provider: provider.id } });
       response.writeHead(302, {
         location: options.afterLoginUrl ?? "/",
         "set-cookie": serializeSessionCookie(created.id, {
-          secure: secureCookies,
+          secure: secureCookies(),
           maxAgeSeconds: Math.max(1, Math.floor((created.expiresAt - Date.now()) / 1000)),
         }),
       });
@@ -420,9 +434,133 @@ export function createHttpService(options: HttpServiceOptions): Server {
     throw new HttpError(404, "unsupported", `No route for ${url.pathname}.`);
   }
 
+  /**
+   * /v1/users/me, /devices, /devices/:id/approve, /recovery, /keys.
+   *
+   * Only ever wraps: the store holds nothing it could use to read a
+   * document. A device is inert until another approved device hands it the
+   * user key (WS7-R11), and revoking one takes that wrap away (WS7-R14).
+   */
+  async function handleUsers(
+    parts: string[],
+    method: string,
+    request: IncomingMessage,
+    response: ServerResponse,
+    session: Session | null,
+  ) {
+    const directory = options.directory;
+    if (!directory) throw new HttpError(404, "unsupported", "This store has no user directory configured.");
+    if (!session?.userId) throw new HttpError(401, "unauthenticated", "Sign in first.");
+    if (parts[2] !== "me") throw new HttpError(404, "unsupported", "Only /v1/users/me is addressable.");
+    const userId = session.userId;
+    const subject = `${session.issuer}#${session.subject}`;
+    const callingDeviceId = (request.headers["x-device-id"] as string | undefined) ?? null;
+    const section = parts[3];
+
+    if (!section && method === "GET") {
+      const devices = await directory.listDevices(userId);
+      return send(response, 200, {
+        user: { userId, issuer: session.issuer, subject: session.subject, displayName: session.displayName },
+        devices,
+      });
+    }
+
+    if (section === "devices") {
+      if (!parts[4] && method === "GET") {
+        return send(response, 200, { devices: await directory.listDevices(userId) });
+      }
+      if (!parts[4] && method === "POST") {
+        const body = await readJson(request);
+        const device = await directory.registerDevice(userId, {
+          publicKey: requireString(body.publicKey, "publicKey"),
+          label: typeof body.label === "string" ? body.label : undefined,
+        });
+        await record({ operation: "device-register", outcome: "ok", subject, docId: null, detail: { deviceId: device.deviceId } });
+        // Registered, but inert: it can reach nothing until approved.
+        return send(response, 201, { device });
+      }
+      const deviceId = parts[4] ? decodeURIComponent(parts[4]) : null;
+      if (deviceId && parts[5] === "approve" && method === "POST") {
+        if (!callingDeviceId) throw new HttpError(400, "bad-request", "Approval must come from a device: send X-Device-Id.");
+        const body = await readJson(request);
+        const wrapped = body.wrappedUserKey as { keyWrap?: unknown; body?: unknown } | undefined;
+        if (typeof wrapped?.keyWrap !== "string" || typeof wrapped?.body !== "string") {
+          throw new HttpError(400, "bad-request", "wrappedUserKey must carry keyWrap and body.");
+        }
+        // The code the approving person confirmed, checked against the key
+        // the store actually holds: a key substituted in transit produces a
+        // different code, and approval fails (WS7-R11).
+        const target = await directory.getDevice(userId, deviceId);
+        const expected = await verificationCodeFor(target.publicKey);
+        const offered = typeof body.verificationCode === "string" ? body.verificationCode.trim().toUpperCase() : "";
+        if (offered !== expected) {
+          await record({ operation: "device-approve", outcome: "denied", subject, docId: null, detail: { deviceId, reason: "verification-code" } });
+          throw new HttpError(400, "bad-request", "The verification code does not match this device. Check both screens and try again.");
+        }
+        const device = await directory.approveDevice(userId, deviceId, callingDeviceId, {
+          keyWrap: wrapped.keyWrap,
+          body: wrapped.body,
+        });
+        await record({ operation: "device-approve", outcome: "ok", subject, docId: null, detail: { deviceId, approvedBy: callingDeviceId } });
+        return send(response, 200, { device });
+      }
+      if (deviceId && !parts[5] && method === "DELETE") {
+        const device = await directory.revokeDevice(userId, deviceId);
+        await record({ operation: "device-revoke", outcome: "ok", subject, docId: null, detail: { deviceId } });
+        return send(response, 200, { device });
+      }
+      throw new HttpError(405, "unsupported", `${method} is not allowed here.`);
+    }
+
+    if (section === "recovery") {
+      if (method === "PUT") {
+        const body = await readJson(request);
+        await directory.putRecovery(userId, {
+          salt: requireString(body.salt, "salt"),
+          sealedUserKey: requireString(body.sealedUserKey, "sealedUserKey"),
+        });
+        await record({ operation: "recovery-set", outcome: "ok", subject, docId: null });
+        return send(response, 204, {});
+      }
+      if (method === "GET") {
+        const recovery = await directory.getRecovery(userId);
+        return send(response, 200, { recovery });
+      }
+      throw new HttpError(405, "unsupported", `${method} is not allowed here.`);
+    }
+
+    if (section === "keys") {
+      if (method === "GET") {
+        if (!callingDeviceId) throw new HttpError(400, "bad-request", "Send X-Device-Id: keys are handed to a device, not a session.");
+        const device = await directory.getDevice(userId, callingDeviceId);
+        if (device.revokedAt) throw new HttpError(403, "revoked", "This device has been revoked.");
+        if (!device.approvedAt || !device.wrappedUserKey) {
+          // Not an error: it is the state a device waits in.
+          return send(response, 200, { status: "awaiting-approval", verificationCode: device.verificationCode });
+        }
+        return send(response, 200, {
+          status: "approved",
+          wrappedUserKey: device.wrappedUserKey,
+          workspaceKeys: await directory.getWorkspaceKeys(userId),
+        });
+      }
+      if (method === "PUT") {
+        const body = await readJson(request);
+        const generation = typeof body.generation === "number" ? body.generation : 1;
+        await directory.putWorkspaceKey(userId, generation, requireString(body.wrappedKey, "wrappedKey"));
+        await record({ operation: "workspace-key-set", outcome: "ok", subject, docId: null, detail: { generation } });
+        return send(response, 204, {});
+      }
+      throw new HttpError(405, "unsupported", `${method} is not allowed here.`);
+    }
+
+    throw new HttpError(404, "unsupported", "No route for that path.");
+  }
+
   function describe(error: unknown): { status: number; reason: string; message: string } {
     if (error instanceof HttpError) return { status: error.status, reason: error.reason, message: error.message };
     if (error instanceof StoreError) return { status: STATUS[error.reason] ?? 500, reason: error.reason, message: error.message };
+    if (error instanceof DirectoryError) return { status: STATUS[error.reason] ?? 500, reason: error.reason, message: error.message };
     // Nothing unexpected reaches the client: it goes to the audit trail and
     // the log, and the caller gets a reason it can act on.
     console.error("[store] unhandled error:", error);

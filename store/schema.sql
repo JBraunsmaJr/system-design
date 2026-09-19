@@ -81,8 +81,11 @@ CREATE TABLE IF NOT EXISTS devices (
     user_id        TEXT        NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
     label          TEXT,
     public_key     BYTEA       NOT NULL,
-    -- The user's private key, wrapped to this device (WS7-R8).
-    wrapped_user_key BYTEA,
+    -- The user's private key, wrapped to this device (WS7-R8): the sealed
+    -- body and the one-off key wrapped to this device's public key. Present
+    -- only once another device has approved this one (WS7-R11).
+    wrapped_user_key_body BYTEA,
+    wrapped_user_key_wrap BYTEA,
     created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
     approved_at    TIMESTAMPTZ,
     revoked_at     TIMESTAMPTZ
@@ -96,6 +99,15 @@ CREATE TABLE IF NOT EXISTS workspace_keys (
     wrapped_key BYTEA       NOT NULL,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (user_id, generation)
+);
+
+-- WS7-R12: the user's private key, sealed under a key derived from their
+-- recovery code. The code itself is never stored, in any form.
+CREATE TABLE IF NOT EXISTS user_recovery (
+    user_id         TEXT PRIMARY KEY REFERENCES users (user_id) ON DELETE CASCADE,
+    salt            BYTEA       NOT NULL,
+    sealed_user_key BYTEA       NOT NULL,
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- WS10-R3: every request, for forwarding to a SIEM. Append-only by
@@ -115,3 +127,12 @@ CREATE TABLE IF NOT EXISTS audit_log (
 
 CREATE INDEX IF NOT EXISTS audit_at_idx ON audit_log (at DESC);
 CREATE INDEX IF NOT EXISTS audit_doc_idx ON audit_log (doc_id, at DESC);
+
+-- Columns added after a deployment may already have created these tables.
+-- Applied every startup, so an existing database catches up without a
+-- separate migration step. A real migration tool arrives with WS8-R9.
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS sealed_meta BYTEA;
+ALTER TABLE documents DROP COLUMN IF EXISTS sealed_title;
+ALTER TABLE devices   ADD COLUMN IF NOT EXISTS wrapped_user_key_body BYTEA;
+ALTER TABLE devices   ADD COLUMN IF NOT EXISTS wrapped_user_key_wrap BYTEA;
+ALTER TABLE devices   DROP COLUMN IF EXISTS wrapped_user_key;

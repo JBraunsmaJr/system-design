@@ -118,6 +118,12 @@ export async function importRecoveryPrivateKey(pkcs8: Uint8Array): Promise<Crypt
   return subtle().importKey("pkcs8", buffer(pkcs8), { name: "RSA-OAEP", hash: "SHA-256" }, false, ["unwrapKey"]);
 }
 
+/** Raw bytes of a symmetric key, for comparing two keys in tests and for
+ * callers that must hand one to another wrap. */
+export async function exportSymmetricKey(key: CryptoKey): Promise<Uint8Array> {
+  return new Uint8Array(await subtle().exportKey("raw", key));
+}
+
 export async function exportPublicKey(key: CryptoKey): Promise<Uint8Array> {
   return new Uint8Array(await subtle().exportKey("spki", key));
 }
