@@ -66,7 +66,12 @@ async function postgresBackend(): Promise<Backend> {
   const store = createPostgresStore({ connectionString: DATABASE_URL });
   await store.migrate();
   const clear = async () => {
-    for (const record of await store.list({ includeDeleted: true })) await store.purge(record.docId);
+    for (const record of await store.list({ includeDeleted: true })) {
+      // A hold blocks purge, which is the point of it (WS10-R8); releasing
+      // first is how a test fixture cleans up after itself.
+      if (record.legalHold) await store.setLegalHold(record.docId, null);
+      await store.purge(record.docId);
+    }
   };
   await clear();
   return {
@@ -94,7 +99,14 @@ async function run(backend: Backend) {
   const sink = backend.persistAudit
     ? { record: async (entry: Parameters<typeof audit.record>[0]) => { audit.record(entry); await backend.persistAudit!.record(entry); } }
     : audit;
-  const server = createHttpService({ store: backend.store, audit: sink, allowUnauthenticated: true });
+  const server = createHttpService({
+    store: backend.store,
+    audit: sink,
+    allowUnauthenticated: true,
+    // Unauthenticated development mode signs requests as "anonymous"; here
+    // that subject is the administrator, so the admin routes are exercised.
+    isAdmin: (subject) => subject === "anonymous",
+  });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const port = (server.address() as AddressInfo).port;
   const origin = `http://127.0.0.1:${port}`;
@@ -164,6 +176,26 @@ async function run(backend: Backend) {
     check(((await call("GET", "/v1/docs?includeDeleted=true")).body.documents as unknown[]).length === 1, "but present for an administrator");
     check((await call("POST", "/v1/docs/doc-http/restore")).status === 200, "restoring succeeds");
     check((await call("GET", "/v1/docs/doc-http")).status === 200, "and the document reads again");
+
+    console.log("  -- holds and purging (WS10-R4, R8)");
+    const held = await call("PUT", "/v1/docs/doc-http/hold", { reason: "FOIA request 2026-114" });
+    check(held.status === 200, "an administrator can place a legal hold");
+    check((await call("POST", "/v1/docs/doc-http/purge")).status === 409, "and a held document cannot be purged");
+    check((await call("DELETE", "/v1/docs/doc-http/hold")).status === 200, "the hold can be released");
+    check(((await call("POST", "/v1/admin/purge-due")).body.purged as unknown[]).length >= 0, "the purge sweep runs");
+    {
+      // Without an administrator configured, nobody may do any of this.
+      const locked = createHttpService({ store: backend.store, allowUnauthenticated: true });
+      await new Promise<void>((resolve) => locked.listen(0, "127.0.0.1", resolve));
+      const lockedPort = (locked.address() as AddressInfo).port;
+      const attempt = await fetch(`http://127.0.0.1:${lockedPort}/v1/docs/doc-http/hold`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ reason: "x" }),
+      });
+      check(attempt.status === 403, "a store with no administrators configured refuses these routes to everyone");
+      await new Promise<void>((resolve) => locked.close(() => resolve()));
+    }
 
     console.log("  -- unknown things");
     check((await call("GET", "/v1/docs/nope")).status === 404, "an unknown document is 404");

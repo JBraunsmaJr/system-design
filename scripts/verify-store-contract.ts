@@ -87,11 +87,19 @@ async function postgresBackend(): Promise<Backend> {
     async fresh() {
       // A clean slate per section, so checks do not depend on order.
       await store.blobs.totalBytes();
-      for (const record of await store.list({ includeDeleted: true })) await store.purge(record.docId);
+      for (const record of await store.list({ includeDeleted: true })) {
+        // A hold blocks purge (WS10-R8); a fixture releases it first.
+        if (record.legalHold) await store.setLegalHold(record.docId, null);
+        await store.purge(record.docId);
+      }
       return { blobs: store.blobs as never, service: store as never };
     },
     async dispose() {
-      for (const record of await store.list({ includeDeleted: true })) await store.purge(record.docId);
+      for (const record of await store.list({ includeDeleted: true })) {
+        // A hold blocks purge (WS10-R8); a fixture releases it first.
+        if (record.legalHold) await store.setLegalHold(record.docId, null);
+        await store.purge(record.docId);
+      }
       await store.close();
     },
   };

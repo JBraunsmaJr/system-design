@@ -14,6 +14,7 @@
  * (WS8-R16), so a failure part-way leaves nothing behind.
  */
 import type { BlobStore } from "./blobStore.ts";
+import { parseRetentionPeriod, purgeDueAt, type RetentionPeriod } from "./retention.ts";
 
 export interface StoredBlobMeta {
   blobId: string;
@@ -29,6 +30,11 @@ export interface DocumentRecord {
   version: number;
   updatedAt: string;
   deletedAt: string | null;
+  /** When purge becomes due (WS10-R4); null under indefinite retention, or
+   * while the document is not deleted. */
+  purgeAfter: string | null;
+  /** WS10-R8: prevents purge in every retention mode. */
+  legalHold: { reason: string; placedBy: string; placedAt: string } | null;
   /** Wrapped document keys, opaque to the store (WS7-R3, WS7-R4). */
   keys: { wrappedForWorkspace: string; wrappedForRecovery?: string };
   blobs: StoredBlobMeta[];
@@ -80,6 +86,8 @@ export interface DocumentServiceOptions<Tx> {
   maxBlobBytes?: number;
   maxBlobsPerDocument?: number;
   maxTotalBytes?: number;
+  /** WS10-R4. Defaults to 30 days. */
+  retention?: RetentionPeriod;
 }
 
 export interface CreateRequest {
@@ -114,6 +122,7 @@ export function createDocumentService<Tx>(options: DocumentServiceOptions<Tx>) {
   const maxBlobBytes = options.maxBlobBytes ?? 8 * 1024 * 1024;
   const maxBlobsPerDocument = options.maxBlobsPerDocument ?? 100_000;
   const maxTotalBytes = options.maxTotalBytes ?? Number.POSITIVE_INFINITY;
+  const retention = options.retention ?? parseRetentionPeriod(undefined);
 
   function require(docId: string, opts: ReadOptions = {}): Row {
     const row = rows.get(docId);
@@ -140,6 +149,8 @@ export function createDocumentService<Tx>(options: DocumentServiceOptions<Tx>) {
         version: 1,
         updatedAt: at,
         deletedAt: null,
+        purgeAfter: null,
+        legalHold: null,
         keys: request.keys,
         blobs: [],
       };
@@ -234,19 +245,53 @@ export function createDocumentService<Tx>(options: DocumentServiceOptions<Tx>) {
         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     },
 
-    /** Soft deletion (WS10-R4): the row and its blobs stay until purge. */
+    /**
+     * Deletion (WS10-R4). Soft by default: the row and its blobs stay until
+     * purge. Under `immediate` retention the document is purged in the same
+     * call - unless a legal hold applies, which outranks every mode
+     * (WS10-R8), in which case it is soft-deleted and kept.
+     */
     async softDelete(docId: string): Promise<DocumentRecord> {
       const row = require(docId);
-      row.record.deletedAt = now().toISOString();
+      const at = now();
+      row.record.deletedAt = at.toISOString();
       row.record.version += 1;
       row.record.updatedAt = row.record.deletedAt;
+      const due = row.record.legalHold ? null : purgeDueAt(retention, at);
+      row.record.purgeAfter = due ? due.toISOString() : null;
+      const deleted = structuredClone(row.record);
+      if (retention.kind === "immediate" && !row.record.legalHold) {
+        await this.purge(docId);
+      }
+      return deleted;
+    },
+
+    /** WS10-R8. Held documents survive purge, and survive `immediate`. */
+    async setLegalHold(docId: string, hold: { reason: string; placedBy: string } | null): Promise<DocumentRecord> {
+      const row = require(docId, { includeDeleted: true });
+      row.record.legalHold = hold ? { ...hold, placedAt: now().toISOString() } : null;
+      if (hold) row.record.purgeAfter = null;
+      else if (row.record.deletedAt) {
+        const due = purgeDueAt(retention, new Date(row.record.deletedAt));
+        row.record.purgeAfter = due ? due.toISOString() : null;
+      }
       return structuredClone(row.record);
+    },
+
+    /** The sweep: everything past its retention and not held. */
+    async purgeDue(at: Date = now()): Promise<string[]> {
+      const due = [...rows.values()]
+        .filter((row) => row.record.deletedAt && !row.record.legalHold && row.record.purgeAfter && new Date(row.record.purgeAfter) <= at)
+        .map((row) => row.record.docId);
+      for (const docId of due) await this.purge(docId);
+      return due;
     },
 
     async restore(docId: string): Promise<DocumentRecord> {
       const row = require(docId, { includeDeleted: true });
       if (!row.record.deletedAt) throw new StoreError(`Document ${docId} is not deleted.`, "conflict");
       row.record.deletedAt = null;
+      row.record.purgeAfter = null;
       row.record.version += 1;
       row.record.updatedAt = now().toISOString();
       return structuredClone(row.record);
@@ -256,6 +301,12 @@ export function createDocumentService<Tx>(options: DocumentServiceOptions<Tx>) {
     async purge(docId: string): Promise<void> {
       const row = rows.get(docId);
       if (!row) throw new StoreError(`No document ${docId}.`, "not-found");
+      if (row.record.legalHold) {
+        throw new StoreError(
+          `Document ${docId} is under legal hold (${row.record.legalHold.reason}) and cannot be purged until it is released.`,
+          "conflict",
+        );
+      }
       const tx = options.begin();
       try {
         await options.blobs.deleteMany(

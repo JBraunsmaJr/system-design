@@ -73,6 +73,10 @@ export interface StoreBackend {
   softDelete(docId: string): Promise<{ version: number }>;
   restore(docId: string): Promise<{ version: number }>;
   getMeta(docId: string, opts?: { seenVersion?: number }): Promise<Uint8Array | null>;
+  /** WS10-R8, WS10-R4: administrators only, through the routes below. */
+  setLegalHold?(docId: string, hold: { reason: string; placedBy: string } | null): Promise<{ version: number }>;
+  purgeDue?(at?: Date): Promise<string[]>;
+  purge?(docId: string): Promise<void>;
   setMeta(docId: string, sealed: Uint8Array): Promise<{ version: number }>;
 }
 
@@ -96,6 +100,13 @@ export interface HttpServiceOptions {
   afterLoginUrl?: string;
   /** Users, devices, and wrapped keys (WS7-R8, R11, R12, R14). */
   directory?: UserDirectory;
+  /**
+   * Who may place holds, purge, and see every document (WS10-R2). Given the
+   * signed-in subject as `issuer#subject`. Absent means nobody: a store with
+   * no administrators configured refuses these routes rather than allowing
+   * them to everyone.
+   */
+  isAdmin?: (subject: string) => boolean;
   /** WS8-R8: refused before the body is read. */
   maxRequestBytes?: number;
 }
@@ -110,6 +121,7 @@ const STATUS: Record<string, number> = {
   "bad-request": 400,
   unsupported: 404,
   "too-many-bytes": 413,
+  forbidden: 403,
   revoked: 403,
   "not-approved": 403,
   unauthenticated: 401,
@@ -221,6 +233,20 @@ export function createHttpService(options: HttpServiceOptions): Server {
         return send(response, 401, { error: { reason: "unauthenticated", message: "Sign in to use this store." } });
       }
 
+      if (parts[1] === "admin") {
+        requireAdmin(subject);
+        if (parts[2] === "purge-due" && method === "POST") {
+          if (!options.store.purgeDue) throw new HttpError(404, "unsupported", "This store does not support purging.");
+          operation = "purge-due";
+          // The sweep an operator or a timer runs: everything past its
+          // retention and not under hold (WS10-R4).
+          const purged = await options.store.purgeDue();
+          await record({ operation, outcome: "ok", subject, docId: null, detail: { count: purged.length } });
+          return send(response, 200, { purged });
+        }
+        throw new HttpError(404, "unsupported", `No route for ${url.pathname}.`);
+      }
+
       if (parts[1] === "users") {
         return await handleUsers(parts, method, request, response, session);
       }
@@ -318,6 +344,35 @@ export function createHttpService(options: HttpServiceOptions): Server {
         });
         await record({ operation, outcome: "ok", subject, docId });
         return send(response, 200, { document: compacted }, compacted.version);
+      }
+
+      if (tail === "hold") {
+        requireAdmin(subject);
+        if (!options.store.setLegalHold) throw new HttpError(404, "unsupported", "This store does not support legal holds.");
+        if (method === "PUT") {
+          const body = await readJson(request);
+          const reason = requireString(body.reason, "reason");
+          const held = await options.store.setLegalHold(docId, { reason, placedBy: subject ?? "unknown" });
+          operation = "legal-hold-place";
+          await record({ operation, outcome: "ok", subject, docId, detail: { reason } });
+          return send(response, 200, { document: held }, held.version);
+        }
+        if (method === "DELETE") {
+          const released = await options.store.setLegalHold(docId, null);
+          operation = "legal-hold-release";
+          await record({ operation, outcome: "ok", subject, docId });
+          return send(response, 200, { document: released }, released.version);
+        }
+        throw new HttpError(405, "unsupported", `${method} is not allowed on ${url.pathname}.`);
+      }
+
+      if (tail === "purge" && method === "POST") {
+        requireAdmin(subject);
+        if (!options.store.purge) throw new HttpError(404, "unsupported", "This store does not support purging.");
+        operation = "purge";
+        await options.store.purge(docId);
+        await record({ operation, outcome: "ok", subject, docId });
+        return send(response, 204, {});
       }
 
       if (tail === "restore" && method === "POST") {
@@ -555,6 +610,13 @@ export function createHttpService(options: HttpServiceOptions): Server {
     }
 
     throw new HttpError(404, "unsupported", "No route for that path.");
+  }
+
+  /** WS10-R2: a store with no administrators configured has none. */
+  function requireAdmin(subject: string | null) {
+    if (!subject || !options.isAdmin?.(subject)) {
+      throw new HttpError(403, "forbidden", "This action is for administrators.");
+    }
   }
 
   function describe(error: unknown): { status: number; reason: string; message: string } {

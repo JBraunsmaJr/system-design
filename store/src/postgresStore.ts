@@ -15,6 +15,7 @@ import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import pg from "pg";
 import type { BlobRef, BlobStore } from "./blobStore.ts";
+import { parseRetentionPeriod, purgeDueAt, type RetentionPeriod } from "./retention.ts";
 import {
   StoreError,
   type AppendRequest,
@@ -33,6 +34,7 @@ export interface PostgresStoreOptions {
   maxBlobBytes?: number;
   maxBlobsPerDocument?: number;
   maxTotalBytes?: number;
+  retention?: RetentionPeriod;
   now?: () => Date;
 }
 
@@ -82,6 +84,9 @@ interface DocumentRow {
   version: string;
   updated_at: Date;
   deleted_at: Date | null;
+  purge_after: Date | null;
+  legal_hold: boolean;
+  legal_hold_reason: string | null;
   wrapped_for_workspace: Buffer;
   wrapped_for_recovery: Buffer | null;
 }
@@ -107,6 +112,10 @@ const toRecord = (row: DocumentRow, blobs: StoredBlobMeta[]): DocumentRecord => 
   version: Number(row.version),
   updatedAt: row.updated_at.toISOString(),
   deletedAt: row.deleted_at ? row.deleted_at.toISOString() : null,
+  purgeAfter: row.purge_after ? row.purge_after.toISOString() : null,
+  legalHold: row.legal_hold
+    ? { reason: row.legal_hold_reason ?? "", placedBy: "", placedAt: row.updated_at.toISOString() }
+    : null,
   keys: {
     wrappedForWorkspace: row.wrapped_for_workspace.toString("base64"),
     ...(row.wrapped_for_recovery ? { wrappedForRecovery: row.wrapped_for_recovery.toString("base64") } : {}),
@@ -126,6 +135,7 @@ export function createPostgresStore(options: PostgresStoreOptions) {
   const maxBlobBytes = options.maxBlobBytes ?? 8 * 1024 * 1024;
   const maxBlobsPerDocument = options.maxBlobsPerDocument ?? 100_000;
   const maxTotalBytes = options.maxTotalBytes ?? Number.POSITIVE_INFINITY;
+  const retention = options.retention ?? parseRetentionPeriod(undefined);
   const now = options.now ?? (() => new Date());
 
   async function inTransaction<T>(work: (tx: PgTx) => Promise<T>): Promise<T> {
@@ -336,16 +346,42 @@ export function createPostgresStore(options: PostgresStoreOptions) {
     },
 
     async softDelete(docId: string): Promise<DocumentRecord> {
-      return inTransaction(async (tx) => {
+      const deleted = await inTransaction(async (tx) => {
         const row = await lockDocument(tx, docId);
         const at = now();
         const version = Number(row.version) + 1;
+        // A hold outranks every retention mode, including immediate.
+        const due = row.legal_hold ? null : purgeDueAt(retention, at);
         const updated = await tx.query<DocumentRow>(
-          `UPDATE documents SET deleted_at = $2, updated_at = $2, version = $3 WHERE doc_id = $1 RETURNING *`,
-          [docId, at, version],
+          `UPDATE documents SET deleted_at = $2, updated_at = $2, version = $3, purge_after = $4 WHERE doc_id = $1 RETURNING *`,
+          [docId, at, version, due],
         );
         return toRecord(updated.rows[0], await blobsOf(docId, tx));
       });
+      if (retention.kind === "immediate" && !deleted.legalHold) await this.purge(docId);
+      return deleted;
+    },
+
+    /** WS10-R8. */
+    async setLegalHold(docId: string, hold: { reason: string; placedBy: string } | null): Promise<DocumentRecord> {
+      return inTransaction(async (tx) => {
+        const row = await lockDocument(tx, docId, { includeDeleted: true });
+        const due = hold || !row.deleted_at ? null : purgeDueAt(retention, row.deleted_at);
+        const updated = await tx.query<DocumentRow>(
+          `UPDATE documents SET legal_hold = $2, legal_hold_reason = $3, purge_after = $4 WHERE doc_id = $1 RETURNING *`,
+          [docId, hold !== null, hold?.reason ?? null, due],
+        );
+        return toRecord(updated.rows[0], await blobsOf(docId, tx));
+      });
+    },
+
+    async purgeDue(at: Date = now()): Promise<string[]> {
+      const due = await pool.query<{ doc_id: string }>(
+        `SELECT doc_id FROM documents WHERE deleted_at IS NOT NULL AND legal_hold = FALSE AND purge_after IS NOT NULL AND purge_after <= $1`,
+        [at],
+      );
+      for (const row of due.rows) await this.purge(row.doc_id);
+      return due.rows.map((row) => row.doc_id);
     },
 
     async restore(docId: string): Promise<DocumentRecord> {
@@ -355,7 +391,7 @@ export function createPostgresStore(options: PostgresStoreOptions) {
         const at = now();
         const version = Number(row.version) + 1;
         const updated = await tx.query<DocumentRow>(
-          `UPDATE documents SET deleted_at = NULL, updated_at = $2, version = $3 WHERE doc_id = $1 RETURNING *`,
+          `UPDATE documents SET deleted_at = NULL, purge_after = NULL, updated_at = $2, version = $3 WHERE doc_id = $1 RETURNING *`,
           [docId, at, version],
         );
         return toRecord(updated.rows[0], await blobsOf(docId, tx));
@@ -364,6 +400,16 @@ export function createPostgresStore(options: PostgresStoreOptions) {
 
     async purge(docId: string): Promise<void> {
       await inTransaction(async (tx) => {
+        const held = await tx.query<{ legal_hold: boolean; legal_hold_reason: string | null }>(
+          `SELECT legal_hold, legal_hold_reason FROM documents WHERE doc_id = $1 FOR UPDATE`,
+          [docId],
+        );
+        if (held.rows[0]?.legal_hold) {
+          throw new StoreError(
+            `Document ${docId} is under legal hold (${held.rows[0].legal_hold_reason ?? ""}) and cannot be purged until it is released.`,
+            "conflict",
+          );
+        }
         const result = await tx.query(`DELETE FROM documents WHERE doc_id = $1`, [docId]);
         if (result.rowCount === 0) throw new StoreError(`No document ${docId}.`, "not-found");
         // blobs and blob_data cascade from documents.
