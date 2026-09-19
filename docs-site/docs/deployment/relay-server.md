@@ -42,65 +42,6 @@ document size or edit frequency, since neither passes through it.
 The flip side: if the relay is down, **existing sessions keep working**
 but nobody new can join, and a peer who reloads can't get back in.
 
----
-
-## Running a relay
-
-### Option 1: the published image
-
-Every release publishes an image to GitHub Container Registry:
-
-```bash
-docker run -d --name relay -p 4444:4444 \
-  ghcr.io/jbraunsmajr/system-design-relay:latest
-```
-
-The server listens on `4444` by default and reads `PORT` from the
-environment if you need something else:
-
-```bash
-docker run -d --name relay -p 9000:9000 -e PORT=9000 \
-  ghcr.io/jbraunsmajr/system-design-relay:latest
-```
-
-### Option 2: build it yourself
-
-The image definition is in `docker/signaling/`. It's deliberately a
-separate, minimal package from the main app — a signaling server has
-nothing to do with React or Vite.
-
-```bash
-docker build -t my-relay ./docker/signaling
-docker run -d -p 4444:4444 my-relay
-```
-
-### Option 3: no Docker
-
-```bash
-cd docker/signaling
-npm install --omit=dev
-PORT=4444 node node_modules/y-webrtc/bin/server.js
-```
-
-### Confirming it works
-
-The server answers any plain HTTP GET with `okay`, which doubles as a
-health check for uptime monitoring:
-
-```bash
-curl http://localhost:4444/          # -> okay
-```
-
-For a deeper check, the main repo ships a script that starts a relay and
-exercises the actual subscribe/publish protocol the app depends on,
-including verifying that separate rooms don't leak into each other:
-
-```bash
-npx tsx scripts/verify-signaling-server.ts
-```
-
----
-
 ## TLS
 
 ::: warning HTTPS Requirement
@@ -158,40 +99,6 @@ A user's saved setting always wins. There is no fallback to any public
 infrastructure: if neither is set, collaboration is disabled with an
 explanatory message rather than silently connecting somewhere you don't
 control.
-
-### Setting the deployment default
-
-`VITE_SIGNALING_URL` is read at **build** time, not runtime, and inlined
-into the JavaScript bundle:
-
-```bash
-VITE_SIGNALING_URL="wss://relay.example.com" npm run build
-```
-
-For GitHub Pages, add it to the build step in
-`.github/workflows/deploy.yml`:
-
-```yaml
-      - run: npm run build
-        env:
-          VITE_SIGNALING_URL: ${{ vars.VITE_SIGNALING_URL }}
-```
-
-Use a repository **variable**, not a secret. The value is inlined into
-publicly-served JavaScript, so a secret would be masked in the Actions
-log and then published in the artifact anyway — creating the impression
-of protection without any.
-
-For a compose setup you may also use an environment variable
-
-```yaml
-relay:
-  image: ghcr.io/jbraunsmajr/system-design-relay:${RELAY_VERSION:-latest}
-  hostname: relay
-  container_name: relay
-  environment:
-    VITE_SIGNALING_URL: ${RELAY_URL:-wss://relay.example.com}
-```
 
 ### Multiple relays
 

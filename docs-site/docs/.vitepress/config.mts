@@ -25,7 +25,6 @@ export default defineConfig({
                 text: 'Deployment & Infrastructure',
                 items: [
                     {text: 'Relay Server (Signaling)', link: '/deployment/relay-server'},
-                    {text: 'Container Configuration', link: '/deployment/container-configuration'},
                     {text: 'Self Hosting', link: '/deployment/self-host.md'}
                 ]
             },

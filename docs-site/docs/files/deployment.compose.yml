@@ -8,7 +8,7 @@ services:
       APP_URL: ${EDITOR_URL:-https://editor.example.com}
 
       # Example from air-gapped network
-      # ICE_SERVERS: ${ICE_SERVERS:-"turn:editor.example.com:3478|webrtc|CHANGEME-long-random-string"}
+      # ICE_SERVERS: ${ICE_SERVERS:-}
     container_name: system-design-editor
     hostname: editor
     restart: unless-stopped
