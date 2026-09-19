@@ -21,6 +21,7 @@ export default defineConfig({
                     {text: 'Quick Start', link: '/guide/getting-started'},
                     {text: 'Diagrams', link: '/guide/diagram'},
                     {text: 'Requirements', link: '/guide/requirement'},
+                    {text: 'Timeline & Planning', link: '/guide/timeline'},
                 ]
             },
             {
