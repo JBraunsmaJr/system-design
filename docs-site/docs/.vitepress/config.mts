@@ -27,12 +27,6 @@ export default defineConfig({
                     {text: 'Relay Server (Signaling)', link: '/deployment/relay-server'},
                     {text: 'Self Hosting', link: '/deployment/self-host.md'}
                 ]
-            },
-            {
-                text: 'Engineering & Testing',
-                items: [
-                    {text: 'Performance Testing Harness', link: '/testing/performance-testing'}
-                ]
             }
         ],
 
