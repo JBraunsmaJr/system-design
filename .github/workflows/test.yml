@@ -120,3 +120,8 @@ jobs:
         run: npx tsx scripts/verify-store-index.ts
         env:
           DATABASE_URL: postgresql://store:store@localhost:5432/store
+
+      - name: Run the store client against PostgreSQL
+        run: npx tsx scripts/verify-store-client.ts
+        env:
+          DATABASE_URL: postgresql://store:store@localhost:5432/store
