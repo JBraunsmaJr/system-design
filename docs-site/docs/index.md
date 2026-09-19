@@ -12,6 +12,9 @@ hero:
     - theme: alt
       text: Relay Server Guide
       link: /deployment/relay-server
+    - theme: alt
+      text: Self-Hosting
+      link: /deployment/self-host
 
 features:
   - title: Real-Time Peer-to-Peer Collaboration

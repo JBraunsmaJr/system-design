@@ -2,17 +2,15 @@
 
 This document describes how to configure, run, and deploy the containerized **System Design Editor** web application.
 
----
-
 ## Overview
 
-The System Design Editor container image is a lightweight Nginx web server packaging the pre-built, static single-page application (SPA).
+The System Design Editor container image is a lightweight Nginx web server packaging the pre-built, static single-page
+application (SPA).
 
 - **Base Image:** `nginx:stable-alpine`
 - **Port:** `80` (HTTP)
-- **Runtime Configuration:** Environment variables are injected on container startup via `/docker-entrypoint.d/40-env-config.sh` into `window.__APP_CONFIG__` (`/usr/share/nginx/html/env-config.js`).
-
----
+- **Runtime Configuration:** Environment variables are injected on container startup via
+  `/docker-entrypoint.d/40-env-config.sh` into `window.__APP_CONFIG__` (`/usr/share/nginx/html/env-config.js`).
 
 ## Environment Variables
 
@@ -26,14 +24,16 @@ To minimize deployment complexity, standard environment variables are provided w
 
 ### Aliases & Fallback Resolution
 
-To prevent silent failures and accommodate different naming conventions across container platforms and build environments, the container resolves variables in the following prioritized order:
+To prevent silent failures and accommodate different naming conventions across container platforms and build
+environments, the container resolves variables in the following prioritized order:
 
 1. **Signaling / Relay:** `RELAY` &rarr; `RELAY_URL` &rarr; `SIGNALING_URL` &rarr; `VITE_SIGNALING_URL`
 2. **App Base URL:** `APP_URL` &rarr; `BASE_URL` &rarr; `VITE_APP_URL`
 3. **ICE / STUN / TURN:** `ICE_SERVERS` &rarr; `VITE_ICE_SERVERS`
 
 ::: tip Best Practice
-When writing new Docker run scripts, Docker Compose files, or Kubernetes manifests, use the primary variables (`RELAY`, `APP_URL`, `ICE_SERVERS`).
+When writing new Docker run scripts, Docker Compose files, or Kubernetes manifests, use the primary variables (`RELAY`,
+`APP_URL`, `ICE_SERVERS`).
 :::
 
 ---
@@ -85,6 +85,7 @@ services:
 ```
 
 Start the stack:
+
 ```bash
 docker compose up -d
 ```
@@ -95,17 +96,21 @@ docker compose up -d
 
 When deploying behind a reverse proxy (e.g., Nginx, Caddy, Traefik, AWS ALB, Cloudflare):
 
-1. **HTTPS / WSS Requirement:** Browsers require WebRTC signaling on secure origins (`https://`) to use secure WebSockets (`wss://`). Ensure your reverse proxy terminates TLS for both the editor and the relay.
-2. **Subpath Hosting:** The Docker container is built with relative base paths (`--base=./`). It can be served from any domain root (`https://example.com/`) or subpath (`https://example.com/system-design/`) without rebuilding. Set `APP_URL` to the full public URL so shared session links format correctly.
+1. **HTTPS / WSS Requirement:** Browsers require WebRTC signaling on secure origins (`https://`) to use secure
+   WebSockets (`wss://`). Ensure your reverse proxy terminates TLS for both the editor and the relay.
+2. **Subpath Hosting:** The Docker container is built with relative base paths (`--base=./`). It can be served from any
+   domain root (`https://example.com/`) or subpath (`https://example.com/system-design/`) without rebuilding. Set
+   `APP_URL` to the full public URL so shared session links format correctly.
 3. **Caching:** Nginx inside the container automatically configures:
-   - `assets/*` &rarr; Long-term immutable caching (`Cache-Control: public, immutable`).
-   - `index.html` & `env-config.js` &rarr; Revalidated on every request (`Cache-Control: no-cache`).
+    - `assets/*` &rarr; Long-term immutable caching (`Cache-Control: public, immutable`).
+    - `index.html` & `env-config.js` &rarr; Revalidated on every request (`Cache-Control: no-cache`).
 
 ---
 
 ## Build-Time Configuration (Alternative)
 
-If you are building the static assets directly with `npm run build` rather than using the pre-built Docker runtime entrypoint:
+If you are building the static assets directly with `npm run build` rather than using the pre-built Docker runtime
+entrypoint:
 
 ```bash
 VITE_SIGNALING_URL="wss://relay.example.com" \

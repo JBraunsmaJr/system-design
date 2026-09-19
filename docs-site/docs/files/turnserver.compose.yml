@@ -1,0 +1,9 @@
+services:
+  # Other services here
+  coturn:
+    image: coturn/coturn:latest
+    container_name: coturn
+    network_mode: host
+    volumes:
+      - "./turnserver.conf:/etc/coturn/turnserver.conf:ro"
+    restart: unless-stopped

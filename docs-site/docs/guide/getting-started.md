@@ -2,8 +2,6 @@
 
 Get up and running with System Design Editor locally or via Docker.
 
----
-
 ## Running Locally
 
 ### Prerequisites
