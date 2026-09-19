@@ -54,6 +54,8 @@ import { countPersistedReplicas } from "./collab/session";
 import { isSoleReplicaHolder } from "./domain/durability";
 import { useFileSaving } from "./hooks/useFileSaving";
 import { LeaveGuardDialog } from "./components/LeaveGuardDialog";
+import { WorkspacePanel } from "./components/WorkspacePanel";
+import { getStoreUrl } from "./domain/storeConfig";
 import {
   acquireDocument,
   replaceDocumentContents,
@@ -266,6 +268,9 @@ function App() {
   const [isDocumentManagerOpen, setIsDocumentManagerOpen] = useState(false);
   /** The file this document is continuously saved to, if any (WS13-R1). */
   const fileSaving = useFileSaving(openDocId);
+  /** Where the workspace is, if this deployment has one. Absent means the
+   * editor behaves exactly as it does with no store at all. */
+  const [storeUrl] = useState(() => getStoreUrl());
 
   /**
    * Switches this tab to another stored document by navigating, so the open
@@ -2902,6 +2907,24 @@ function App() {
         onRenameCurrent={setTitle}
         timedCopies={timedCopies}
         onTimedCopiesChange={setTimedCopies}
+        workspace={
+          storeUrl ? (
+            <WorkspacePanel
+              storeUrl={storeUrl}
+              currentDocId={openDocId}
+              buildCurrentFile={buildCurrentFile}
+              onOpenFile={(file) => {
+                // Opened like any other document: whole-document
+                // replacement, so undo history does not reach across it
+                // (WS3-R4).
+                replaceDocumentContents(openDoc.doc, snapshotToDiagramFile(diagramFileToSnapshot(file)));
+                undo.clear();
+                setIsDocumentManagerOpen(false);
+                showToast(`Opened "${file.title}" from the workspace`);
+              }}
+            />
+          ) : undefined
+        }
         onOpenDocument={openDocumentInTab}
         onNewDocument={onNew}
       />

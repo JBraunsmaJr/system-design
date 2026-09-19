@@ -116,22 +116,36 @@ export function parseCookies(header: string | undefined): Record<string, string>
 }
 
 /**
- * HttpOnly so page scripts cannot read it; SameSite=Lax so another site
- * cannot cause an authenticated request while still allowing the provider's
- * redirect back; Secure unless the deployment is plain HTTP for development.
+ * HttpOnly, so page scripts cannot read it.
+ *
+ * SameSite depends on where the editor is served from. Same site as the
+ * store: Lax, so another site cannot cause an authenticated request. A
+ * different site - the usual deployment, editor and store on separate hosts
+ * - has to be None, because a Lax cookie is not sent on cross-site requests
+ * at all and every call would look unauthenticated. None requires Secure,
+ * so a cross-origin deployment must be HTTPS; browsers treat localhost and
+ * 127.0.0.1 as secure, which is what makes local development work.
+ *
+ * Dropping to None is safe here because the store allows only the origins
+ * it was configured with (WS10-R1) and every state-changing route is a
+ * POST/PUT/DELETE that a form cannot forge cross-origin without CORS.
  */
-export function serializeSessionCookie(id: string, options: { secure: boolean; maxAgeSeconds: number }): string {
+export function serializeSessionCookie(
+  id: string,
+  options: { secure: boolean; maxAgeSeconds: number; crossSite?: boolean },
+): string {
+  const crossSite = options.crossSite ?? false;
   const parts = [
     `${SESSION_COOKIE}=${encodeURIComponent(id)}`,
     "Path=/",
     "HttpOnly",
-    "SameSite=Lax",
+    `SameSite=${crossSite ? "None" : "Lax"}`,
     `Max-Age=${options.maxAgeSeconds}`,
   ];
-  if (options.secure) parts.push("Secure");
+  if (options.secure || crossSite) parts.push("Secure");
   return parts.join("; ");
 }
 
-export function expiredSessionCookie(secure: boolean): string {
-  return serializeSessionCookie("", { secure, maxAgeSeconds: 0 });
+export function expiredSessionCookie(secure: boolean, crossSite = false): string {
+  return serializeSessionCookie("", { secure, maxAgeSeconds: 0, crossSite });
 }

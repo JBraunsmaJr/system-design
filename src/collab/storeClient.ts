@@ -253,6 +253,7 @@ export function createStoreClient(options: StoreClientOptions) {
       const { body } = await request("/v1/users/me/keys", { headers: { "x-device-id": deviceId } });
       return body as
         | { status: "awaiting-approval"; verificationCode: string }
+        | { status: "needs-setup"; verificationCode: string }
         | { status: "approved"; wrappedUserKey: { keyWrap: string; body: string }; workspaceKeys: { generation: number; wrappedKey: string }[] };
     },
 

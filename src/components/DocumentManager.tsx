@@ -17,6 +17,8 @@ interface DocumentManagerProps {
   onRenameCurrent: (title: string) => void;
   onOpenDocument: (docId: string) => void;
   onNewDocument: () => void;
+  /** The workspace section, where a store is configured (WS9-R4). */
+  workspace?: React.ReactNode;
   /** WS13-R6: timed downloads, a browser-wide preference. */
   timedCopies?: TimedCopiesSettings;
   onTimedCopiesChange?: (next: TimedCopiesSettings) => void;
@@ -49,6 +51,7 @@ export function DocumentManager({
   onRenameCurrent,
   onOpenDocument,
   onNewDocument,
+  workspace,
   timedCopies,
   onTimedCopiesChange,
 }: DocumentManagerProps) {
@@ -274,6 +277,8 @@ export function DocumentManager({
             "Checking storage..."
           )}
         </div>
+
+        {workspace}
 
         {timedCopies && onTimedCopiesChange && (
           <div

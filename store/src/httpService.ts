@@ -115,6 +115,14 @@ export interface HttpServiceOptions {
    * in passthrough the store reads content, and the interface must say so.
    */
   cryptoMode?: "webcrypto" | "passthrough";
+  /**
+   * Origins the editor may be served from. The store and the editor are
+   * usually different hosts, and a session cookie only travels
+   * cross-origin with an explicit allowance. Listed exactly: a wildcard is
+   * not permitted alongside credentials, and would let any site spend a
+   * signed-in person's session.
+   */
+  allowedOrigins?: string[];
   /** WS8-R8: refused before the body is read. */
   maxRequestBytes?: number;
 }
@@ -180,6 +188,8 @@ export function createHttpService(options: HttpServiceOptions): Server {
   }
   const publicUrl = () => (typeof options.publicUrl === "function" ? options.publicUrl() : options.publicUrl ?? "http://127.0.0.1");
   const secureCookies = () => publicUrl().startsWith("https://");
+  /** An editor on another origin cannot send a Lax cookie at all. */
+  const crossSiteCookies = () => (options.allowedOrigins ?? []).some((origin) => origin !== new URL(publicUrl()).origin);
   const maxRequestBytes = options.maxRequestBytes ?? 16 * 1024 * 1024;
   const audit = options.audit;
 
@@ -209,8 +219,29 @@ export function createHttpService(options: HttpServiceOptions): Server {
     void handle(request, response);
   });
 
+  /** Set once per request, so every reply carries it - errors and
+   * redirects included, or a cross-origin editor sees an opaque failure. */
+  function applyCors(request: IncomingMessage, response: ServerResponse): boolean {
+    const origin = request.headers.origin;
+    if (!origin || !(options.allowedOrigins ?? []).includes(origin)) return false;
+    response.setHeader("access-control-allow-origin", origin);
+    response.setHeader("access-control-allow-credentials", "true");
+    response.setHeader("access-control-expose-headers", "x-document-version");
+    response.setHeader("vary", "origin");
+    return true;
+  }
+
   async function handle(request: IncomingMessage, response: ServerResponse) {
     const url = new URL(request.url ?? "/", "http://store.local");
+    applyCors(request, response);
+    if (request.method === "OPTIONS") {
+      response.writeHead(204, {
+        "access-control-allow-methods": "GET, POST, PUT, DELETE, OPTIONS",
+        "access-control-allow-headers": "content-type, if-document-version, x-device-id",
+        "access-control-max-age": "600",
+      });
+      return response.end();
+    }
     const parts = url.pathname.split("/").filter(Boolean);
     const method = request.method ?? "GET";
     // Replaced by the authenticated subject in the next step; until then it
@@ -474,7 +505,7 @@ export function createHttpService(options: HttpServiceOptions): Server {
     if (parts[2] === "logout" && method === "POST") {
       if (session) sessions?.destroy(session.id);
       await record({ operation: "logout", outcome: "ok", subject: session ? `${session.issuer}#${session.subject}` : null, docId: null });
-      response.writeHead(204, { "set-cookie": expiredSessionCookie(secureCookies()) });
+      response.writeHead(204, { "set-cookie": expiredSessionCookie(secureCookies(), crossSiteCookies()) });
       return response.end();
     }
 
@@ -521,6 +552,7 @@ export function createHttpService(options: HttpServiceOptions): Server {
         location: options.afterLoginUrl ?? "/",
         "set-cookie": serializeSessionCookie(created.id, {
           secure: secureCookies(),
+          crossSite: crossSiteCookies(),
           maxAgeSeconds: Math.max(1, Math.floor((created.expiresAt - Date.now()) / 1000)),
         }),
       });
@@ -655,9 +687,16 @@ export function createHttpService(options: HttpServiceOptions): Server {
         if (!callingDeviceId) throw new HttpError(400, "bad-request", "Send X-Device-Id: keys are handed to a device, not a session.");
         const device = await directory.getDevice(userId, callingDeviceId);
         if (device.revokedAt) throw new HttpError(403, "revoked", "This device has been revoked.");
-        if (!device.approvedAt || !device.wrappedUserKey) {
-          // Not an error: it is the state a device waits in.
+        if (!device.approvedAt) {
+          // Not an error: it is the state a device waits in until another
+          // one approves it (WS7-R11).
           return send(response, 200, { status: "awaiting-approval", verificationCode: device.verificationCode });
+        }
+        if (!device.wrappedUserKey) {
+          // Approved, but holding no wrap: the person's first device, which
+          // generates the user key itself. Distinct from waiting, because
+          // nothing will ever arrive for it.
+          return send(response, 200, { status: "needs-setup", verificationCode: device.verificationCode });
         }
         return send(response, 200, {
           status: "approved",

@@ -1,0 +1,329 @@
+/**
+ * The workspace, as a person sees it (WS9-R4, WS6-R3, WS7-R11).
+ *
+ * Only appears where a store is configured. Everything it needs is already
+ * built and tested: the client, device enrollment, and the sealed index.
+ * This is the part that decides what to show while each of those is in
+ * progress, which is most of the work:
+ *
+ *   no store        nothing at all - the editor is unchanged
+ *   signed out      the providers this store accepts
+ *   awaiting        this browser's verification code, and what to do with it
+ *   ready           the workspace's documents
+ *
+ * A document saved here is sealed in this browser. The store never sees a
+ * title, a diagram, or a key - except in passthrough mode, which says so.
+ */
+import { useCallback, useEffect, useRef, useState } from "react";
+import { CloudOff, Cloud, Loader2, ShieldAlert, Upload, FolderOpen, Trash2, Check } from "lucide-react";
+import { createStoreClient, StoreClientError, type IndexEntry, type SessionInfo, type StoreClient } from "../collab/storeClient";
+import {
+  approveOtherDevice,
+  bootstrapFirstDevice,
+  createIndexedDbDeviceKeyStorage,
+  enrollDevice,
+  type DeviceKeyStorage,
+  type DeviceState,
+  type EnrollmentApi,
+} from "../collab/deviceIdentity";
+import { documentKeyFor, indexKeyFor, newDocumentKey, removeEntry, upsertEntry } from "../collab/workspaceDocuments";
+import { unwrapPrivateKeyWithPrivateKey } from "../crypto/keys";
+import type { DiagramFile } from "../domain/serialization";
+
+const WORKSPACE_ID = "default";
+
+export interface WorkspacePanelProps {
+  storeUrl: string;
+  /** The document on screen, for "Save to workspace". */
+  currentDocId: string;
+  buildCurrentFile: () => DiagramFile;
+  /** Opens a workspace document in the editor. */
+  onOpenFile: (file: DiagramFile, docId: string) => void;
+  /** Test seam; the browser uses IndexedDB. */
+  keyStorage?: DeviceKeyStorage;
+  client?: StoreClient;
+}
+
+type Phase = "checking" | "offline" | "signed-out" | "enrolling" | "awaiting-approval" | "ready" | "error";
+
+interface PendingDevice {
+  deviceId: string;
+  publicKey: string;
+  verificationCode: string;
+  label?: string;
+}
+
+export function WorkspacePanel(props: WorkspacePanelProps) {
+  const [client] = useState<StoreClient>(() => props.client ?? createStoreClient({ baseUrl: props.storeUrl }));
+  const [storage] = useState<DeviceKeyStorage>(() => props.keyStorage ?? createIndexedDbDeviceKeyStorage());
+  const [phase, setPhase] = useState<Phase>("checking");
+  const [session, setSession] = useState<SessionInfo | null>(null);
+  const [providers, setProviders] = useState<string[]>([]);
+  const [serverReadsContent, setServerReadsContent] = useState(false);
+  const [device, setDevice] = useState<DeviceState | null>(null);
+  const [pending, setPending] = useState<PendingDevice[]>([]);
+  const [entries, setEntries] = useState<IndexEntry[]>([]);
+  const [message, setMessage] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const workspaceKey = useRef<CryptoKey | null>(null);
+
+  const api: EnrollmentApi = {
+    registerDevice: (publicKey, label) => client.registerDevice(publicKey, label),
+    keysForDevice: (deviceId) => client.keysForDevice(deviceId),
+    publishUserPublicKey: (publicKey) => client.publishUserPublicKey(publicKey),
+    putWorkspaceKey: (generation, wrappedKey) => client.putWorkspaceKey(generation, wrappedKey),
+    listDevices: () => client.listDevices(),
+    approveDevice: (deviceId, code, wrapped, from) => client.approveDevice(deviceId, code, wrapped, from),
+    setOwnUserKey: (deviceId, wrapped) => client.setOwnUserKey(deviceId, wrapped),
+  };
+
+  const say = (error: unknown): string => {
+    if (error instanceof StoreClientError) {
+      if (error.reason === "offline") return "The workspace is unreachable. Your work is saved in this browser.";
+      if (error.reason === "rolled-back") return "The workspace offered an older version than this browser has seen. Nothing was applied.";
+      return error.message;
+    }
+    return String(error);
+  };
+
+  const loadEntries = useCallback(async (key: CryptoKey) => {
+    const listed = await client.readIndex(WORKSPACE_ID, await indexKeyFor(key));
+    setEntries(listed.entries);
+  }, [client]);
+
+  const refresh = useCallback(async () => {
+    setBusy(true);
+    try {
+      const health = await client.health();
+      setServerReadsContent(health.cryptoMode === "passthrough");
+      const who = await client.session();
+      setSession(who);
+      if (!who) {
+        setProviders(await client.providers());
+        setPhase("signed-out");
+        return;
+      }
+      const state = await enrollDevice({ api, storage });
+      setDevice(state);
+      if (state.status === "ready" && state.workspaceKey) {
+        workspaceKey.current = state.workspaceKey;
+        setPhase("ready");
+        await loadEntries(state.workspaceKey);
+        // Devices of this person still waiting for approval (WS7-R11).
+        const devices = await client.listDevices();
+        setPending(devices.filter((d) => !d.approvedAt && !d.revokedAt).map((d) => ({ deviceId: d.deviceId, publicKey: d.publicKey, verificationCode: d.verificationCode, label: d.label })));
+      } else if (state.status === "awaiting-approval") {
+        setPhase("awaiting-approval");
+      } else if (state.status === "needs-setup") {
+        // The person's first browser: it makes the keys.
+        setPhase("enrolling");
+      } else {
+        setPhase("error");
+        setMessage(state.message ?? null);
+      }
+      setMessage(null);
+    } catch (error) {
+      setPhase(error instanceof StoreClientError && error.reason === "offline" ? "offline" : "error");
+      setMessage(say(error));
+    } finally {
+      setBusy(false);
+    }
+  // api and storage are stable for the life of the panel.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client, loadEntries, storage]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.resolve().then(() => {
+      if (!cancelled) return refresh();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [refresh]);
+
+  const run = async (work: () => Promise<void>) => {
+    setBusy(true);
+    try {
+      await work();
+      setMessage(null);
+    } catch (error) {
+      setMessage(say(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const setUpKeys = () =>
+    run(async () => {
+      const state = await bootstrapFirstDevice({ api, storage, label: navigator.userAgent.slice(0, 60) });
+      setDevice(state);
+      if (state.status === "ready" && state.workspaceKey) {
+        workspaceKey.current = state.workspaceKey;
+        setPhase("ready");
+        await loadEntries(state.workspaceKey);
+      } else {
+        setPhase(state.status === "awaiting-approval" ? "awaiting-approval" : "error");
+        setMessage(state.message ?? null);
+      }
+    });
+
+  const saveHere = () =>
+    run(async () => {
+      const key = workspaceKey.current;
+      if (!key) throw new Error("This browser cannot write to the workspace yet.");
+      const file = props.buildCurrentFile();
+      const existing = entries.find((entry) => entry.docId === props.currentDocId);
+      const keys = existing
+        ? { documentKey: await documentKeyFor(existing, key), wrappedDocKey: existing.wrappedDocKey }
+        : await newDocumentKey(key);
+      await client.putDocument(props.currentDocId, keys.documentKey, file, { wrappedForWorkspace: keys.wrappedDocKey });
+      const indexKey = await indexKeyFor(key);
+      const next = await client.updateIndex(WORKSPACE_ID, indexKey, (current) =>
+        upsertEntry(current, { docId: props.currentDocId, wrappedDocKey: keys.wrappedDocKey, title: file.title, updatedAt: new Date().toISOString() }),
+      );
+      setEntries(next);
+    });
+
+  const openEntry = (entry: IndexEntry) =>
+    run(async () => {
+      const key = workspaceKey.current;
+      if (!key) throw new Error("This browser cannot read the workspace yet.");
+      const { file } = await client.getDocument(entry.docId, await documentKeyFor(entry, key));
+      props.onOpenFile(file, entry.docId);
+    });
+
+  const removeEntryFromWorkspace = (entry: IndexEntry) =>
+    run(async () => {
+      const key = workspaceKey.current;
+      if (!key) return;
+      await client.deleteDocument(entry.docId);
+      const next = await client.updateIndex(WORKSPACE_ID, await indexKeyFor(key), (current) => removeEntry(current, entry.docId));
+      setEntries(next);
+    });
+
+  const approve = (target: PendingDevice) =>
+    run(async () => {
+      const held = await storage.load();
+      const key = workspaceKey.current;
+      if (!held || !key) throw new Error("This browser cannot approve another yet.");
+      const keys = await client.keysForDevice(held.deviceId);
+      if (keys.status !== "approved") throw new Error("This browser is not approved itself.");
+      const userKey = await unwrapPrivateKeyWithPrivateKey(
+        {
+          keyWrap: Uint8Array.from(atob(keys.wrappedUserKey.keyWrap), (c) => c.charCodeAt(0)),
+          body: Uint8Array.from(atob(keys.wrappedUserKey.body), (c) => c.charCodeAt(0)),
+        },
+        held.keyPair.privateKey,
+        { docId: "user-key", kind: "key-wrap", version: 1 },
+      );
+      await approveOtherDevice({ api, storage, thisDeviceId: held.deviceId, userKey }, target);
+      setPending((current) => current.filter((d) => d.deviceId !== target.deviceId));
+    });
+
+  return (
+    <div className="workspace-panel" data-phase={phase} style={{ padding: "10px 18px", borderBottom: "1px solid var(--border, #2d3342)", display: "grid", gap: 8, fontSize: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        {phase === "offline" ? <CloudOff size={14} /> : <Cloud size={14} />}
+        <strong>Workspace</strong>
+        {busy && <Loader2 size={12} className="workspace-panel__busy" />}
+        {session && <span className="workspace-panel__who" style={{ color: "var(--text-muted, #9aa3b2)" }}>{session.displayName ?? session.subject}</span>}
+      </div>
+
+      {serverReadsContent && (
+        // WS6-R3: not dismissible, and stated plainly.
+        <p className="workspace-panel__passthrough" role="alert" style={{ margin: 0, color: "var(--warning, #e0a84a)", display: "flex", gap: 6, alignItems: "center" }}>
+          <ShieldAlert size={14} /> This workspace stores documents unencrypted: the server can read their contents.
+        </p>
+      )}
+
+      {phase === "offline" && <p className="workspace-panel__status" style={{ margin: 0 }}>The workspace is unreachable. Your work is saved in this browser.</p>}
+
+      {phase === "signed-out" && (
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <span>Sign in to use the workspace:</span>
+          {providers.map((provider) => (
+            <button
+              key={provider}
+              type="button"
+              className="workspace-panel__sign-in"
+              onClick={() => globalThis.location.assign(`${props.storeUrl}/v1/auth/${encodeURIComponent(provider)}/start`)}
+            >
+              {provider}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {phase === "enrolling" && (
+        <div style={{ display: "grid", gap: 6 }}>
+          <p style={{ margin: 0 }}>This browser has no workspace keys yet.</p>
+          <button type="button" className="workspace-panel__bootstrap" onClick={() => void setUpKeys()} disabled={busy}>
+            Set up this browser
+          </button>
+        </div>
+      )}
+
+      {phase === "awaiting-approval" && (
+        <div style={{ display: "grid", gap: 6 }}>
+          <p style={{ margin: 0 }}>
+            Waiting for approval. On a browser you already use, open File &gt; Documents and approve this one, checking the code matches.
+          </p>
+          <code className="workspace-panel__code" style={{ fontSize: 16, letterSpacing: 1 }}>{device?.verificationCode}</code>
+          <button type="button" className="workspace-panel__recheck" onClick={() => void refresh()} disabled={busy}>
+            Check again
+          </button>
+        </div>
+      )}
+
+      {phase === "ready" && (
+        <div style={{ display: "grid", gap: 8 }}>
+          {pending.length > 0 && (
+            <div className="workspace-panel__pending" style={{ display: "grid", gap: 4 }}>
+              <strong>Waiting to be approved</strong>
+              {pending.map((target) => (
+                <div key={target.deviceId} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <code>{target.verificationCode}</code>
+                  <span style={{ color: "var(--text-muted, #9aa3b2)" }}>{target.label ?? "another browser"}</span>
+                  <button type="button" className="workspace-panel__approve" onClick={() => void approve(target)} disabled={busy}>
+                    <Check size={12} /> Codes match, approve
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button type="button" className="workspace-panel__save" onClick={() => void saveHere()} disabled={busy}>
+              <Upload size={12} /> Save this document to the workspace
+            </button>
+          </div>
+
+          {entries.length === 0 ? (
+            <p style={{ margin: 0, color: "var(--text-muted, #9aa3b2)" }}>No documents in the workspace yet.</p>
+          ) : (
+            <ul className="workspace-panel__list" style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 4 }}>
+              {entries.map((entry) => (
+                <li key={entry.docId} className="workspace-panel__entry" data-doc-id={entry.docId} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <span className="workspace-panel__title" style={{ flex: 1 }}>{entry.title}</span>
+                  <button type="button" className="workspace-panel__open" onClick={() => void openEntry(entry)} disabled={busy}>
+                    <FolderOpen size={12} /> Open
+                  </button>
+                  <button type="button" className="workspace-panel__remove" onClick={() => void removeEntryFromWorkspace(entry)} disabled={busy}>
+                    <Trash2 size={12} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {message && (
+        <p className="workspace-panel__message" role="alert" style={{ margin: 0, color: "var(--danger, #e06c75)" }}>
+          {message}
+        </p>
+      )}
+    </div>
+  );
+}

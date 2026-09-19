@@ -42,6 +42,8 @@ export type EnrollmentStatus =
   | "inactive"
   /** Registered, waiting for another device to approve this one. */
   | "awaiting-approval"
+  /** The person's first device: approved, but it has to make the keys. */
+  | "needs-setup"
   /** Holds the workspace key; documents can be opened and saved. */
   | "ready"
   | "error";
@@ -67,6 +69,7 @@ export interface EnrollmentApi {
   registerDevice(publicKey: string, label?: string): Promise<{ deviceId: string; verificationCode: string; approvedAt: string | null }>;
   keysForDevice(deviceId: string): Promise<
     | { status: "awaiting-approval"; verificationCode: string }
+    | { status: "needs-setup"; verificationCode: string }
     | { status: "approved"; wrappedUserKey: { keyWrap: string; body: string }; workspaceKeys: { generation: number; wrappedKey: string }[] }
   >;
   publishUserPublicKey(publicKey: string): Promise<void>;
@@ -102,8 +105,8 @@ export async function enrollDevice(options: EnrollOptions): Promise<DeviceState>
     }
 
     const keys = await api.keysForDevice(held.deviceId);
-    if (keys.status === "awaiting-approval") {
-      return { status: "awaiting-approval", deviceId: held.deviceId, verificationCode: keys.verificationCode, workspaceKey: null };
+    if (keys.status === "awaiting-approval" || keys.status === "needs-setup") {
+      return { status: keys.status, deviceId: held.deviceId, verificationCode: keys.verificationCode, workspaceKey: null };
     }
 
     const userKey = await unwrapPrivateKeyWithPrivateKey(

@@ -123,7 +123,10 @@ async function run(name: string, directory: UserDirectory) {
     )).device as { deviceId: string; verificationCode: string; approvedAt: string | null };
     check(firstRegistered.approvedAt !== null, "the user's first device is approved as it registers: it is the one that makes the user key");
     const firstKeys = await json(await call("/v1/users/me/keys", { cookie, deviceId: firstRegistered.deviceId }));
-    check(firstKeys.status === "awaiting-approval", "it still holds no wrap from the store: it has the user key itself");
+    check(
+      firstKeys.status === "needs-setup",
+      "and is told it must make the keys itself, distinct from waiting for an approval that would never come"
+    );
 
     console.log("  -- the store holds only wraps");
     await call("/v1/users/me/keys", { method: "PUT", cookie, body: JSON.stringify({ generation: 1, wrappedKey: workspaceForUser }) });
