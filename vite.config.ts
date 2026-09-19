@@ -18,6 +18,29 @@ export default defineConfig({
       }
     : undefined,
   plugins: [
+      {
+        name: 'docs-redirect',
+        configureServer(server) {
+          server.middlewares.use((req, res, next) => {
+            if (req.url === '/system-design/docs' || req.url === '/system-design/docs/' || req.url === '/docs' || req.url === '/docs/') {
+              res.writeHead(302, { Location: '/system-design/docs/index.html' });
+              res.end();
+              return;
+            }
+            next();
+          });
+        },
+        configurePreviewServer(server) {
+          server.middlewares.use((req, res, next) => {
+            if (req.url === '/system-design/docs' || req.url === '/system-design/docs/' || req.url === '/docs' || req.url === '/docs/') {
+              res.writeHead(302, { Location: '/system-design/docs/index.html' });
+              res.end();
+              return;
+            }
+            next();
+          });
+        }
+      },
       react(),
 
       VitePWA({
@@ -53,6 +76,7 @@ export default defineConfig({
         },
 
         workbox: {
+          navigateFallbackDenylist: [/^\/system-design\/docs/],
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
           globPatterns: [
             "**/*.{js,css,html,png,jpg,jpeg,gif,svg,ico}"

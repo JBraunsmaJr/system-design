@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build:app": "tsc -b && vite build",
+    "build:docs": "npm --prefix docs-site run build",
+    "build": "npm run build:app && npm run build:docs",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "tsx scripts/run-tests.ts",
