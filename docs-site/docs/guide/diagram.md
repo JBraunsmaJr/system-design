@@ -47,12 +47,6 @@ Select any component or edge to open the **Inspector Panel** on the right:
 Complex systems quickly become unreadable when flattened onto a single canvas. The sub-diagram engine allows you to
 model high-level architectures at the root while encapsulating low-level implementation details in nested layers.
 
-```
-Root Architecture (Macro View)
-  └── Order Service Node
-        └── Sub-Diagram: Request Handling, Worker Pools, & Database Shards (Micro View)
-```
-
 ### How to Use Sub-Diagrams
 
 1. **Creating a Sub-Diagram**:
@@ -127,7 +121,31 @@ Click **Present** to launch the presentation mode:
 
 ---
 
-## 4. Exporting Diagrams (SVG & PNG)
+## 4. Linking to Requirements
+
+Architectural components do not exist in isolation; they implement specific functional, performance, and security requirements. The editor enables bi-directional traceability by allowing you to link any canvas node directly to existing engineering requirements.
+
+![link requirement](../images/diagram/link-requirement.png)
+
+### How to Link a Component to a Requirement
+
+1. **Select a Component**: Click any architectural node or shape on the canvas to open the **Inspector Panel** on the right.
+2. **Open the Linker**: In the Inspector panel, locate the **Linked requirements** section and click **+ Link requirement**.
+3. **Search & Select**:
+    - Type in the search box to filter existing requirements by their ID (e.g., `REQ-001`) or title keywords.
+    - Click any requirement from the dropdown to link it to the selected component.
+    - The dropdown stays open so you can link multiple requirements in succession.
+
+### Managing & Navigating Linked Requirements
+
+- **Color-Coded Badges**: Linked requirements appear as colored pills in the Inspector, reflecting their configured requirement type (e.g., Functional, Security, Reliability).
+- **Jump to Requirement**: Click any requirement pill label to immediately switch to the **Requirements View** and focus on that requirement's full description, acceptance criteria, and metadata.
+- **Unlinking**: Click the `×` button on any pill to remove the link from the component without modifying the requirement itself.
+- **Bi-Directional Traceability**: Inside the **Requirements View**, each requirement card displays its connected diagram components under **Linked Diagrams & Components**, enabling team members to jump back and forth between design models and specifications.
+
+---
+
+## 5. Exporting Diagrams (SVG & PNG)
 
 Diagrams can be exported as standalone vector graphics or high-resolution images for RFCs, wiki pages, presentations,
 and technical documentation.
@@ -148,7 +166,7 @@ and technical documentation.
 
 ---
 
-## 5. Workflow Recommendations
+## 6. Workflow Recommendations
 
 - **Start Broad, Then Drill Down**: Use the Root level for system boundaries and service communication contracts. Drill
   down into sub-diagrams for internal class/module interactions or storage schemas.
