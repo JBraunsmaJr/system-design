@@ -9,7 +9,7 @@ export default defineConfig({
     themeConfig: {
         nav: [
             {text: 'Home', link: '/'},
-            {text: 'Guide', link: '/guide/diagrams'},
+            {text: 'Guide', link: '/guide/diagram'},
             {text: 'Deployment', link: '/deployment/self-host'},
         ],
 
@@ -18,7 +18,6 @@ export default defineConfig({
                 text: 'Guide',
                 items: [
                     {text: 'Overview', link: '/guide/overview'},
-                    {text: 'Quick Start', link: '/guide/getting-started'},
                     {text: 'Diagrams', link: '/guide/diagram'},
                     {text: 'Requirements', link: '/guide/requirement'},
                     {text: 'Timeline & Planning', link: '/guide/timeline'},
