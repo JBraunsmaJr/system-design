@@ -16,6 +16,7 @@ import { fileURLToPath } from "url";
 import pg from "pg";
 import type { BlobRef, BlobStore } from "./blobStore.ts";
 import { parseRetentionPeriod, purgeDueAt, type RetentionPeriod } from "./retention.ts";
+import { IndexError, type WorkspaceIndexStore } from "./workspaceIndex.ts";
 import {
   StoreError,
   type AppendRequest,
@@ -464,3 +465,57 @@ export function createPostgresStore(options: PostgresStoreOptions) {
 }
 
 export type PostgresStore = ReturnType<typeof createPostgresStore>;
+
+/**
+ * The workspace index over PostgreSQL (WS9-R1, R3). One row, conditionally
+ * updated: the UPDATE matches on the version the client read, so a second
+ * writer that read the same version changes nothing and is told so.
+ */
+export function createPostgresWorkspaceIndex(pool: pg.Pool): WorkspaceIndexStore {
+  return {
+    async get(workspaceId) {
+      const result = await pool.query<{ sealed: Buffer; version: string; updated_at: Date }>(
+        `SELECT sealed, version, updated_at FROM workspace_index WHERE workspace_id = $1`,
+        [workspaceId],
+      );
+      const row = result.rows[0];
+      return row
+        ? { sealed: row.sealed.toString("base64"), version: Number(row.version), updatedAt: row.updated_at.toISOString() }
+        : null;
+    },
+
+    async put(workspaceId, sealed, expectedVersion) {
+      const bytes = Buffer.from(sealed, "base64");
+      if (expectedVersion === null) {
+        const inserted = await pool.query<{ version: string; updated_at: Date }>(
+          `INSERT INTO workspace_index (workspace_id, sealed, version) VALUES ($1, $2, 1)
+           ON CONFLICT (workspace_id) DO NOTHING RETURNING version, updated_at`,
+          [workspaceId, bytes],
+        );
+        if (inserted.rows[0]) {
+          return { sealed, version: Number(inserted.rows[0].version), updatedAt: inserted.rows[0].updated_at.toISOString() };
+        }
+        const current = await this.get(workspaceId);
+        throw new IndexError(
+          `There is already an index for ${workspaceId} (version ${current?.version}). Re-read it and apply your change again.`,
+          "conflict",
+          current?.version,
+        );
+      }
+      const updated = await pool.query<{ version: string; updated_at: Date }>(
+        `UPDATE workspace_index SET sealed = $2, version = version + 1, updated_at = now()
+          WHERE workspace_id = $1 AND version = $3 RETURNING version, updated_at`,
+        [workspaceId, bytes, expectedVersion],
+      );
+      if (!updated.rows[0]) {
+        const current = await this.get(workspaceId);
+        throw new IndexError(
+          `The workspace index has moved on: you wrote against version ${expectedVersion}, and it is at ${current?.version ?? "none"}. Re-read it and apply your change again.`,
+          "conflict",
+          current?.version,
+        );
+      }
+      return { sealed, version: Number(updated.rows[0].version), updatedAt: updated.rows[0].updated_at.toISOString() };
+    },
+  };
+}

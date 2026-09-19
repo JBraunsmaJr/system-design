@@ -24,6 +24,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { StoreError } from "./documentService.ts";
 import type { Provider } from "./auth/providers.ts";
 import { DirectoryError, verificationCodeFor, type UserDirectory } from "./userDirectory.ts";
+import { IndexError, type WorkspaceIndexStore } from "./workspaceIndex.ts";
 import {
   SESSION_COOKIE,
   expiredSessionCookie,
@@ -107,6 +108,8 @@ export interface HttpServiceOptions {
    * them to everyone.
    */
   isAdmin?: (subject: string) => boolean;
+  /** WS9-R1: the sealed per-workspace index. */
+  workspaceIndex?: WorkspaceIndexStore;
   /** WS8-R8: refused before the body is read. */
   maxRequestBytes?: number;
 }
@@ -231,6 +234,10 @@ export function createHttpService(options: HttpServiceOptions): Server {
       if (!session && !options.allowUnauthenticated) {
         await record({ operation, outcome: "denied", subject: null, docId: null, detail: { reason: "unauthenticated" } });
         return send(response, 401, { error: { reason: "unauthenticated", message: "Sign in to use this store." } });
+      }
+
+      if (parts[1] === "workspaces") {
+        return await handleWorkspaces(parts, method, request, response, subject);
       }
 
       if (parts[1] === "admin") {
@@ -647,6 +654,43 @@ export function createHttpService(options: HttpServiceOptions): Server {
     throw new HttpError(404, "unsupported", "No route for that path.");
   }
 
+  /**
+   * /v1/workspaces/:id/index (WS9-R1, R3).
+   *
+   * The store sees a sealed blob and a version. Writes state the version
+   * they build on, so two clients editing the index at once cannot
+   * overwrite each other: the second gets 409 and the current version, and
+   * re-applies its change.
+   */
+  async function handleWorkspaces(
+    parts: string[],
+    method: string,
+    request: IncomingMessage,
+    response: ServerResponse,
+    subject: string | null,
+  ) {
+    const index = options.workspaceIndex;
+    if (!index) throw new HttpError(404, "unsupported", "This store has no workspace index configured.");
+    const workspaceId = parts[2] ? decodeURIComponent(parts[2]) : null;
+    if (!workspaceId || parts[3] !== "index") throw new HttpError(404, "unsupported", "No route for that path.");
+
+    if (method === "GET") {
+      const snapshot = await index.get(workspaceId);
+      return send(response, 200, { index: snapshot?.sealed ?? null, version: snapshot?.version ?? null, updatedAt: snapshot?.updatedAt ?? null });
+    }
+    if (method === "PUT") {
+      const body = await readJson(request);
+      const expected = body.expectedVersion === null || body.expectedVersion === undefined ? null : Number(body.expectedVersion);
+      if (expected !== null && (!Number.isSafeInteger(expected) || expected < 0)) {
+        throw new HttpError(400, "bad-request", "expectedVersion must be a non-negative integer, or null to create the index.");
+      }
+      const snapshot = await index.put(workspaceId, requireString(body.index, "index"), expected);
+      await record({ operation: "index-write", outcome: "ok", subject, docId: null, detail: { workspaceId, version: snapshot.version } });
+      return send(response, 200, { version: snapshot.version, updatedAt: snapshot.updatedAt });
+    }
+    throw new HttpError(405, "unsupported", `${method} is not allowed here.`);
+  }
+
   /** WS10-R2: a store with no administrators configured has none. */
   function requireAdmin(subject: string | null) {
     if (!subject || !options.isAdmin?.(subject)) {
@@ -658,6 +702,7 @@ export function createHttpService(options: HttpServiceOptions): Server {
     if (error instanceof HttpError) return { status: error.status, reason: error.reason, message: error.message };
     if (error instanceof StoreError) return { status: STATUS[error.reason] ?? 500, reason: error.reason, message: error.message };
     if (error instanceof DirectoryError) return { status: STATUS[error.reason] ?? 500, reason: error.reason, message: error.message };
+    if (error instanceof IndexError) return { status: error.reason === "conflict" ? 409 : 404, reason: error.reason, message: error.message };
     // Nothing unexpected reaches the client: it goes to the audit trail and
     // the log, and the caller gets a reason it can act on.
     console.error("[store] unhandled error:", error);

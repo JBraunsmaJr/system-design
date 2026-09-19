@@ -104,6 +104,18 @@ CREATE TABLE IF NOT EXISTS workspace_keys (
     PRIMARY KEY (user_id, generation)
 );
 
+-- WS9-R1: one sealed index blob per workspace, holding {docId,
+-- wrappedDocKey, encryptedTitle, updatedAt} per document. Ciphertext to the
+-- store, which is why it cannot enumerate titles (WS9-R5). `version` makes
+-- writes conditional, so two clients cannot silently overwrite each other
+-- (WS9-R3).
+CREATE TABLE IF NOT EXISTS workspace_index (
+    workspace_id TEXT PRIMARY KEY,
+    sealed       BYTEA       NOT NULL,
+    version      BIGINT      NOT NULL DEFAULT 1,
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- WS7-R12: the user's private key, sealed under a key derived from their
 -- recovery code. The code itself is never stored, in any form.
 CREATE TABLE IF NOT EXISTS user_recovery (
