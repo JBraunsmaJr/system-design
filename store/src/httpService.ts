@@ -110,6 +110,11 @@ export interface HttpServiceOptions {
   isAdmin?: (subject: string) => boolean;
   /** WS9-R1: the sealed per-workspace index. */
   workspaceIndex?: WorkspaceIndexStore;
+  /**
+   * WS6-R2. Reported at /v1/health so a client can show the WS6-R3 warning:
+   * in passthrough the store reads content, and the interface must say so.
+   */
+  cryptoMode?: "webcrypto" | "passthrough";
   /** WS8-R8: refused before the body is read. */
   maxRequestBytes?: number;
 }
@@ -221,7 +226,11 @@ export function createHttpService(options: HttpServiceOptions): Server {
       if (parts[0] !== "v1") throw new HttpError(404, "unsupported", `No route for ${url.pathname}.`);
 
       if (parts[1] === "health" && method === "GET") {
-        return send(response, 200, { status: "ok" });
+        return send(response, 200, {
+          status: "ok",
+          cryptoMode: options.cryptoMode ?? "webcrypto",
+          authentication: options.allowUnauthenticated ? "none" : "required",
+        });
       }
 
       if (parts[1] === "auth") {

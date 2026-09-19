@@ -136,6 +136,16 @@ export function createStoreClient(options: StoreClientOptions) {
   const contextFor = (docId: string, kind: BlobContext["kind"], version: number): BlobContext => ({ docId, kind, version });
 
   return {
+    /** What the store is: its mode, and whether it requires sign-in. A
+     * client shows the WS6-R3 warning from `cryptoMode: "passthrough"`. */
+    async health(): Promise<{ cryptoMode: "webcrypto" | "passthrough"; authentication: "none" | "required" }> {
+      const { body } = await request("/v1/health");
+      return {
+        cryptoMode: (body.cryptoMode as "webcrypto" | "passthrough") ?? "webcrypto",
+        authentication: (body.authentication as "none" | "required") ?? "required",
+      };
+    },
+
     /** Who the store thinks we are, or null when not signed in. */
     async session(): Promise<SessionInfo | null> {
       try {
@@ -145,6 +155,11 @@ export function createStoreClient(options: StoreClientOptions) {
         if (error instanceof StoreClientError && error.reason === "unauthenticated") return null;
         throw error;
       }
+    },
+
+    /** Ends the session at the store, so the cookie stops working. */
+    async logout(): Promise<void> {
+      await request("/v1/auth/logout", { method: "POST" });
     },
 
     async providers(): Promise<string[]> {

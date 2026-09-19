@@ -10,8 +10,7 @@ export default defineConfig({
         nav: [
             {text: 'Home', link: '/'},
             {text: 'Guide', link: '/guide/getting-started'},
-            {text: 'Deployment', link: '/deployment/relay-server'},
-            {text: 'Testing', link: '/testing/performance-testing'}
+            {text: 'Deployment', link: '/deployment/self-host'},
         ],
 
         sidebar: [
@@ -24,8 +23,8 @@ export default defineConfig({
             {
                 text: 'Deployment & Infrastructure',
                 items: [
-                    {text: 'Relay Server (Signaling)', link: '/deployment/relay-server'},
-                    {text: 'Self Hosting', link: '/deployment/self-host.md'}
+                    {text: 'Self Hosting', link: '/deployment/self-host.md'},
+                    {text: 'Relay Server (Signaling)', link: '/deployment/relay-server'}
                 ]
             }
         ],

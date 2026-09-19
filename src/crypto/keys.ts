@@ -124,6 +124,12 @@ export async function exportSymmetricKey(key: CryptoKey): Promise<Uint8Array> {
   return new Uint8Array(await subtle().exportKey("raw", key));
 }
 
+/** A symmetric key as lowercase hex, the form a document key takes in a
+ * share link and in deriveStorageKey. */
+export async function exportSymmetricKeyHex(key: CryptoKey): Promise<string> {
+  return Array.from(await exportSymmetricKey(key), (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 export async function exportPublicKey(key: CryptoKey): Promise<Uint8Array> {
   return new Uint8Array(await subtle().exportKey("spki", key));
 }
@@ -137,13 +143,26 @@ export async function wrapKey(key: CryptoKey, under: CryptoKey): Promise<Uint8Ar
   return new Uint8Array(await subtle().wrapKey("raw", key, under, "AES-KW"));
 }
 
+/**
+ * A document key (128 bits of hex, as a share link carries) as a CryptoKey,
+ * so it can be wrapped under the workspace key. It is the document key that
+ * is wrapped, not the storage key derived from it: a workspace document is
+ * still shareable by link, and deriving twice would produce a key that opens
+ * nothing.
+ */
+export async function importDocumentKey(hex: string): Promise<CryptoKey> {
+  return subtle().importKey("raw", buffer(secretBytes(hex)), { name: "AES-GCM" }, true, ["encrypt", "decrypt"]);
+}
+
 export async function unwrapKey(
   wrapped: Uint8Array,
   under: CryptoKey,
   as: "AES-GCM" | "AES-KW",
+  /** 128 for a document key, 256 for everything else. */
+  length: 128 | 256 = 256,
 ): Promise<CryptoKey> {
   const usages: KeyUsage[] = as === "AES-KW" ? ["wrapKey", "unwrapKey"] : ["encrypt", "decrypt"];
-  return subtle().unwrapKey("raw", buffer(wrapped), under, "AES-KW", { name: as, length: 256 }, true, usages);
+  return subtle().unwrapKey("raw", buffer(wrapped), under, "AES-KW", { name: as, length }, true, usages);
 }
 
 /** Wraps a symmetric key to a public key: escrow (WS7-R4), the workspace key
