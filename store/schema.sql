@@ -71,6 +71,9 @@ CREATE TABLE IF NOT EXISTS users (
     issuer       TEXT        NOT NULL,
     subject      TEXT        NOT NULL,
     display_name TEXT,
+    -- WS7-R8: the member's public user key, so an administrator or another
+    -- member can wrap the workspace key to them. Public by nature.
+    user_public_key BYTEA,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
     disabled_at  TIMESTAMPTZ,
     UNIQUE (issuer, subject)
@@ -136,3 +139,4 @@ ALTER TABLE documents DROP COLUMN IF EXISTS sealed_title;
 ALTER TABLE devices   ADD COLUMN IF NOT EXISTS wrapped_user_key_body BYTEA;
 ALTER TABLE devices   ADD COLUMN IF NOT EXISTS wrapped_user_key_wrap BYTEA;
 ALTER TABLE devices   DROP COLUMN IF EXISTS wrapped_user_key;
+ALTER TABLE users     ADD COLUMN IF NOT EXISTS user_public_key BYTEA;

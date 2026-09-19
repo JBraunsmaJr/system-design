@@ -77,7 +77,16 @@ async function run(name: string, directory: UserDirectory) {
   const audit = createMemoryAuditSink();
   const providers = [createProvider({ id: "oidc", kind: "oidc", issuer: idp.issuer, clientId: idp.clientId, clientSecret: idp.clientSecret })];
   let origin = "";
-  const server = createHttpService({ store: memoryStore(), audit, sessions, providers, directory, publicUrl: () => origin });
+  const server = createHttpService({
+    store: memoryStore(),
+    audit,
+    sessions,
+    providers,
+    directory,
+    publicUrl: () => origin,
+    // One administrator, for the re-grant below (WS7-R13, WS10-R2).
+    isAdmin: (subject) => subject === `${idp.issuer}#person-${name}`,
+  });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 
@@ -245,9 +254,47 @@ async function run(name: string, directory: UserDirectory) {
     }
     check(!wrongWorked, "another code does not");
 
+    console.log("  -- administrator re-grant (WS7-R13)");
+    {
+      // The member publishes their public user key, so the workspace key can
+      // be wrapped to them.
+      const userPublic = b64(await exportPublicKey(userKeyPair.publicKey));
+      const published = await call("/v1/users/me/public-key", { method: "PUT", cookie, body: JSON.stringify({ publicKey: userPublic }) });
+      check(published.status === 200, "a member publishes their public user key");
+      const listed = (await json(await call("/v1/admin/users", { cookie }))).users as { userId: string; publicKey?: string }[];
+      check(listed.some((user) => user.publicKey === userPublic), "an administrator can see it, to wrap the workspace key to them");
+
+      // Now everything is lost: every device gone, recovery code forgotten.
+      const me = listed[0];
+      const regranted = await call(`/v1/admin/users/${me.userId}/regrant`, { method: "POST", cookie });
+      check(regranted.status === 200, "the administrator re-grants access");
+      const afterDevices = (await json(await call("/v1/users/me/devices", { cookie }))).devices as { revokedAt: string | null }[];
+      check(afterDevices.every((device) => device.revokedAt !== null), "every previous device is revoked");
+      check((await json(await call("/v1/users/me/recovery", { cookie }))).recovery === null, "the old recovery wrap is gone");
+      check(((await json(await call("/v1/admin/users", { cookie }))).users as { publicKey?: string }[])[0].publicKey === undefined, "and so is the old user key, which nobody can reach");
+
+      // The person signs in on a new machine: a new user key, a new device.
+      const freshUserKey = await generateWrappingKeyPair("user");
+      const freshDevice = await generateWrappingKeyPair("device");
+      const freshRegistered = (await json(
+        await call("/v1/users/me/devices", { method: "POST", cookie, body: JSON.stringify({ publicKey: b64(await exportPublicKey(freshDevice.publicKey)), label: "Replacement" }) }),
+      )).device as { deviceId: string; approvedAt: string | null };
+      check(freshRegistered.approvedAt !== null, "their next device enrolls as a first device again");
+      await call("/v1/users/me/public-key", { method: "PUT", cookie, body: JSON.stringify({ publicKey: b64(await exportPublicKey(freshUserKey.publicKey)) }) });
+
+      // The administrator wraps the workspace key to the new user key.
+      const rewrapped = b64(await wrapKeyForPublicKey(workspaceKey, freshUserKey.publicKey));
+      const granted = await call(`/v1/admin/users/${me.userId}/workspace-key`, { method: "PUT", cookie, body: JSON.stringify({ generation: 2, wrappedKey: rewrapped }) });
+      check(granted.status === 204, "and wraps the workspace key to it");
+
+      const recovered = await unwrapKeyWithPrivateKey(Uint8Array.from(Buffer.from(rewrapped, "base64")), freshUserKey.privateKey, "AES-KW");
+      check((await raw(recovered)) === (await raw(workspaceKey)), "the person is back in: the same workspace key, through a new user key");
+      check((await json(await call("/v1/users/me/keys", { cookie, deviceId: freshRegistered.deviceId }))).status !== undefined, "and their new device is serviceable");
+    }
+
     console.log("  -- the audit trail");
     const operations = audit.all().map((entry) => entry.operation);
-    for (const operation of ["device-register", "device-approve", "device-revoke", "recovery-set", "workspace-key-set"]) {
+    for (const operation of ["device-register", "device-approve", "device-revoke", "recovery-set", "workspace-key-set", "user-regrant", "workspace-key-grant"]) {
       check(operations.includes(operation), `${operation} is audited`);
     }
     check(audit.all().some((e) => e.operation === "device-approve" && e.outcome === "denied"), "a refused approval is audited too");

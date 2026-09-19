@@ -16,6 +16,22 @@ import {
   type WrappedUserKey,
 } from "./userDirectory.ts";
 
+interface UserRow {
+  user_id: string;
+  issuer: string;
+  subject: string;
+  display_name: string | null;
+  user_public_key: Buffer | null;
+}
+
+const toUser = (row: UserRow): UserRecord => ({
+  userId: row.user_id,
+  issuer: row.issuer,
+  subject: row.subject,
+  displayName: row.display_name ?? undefined,
+  publicKey: row.user_public_key ? row.user_public_key.toString("base64") : undefined,
+});
+
 interface DeviceRow {
   device_id: string;
   user_id: string;
@@ -52,14 +68,57 @@ export function createPostgresUserDirectory(pool: pg.Pool, now: () => Date = () 
 
   return {
     async upsertUser(identity): Promise<UserRecord> {
-      const result = await pool.query<{ user_id: string; issuer: string; subject: string; display_name: string | null }>(
+      const result = await pool.query<UserRow>(
         `INSERT INTO users (user_id, issuer, subject, display_name) VALUES ($1, $2, $3, $4)
          ON CONFLICT (issuer, subject) DO UPDATE SET display_name = COALESCE(EXCLUDED.display_name, users.display_name)
-         RETURNING user_id, issuer, subject, display_name`,
+         RETURNING user_id, issuer, subject, display_name, user_public_key`,
         [randomUUID(), identity.issuer, identity.subject, identity.displayName ?? null],
       );
-      const row = result.rows[0];
-      return { userId: row.user_id, issuer: row.issuer, subject: row.subject, displayName: row.display_name ?? undefined };
+      return toUser(result.rows[0]);
+    },
+
+    async setUserPublicKey(userId, publicKey) {
+      const result = await pool.query<UserRow>(
+        `UPDATE users SET user_public_key = $2 WHERE user_id = $1
+         RETURNING user_id, issuer, subject, display_name, user_public_key`,
+        [userId, Buffer.from(publicKey, "base64")],
+      );
+      if (!result.rows[0]) throw new DirectoryError(`No user ${userId}.`, "not-found");
+      return toUser(result.rows[0]);
+    },
+
+    async getUser(userId) {
+      const result = await pool.query<UserRow>(
+        `SELECT user_id, issuer, subject, display_name, user_public_key FROM users WHERE user_id = $1`,
+        [userId],
+      );
+      if (!result.rows[0]) throw new DirectoryError(`No user ${userId}.`, "not-found");
+      return toUser(result.rows[0]);
+    },
+
+    async listUsers() {
+      const result = await pool.query<UserRow>(
+        `SELECT user_id, issuer, subject, display_name, user_public_key FROM users ORDER BY created_at`,
+      );
+      return result.rows.map(toUser);
+    },
+
+    async regrantUser(userId) {
+      // Everything wrapped to the lost user key goes with it (WS7-R13).
+      await pool.query(
+        `UPDATE devices SET revoked_at = $2, wrapped_user_key_body = NULL, wrapped_user_key_wrap = NULL
+          WHERE user_id = $1 AND revoked_at IS NULL`,
+        [userId, now()],
+      );
+      await pool.query(`DELETE FROM user_recovery WHERE user_id = $1`, [userId]);
+      await pool.query(`DELETE FROM workspace_keys WHERE user_id = $1`, [userId]);
+      const result = await pool.query<UserRow>(
+        `UPDATE users SET user_public_key = NULL WHERE user_id = $1
+         RETURNING user_id, issuer, subject, display_name, user_public_key`,
+        [userId],
+      );
+      if (!result.rows[0]) throw new DirectoryError(`No user ${userId}.`, "not-found");
+      return toUser(result.rows[0]);
     },
 
     async registerDevice(userId, device) {

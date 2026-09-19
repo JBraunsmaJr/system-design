@@ -235,6 +235,31 @@ export function createHttpService(options: HttpServiceOptions): Server {
 
       if (parts[1] === "admin") {
         requireAdmin(subject);
+        // WS7-R13: an administrator restoring access for someone who has
+        // lost every device and their recovery code.
+        if (parts[2] === "users" && !parts[3] && method === "GET") {
+          if (!options.directory) throw new HttpError(404, "unsupported", "This store has no user directory configured.");
+          return send(response, 200, { users: await options.directory.listUsers() });
+        }
+        if (parts[2] === "users" && parts[3] && parts[4] === "regrant" && method === "POST") {
+          if (!options.directory) throw new HttpError(404, "unsupported", "This store has no user directory configured.");
+          operation = "user-regrant";
+          const user = await options.directory.regrantUser(decodeURIComponent(parts[3]));
+          await record({ operation, outcome: "ok", subject, docId: null, detail: { userId: user.userId } });
+          // Their next device enrolls as a first device, and the
+          // administrator wraps the workspace key to its new user key below.
+          return send(response, 200, { user });
+        }
+        if (parts[2] === "users" && parts[3] && parts[4] === "workspace-key" && method === "PUT") {
+          if (!options.directory) throw new HttpError(404, "unsupported", "This store has no user directory configured.");
+          const body = await readJson(request);
+          const userId = decodeURIComponent(parts[3]);
+          const generation = typeof body.generation === "number" ? body.generation : 1;
+          await options.directory.putWorkspaceKey(userId, generation, requireString(body.wrappedKey, "wrappedKey"));
+          operation = "workspace-key-grant";
+          await record({ operation, outcome: "ok", subject, docId: null, detail: { userId, generation } });
+          return send(response, 204, {});
+        }
         if (parts[2] === "purge-due" && method === "POST") {
           if (!options.store.purgeDue) throw new HttpError(404, "unsupported", "This store does not support purging.");
           operation = "purge-due";
@@ -563,6 +588,16 @@ export function createHttpService(options: HttpServiceOptions): Server {
         const device = await directory.revokeDevice(userId, deviceId);
         await record({ operation: "device-revoke", outcome: "ok", subject, docId: null, detail: { deviceId } });
         return send(response, 200, { device });
+      }
+      throw new HttpError(405, "unsupported", `${method} is not allowed here.`);
+    }
+
+    if (section === "public-key") {
+      if (method === "PUT") {
+        const body = await readJson(request);
+        const user = await directory.setUserPublicKey(userId, requireString(body.publicKey, "publicKey"));
+        await record({ operation: "user-public-key-set", outcome: "ok", subject, docId: null });
+        return send(response, 200, { user });
       }
       throw new HttpError(405, "unsupported", `${method} is not allowed here.`);
     }

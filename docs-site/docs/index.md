@@ -7,14 +7,11 @@ hero:
   tagline: Real-time peer-to-peer diagrams, requirement traceability, and capacity planning.
   actions:
     - theme: brand
-      text: Get Started
-      link: /guide/getting-started
+      text: Self-Hosting
+      link: /deployment/self-host
     - theme: alt
       text: Relay Server Guide
       link: /deployment/relay-server
-    - theme: alt
-      text: Self-Hosting
-      link: /deployment/self-host
 
 features:
   - title: Real-Time Peer-to-Peer Collaboration

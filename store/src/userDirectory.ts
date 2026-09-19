@@ -19,6 +19,9 @@ export interface UserRecord {
   issuer: string;
   subject: string;
   displayName?: string;
+  /** base64 SPKI of the member's user key, so the workspace key can be
+   * wrapped to them (WS7-R8). Absent until their first device publishes it. */
+  publicKey?: string;
 }
 
 export interface WrappedUserKey {
@@ -72,6 +75,18 @@ export interface UserDirectory {
   revokeDevice(userId: string, deviceId: string): Promise<DeviceRecord>;
   putRecovery(userId: string, recovery: RecoveryRecord): Promise<void>;
   getRecovery(userId: string): Promise<RecoveryRecord | null>;
+  /** The member's public user key, published by their first device. */
+  setUserPublicKey(userId: string, publicKey: string): Promise<UserRecord>;
+  getUser(userId: string): Promise<UserRecord>;
+  listUsers(): Promise<UserRecord[]>;
+  /**
+   * WS7-R13: an administrator restoring access for someone who has lost
+   * every device and their recovery code. Their old user key becomes
+   * unreachable, so everything wrapped to it goes: devices are revoked, the
+   * recovery wrap is cleared, and the workspace wraps are dropped until the
+   * administrator re-wraps to the new user key.
+   */
+  regrantUser(userId: string): Promise<UserRecord>;
   /** WS7-R8: the workspace key, wrapped to this user's public user key. */
   putWorkspaceKey(userId: string, generation: number, wrappedKey: string): Promise<void>;
   getWorkspaceKeys(userId: string): Promise<{ generation: number; wrappedKey: string }[]>;
@@ -169,6 +184,39 @@ export function createMemoryUserDirectory(now: () => Date = () => new Date()): U
       // reach the user key again (WS7-R14).
       device.wrappedUserKey = null;
       return { ...device };
+    },
+
+    async setUserPublicKey(userId, publicKey) {
+      const user = users.get(userId);
+      if (!user) throw new DirectoryError(`No user ${userId}.`, "not-found");
+      user.publicKey = publicKey;
+      return { ...user };
+    },
+
+    async getUser(userId) {
+      const user = users.get(userId);
+      if (!user) throw new DirectoryError(`No user ${userId}.`, "not-found");
+      return { ...user };
+    },
+
+    async listUsers() {
+      return [...users.values()].map((user) => ({ ...user }));
+    },
+
+    async regrantUser(userId) {
+      const user = users.get(userId);
+      if (!user) throw new DirectoryError(`No user ${userId}.`, "not-found");
+      for (const device of devices.values()) {
+        if (device.userId === userId && !device.revokedAt) {
+          device.revokedAt = now().toISOString();
+          device.wrappedUserKey = null;
+        }
+      }
+      recovery.delete(userId);
+      workspaceKeys.delete(userId);
+      // The old user key is gone with the devices that held it.
+      delete user.publicKey;
+      return { ...user };
     },
 
     async putRecovery(userId, value) {
