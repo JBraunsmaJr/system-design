@@ -15,15 +15,17 @@ export default defineConfig({
 
         sidebar: [
             {
-                text: 'Getting Started',
+                text: 'Guide',
                 items: [
                     {text: 'Overview', link: '/guide/overview'},
+                    {text: 'Quick Start', link: '/guide/getting-started'},
+                    {text: 'Diagrams', link: '/guide/diagram'},
                 ]
             },
             {
                 text: 'Deployment & Infrastructure',
                 items: [
-                    {text: 'Self Hosting', link: '/deployment/self-host.md'},
+                    {text: 'Self Hosting', link: '/deployment/self-host'},
                     {text: 'Relay Server (Signaling)', link: '/deployment/relay-server'}
                 ]
             }

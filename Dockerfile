@@ -21,15 +21,8 @@ COPY . .
 # reverse proxy at some arbitrary subpath, without knowing which in
 # advance and without a rebuild per deployment. A relative base makes
 # every asset reference resolve against wherever index.html actually was
-# loaded from, whatever that turns out to be. Verified this concretely,
-# not just by inspecting the built HTML: served the same build through
-# nginx at both a root path and a simulated subpath and confirmed assets
-# loaded correctly (200) in both cases, and specifically confirmed they
-# do NOT resolve at the wrong (root) location when served from a subpath
-# (404 there) - proving genuine relative resolution rather than a
-# coincidence. See docker/nginx.conf's comment on why the SPA fallback
-# was removed as a direct consequence of this choice.
-RUN npm run build -- --base=./
+# loaded from, whatever that turns out to be.
+RUN npm run build:app -- --base=./
 
 # ---- Runtime stage: serves the built static files via nginx ----
 FROM nginx:stable-alpine AS runtime
