@@ -66,6 +66,7 @@ console.log("Testing 40-env-config.sh entrypoint script...\n");
     VITE_RELAY_URL: "",
     VITE_RELAY: "",
     APP_URL: "",
+    STORE_URL: "",
     BASE_URL: "",
     VITE_APP_URL: "",
     VITE_BASE_URL: "",

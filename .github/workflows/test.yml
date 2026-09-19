@@ -126,6 +126,11 @@ jobs:
         env:
           DATABASE_URL: postgresql://store:store@localhost:5432/store
 
+      - name: Start the store as a process against PostgreSQL
+        run: npx tsx scripts/verify-store-startup.ts
+        env:
+          DATABASE_URL: postgresql://store:store@localhost:5432/store
+
       - name: Run device identity against PostgreSQL
         run: npx tsx scripts/verify-device-identity.ts
         env:

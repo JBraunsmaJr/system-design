@@ -13,6 +13,9 @@ SIGNALING_URL="${RELAY:-${RELAY_URL:-${SIGNALING_URL:-${VITE_SIGNALING_URL:-${VI
 # 3. VITE_APP_URL (Build-time fallback)
 APP_URL="${APP_URL:-${BASE_URL:-${VITE_APP_URL:-${VITE_BASE_URL:-}}}}"
 ICE_SERVERS="${ICE_SERVERS:-${VITE_ICE_SERVERS:-}}"
+# Where the store is, if this deployment has one. Empty means no workspace:
+# the editor behaves exactly as it does with no store at all.
+STORE_URL="${STORE_URL:-${VITE_STORE_URL:-}}"
 
 # Escape backslashes and double quotes for valid JavaScript string literal,
 # stripping carriage returns (e.g. from Windows CRLF env files or host environments)
@@ -33,6 +36,7 @@ escape_js() {
 ESC_SIGNALING="$(escape_js "$SIGNALING_URL")"
 ESC_APP_URL="$(escape_js "$APP_URL")"
 ESC_ICE="$(escape_js "$ICE_SERVERS")"
+ESC_STORE="$(escape_js "$STORE_URL")"
 
 TARGET_FILE="${TARGET_FILE:-/usr/share/nginx/html/env-config.js}"
 
@@ -44,7 +48,8 @@ window.__APP_CONFIG__ = {
   RELAY: "$ESC_SIGNALING",
   APP_URL: "$ESC_APP_URL",
   BASE_URL: "$ESC_APP_URL",
-  ICE_SERVERS: "$ESC_ICE"
+  ICE_SERVERS: "$ESC_ICE",
+  STORE_URL: "$ESC_STORE"
 };
 EOF
 

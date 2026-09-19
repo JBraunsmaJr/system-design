@@ -1,0 +1,79 @@
+# A complete deployment: the editor, the relay, the store, PostgreSQL, and
+# Keycloak as the identity provider (WS8-R9).
+#
+# As written this runs on localhost over plain HTTP, which browsers treat as
+# secure enough for development. For anything else, put all four behind TLS
+# and change every URL below to https:// - a cross-origin editor needs a
+# SameSite=None cookie, and browsers only accept those over HTTPS. The store
+# refuses to start in that combination rather than failing silently later.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: store
+      POSTGRES_PASSWORD: change-me
+      POSTGRES_DB: store
+    volumes:
+      - store-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U store"]
+      interval: 5s
+      retries: 10
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    command: start-dev
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: change-me
+    ports:
+      - "8081:8080"
+
+  store:
+    build:
+      context: ../..
+      dockerfile: docker/store/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: 8080
+      DATABASE_URL: postgresql://store:change-me@postgres:5432/store
+      # Where people reach the store, and where sign-in returns to.
+      PUBLIC_URL: http://localhost:8080
+      # Where the editor is served from. Exactly; no wildcards.
+      ALLOWED_ORIGINS: http://localhost:8088
+      AUTH_PROVIDERS: oidc
+      OIDC_ISSUER: http://localhost:8081/realms/system-design
+      OIDC_CLIENT_ID: system-design-store
+      OIDC_CLIENT_SECRET: change-me
+      # issuer#subject for each administrator: who may place legal holds and
+      # purge. With none set, those actions are refused to everyone.
+      ADMIN_SUBJECTS: ""
+      # immediate | a duration (7d, 6m, 7y) | indefinite. Default 30d.
+      RETENTION_PERIOD: 30d
+    ports:
+      - "8080:8080"
+
+  relay:
+    build:
+      context: ../..
+      dockerfile: docker/signaling/Dockerfile
+    ports:
+      - "4444:4444"
+
+  editor:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    environment:
+      APP_URL: http://localhost:8088
+      RELAY: ws://localhost:4444
+      # Without this the editor has no workspace at all, and behaves exactly
+      # as it does with no store.
+      STORE_URL: http://localhost:8080
+    ports:
+      - "8088:80"
+
+volumes:
+  store-data:
