@@ -162,6 +162,18 @@ export function createPostgresUserDirectory(pool: pg.Pool, now: () => Date = () 
       return toDevice(result.rows[0]);
     },
 
+    async setOwnUserKey(userId, deviceId, wrapped) {
+      const device = await requireRow(userId, deviceId);
+      if (device.revoked_at) throw new DirectoryError("That device has been revoked.", "revoked");
+      if (!device.approved_at) throw new DirectoryError("That device is not approved.", "not-approved");
+      if (device.wrapped_user_key_body) throw new DirectoryError("That device already holds a wrapped user key.", "conflict");
+      const result = await pool.query<DeviceRow>(
+        `UPDATE devices SET wrapped_user_key_body = $3, wrapped_user_key_wrap = $4 WHERE device_id = $1 AND user_id = $2 RETURNING *`,
+        [deviceId, userId, Buffer.from(wrapped.body, "base64"), Buffer.from(wrapped.keyWrap, "base64")],
+      );
+      return toDevice(result.rows[0]);
+    },
+
     async revokeDevice(userId, deviceId) {
       await requireRow(userId, deviceId);
       const result = await pool.query<DeviceRow>(

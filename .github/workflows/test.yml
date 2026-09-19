@@ -125,3 +125,8 @@ jobs:
         run: npx tsx scripts/verify-store-client.ts
         env:
           DATABASE_URL: postgresql://store:store@localhost:5432/store
+
+      - name: Run device identity against PostgreSQL
+        run: npx tsx scripts/verify-device-identity.ts
+        env:
+          DATABASE_URL: postgresql://store:store@localhost:5432/store

@@ -236,6 +236,67 @@ export function createStoreClient(options: StoreClientOptions) {
       await request(`/v1/docs/${encodeURIComponent(docId)}`, { method: "DELETE", docId });
     },
 
+    // -- devices and keys (WS7-R8, R11) ------------------------------------
+
+    async registerDevice(publicKey: string, label?: string) {
+      const { body } = await request("/v1/users/me/devices", { method: "POST", body: JSON.stringify({ publicKey, label }) });
+      return body.device as { deviceId: string; verificationCode: string; approvedAt: string | null };
+    },
+
+    async listDevices() {
+      const { body } = await request("/v1/users/me/devices");
+      return body.devices as { deviceId: string; publicKey: string; verificationCode: string; approvedAt: string | null; revokedAt: string | null; label?: string }[];
+    },
+
+    /** What this device is given: nothing until another approves it. */
+    async keysForDevice(deviceId: string) {
+      const { body } = await request("/v1/users/me/keys", { headers: { "x-device-id": deviceId } });
+      return body as
+        | { status: "awaiting-approval"; verificationCode: string }
+        | { status: "approved"; wrappedUserKey: { keyWrap: string; body: string }; workspaceKeys: { generation: number; wrappedKey: string }[] };
+    },
+
+    async approveDevice(deviceId: string, verificationCode: string, wrappedUserKey: { keyWrap: string; body: string }, fromDeviceId: string) {
+      await request(`/v1/users/me/devices/${encodeURIComponent(deviceId)}/approve`, {
+        method: "POST",
+        headers: { "x-device-id": fromDeviceId },
+        body: JSON.stringify({ verificationCode, wrappedUserKey }),
+      });
+    },
+
+    /** The first device storing the user key it generated, wrapped to
+     * itself, so its next visit can recover it. */
+    async setOwnUserKey(deviceId: string, wrappedUserKey: { keyWrap: string; body: string }) {
+      await request(`/v1/users/me/devices/${encodeURIComponent(deviceId)}/user-key`, {
+        method: "PUT",
+        headers: { "x-device-id": deviceId },
+        body: JSON.stringify({ wrappedUserKey }),
+      });
+    },
+
+    async revokeDevice(deviceId: string) {
+      await request(`/v1/users/me/devices/${encodeURIComponent(deviceId)}`, { method: "DELETE" });
+    },
+
+    async publishUserPublicKey(publicKey: string) {
+      await request("/v1/users/me/public-key", { method: "PUT", body: JSON.stringify({ publicKey }) });
+    },
+
+    async putWorkspaceKey(generation: number, wrappedKey: string) {
+      await request("/v1/users/me/keys", { method: "PUT", body: JSON.stringify({ generation, wrappedKey }) });
+    },
+
+    /** WS7-R12: the sealed user key and its salt, for unlocking with a
+     * recovery code on a browser with no approved device. */
+    async putRecovery(salt: string, sealedUserKey: string) {
+      await request("/v1/users/me/recovery", { method: "PUT", body: JSON.stringify({ salt, sealedUserKey }) });
+    },
+
+    async getRecovery() {
+      const { body } = await request("/v1/users/me/recovery");
+      return (body.recovery as { salt: string; sealedUserKey: string } | null) ?? null;
+    },
+
     // -- the workspace index (WS9) -----------------------------------------
 
     async readIndex(workspaceId: string, indexKey: CryptoKey): Promise<{ entries: IndexEntry[]; version: number | null }> {

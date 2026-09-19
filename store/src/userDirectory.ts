@@ -71,6 +71,12 @@ export interface UserDirectory {
   getDevice(userId: string, deviceId: string): Promise<DeviceRecord>;
   /** WS7-R11: an approved device hands the new one the user key. */
   approveDevice(userId: string, deviceId: string, approvedBy: string, wrapped: WrappedUserKey): Promise<DeviceRecord>;
+  /**
+   * The user key, wrapped to a device by that device itself. Only the first
+   * device does this: it generates the user key, so there is nobody to hand
+   * it one, and it needs the wrap to recover the key on its next visit.
+   */
+  setOwnUserKey(userId: string, deviceId: string, wrapped: WrappedUserKey): Promise<DeviceRecord>;
   /** WS7-R14. */
   revokeDevice(userId: string, deviceId: string): Promise<DeviceRecord>;
   putRecovery(userId: string, recovery: RecoveryRecord): Promise<void>;
@@ -173,6 +179,15 @@ export function createMemoryUserDirectory(now: () => Date = () => new Date()): U
       if (device.revokedAt) throw new DirectoryError("That device has been revoked.", "revoked");
       if (device.approvedAt) throw new DirectoryError("That device is already approved.", "conflict");
       device.approvedAt = now().toISOString();
+      device.wrappedUserKey = wrapped;
+      return { ...device };
+    },
+
+    async setOwnUserKey(userId, deviceId, wrapped) {
+      const device = requireDevice(userId, deviceId);
+      if (device.revokedAt) throw new DirectoryError("That device has been revoked.", "revoked");
+      if (!device.approvedAt) throw new DirectoryError("That device is not approved.", "not-approved");
+      if (device.wrappedUserKey) throw new DirectoryError("That device already holds a wrapped user key.", "conflict");
       device.wrappedUserKey = wrapped;
       return { ...device };
     },

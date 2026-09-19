@@ -600,6 +600,21 @@ export function createHttpService(options: HttpServiceOptions): Server {
         await record({ operation: "device-approve", outcome: "ok", subject, docId: null, detail: { deviceId, approvedBy: callingDeviceId } });
         return send(response, 200, { device });
       }
+      if (deviceId && parts[5] === "user-key" && method === "PUT") {
+        // Only the calling device, and only once: the first device storing
+        // the user key it just generated, for its own next visit.
+        if (callingDeviceId !== deviceId) {
+          throw new HttpError(403, "forbidden", "A device may only store a user key wrapped to itself.");
+        }
+        const body = await readJson(request);
+        const wrapped = body.wrappedUserKey as { keyWrap?: unknown; body?: unknown } | undefined;
+        if (typeof wrapped?.keyWrap !== "string" || typeof wrapped?.body !== "string") {
+          throw new HttpError(400, "bad-request", "wrappedUserKey must carry keyWrap and body.");
+        }
+        const device = await directory.setOwnUserKey(userId, deviceId, { keyWrap: wrapped.keyWrap, body: wrapped.body });
+        await record({ operation: "device-self-key", outcome: "ok", subject, docId: null, detail: { deviceId } });
+        return send(response, 200, { device });
+      }
       if (deviceId && !parts[5] && method === "DELETE") {
         const device = await directory.revokeDevice(userId, deviceId);
         await record({ operation: "device-revoke", outcome: "ok", subject, docId: null, detail: { deviceId } });
