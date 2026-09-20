@@ -34,7 +34,17 @@ interface PendingCode {
   redirectUri: string;
 }
 
-export async function startTestOidcProvider(options: { subject?: string } = {}): Promise<TestOidcProvider> {
+export interface TestOidcOptions {
+  subject?: string;
+  /**
+   * Serve a login form at the authorization endpoint, with the field names
+   * Keycloak uses, instead of redirecting straight back. Lets the Keycloak
+   * suite's form-filling path be exercised without Keycloak.
+   */
+  loginForm?: boolean;
+}
+
+export async function startTestOidcProvider(options: TestOidcOptions = {}): Promise<TestOidcProvider> {
   const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
   const jwk = publicKey.export({ format: "jwk" }) as { n: string; e: string };
   const kid = "test-key-1";
@@ -79,6 +89,41 @@ export async function startTestOidcProvider(options: { subject?: string } = {}):
 
     if (url.pathname === "/protocol/openid-connect/certs") {
       return json(200, { keys: [{ kty: "RSA", kid, alg: "RS256", use: "sig", n: jwk.n, e: jwk.e }] });
+    }
+
+    if (url.pathname === "/protocol/openid-connect/auth" && options.loginForm) {
+      // Keycloak's field and button ids, so a client driving the form is
+      // driving the same shapes.
+      const form = `<!doctype html><html><body><form id="kc-form-login" method="POST" action="/login-actions/authenticate${url.search}">
+        <input id="username" name="username" autocomplete="username" />
+        <input id="password" name="password" type="password" />
+        <input id="kc-login" type="submit" value="Sign In" />
+      </form></body></html>`;
+      response.writeHead(200, { "content-type": "text/html", "content-length": String(Buffer.byteLength(form)) });
+      return response.end(form);
+    }
+
+    if (url.pathname === "/login-actions/authenticate" && request.method === "POST") {
+      const chunks: Buffer[] = [];
+      for await (const chunk of request) chunks.push(chunk as Buffer);
+      const submitted = new URLSearchParams(Buffer.concat(chunks).toString("utf8"));
+      if (!submitted.get("username") || !submitted.get("password")) {
+        response.writeHead(401, { "content-type": "text/html" });
+        return response.end("<html><body><p id='input-error'>Invalid username or password.</p></body></html>");
+      }
+      subject = submitted.get("username") ?? subject;
+      const redirectUri = url.searchParams.get("redirect_uri") ?? "";
+      const code = randomBytes(12).toString("hex");
+      codes.set(code, {
+        nonce: url.searchParams.get("nonce") ?? "",
+        challenge: url.searchParams.get("code_challenge") ?? "",
+        redirectUri,
+      });
+      const back = new URL(redirectUri);
+      back.searchParams.set("code", code);
+      back.searchParams.set("state", url.searchParams.get("state") ?? "");
+      response.writeHead(302, { location: back.toString() });
+      return response.end();
     }
 
     if (url.pathname === "/protocol/openid-connect/auth") {

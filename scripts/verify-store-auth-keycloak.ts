@@ -6,8 +6,12 @@
  * whether we read a real provider's discovery document correctly, follow a
  * real login page, and accept a real token. That is what this does.
  *
- * Skipped unless KEYCLOAK_ISSUER is set, so `npm test` on a developer's
- * machine does not need Keycloak. CI provides one.
+ * With KEYCLOAK_ISSUER set (CI), it runs against that Keycloak. Without
+ * one it runs against a stand-in provider that serves a login form with
+ * Keycloak's field names, so the suite still exercises this script - the
+ * redirect, the form, the callback, the session - on a machine with no
+ * Keycloak. The stand-in cannot tell us whether we read Keycloak's real
+ * discovery document and tokens correctly; only CI can.
  *
  *   KEYCLOAK_ISSUER=http://localhost:8081/realms/system-design \
  *   KEYCLOAK_CLIENT_ID=system-design-store \
@@ -24,10 +28,13 @@ import { createMemoryUserDirectory } from "../store/src/userDirectory.ts";
 import { createSessionStore } from "../store/src/auth/sessions.ts";
 import { createProvider } from "../store/src/auth/providers.ts";
 
-const issuer = process.env.KEYCLOAK_ISSUER;
-if (!issuer) {
-  console.log("KEYCLOAK_ISSUER is not set: skipping the Keycloak sign-in checks.");
-  process.exit(0);
+import { startTestOidcProvider } from "./lib/testIdentityProviders.ts";
+
+const external = process.env.KEYCLOAK_ISSUER;
+const standIn = external ? null : await startTestOidcProvider({ subject: "tester", loginForm: true });
+const issuer = external ?? standIn!.issuer;
+if (standIn) {
+  console.log("KEYCLOAK_ISSUER is not set: running against a stand-in provider that serves a login form.");
 }
 
 let failures = 0;
@@ -39,10 +46,10 @@ function check(condition: boolean, message: string) {
   }
 }
 
-const clientId = process.env.KEYCLOAK_CLIENT_ID ?? "system-design-store";
-const clientSecret = process.env.KEYCLOAK_CLIENT_SECRET ?? "";
+const clientId = process.env.KEYCLOAK_CLIENT_ID ?? standIn?.clientId ?? "system-design-store";
+const clientSecret = process.env.KEYCLOAK_CLIENT_SECRET ?? standIn?.clientSecret ?? "";
 const username = process.env.KEYCLOAK_USERNAME ?? "tester";
-const password = process.env.KEYCLOAK_PASSWORD ?? "";
+const password = process.env.KEYCLOAK_PASSWORD ?? "anything";
 
 const blobs = createMemoryBlobStore();
 const store = createDocumentService<MemoryTx>({
@@ -100,7 +107,12 @@ try {
   }
   check(!!session, `the browser comes back signed in (${body.slice(0, 120)})`);
   check(session?.issuer === issuer.replace(/\/+$/, ""), "the session records Keycloak as the issuer");
-  check(!!session?.subject && session.subject !== username, `and its subject is Keycloak's identifier, not the username (${session?.subject})`);
+  check(!!session?.subject, `the session carries the provider's subject (${session?.subject})`);
+  if (external) {
+    // Keycloak identifies people by a UUID, never by the name they typed:
+    // usernames can be changed and reused, subjects cannot.
+    check(session?.subject !== username, `and with Keycloak that is its own identifier, not the username (${session?.subject})`);
+  }
 
   console.log("\n=== The session works, and ends ===");
   const cookies = await context.cookies();
@@ -122,6 +134,7 @@ try {
 } finally {
   await browser.close().catch(() => {});
   await new Promise<void>((resolve) => server.close(() => resolve()));
+  await standIn?.close();
 }
 
 if (failures > 0) {
