@@ -211,7 +211,8 @@ jobs:
                  "secret":"store-secret","standardFlowEnabled":true,"directAccessGrantsEnabled":false,
                  "redirectUris":["http://127.0.0.1:8090/v1/auth/callback"],"webOrigins":["+"]}'
           curl -sf -X POST "$KC/admin/realms/system-design/users" -H "$auth" -H "content-type: application/json" \
-            -d '{"username":"tester","enabled":true,"emailVerified":true,"firstName":"Test","lastName":"User",
+            -d '{"username":"tester","enabled":true,"email":"tester@example.gov","emailVerified":true,
+                 "firstName":"Test","lastName":"User","requiredActions":[],
                  "credentials":[{"type":"password","value":"tester-password","temporary":false}]}'
           echo "Keycloak configured."
 

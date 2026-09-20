@@ -44,6 +44,11 @@ export interface TestOidcOptions {
   loginForm?: boolean;
 }
 
+/** Keycloak asks a fresh user to complete their profile before it will
+ * finish a sign-in. The stand-in does it once, so the handling for that is
+ * exercised without Keycloak. */
+
+
 export async function startTestOidcProvider(options: TestOidcOptions = {}): Promise<TestOidcProvider> {
   const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
   const jwk = publicKey.export({ format: "jwk" }) as { n: string; e: string };
@@ -54,6 +59,7 @@ export async function startTestOidcProvider(options: TestOidcOptions = {}): Prom
   let subject = options.subject ?? "user-1";
   let displayName = "Test User";
   let misbehaviour: Misbehaviour = "none";
+  let profileCompleted = false;
   let issuer = "";
 
   const sign = (payload: Record<string, unknown>, mode: Misbehaviour): string => {
@@ -91,6 +97,29 @@ export async function startTestOidcProvider(options: TestOidcOptions = {}): Prom
       return json(200, { keys: [{ kty: "RSA", kid, alg: "RS256", use: "sig", n: jwk.n, e: jwk.e }] });
     }
 
+    if (url.pathname === "/login-actions/profile" && request.method === "POST") {
+      const chunks: Buffer[] = [];
+      for await (const chunk of request) chunks.push(chunk as Buffer);
+      const submitted = new URLSearchParams(Buffer.concat(chunks).toString("utf8"));
+      if (!submitted.get("email")) {
+        response.writeHead(200, { "content-type": "text/html" });
+        return response.end("<html><body><h1 id='kc-page-title'>Update Account Information</h1><p id='input-error'>Email is required.</p></body></html>");
+      }
+      profileCompleted = true;
+      const redirectUri = url.searchParams.get("redirect_uri") ?? "";
+      const code = randomBytes(12).toString("hex");
+      codes.set(code, {
+        nonce: url.searchParams.get("nonce") ?? "",
+        challenge: url.searchParams.get("code_challenge") ?? "",
+        redirectUri,
+      });
+      const back = new URL(redirectUri);
+      back.searchParams.set("code", code);
+      back.searchParams.set("state", url.searchParams.get("state") ?? "");
+      response.writeHead(302, { location: back.toString() });
+      return response.end();
+    }
+
     if (url.pathname === "/protocol/openid-connect/auth" && options.loginForm) {
       // Keycloak's field and button ids, so a client driving the form is
       // driving the same shapes.
@@ -112,6 +141,17 @@ export async function startTestOidcProvider(options: TestOidcOptions = {}): Prom
         return response.end("<html><body><p id='input-error'>Invalid username or password.</p></body></html>");
       }
       subject = submitted.get("username") ?? subject;
+      if (!profileCompleted) {
+        // "Update Account Information", as Keycloak shows for a user with
+        // no email: the browser stays here until it is filled in.
+        const form = `<!doctype html><html><body><h1 id="kc-page-title">Update Account Information</h1>
+          <form id="kc-update-profile-form" method="POST" action="/login-actions/profile${url.search}">
+            <input id="email" name="email" /><input id="firstName" name="firstName" />
+            <input id="lastName" name="lastName" /><input type="submit" value="Submit" />
+          </form></body></html>`;
+        response.writeHead(200, { "content-type": "text/html", "content-length": String(Buffer.byteLength(form)) });
+        return response.end(form);
+      }
       const redirectUri = url.searchParams.get("redirect_uri") ?? "";
       const code = randomBytes(12).toString("hex");
       codes.set(code, {

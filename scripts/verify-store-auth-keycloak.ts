@@ -96,9 +96,47 @@ try {
   await page.fill("#username", username);
   await page.fill("#password", password);
   await page.click("#kc-login, input[type=submit]");
-  await page.waitForURL(`${origin}/**`, { timeout: 30000 });
 
-  const body = await page.evaluate(() => document.body.innerText);
+  // Keycloak can interrupt a sign-in with a page of its own: an incomplete
+  // profile, an expired password, a consent screen. Each keeps the browser
+  // on the provider, which looked like a hung redirect the first time this
+  // ran. Complete the one that can be completed, and report the rest by
+  // name instead of timing out on a URL.
+  const backAtStore = () => page.url().startsWith(origin);
+  for (let attempt = 0; attempt < 3 && !backAtStore(); attempt++) {
+    await page
+      .waitForURL((url) => url.href.startsWith(origin), { timeout: 15000 })
+      .catch(() => {});
+    if (backAtStore()) break;
+
+    const profileForm = page.locator("#kc-update-profile-form, form#kc-form-update-profile");
+    if (await profileForm.count()) {
+      // "Update Account Information": a user created without an email.
+      const email = page.locator("#email");
+      if (await email.count()) await email.fill(`${username}@example.gov`);
+      for (const field of ["#firstName", "#lastName"]) {
+        const input = page.locator(field);
+        if ((await input.count()) && !(await input.inputValue())) await input.fill("Test");
+      }
+      await page.click("input[type=submit], button[type=submit]");
+      continue;
+    }
+
+    const consent = page.locator("#kc-login[value='Yes'], #kc-approve");
+    if (await consent.count()) {
+      await consent.first().click();
+      continue;
+    }
+    break;
+  }
+
+  if (!backAtStore()) {
+    const heading = (await page.locator("h1, h2, #kc-page-title").first().textContent().catch(() => null))?.trim();
+    const error = (await page.locator("#input-error, .alert-error, #kc-error-message").first().textContent().catch(() => null))?.trim();
+    check(false, `the sign-in came back to the store (stuck at ${page.url()} - "${heading ?? "no heading"}"${error ? `: ${error}` : ""})`);
+  }
+
+  const body = backAtStore() ? await page.evaluate(() => document.body.innerText) : "";
   let session: { issuer?: string; subject?: string; displayName?: string } | undefined;
   try {
     session = (JSON.parse(body) as { session?: typeof session }).session;
