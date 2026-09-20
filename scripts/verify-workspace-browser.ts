@@ -316,14 +316,26 @@ async function run() {
       (await second.evaluate(() => document.querySelectorAll('.react-flow__node').length)) === 25,
       'and its contents arrive from the store',
     );
-    // The title is a known wrinkle rather than a silent one: opening a
-    // workspace document in a browser that has no copy of it seeds a new
-    // document with a default title, and that default competes with the
-    // stored title as an ordinary concurrent edit. The diagram merges
-    // correctly; whichever title wins is arbitrary. Seeding a document
-    // without writing a title is the fix, and is not in this patch.
-    const openedTitle = await second.inputValue('[aria-label="Diagram title"]');
-    console.log(`  (the opened document is titled "${openedTitle}" - see the note above)`);
+    // Including its title. A browser opening a document it has no copy of
+    // seeds an empty one first, and a seeded placeholder title would
+    // compete with the real one as a concurrent edit - so the placeholder
+    // is never written (seedYjsDocumentMeta).
+    const titled = await second
+      .waitForFunction(
+        () =>
+          (document.querySelector('[aria-label="Diagram title"]') as HTMLInputElement | null)
+            ?.value === 'Shared architecture',
+        null,
+        { timeout: 20000 },
+      )
+      .then(
+        () => true,
+        () => false,
+      );
+    check(
+      titled,
+      `with the title the first browser gave it (${await second.inputValue('[aria-label="Diagram title"]')})`,
+    );
 
     console.log('\n=== Both browsers editing the same document (WS8-R2, R4) ===');
     {

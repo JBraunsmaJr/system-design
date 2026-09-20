@@ -102,7 +102,13 @@ export function createYjsDocumentMetaStore(doc: Y.Doc): DocumentMetaStore {
  */
 export function seedYjsDocumentMeta(doc: Y.Doc, initial: Partial<DocumentMeta>): void {
   const meta = doc.getMap<unknown>(META_MAP);
-  const needsTitle = !meta.has(TITLE) && initial.title !== undefined;
+  // The placeholder title is never written. getSnapshot already reports it
+  // for a document that has none, so writing it gains nothing - and it
+  // costs something: a browser opening a shared document it has no copy of
+  // seeds a new one first, and a written placeholder then competes with
+  // the real title as an ordinary concurrent edit, at random (WS8-R4).
+  const seedsPlaceholder = initial.title === DEFAULT_DOCUMENT_TITLE;
+  const needsTitle = !meta.has(TITLE) && initial.title !== undefined && !seedsPlaceholder;
   const needsScenarios = !meta.has(SCENARIOS) && initial.scenarios !== undefined;
   if (!needsTitle && !needsScenarios) return;
   doc.transact(() => {
