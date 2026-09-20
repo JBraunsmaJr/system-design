@@ -22,7 +22,7 @@
  */
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "http";
 import { StoreError } from "./documentService.ts";
-import type { Provider } from "./auth/providers.ts";
+import { ProviderUnreachable, type Provider } from "./auth/providers.ts";
 import { DirectoryError, verificationCodeFor, type UserDirectory } from "./userDirectory.ts";
 import { IndexError, type WorkspaceIndexStore } from "./workspaceIndex.ts";
 import {
@@ -149,6 +149,7 @@ const STATUS: Record<string, number> = {
   "too-many-bytes": 413,
   forbidden: 403,
   "escrow-required": 400,
+  "provider-unreachable": 502,
   "escrow-unavailable": 503,
   revoked: 403,
   "not-approved": 403,
@@ -835,8 +836,9 @@ export function createHttpService(options: HttpServiceOptions): Server {
     if (error instanceof StoreError) return { status: STATUS[error.reason] ?? 500, reason: error.reason, message: error.message };
     if (error instanceof DirectoryError) return { status: STATUS[error.reason] ?? 500, reason: error.reason, message: error.message };
     if (error instanceof IndexError) return { status: error.reason === "conflict" ? 409 : 404, reason: error.reason, message: error.message };
-    // Nothing unexpected reaches the client: it goes to the audit trail and
-    // the log, and the caller gets a reason it can act on.
+    if (error instanceof ProviderUnreachable) {
+      return { status: 502, reason: "provider-unreachable", message: error.message };
+    }
     console.error("[store] unhandled error:", error);
     return { status: 500, reason: "internal", message: "The store failed to handle this request." };
   }

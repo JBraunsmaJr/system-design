@@ -57,6 +57,29 @@ Two things trip people up:
   service account or a test user created through the admin API, which
   should be given an email and marked verified.
 
+### When the browser and the store reach the provider differently
+
+Inside a container, `localhost` is that container, not the host. A store
+configured only with `OIDC_ISSUER=http://localhost:8081/...` will send the
+browser to the right place and then fail to reach the provider itself, with
+a connection refused. It answers `502 provider-unreachable` and names the
+address it tried.
+
+Give it both addresses:
+
+```yaml
+OIDC_ISSUER: http://localhost:8081/realms/system-design   # the browser's
+OIDC_INTERNAL_URL: http://keycloak:8080                   # this server's
+```
+
+Only back-channel calls use the internal address: discovery, the token
+exchange, the key set. The browser is always sent to the public address,
+and tokens are still checked against the public issuer.
+
+The provider must also know its public address, or it will advertise
+endpoints and issue tokens under the internal one and the two will not
+match. For Keycloak that is `KC_HOSTNAME`; the example sets it.
+
 `OIDC_ISSUER` is the realm or tenant URL, the one that serves
 `/.well-known/openid-configuration` — for Keycloak,
 `https://keycloak.example.gov/realms/<realm>`. Everything else is read from
@@ -94,7 +117,8 @@ at startup. Anything unusable stops it, with a sentence saying what to set.
 | `PORT` | no | Default 8080. |
 | `ALLOWED_ORIGINS` | where the editor is elsewhere | Exact origins the editor is served from, comma separated. No wildcards. |
 | `AUTH_PROVIDERS` | yes | `oidc`, `github`, or both. |
-| `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | with `oidc` | The provider's issuer URL and this store's client. The secret stays on the server. |
+| `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | with `oidc` | The provider's issuer URL **as the browser sees it**, and this store's client. The secret stays on the server. |
+| `OIDC_INTERNAL_URL` | when the store reaches the provider elsewhere | The address *this server* uses, when it differs — a container network, typically. See below. |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | with `github` | A GitHub OAuth app. |
 | `ADMIN_SUBJECTS` | no | `issuer#subject` for each administrator. **With none set, legal holds and purges are refused to everyone.** The subject is the provider's identifier, not a username: with Keycloak it is the user's UUID, which `GET /v1/users/me` reports after signing in. |
 | `RETENTION_PERIOD` | no | `immediate`, a duration (`7d`, `12w`, `6m`, `7y`), or `indefinite`. Default `30d`. |

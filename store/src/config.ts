@@ -83,6 +83,9 @@ export function loadStoreConfig(env: Env = process.env): StoreConfig {
         id,
         kind: "oidc",
         issuer: url("OIDC_ISSUER", required(env, "OIDC_ISSUER", "the identity provider's issuer URL, for example a Keycloak realm.")),
+        // Where this server reaches the provider, when that differs from
+        // where the browser does - a container network, usually.
+        ...(env.OIDC_INTERNAL_URL?.trim() ? { internalUrl: url("OIDC_INTERNAL_URL", env.OIDC_INTERNAL_URL.trim()) } : {}),
         clientId: required(env, "OIDC_CLIENT_ID", "the client this store is registered as."),
         clientSecret: required(env, "OIDC_CLIENT_SECRET", "the client secret; it stays on the server."),
         scopes: list(env.OIDC_SCOPES).length ? list(env.OIDC_SCOPES) : undefined,
@@ -161,7 +164,11 @@ export function describeConfig(config: StoreConfig): string[] {
   return [
     `Listening on port ${config.port}, public address ${config.publicUrl}`,
     config.databaseUrl ? "Storage: PostgreSQL" : "Storage: in memory (nothing is kept when this process stops)",
-    config.providers.length ? `Sign-in: ${config.providers.map((p) => p.id).join(", ")}` : "Sign-in: NONE - this store is open to anyone who can reach it",
+    config.providers.length
+      ? `Sign-in: ${config.providers
+          .map((p) => `${p.id}${p.issuer ? ` at ${p.issuer}` : ""}${p.internalUrl ? ` (reached here as ${p.internalUrl})` : ""}`)
+          .join(", ")}`
+      : "Sign-in: NONE - this store is open to anyone who can reach it",
     config.allowedOrigins.length ? `Editor origins: ${config.allowedOrigins.join(", ")}` : "Editor origins: same origin only",
     config.admins.length ? `Administrators: ${config.admins.length}` : "Administrators: none configured - holds and purges are refused to everyone",
     describeRetention(config.retention),

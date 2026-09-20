@@ -33,10 +33,6 @@ jobs:
       - name: Run tests
         run: npm run tests
 
-  # WS13-R13: the file-saving and session-safety suite in Firefox, which has no
-  # File System Access API. The file-backed sections report as skipped there;
-  # timed copies, capability messaging, the interrupted-write check and the
-  # leave guard run against Firefox's real behavior.
   file-saving-firefox:
     name: File saving suite (Firefox)
     runs-on: ubuntu-latest
@@ -61,9 +57,6 @@ jobs:
         env:
           E2E_BROWSER: firefox
 
-  # WS8-R16/R17: the store contract against a real PostgreSQL, and the size
-  # and latency table the storage decision rests on (OQ-17). The suite also
-  # runs in-memory in the main job; both must pass the same checks.
   store-contract-postgres:
     name: Store contract (PostgreSQL)
     runs-on: ubuntu-latest
@@ -146,15 +139,6 @@ jobs:
         env:
           DATABASE_URL: postgresql://store:store@localhost:5432/store
 
-  # WS10-R1, OQ-18: sign-in against a real Keycloak, which is what a
-  # government deployment will use. The in-process provider in
-  # verify-store-auth.ts covers the protocol logic; this covers the
-  # assumptions - discovery, a real login page, a real token.
-  #
-  # Keycloak runs as a step rather than a service container: a service
-  # container cannot be given a command, and this image needs "start-dev" -
-  # without it the container exits at once and the job fails before it
-  # begins, which is exactly what happened the first time.
   auth-keycloak:
     name: Sign-in (Keycloak)
     runs-on: ubuntu-latest
@@ -183,9 +167,6 @@ jobs:
             -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
             quay.io/keycloak/keycloak:26.0 start-dev
 
-      # A realm, a confidential client for the store, and one person to sign
-      # in as. Created through the admin API rather than an imported file, so
-      # nothing has to be mounted into the container.
       - name: Configure Keycloak
         run: |
           set -euo pipefail

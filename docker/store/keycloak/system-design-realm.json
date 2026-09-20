@@ -1,14 +1,4 @@
 {
-  "_comment": [
-    "A realm for the compose example (WS10-R1). Imported at startup with",
-    "--import-realm, so the example works from a single command rather than",
-    "leaving the store pointed at a realm that does not exist yet.",
-    "",
-    "Change before any real use: the client secret below is a placeholder,",
-    "the redirect URI must match the store's PUBLIC_URL, and the demo user",
-    "at the end must be removed - the deployment's own identity provider",
-    "supplies people."
-  ],
   "realm": "system-design",
   "enabled": true,
   "sslRequired": "external",
@@ -24,7 +14,6 @@
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": false,
-      "_comment": "Exactly the store's callback: <PUBLIC_URL>/v1/auth/callback.",
       "redirectUris": ["http://localhost:8080/v1/auth/callback"],
       "webOrigins": ["http://localhost:8088"],
       "attributes": {
@@ -34,12 +23,6 @@
   ],
   "users": [
     {
-      "_comment": [
-        "A demo account, so the example can be signed into immediately.",
-        "Keycloak will not finish a sign-in for a user with no email: it",
-        "asks them to complete their profile first. Delete this user before",
-        "using the example for anything real."
-      ],
       "username": "demo",
       "enabled": true,
       "email": "demo@example.invalid",

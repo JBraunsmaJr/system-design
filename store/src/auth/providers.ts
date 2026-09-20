@@ -20,8 +20,19 @@ export interface ProviderConfig {
   kind: "oidc" | "github";
   clientId: string;
   clientSecret: string;
-  /** OIDC only: where discovery starts. */
+  /**
+   * OIDC only: the issuer as the BROWSER sees it, and as tokens claim it.
+   */
   issuer?: string;
+  /**
+   * Where this server reaches the provider, when that is a different
+   * address from the browser's - a container network, typically, where
+   * the browser knows http://localhost:8081 and the store knows
+   * http://keycloak:8080. Only back-channel calls use it: discovery, the
+   * token exchange, the key set. The browser is always sent to the public
+   * address, and tokens are still checked against the public issuer.
+   */
+  internalUrl?: string;
   /** GitHub only, to point tests and GitHub Enterprise elsewhere. */
   authorizeUrl?: string;
   tokenUrl?: string;
@@ -60,6 +71,15 @@ const randomToken = () => base64url(randomBytes(32));
 
 export type Fetcher = typeof fetch;
 
+/** The provider could not be reached at all, as distinct from refusing
+ * something. Worth its own type: it is nearly always configuration. */
+export class ProviderUnreachable extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ProviderUnreachable";
+  }
+}
+
 interface Discovery {
   issuer: string;
   authorization_endpoint: string;
@@ -75,19 +95,56 @@ interface Discovery {
 export function createOidcProvider(config: ProviderConfig, fetcher: Fetcher = fetch): Provider {
   if (!config.issuer) throw new Error(`Provider ${config.id} needs an issuer URL.`);
   const issuer = config.issuer.replace(/\/+$/, "");
+  const internalBase = config.internalUrl?.replace(/\/+$/, "") ?? null;
+
+  /**
+   * A provider's own endpoints come back as public URLs, which this server
+   * may not be able to reach. Back-channel calls are sent to the internal
+   * address instead, keeping the path. The authorization endpoint is left
+   * alone: that one is for the browser.
+   */
+  const backChannel = (endpoint: string): string => {
+    if (!internalBase) return endpoint;
+    const target = new URL(endpoint);
+    const publicOrigin = new URL(issuer).origin;
+    if (target.origin !== publicOrigin) return endpoint;
+    return `${internalBase}${target.pathname}${target.search}`;
+  };
   let discovered: Discovery | null = null;
   let keys: JsonWebKey[] = [];
 
   async function discover(): Promise<Discovery> {
     if (discovered) return discovered;
-    const response = await fetcher(`${issuer}/.well-known/openid-configuration`);
-    if (!response.ok) throw new Error(`Discovery failed for ${issuer}: ${response.status}`);
+    // The issuer's path, if it has one (a Keycloak realm does), joined
+    // without leaving a double slash when it does not.
+    const issuerPath = new URL(issuer).pathname.replace(/\/+$/, "");
+    const discoveryUrl = internalBase
+      ? `${internalBase}${issuerPath}/.well-known/openid-configuration`
+      : `${issuer}/.well-known/openid-configuration`;
+    let response: Response;
+    try {
+      response = await fetcher(discoveryUrl);
+    } catch (error) {
+      throw new ProviderUnreachable(
+        `The store could not reach the identity provider at ${discoveryUrl}. ` +
+          (internalBase
+            ? "Check OIDC_INTERNAL_URL: it is the address this server uses, which in a container network is usually the service name, not localhost."
+            : "Check OIDC_ISSUER, and whether this server can reach it - inside a container, localhost is the container itself.") +
+          ` (${String((error as Error).cause ?? error).slice(0, 120)})`,
+      );
+    }
+    if (!response.ok) throw new Error(`Discovery failed for ${discoveryUrl}: ${response.status}`);
     const document = (await response.json()) as Discovery;
     for (const field of ["authorization_endpoint", "token_endpoint", "jwks_uri"] as const) {
       if (typeof document[field] !== "string") throw new Error(`Discovery for ${issuer} has no ${field}.`);
     }
     if (document.issuer !== issuer) {
-      throw new Error(`Discovery at ${issuer} declares a different issuer (${document.issuer}).`);
+      throw new Error(
+        `The provider declares its issuer as ${document.issuer}, but this store is configured with ${issuer}. ` +
+          `They must match exactly - tokens carry the provider's value. Where the browser and this server reach the provider ` +
+          `at different addresses, set OIDC_ISSUER to the browser's and OIDC_INTERNAL_URL to this server's, and configure the ` +
+          `provider with its public address (for Keycloak, KC_HOSTNAME).`,
+      );
     }
     discovered = document;
     return document;
@@ -96,7 +153,7 @@ export function createOidcProvider(config: ProviderConfig, fetcher: Fetcher = fe
   async function jwks(): Promise<JsonWebKey[]> {
     // Refetched when a token names a key we do not have: providers rotate.
     const document = await discover();
-    const response = await fetcher(document.jwks_uri);
+    const response = await fetcher(backChannel(document.jwks_uri));
     if (!response.ok) throw new Error(`Could not fetch the provider's keys: ${response.status}`);
     keys = ((await response.json()) as { keys?: JsonWebKey[] }).keys ?? [];
     return keys;
@@ -131,7 +188,7 @@ export function createOidcProvider(config: ProviderConfig, fetcher: Fetcher = fe
 
     async complete(code, pending) {
       const document = await discover();
-      const response = await fetcher(document.token_endpoint, {
+      const response = await fetcher(backChannel(document.token_endpoint), {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" },
         body: new URLSearchParams({

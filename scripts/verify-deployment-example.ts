@@ -94,6 +94,21 @@ check(client.webOrigins.includes(editor.APP_URL) || client.webOrigins.includes("
 check(store.ALLOWED_ORIGINS === editor.APP_URL, `the store allows the editor's origin (${store.ALLOWED_ORIGINS})`);
 check(editor.STORE_URL === store.PUBLIC_URL, "and the editor points at the store's public address");
 check(!client.publicClient, "the store is a confidential client: the secret stays on the server");
+// The mistake this example made until someone ran it: one address for a
+// provider the browser and the store reach differently.
+const keycloak = compose.services.keycloak.environment;
+check(
+  !!store.OIDC_INTERNAL_URL && !/localhost|127\.0\.0\.1/.test(store.OIDC_INTERNAL_URL),
+  `the store reaches the provider by service name, not localhost (${store.OIDC_INTERNAL_URL ?? "not set"})`
+);
+check(
+  /localhost|127\.0\.0\.1/.test(store.OIDC_ISSUER ?? ""),
+  "while the browser is sent to the address it can actually reach"
+);
+check(
+  keycloak.KC_HOSTNAME === new URL(store.OIDC_ISSUER!).origin,
+  `and the provider knows its own public address (KC_HOSTNAME ${keycloak.KC_HOSTNAME ?? "not set"})`
+);
 
 console.log("\n=== Things that must not reach a real deployment ===");
 check(

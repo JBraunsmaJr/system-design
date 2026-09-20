@@ -1,17 +1,15 @@
-# The store (WS8-R9). Node runs the TypeScript directly with type stripping,
-# so there is no build step and nothing to fall out of step with the source.
 FROM node:26.7.0-alpine
 WORKDIR /app
 
 RUN apk update && apk upgrade
 
-# Only what the store needs at runtime: pg, and nothing else.
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && \
     npm cache clean --force && \
     rm -rf /root/.npm /root/.cache
 
 COPY store ./store
+COPY src/crypto ./src/crypto
 
 ENV NODE_ENV=production
 ENV PORT=8080

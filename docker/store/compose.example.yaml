@@ -30,6 +30,10 @@ services:
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: change-me
+      # The address the BROWSER uses. Keycloak issues tokens and endpoint
+      # URLs under this name, so it must be the public one even though the
+      # store reaches Keycloak as http://keycloak:8080 inside the network.
+      KC_HOSTNAME: http://localhost:8081
     volumes:
       # A realm with the store registered as a client, so this example works
       # from one command. Its client secret is a placeholder and it carries a
@@ -61,7 +65,12 @@ services:
       # Where the editor is served from. Exactly; no wildcards.
       ALLOWED_ORIGINS: http://localhost:8088
       AUTH_PROVIDERS: oidc
+      # Two addresses for one provider: the browser is sent to localhost,
+      # and this container reaches Keycloak by its service name. Inside a
+      # container, localhost is the container itself - which is why a
+      # single address cannot work here.
       OIDC_ISSUER: http://localhost:8081/realms/system-design
+      OIDC_INTERNAL_URL: http://keycloak:8080
       OIDC_CLIENT_ID: system-design-store
       # Must match the client secret in keycloak/system-design-realm.json.
       OIDC_CLIENT_SECRET: change-me

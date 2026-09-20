@@ -215,7 +215,83 @@ try {
     );
   }
 
-  console.log("\n=== The audit trail (WS10-R3) ===");
+  console.log("\n=== A provider the browser and the store reach differently ===");
+{
+  // A container network: the browser knows one address, the store another.
+  // The provider advertises the browser's, as Keycloak does with
+  // KC_HOSTNAME, and the store must use its own for back-channel calls
+  // while still checking tokens against the advertised issuer.
+  const behindNetwork = await startTestOidcProvider({ subject: "split", publicIssuer: "http://provider.public.invalid" });
+  const splitSessions = createSessionStore();
+  let splitOrigin = "";
+  const splitServer = createHttpService({
+    publicUrl: () => splitOrigin,
+    store: newStore(),
+    sessions: splitSessions,
+    providers: [
+      createProvider({
+        id: "oidc",
+        kind: "oidc",
+        issuer: "http://provider.public.invalid",
+        internalUrl: behindNetwork.issuer,
+        clientId: behindNetwork.clientId,
+        clientSecret: behindNetwork.clientSecret,
+      }),
+    ],
+  });
+  await new Promise<void>((resolve) => splitServer.listen(0, "127.0.0.1", resolve));
+  splitOrigin = `http://127.0.0.1:${(splitServer.address() as AddressInfo).port}`;
+  try {
+    const start = await fetch(`${splitOrigin}/v1/auth/oidc/start`, { redirect: "manual" });
+    const authorizeUrl = start.headers.get("location") ?? "";
+    check(
+      authorizeUrl.startsWith("http://provider.public.invalid/"),
+      `the browser is sent to the provider's public address (${authorizeUrl.split("?")[0]})`
+    );
+
+    // The browser's leg, which only the browser can reach, done by hand
+    // against the address the provider really listens on.
+    const asBrowser = authorizeUrl.replace("http://provider.public.invalid", behindNetwork.issuer);
+    const atProvider = await fetch(asBrowser, { redirect: "manual" });
+    const callback = await fetch(atProvider.headers.get("location") ?? "", { redirect: "manual" });
+    const cookie = (callback.headers.get("set-cookie") ?? "").split(";")[0];
+    check(!!cookie, "and the callback completes: the token exchange went to the address the store can reach");
+    const session = await (await fetch(`${splitOrigin}/v1/auth/session`, { headers: { cookie } })).json();
+    check(session.session?.issuer === "http://provider.public.invalid", "the session records the public issuer, which is what tokens claim");
+  } finally {
+    await new Promise<void>((resolve) => splitServer.close(() => resolve()));
+    await behindNetwork.close();
+  }
+}
+
+console.log("\n=== A provider the store cannot reach at all ===");
+{
+  // What a misconfigured container network produces. It must not surface
+  // as "the store failed to handle this request".
+  const unreachable = createHttpService({
+    store: newStore(),
+    sessions: createSessionStore(),
+    providers: [
+      createProvider({ id: "oidc", kind: "oidc", issuer: "http://127.0.0.1:9/realms/x", clientId: "c", clientSecret: "s" }),
+    ],
+  });
+  await new Promise<void>((resolve) => unreachable.listen(0, "127.0.0.1", resolve));
+  const port = (unreachable.address() as AddressInfo).port;
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/v1/auth/oidc/start`, { redirect: "manual" });
+    const body = (await response.json()) as { error?: { reason?: string; message?: string } };
+    check(response.status === 502, `it answers 502, not 500 (${response.status})`);
+    check(body.error?.reason === "provider-unreachable", "with a reason naming the problem");
+    check(
+      (body.error?.message ?? "").includes("127.0.0.1:9") && /localhost is the container itself/.test(body.error?.message ?? ""),
+      `and a message naming the address and the usual cause (${(body.error?.message ?? "").slice(0, 120)})`
+    );
+  } finally {
+    await new Promise<void>((resolve) => unreachable.close(() => resolve()));
+  }
+}
+
+console.log("\n=== The audit trail (WS10-R3) ===");
   {
     const entries = audit.all();
     check(entries.some((e) => e.operation === "login" && e.outcome === "ok" && e.subject?.includes("alice")), "a successful sign-in is recorded with its subject");

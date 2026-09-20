@@ -18,7 +18,10 @@ import type { AddressInfo } from "net";
 export type Misbehaviour = "none" | "bad-signature" | "wrong-audience" | "expired" | "wrong-nonce" | "alg-none" | "no-id-token";
 
 export interface TestOidcProvider {
+  /** Where it listens. */
   issuer: string;
+  /** What it advertises, which may differ (see publicIssuer). */
+  advertisedIssuer: string;
   clientId: string;
   clientSecret: string;
   /** What the next token exchange should do wrong. */
@@ -42,6 +45,13 @@ export interface TestOidcOptions {
    * suite's form-filling path be exercised without Keycloak.
    */
   loginForm?: boolean;
+  /**
+   * Advertise this issuer and these endpoint URLs instead of the address
+   * the provider actually listens on, as Keycloak does when KC_HOSTNAME is
+   * set. Lets a store be tested against a provider whose public address is
+   * not the one it can reach.
+   */
+  publicIssuer?: string;
 }
 
 /** Keycloak asks a fresh user to complete their profile before it will
@@ -81,13 +91,14 @@ export async function startTestOidcProvider(options: TestOidcOptions = {}): Prom
     };
 
     if (url.pathname === "/.well-known/openid-configuration") {
+      const advertised = options.publicIssuer ?? issuer;
       return json(200, {
-        issuer,
+        issuer: advertised,
         // Deliberately not `${issuer}/authorize`: a client that guesses the
         // endpoint instead of reading it here would break on Keycloak too.
-        authorization_endpoint: `${issuer}/protocol/openid-connect/auth`,
-        token_endpoint: `${issuer}/protocol/openid-connect/token`,
-        jwks_uri: `${issuer}/protocol/openid-connect/certs`,
+        authorization_endpoint: `${advertised}/protocol/openid-connect/auth`,
+        token_endpoint: `${advertised}/protocol/openid-connect/token`,
+        jwks_uri: `${advertised}/protocol/openid-connect/certs`,
         response_types_supported: ["code"],
         id_token_signing_alg_values_supported: ["RS256"],
       });
@@ -200,7 +211,7 @@ export async function startTestOidcProvider(options: TestOidcOptions = {}): Prom
       if (mode === "no-id-token") return json(200, { access_token: "x", token_type: "Bearer" });
       const nowSeconds = Math.floor(Date.now() / 1000);
       const payload = {
-        iss: issuer,
+        iss: options.publicIssuer ?? issuer,
         sub: subject,
         aud: mode === "wrong-audience" ? "some-other-client" : clientId,
         exp: mode === "expired" ? nowSeconds - 3600 : nowSeconds + 300,
@@ -219,6 +230,7 @@ export async function startTestOidcProvider(options: TestOidcOptions = {}): Prom
 
   return {
     issuer,
+    advertisedIssuer: options.publicIssuer ?? issuer,
     clientId,
     clientSecret,
     misbehave(mode) {
