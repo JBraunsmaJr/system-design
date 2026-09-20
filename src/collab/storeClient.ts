@@ -168,11 +168,14 @@ export function createStoreClient(options: StoreClientOptions) {
     async health(): Promise<{
       cryptoMode: 'webcrypto' | 'passthrough';
       authentication: 'none' | 'required';
+      /** WS10-R6: whether joining a session needs a token from here. */
+      relayAuthentication: 'none' | 'required';
     }> {
       const { body } = await request('/v1/health');
       return {
         cryptoMode: (body.cryptoMode as 'webcrypto' | 'passthrough') ?? 'webcrypto',
         authentication: (body.authentication as 'none' | 'required') ?? 'required',
+        relayAuthentication: (body.relayAuthentication as 'none' | 'required') ?? 'none',
       };
     },
 
@@ -187,6 +190,15 @@ export function createStoreClient(options: StoreClientOptions) {
         recoveryKeyPem = (body.publicKey as string | null) ?? null;
       }
       return recoveryKeyPem;
+    },
+
+    /** A short-lived token admitting this person to one session room
+     * (WS10-R7). Refused where they are not signed in. */
+    async roomToken(room: string): Promise<{ token: string; expiresAt: string }> {
+      const { body } = await request(`/v1/rooms/${encodeURIComponent(room)}/token`, {
+        method: 'POST',
+      });
+      return body as { token: string; expiresAt: string };
     },
 
     /** Who the store thinks we are, or null when not signed in. */
@@ -259,8 +271,15 @@ export function createStoreClient(options: StoreClientOptions) {
     },
 
     /** Registers a document, with its wrapped keys and nothing in it. */
-    async createDocument(docId: string, wraps: { wrappedForWorkspace: string; wrappedForRecovery?: string }): Promise<number> {
-      const { body } = await request("/v1/docs", { method: "POST", docId, body: JSON.stringify({ docId, keys: wraps }) });
+    async createDocument(
+      docId: string,
+      wraps: { wrappedForWorkspace: string; wrappedForRecovery?: string },
+    ): Promise<number> {
+      const { body } = await request('/v1/docs', {
+        method: 'POST',
+        docId,
+        body: JSON.stringify({ docId, keys: wraps }),
+      });
       return (body.document as { version: number }).version;
     },
 
@@ -272,33 +291,58 @@ export function createStoreClient(options: StoreClientOptions) {
      * they were first (WS8-R15). A conflict is reported, not retried here:
      * the caller re-reads what it missed and appends again.
      */
-    async appendUpdate(docId: string, documentKey: string, update: Uint8Array, atVersion: number): Promise<number> {
+    async appendUpdate(
+      docId: string,
+      documentKey: string,
+      update: Uint8Array,
+      atVersion: number,
+    ): Promise<number> {
       const key = await deriveStorageKey(documentKey);
-      const sealed = await crypto.seal(contextFor(docId, "update", atVersion + 1), update, key);
+      const sealed = await crypto.seal(contextFor(docId, 'update', atVersion + 1), update, key);
       const { body } = await request(`/v1/docs/${encodeURIComponent(docId)}/updates`, {
-        method: "POST",
+        method: 'POST',
         docId,
-        body: JSON.stringify({ kind: "update", bytes: toBase64(sealed), expectedVersion: atVersion }),
+        body: JSON.stringify({
+          kind: 'update',
+          bytes: toBase64(sealed),
+          expectedVersion: atVersion,
+        }),
       });
       return (body.document as { version: number }).version;
     },
 
     /** Updates written after `since`, opened (WS8-R2). */
-    async updatesSince(docId: string, documentKey: string, since: number): Promise<{ version: number; updates: Uint8Array[] }> {
+    async updatesSince(
+      docId: string,
+      documentKey: string,
+      since: number,
+    ): Promise<{ version: number; updates: Uint8Array[] }> {
       const key = await deriveStorageKey(documentKey);
-      const { body } = await request(`/v1/docs/${encodeURIComponent(docId)}/updates?since=${since}`, { docId });
+      const { body } = await request(
+        `/v1/docs/${encodeURIComponent(docId)}/updates?since=${since}`,
+        { docId },
+      );
       const record = body.document as { version: number };
       const blobs = (body.blobs as { kind: string; version: number; bytes: string }[]) ?? [];
       const updates: Uint8Array[] = [];
       for (const blob of blobs) {
-        updates.push(await crypto.open(contextFor(docId, blob.kind as BlobContext["kind"], blob.version), fromBase64(blob.bytes), key));
+        updates.push(
+          await crypto.open(
+            contextFor(docId, blob.kind as BlobContext['kind'], blob.version),
+            fromBase64(blob.bytes),
+            key,
+          ),
+        );
       }
       return { version: record.version, updates };
     },
 
     /** Every blob of a document, opened, in order (WS8-R4: order does not
      * matter to a CRDT, but the store returns them as written). */
-    async allUpdates(docId: string, documentKey: string): Promise<{ version: number; blobs: { kind: string; bytes: Uint8Array }[] }> {
+    async allUpdates(
+      docId: string,
+      documentKey: string,
+    ): Promise<{ version: number; blobs: { kind: string; bytes: Uint8Array }[] }> {
       const key = await deriveStorageKey(documentKey);
       const { body } = await request(`/v1/docs/${encodeURIComponent(docId)}`, { docId });
       const record = body.document as { version: number };
@@ -307,20 +351,29 @@ export function createStoreClient(options: StoreClientOptions) {
       for (const blob of blobs) {
         opened.push({
           kind: blob.kind,
-          bytes: await crypto.open(contextFor(docId, blob.kind as BlobContext["kind"], blob.version), fromBase64(blob.bytes), key),
+          bytes: await crypto.open(
+            contextFor(docId, blob.kind as BlobContext['kind'], blob.version),
+            fromBase64(blob.bytes),
+            key,
+          ),
         });
       }
       return { version: record.version, blobs: opened };
     },
 
     /** Replaces the log with one sealed state (WS8-R5). */
-    async compactDocument(docId: string, documentKey: string, state: Uint8Array, atVersion: number): Promise<number> {
+    async compactDocument(
+      docId: string,
+      documentKey: string,
+      state: Uint8Array,
+      atVersion: number,
+    ): Promise<number> {
       const key = await deriveStorageKey(documentKey);
-      const sealed = await crypto.seal(contextFor(docId, "snapshot", atVersion + 1), state, key);
+      const sealed = await crypto.seal(contextFor(docId, 'snapshot', atVersion + 1), state, key);
       const { body } = await request(`/v1/docs/${encodeURIComponent(docId)}/compact`, {
-        method: "POST",
+        method: 'POST',
         docId,
-        body: JSON.stringify({ kind: "snapshot", bytes: toBase64(sealed) }),
+        body: JSON.stringify({ kind: 'snapshot', bytes: toBase64(sealed) }),
       });
       return (body.document as { version: number }).version;
     },

@@ -250,6 +250,65 @@ console.log('\n=== A relay that does not ===');
   }
 }
 
+console.log('\n=== The client asking for a token ===');
+{
+  // What the editor does before joining: ask the store whether the relay
+  // needs a token, and get one for this room if it does.
+  const { createMemoryBlobStore } = await import('../store/src/blobStore.ts');
+  const { createDocumentService } = await import('../store/src/documentService.ts');
+  const { createHttpService } = await import('../store/src/httpService.ts');
+  const { authorizeRelayUrls } = await import('../src/collab/relayAccess.ts');
+
+  const blobs = createMemoryBlobStore();
+  const store = createDocumentService({
+    blobs,
+    begin: () => blobs.begin(),
+    commit: (tx) => blobs.commit(tx),
+    rollback: (tx) => blobs.rollback(tx),
+  });
+
+  const withRelayAuth = createHttpService({
+    store: store as never,
+    allowUnauthenticated: true,
+    relayTokenSecret: SECRET,
+  });
+  const open = createHttpService({ store: store as never, allowUnauthenticated: true });
+  await new Promise<void>((resolve) => withRelayAuth.listen(14473, '127.0.0.1', resolve));
+  await new Promise<void>((resolve) => open.listen(14474, '127.0.0.1', resolve));
+
+  try {
+    const room = 'room-from-client';
+    const urls = ['ws://relay.example:4444'];
+
+    const authorised = await authorizeRelayUrls({ storeUrl: 'http://127.0.0.1:14473', room, urls });
+    check(
+      authorised.urls[0].includes('token='),
+      'a relay that requires tokens gets one on the URL',
+    );
+    const token =
+      new URL(authorised.urls[0].replace('ws://', 'http://')).searchParams.get('token') ?? '';
+    check(
+      verifyRoomToken(token, { room, secret: SECRET }).room === room,
+      'and it is a token for this room',
+    );
+
+    const untouched = await authorizeRelayUrls({ storeUrl: 'http://127.0.0.1:14474', room, urls });
+    check(untouched.urls[0] === urls[0], 'a relay that does not is left alone');
+
+    const noStore = await authorizeRelayUrls({ storeUrl: null, room, urls });
+    check(noStore.urls[0] === urls[0], 'and a deployment with no store is unaffected entirely');
+
+    const unreachable = await authorizeRelayUrls({ storeUrl: 'http://127.0.0.1:9', room, urls });
+    check(
+      unreachable.urls[0] === urls[0] && unreachable.note !== null,
+      `an unreachable store says so rather than failing silently (${unreachable.note?.slice(0, 60)})`,
+    );
+  } finally {
+    await new Promise<void>((resolve) => withRelayAuth.close(() => resolve()));
+    await new Promise<void>((resolve) => open.close(() => resolve()));
+  }
+}
+
 if (failures > 0) {
   console.error(`\n${failures} check(s) failed`);
   process.exit(1);

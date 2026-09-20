@@ -83,6 +83,7 @@ import { LeaveGuardDialog } from './components/LeaveGuardDialog';
 import { WorkspacePanel } from './components/WorkspacePanel';
 import { getStoreUrl } from './domain/storeConfig';
 import { useWorkspaceSync } from './collab/useWorkspaceSync';
+import { authorizeRelayUrls } from './collab/relayAccess';
 import {
   acquireDocument,
   replaceDocumentContents,
@@ -700,7 +701,7 @@ function App() {
 
   // Starts a brand-new session on the document already open (WS1-R4).
   const startNewSession = useCallback(
-    (explicitKey?: string, explicitRoom?: string) => {
+    async (explicitKey?: string, explicitRoom?: string) => {
       /**
        * Restarting a session used to mean copying the old session's content
        * back into React state before building a fresh document. With one
@@ -727,8 +728,13 @@ function App() {
        * session.
        */
       const doc = openDoc.doc;
+      // Where the relay requires membership, the store issues a token for
+      // this room first (WS10-R6). Untouched where it does not, which is
+      // every deployment that has no store.
+      const relay = await authorizeRelayUrls({ storeUrl, room: roomName, urls: signalingUrls });
+      if (relay.note) showToast(relay.note);
       const session = startCollabSession(doc, roomName, {
-        signalingUrls,
+        signalingUrls: relay.urls,
         password: sessionKey,
         iceServers,
         // Already persisted under its document key - don't store it twice.
@@ -786,6 +792,7 @@ function App() {
       iceServers,
       displayName,
       showToast,
+      storeUrl,
     ],
   );
 
