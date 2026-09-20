@@ -20,14 +20,29 @@ services:
       interval: 5s
       retries: 10
 
+  # The identity provider. A deployment that already has one (Keycloak,
+  # Entra ID, Okta, Auth0) points the store at that instead and drops this
+  # service; see docs/store-deployment.md.
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
-    command: start-dev
+    # The command matters: this image does nothing useful without it.
+    command: start-dev --import-realm
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: change-me
+    volumes:
+      # A realm with the store registered as a client, so this example works
+      # from one command. Its client secret is a placeholder and it carries a
+      # demo account: read the file before using it for anything real.
+      - ./keycloak/system-design-realm.json:/opt/keycloak/data/import/system-design-realm.json:ro
     ports:
       - "8081:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /realms/system-design HTTP/1.1\r\nhost: localhost\r\nconnection: close\r\n\r\n' >&3 && grep -q '200 OK' <&3"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
 
   store:
     build:
@@ -35,6 +50,8 @@ services:
       dockerfile: docker/store/Dockerfile
     depends_on:
       postgres:
+        condition: service_healthy
+      keycloak:
         condition: service_healthy
     environment:
       PORT: 8080
@@ -46,6 +63,7 @@ services:
       AUTH_PROVIDERS: oidc
       OIDC_ISSUER: http://localhost:8081/realms/system-design
       OIDC_CLIENT_ID: system-design-store
+      # Must match the client secret in keycloak/system-design-realm.json.
       OIDC_CLIENT_SECRET: change-me
       # issuer#subject for each administrator: who may place legal holds and
       # purge. With none set, those actions are refused to everyone.

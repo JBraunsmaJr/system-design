@@ -23,3 +23,8 @@ dist-ssr
 *.sln
 *.sw?
 /.env
+
+# Recovery keys (WS7-R5). The private half must never be committed: it is
+# the last route into every escrowed document.
+*-private.pem
+docker/store/recovery-*.pem

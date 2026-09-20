@@ -7,6 +7,20 @@ always has, and nothing leaves the browser.
 A complete example — editor, relay, store, PostgreSQL and Keycloak — is in
 [`docker/store/compose.example.yaml`](../docker/store/compose.example.yaml).
 
+## Trying it
+
+```bash
+cd docker/store
+npx tsx ../../scripts/generate-recovery-key.ts --out ./recovery
+docker compose -f compose.example.yaml up --build
+```
+
+Then open <http://localhost:8088> and sign in as `demo` / `demo`.
+
+That is all it takes, but read what it gives you before going further: a
+placeholder client secret, a demo account, a throwaway database password,
+and plain HTTP. Each is called out below.
+
 ## What you need
 
 - **PostgreSQL 16 or later.** The store applies its own schema at startup;
@@ -15,6 +29,58 @@ A complete example — editor, relay, store, PostgreSQL and Keycloak — is in
   development. Any OIDC provider works — Keycloak, Entra ID, Okta, Auth0,
   GitLab, Google — and GitHub is supported through an adapter.
 - **HTTPS**, unless everything is on localhost. See *Origins and HTTPS*.
+
+## Setting up the identity provider
+
+The store is registered with your provider as a **confidential client**:
+it holds a secret, and the browser never sees a token.
+
+Whatever the provider, register:
+
+| Setting | Value |
+|---|---|
+| Client id | Anything; `system-design-store` in the examples. Goes in `OIDC_CLIENT_ID`. |
+| Client type | Confidential (a client secret). Goes in `OIDC_CLIENT_SECRET`. |
+| Redirect URI | **Exactly** `<PUBLIC_URL>/v1/auth/callback`. |
+| Web origins | The editor's origin, where the provider asks for one. |
+| Flow | Authorization Code with PKCE. Implicit and direct grants are not used. |
+| Scopes | `openid profile`. The store reads only the subject and a display name. |
+
+Two things trip people up:
+
+- **The redirect URI must match `PUBLIC_URL` exactly**, including the port.
+  A mismatch shows as the provider refusing the sign-in before the store is
+  involved at all.
+- **A user with no email address may not be able to sign in.** Keycloak 26
+  interrupts the sign-in and asks them to complete their profile. That is
+  normal for a real person signing in themselves, and a nuisance for a
+  service account or a test user created through the admin API, which
+  should be given an email and marked verified.
+
+`OIDC_ISSUER` is the realm or tenant URL, the one that serves
+`/.well-known/openid-configuration` — for Keycloak,
+`https://keycloak.example.gov/realms/<realm>`. Everything else is read from
+that document, so no other endpoint needs configuring.
+
+### Keycloak, specifically
+
+The example imports
+[`docker/store/keycloak/system-design-realm.json`](../docker/store/keycloak/system-design-realm.json),
+which registers the client and a demo account. For a real deployment,
+either import that file into your own Keycloak and change the secret and
+redirect URI, or create the client by hand with the settings above.
+
+Before using it for anything real:
+
+1. Replace the client secret in both the realm file and `OIDC_CLIENT_SECRET`.
+2. Delete the `demo` user; people come from your own directory.
+3. Point the redirect URI at your real `PUBLIC_URL`, over HTTPS.
+
+### GitHub
+
+Register an OAuth app with the same callback URL, set `AUTH_PROVIDERS` to
+`github`, and supply `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`. GitHub
+is OAuth2 without OIDC, so there is no issuer to configure.
 
 ## Settings
 
@@ -30,7 +96,7 @@ at startup. Anything unusable stops it, with a sentence saying what to set.
 | `AUTH_PROVIDERS` | yes | `oidc`, `github`, or both. |
 | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | with `oidc` | The provider's issuer URL and this store's client. The secret stays on the server. |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | with `github` | A GitHub OAuth app. |
-| `ADMIN_SUBJECTS` | no | `issuer#subject` for each administrator. **With none set, legal holds and purges are refused to everyone.** |
+| `ADMIN_SUBJECTS` | no | `issuer#subject` for each administrator. **With none set, legal holds and purges are refused to everyone.** The subject is the provider's identifier, not a username: with Keycloak it is the user's UUID, which `GET /v1/users/me` reports after signing in. |
 | `RETENTION_PERIOD` | no | `immediate`, a duration (`7d`, `12w`, `6m`, `7y`), or `indefinite`. Default `30d`. |
 | `CRYPTO_MODE` | no | `webcrypto` (default) or `passthrough`. |
 | `RECOVERY_PUBLIC_KEY_FILE` | with `webcrypto` | PEM file holding the organisation's recovery **public** key. Without it the store refuses every document (see below). |
