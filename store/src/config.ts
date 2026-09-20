@@ -18,6 +18,12 @@ export interface StoreConfig {
   publicUrl: string;
   /** Origins the editor is served from (WS10-R1). */
   allowedOrigins: string[];
+  /**
+   * Where the browser is sent once it has signed in - the editor, not the
+   * store. Defaults to the first allowed origin, because landing on the
+   * store's own root is never what anyone wanted.
+   */
+  afterLoginUrl: string;
   providers: ProviderConfig[];
   /** `issuer#subject` for each administrator (WS10-R2). */
   admins: string[];
@@ -136,6 +142,21 @@ export function loadStoreConfig(env: Env = process.env): StoreConfig {
     return pem.trim();
   })();
 
+  // Only somewhere this deployment already trusts: an arbitrary address
+  // here would be an open redirect off the back of a real sign-in.
+  const configuredAfterLogin = env.AFTER_LOGIN_URL?.trim();
+  const afterLoginUrl = configuredAfterLogin ? url("AFTER_LOGIN_URL", configuredAfterLogin) : (allowedOrigins[0] ?? publicUrl);
+  if (configuredAfterLogin) {
+    const target = new URL(afterLoginUrl).origin;
+    const trusted = [...allowedOrigins.map((origin) => new URL(origin).origin), new URL(publicUrl).origin];
+    if (!trusted.includes(target)) {
+      throw new ConfigError(
+        `AFTER_LOGIN_URL points at ${target}, which is neither this store nor an allowed editor origin (${trusted.join(", ")}). ` +
+          `Sending people somewhere else after they sign in would be an open redirect.`,
+      );
+    }
+  }
+
   const cryptoMode = (env.CRYPTO_MODE ?? "webcrypto").trim();
   if (cryptoMode !== "webcrypto" && cryptoMode !== "passthrough") {
     throw new ConfigError(`CRYPTO_MODE must be "webcrypto" or "passthrough", not "${cryptoMode}".`);
@@ -146,6 +167,7 @@ export function loadStoreConfig(env: Env = process.env): StoreConfig {
     databaseUrl: env.DATABASE_URL?.trim() || null,
     publicUrl,
     allowedOrigins,
+    afterLoginUrl,
     providers,
     admins: list(env.ADMIN_SUBJECTS),
     retention: parseRetentionPeriod(env.RETENTION_PERIOD),
@@ -170,6 +192,7 @@ export function describeConfig(config: StoreConfig): string[] {
           .join(", ")}`
       : "Sign-in: NONE - this store is open to anyone who can reach it",
     config.allowedOrigins.length ? `Editor origins: ${config.allowedOrigins.join(", ")}` : "Editor origins: same origin only",
+    `After signing in, people are sent to ${config.afterLoginUrl}`,
     config.admins.length ? `Administrators: ${config.admins.length}` : "Administrators: none configured - holds and purges are refused to everyone",
     describeRetention(config.retention),
     config.cryptoMode === "passthrough"

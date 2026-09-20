@@ -271,6 +271,20 @@ export function createHttpService(options: HttpServiceOptions): Server {
     try {
       // Inside the try: a malformed header is a 400 like any other bad input.
       const seenVersion = positiveIntHeader(request, "if-document-version");
+      if (parts.length === 0 && method === "GET") {
+        // Someone has opened the store in a browser - usually by following
+        // a sign-in that had nowhere to return to. Say what this is and
+        // where the editor is, rather than answering "No route for /".
+        return send(response, 200, {
+          service: "system-design store",
+          documents: "/v1/docs",
+          health: "/v1/health",
+          signIn: [...providers.keys()].map((provider) => `/v1/auth/${provider}/start`),
+          editor: options.afterLoginUrl ?? null,
+          note: "This is the storage service, not the editor.",
+        });
+      }
+
       if (parts[0] !== "v1") throw new HttpError(404, "unsupported", `No route for ${url.pathname}.`);
 
       if (parts[1] === "health" && method === "GET") {

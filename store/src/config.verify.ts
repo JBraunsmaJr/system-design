@@ -45,6 +45,20 @@ console.log("=== A working configuration ===");
   assert(/Administrators: none configured/.test(described), "including that no administrator is configured");
 }
 
+console.log("\n=== Where people land after signing in ===");
+{
+  const config = loadStoreConfig(WORKING);
+  assert(config.afterLoginUrl === "https://design.example.gov", "by default, the editor - not the store's own root");
+  assert(
+    loadStoreConfig({ ...WORKING, AFTER_LOGIN_URL: "https://design.example.gov/system-design/" }).afterLoginUrl.startsWith("https://design.example.gov"),
+    "a path within the editor can be set"
+  );
+  assert(
+    loadStoreConfig({ ...WORKING, ALLOWED_ORIGINS: "" }).afterLoginUrl === "https://store.example.gov",
+    "with no editor origin, the store's own address"
+  );
+}
+
 console.log("\n=== What it refuses ===");
 refuses({ ...WORKING, PUBLIC_URL: undefined }, /PUBLIC_URL is required/, "no public address");
 refuses({ ...WORKING, PUBLIC_URL: "store.example.gov" }, /absolute URL/, "a public address that is not a URL");
@@ -55,6 +69,11 @@ refuses({ ...WORKING, AUTH_PROVIDERS: "github", GITHUB_CLIENT_ID: undefined }, /
 refuses({ ...WORKING, RETENTION_PERIOD: "thirty days" }, /Unrecognised retention period/, "a retention period it cannot parse");
 refuses({ ...WORKING, CRYPTO_MODE: "aes" }, /CRYPTO_MODE must be/, "an unknown crypto mode");
 refuses({ ...WORKING, MAX_BLOB_BYTES: "-1" }, /must be a positive number/, "a negative limit");
+refuses(
+  { ...WORKING, AFTER_LOGIN_URL: "https://elsewhere.example.com/" },
+  /open redirect/,
+  "sending people somewhere untrusted after they sign in"
+);
 // The one that would look fine and then fail in the browser: a cross-origin
 // editor needs SameSite=None, which needs HTTPS.
 refuses(

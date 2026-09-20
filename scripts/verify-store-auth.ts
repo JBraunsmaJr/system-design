@@ -128,7 +128,7 @@ try {
     check(!!cookie?.startsWith(`${SESSION_COOKIE}=`), "the callback sets a session cookie");
     check(/HttpOnly/i.test(setCookie ?? "") && /SameSite=Lax/i.test(setCookie ?? ""), "HttpOnly and SameSite=Lax, so page scripts cannot read it and another site cannot use it");
     check(!/Secure/i.test(setCookie ?? ""), "not Secure here, because this deployment is plain http for development");
-    check(finalLocation === "/app", "and the browser is sent on to the application");
+    check(finalLocation === "/app", "and the browser is sent on to the application, not left on the store");
     check(!(cookie ?? "").includes("alice"), "the cookie is opaque: it carries no identity of its own");
 
     const session = await (await call("/v1/auth/session", cookie)).json();

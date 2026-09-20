@@ -116,6 +116,7 @@ at startup. Anything unusable stops it, with a sentence saying what to set.
 | `DATABASE_URL` | no | PostgreSQL. Without it the store keeps everything in memory and says so — for demonstrations only. |
 | `PORT` | no | Default 8080. |
 | `ALLOWED_ORIGINS` | where the editor is elsewhere | Exact origins the editor is served from, comma separated. No wildcards. |
+| `AFTER_LOGIN_URL` | no | Where people are sent once signed in. Defaults to the first allowed origin — the editor. Must be this store or an allowed origin, or it would be an open redirect. |
 | `AUTH_PROVIDERS` | yes | `oidc`, `github`, or both. |
 | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | with `oidc` | The provider's issuer URL **as the browser sees it**, and this store's client. The secret stays on the server. |
 | `OIDC_INTERNAL_URL` | when the store reaches the provider elsewhere | The address *this server* uses, when it differs — a container network, typically. See below. |

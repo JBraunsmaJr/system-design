@@ -90,6 +90,7 @@ async function main() {
     providers: config.providers.map((provider) => createProvider(provider)),
     publicUrl: config.publicUrl,
     allowedOrigins: config.allowedOrigins,
+    afterLoginUrl: config.afterLoginUrl,
     allowUnauthenticated: config.allowUnauthenticated,
     cryptoMode: config.cryptoMode,
     recoveryPublicKeyPem: config.recoveryPublicKeyPem,

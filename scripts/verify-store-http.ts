@@ -133,6 +133,13 @@ async function run(backend: Backend) {
   try {
     console.log("  -- documents");
     check((await call("GET", "/v1/health")).status === 200, "health answers");
+    {
+      // Someone opening the store in a browser should learn what it is,
+      // not read "No route for /".
+      const root = await call("GET", "/");
+      check(root.status === 200 && typeof root.body.service === "string", `the root says what this service is (${root.status})`);
+      check(/not the editor/i.test(JSON.stringify(root.body)), "and that it is not the editor");
+    }
     const created = await call("POST", "/v1/docs", { docId: "doc-http", keys: KEYS });
     check(created.status === 201 && created.version === 1, `creating a document returns 201 and its version (${created.status}, v${created.version})`);
     check((await call("POST", "/v1/docs", { docId: "doc-http", keys: KEYS })).status === 409, "creating it again is 409");

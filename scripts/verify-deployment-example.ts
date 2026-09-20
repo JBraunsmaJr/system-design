@@ -93,6 +93,10 @@ check(
 check(client.webOrigins.includes(editor.APP_URL) || client.webOrigins.includes("+"), "and the editor's origin is allowed");
 check(store.ALLOWED_ORIGINS === editor.APP_URL, `the store allows the editor's origin (${store.ALLOWED_ORIGINS})`);
 check(editor.STORE_URL === store.PUBLIC_URL, "and the editor points at the store's public address");
+check(
+  store.AFTER_LOGIN_URL === editor.APP_URL,
+  `signing in returns people to the editor, not the store's root (${store.AFTER_LOGIN_URL ?? "not set"})`
+);
 check(!client.publicClient, "the store is a confidential client: the secret stays on the server");
 // The mistake this example made until someone ran it: one address for a
 // provider the browser and the store reach differently.
