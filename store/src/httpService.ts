@@ -79,6 +79,8 @@ export interface StoreBackend {
   purgeDue?(at?: Date): Promise<string[]>;
   purge?(docId: string): Promise<void>;
   setMeta(docId: string, sealed: Uint8Array): Promise<{ version: number }>;
+  /** WS7-R7: re-wrap a document key under a new workspace key. */
+  setWorkspaceWrap?(docId: string, wrappedForWorkspace: string): Promise<{ version: number }>;
 }
 
 export interface HttpServiceOptions {
@@ -455,6 +457,17 @@ export function createHttpService(options: HttpServiceOptions): Server {
         return send(response, 200, { document: compacted }, compacted.version);
       }
 
+      if (tail === "keys" && method === "PUT") {
+        // WS7-R7. Only the wrap changes; the content is untouched, which is
+        // what makes rotating a workspace of 500 documents cheap.
+        if (!options.store.setWorkspaceWrap) throw new HttpError(404, "unsupported", "This store cannot re-wrap document keys.");
+        const body = await readJson(request);
+        const updated = await options.store.setWorkspaceWrap(docId, requireString(body.wrappedForWorkspace, "wrappedForWorkspace"));
+        operation = "rewrap";
+        await record({ operation, outcome: "ok", subject, docId });
+        return send(response, 200, { document: updated });
+      }
+
       if (tail === "hold") {
         requireAdmin(subject);
         if (!options.store.setLegalHold) throw new HttpError(404, "unsupported", "This store does not support legal holds.");
@@ -776,7 +789,12 @@ export function createHttpService(options: HttpServiceOptions): Server {
 
     if (method === "GET") {
       const snapshot = await index.get(workspaceId);
-      return send(response, 200, { index: snapshot?.sealed ?? null, version: snapshot?.version ?? null, updatedAt: snapshot?.updatedAt ?? null });
+      return send(response, 200, {
+        index: snapshot?.sealed ?? null,
+        version: snapshot?.version ?? null,
+        updatedAt: snapshot?.updatedAt ?? null,
+        generation: snapshot?.generation ?? null,
+      });
     }
     if (method === "PUT") {
       const body = await readJson(request);
@@ -784,9 +802,10 @@ export function createHttpService(options: HttpServiceOptions): Server {
       if (expected !== null && (!Number.isSafeInteger(expected) || expected < 0)) {
         throw new HttpError(400, "bad-request", "expectedVersion must be a non-negative integer, or null to create the index.");
       }
-      const snapshot = await index.put(workspaceId, requireString(body.index, "index"), expected);
+      const generation = typeof body.generation === "number" ? body.generation : undefined;
+      const snapshot = await index.put(workspaceId, requireString(body.index, "index"), expected, generation);
       await record({ operation: "index-write", outcome: "ok", subject, docId: null, detail: { workspaceId, version: snapshot.version } });
-      return send(response, 200, { version: snapshot.version, updatedAt: snapshot.updatedAt });
+      return send(response, 200, { version: snapshot.version, updatedAt: snapshot.updatedAt, generation: snapshot.generation });
     }
     throw new HttpError(405, "unsupported", `${method} is not allowed here.`);
   }

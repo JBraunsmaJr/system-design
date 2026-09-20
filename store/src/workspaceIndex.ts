@@ -15,6 +15,8 @@ export interface IndexSnapshot {
   sealed: string;
   version: number;
   updatedAt: string;
+  /** The workspace key generation this index is sealed under (WS7-R7). */
+  generation: number;
 }
 
 export type IndexErrorReason = "conflict" | "not-found";
@@ -39,7 +41,7 @@ export interface WorkspaceIndexStore {
    * `expectedVersion` is the version the client read. Absent means "this
    * workspace has no index yet"; anything else is a conflict.
    */
-  put(workspaceId: string, sealed: string, expectedVersion: number | null): Promise<IndexSnapshot>;
+  put(workspaceId: string, sealed: string, expectedVersion: number | null, generation?: number): Promise<IndexSnapshot>;
 }
 
 export function createMemoryWorkspaceIndex(now: () => Date = () => new Date()): WorkspaceIndexStore {
@@ -51,7 +53,7 @@ export function createMemoryWorkspaceIndex(now: () => Date = () => new Date()): 
       return found ? { ...found } : null;
     },
 
-    async put(workspaceId, sealed, expectedVersion) {
+    async put(workspaceId, sealed, expectedVersion, generation) {
       const existing = indexes.get(workspaceId);
       const current = existing?.version ?? null;
       if (current !== expectedVersion) {
@@ -67,6 +69,7 @@ export function createMemoryWorkspaceIndex(now: () => Date = () => new Date()): 
         sealed,
         version: (current ?? 0) + 1,
         updatedAt: now().toISOString(),
+        generation: generation ?? existing?.generation ?? 1,
       };
       indexes.set(workspaceId, snapshot);
       return { ...snapshot };

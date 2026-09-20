@@ -306,6 +306,19 @@ export function createPostgresStore(options: PostgresStoreOptions) {
       return sealed ? new Uint8Array(sealed) : null;
     },
 
+    /** WS7-R7: the document key re-wrapped under a new workspace key. The
+     * content is untouched; only the wrap changes. */
+    async setWorkspaceWrap(docId: string, wrappedForWorkspace: string): Promise<DocumentRecord> {
+      return inTransaction(async (tx) => {
+        const row = await lockDocument(tx, docId, { includeDeleted: true });
+        const updated = await tx.query<DocumentRow>(
+          `UPDATE documents SET wrapped_for_workspace = $2 WHERE doc_id = $1 RETURNING *`,
+          [row.doc_id, Buffer.from(wrappedForWorkspace, "base64")],
+        );
+        return toRecord(updated.rows[0], await blobsOf(docId, tx));
+      });
+    },
+
     async setMeta(docId: string, sealed: Uint8Array): Promise<DocumentRecord> {
       return inTransaction(async (tx) => {
         const row = await lockDocument(tx, docId);
@@ -474,26 +487,36 @@ export type PostgresStore = ReturnType<typeof createPostgresStore>;
 export function createPostgresWorkspaceIndex(pool: pg.Pool): WorkspaceIndexStore {
   return {
     async get(workspaceId) {
-      const result = await pool.query<{ sealed: Buffer; version: string; updated_at: Date }>(
-        `SELECT sealed, version, updated_at FROM workspace_index WHERE workspace_id = $1`,
+      const result = await pool.query<{ sealed: Buffer; version: string; updated_at: Date; generation: number }>(
+        `SELECT sealed, version, updated_at, generation FROM workspace_index WHERE workspace_id = $1`,
         [workspaceId],
       );
       const row = result.rows[0];
       return row
-        ? { sealed: row.sealed.toString("base64"), version: Number(row.version), updatedAt: row.updated_at.toISOString() }
+        ? {
+            sealed: row.sealed.toString("base64"),
+            version: Number(row.version),
+            updatedAt: row.updated_at.toISOString(),
+            generation: row.generation,
+          }
         : null;
     },
 
-    async put(workspaceId, sealed, expectedVersion) {
+    async put(workspaceId, sealed, expectedVersion, generation) {
       const bytes = Buffer.from(sealed, "base64");
       if (expectedVersion === null) {
-        const inserted = await pool.query<{ version: string; updated_at: Date }>(
-          `INSERT INTO workspace_index (workspace_id, sealed, version) VALUES ($1, $2, 1)
-           ON CONFLICT (workspace_id) DO NOTHING RETURNING version, updated_at`,
-          [workspaceId, bytes],
+        const inserted = await pool.query<{ version: string; updated_at: Date; generation: number }>(
+          `INSERT INTO workspace_index (workspace_id, sealed, version, generation) VALUES ($1, $2, 1, $3)
+           ON CONFLICT (workspace_id) DO NOTHING RETURNING version, updated_at, generation`,
+          [workspaceId, bytes, generation ?? 1],
         );
         if (inserted.rows[0]) {
-          return { sealed, version: Number(inserted.rows[0].version), updatedAt: inserted.rows[0].updated_at.toISOString() };
+          return {
+            sealed,
+            version: Number(inserted.rows[0].version),
+            updatedAt: inserted.rows[0].updated_at.toISOString(),
+            generation: inserted.rows[0].generation,
+          };
         }
         const current = await this.get(workspaceId);
         throw new IndexError(
@@ -502,10 +525,11 @@ export function createPostgresWorkspaceIndex(pool: pg.Pool): WorkspaceIndexStore
           current?.version,
         );
       }
-      const updated = await pool.query<{ version: string; updated_at: Date }>(
-        `UPDATE workspace_index SET sealed = $2, version = version + 1, updated_at = now()
-          WHERE workspace_id = $1 AND version = $3 RETURNING version, updated_at`,
-        [workspaceId, bytes, expectedVersion],
+      const updated = await pool.query<{ version: string; updated_at: Date; generation: number }>(
+        `UPDATE workspace_index SET sealed = $2, version = version + 1, updated_at = now(),
+                generation = COALESCE($4, generation)
+          WHERE workspace_id = $1 AND version = $3 RETURNING version, updated_at, generation`,
+        [workspaceId, bytes, expectedVersion, generation ?? null],
       );
       if (!updated.rows[0]) {
         const current = await this.get(workspaceId);
@@ -515,7 +539,12 @@ export function createPostgresWorkspaceIndex(pool: pg.Pool): WorkspaceIndexStore
           current?.version,
         );
       }
-      return { sealed, version: Number(updated.rows[0].version), updatedAt: updated.rows[0].updated_at.toISOString() };
+      return {
+        sealed,
+        version: Number(updated.rows[0].version),
+        updatedAt: updated.rows[0].updated_at.toISOString(),
+        generation: updated.rows[0].generation,
+      };
     },
   };
 }

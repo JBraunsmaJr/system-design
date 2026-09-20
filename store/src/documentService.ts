@@ -210,6 +210,15 @@ export function createDocumentService<Tx>(options: DocumentServiceOptions<Tx>) {
       return { record: structuredClone(row.record), blobs: out };
     },
 
+    /** WS7-R7: the document key re-wrapped under a new workspace key. Only
+     * the wrap changes; no content is re-encrypted. Deleted documents are
+     * re-wrapped too, so they stay restorable (WS10-R4). */
+    async setWorkspaceWrap(docId: string, wrappedForWorkspace: string): Promise<DocumentRecord> {
+      const row = require(docId, { includeDeleted: true });
+      row.record.keys = { ...row.record.keys, wrappedForWorkspace };
+      return structuredClone(row.record);
+    },
+
     /** WS8-R2, WS9-R1: sealed per-document metadata, opaque to the store. */
     async getMeta(docId: string, opts: ReadOptions = {}): Promise<Uint8Array | null> {
       const row = require(docId, opts);

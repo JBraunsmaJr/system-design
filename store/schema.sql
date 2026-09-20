@@ -113,6 +113,10 @@ CREATE TABLE IF NOT EXISTS workspace_index (
     workspace_id TEXT PRIMARY KEY,
     sealed       BYTEA       NOT NULL,
     version      BIGINT      NOT NULL DEFAULT 1,
+    -- Which workspace key generation sealed this index (WS7-R7). A reader
+    -- that holds an older generation knows to fetch the newer key rather
+    -- than conclude the index is corrupt.
+    generation   INTEGER     NOT NULL DEFAULT 1,
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -152,3 +156,4 @@ ALTER TABLE devices   ADD COLUMN IF NOT EXISTS wrapped_user_key_body BYTEA;
 ALTER TABLE devices   ADD COLUMN IF NOT EXISTS wrapped_user_key_wrap BYTEA;
 ALTER TABLE devices   DROP COLUMN IF EXISTS wrapped_user_key;
 ALTER TABLE users     ADD COLUMN IF NOT EXISTS user_public_key BYTEA;
+ALTER TABLE workspace_index ADD COLUMN IF NOT EXISTS generation INTEGER NOT NULL DEFAULT 1;

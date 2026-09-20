@@ -246,6 +246,28 @@ export function createStoreClient(options: StoreClientOptions) {
       }
     },
 
+    /** WS7-R7: the document key re-wrapped under a new workspace key. */
+    async rewrapDocument(docId: string, wrappedForWorkspace: string): Promise<void> {
+      await request(`/v1/docs/${encodeURIComponent(docId)}/keys`, {
+        method: "PUT",
+        body: JSON.stringify({ wrappedForWorkspace }),
+      });
+    },
+
+    /** Members and their public user keys, for wrapping a new workspace key
+     * to each of them (WS7-R7, R8). Administrators only. */
+    async listMembers(): Promise<{ userId: string; displayName?: string; publicKey?: string }[]> {
+      const { body } = await request("/v1/admin/users");
+      return body.users as { userId: string; displayName?: string; publicKey?: string }[];
+    },
+
+    async grantWorkspaceKey(userId: string, generation: number, wrappedKey: string): Promise<void> {
+      await request(`/v1/admin/users/${encodeURIComponent(userId)}/workspace-key`, {
+        method: "PUT",
+        body: JSON.stringify({ generation, wrappedKey }),
+      });
+    },
+
     async deleteDocument(docId: string): Promise<void> {
       await request(`/v1/docs/${encodeURIComponent(docId)}`, { method: "DELETE", docId });
     },
@@ -314,17 +336,41 @@ export function createStoreClient(options: StoreClientOptions) {
 
     // -- the workspace index (WS9) -----------------------------------------
 
-    async readIndex(workspaceId: string, indexKey: CryptoKey): Promise<{ entries: IndexEntry[]; version: number | null }> {
+    async readIndex(workspaceId: string, indexKey: CryptoKey): Promise<{ entries: IndexEntry[]; version: number | null; generation: number | null }> {
       const { body } = await request(`/v1/workspaces/${encodeURIComponent(workspaceId)}/index`);
       const sealed = body.index as string | null;
       const version = (body.version as number | null) ?? null;
-      if (!sealed) return { entries: [], version };
+      const generation = (body.generation as number | null) ?? null;
+      if (!sealed) return { entries: [], version, generation };
       const opened = await crypto.open(
         { docId: workspaceId, kind: "index", version: 1 },
         fromBase64(sealed),
         indexKey,
       );
-      return { entries: JSON.parse(decoder.decode(opened)) as IndexEntry[], version };
+      return { entries: JSON.parse(decoder.decode(opened)) as IndexEntry[], version, generation };
+    },
+
+    /**
+     * Writes the index under a key that is not the one it is currently
+     * sealed with: rotation (WS7-R7), where re-reading first would need the
+     * key being replaced. Everything else uses updateIndex.
+     */
+    async writeIndex(
+      workspaceId: string,
+      indexKey: CryptoKey,
+      entries: IndexEntry[],
+      expectedVersion: number | null,
+      generation?: number,
+    ): Promise<void> {
+      const sealed = await crypto.seal(
+        { docId: workspaceId, kind: "index", version: 1 },
+        encoder.encode(JSON.stringify(entries)),
+        indexKey,
+      );
+      await request(`/v1/workspaces/${encodeURIComponent(workspaceId)}/index`, {
+        method: "PUT",
+        body: JSON.stringify({ index: toBase64(sealed), expectedVersion, ...(generation ? { generation } : {}) }),
+      });
     },
 
     /**
@@ -337,6 +383,7 @@ export function createStoreClient(options: StoreClientOptions) {
       indexKey: CryptoKey,
       change: (entries: IndexEntry[]) => IndexEntry[],
       attempts = 5,
+      generation?: number,
     ): Promise<IndexEntry[]> {
       for (let attempt = 1; attempt <= attempts; attempt++) {
         const { entries, version } = await this.readIndex(workspaceId, indexKey);
@@ -349,7 +396,7 @@ export function createStoreClient(options: StoreClientOptions) {
         try {
           await request(`/v1/workspaces/${encodeURIComponent(workspaceId)}/index`, {
             method: "PUT",
-            body: JSON.stringify({ index: toBase64(sealed), expectedVersion: version }),
+            body: JSON.stringify({ index: toBase64(sealed), expectedVersion: version, ...(generation ? { generation } : {}) }),
           });
           return next;
         } catch (error) {
