@@ -173,6 +173,32 @@ List editor origins exactly in `ALLOWED_ORIGINS`. A wildcard is not
 permitted alongside credentials, and would let any site spend a signed-in
 person's session.
 
+## The relay, and who may join a session
+
+By default the relay admits anyone who can reach it: knowing a room name is
+the whole of the access control. That is defensible where the relay is only
+reachable inside a network, and not where it is public.
+
+To require membership, set the same secret on both:
+
+```yaml
+store:
+  environment:
+    RELAY_TOKEN_SECRET: <at least 32 random characters>
+relay:
+  environment:
+    RELAY_TOKEN_SECRET: <the same value>
+```
+
+The store then issues a short-lived token for one room to someone it has
+already signed in, and the relay accepts nothing else. Run the relay from
+`scripts/relay-server.ts` (the image's default) rather than y-webrtc's own
+server, which has no such check.
+
+The relay learns nothing either way. Session content is encrypted with the
+key from the share link, which neither service ever sees, so a token
+governs who may join a session — not who may read one.
+
 ## Retention and legal hold
 
 `RETENTION_PERIOD` decides what deleting a document means:

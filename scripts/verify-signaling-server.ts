@@ -82,19 +82,29 @@ const hardExit = setTimeout(() => {
 }, 8000);
 
 try {
-  server = spawn(process.execPath, ['node_modules/y-webrtc/bin/server.js'], {
+  // Both relays are checked against the same protocol expectations:
+  // y-webrtc's own server, which this project has always used, and ours,
+  // which adds authentication (WS10-R6). "Speaks the same protocol" is
+  // then a tested claim rather than an intention. RELAY=ours runs only the
+  // second; the default runs y-webrtc's.
+  const useOurs = process.env.RELAY === 'ours';
+  const entry = useOurs ? 'scripts/relay-server.ts' : 'node_modules/y-webrtc/bin/server.js';
+  const readyWhen = useOurs ? 'Relay listening' : 'Signaling server running';
+  server = spawn(process.execPath, useOurs ? ['node_modules/tsx/dist/cli.mjs', entry] : [entry], {
     cwd: process.cwd(),
     env: { ...process.env, PORT: String(PORT) },
   });
   let ready = false;
   server.stdout?.on('data', (d) => {
-    if (d.toString().includes('Signaling server running')) ready = true;
+    if (d.toString().includes(readyWhen)) ready = true;
   });
 
   await waitFor(() => ready);
   assert(
     true,
-    "the real, unmodified signaling server (y-webrtc's own bin/server.js) starts and reports ready",
+    useOurs
+      ? 'our own relay (scripts/relay-server.ts) starts and reports ready'
+      : "the real, unmodified signaling server (y-webrtc's own bin/server.js) starts and reports ready",
   );
 
   const clientA = new WebSocket(`ws://localhost:${PORT}`);

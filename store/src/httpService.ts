@@ -25,6 +25,7 @@ import { StoreError } from './documentService.ts';
 import { ProviderUnreachable, type Provider } from './auth/providers.ts';
 import { DirectoryError, verificationCodeFor, type UserDirectory } from './userDirectory.ts';
 import { IndexError, type WorkspaceIndexStore } from './workspaceIndex.ts';
+import { mintRoomToken } from './auth/roomTokens.ts';
 import {
   SESSION_COOKIE,
   expiredSessionCookie,
@@ -163,6 +164,12 @@ export interface HttpServiceOptions {
    * in passthrough the store reads content, and the interface must say so.
    */
   cryptoMode?: 'webcrypto' | 'passthrough';
+  /**
+   * WS10-R6, R7. Shared with the relay: set on both, and the relay admits
+   * only peers carrying a token this store issued; set on neither, and a
+   * room name is the only thing protecting a session, as before.
+   */
+  relayTokenSecret?: string | null;
   /**
    * Origins the editor may be served from. The store and the editor are
    * usually different hosts, and a session cookie only travels
@@ -353,6 +360,9 @@ export function createHttpService(options: HttpServiceOptions): Server {
               ? 'configured'
               : 'missing'
             : 'not-applicable',
+          // So a client knows whether to ask for a token before joining
+          // a session (WS10-R6).
+          relayAuthentication: options.relayTokenSecret ? 'required' : 'none',
         });
       }
 
@@ -379,6 +389,33 @@ export function createHttpService(options: HttpServiceOptions): Server {
         });
         return send(response, 401, {
           error: { reason: 'unauthenticated', message: 'Sign in to use this store.' },
+        });
+      }
+
+      if (parts[1] === 'rooms' && parts[3] === 'token' && method === 'POST') {
+        // A token for one room, for someone this store has already
+        // identified. It admits the holder to the relay; it opens no
+        // document, since session content is encrypted with the key from
+        // the link, which never reaches either service (WS3-R1).
+        if (!options.relayTokenSecret) {
+          throw new HttpError(
+            404,
+            'unsupported',
+            "This deployment's relay does not require tokens.",
+          );
+        }
+        const room = decodeURIComponent(parts[2] ?? '');
+        if (!room) throw new HttpError(400, 'bad-request', 'Name the room.');
+        const minted = mintRoomToken({
+          room,
+          subject: subject ?? 'anonymous',
+          secret: options.relayTokenSecret,
+        });
+        operation = 'room-token';
+        await record({ operation, outcome: 'ok', subject, docId: null, detail: { room } });
+        return send(response, 200, {
+          token: minted.token,
+          expiresAt: new Date(minted.expiresAt).toISOString(),
         });
       }
 
