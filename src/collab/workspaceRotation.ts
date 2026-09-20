@@ -28,6 +28,14 @@ export interface RotationResult {
   /** Members with no published key: they cannot be given the new one until
    * they sign in again, and are named rather than skipped silently. */
   membersSkipped: string[];
+  /**
+   * True where this person could not list the workspace's members - they
+   * are not an administrator - so only their own key was replaced and an
+   * administrator has to give the new one to everyone else. Rotation is
+   * still worth doing: the old key stops opening anything saved from now
+   * on, which is the point after losing a device.
+   */
+  selfOnly: boolean;
 }
 
 export interface RotationOptions {
@@ -69,19 +77,40 @@ export async function rotateWorkspaceKey(options: RotationOptions): Promise<Rota
   const newIndexKey = await indexKeyFor(newKey);
   await client.writeIndex(workspaceId, newIndexKey, rewrapped, version, generation);
 
-  // Last: hand the new key to each member.
-  const members = await client.listMembers();
+  // Last: hand the new key to each member. Listing them is an
+  // administrator's right; a member rotating after losing their own device
+  // replaces their own key and says so.
   const skipped: string[] = [];
   let granted = 0;
-  for (const member of members) {
-    if (!member.publicKey) {
-      skipped.push(member.displayName ?? member.userId);
-      continue;
-    }
-    const wrapped = await wrapKeyForPublicKey(newKey, await importPublicKey(fromBase64(member.publicKey)));
-    await client.grantWorkspaceKey(member.userId, generation, toBase64(wrapped));
-    granted++;
+  let selfOnly = false;
+  let members: { userId: string; displayName?: string; publicKey?: string }[] = [];
+  try {
+    members = await client.listMembers();
+  } catch {
+    selfOnly = true;
   }
 
-  return { generation, workspaceKey: newKey, documentsRewrapped: rewrapped.length, membersGranted: granted, membersSkipped: skipped };
+  if (selfOnly) {
+    const me = await client.me();
+    if (!me.publicKey) {
+      throw new Error(
+        "This browser cannot finish rotating: your public user key is not published, so the new key cannot be wrapped to you. Sign in again, then retry.",
+      );
+    }
+    const wrapped = await wrapKeyForPublicKey(newKey, await importPublicKey(fromBase64(me.publicKey)));
+    await client.putWorkspaceKey(generation, toBase64(wrapped));
+    granted = 1;
+  } else {
+    for (const member of members) {
+      if (!member.publicKey) {
+        skipped.push(member.displayName ?? member.userId);
+        continue;
+      }
+      const wrapped = await wrapKeyForPublicKey(newKey, await importPublicKey(fromBase64(member.publicKey)));
+      await client.grantWorkspaceKey(member.userId, generation, toBase64(wrapped));
+      granted++;
+    }
+  }
+
+  return { generation, workspaceKey: newKey, documentsRewrapped: rewrapped.length, membersGranted: granted, membersSkipped: skipped, selfOnly };
 }

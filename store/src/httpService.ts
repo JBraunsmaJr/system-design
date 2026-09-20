@@ -641,8 +641,17 @@ export function createHttpService(options: HttpServiceOptions): Server {
 
     if (!section && method === "GET") {
       const devices = await directory.listDevices(userId);
+      const user = await directory.getUser(userId).catch(() => null);
       return send(response, 200, {
-        user: { userId, issuer: session.issuer, subject: session.subject, displayName: session.displayName },
+        user: {
+          userId,
+          issuer: session.issuer,
+          subject: session.subject,
+          displayName: session.displayName,
+          // Their own public key, so they can wrap a new workspace key to
+          // themselves when rotating without being an administrator.
+          publicKey: user?.publicKey,
+        },
         devices,
       });
     }

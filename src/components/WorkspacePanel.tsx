@@ -15,7 +15,7 @@
  * title, a diagram, or a key - except in passthrough mode, which says so.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CloudOff, Cloud, Loader2, ShieldAlert, Upload, FolderOpen, Trash2, Check } from "lucide-react";
+import { CloudOff, Cloud, Loader2, ShieldAlert, Upload, FolderOpen, Trash2, Check, KeyRound, Laptop } from "lucide-react";
 import { createStoreClient, StoreClientError, type IndexEntry, type SessionInfo, type StoreClient } from "../collab/storeClient";
 import {
   approveOtherDevice,
@@ -27,6 +27,7 @@ import {
   type EnrollmentApi,
 } from "../collab/deviceIdentity";
 import { documentKeyFor, escrowDocumentKey, indexKeyFor, newDocumentKey, removeEntry, upsertEntry } from "../collab/workspaceDocuments";
+import { rotateWorkspaceKey } from "../collab/workspaceRotation";
 import { unwrapPrivateKeyWithPrivateKey } from "../crypto/keys";
 import type { DiagramFile } from "../domain/serialization";
 
@@ -62,6 +63,11 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
   const [serverReadsContent, setServerReadsContent] = useState(false);
   const [device, setDevice] = useState<DeviceState | null>(null);
   const [pending, setPending] = useState<PendingDevice[]>([]);
+  const [devices, setDevices] = useState<{ deviceId: string; label?: string; approvedAt: string | null; revokedAt: string | null }[]>([]);
+  const [generation, setGeneration] = useState(1);
+  /** Set after revoking: a revoked device keeps the workspace key it
+   * already unwrapped, and only rotation makes that key worthless. */
+  const [rotationAdvised, setRotationAdvised] = useState(false);
   const [entries, setEntries] = useState<IndexEntry[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -89,6 +95,7 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
   const loadEntries = useCallback(async (key: CryptoKey) => {
     const listed = await client.readIndex(WORKSPACE_ID, await indexKeyFor(key));
     setEntries(listed.entries);
+    if (listed.generation) setGeneration(listed.generation);
   }, [client]);
 
   const refresh = useCallback(async () => {
@@ -110,8 +117,9 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
         setPhase("ready");
         await loadEntries(state.workspaceKey);
         // Devices of this person still waiting for approval (WS7-R11).
-        const devices = await client.listDevices();
-        setPending(devices.filter((d) => !d.approvedAt && !d.revokedAt).map((d) => ({ deviceId: d.deviceId, publicKey: d.publicKey, verificationCode: d.verificationCode, label: d.label })));
+        const listed = await client.listDevices();
+        setDevices(listed.map((d) => ({ deviceId: d.deviceId, label: d.label, approvedAt: d.approvedAt, revokedAt: d.revokedAt })));
+        setPending(listed.filter((d) => !d.approvedAt && !d.revokedAt).map((d) => ({ deviceId: d.deviceId, publicKey: d.publicKey, verificationCode: d.verificationCode, label: d.label })));
       } else if (state.status === "awaiting-approval") {
         setPhase("awaiting-approval");
       } else if (state.status === "needs-setup") {
@@ -142,11 +150,13 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
     };
   }, [refresh]);
 
-  const run = async (work: () => Promise<void>) => {
+  /** Clears a stale error on success, unless the action reported
+   * something of its own - rotation's summary, for instance. */
+  const run = async (work: () => Promise<void>, options: { keepMessage?: boolean } = {}) => {
     setBusy(true);
     try {
       await work();
-      setMessage(null);
+      if (!options.keepMessage) setMessage(null);
     } catch (error) {
       setMessage(say(error));
     } finally {
@@ -209,6 +219,36 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
       setEntries(next);
     });
 
+  const revoke = (deviceId: string) =>
+    run(async () => {
+      await client.revokeDevice(deviceId);
+      setDevices((current) => current.map((d) => (d.deviceId === deviceId ? { ...d, revokedAt: new Date().toISOString() } : d)));
+      setPending((current) => current.filter((d) => d.deviceId !== deviceId));
+      // Revoking stops the store serving that browser, but it still holds
+      // the workspace key it unwrapped. Only rotation ends that.
+      setRotationAdvised(true);
+    });
+
+  const rotate = () =>
+    run(async () => {
+      const key = workspaceKey.current;
+      if (!key) throw new Error("This browser cannot rotate the workspace key yet.");
+      const result = await rotateWorkspaceKey({ client, workspaceId: WORKSPACE_ID, currentKey: key, currentGeneration: generation });
+      workspaceKey.current = result.workspaceKey;
+      setGeneration(result.generation);
+      setRotationAdvised(false);
+      await loadEntries(result.workspaceKey);
+      const others = result.selfOnly
+        ? " Only your own key was replaced: ask an administrator to give the new one to everyone else."
+        : "";
+      const skipped = result.membersSkipped.length
+        ? ` ${result.membersSkipped.length} member(s) have not signed in since publishing a key and will get the new one when they do: ${result.membersSkipped.join(", ")}.`
+        : "";
+      setMessage(
+        `Rotated to key ${result.generation}: ${result.documentsRewrapped} document(s) re-wrapped, ${result.membersGranted} member(s) given the new key. No document content was re-encrypted.${others}${skipped}`,
+      );
+    }, { keepMessage: true });
+
   const approve = (target: PendingDevice) =>
     run(async () => {
       const held = await storage.load();
@@ -225,7 +265,15 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
         { docId: "user-key", kind: "key-wrap", version: 1 },
       );
       await approveOtherDevice({ api, storage, thisDeviceId: held.deviceId, userKey }, target);
-      setPending((current) => current.filter((d) => d.deviceId !== target.deviceId));
+      // Re-read rather than patch the list: the approved browser now counts
+      // among those with access, and appears in the list below.
+      const listed = await client.listDevices();
+      setDevices(listed.map((d) => ({ deviceId: d.deviceId, label: d.label, approvedAt: d.approvedAt, revokedAt: d.revokedAt })));
+      setPending(
+        listed
+          .filter((d) => !d.approvedAt && !d.revokedAt)
+          .map((d) => ({ deviceId: d.deviceId, publicKey: d.publicKey, verificationCode: d.verificationCode, label: d.label })),
+      );
     });
 
   return (
@@ -300,11 +348,55 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
             </div>
           )}
 
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <button type="button" className="workspace-panel__save" onClick={() => void saveHere()} disabled={busy}>
               <Upload size={12} /> Save this document to the workspace
             </button>
+            <button
+              type="button"
+              className="workspace-panel__rotate"
+              onClick={() => {
+                if (
+                  window.confirm(
+                    "Replace the workspace key?\n\nEvery document is re-wrapped under a new key; their contents are not re-encrypted and nothing is lost. Anyone holding the old key - including a device you have revoked - can no longer open anything saved afterwards.\n\nMembers who have not signed in recently will get the new key when they next do.",
+                  )
+                ) {
+                  void rotate();
+                }
+              }}
+              disabled={busy}
+              title="Replace the workspace key, for example after losing a device"
+            >
+              <KeyRound size={12} /> Rotate key
+            </button>
+            <span className="workspace-panel__generation" style={{ color: "var(--text-muted, #9aa3b2)" }}>
+              key {generation}
+            </span>
           </div>
+
+          {rotationAdvised && (
+            <p className="workspace-panel__rotation-advice" role="alert" style={{ margin: 0, color: "var(--warning, #e0a84a)" }}>
+              That browser can no longer reach the workspace, but it still holds the key it already had. Rotate the key so it
+              cannot open anything saved from now on.
+            </p>
+          )}
+
+          {devices.length > 1 && (
+            <div className="workspace-panel__devices" style={{ display: "grid", gap: 4 }}>
+              <strong>Browsers with access</strong>
+              {devices
+                .filter((device) => device.approvedAt && !device.revokedAt)
+                .map((device) => (
+                  <div key={device.deviceId} className="workspace-panel__device" data-device-id={device.deviceId} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <Laptop size={12} />
+                    <span style={{ flex: 1 }}>{device.label ?? device.deviceId}</span>
+                    <button type="button" className="workspace-panel__revoke" onClick={() => void revoke(device.deviceId)} disabled={busy}>
+                      Revoke
+                    </button>
+                  </div>
+                ))}
+            </div>
+          )}
 
           {entries.length === 0 ? (
             <p style={{ margin: 0, color: "var(--text-muted, #9aa3b2)" }}>No documents in the workspace yet.</p>

@@ -279,6 +279,13 @@ export function createStoreClient(options: StoreClientOptions) {
       return body.device as { deviceId: string; verificationCode: string; approvedAt: string | null };
     },
 
+    /** This person, as the directory holds them, including their public
+     * user key. */
+    async me(): Promise<{ userId: string; displayName?: string; publicKey?: string }> {
+      const { body } = await request("/v1/users/me");
+      return body.user as { userId: string; displayName?: string; publicKey?: string };
+    },
+
     async listDevices() {
       const { body } = await request("/v1/users/me/devices");
       return body.devices as { deviceId: string; publicKey: string; verificationCode: string; approvedAt: string | null; revokedAt: string | null; label?: string }[];

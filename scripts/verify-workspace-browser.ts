@@ -196,6 +196,52 @@ async function run() {
     await second.waitForFunction(() => document.querySelectorAll(".react-flow__node").length === 25, null, { timeout: 20000 });
     check((await second.inputValue('[aria-label="Diagram title"]')) === "Shared architecture", "and opens the document the first browser saved");
 
+    console.log("\n=== Losing a browser: revoke, then rotate (WS7-R7, R14) ===");
+    {
+      await openManager(first);
+      await first.waitForSelector(".workspace-panel__device", { timeout: 20000 });
+      const before = (await first.textContent(".workspace-panel__generation"))?.trim();
+      check(before === "key 1", `the workspace starts on its first key (${before})`);
+
+      // The second browser is the one that was lost.
+      const target = first.locator(".workspace-panel__device").nth(1);
+      await target.locator(".workspace-panel__revoke").click();
+      await first.waitForSelector(".workspace-panel__rotation-advice", { timeout: 20000 });
+      const advice = (await first.textContent(".workspace-panel__rotation-advice")) ?? "";
+      check(/still holds the key/.test(advice), "revoking says what revoking alone does not solve");
+
+      first.once("dialog", (dialog) => {
+        check(/re-wrapped/.test(dialog.message()), "rotating explains what it does before doing it");
+        void dialog.accept();
+      });
+      await first.click(".workspace-panel__rotate");
+      await first.waitForFunction(
+        () => (document.querySelector(".workspace-panel__generation")?.textContent ?? "").includes("key 2"),
+        null,
+        { timeout: 30000 },
+      );
+      check(true, "the workspace moves to its second key");
+      const summary = (await first.textContent(".workspace-panel__message")) ?? "";
+      check(
+        /document\(s\) re-wrapped/.test(summary) && /No document content was re-encrypted/.test(summary),
+        `and says what happened (${summary.slice(0, 110)})`
+      );
+      check((await first.locator(".workspace-panel__entry").count()) === 1, "the documents are still listed");
+
+      // The point of it: this browser still works afterwards.
+      await first.click(".workspace-panel__open");
+      await first.waitForFunction(() => document.querySelectorAll(".react-flow__node").length === 25, null, { timeout: 20000 });
+      check(true, "and still open, with the new key");
+
+      // And the revoked browser is out.
+      await openManager(second);
+      await second.click(".workspace-panel__recheck").catch(() => {});
+      await sleep(1000);
+      const phase = await second.getAttribute(".workspace-panel", "data-phase");
+      check(phase !== "ready", `the revoked browser no longer reaches the workspace (${phase})`);
+      await closeManager(second);
+    }
+
     console.log("\n=== A store that reads content (WS6-R3) ===");
     passthroughStore = await startStore(appOrigin, "passthrough");
     const third = await openBrowser(passthroughStore.origin);
