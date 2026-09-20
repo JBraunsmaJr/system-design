@@ -31,6 +31,16 @@
       "lastName": "User",
       "requiredActions": [],
       "credentials": [{ "type": "password", "value": "demo", "temporary": false }]
+    },
+    {
+      "username": "Badger",
+      "enabled": true,
+      "email": "badger@example.invalid",
+      "emailVerified": true,
+      "firstName": "Badger",
+      "lastName": "2-3",
+      "requiredActions": [],
+      "credentials": [{ "type": "password", "value": "badger", "temporary": false }]
     }
   ]
 }
