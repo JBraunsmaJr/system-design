@@ -400,6 +400,15 @@ function App() {
     /** Whether this session owns `doc` and its stores - true for a joined
      * session, which must release them when it ends (WS1 Step 1). */
     ownsDocument: boolean;
+    /**
+     * Joined because the document is in a workspace, rather than chosen
+     * by the person. New and Documents stay available in one of these:
+     * switching documents means leaving this room and joining another,
+     * which is ordinary. In a session someone started or joined by link,
+     * switching would replace the document for everyone, so it stays
+     * disabled there.
+     */
+    autoJoined?: boolean;
   }
   const [activeSession, setActiveSession] = useState<ActiveCollabSession | null>(null);
 
@@ -700,8 +709,19 @@ function App() {
   );
 
   // Starts a brand-new session on the document already open (WS1-R4).
+  /**
+   * A workspace document is open in a room everyone holding its key
+   * computes, so opening it is enough to be in it with whoever else has
+   * it open: presence, cursors, and live edits, rather than changes
+   * appearing with nobody attached to them (WS3, WS8-R2).
+   *
+   * Joined once per room. A session the person started or joined by link
+   * is left alone - they chose that one.
+   */
+  const autoJoinedRoom = useRef<string | null>(null);
+
   const startNewSession = useCallback(
-    async (explicitKey?: string, explicitRoom?: string) => {
+    async (explicitKey?: string, explicitRoom?: string, options?: { autoJoined?: boolean }) => {
       /**
        * Restarting a session used to mean copying the old session's content
        * back into React state before building a fresh document. With one
@@ -760,6 +780,7 @@ function App() {
         password: sessionKey,
         stores: openDoc.stores,
         ownsDocument: false,
+        autoJoined: options?.autoJoined ?? false,
       });
 
       // Auto-copy shareable session link to clipboard
@@ -965,6 +986,38 @@ function App() {
    * local document, or a browser that has not been enrolled.
    */
   const workspaceSync = useWorkspaceSync({ storeUrl, docId: openDocId, doc: openDoc.doc, title });
+
+  /**
+   * Opening a workspace document joins its room. Everyone holding the
+   * key computes the same one, so no link changes hands, and the session
+   * is what makes an edit legible: who is here, where their cursor is,
+   * what they just changed (WS3).
+   *
+   * The document is saved to the workspace throughout, by its own sync -
+   * the session is how people see each other, not how work is kept.
+   */
+  useEffect(() => {
+    const room = workspaceSync.session?.room ?? null;
+    const key = workspaceSync.session?.key ?? null;
+    if (!room || !key) return;
+    // A deployment with no relay has no live sessions at all. The
+    // document still saves to the workspace; people just do not see each
+    // other, which is the behaviour before any of this existed.
+    if (signalingUrls.length === 0) return;
+    // Someone in a session they chose - started, or joined by link - is
+    // left in it.
+    if (activeSessionRef.current || autoJoinedRoom.current === room) return;
+    autoJoinedRoom.current = room;
+    void startNewSession(key, room, { autoJoined: true });
+  }, [workspaceSync.session?.room, workspaceSync.session?.key, signalingUrls, startNewSession]);
+
+  // Leaving the document, or taking it out of the workspace, ends the
+  // session it joined on its behalf.
+  useEffect(() => {
+    return () => {
+      autoJoinedRoom.current = null;
+    };
+  }, [openDocId]);
 
   // Same value-or-updater shape as the useState setters these replaced, so
   // every existing call site is unchanged.
@@ -3027,7 +3080,9 @@ function App() {
               fileName={activeSession?.ownsDocument ? null : fileSaving.fileName}
             />
           }
-          isInSession={!!activeSession}
+          // A workspace session does not lock the document: see
+          // ActiveCollabSession.autoJoined.
+          isInSession={!!activeSession && !activeSession.autoJoined}
           collabPanel={
             <CollabPanel
               signalingConfigured={signalingUrls.length > 0}

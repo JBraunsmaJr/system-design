@@ -98,7 +98,9 @@ async function run() {
       const context = await browser!.newContext();
       // How a deployment tells the editor where its store is.
       await context.addInitScript({
-        content: `window.__APP_CONFIG__ = Object.assign({}, window.__APP_CONFIG__, { STORE_URL: ${JSON.stringify(storeOrigin)} });`,
+        // The relay too: a workspace document opens a session, and
+        // without one there is nobody to see.
+        content: `window.__APP_CONFIG__ = Object.assign({}, window.__APP_CONFIG__, { STORE_URL: ${JSON.stringify(storeOrigin)}, RELAY: ${JSON.stringify(servers!.relayUrl)} });`,
       });
       contexts.push(context);
       const page = await context.newPage();
@@ -373,6 +375,41 @@ async function run() {
         (await countNodes(first)) === before + 2 && (await countNodes(second)) === before + 2,
         'and neither lost a node',
       );
+    }
+
+    console.log('\n=== Opening a workspace document puts people in the same room (WS3) ===');
+    {
+      // Nobody has shared a link. Both browsers have the same workspace
+      // document open, so both should be in its session, seeing each
+      // other - otherwise an edit arrives with nobody attached to it.
+      await closeManager(first);
+      await closeManager(second);
+      const openCollab = async (page: Page) => {
+        if (await page.locator('.collab-panel__peer').count()) return;
+        // The button says "Session Active" once in one, which is itself
+        // the point: a workspace document joins its session on opening.
+        await page.click('button[title^="In session"], button[title="Collaborate"]');
+      };
+      await openCollab(first);
+      await openCollab(second);
+      const sawEachOther = async (page: Page) =>
+        page
+          .waitForFunction(
+            () => document.querySelectorAll('.collab-panel__peer').length > 0,
+            null,
+            {
+              timeout: 30000,
+            },
+          )
+          .then(
+            () => true,
+            () => false,
+          );
+      const firstSees = await sawEachOther(first);
+      const secondSees = await sawEachOther(second);
+      check(firstSees && secondSees, 'each browser is in the session, with the other one in it');
+      const peerName = (await first.textContent('.collab-panel__peer-name')) ?? '';
+      check(peerName.trim().length > 0, `and can say who it is (${peerName.trim()})`);
     }
 
     console.log('\n=== Losing a browser: revoke, then rotate (WS7-R7, R14) ===');

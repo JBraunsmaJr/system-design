@@ -24,6 +24,7 @@ import {
   type EnrollmentApi,
 } from './deviceIdentity.ts';
 import { documentKeyFor, indexKeyFor, upsertEntry } from './workspaceDocuments.ts';
+import { deriveWorkspaceRoom } from './workspaceSession.ts';
 import { createDocumentSync, type DocumentSync } from './documentSync.ts';
 import type * as Y from 'yjs';
 
@@ -38,6 +39,12 @@ export type WorkspaceSyncStatus =
 
 export interface WorkspaceSyncState {
   status: WorkspaceSyncStatus;
+  /**
+   * The live session this document belongs to, once it is known to be in
+   * the workspace: the room everyone holding its key computes, and that
+   * key. Null for a local document (WS3).
+   */
+  session: { room: string; key: string } | null;
   /** The document version the workspace last accepted. */
   version: number | null;
   message: string | null;
@@ -75,6 +82,7 @@ export function useWorkspaceSync(options: WorkspaceSyncOptions) {
   );
   const [state, setState] = useState<WorkspaceSyncState>({
     status: 'inactive',
+    session: null,
     version: null,
     message: null,
   });
@@ -112,7 +120,7 @@ export function useWorkspaceSync(options: WorkspaceSyncOptions) {
       if (device.status !== 'ready' || !device.workspaceKey) {
         // Not enrolled, or waiting for approval: nothing to sync yet.
         stop();
-        setState({ status: 'inactive', version: null, message: null });
+        setState({ status: 'inactive', session: null, version: null, message: null });
         return;
       }
       const indexKey = await indexKeyFor(device.workspaceKey);
@@ -122,7 +130,7 @@ export function useWorkspaceSync(options: WorkspaceSyncOptions) {
       if (!entry) {
         // A local document: nothing of it belongs in the workspace.
         stop();
-        setState({ status: 'inactive', version: null, message: null });
+        setState({ status: 'inactive', session: null, version: null, message: null });
         return;
       }
       if (sync.current) return;
@@ -132,6 +140,9 @@ export function useWorkspaceSync(options: WorkspaceSyncOptions) {
         documentKey,
         wrappedDocKey: entry.wrappedDocKey,
       };
+      // Everyone holding this key computes the same room, so opening the
+      // document is enough to be in it together (WS3).
+      const room = await deriveWorkspaceRoom(documentKey);
       const started = createDocumentSync({
         client,
         docId,
@@ -140,6 +151,9 @@ export function useWorkspaceSync(options: WorkspaceSyncOptions) {
         onStatus: (status, detail) =>
           setState({
             status: status === 'starting' ? 'saving' : status,
+            // Carried through every status change, so the editor can join
+            // the room as soon as the document is known to be shared.
+            session: { room, key: documentKey },
             version: client.versionOf(docId),
             message: detail ?? null,
           }),
@@ -151,6 +165,7 @@ export function useWorkspaceSync(options: WorkspaceSyncOptions) {
       setState({
         status:
           error instanceof StoreClientError && error.reason === 'offline' ? 'offline' : 'inactive',
+        session: null,
         version: null,
         message: null,
       });
