@@ -248,6 +248,17 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client, loadEntries, storage]);
 
+  /**
+   * While this panel is open, look again every few seconds: someone who
+   * has just signed in and is waiting should appear without anyone
+   * closing and reopening the dialog.
+   */
+  useEffect(() => {
+    if (phase !== 'ready' && phase !== 'awaiting-access') return;
+    const timer = setInterval(() => void refresh(), 5000);
+    return () => clearInterval(timer);
+  }, [phase, refresh]);
+
   useEffect(() => {
     let cancelled = false;
     void Promise.resolve().then(() => {
@@ -543,6 +554,24 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
         </div>
       )}
 
+      {phase === 'awaiting-access' && (
+        <div className="workspace-panel__awaiting-access" style={{ display: 'grid', gap: 6 }}>
+          <p style={{ margin: 0 }}>
+            You are signed in, and this workspace already exists. Anyone already in it can see that
+            you are waiting and give you access — ask them to open File &gt; Documents. Until they
+            do, nothing here can read the workspace, and neither can the server.
+          </p>
+          <button
+            type="button"
+            className="workspace-panel__recheck"
+            onClick={() => void refresh()}
+            disabled={busy}
+          >
+            Check again
+          </button>
+        </div>
+      )}
+
       {phase === 'awaiting-approval' && (
         <div style={{ display: 'grid', gap: 6 }}>
           <p style={{ margin: 0 }}>
@@ -592,7 +621,11 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
 
           {canGrant && members.length > 0 && (
             <div className="workspace-panel__members" style={{ display: 'grid', gap: 4 }}>
-              <strong>People in this workspace</strong>
+              <strong>
+                People in this workspace
+                {members.some((member) => !member.hasAccess) &&
+                  ` — ${members.filter((member) => !member.hasAccess).length} waiting for access`}
+              </strong>
               {members.map((member) => (
                 <div
                   key={member.userId}

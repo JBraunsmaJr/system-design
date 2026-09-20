@@ -279,7 +279,11 @@ try {
     // A different person, not another browser of the same person: their own
     // identity, their own user key, and no workspace key at all.
     const other = await newBrowserAs('person-2');
-    const joined = await bootstrapFirstDevice({
+    // They do nothing deliberate: they sign in, and their browser enrols
+    // as it would on any visit. That alone has to leave someone able to
+    // let them in - a member who must press a button they were never
+    // shown is a member nobody can grant access to.
+    const joined = await enrollDevice({
       api: other.api,
       storage: other.storage,
       label: 'Their laptop',
@@ -294,7 +298,10 @@ try {
     const members = await first.client.listMembers();
     const mine = await first.client.me();
     const them = members.find((member) => member.userId !== mine.userId);
-    check(!!them?.publicKey, 'the first person can see their published public key');
+    check(
+      !!them?.publicKey,
+      'their public key is published by signing in alone, so there is something to wrap the key to',
+    );
     const wrapped = await wrapKeyForPublicKey(
       workspaceKey,
       await importPublicKey(fromBase64(them!.publicKey!)),

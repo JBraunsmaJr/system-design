@@ -23,6 +23,7 @@
 import { documentKeyFor, fromBase64, toBase64 } from './workspaceDocuments.ts';
 import {
   exportPublicKey,
+  publicKeyOf,
   generateWorkspaceKey,
   generateWrappingKeyPair,
   importPublicKey,
@@ -155,11 +156,25 @@ export async function enrollDevice(options: EnrollOptions): Promise<DeviceState>
       // first device, which has to make the keys, or they have joined a
       // workspace someone else created and are waiting to be let in.
       const exists = await api.workspaceExists().catch(() => false);
+      if (!exists) {
+        return {
+          status: 'needs-setup',
+          deviceId: held.deviceId,
+          verificationCode: keys.verificationCode,
+          workspaceKey: null,
+        };
+      }
+      // Waiting to be let in, so publish what someone needs in order to
+      // let them in. Without this a new member appears in the workspace
+      // with nothing to wrap the key to, and the person who could grant
+      // it sees a button they cannot press - which is what happened.
+      await publishIdentity(options, held);
       return {
-        status: exists ? 'awaiting-access' : 'needs-setup',
+        status: 'awaiting-access',
         deviceId: held.deviceId,
         verificationCode: keys.verificationCode,
         workspaceKey: null,
+        message: 'Waiting for someone in this workspace to give you access.',
       };
     }
     if (keys.status === 'awaiting-approval') {
@@ -181,13 +196,21 @@ export async function enrollDevice(options: EnrollOptions): Promise<DeviceState>
     );
     const newest = [...keys.workspaceKeys].sort((a, b) => b.generation - a.generation)[0];
     if (!newest) {
+      // Has keys of their own, holds no workspace key: waiting, not
+      // broken. Their public key is republished in case it was never
+      // stored, so whoever can grant access has something to wrap to.
+      await api
+        .publishUserPublicKey(toBase64(await exportPublicKey(await publicKeyOf(userKey))))
+        .catch(() => {
+          // Already published, or the store refused: the waiting state is
+          // reported either way.
+        });
       return {
-        status: 'error',
+        status: 'awaiting-access',
         deviceId: held.deviceId,
         verificationCode: null,
         workspaceKey: null,
-        message:
-          'This device is approved, but no workspace key has been shared with you yet. An administrator can grant one.',
+        message: 'Waiting for someone in this workspace to give you access.',
       };
     }
     const workspaceKey = await unwrapKeyWithPrivateKey(
@@ -224,6 +247,30 @@ export async function attachExistingDevice(options: EnrollOptions): Promise<Devi
   if (!held)
     return { status: 'inactive', deviceId: null, verificationCode: null, workspaceKey: null };
   return enrollDevice(options);
+}
+
+/**
+ * Makes this person's user key, seals it to this device, and publishes
+ * its public half - everything needed for someone else to wrap the
+ * workspace key to them (WS7-R8). Once done, the device holds a wrapped
+ * user key, so a later call takes the approved path instead.
+ */
+async function publishIdentity(
+  options: EnrollOptions,
+  device: { deviceId: string; keyPair: CryptoKeyPair },
+): Promise<CryptoKey> {
+  const userKeyPair = await generateWrappingKeyPair('user');
+  const wrapped = await wrapPrivateKeyForPublicKey(
+    userKeyPair.privateKey,
+    device.keyPair.publicKey,
+    KEY_CONTEXT,
+  );
+  await options.api.setOwnUserKey(device.deviceId, {
+    keyWrap: toBase64(wrapped.keyWrap),
+    body: toBase64(wrapped.body),
+  });
+  await options.api.publishUserPublicKey(toBase64(await exportPublicKey(userKeyPair.publicKey)));
+  return userKeyPair.privateKey;
 }
 
 export async function bootstrapFirstDevice(options: EnrollOptions): Promise<DeviceState> {

@@ -146,6 +146,27 @@ export async function exportSymmetricKeyHex(key: CryptoKey): Promise<string> {
   return Array.from(await exportSymmetricKey(key), (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+/**
+ * The public half of a wrapping private key. Needed where a device holds
+ * the private key and has to republish the public one - a member waiting
+ * to be let into a workspace, whose key nobody has anything to wrap to
+ * (WS7-R8).
+ */
+export async function publicKeyOf(privateKey: CryptoKey): Promise<CryptoKey> {
+  const jwk = (await subtle().exportKey('jwk', privateKey)) as Record<string, unknown>;
+  // Everything that makes it private, removed by name: exporting the
+  // whole key and hoping the import ignores the rest would be a way to
+  // publish a private key by accident.
+  for (const secret of ['d', 'p', 'q', 'dp', 'dq', 'qi']) delete jwk[secret];
+  return subtle().importKey(
+    'jwk',
+    { ...jwk, key_ops: ['wrapKey'] } as JsonWebKey,
+    { name: 'RSA-OAEP', hash: 'SHA-256' },
+    true,
+    ['wrapKey'],
+  );
+}
+
 export async function exportPublicKey(key: CryptoKey): Promise<Uint8Array> {
   return new Uint8Array(await subtle().exportKey('spki', key));
 }
