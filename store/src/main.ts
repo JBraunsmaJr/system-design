@@ -15,6 +15,7 @@ import { createMemoryUserDirectory } from "./userDirectory.ts";
 import { createMemoryWorkspaceIndex } from "./workspaceIndex.ts";
 import { createHttpService, createMemoryAuditSink, type StoreBackend } from "./httpService.ts";
 import { createSessionStore } from "./auth/sessions.ts";
+import { createPostgresSessionStore } from "./auth/postgresSessions.ts";
 import { createProvider } from "./auth/providers.ts";
 import { ConfigError, describeConfig, loadStoreConfig } from "./config.ts";
 import pg from "pg";
@@ -37,6 +38,7 @@ async function main() {
   let directory;
   let index;
   let audit;
+  let sessions;
   let close = async () => {};
 
   if (config.databaseUrl) {
@@ -53,6 +55,9 @@ async function main() {
     directory = createPostgresUserDirectory(pool);
     index = createPostgresWorkspaceIndex(pool);
     audit = postgres.audit;
+    // Sessions in the database, so a restart or a second instance does not
+    // sign everyone out (WS10-R1).
+    sessions = createPostgresSessionStore(pool);
     close = async () => {
       await pool.end();
       await postgres.close();
@@ -72,6 +77,7 @@ async function main() {
     directory = createMemoryUserDirectory();
     index = createMemoryWorkspaceIndex();
     audit = createMemoryAuditSink();
+    sessions = createSessionStore();
   }
 
   const admins = new Set(config.admins);
@@ -80,7 +86,7 @@ async function main() {
     directory,
     workspaceIndex: index,
     audit,
-    sessions: createSessionStore(),
+    sessions,
     providers: config.providers.map((provider) => createProvider(provider)),
     publicUrl: config.publicUrl,
     allowedOrigins: config.allowedOrigins,

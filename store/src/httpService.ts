@@ -262,7 +262,7 @@ export function createHttpService(options: HttpServiceOptions): Server {
     const method = request.method ?? "GET";
     // Replaced by the authenticated subject in the next step; until then it
     // is only ever a label in the audit trail.
-    const session = sessions?.get(parseCookies(request.headers.cookie)[SESSION_COOKIE] ?? null) ?? null;
+    const session = (await sessions?.get(parseCookies(request.headers.cookie)[SESSION_COOKIE] ?? null)) ?? null;
     const subject = session ? `${session.issuer}#${session.subject}` : options.allowUnauthenticated ? "anonymous" : null;
     let docId: string | null = null;
     let operation = `${method} ${url.pathname}`;
@@ -553,7 +553,7 @@ export function createHttpService(options: HttpServiceOptions): Server {
     }
 
     if (parts[2] === "logout" && method === "POST") {
-      if (session) sessions?.destroy(session.id);
+      if (session) await sessions?.destroy(session.id);
       await record({ operation: "logout", outcome: "ok", subject: session ? `${session.issuer}#${session.subject}` : null, docId: null });
       response.writeHead(204, { "set-cookie": expiredSessionCookie(secureCookies(), crossSiteCookies()) });
       return response.end();
@@ -563,7 +563,7 @@ export function createHttpService(options: HttpServiceOptions): Server {
       const provider = providers.get(parts[2]);
       if (!provider || !sessions) throw new HttpError(404, "unsupported", `No sign-in provider named ${parts[2]}.`);
       const { url: authorizeUrl, pending } = await provider.begin(`${publicUrl()}/v1/auth/callback`);
-      sessions.remember(pending);
+      await sessions.remember(pending);
       await record({ operation: "login-start", outcome: "ok", subject: null, docId: null, detail: { provider: provider.id } });
       response.writeHead(302, { location: authorizeUrl });
       return response.end();
@@ -578,7 +578,7 @@ export function createHttpService(options: HttpServiceOptions): Server {
       }
       // Single-use, and unknown after ten minutes: a callback without a
       // pending sign-in is a replay or a forgery, not a login.
-      const pending = sessions.take(url.searchParams.get("state"));
+      const pending = await sessions.take(url.searchParams.get("state"));
       if (!pending) {
         await record({ operation: "login", outcome: "denied", subject: null, docId: null, detail: { reason: "unknown-state" } });
         throw new HttpError(400, "bad-request", "This sign-in did not start here, or it has expired. Try again.");
@@ -594,9 +594,13 @@ export function createHttpService(options: HttpServiceOptions): Server {
         await record({ operation: "login", outcome: "denied", subject: null, docId: null, detail: { provider: provider.id, message: String(failure).slice(0, 200) } });
         throw new HttpError(401, "unauthenticated", "Sign-in failed. Please try again.");
       }
-      const created = sessions.create(identity);
+      const created = await sessions.create(identity);
       // Resolved once, here, rather than on every request.
-      if (options.directory) created.userId = (await options.directory.upsertUser(identity)).userId;
+      if (options.directory) {
+        const user = await options.directory.upsertUser(identity);
+        created.userId = user.userId;
+        await sessions.setUserId(created.id, user.userId);
+      }
       await record({ operation: "login", outcome: "ok", subject: `${identity.issuer}#${identity.subject}`, docId: null, detail: { provider: provider.id } });
       response.writeHead(302, {
         location: options.afterLoginUrl ?? "/",

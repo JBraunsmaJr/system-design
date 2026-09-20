@@ -27,13 +27,20 @@ export interface Session {
   expiresAt: number;
 }
 
+/**
+ * Asynchronous throughout, so a session can live in PostgreSQL: sessions
+ * kept only in a process are lost on every restart, and are invisible to a
+ * second instance behind a load balancer.
+ */
 export interface SessionStore {
-  create(identity: Identity): Session;
-  get(id: string | null): Session | null;
-  destroy(id: string): void;
+  create(identity: Identity): Promise<Session>;
+  get(id: string | null): Promise<Session | null>;
+  destroy(id: string): Promise<void>;
   /** Sign-ins that have started but not come back yet, by state. */
-  remember(pending: PendingLogin): void;
-  take(state: string | null): PendingLogin | null;
+  remember(pending: PendingLogin): Promise<void>;
+  take(state: string | null): Promise<PendingLogin | null>;
+  /** Records the directory user behind a session, resolved at sign-in. */
+  setUserId(id: string, userId: string): Promise<void>;
 }
 
 export interface SessionOptions {
@@ -59,7 +66,7 @@ export function createSessionStore(options: SessionOptions = {}): SessionStore {
   }
 
   return {
-    create(identity) {
+    async create(identity) {
       sweep();
       const session: Session = {
         // 256 bits from the platform CSPRNG: the cookie is the credential.
@@ -74,7 +81,7 @@ export function createSessionStore(options: SessionOptions = {}): SessionStore {
       return session;
     },
 
-    get(id) {
+    async get(id) {
       if (!id) return null;
       const session = sessions.get(id);
       if (!session) return null;
@@ -85,16 +92,21 @@ export function createSessionStore(options: SessionOptions = {}): SessionStore {
       return session;
     },
 
-    destroy(id) {
+    async destroy(id) {
       sessions.delete(id);
     },
 
-    remember(login) {
+    async setUserId(id, userId) {
+      const session = sessions.get(id);
+      if (session) session.userId = userId;
+    },
+
+    async remember(login) {
       sweep();
       pending.set(login.state, login);
     },
 
-    take(state) {
+    async take(state) {
       if (!state) return null;
       const login = pending.get(state);
       // Single use: a state that comes back twice is a replay.

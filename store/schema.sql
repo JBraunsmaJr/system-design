@@ -129,6 +129,32 @@ CREATE TABLE IF NOT EXISTS user_recovery (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- WS10-R1: sessions, so a restart does not sign everyone out and a second
+-- instance behind a load balancer sees the same ones. The cookie is an
+-- opaque id; nothing here is a credential a browser holds.
+CREATE TABLE IF NOT EXISTS sessions (
+    session_id   TEXT PRIMARY KEY,
+    issuer       TEXT        NOT NULL,
+    subject      TEXT        NOT NULL,
+    display_name TEXT,
+    user_id      TEXT,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    expires_at   TIMESTAMPTZ NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS sessions_expiry_idx ON sessions (expires_at);
+
+-- Sign-ins that have started and not come back yet. Single use, and swept
+-- once they expire: a state that returns twice is a replay.
+CREATE TABLE IF NOT EXISTS pending_logins (
+    state         TEXT PRIMARY KEY,
+    provider      TEXT        NOT NULL,
+    nonce         TEXT        NOT NULL,
+    code_verifier TEXT        NOT NULL,
+    redirect_uri  TEXT        NOT NULL,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- WS10-R3: every request, for forwarding to a SIEM. Append-only by
 -- convention; a deployment that needs it enforced can revoke UPDATE/DELETE.
 CREATE TABLE IF NOT EXISTS audit_log (

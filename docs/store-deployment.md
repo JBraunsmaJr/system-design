@@ -132,6 +132,17 @@ gone, and it is the reason documents can be recovered at all; the store
 never holds its private half. Recover a document with
 `npx tsx scripts/recover-document.ts --key recovery-private.pem --package doc.json`.
 
+## Running more than one instance
+
+Sessions live in PostgreSQL, so a restart does not sign everyone out and two
+instances behind a load balancer share them: no sticky sessions are needed.
+A store running without `DATABASE_URL` keeps sessions in memory along with
+everything else, which is one more reason that mode is for demonstrations.
+
+The purge sweep runs in every instance. It is safe to run concurrently —
+each document is purged once — but there is no need for more than one, so
+set `PURGE_INTERVAL_MINUTES` higher where several instances run.
+
 ## Backups
 
 Back up PostgreSQL as usual. Its contents are encrypted, so a backup is
