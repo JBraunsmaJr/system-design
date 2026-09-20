@@ -429,13 +429,29 @@ export function createStoreClient(options: StoreClientOptions) {
 
     /** Members and their public user keys, for wrapping a new workspace key
      * to each of them (WS7-R7, R8). Administrators only. */
-    async listMembers(): Promise<{ userId: string; displayName?: string; publicKey?: string }[]> {
-      const { body } = await request('/v1/admin/users');
-      return body.users as { userId: string; displayName?: string; publicKey?: string }[];
+    async listMembers(): Promise<
+      {
+        userId: string;
+        displayName?: string;
+        publicKey?: string;
+        /** Which workspace key generations this member holds (WS7-R8). */
+        workspaceKeyGenerations?: number[];
+      }[]
+    > {
+      const { body } = await request('/v1/workspace/members');
+      return body.members as {
+        userId: string;
+        displayName?: string;
+        publicKey?: string;
+        workspaceKeyGenerations?: number[];
+      }[];
     },
 
+    /** Hands the workspace key to another member, wrapped to their public
+     * key (WS7-R8). Any member may: they could share it out of band
+     * anyway, and the store records who did it. */
     async grantWorkspaceKey(userId: string, generation: number, wrappedKey: string): Promise<void> {
-      await request(`/v1/admin/users/${encodeURIComponent(userId)}/workspace-key`, {
+      await request(`/v1/workspace/members/${encodeURIComponent(userId)}/key`, {
         method: 'PUT',
         body: JSON.stringify({ generation, wrappedKey }),
       });
@@ -547,6 +563,14 @@ export function createStoreClient(options: StoreClientOptions) {
     },
 
     // -- the workspace index (WS9) -----------------------------------------
+
+    /** Whether this workspace holds an index yet - asked without a key,
+     * because someone who has not been given the workspace key still
+     * needs to know a workspace exists (WS7-R8). */
+    async workspaceExists(workspaceId: string): Promise<boolean> {
+      const { body } = await request(`/v1/workspaces/${encodeURIComponent(workspaceId)}/index`);
+      return (body.index as string | null) !== null;
+    },
 
     async readIndex(
       workspaceId: string,

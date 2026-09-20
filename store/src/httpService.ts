@@ -419,6 +419,53 @@ export function createHttpService(options: HttpServiceOptions): Server {
         });
       }
 
+      if (parts[1] === 'workspace' && parts[2] === 'members') {
+        // Members, to any member - not only administrators. Someone who
+        // holds the workspace key can already hand it to anyone they
+        // like; refusing them the list would add friction without
+        // withholding anything. Granting is audited, and an
+        // administrator can still see who did it (WS10-R3).
+        if (!options.directory)
+          throw new HttpError(404, 'unsupported', 'This store has no user directory configured.');
+        if (!session?.userId && !options.allowUnauthenticated) {
+          throw new HttpError(401, 'unauthenticated', 'Sign in first.');
+        }
+        if (!parts[3] && method === 'GET') {
+          const users = await options.directory.listUsers();
+          const withAccess = [];
+          for (const user of users) {
+            const wraps = await options.directory.getWorkspaceKeys(user.userId);
+            withAccess.push({
+              userId: user.userId,
+              displayName: user.displayName,
+              publicKey: user.publicKey,
+              workspaceKeyGenerations: wraps.map((wrap) => wrap.generation),
+            });
+          }
+          return send(response, 200, { members: withAccess });
+        }
+        if (parts[3] && parts[4] === 'key' && method === 'PUT') {
+          const body = await readJson(request);
+          const userId = decodeURIComponent(parts[3]);
+          const generation = typeof body.generation === 'number' ? body.generation : 1;
+          await options.directory.putWorkspaceKey(
+            userId,
+            generation,
+            requireString(body.wrappedKey, 'wrappedKey'),
+          );
+          operation = 'workspace-key-share';
+          await record({
+            operation,
+            outcome: 'ok',
+            subject,
+            docId: null,
+            detail: { userId, generation },
+          });
+          return send(response, 204, {});
+        }
+        throw new HttpError(404, 'unsupported', `No route for ${url.pathname}.`);
+      }
+
       if (parts[1] === 'workspaces') {
         return await handleWorkspaces(parts, method, request, response, subject);
       }
@@ -430,7 +477,19 @@ export function createHttpService(options: HttpServiceOptions): Server {
         if (parts[2] === 'users' && !parts[3] && method === 'GET') {
           if (!options.directory)
             throw new HttpError(404, 'unsupported', 'This store has no user directory configured.');
-          return send(response, 200, { users: await options.directory.listUsers() });
+          const users = await options.directory.listUsers();
+          // Which workspace key generations each member holds, so an
+          // interface can show who can actually read the workspace rather
+          // than only who has an account (WS7-R8).
+          const withAccess = [];
+          for (const user of users) {
+            const wraps = await options.directory.getWorkspaceKeys(user.userId);
+            withAccess.push({
+              ...user,
+              workspaceKeyGenerations: wraps.map((wrap) => wrap.generation),
+            });
+          }
+          return send(response, 200, { users: withAccess });
         }
         if (parts[2] === 'users' && parts[3] && parts[4] === 'regrant' && method === 'POST') {
           if (!options.directory)

@@ -95,6 +95,7 @@ export function useWorkspaceSync(options: WorkspaceSyncOptions) {
     approveDevice: (deviceId, code, wrapped, from) =>
       client.approveDevice(deviceId, code, wrapped, from),
     setOwnUserKey: (deviceId, wrapped) => client.setOwnUserKey(deviceId, wrapped),
+    workspaceExists: () => client.workspaceExists(WORKSPACE_ID),
   };
 
   const stop = useCallback(() => {

@@ -26,6 +26,7 @@ import {
   Check,
   KeyRound,
   Laptop,
+  Users,
 } from 'lucide-react';
 import {
   createStoreClient,
@@ -46,12 +47,15 @@ import {
 import {
   documentKeyFor,
   escrowDocumentKey,
+  fromBase64,
+  toBase64,
   indexKeyFor,
   newDocumentKey,
   removeEntry,
   upsertEntry,
 } from '../collab/workspaceDocuments';
 import { rotateWorkspaceKey } from '../collab/workspaceRotation';
+import { importPublicKey, wrapKeyForPublicKey } from '../crypto/keys';
 import { announceWorkspaceChange } from '../collab/useWorkspaceSync';
 import { unwrapPrivateKeyWithPrivateKey } from '../crypto/keys';
 
@@ -73,7 +77,24 @@ export interface WorkspacePanelProps {
 }
 
 type Phase =
-  'checking' | 'offline' | 'signed-out' | 'enrolling' | 'awaiting-approval' | 'ready' | 'error';
+  | 'checking'
+  | 'offline'
+  | 'signed-out'
+  | 'enrolling'
+  | 'awaiting-approval'
+  /** Signed in, with keys of their own, but not yet given the workspace
+   * key by anyone who has it (WS7-R8). */
+  | 'awaiting-access'
+  | 'ready'
+  | 'error';
+
+/** Someone else in this workspace, and whether they can read it yet. */
+interface Member {
+  userId: string;
+  displayName?: string;
+  publicKey?: string;
+  hasAccess: boolean;
+}
 
 interface PendingDevice {
   deviceId: string;
@@ -95,6 +116,10 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
   const [serverReadsContent, setServerReadsContent] = useState(false);
   const [device, setDevice] = useState<DeviceState | null>(null);
   const [pending, setPending] = useState<PendingDevice[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
+  /** Whether this person may grant access: discovered by asking, since
+   * only an administrator may list members (WS10-R2). */
+  const [canGrant, setCanGrant] = useState(false);
   const [devices, setDevices] = useState<
     { deviceId: string; label?: string; approvedAt: string | null; revokedAt: string | null }[]
   >([]);
@@ -116,6 +141,7 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
     approveDevice: (deviceId, code, wrapped, from) =>
       client.approveDevice(deviceId, code, wrapped, from),
     setOwnUserKey: (deviceId, wrapped) => client.setOwnUserKey(deviceId, wrapped),
+    workspaceExists: () => client.workspaceExists(WORKSPACE_ID),
   };
 
   const say = (error: unknown): string => {
@@ -166,6 +192,27 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
             revokedAt: d.revokedAt,
           })),
         );
+        // Who else is in this workspace, and whether they can read it.
+        // Only an administrator may ask, so a refusal is not an error -
+        // it just means this person cannot hand out access (WS10-R2).
+        try {
+          const listedMembers = await client.listMembers();
+          const me = await client.me();
+          setMembers(
+            listedMembers
+              .filter((member) => member.userId !== me.userId)
+              .map((member) => ({
+                userId: member.userId,
+                displayName: member.displayName,
+                publicKey: member.publicKey,
+                hasAccess: (member.workspaceKeyGenerations ?? []).includes(generation),
+              })),
+          );
+          setCanGrant(true);
+        } catch {
+          setMembers([]);
+          setCanGrant(false);
+        }
         setPending(
           listed
             .filter((d) => !d.approvedAt && !d.revokedAt)
@@ -178,6 +225,9 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
         );
       } else if (state.status === 'awaiting-approval') {
         setPhase('awaiting-approval');
+      } else if (state.status === 'awaiting-access') {
+        setPhase('awaiting-access');
+        setMessage(state.message ?? null);
       } else if (state.status === 'needs-setup') {
         // The person's first browser: it makes the keys.
         setPhase('enrolling');
@@ -346,6 +396,33 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
       { keepMessage: true },
     );
 
+  /**
+   * Hands the workspace key to another member, wrapped to their public
+   * user key (WS7-R8). Their browser picks it up the next time it looks:
+   * nothing secret passes through this one except in wrapped form, and
+   * the store never sees the key itself.
+   */
+  const grantAccess = (member: Member) =>
+    run(async () => {
+      const key = workspaceKey.current;
+      if (!key) throw new Error('This browser does not hold the workspace key.');
+      if (!member.publicKey) {
+        throw new Error(
+          `${member.displayName ?? 'That member'} has not signed in with a browser yet, so there is no key to wrap this to.`,
+        );
+      }
+      const wrapped = await wrapKeyForPublicKey(
+        key,
+        await importPublicKey(fromBase64(member.publicKey)),
+      );
+      await client.grantWorkspaceKey(member.userId, generation, toBase64(wrapped));
+      setMembers((current) =>
+        current.map((candidate) =>
+          candidate.userId === member.userId ? { ...candidate, hasAccess: true } : candidate,
+        ),
+      );
+    });
+
   const approve = (target: PendingDevice) =>
     run(async () => {
       const held = await storage.load();
@@ -508,6 +585,41 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
                   >
                     <Check size={12} /> Codes match, approve
                   </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {canGrant && members.length > 0 && (
+            <div className="workspace-panel__members" style={{ display: 'grid', gap: 4 }}>
+              <strong>People in this workspace</strong>
+              {members.map((member) => (
+                <div
+                  key={member.userId}
+                  className="workspace-panel__member"
+                  data-user-id={member.userId}
+                  data-has-access={member.hasAccess}
+                  style={{ display: 'flex', gap: 8, alignItems: 'center' }}
+                >
+                  <Users size={12} />
+                  <span style={{ flex: 1 }}>{member.displayName ?? member.userId}</span>
+                  {member.hasAccess ? (
+                    <span style={{ color: 'var(--text-muted, #9aa3b2)' }}>has access</span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="workspace-panel__grant"
+                      onClick={() => void grantAccess(member)}
+                      disabled={busy || !member.publicKey}
+                      title={
+                        member.publicKey
+                          ? 'Wrap the workspace key to this person, so they can read its documents'
+                          : 'They have to sign in once before anything can be wrapped to them'
+                      }
+                    >
+                      Give access
+                    </button>
+                  )}
                 </div>
               ))}
             </div>

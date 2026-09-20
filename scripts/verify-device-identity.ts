@@ -26,13 +26,17 @@ import {
 } from '../src/collab/deviceIdentity.ts';
 import {
   documentKeyFor,
+  fromBase64,
   indexKeyFor,
   newDocumentKey,
+  toBase64,
   upsertEntry,
 } from '../src/collab/workspaceDocuments.ts';
 import {
   exportPublicKey,
   exportSymmetricKeyHex,
+  importPublicKey,
+  wrapKeyForPublicKey,
   generateWrappingKeyPair,
   unwrapPrivateKeyWithPrivateKey,
 } from '../src/crypto/keys.ts';
@@ -86,6 +90,7 @@ const apiFor = (client: StoreClient): EnrollmentApi => ({
   approveDevice: (deviceId, code, wrapped, from) =>
     client.approveDevice(deviceId, code, wrapped, from),
   setOwnUserKey: (deviceId, wrapped) => client.setOwnUserKey(deviceId, wrapped),
+  workspaceExists: () => client.workspaceExists('default'),
 });
 
 const blobs = createMemoryBlobStore();
@@ -123,6 +128,11 @@ await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
 origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 
 /** One browser: its own cookie jar and its own key storage. */
+async function newBrowserAs(subject: string) {
+  idp.setSubject(subject);
+  return newBrowser();
+}
+
 async function newBrowser() {
   let cookie = '';
   const client = createStoreClient({
@@ -264,6 +274,66 @@ try {
     'and opens the document the first browser saved',
   );
 
+  console.log('\n=== A second person joins the workspace (WS7-R8) ===');
+  {
+    // A different person, not another browser of the same person: their own
+    // identity, their own user key, and no workspace key at all.
+    const other = await newBrowserAs('person-2');
+    const joined = await bootstrapFirstDevice({
+      api: other.api,
+      storage: other.storage,
+      label: 'Their laptop',
+    });
+    check(
+      joined.status === 'awaiting-access',
+      `they are told they must be let in rather than getting a workspace of their own (${joined.status})`,
+    );
+    check(joined.workspaceKey === null, 'and hold no workspace key');
+    // The first person gives them access: the workspace key, wrapped to
+    // their published public key.
+    const members = await first.client.listMembers();
+    const mine = await first.client.me();
+    const them = members.find((member) => member.userId !== mine.userId);
+    check(!!them?.publicKey, 'the first person can see their published public key');
+    const wrapped = await wrapKeyForPublicKey(
+      workspaceKey,
+      await importPublicKey(fromBase64(them!.publicKey!)),
+    );
+    await first.client.grantWorkspaceKey(them!.userId, 1, toBase64(wrapped));
+    check(
+      (await first.client.listMembers())
+        .find((member) => member.userId === them!.userId)
+        ?.workspaceKeyGenerations?.includes(1) === true,
+      'and the store records that they now hold it',
+    );
+
+    const admitted = await enrollDevice({ api: other.api, storage: other.storage });
+    check(
+      admitted.status === 'ready',
+      `their browser picks it up on its next look (${admitted.status})`,
+    );
+    check(
+      (await exportSymmetricKeyHex(admitted.workspaceKey!)) ===
+        (await exportSymmetricKeyHex(workspaceKey)),
+      'and it is the same workspace key, never sent anywhere unwrapped',
+    );
+    const theirEntries = (
+      await other.client.readIndex('default', await indexKeyFor(admitted.workspaceKey!))
+    ).entries;
+    check(
+      theirEntries.length === 1 && theirEntries[0].title === 'Shared architecture',
+      'they can now list the workspace',
+    );
+    const theirCopy = await other.client.getDocument(
+      theirEntries[0].docId,
+      await documentKeyFor(theirEntries[0], admitted.workspaceKey!),
+    );
+    check(
+      theirCopy.file.title === 'Shared architecture',
+      'and open the document the first person saved',
+    );
+  }
+
   console.log('\n=== What the store saw ===');
   const served = JSON.stringify(await (await fetch(`${origin}/v1/docs/doc-shared`)).json());
   check(
@@ -275,6 +345,26 @@ try {
     !devices.includes(await exportSymmetricKeyHex(workspaceKey)),
     'and no workspace key among the device records',
   );
+
+  console.log('\n=== A browser whose device the store has never heard of ===');
+  {
+    // What a replaced database, or a browser older than the deployment,
+    // leaves behind: a device id nobody knows. It used to leave that
+    // browser permanently stuck - it asked about a device that did not
+    // exist, got an error, and never offered to register a new one.
+    const stale = await newBrowserAs('person-3');
+    await stale.storage.save('dev_from_a_previous_life', await generateWrappingKeyPair('device'));
+    const recovered = await enrollDevice({ api: stale.api, storage: stale.storage });
+    check(
+      recovered.status !== 'error',
+      `it registers again rather than getting stuck (${recovered.status})`,
+    );
+    const held = await stale.storage.load();
+    check(
+      held !== null && held.deviceId !== 'dev_from_a_previous_life',
+      'and keeps the new device, not the forgotten one',
+    );
+  }
 
   console.log('\n=== Revoking the second browser (WS7-R14) ===');
   await first.client.revokeDevice(waiting.deviceId!);

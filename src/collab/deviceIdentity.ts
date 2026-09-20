@@ -40,6 +40,12 @@ export type EnrollmentStatus =
   | 'awaiting-approval'
   /** The person's first device: approved, but it has to make the keys. */
   | 'needs-setup'
+  /**
+   * Signed in, with a device, in a workspace that already exists and was
+   * not created by them: they hold no workspace key, and a member or an
+   * administrator has to give them one (WS7-R8).
+   */
+  | 'awaiting-access'
   /** Holds the workspace key; documents can be opened and saved. */
   | 'ready'
   | 'error';
@@ -87,6 +93,9 @@ export interface EnrollmentApi {
     }[]
   >;
   setOwnUserKey(deviceId: string, wrappedUserKey: { keyWrap: string; body: string }): Promise<void>;
+  /** Whether this workspace already holds an index - that is, whether
+   * anyone has put a document in it yet. */
+  workspaceExists(): Promise<boolean>;
   approveDevice(
     deviceId: string,
     verificationCode: string,
@@ -111,6 +120,23 @@ export async function enrollDevice(options: EnrollOptions): Promise<DeviceState>
   const { api, storage } = options;
   try {
     let held = await storage.load();
+    if (held) {
+      // A device this store has never heard of: its database was
+      // replaced, or this browser's key outlived the deployment that
+      // issued it. Keeping it leaves the browser permanently unable to
+      // enrol - it asks about a device nobody knows, gets an error, and
+      // never offers to register a new one.
+      const stored = held;
+      const known = await api.listDevices().then(
+        (devices) => devices.some((device) => device.deviceId === stored.deviceId),
+        // Could not ask: assume it is fine rather than discard a good key.
+        () => true,
+      );
+      if (!known) {
+        await storage.clear();
+        held = null;
+      }
+    }
     if (!held) {
       // Non-extractable: this key is the anchor of the browser's access and
       // must never be copied anywhere, not even by this code.
@@ -124,7 +150,19 @@ export async function enrollDevice(options: EnrollOptions): Promise<DeviceState>
     }
 
     const keys = await api.keysForDevice(held.deviceId);
-    if (keys.status === 'awaiting-approval' || keys.status === 'needs-setup') {
+    if (keys.status === 'needs-setup') {
+      // Approved and holding no user key. Either this is the person's
+      // first device, which has to make the keys, or they have joined a
+      // workspace someone else created and are waiting to be let in.
+      const exists = await api.workspaceExists().catch(() => false);
+      return {
+        status: exists ? 'awaiting-access' : 'needs-setup',
+        deviceId: held.deviceId,
+        verificationCode: keys.verificationCode,
+        workspaceKey: null,
+      };
+    }
+    if (keys.status === 'awaiting-approval') {
       return {
         status: keys.status,
         deviceId: held.deviceId,
@@ -190,6 +228,32 @@ export async function attachExistingDevice(options: EnrollOptions): Promise<Devi
 
 export async function bootstrapFirstDevice(options: EnrollOptions): Promise<DeviceState> {
   const { api, storage } = options;
+  // A workspace that already holds documents has a key. Minting a second
+  // one would leave this person unable to read anything already there,
+  // and writing documents nobody else can read. They publish their public
+  // key and wait to be given the existing key instead (WS7-R8).
+  if (await api.workspaceExists().catch(() => false)) {
+    const device = (await storage.load()) ?? (await registerHere(options));
+    const userKeyPair = await generateWrappingKeyPair('user');
+    const wrapped = await wrapPrivateKeyForPublicKey(
+      userKeyPair.privateKey,
+      device.keyPair.publicKey,
+      KEY_CONTEXT,
+    );
+    await api.setOwnUserKey(device.deviceId, {
+      keyWrap: toBase64(wrapped.keyWrap),
+      body: toBase64(wrapped.body),
+    });
+    await api.publishUserPublicKey(toBase64(await exportPublicKey(userKeyPair.publicKey)));
+    return {
+      status: 'awaiting-access',
+      deviceId: device.deviceId,
+      verificationCode: null,
+      workspaceKey: null,
+      message:
+        'Your account is ready. A workspace member or an administrator has to give you access to the workspace.',
+    };
+  }
   const existing = await api.listDevices();
   const others = existing.filter((device) => !device.revokedAt);
   const held = await storage.load();
