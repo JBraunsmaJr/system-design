@@ -1,10 +1,14 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { Tag, Trash2, X } from "lucide-react";
-import { countItemsUsingCategory, findCategoryByLabel, getCategory } from "../../domain/requirementsRegistry";
-import { computeFlippedPosition } from "../../domain/popoverPosition";
-import type { RequirementsDocument } from "../../domain/requirementsTypes";
-import { HighlightedText } from "./HighlightText";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Tag, Trash2, X } from 'lucide-react';
+import {
+  countItemsUsingCategory,
+  findCategoryByLabel,
+  getCategory,
+} from '../../domain/requirementsRegistry';
+import { computeFlippedPosition } from '../../domain/popoverPosition';
+import type { RequirementsDocument } from '../../domain/requirementsTypes';
+import { HighlightedText } from './HighlightText';
 
 interface CategoryPickerProps {
   doc: RequirementsDocument;
@@ -43,9 +47,17 @@ const DROPDOWN_WIDTH = 220;
  * synchronously after the DOM commits but before the browser paints, so
  * any correction happens invisibly rather than as a visible jump.
  */
-export function CategoryPicker({ doc, categoryId, onAssign, onCreateAndAssign, onClear, onDelete, searchQuery }: CategoryPickerProps) {
+export function CategoryPicker({
+  doc,
+  categoryId,
+  onAssign,
+  onCreateAndAssign,
+  onClear,
+  onDelete,
+  searchQuery,
+}: CategoryPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState('');
   // Which row is showing its inline "really delete?" strip. An inline
   // confirm rather than window.confirm because the count of affected
   // items is the whole point of asking, and a native dialog can't show
@@ -66,7 +78,7 @@ export function CategoryPicker({ doc, categoryId, onAssign, onCreateAndAssign, o
   };
   const close = () => {
     setIsOpen(false);
-    setQuery("");
+    setQuery('');
     setPendingDeleteId(null);
   };
 
@@ -85,9 +97,11 @@ export function CategoryPicker({ doc, categoryId, onAssign, onCreateAndAssign, o
     const next = computeFlippedPosition(
       triggerRect,
       { width: dropdownRect.width, height: dropdownRect.height },
-      { width: window.innerWidth, height: window.innerHeight }
+      { width: window.innerWidth, height: window.innerHeight },
     );
-    setDropdownPos((prev) => (prev && prev.top === next.top && prev.left === next.left ? prev : next));
+    setDropdownPos((prev) =>
+      prev && prev.top === next.top && prev.left === next.left ? prev : next,
+    );
   }, [isOpen, query, pendingDeleteId]);
 
   // Same measure-and-flip logic, reused for scroll/resize while open -
@@ -103,8 +117,8 @@ export function CategoryPicker({ doc, categoryId, onAssign, onCreateAndAssign, o
       computeFlippedPosition(
         triggerRect,
         { width: dropdownRect.width, height: dropdownRect.height },
-        { width: window.innerWidth, height: window.innerHeight }
-      )
+        { width: window.innerWidth, height: window.innerHeight },
+      ),
     );
   }, []);
 
@@ -121,8 +135,8 @@ export function CategoryPicker({ doc, categoryId, onAssign, onCreateAndAssign, o
       if (dropdownRef.current?.contains(target)) return;
       close();
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
   }, [isOpen]);
 
   // A portaled, fixed-position dropdown doesn't automatically track the
@@ -133,15 +147,17 @@ export function CategoryPicker({ doc, categoryId, onAssign, onCreateAndAssign, o
   // area, since scroll events don't bubble the way most DOM events do.
   useEffect(() => {
     if (!isOpen) return;
-    window.addEventListener("scroll", reposition, true);
-    window.addEventListener("resize", reposition);
+    window.addEventListener('scroll', reposition, true);
+    window.addEventListener('resize', reposition);
     return () => {
-      window.removeEventListener("scroll", reposition, true);
-      window.removeEventListener("resize", reposition);
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
     };
   }, [isOpen, reposition]);
 
-  const filtered = doc.categories.filter((c) => c.label.toLowerCase().includes(query.trim().toLowerCase()));
+  const filtered = doc.categories.filter((c) =>
+    c.label.toLowerCase().includes(query.trim().toLowerCase()),
+  );
   const exactMatch = findCategoryByLabel(doc, query);
   const canCreate = query.trim().length > 0 && !exactMatch;
 
@@ -150,12 +166,12 @@ export function CategoryPicker({ doc, categoryId, onAssign, onCreateAndAssign, o
       <button
         ref={triggerRef}
         type="button"
-        className={`category-picker__trigger${current ? "" : " is-empty"}`}
+        className={`category-picker__trigger${current ? '' : ' is-empty'}`}
         style={current ? { borderColor: `${current.color}66`, color: current.color } : undefined}
         onClick={() => (isOpen ? close() : open())}
       >
         <Tag size={11} />
-        {current ? <HighlightedText text={current.label} search={searchQuery} /> : "Category"}
+        {current ? <HighlightedText text={current.label} search={searchQuery} /> : 'Category'}
       </button>
 
       {isOpen &&
@@ -164,7 +180,7 @@ export function CategoryPicker({ doc, categoryId, onAssign, onCreateAndAssign, o
           <div
             ref={dropdownRef}
             className="category-picker__dropdown"
-            style={{ position: "fixed", top: dropdownPos.top, left: dropdownPos.left }}
+            style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left }}
           >
             <input
               autoFocus
@@ -173,10 +189,10 @@ export function CategoryPicker({ doc, categoryId, onAssign, onCreateAndAssign, o
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && canCreate) {
+                if (e.key === 'Enter' && canCreate) {
                   onCreateAndAssign(query.trim());
                   close();
-                } else if (e.key === "Escape") {
+                } else if (e.key === 'Escape') {
                   close();
                 }
               }}
@@ -204,7 +220,7 @@ export function CategoryPicker({ doc, categoryId, onAssign, onCreateAndAssign, o
                         const inUse = countItemsUsingCategory(doc, c.id);
                         return inUse === 0
                           ? " It isn't used by anything."
-                          : ` ${inUse} item${inUse === 1 ? "" : "s"} will become uncategorized.`;
+                          : ` ${inUse} item${inUse === 1 ? '' : 's'} will become uncategorized.`;
                       })()}
                     </span>
                     <div className="category-picker__confirm-actions">
@@ -252,7 +268,7 @@ export function CategoryPicker({ doc, categoryId, onAssign, onCreateAndAssign, o
                       </button>
                     )}
                   </div>
-                )
+                ),
               )}
               {canCreate && (
                 <button
@@ -267,11 +283,13 @@ export function CategoryPicker({ doc, categoryId, onAssign, onCreateAndAssign, o
                 </button>
               )}
               {filtered.length === 0 && !canCreate && (
-                <p className="category-picker__empty">No categories yet - type a name to create one.</p>
+                <p className="category-picker__empty">
+                  No categories yet - type a name to create one.
+                </p>
               )}
             </div>
           </div>,
-          document.body
+          document.body,
         )}
     </>
   );

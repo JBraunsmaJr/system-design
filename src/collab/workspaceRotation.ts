@@ -16,9 +16,15 @@
  * interruption leaves everyone still holding a working old key rather than
  * a new key that opens nothing.
  */
-import { generateWorkspaceKey, unwrapKey, wrapKey, wrapKeyForPublicKey, importPublicKey } from "../crypto/keys.ts";
-import { fromBase64, indexKeyFor, toBase64 } from "./workspaceDocuments.ts";
-import type { IndexEntry, StoreClient } from "./storeClient.ts";
+import {
+  generateWorkspaceKey,
+  unwrapKey,
+  wrapKey,
+  wrapKeyForPublicKey,
+  importPublicKey,
+} from '../crypto/keys.ts';
+import { fromBase64, indexKeyFor, toBase64 } from './workspaceDocuments.ts';
+import type { IndexEntry, StoreClient } from './storeClient.ts';
 
 export interface RotationResult {
   generation: number;
@@ -61,7 +67,12 @@ export async function rotateWorkspaceKey(options: RotationOptions): Promise<Rota
   const rewrapped: IndexEntry[] = [];
   let done = 0;
   for (const entry of entries) {
-    const documentKey = await unwrapKey(fromBase64(entry.wrappedDocKey), currentKey, "AES-GCM", 128);
+    const documentKey = await unwrapKey(
+      fromBase64(entry.wrappedDocKey),
+      currentKey,
+      'AES-GCM',
+      128,
+    );
     const wrappedDocKey = toBase64(await wrapKey(documentKey, newKey));
     await client.rewrapDocument(entry.docId, wrappedDocKey);
     rewrapped.push({ ...entry, wrappedDocKey });
@@ -94,10 +105,13 @@ export async function rotateWorkspaceKey(options: RotationOptions): Promise<Rota
     const me = await client.me();
     if (!me.publicKey) {
       throw new Error(
-        "This browser cannot finish rotating: your public user key is not published, so the new key cannot be wrapped to you. Sign in again, then retry.",
+        'This browser cannot finish rotating: your public user key is not published, so the new key cannot be wrapped to you. Sign in again, then retry.',
       );
     }
-    const wrapped = await wrapKeyForPublicKey(newKey, await importPublicKey(fromBase64(me.publicKey)));
+    const wrapped = await wrapKeyForPublicKey(
+      newKey,
+      await importPublicKey(fromBase64(me.publicKey)),
+    );
     await client.putWorkspaceKey(generation, toBase64(wrapped));
     granted = 1;
   } else {
@@ -106,11 +120,21 @@ export async function rotateWorkspaceKey(options: RotationOptions): Promise<Rota
         skipped.push(member.displayName ?? member.userId);
         continue;
       }
-      const wrapped = await wrapKeyForPublicKey(newKey, await importPublicKey(fromBase64(member.publicKey)));
+      const wrapped = await wrapKeyForPublicKey(
+        newKey,
+        await importPublicKey(fromBase64(member.publicKey)),
+      );
       await client.grantWorkspaceKey(member.userId, generation, toBase64(wrapped));
       granted++;
     }
   }
 
-  return { generation, workspaceKey: newKey, documentsRewrapped: rewrapped.length, membersGranted: granted, membersSkipped: skipped, selfOnly };
+  return {
+    generation,
+    workspaceKey: newKey,
+    documentsRewrapped: rewrapped.length,
+    membersGranted: granted,
+    membersSkipped: skipped,
+    selfOnly,
+  };
 }

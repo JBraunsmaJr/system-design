@@ -1,4 +1,4 @@
-import { Handle, Position } from "@xyflow/react";
+import { Handle, Position } from '@xyflow/react';
 
 /**
  * One source + one target handle stacked at each of the 4 sides, so a

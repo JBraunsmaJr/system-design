@@ -11,11 +11,13 @@ The **Timeline** module provides a collaborative Program Increment (PI) planning
 Program Increments (PIs) provide multi-sprint planning intervals (typically 8–12 weeks) that align engineering delivery with architectural milestones.
 
 ### Adding a Program Increment
+
 1. In the Timeline toolbar, click **+ Program Increment** (or **+ PI**).
 2. The editor automatically initializes a new planning interval (e.g., `PI 1`, `PI 2`) starting seamlessly on the day following the previous PI's conclusion.
 3. Sprints within the PI default to standard two-week (14-day) durations.
 
 ### Sprint Management & Cascading Dates
+
 - **Adding Sprints**: Click **+ Sprint** on any PI to add subsequent sprints.
 - **Adjusting Durations**: Modify a sprint's end date directly from the sprint header date picker.
 - **Automatic Cascading**: Start and end dates for subsequent sprints automatically adjust when an earlier sprint is lengthened or shortened, keeping the timeline perfectly contiguous without manual re-calculation.
@@ -29,6 +31,7 @@ Milestones represent critical temporal events, releases, regulatory checkpoints,
 ![Add Marker](../images/timeline/add-marker.png)
 
 ### Creating a Milestone Marker
+
 1. Click **+ Marker** in the timeline toolbar or click the milestone indicator on any sprint column.
 2. Select the milestone category:
    - **Release** (`📦`): Planned software or capability release.
@@ -46,16 +49,18 @@ Milestones appear as distinctive colored point-in-time indicators on sprint head
 
 ## 3. Workable Item Assignment & Scheduling
 
-The timeline board features a backlog drawer for scheduling unassigned actionable items (*Tickets*, *Workable Requirements*, etc.) into target sprints.
+The timeline board features a backlog drawer for scheduling unassigned actionable items (_Tickets_, _Workable Requirements_, etc.) into target sprints.
 
 ![Assignment](../images/timeline/assignment.png)
 
 ### Scheduling Items
+
 - **Backlog Drawer**: Open the **Backlog** drawer on the left to view all unassigned workable items.
 - **Drag-and-Drop**: Drag tickets directly from the backlog into any sprint column, or drag items between sprints to re-sequence work.
 - **Inline Editing**: Set story point estimates, update status (`To Do`, `In Progress`, `Done`), and assign team members directly on the sprint card.
 
 ### Real-Time Impact Preview
+
 When dragging items across the board, the drop target displays a live impact preview.
 
 ![Sprint Impact Preview](../images/timeline/sprint-impact-preview.png)
@@ -71,6 +76,7 @@ Effective PI planning requires accounting for operational overhead, maintenance,
 ![Reservations](../images/timeline/reservations.png)
 
 ### Configuring Capacity Reservations
+
 Click **Reservations** on any PI to configure capacity buffers.
 
 ![Reservation Details](../images/timeline/reservation-details.png)
@@ -84,6 +90,7 @@ Click **Reservations** on any PI to configure capacity buffers.
 - **Scope**: Apply reservations globally across all sprints in the PI, or target individual sprints (e.g., reserving extra hardening capacity during a pre-release sprint).
 
 ### Live Sprint Capacity Bar
+
 Every sprint column displays a live capacity gauge comparing planned story points against available net capacity. The bar updates dynamically as tickets are added, resized, or reassigned.
 
 ---
@@ -95,14 +102,18 @@ The timeline provides dual viewing modes tailored for sprint-level execution and
 ![Swap to Gantt Chart](../images/timeline/swap-to-gantt-chart.png)
 
 ### Switching Modes
+
 Click the view toggle in the toolbar to switch between:
+
 - **Board View**: Columnar view organized by Program Increment and Sprint, optimized for backlog grooming and card dragging.
 - **Gantt Chart**: Horizontal timeline visualizing work streams, epics, and milestone deadlines across months and quarters.
 
 ![Gantt Chart](../images/timeline/gantt-chart.png)
 
 ### Inferred Epic Scheduling
+
 The Gantt chart automatically computes start and end spans for high-level Epics based on the scheduled dates of their underlying child tickets:
+
 - **Automatic Date Spans**: An Epic's timeline bar spans from the start of its earliest child ticket's sprint to the conclusion of its latest child ticket's sprint.
 - **Epic Filtering**: Use the Epic filter dropdown in the toolbar to isolate a single initiative across the timeline.
 
@@ -124,5 +135,6 @@ Scheduling mistakes, such as scheduling a dependent ticket before its prerequisi
 ## 7. Collaborative PI Planning
 
 During team-wide PI planning sessions, multiple engineers, architects, and product managers can work on the timeline simultaneously:
+
 - **Live Peer Presence**: Colored presence avatars on sprint cards and detail modals show which items other participants are currently inspecting or editing.
 - **Zero-Conflict Sync**: Sprint re-ordering, ticket assignments, and capacity adjustments propagate instantaneously across all connected clients via peer-to-peer WebRTC signaling.

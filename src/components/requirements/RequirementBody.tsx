@@ -1,5 +1,5 @@
-import ReactMarkdown, { type Components } from "react-markdown";
-import remarkGfm from "remark-gfm";
+import ReactMarkdown, { type Components } from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 /**
  * Makes a single newline render as an actual line break.
  *
@@ -14,10 +14,10 @@ import remarkGfm from "remark-gfm";
  * remark-breaks only rewrites soft breaks inside paragraphs, so code
  * blocks, tables and lists keep their own line handling.
  */
-import remarkBreaks from "remark-breaks";
-import { resolveReferencesToMarkdownLinks } from "../../domain/requirementsRegistry";
-import type { RequirementsDocument } from "../../domain/requirementsTypes";
-import { highlightInReactNode } from "../../domain/reactHighlight";
+import remarkBreaks from 'remark-breaks';
+import { resolveReferencesToMarkdownLinks } from '../../domain/requirementsRegistry';
+import type { RequirementsDocument } from '../../domain/requirementsTypes';
+import { highlightInReactNode } from '../../domain/reactHighlight';
 
 interface RequirementBodyProps {
   text: string;
@@ -31,9 +31,14 @@ interface RequirementBodyProps {
  * user wrote" apart from "a #REQ-3 reference that got turned into
  * markdown-link syntax so it renders through the normal link machinery",
  * and handle the two completely differently (scroll-to vs navigate). */
-const REF_SCHEME_PREFIX = "#ref:";
+const REF_SCHEME_PREFIX = '#ref:';
 
-export function RequirementBody({ text, doc, onNavigateToItem, searchQuery }: RequirementBodyProps) {
+export function RequirementBody({
+  text,
+  doc,
+  onNavigateToItem,
+  searchQuery,
+}: RequirementBodyProps) {
   const resolved = resolveReferencesToMarkdownLinks(text, doc);
 
   const trimmedQuery = searchQuery?.trim();
@@ -42,7 +47,9 @@ export function RequirementBody({ text, doc, onNavigateToItem, searchQuery }: Re
     return trimmedQuery ? highlightInReactNode(children, trimmedQuery) : children;
   };
 
-  const linkComponent = (props: React.AnchorHTMLAttributes<HTMLAnchorElement> & { node?: unknown }) => {
+  const linkComponent = (
+    props: React.AnchorHTMLAttributes<HTMLAnchorElement> & { node?: unknown },
+  ) => {
     const { href, children, node: _node, ...rest } = props;
     void _node;
     if (href?.startsWith(REF_SCHEME_PREFIX)) {
@@ -70,19 +77,58 @@ export function RequirementBody({ text, doc, onNavigateToItem, searchQuery }: Re
   const components: Components = trimmedQuery
     ? {
         a: linkComponent,
-        p: ({ children, node: _n, ...rest }) => { void _n; return <p {...rest}>{highlight(children)}</p>; },
-        li: ({ children, node: _n, ...rest }) => { void _n; return <li {...rest}>{highlight(children)}</li>; },
-        h1: ({ children, node: _n, ...rest }) => { void _n; return <h1 {...rest}>{highlight(children)}</h1>; },
-        h2: ({ children, node: _n, ...rest }) => { void _n; return <h2 {...rest}>{highlight(children)}</h2>; },
-        h3: ({ children, node: _n, ...rest }) => { void _n; return <h3 {...rest}>{highlight(children)}</h3>; },
-        h4: ({ children, node: _n, ...rest }) => { void _n; return <h4 {...rest}>{highlight(children)}</h4>; },
-        h5: ({ children, node: _n, ...rest }) => { void _n; return <h5 {...rest}>{highlight(children)}</h5>; },
-        h6: ({ children, node: _n, ...rest }) => { void _n; return <h6 {...rest}>{highlight(children)}</h6>; },
-        blockquote: ({ children, node: _n, ...rest }) => { void _n; return <blockquote {...rest}>{highlight(children)}</blockquote>; },
-        strong: ({ children, node: _n, ...rest }) => { void _n; return <strong {...rest}>{highlight(children)}</strong>; },
-        em: ({ children, node: _n, ...rest }) => { void _n; return <em {...rest}>{highlight(children)}</em>; },
-        td: ({ children, node: _n, ...rest }) => { void _n; return <td {...rest}>{highlight(children)}</td>; },
-        th: ({ children, node: _n, ...rest }) => { void _n; return <th {...rest}>{highlight(children)}</th>; },
+        p: ({ children, node: _n, ...rest }) => {
+          void _n;
+          return <p {...rest}>{highlight(children)}</p>;
+        },
+        li: ({ children, node: _n, ...rest }) => {
+          void _n;
+          return <li {...rest}>{highlight(children)}</li>;
+        },
+        h1: ({ children, node: _n, ...rest }) => {
+          void _n;
+          return <h1 {...rest}>{highlight(children)}</h1>;
+        },
+        h2: ({ children, node: _n, ...rest }) => {
+          void _n;
+          return <h2 {...rest}>{highlight(children)}</h2>;
+        },
+        h3: ({ children, node: _n, ...rest }) => {
+          void _n;
+          return <h3 {...rest}>{highlight(children)}</h3>;
+        },
+        h4: ({ children, node: _n, ...rest }) => {
+          void _n;
+          return <h4 {...rest}>{highlight(children)}</h4>;
+        },
+        h5: ({ children, node: _n, ...rest }) => {
+          void _n;
+          return <h5 {...rest}>{highlight(children)}</h5>;
+        },
+        h6: ({ children, node: _n, ...rest }) => {
+          void _n;
+          return <h6 {...rest}>{highlight(children)}</h6>;
+        },
+        blockquote: ({ children, node: _n, ...rest }) => {
+          void _n;
+          return <blockquote {...rest}>{highlight(children)}</blockquote>;
+        },
+        strong: ({ children, node: _n, ...rest }) => {
+          void _n;
+          return <strong {...rest}>{highlight(children)}</strong>;
+        },
+        em: ({ children, node: _n, ...rest }) => {
+          void _n;
+          return <em {...rest}>{highlight(children)}</em>;
+        },
+        td: ({ children, node: _n, ...rest }) => {
+          void _n;
+          return <td {...rest}>{highlight(children)}</td>;
+        },
+        th: ({ children, node: _n, ...rest }) => {
+          void _n;
+          return <th {...rest}>{highlight(children)}</th>;
+        },
         code: ({ children, className, node: _n, ...rest }) => {
           void _n;
           return (

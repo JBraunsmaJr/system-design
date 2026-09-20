@@ -1,7 +1,13 @@
-import type { Node, Edge } from "@xyflow/react";
-import type { ArchNodeData, ArchEdgeData, ArchEdgeDataPatch, EdgeWaypoint, SubDiagram } from "../domain/types";
-import type { EdgeEndpoints } from "../domain/edgeReconnect";
-import { recordUnflattenCall, recordStoreWrite } from "../perf/instrumentation";
+import type { Node, Edge } from '@xyflow/react';
+import type {
+  ArchNodeData,
+  ArchEdgeData,
+  ArchEdgeDataPatch,
+  EdgeWaypoint,
+  SubDiagram,
+} from '../domain/types';
+import type { EdgeEndpoints } from '../domain/edgeReconnect';
+import { recordUnflattenCall, recordStoreWrite } from '../perf/instrumentation';
 
 /**
  * DiagramStore is the same kind of seam TeamStore, RequirementsStore, and
@@ -107,10 +113,19 @@ export interface DiagramStore {
   subscribe(listener: () => void): () => void;
 
   /** Creates a new node at the given tree level and returns its id. */
-  addNode(parentPath: string[], type: string, position: { x: number; y: number }, data: ArchNodeData): string;
+  addNode(
+    parentPath: string[],
+    type: string,
+    position: { x: number; y: number },
+    data: ArchNodeData,
+  ): string;
   updateNode(id: string, patch: Partial<ArchNodeData>): void;
   updatePosition(id: string, position: { x: number; y: number }): void;
-  updateParentId(id: string, parentId: string | undefined, position: { x: number; y: number }): void;
+  updateParentId(
+    id: string,
+    parentId: string | undefined,
+    position: { x: number; y: number },
+  ): void;
   updateDimensions(id: string, width: number | undefined, height: number | undefined): void;
   /** Deletes the node, every descendant at any deeper parentPath (its
    * own sub-diagram tree, recursively), and every edge touching any of
@@ -137,7 +152,7 @@ export interface DiagramStore {
     target: string,
     data: ArchEdgeData,
     sourceHandle?: string | null,
-    targetHandle?: string | null
+    targetHandle?: string | null,
   ): string;
   updateEdge(id: string, patch: ArchEdgeDataPatch): void;
   deleteEdge(id: string): void;
@@ -201,7 +216,11 @@ export interface DiagramStore {
  * saved file, and in diagramStore.verify.ts's own check that the local
  * and Yjs stores produce edge data with the identical set of keys.
  */
-export function withWaypointAdded(data: ArchEdgeData, index: number, waypoint: EdgeWaypoint): ArchEdgeData {
+export function withWaypointAdded(
+  data: ArchEdgeData,
+  index: number,
+  waypoint: EdgeWaypoint,
+): ArchEdgeData {
   const current = data.waypoints ?? [];
   const clamped = Math.max(0, Math.min(index, current.length));
   const next = [...current.slice(0, clamped), waypoint, ...current.slice(clamped)];
@@ -211,13 +230,15 @@ export function withWaypointAdded(data: ArchEdgeData, index: number, waypoint: E
 export function withWaypointMoved(
   data: ArchEdgeData,
   waypointId: string,
-  position: { x: number; y: number }
+  position: { x: number; y: number },
 ): ArchEdgeData {
   const current = data.waypoints ?? [];
   if (!current.some((w) => w.id === waypointId)) return data;
   return {
     ...data,
-    waypoints: current.map((w) => (w.id === waypointId ? { ...w, x: position.x, y: position.y } : w)),
+    waypoints: current.map((w) =>
+      w.id === waypointId ? { ...w, x: position.x, y: position.y } : w,
+    ),
   };
 }
 
@@ -241,11 +262,15 @@ function withWaypointsOrNone(data: ArchEdgeData, waypoints: EdgeWaypoint[]): Arc
 }
 
 export function getNodesAtPath(nodes: Node<ArchNodeData>[], path: string[]): Node<ArchNodeData>[] {
-  return nodes.filter((n) => arraysEqual((n.data as ArchNodeData & { parentPath?: string[] }).parentPath ?? [], path));
+  return nodes.filter((n) =>
+    arraysEqual((n.data as ArchNodeData & { parentPath?: string[] }).parentPath ?? [], path),
+  );
 }
 
 export function getEdgesAtPath(edges: Edge<ArchEdgeData>[], path: string[]): Edge<ArchEdgeData>[] {
-  return edges.filter((e) => arraysEqual((e.data as ArchEdgeData & { parentPath?: string[] }).parentPath ?? [], path));
+  return edges.filter((e) =>
+    arraysEqual((e.data as ArchEdgeData & { parentPath?: string[] }).parentPath ?? [], path),
+  );
 }
 
 /** True if `nodeId` (itself at `parentPath`) has any node one level
@@ -256,13 +281,17 @@ export function getEdgesAtPath(edges: Edge<ArchEdgeData>[], path: string[]): Edg
  * separate "opened but empty" state to derive here - nothing in the app
  * ever actually creates one, so this is the only check that's ever
  * needed. */
-export function hasSubDiagram(nodes: Node<ArchNodeData>[], parentPath: string[], nodeId: string): boolean {
+export function hasSubDiagram(
+  nodes: Node<ArchNodeData>[],
+  parentPath: string[],
+  nodeId: string,
+): boolean {
   return getNodesAtPath(nodes, [...parentPath, nodeId]).length > 0;
 }
 
 /** A tree level as a single comparable string. NUL cannot appear in an id. */
 export function levelKey(path: readonly string[]): string {
-  return path.join("\u0000");
+  return path.join('\u0000');
 }
 
 /**
@@ -289,7 +318,10 @@ export function populatedLevels(nodes: Node<ArchNodeData>[]): Set<string> {
  * second caller (seedYjsDiagramDoc, used when starting a collaborative
  * session) needed the exact same logic, so the two don't drift apart by
  * each maintaining their own copy. */
-export function flattenSubDiagramTree(root: SubDiagram): { nodes: Node<ArchNodeData>[]; edges: Edge<ArchEdgeData>[] } {
+export function flattenSubDiagramTree(root: SubDiagram): {
+  nodes: Node<ArchNodeData>[];
+  edges: Edge<ArchEdgeData>[];
+} {
   const nodes: Node<ArchNodeData>[] = [];
   const edges: Edge<ArchEdgeData>[] = [];
   function walk(sd: SubDiagram, path: string[]) {
@@ -301,7 +333,10 @@ export function flattenSubDiagramTree(root: SubDiagram): { nodes: Node<ArchNodeD
     }
     for (const edge of sd.edges) {
       const level = levelFor(path, (edge.data as { parentPath?: unknown } | undefined)?.parentPath);
-      edges.push({ ...edge, data: { ...(edge.data as ArchEdgeData), parentPath: level } as ArchEdgeData });
+      edges.push({
+        ...edge,
+        data: { ...(edge.data as ArchEdgeData), parentPath: level } as ArchEdgeData,
+      });
     }
   }
   walk(root, []);
@@ -328,7 +363,9 @@ export function flattenSubDiagramTree(root: SubDiagram): { nodes: Node<ArchNodeD
  */
 function levelFor(treePath: string[], ownTag: unknown): string[] {
   if (treePath.length > 0) return treePath;
-  return Array.isArray(ownTag) && ownTag.every((s) => typeof s === "string") ? (ownTag as string[]) : treePath;
+  return Array.isArray(ownTag) && ownTag.every((s) => typeof s === 'string')
+    ? (ownTag as string[])
+    : treePath;
 }
 
 /** The inverse of flattenSubDiagramTree - rebuilds a recursive
@@ -344,13 +381,18 @@ function levelFor(treePath: string[], ownTag: unknown): string[] {
  * parentPath itself is dropped from each node/edge's data on the way
  * back out - it only ever existed to support the flat representation;
  * position in the rebuilt tree is what encodes nesting once again. */
-export function unflattenToSubDiagram(nodes: Node<ArchNodeData>[], edges: Edge<ArchEdgeData>[]): SubDiagram {
+export function unflattenToSubDiagram(
+  nodes: Node<ArchNodeData>[],
+  edges: Edge<ArchEdgeData>[],
+): SubDiagram {
   recordUnflattenCall();
   function buildLevel(path: string[]): SubDiagram {
     const levelNodes = getNodesAtPath(nodes, path).map((n) => {
       const restData: Record<string, unknown> = { ...(n.data as Record<string, unknown>) };
       delete restData.parentPath;
-      const childSubDiagram = hasSubDiagram(nodes, path, n.id) ? buildLevel([...path, n.id]) : undefined;
+      const childSubDiagram = hasSubDiagram(nodes, path, n.id)
+        ? buildLevel([...path, n.id])
+        : undefined;
       return { ...n, data: { ...restData, subDiagram: childSubDiagram } as ArchNodeData };
     });
     const levelEdges = getEdgesAtPath(edges, path).map((e) => {
@@ -380,14 +422,15 @@ export function getBreadcrumbLabelsFlat(nodes: Node<ArchNodeData>[], path: strin
   let resolved = true;
   return path.map((id, i) => {
     const node = resolved ? byId.get(id) : undefined;
-    const level = (node?.data as (ArchNodeData & { parentPath?: string[] }) | undefined)?.parentPath ?? [];
+    const level =
+      (node?.data as (ArchNodeData & { parentPath?: string[] }) | undefined)?.parentPath ?? [];
     if (!node || !arraysEqual(level, path.slice(0, i))) {
       // Once a segment fails to resolve, the tree walk descends into an empty
       // sub-diagram, so every later segment is unresolvable too.
       resolved = false;
-      return "Untitled";
+      return 'Untitled';
     }
-    return node.data.label ?? "Untitled";
+    return node.data.label ?? 'Untitled';
   });
 }
 
@@ -480,7 +523,9 @@ export function createLocalDiagramStore(initial?: {
       if (!target) return;
       const descendantPrefix = [...nodeParentPath(target), id];
       const removedIds = new Set(
-        nodes.filter((n) => n.id === id || isPathAtOrBelow(nodeParentPath(n), descendantPrefix)).map((n) => n.id)
+        nodes
+          .filter((n) => n.id === id || isPathAtOrBelow(nodeParentPath(n), descendantPrefix))
+          .map((n) => n.id),
       );
       nodes = nodes.filter((n) => !removedIds.has(n.id));
       edges = edges.filter((e) => !removedIds.has(e.source) && !removedIds.has(e.target));
@@ -496,7 +541,7 @@ export function createLocalDiagramStore(initial?: {
         target,
         sourceHandle,
         targetHandle,
-        type: "typed",
+        type: 'typed',
         data: { ...data, parentPath } as ArchEdgeData & { parentPath: string[] },
       };
       edges = [...edges, edge];
@@ -506,7 +551,9 @@ export function createLocalDiagramStore(initial?: {
 
     updateEdge: (id, patch) => {
       recordStoreWrite();
-      edges = edges.map((e) => (e.id === id ? { ...e, data: { ...(e.data as ArchEdgeData), ...patch } } : e));
+      edges = edges.map((e) =>
+        e.id === id ? { ...e, data: { ...(e.data as ArchEdgeData), ...patch } } : e,
+      );
       notify();
     },
 
@@ -527,7 +574,7 @@ export function createLocalDiagramStore(initial?: {
               sourceHandle: endpoints.sourceHandle ?? null,
               targetHandle: endpoints.targetHandle ?? null,
             }
-          : e
+          : e,
       );
       notify();
     },
@@ -535,7 +582,9 @@ export function createLocalDiagramStore(initial?: {
     addEdgeWaypoint: (edgeId, index, waypoint) => {
       recordStoreWrite();
       edges = edges.map((e) =>
-        e.id === edgeId ? { ...e, data: withWaypointAdded(e.data as ArchEdgeData, index, waypoint) } : e
+        e.id === edgeId
+          ? { ...e, data: withWaypointAdded(e.data as ArchEdgeData, index, waypoint) }
+          : e,
       );
       notify();
     },
@@ -543,7 +592,9 @@ export function createLocalDiagramStore(initial?: {
     moveEdgeWaypoint: (edgeId, waypointId, position) => {
       recordStoreWrite();
       edges = edges.map((e) =>
-        e.id === edgeId ? { ...e, data: withWaypointMoved(e.data as ArchEdgeData, waypointId, position) } : e
+        e.id === edgeId
+          ? { ...e, data: withWaypointMoved(e.data as ArchEdgeData, waypointId, position) }
+          : e,
       );
       notify();
     },
@@ -551,7 +602,9 @@ export function createLocalDiagramStore(initial?: {
     removeEdgeWaypoint: (edgeId, waypointId) => {
       recordStoreWrite();
       edges = edges.map((e) =>
-        e.id === edgeId ? { ...e, data: withWaypointRemoved(e.data as ArchEdgeData, waypointId) } : e
+        e.id === edgeId
+          ? { ...e, data: withWaypointRemoved(e.data as ArchEdgeData, waypointId) }
+          : e,
       );
       notify();
     },
@@ -559,7 +612,7 @@ export function createLocalDiagramStore(initial?: {
     clearEdgeWaypoints: (edgeId) => {
       recordStoreWrite();
       edges = edges.map((e) =>
-        e.id === edgeId ? { ...e, data: withWaypointsCleared(e.data as ArchEdgeData) } : e
+        e.id === edgeId ? { ...e, data: withWaypointsCleared(e.data as ArchEdgeData) } : e,
       );
       notify();
     },

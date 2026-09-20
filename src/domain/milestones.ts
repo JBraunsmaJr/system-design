@@ -1,13 +1,8 @@
-import type { RequirementsDocument, RequirementItem } from "./requirementsTypes.ts";
-import { isItemWorkable } from "./requirementsRegistry.ts";
+import type { RequirementsDocument, RequirementItem } from './requirementsTypes.ts';
+import { isItemWorkable } from './requirementsRegistry.ts';
 
 export type BuiltInMilestoneType =
-  | "release"
-  | "deadline"
-  | "review"
-  | "launch"
-  | "code-freeze"
-  | "pi-boundary";
+  'release' | 'deadline' | 'review' | 'launch' | 'code-freeze' | 'pi-boundary';
 
 export interface MilestoneTypeDefinition {
   id: string;
@@ -19,46 +14,46 @@ export interface MilestoneTypeDefinition {
 
 export const BUILT_IN_MILESTONE_TYPES: MilestoneTypeDefinition[] = [
   {
-    id: "release",
-    label: "Release",
-    iconName: "package",
-    color: "#9061f9", // Purple/Violet
-    description: "A planned product, increment, or capability release",
+    id: 'release',
+    label: 'Release',
+    iconName: 'package',
+    color: '#9061f9', // Purple/Violet
+    description: 'A planned product, increment, or capability release',
   },
   {
-    id: "deadline",
-    label: "Deadline",
-    iconName: "flag",
-    color: "#f0578c",
-    description: "A contractual, regulatory, or target deadline",
+    id: 'deadline',
+    label: 'Deadline',
+    iconName: 'flag',
+    color: '#f0578c',
+    description: 'A contractual, regulatory, or target deadline',
   },
   {
-    id: "review",
-    label: "Review",
-    iconName: "clipboard-check",
-    color: "#06b6d4",
-    description: "Architecture, security, or stakeholder review",
+    id: 'review',
+    label: 'Review',
+    iconName: 'clipboard-check',
+    color: '#06b6d4',
+    description: 'Architecture, security, or stakeholder review',
   },
   {
-    id: "launch",
-    label: "Launch",
-    iconName: "rocket",
-    color: "#0fa36b",
-    description: "Production or public go-live event",
+    id: 'launch',
+    label: 'Launch',
+    iconName: 'rocket',
+    color: '#0fa36b',
+    description: 'Production or public go-live event',
   },
   {
-    id: "code-freeze",
-    label: "Code Freeze",
-    iconName: "snowflake",
-    color: "#3b82f6",
-    description: "Stabilization cutoff date before deployment",
+    id: 'code-freeze',
+    label: 'Code Freeze',
+    iconName: 'snowflake',
+    color: '#3b82f6',
+    description: 'Stabilization cutoff date before deployment',
   },
   {
-    id: "pi-boundary",
-    label: "PI Boundary",
-    iconName: "calendar",
-    color: "#f59e0b",
-    description: "Planning interval transition boundary",
+    id: 'pi-boundary',
+    label: 'PI Boundary',
+    iconName: 'calendar',
+    color: '#f59e0b',
+    description: 'Planning interval transition boundary',
   },
 ];
 
@@ -91,7 +86,7 @@ export interface Milestone {
 
 /** Validation errors representation */
 export interface MilestoneValidationError {
-  field: keyof Milestone | "general";
+  field: keyof Milestone | 'general';
   message: string;
 }
 
@@ -109,36 +104,35 @@ export function getMilestoneRelatedItemIds(milestone: Partial<Milestone>): strin
  */
 export function validateMilestone(
   milestone: Partial<Milestone>,
-  requirementsDoc?: RequirementsDocument
+  requirementsDoc?: RequirementsDocument,
 ): MilestoneValidationError[] {
   const errors: MilestoneValidationError[] = [];
 
   // Required name (FR-001, Section 12)
-  if (!milestone.name || milestone.name.trim() === "") {
-    errors.push({ field: "name", message: "Milestone name is required." });
+  if (!milestone.name || milestone.name.trim() === '') {
+    errors.push({ field: 'name', message: 'Milestone name is required.' });
   }
 
   // Required scheduled date (FR-001, FR-002, DR-002, Section 12)
-  if (!milestone.scheduledAt || milestone.scheduledAt.trim() === "") {
-    errors.push({ field: "scheduledAt", message: "Scheduled date is required." });
+  if (!milestone.scheduledAt || milestone.scheduledAt.trim() === '') {
+    errors.push({ field: 'scheduledAt', message: 'Scheduled date is required.' });
   } else if (!/^\d{4}-\d{2}-\d{2}$/.test(milestone.scheduledAt)) {
-    errors.push({ field: "scheduledAt", message: "Scheduled date must be in YYYY-MM-DD format." });
+    errors.push({ field: 'scheduledAt', message: 'Scheduled date must be in YYYY-MM-DD format.' });
   } else {
     // Check for valid calendar date
-    const [y, m, d] = milestone.scheduledAt.split("-").map(Number);
+    const [y, m, d] = milestone.scheduledAt.split('-').map(Number);
     const date = new Date(Date.UTC(y, m - 1, d));
-    if (
-      date.getUTCFullYear() !== y ||
-      date.getUTCMonth() !== m - 1 ||
-      date.getUTCDate() !== d
-    ) {
-      errors.push({ field: "scheduledAt", message: "Scheduled date is not a valid calendar date." });
+    if (date.getUTCFullYear() !== y || date.getUTCMonth() !== m - 1 || date.getUTCDate() !== d) {
+      errors.push({
+        field: 'scheduledAt',
+        message: 'Scheduled date is not a valid calendar date.',
+      });
     }
   }
 
   // Type validation
-  if (milestone.type !== undefined && (!milestone.type || milestone.type.trim() === "")) {
-    errors.push({ field: "type", message: "Milestone type must not be empty." });
+  if (milestone.type !== undefined && (!milestone.type || milestone.type.trim() === '')) {
+    errors.push({ field: 'type', message: 'Milestone type must not be empty.' });
   }
 
   // Related items validation (FR-005, Section 12)
@@ -148,7 +142,8 @@ export function validateMilestone(
 
     for (const itemId of relatedIds) {
       if (!existingItemIds.has(itemId)) {
-        const errorField: keyof Milestone = milestone.relatedItemIds !== undefined ? "relatedItemIds" : "relatedWorkableItemIds";
+        const errorField: keyof Milestone =
+          milestone.relatedItemIds !== undefined ? 'relatedItemIds' : 'relatedWorkableItemIds';
         errors.push({
           field: errorField,
           message: `Referenced requirement item '${itemId}' does not exist.`,
@@ -165,18 +160,18 @@ export function validateMilestone(
  */
 export function sanitizeRelatedItemIds(ids: string[] | undefined): string[] {
   if (!ids || !Array.isArray(ids)) return [];
-  return Array.from(new Set(ids.filter((id) => typeof id === "string" && id.trim() !== "")));
+  return Array.from(new Set(ids.filter((id) => typeof id === 'string' && id.trim() !== '')));
 }
 
 /**
  * Returns the effective color for a milestone (custom override or type default).
  */
 export function getMilestoneColor(milestone: Milestone): string {
-  if (milestone.color && milestone.color.trim() !== "") {
+  if (milestone.color && milestone.color.trim() !== '') {
     return milestone.color;
   }
   const typeDef = BUILT_IN_MILESTONE_TYPES.find((t) => t.id === milestone.type);
-  return typeDef?.color ?? "#9061f9";
+  return typeDef?.color ?? '#9061f9';
 }
 
 /**
@@ -184,7 +179,7 @@ export function getMilestoneColor(milestone: Milestone): string {
  */
 export function getMilestoneTypeLabel(type: string): string {
   const typeDef = BUILT_IN_MILESTONE_TYPES.find((t) => t.id === type);
-  return typeDef?.label ?? (type.charAt(0).toUpperCase() + type.slice(1));
+  return typeDef?.label ?? type.charAt(0).toUpperCase() + type.slice(1);
 }
 
 /**
@@ -193,20 +188,15 @@ export function getMilestoneTypeLabel(type: string): string {
 export function filterMilestonesByDateRange(
   milestones: Milestone[],
   startDate: string,
-  endDate: string
+  endDate: string,
 ): Milestone[] {
-  return milestones.filter(
-    (m) => m.scheduledAt >= startDate && m.scheduledAt <= endDate
-  );
+  return milestones.filter((m) => m.scheduledAt >= startDate && m.scheduledAt <= endDate);
 }
 
 /**
  * Returns all milestones that reference a given requirement item ID (FR-005).
  */
-export function findMilestonesForItem(
-  milestones: Milestone[],
-  itemId: string
-): Milestone[] {
+export function findMilestonesForItem(milestones: Milestone[], itemId: string): Milestone[] {
   return milestones.filter((m) => {
     const ids = getMilestoneRelatedItemIds(m);
     return ids.includes(itemId);
@@ -218,7 +208,7 @@ export function findMilestonesForItem(
  */
 export function findMilestonesForWorkableItem(
   milestones: Milestone[],
-  workableItemId: string
+  workableItemId: string,
 ): Milestone[] {
   return findMilestonesForItem(milestones, workableItemId);
 }
@@ -228,7 +218,7 @@ export function findMilestonesForWorkableItem(
  */
 export function getMilestoneItems(
   milestone: Milestone,
-  doc: RequirementsDocument
+  doc: RequirementsDocument,
 ): RequirementItem[] {
   const ids = new Set(getMilestoneRelatedItemIds(milestone));
   return doc.items.filter((item) => ids.has(item.id));
@@ -239,7 +229,7 @@ export function getMilestoneItems(
  */
 export function getMilestoneWorkableItems(
   milestone: Milestone,
-  doc: RequirementsDocument
+  doc: RequirementsDocument,
 ): RequirementItem[] {
   return getMilestoneItems(milestone, doc).filter((item) => isItemWorkable(doc, item));
 }
@@ -249,7 +239,7 @@ export function getMilestoneWorkableItems(
  */
 export function getMilestoneNonWorkableItems(
   milestone: Milestone,
-  doc: RequirementsDocument
+  doc: RequirementsDocument,
 ): RequirementItem[] {
   return getMilestoneItems(milestone, doc).filter((item) => !isItemWorkable(doc, item));
 }
@@ -260,7 +250,7 @@ export function getMilestoneNonWorkableItems(
 export function filterMilestoneItemsByType(
   milestone: Milestone,
   doc: RequirementsDocument,
-  typeId: string
+  typeId: string,
 ): RequirementItem[] {
   return getMilestoneItems(milestone, doc).filter((item) => item.typeId === typeId);
 }

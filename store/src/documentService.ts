@@ -13,8 +13,8 @@
  * One transaction covers the version bump, the blob, and the index row
  * (WS8-R16), so a failure part-way leaves nothing behind.
  */
-import type { BlobStore } from "./blobStore.ts";
-import { parseRetentionPeriod, purgeDueAt, type RetentionPeriod } from "./retention.ts";
+import type { BlobStore } from './blobStore.ts';
+import { parseRetentionPeriod, purgeDueAt, type RetentionPeriod } from './retention.ts';
 
 export interface StoredBlobMeta {
   blobId: string;
@@ -62,23 +62,28 @@ export interface AppendRequest {
   expectedVersion?: number;
 }
 
-export type StoreErrorReason = "not-found" | "conflict" | "stale-version" | "deleted" | "too-large" | "quota";
+export type StoreErrorReason =
+  'not-found' | 'conflict' | 'stale-version' | 'deleted' | 'too-large' | 'quota';
 
 export class StoreError extends Error {
   reason: StoreErrorReason;
 
   constructor(message: string, reason: StoreErrorReason) {
     super(message);
-    this.name = "StoreError";
+    this.name = 'StoreError';
     this.reason = reason;
   }
 }
 
 export interface DocumentServiceOptions<Tx> {
   blobs: BlobStore<Tx>;
+
   begin(): Tx;
+
   commit(tx: Tx): void | Promise<void>;
+
   rollback(tx: Tx): void | Promise<void>;
+
   /** Injected so tests can freeze it and so audit rows and version bumps
    * agree on one moment. */
   now?: () => Date;
@@ -92,7 +97,7 @@ export interface DocumentServiceOptions<Tx> {
 
 export interface CreateRequest {
   docId: string;
-  keys: DocumentRecord["keys"];
+  keys: DocumentRecord['keys'];
 }
 
 export interface ReadOptions {
@@ -126,15 +131,15 @@ export function createDocumentService<Tx>(options: DocumentServiceOptions<Tx>) {
 
   function require(docId: string, opts: ReadOptions = {}): Row {
     const row = rows.get(docId);
-    if (!row) throw new StoreError(`No document ${docId}.`, "not-found");
+    if (!row) throw new StoreError(`No document ${docId}.`, 'not-found');
     if (row.record.deletedAt && !opts.includeDeleted) {
-      throw new StoreError(`Document ${docId} is deleted.`, "deleted");
+      throw new StoreError(`Document ${docId} is deleted.`, 'deleted');
     }
     if (opts.seenVersion !== undefined && row.record.version < opts.seenVersion) {
       throw new StoreError(
         `The store returned version ${row.record.version} for ${docId}, but version ${opts.seenVersion} has already been seen. ` +
           `Refusing to go backwards.`,
-        "stale-version",
+        'stale-version',
       );
     }
     return row;
@@ -142,7 +147,8 @@ export function createDocumentService<Tx>(options: DocumentServiceOptions<Tx>) {
 
   return {
     async create(request: CreateRequest): Promise<DocumentRecord> {
-      if (rows.has(request.docId)) throw new StoreError(`Document ${request.docId} already exists.`, "conflict");
+      if (rows.has(request.docId))
+        throw new StoreError(`Document ${request.docId} already exists.`, 'conflict');
       const at = now().toISOString();
       const record: DocumentRecord = {
         docId: request.docId,
@@ -161,21 +167,24 @@ export function createDocumentService<Tx>(options: DocumentServiceOptions<Tx>) {
     async append(request: AppendRequest): Promise<AppendResult> {
       const row = require(request.docId);
       if (request.bytes.length > maxBlobBytes) {
-        throw new StoreError(`A blob of ${request.bytes.length} bytes exceeds the ${maxBlobBytes}-byte limit.`, "too-large");
+        throw new StoreError(
+          `A blob of ${request.bytes.length} bytes exceeds the ${maxBlobBytes}-byte limit.`,
+          'too-large',
+        );
       }
       if (row.record.blobs.length >= maxBlobsPerDocument) {
         throw new StoreError(
           `Document ${request.docId} already holds ${row.record.blobs.length} blobs, the configured limit. Compact it before appending more.`,
-          "quota",
+          'quota',
         );
       }
       if ((await options.blobs.totalBytes()) + request.bytes.length > maxTotalBytes) {
-        throw new StoreError(`This workspace has reached its storage quota.`, "quota");
+        throw new StoreError(`This workspace has reached its storage quota.`, 'quota');
       }
       if (request.expectedVersion !== undefined && request.expectedVersion !== row.record.version) {
         throw new StoreError(
           `Expected version ${request.expectedVersion}, but ${request.docId} is at ${row.record.version}.`,
-          "conflict",
+          'conflict',
         );
       }
       const blobId = `b${(++blobCounter).toString(36)}`;
@@ -188,7 +197,13 @@ export function createDocumentService<Tx>(options: DocumentServiceOptions<Tx>) {
         await options.commit(tx);
         row.record.version = version;
         row.record.updatedAt = at;
-        const meta: StoredBlobMeta = { blobId, kind: request.kind, bytes: request.bytes.length, createdAt: at, version };
+        const meta: StoredBlobMeta = {
+          blobId,
+          kind: request.kind,
+          bytes: request.bytes.length,
+          createdAt: at,
+          version,
+        };
         row.record.blobs.push(meta);
         row.blobIds.push(blobId);
         return { docId: request.docId, version, updatedAt: at, blob: { ...meta } };
@@ -233,7 +248,13 @@ export function createDocumentService<Tx>(options: DocumentServiceOptions<Tx>) {
       return structuredClone(row.record);
     },
 
-    async read(docId: string, opts: ReadOptions = {}): Promise<{ record: DocumentRecord; blobs: { meta: StoredBlobMeta; bytes: Uint8Array }[] }> {
+    async read(
+      docId: string,
+      opts: ReadOptions = {},
+    ): Promise<{
+      record: DocumentRecord;
+      blobs: { meta: StoredBlobMeta; bytes: Uint8Array }[];
+    }> {
       const row = require(docId, opts);
       const blobs: { meta: StoredBlobMeta; bytes: Uint8Array }[] = [];
       for (const meta of row.record.blobs) {
@@ -269,14 +290,17 @@ export function createDocumentService<Tx>(options: DocumentServiceOptions<Tx>) {
       const due = row.record.legalHold ? null : purgeDueAt(retention, at);
       row.record.purgeAfter = due ? due.toISOString() : null;
       const deleted = structuredClone(row.record);
-      if (retention.kind === "immediate" && !row.record.legalHold) {
+      if (retention.kind === 'immediate' && !row.record.legalHold) {
         await this.purge(docId);
       }
       return deleted;
     },
 
     /** WS10-R8. Held documents survive purge, and survive `immediate`. */
-    async setLegalHold(docId: string, hold: { reason: string; placedBy: string } | null): Promise<DocumentRecord> {
+    async setLegalHold(
+      docId: string,
+      hold: { reason: string; placedBy: string } | null,
+    ): Promise<DocumentRecord> {
       const row = require(docId, { includeDeleted: true });
       row.record.legalHold = hold ? { ...hold, placedAt: now().toISOString() } : null;
       if (hold) row.record.purgeAfter = null;
@@ -290,7 +314,13 @@ export function createDocumentService<Tx>(options: DocumentServiceOptions<Tx>) {
     /** The sweep: everything past its retention and not held. */
     async purgeDue(at: Date = now()): Promise<string[]> {
       const due = [...rows.values()]
-        .filter((row) => row.record.deletedAt && !row.record.legalHold && row.record.purgeAfter && new Date(row.record.purgeAfter) <= at)
+        .filter(
+          (row) =>
+            row.record.deletedAt &&
+            !row.record.legalHold &&
+            row.record.purgeAfter &&
+            new Date(row.record.purgeAfter) <= at,
+        )
         .map((row) => row.record.docId);
       for (const docId of due) await this.purge(docId);
       return due;
@@ -298,7 +328,8 @@ export function createDocumentService<Tx>(options: DocumentServiceOptions<Tx>) {
 
     async restore(docId: string): Promise<DocumentRecord> {
       const row = require(docId, { includeDeleted: true });
-      if (!row.record.deletedAt) throw new StoreError(`Document ${docId} is not deleted.`, "conflict");
+      if (!row.record.deletedAt)
+        throw new StoreError(`Document ${docId} is not deleted.`, 'conflict');
       row.record.deletedAt = null;
       row.record.purgeAfter = null;
       row.record.version += 1;
@@ -309,11 +340,11 @@ export function createDocumentService<Tx>(options: DocumentServiceOptions<Tx>) {
     /** Irreversible; only for a document whose retention has ended (WS10-R4). */
     async purge(docId: string): Promise<void> {
       const row = rows.get(docId);
-      if (!row) throw new StoreError(`No document ${docId}.`, "not-found");
+      if (!row) throw new StoreError(`No document ${docId}.`, 'not-found');
       if (row.record.legalHold) {
         throw new StoreError(
           `Document ${docId} is under legal hold (${row.record.legalHold.reason}) and cannot be purged until it is released.`,
-          "conflict",
+          'conflict',
         );
       }
       const tx = options.begin();
@@ -335,7 +366,10 @@ export function createDocumentService<Tx>(options: DocumentServiceOptions<Tx>) {
      * identity and version history are untouched; this is compaction, never
      * a rebase.
      */
-    async compact(docId: string, snapshot: { kind: string; bytes: Uint8Array }): Promise<DocumentRecord> {
+    async compact(
+      docId: string,
+      snapshot: { kind: string; bytes: Uint8Array },
+    ): Promise<DocumentRecord> {
       const row = require(docId);
       const blobId = `b${(++blobCounter).toString(36)}`;
       const superseded = row.blobIds.map((id) => ({ docId, blobId: id }));
@@ -348,7 +382,15 @@ export function createDocumentService<Tx>(options: DocumentServiceOptions<Tx>) {
         await options.commit(tx);
         row.record.version = version;
         row.record.updatedAt = at;
-        row.record.blobs = [{ blobId, kind: snapshot.kind, bytes: snapshot.bytes.length, createdAt: at, version }];
+        row.record.blobs = [
+          {
+            blobId,
+            kind: snapshot.kind,
+            bytes: snapshot.bytes.length,
+            createdAt: at,
+            version,
+          },
+        ];
         row.blobIds = [blobId];
       } catch (error) {
         await options.rollback(tx);

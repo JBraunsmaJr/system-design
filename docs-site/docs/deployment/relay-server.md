@@ -130,8 +130,8 @@ an auth check would go, and no check:
 
 ```js
 server.on('upgrade', (request, socket, head) => {
-    // You may check auth of request here..
-})
+  // You may check auth of request here..
+});
 ```
 
 Anyone who can reach the relay can subscribe to any topic, and **topics
@@ -178,7 +178,7 @@ stun:global.stun.twilio.com:3478
 What that costs you depends on your network:
 
 | Situation                                       | Works without STUN?                                                                                                   |
-|-------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | All users on the same flat LAN / subnet         | **Yes.** Host candidates are sufficient — the browsers can see each other's local addresses directly.                 |
 | Users across subnets, with routing between them | **Usually.** Depends on whether the routed addresses appear as host candidates. Test it.                              |
 | Users behind NAT from each other                | **No.** Requires STUN to discover external addresses, and often TURN to relay when a direct connection can't be made. |
@@ -219,7 +219,7 @@ connection time.
 There are three meaningful states:
 
 | Value         | Result                                                  |
-|---------------|---------------------------------------------------------|
+| ------------- | ------------------------------------------------------- |
 | unset / blank | The library's own defaults stay in place (public STUN). |
 | `none`        | **No ICE servers at all.** Host candidates only.        |
 | a list        | Exactly those servers, replacing the defaults.          |
@@ -247,6 +247,7 @@ For topologies that genuinely need TURN, run something like
 
    Use `none` if every user is on one LAN; point it at an internal
    STUN/TURN server if they aren't.
+
 3. Run the relay somewhere reachable from every client.
 4. Terminate TLS in front of it if the app is served over HTTPS.
 5. Confirm two browsers on the target network can actually reach each
@@ -273,6 +274,7 @@ curl http://localhost:4444/
 ```
 
 Common causes:
+
 - **`ws://` on an HTTPS page**: Blocked as mixed content, silently. Use `wss://`.
 - **No scheme at all**: `relay.example.com` is not valid; specify `wss://` or `ws://`.
 - **A TLS alert during handshake**: Certificate issuance issue on your proxy.

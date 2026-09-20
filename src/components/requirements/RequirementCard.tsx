@@ -1,24 +1,24 @@
-import { memo, useEffect, useRef, useState } from "react";
-import { Trash2 } from "lucide-react";
-import { getItemType, isItemWorkable } from "../../domain/requirementsRegistry";
-import type { LinkedNodeRef, DiagramPath } from "../../domain/subDiagramTree";
-import { RequirementBody } from "./RequirementBody";
-import { peerBadgesAreEqual } from "../../domain/presenceComparison";
-import { LinkedDiagramsSection } from "./LinkedDiagramsSection";
-import { RequirementEditor } from "./RequirementEditor";
-import { CategoryPicker } from "./CategoryPicker";
-import { StatusPicker } from "./StatusPicker";
-import { TypePicker } from "./TypePicker";
-import { SprintPicker } from "./SprintPicker";
-import { RelationshipManager } from "./RelationshipManager";
-import { MemberPicker } from "../team/MemberPicker";
-import { PointsPicker } from "../team/PointsPicker";
-import { HighlightedText, HighlightedTitle } from "./HighlightText";
-import type { RequirementItem, RequirementsDocument } from "../../domain/requirementsTypes";
-import type { ProgramIncrement } from "../../domain/programIncrements";
-import type { TeamDocument } from "../../domain/teamTypes";
-import type { SubDiagram } from "../../domain/types";
-import type { PresenceInfo } from "../../collab/session";
+import { memo, useEffect, useRef, useState } from 'react';
+import { Trash2 } from 'lucide-react';
+import { getItemType, isItemWorkable } from '../../domain/requirementsRegistry';
+import type { LinkedNodeRef, DiagramPath } from '../../domain/subDiagramTree';
+import { RequirementBody } from './RequirementBody';
+import { peerBadgesAreEqual } from '../../domain/presenceComparison';
+import { LinkedDiagramsSection } from './LinkedDiagramsSection';
+import { RequirementEditor } from './RequirementEditor';
+import { CategoryPicker } from './CategoryPicker';
+import { StatusPicker } from './StatusPicker';
+import { TypePicker } from './TypePicker';
+import { SprintPicker } from './SprintPicker';
+import { RelationshipManager } from './RelationshipManager';
+import { MemberPicker } from '../team/MemberPicker';
+import { PointsPicker } from '../team/PointsPicker';
+import { HighlightedText, HighlightedTitle } from './HighlightText';
+import type { RequirementItem, RequirementsDocument } from '../../domain/requirementsTypes';
+import type { ProgramIncrement } from '../../domain/programIncrements';
+import type { TeamDocument } from '../../domain/teamTypes';
+import type { SubDiagram } from '../../domain/types';
+import type { PresenceInfo } from '../../collab/session';
 
 interface RequirementCardProps {
   item: RequirementItem;
@@ -107,11 +107,14 @@ function RequirementCardImpl({
       // Used as the scroll-to target for reference navigation - see
       // RequirementsView's onNavigateToItem.
       id={`requirement-${item.id}`}
-      className={`requirement-card${highlighted ? " is-highlighted" : ""}`}
+      className={`requirement-card${highlighted ? ' is-highlighted' : ''}`}
     >
       <div className="requirement-card__header">
         <div className="requirement-card__header-row">
-          <span className="requirement-card__id" style={{ color: type?.color ?? "var(--chrome-text-dim)" }}>
+          <span
+            className="requirement-card__id"
+            style={{ color: type?.color ?? 'var(--chrome-text-dim)' }}
+          >
             <HighlightedText text={item.id} search={searchQuery} />
           </span>
           <TypePicker
@@ -126,16 +129,26 @@ function RequirementCardImpl({
             }}
           />
           {peersHere.length > 0 && (
-            <span className="requirement-card__peers" title={`${peersHere.map((p) => p.name).join(", ")} ${peersHere.length === 1 ? "is" : "are"} editing this`}>
+            <span
+              className="requirement-card__peers"
+              title={`${peersHere.map((p) => p.name).join(', ')} ${peersHere.length === 1 ? 'is' : 'are'} editing this`}
+            >
               {peersHere.map((p) => (
-                <span key={p.clientId} className="requirement-card__peer-dot" style={{ backgroundColor: p.color }}>
+                <span
+                  key={p.clientId}
+                  className="requirement-card__peer-dot"
+                  style={{ backgroundColor: p.color }}
+                >
                   {p.name.charAt(0).toUpperCase()}
                 </span>
               ))}
             </span>
           )}
           {isItemWorkable(doc, item) && (
-            <StatusPicker status={item.status} onChange={(status) => onUpdateItem(item.id, { status })} />
+            <StatusPicker
+              status={item.status}
+              onChange={(status) => onUpdateItem(item.id, { status })}
+            />
           )}
           <CategoryPicker
             doc={doc}
@@ -188,7 +201,7 @@ function RequirementCardImpl({
             onChange={(e) => onUpdateItem(item.id, { title: e.target.value })}
             onBlur={() => setIsEditingTitle(false)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === "Escape") {
+              if (e.key === 'Enter' || e.key === 'Escape') {
                 setIsEditingTitle(false);
               }
             }}
@@ -201,7 +214,7 @@ function RequirementCardImpl({
             aria-label={`Title for ${item.id}`}
             onClick={() => setIsEditingTitle(true)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
+              if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
                 setIsEditingTitle(true);
               }
@@ -223,7 +236,12 @@ function RequirementCardImpl({
         />
       ) : (
         <div onDoubleClick={() => setIsEditingBody(true)} className="requirement-card__body-wrap">
-          <RequirementBody text={item.body} doc={doc} onNavigateToItem={onNavigateToItem} searchQuery={searchQuery} />
+          <RequirementBody
+            text={item.body}
+            doc={doc}
+            onNavigateToItem={onNavigateToItem}
+            searchQuery={searchQuery}
+          />
         </div>
       )}
       <RelationshipManager

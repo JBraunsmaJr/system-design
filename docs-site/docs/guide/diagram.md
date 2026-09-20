@@ -50,24 +50,24 @@ model high-level architectures at the root while encapsulating low-level impleme
 ### How to Use Sub-Diagrams
 
 1. **Creating a Sub-Diagram**:
-    - Select any architectural node on the canvas.
-    - In the right-hand Inspector panel, click **Create sub-diagram →** (or **Open sub-diagram** if one exists).
+   - Select any architectural node on the canvas.
+   - In the right-hand Inspector panel, click **Create sub-diagram →** (or **Open sub-diagram** if one exists).
 
 ![how to create a sub-diagram](../images/diagram/diagram-create-sub.png)
 
 2. **Editing Nested Layers**:
-    - The canvas transitions into the isolated sub-diagram view.
-    - Add nodes, edges, and annotations specific to that component's internal architecture.
+   - The canvas transitions into the isolated sub-diagram view.
+   - Add nodes, edges, and annotations specific to that component's internal architecture.
 
 3. **Breadcrumb Navigation**:
-    - A persistent breadcrumb bar at the top of the canvas (`Root › Service A › Worker Pool`) tracks your current
-      abstraction level.
-    - Click any breadcrumb segment to jump directly back to higher levels.
+   - A persistent breadcrumb bar at the top of the canvas (`Root › Service A › Worker Pool`) tracks your current
+     abstraction level.
+   - Click any breadcrumb segment to jump directly back to higher levels.
 
 ![breadcrumb navigation](../images/diagram/diagram-sub-navigation.png)
 
 4. **Hierarchy Management**:
-    - Deleting a parent node cleanly cascades and removes its underlying sub-diagram structure.
+   - Deleting a parent node cleanly cascades and removes its underlying sub-diagram structure.
 
 ---
 
@@ -81,8 +81,8 @@ Static diagrams often fail to convey runtime execution order, request lifecycles
 ![scenario creation](../images/diagram/scenario-create.png)
 
 1. Click **Scenarios** (film icon) in the top toolbar or bottom tray to open the **Scenario Panel**.
-2. Click **+ New Scenario** and give your scenario a descriptive title (e.g., *"User Authentication & Token Refresh
-   Flow"* or *"Payment Processing with Circuit Breaking"*).
+2. Click **+ New Scenario** and give your scenario a descriptive title (e.g., _"User Authentication & Token Refresh
+   Flow"_ or _"Payment Processing with Circuit Breaking"_).
 3. Click **Add Step** to create a presentation sequence. Any selected node and edge wil be added to the step.
 
 ![scenario step configuration](../images/diagram/scenario-add-to.png)
@@ -132,9 +132,9 @@ Architectural components do not exist in isolation; they implement specific func
 1. **Select a Component**: Click any architectural node or shape on the canvas to open the **Inspector Panel** on the right.
 2. **Open the Linker**: In the Inspector panel, locate the **Linked requirements** section and click **+ Link requirement**.
 3. **Search & Select**:
-    - Type in the search box to filter existing requirements by their ID (e.g., `REQ-001`) or title keywords.
-    - Click any requirement from the dropdown to link it to the selected component.
-    - The dropdown stays open so you can link multiple requirements in succession.
+   - Type in the search box to filter existing requirements by their ID (e.g., `REQ-001`) or title keywords.
+   - Click any requirement from the dropdown to link it to the selected component.
+   - The dropdown stays open so you can link multiple requirements in succession.
 
 ### Managing & Navigating Linked Requirements
 
@@ -153,7 +153,7 @@ and technical documentation.
 ### Export Formats
 
 | Format           | Best Used For                                       | Features                                                                |
-|:-----------------|:----------------------------------------------------|:------------------------------------------------------------------------|
+| :--------------- | :-------------------------------------------------- | :---------------------------------------------------------------------- |
 | **SVG** (Vector) | Web documentation, Markdown wikis, scalable print   | Infinite resolution scaling, crisp text, vector paths, small file size. |
 | **PNG** (Raster) | Slide decks, messaging apps, tickets, email reports | High-DPI rasterization, universal image viewer compatibility.           |
 

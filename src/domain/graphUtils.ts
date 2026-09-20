@@ -1,4 +1,4 @@
-import type { Node } from "@xyflow/react";
+import type { Node } from '@xyflow/react';
 
 /**
  * React Flow requires a parent node to appear before its children in the
@@ -7,16 +7,16 @@ import type { Node } from "@xyflow/react";
  * otherwise, so this is safe to call after every add/reparent.
  */
 export function reorderWithGroupsFirst<T extends { type?: string }>(nodes: T[]): T[] {
-  const groups = nodes.filter((n) => n.type === "group");
-  const rest = nodes.filter((n) => n.type !== "group");
+  const groups = nodes.filter((n) => n.type === 'group');
+  const rest = nodes.filter((n) => n.type !== 'group');
   return [...groups, ...rest];
 }
 
 /** Converts a node's position to canvas-absolute coordinates, given its current parent (if any). */
 export function toAbsolutePosition(
-  node: Pick<Node, "position">,
+  node: Pick<Node, 'position'>,
   allNodes: Node[],
-  parentId: string | undefined
+  parentId: string | undefined,
 ): { x: number; y: number } {
   if (!parentId) return node.position;
   const parent = allNodes.find((n) => n.id === parentId);
@@ -35,14 +35,14 @@ export interface Rect {
  * Checks whether a node is fully contained inside a given bounding rect (in canvas-absolute coordinates).
  */
 export function isNodeContainedInRect(
-  node: Pick<Node, "position"> & {
+  node: Pick<Node, 'position'> & {
     parentId?: string;
     width?: number;
     height?: number;
     measured?: { width?: number; height?: number };
   },
   allNodes: Node[],
-  rect: Rect
+  rect: Rect,
 ): boolean {
   const absPos = toAbsolutePosition(node, allNodes, node.parentId);
   const w = node.width ?? node.measured?.width ?? 0;
@@ -61,13 +61,13 @@ export function isNodeContainedInRect(
 export function findNodesContainedInRect<T extends Node>(
   rect: Rect,
   allNodes: T[],
-  groupIdToExclude?: string
+  groupIdToExclude?: string,
 ): T[] {
   return allNodes.filter((n) => {
     if (groupIdToExclude && (n.id === groupIdToExclude || n.parentId === groupIdToExclude)) {
       return false;
     }
-    if (n.type === "group") {
+    if (n.type === 'group') {
       return false;
     }
     return isNodeContainedInRect(n, allNodes, rect);

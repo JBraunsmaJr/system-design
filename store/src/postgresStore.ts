@@ -10,13 +10,13 @@
  * wrapped keys. Nothing here interprets them, and a database dump reveals no
  * document content.
  */
-import { readFileSync } from "fs";
-import { dirname, join } from "path";
-import { fileURLToPath } from "url";
-import pg from "pg";
-import type { BlobRef, BlobStore } from "./blobStore.ts";
-import { parseRetentionPeriod, purgeDueAt, type RetentionPeriod } from "./retention.ts";
-import { IndexError, type WorkspaceIndexStore } from "./workspaceIndex.ts";
+import { readFileSync } from 'fs';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
+import pg from 'pg';
+import type { BlobRef, BlobStore } from './blobStore.ts';
+import { parseRetentionPeriod, purgeDueAt, type RetentionPeriod } from './retention.ts';
+import { IndexError, type WorkspaceIndexStore } from './workspaceIndex.ts';
 import {
   StoreError,
   type AppendRequest,
@@ -25,7 +25,7 @@ import {
   type DocumentRecord,
   type ReadOptions,
   type StoredBlobMeta,
-} from "./documentService.ts";
+} from './documentService.ts';
 
 export type PgTx = pg.PoolClient;
 
@@ -39,11 +39,11 @@ export interface PostgresStoreOptions {
   now?: () => Date;
 }
 
-const schemaPath = join(dirname(fileURLToPath(import.meta.url)), "..", "schema.sql");
+const schemaPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'schema.sql');
 
 export function createPostgresBlobStore(pool: pg.Pool): BlobStore<PgTx> {
   return {
-    kind: "postgres",
+    kind: 'postgres',
 
     async put(ref, bytes, tx) {
       // Joins the caller's transaction: the row in `blobs` and these bytes
@@ -73,8 +73,13 @@ export function createPostgresBlobStore(pool: pg.Pool): BlobStore<PgTx> {
 
     async totalBytes(docId) {
       const result = docId
-        ? await pool.query<{ total: string | null }>(`SELECT SUM(LENGTH(bytes)) AS total FROM blob_data WHERE doc_id = $1`, [docId])
-        : await pool.query<{ total: string | null }>(`SELECT SUM(LENGTH(bytes)) AS total FROM blob_data`);
+        ? await pool.query<{ total: string | null }>(
+            `SELECT SUM(LENGTH(bytes)) AS total FROM blob_data WHERE doc_id = $1`,
+            [docId],
+          )
+        : await pool.query<{ total: string | null }>(
+            `SELECT SUM(LENGTH(bytes)) AS total FROM blob_data`,
+          );
       return Number(result.rows[0]?.total ?? 0);
     },
   };
@@ -115,11 +120,13 @@ const toRecord = (row: DocumentRow, blobs: StoredBlobMeta[]): DocumentRecord => 
   deletedAt: row.deleted_at ? row.deleted_at.toISOString() : null,
   purgeAfter: row.purge_after ? row.purge_after.toISOString() : null,
   legalHold: row.legal_hold
-    ? { reason: row.legal_hold_reason ?? "", placedBy: "", placedAt: row.updated_at.toISOString() }
+    ? { reason: row.legal_hold_reason ?? '', placedBy: '', placedAt: row.updated_at.toISOString() }
     : null,
   keys: {
-    wrappedForWorkspace: row.wrapped_for_workspace.toString("base64"),
-    ...(row.wrapped_for_recovery ? { wrappedForRecovery: row.wrapped_for_recovery.toString("base64") } : {}),
+    wrappedForWorkspace: row.wrapped_for_workspace.toString('base64'),
+    ...(row.wrapped_for_recovery
+      ? { wrappedForRecovery: row.wrapped_for_recovery.toString('base64') }
+      : {}),
   },
   blobs,
 });
@@ -142,12 +149,12 @@ export function createPostgresStore(options: PostgresStoreOptions) {
   async function inTransaction<T>(work: (tx: PgTx) => Promise<T>): Promise<T> {
     const client = await pool.connect();
     try {
-      await client.query("BEGIN");
+      await client.query('BEGIN');
       const result = await work(client);
-      await client.query("COMMIT");
+      await client.query('COMMIT');
       return result;
     } catch (error) {
-      await client.query("ROLLBACK").catch(() => {});
+      await client.query('ROLLBACK').catch(() => {});
       throw error;
     } finally {
       client.release();
@@ -156,18 +163,29 @@ export function createPostgresStore(options: PostgresStoreOptions) {
 
   /** Locks the row for the duration of a write, so two appends cannot read
    * the same version and both build on it. */
-  async function lockDocument(tx: PgTx, docId: string, opts: ReadOptions = {}): Promise<DocumentRow> {
-    const result = await tx.query<DocumentRow>(`SELECT * FROM documents WHERE doc_id = $1 FOR UPDATE`, [docId]);
+  async function lockDocument(
+    tx: PgTx,
+    docId: string,
+    opts: ReadOptions = {},
+  ): Promise<DocumentRow> {
+    const result = await tx.query<DocumentRow>(
+      `SELECT * FROM documents WHERE doc_id = $1 FOR UPDATE`,
+      [docId],
+    );
     const row = result.rows[0];
-    if (!row) throw new StoreError(`No document ${docId}.`, "not-found");
-    if (row.deleted_at && !opts.includeDeleted) throw new StoreError(`Document ${docId} is deleted.`, "deleted");
+    if (!row) throw new StoreError(`No document ${docId}.`, 'not-found');
+    if (row.deleted_at && !opts.includeDeleted)
+      throw new StoreError(`Document ${docId} is deleted.`, 'deleted');
     return row;
   }
 
   /** Reads inside a transaction must use that transaction: a pooled
    * connection is a different session and would see the pre-commit state,
    * which returned a stale blob list from compact(). */
-  async function blobsOf(docId: string, executor: pg.Pool | PgTx = pool): Promise<StoredBlobMeta[]> {
+  async function blobsOf(
+    docId: string,
+    executor: pg.Pool | PgTx = pool,
+  ): Promise<StoredBlobMeta[]> {
     const result = await executor.query<BlobRow>(
       `SELECT blob_id, kind, version, byte_length, created_at FROM blobs WHERE doc_id = $1 ORDER BY created_at, blob_id`,
       [docId],
@@ -176,14 +194,17 @@ export function createPostgresStore(options: PostgresStoreOptions) {
   }
 
   async function requireRow(docId: string, opts: ReadOptions = {}): Promise<DocumentRow> {
-    const result = await pool.query<DocumentRow>(`SELECT * FROM documents WHERE doc_id = $1`, [docId]);
+    const result = await pool.query<DocumentRow>(`SELECT * FROM documents WHERE doc_id = $1`, [
+      docId,
+    ]);
     const row = result.rows[0];
-    if (!row) throw new StoreError(`No document ${docId}.`, "not-found");
-    if (row.deleted_at && !opts.includeDeleted) throw new StoreError(`Document ${docId} is deleted.`, "deleted");
+    if (!row) throw new StoreError(`No document ${docId}.`, 'not-found');
+    if (row.deleted_at && !opts.includeDeleted)
+      throw new StoreError(`Document ${docId} is deleted.`, 'deleted');
     if (opts.seenVersion !== undefined && Number(row.version) < opts.seenVersion) {
       throw new StoreError(
         `The store returned version ${row.version} for ${docId}, but version ${opts.seenVersion} has already been seen. Refusing to go backwards.`,
-        "stale-version",
+        'stale-version',
       );
     }
     return row;
@@ -192,7 +213,7 @@ export function createPostgresStore(options: PostgresStoreOptions) {
   return {
     /** Applies schema.sql. Idempotent; safe to run at startup. */
     async migrate(): Promise<void> {
-      await pool.query(readFileSync(schemaPath, "utf8"));
+      await pool.query(readFileSync(schemaPath, 'utf8'));
     },
 
     async close(): Promise<void> {
@@ -208,14 +229,16 @@ export function createPostgresStore(options: PostgresStoreOptions) {
           [
             request.docId,
             at,
-            Buffer.from(request.keys.wrappedForWorkspace, "base64"),
-            request.keys.wrappedForRecovery ? Buffer.from(request.keys.wrappedForRecovery, "base64") : null,
+            Buffer.from(request.keys.wrappedForWorkspace, 'base64'),
+            request.keys.wrappedForRecovery
+              ? Buffer.from(request.keys.wrappedForRecovery, 'base64')
+              : null,
           ],
         );
         return toRecord(result.rows[0], []);
       } catch (error) {
-        if ((error as { code?: string }).code === "23505") {
-          throw new StoreError(`Document ${request.docId} already exists.`, "conflict");
+        if ((error as { code?: string }).code === '23505') {
+          throw new StoreError(`Document ${request.docId} already exists.`, 'conflict');
         }
         throw error;
       }
@@ -223,7 +246,10 @@ export function createPostgresStore(options: PostgresStoreOptions) {
 
     async append(request: AppendRequest): Promise<AppendResult> {
       if (request.bytes.length > maxBlobBytes) {
-        throw new StoreError(`A blob of ${request.bytes.length} bytes exceeds the ${maxBlobBytes}-byte limit.`, "too-large");
+        throw new StoreError(
+          `A blob of ${request.bytes.length} bytes exceeds the ${maxBlobBytes}-byte limit.`,
+          'too-large',
+        );
       }
       return inTransaction(async (tx) => {
         const row = await lockDocument(tx, request.docId);
@@ -234,15 +260,18 @@ export function createPostgresStore(options: PostgresStoreOptions) {
         if (Number(counted.rows[0].count) >= maxBlobsPerDocument) {
           throw new StoreError(
             `Document ${request.docId} already holds ${counted.rows[0].count} blobs, the configured limit. Compact it before appending more.`,
-            "quota",
+            'quota',
           );
         }
         if (Number(counted.rows[0].total ?? 0) + request.bytes.length > maxTotalBytes) {
-          throw new StoreError(`This workspace has reached its storage quota.`, "quota");
+          throw new StoreError(`This workspace has reached its storage quota.`, 'quota');
         }
         const current = Number(row.version);
         if (request.expectedVersion !== undefined && request.expectedVersion !== current) {
-          throw new StoreError(`Expected version ${request.expectedVersion}, but ${request.docId} is at ${current}.`, "conflict");
+          throw new StoreError(
+            `Expected version ${request.expectedVersion}, but ${request.docId} is at ${current}.`,
+            'conflict',
+          );
         }
         const version = current + 1;
         const blobId = `b${(++blobCounter).toString(36)}${Date.now().toString(36)}`;
@@ -254,12 +283,22 @@ export function createPostgresStore(options: PostgresStoreOptions) {
           [request.docId, blobId, request.kind, version, request.bytes.length, at],
         );
         await blobs.put({ docId: request.docId, blobId }, request.bytes, tx);
-        await tx.query(`UPDATE documents SET version = $2, updated_at = $3 WHERE doc_id = $1`, [request.docId, version, at]);
+        await tx.query(`UPDATE documents SET version = $2, updated_at = $3 WHERE doc_id = $1`, [
+          request.docId,
+          version,
+          at,
+        ]);
         return {
           docId: request.docId,
           version,
           updatedAt: at.toISOString(),
-          blob: { blobId, kind: request.kind, version, bytes: request.bytes.length, createdAt: at.toISOString() },
+          blob: {
+            blobId,
+            kind: request.kind,
+            version,
+            bytes: request.bytes.length,
+            createdAt: at.toISOString(),
+          },
         };
       });
     },
@@ -301,7 +340,10 @@ export function createPostgresStore(options: PostgresStoreOptions) {
 
     async getMeta(docId: string, opts: ReadOptions = {}): Promise<Uint8Array | null> {
       await requireRow(docId, opts);
-      const result = await pool.query<{ sealed_meta: Buffer | null }>(`SELECT sealed_meta FROM documents WHERE doc_id = $1`, [docId]);
+      const result = await pool.query<{ sealed_meta: Buffer | null }>(
+        `SELECT sealed_meta FROM documents WHERE doc_id = $1`,
+        [docId],
+      );
       const sealed = result.rows[0]?.sealed_meta;
       return sealed ? new Uint8Array(sealed) : null;
     },
@@ -313,7 +355,7 @@ export function createPostgresStore(options: PostgresStoreOptions) {
         const row = await lockDocument(tx, docId, { includeDeleted: true });
         const updated = await tx.query<DocumentRow>(
           `UPDATE documents SET wrapped_for_workspace = $2 WHERE doc_id = $1 RETURNING *`,
-          [row.doc_id, Buffer.from(wrappedForWorkspace, "base64")],
+          [row.doc_id, Buffer.from(wrappedForWorkspace, 'base64')],
         );
         return toRecord(updated.rows[0], await blobsOf(docId, tx));
       });
@@ -372,12 +414,15 @@ export function createPostgresStore(options: PostgresStoreOptions) {
         );
         return toRecord(updated.rows[0], await blobsOf(docId, tx));
       });
-      if (retention.kind === "immediate" && !deleted.legalHold) await this.purge(docId);
+      if (retention.kind === 'immediate' && !deleted.legalHold) await this.purge(docId);
       return deleted;
     },
 
     /** WS10-R8. */
-    async setLegalHold(docId: string, hold: { reason: string; placedBy: string } | null): Promise<DocumentRecord> {
+    async setLegalHold(
+      docId: string,
+      hold: { reason: string; placedBy: string } | null,
+    ): Promise<DocumentRecord> {
       return inTransaction(async (tx) => {
         const row = await lockDocument(tx, docId, { includeDeleted: true });
         const due = hold || !row.deleted_at ? null : purgeDueAt(retention, row.deleted_at);
@@ -401,7 +446,7 @@ export function createPostgresStore(options: PostgresStoreOptions) {
     async restore(docId: string): Promise<DocumentRecord> {
       return inTransaction(async (tx) => {
         const row = await lockDocument(tx, docId, { includeDeleted: true });
-        if (!row.deleted_at) throw new StoreError(`Document ${docId} is not deleted.`, "conflict");
+        if (!row.deleted_at) throw new StoreError(`Document ${docId} is not deleted.`, 'conflict');
         const at = now();
         const version = Number(row.version) + 1;
         const updated = await tx.query<DocumentRow>(
@@ -420,17 +465,20 @@ export function createPostgresStore(options: PostgresStoreOptions) {
         );
         if (held.rows[0]?.legal_hold) {
           throw new StoreError(
-            `Document ${docId} is under legal hold (${held.rows[0].legal_hold_reason ?? ""}) and cannot be purged until it is released.`,
-            "conflict",
+            `Document ${docId} is under legal hold (${held.rows[0].legal_hold_reason ?? ''}) and cannot be purged until it is released.`,
+            'conflict',
           );
         }
         const result = await tx.query(`DELETE FROM documents WHERE doc_id = $1`, [docId]);
-        if (result.rowCount === 0) throw new StoreError(`No document ${docId}.`, "not-found");
+        if (result.rowCount === 0) throw new StoreError(`No document ${docId}.`, 'not-found');
         // blobs and blob_data cascade from documents.
       });
     },
 
-    async compact(docId: string, snapshot: { kind: string; bytes: Uint8Array }): Promise<DocumentRecord> {
+    async compact(
+      docId: string,
+      snapshot: { kind: string; bytes: Uint8Array },
+    ): Promise<DocumentRecord> {
       return inTransaction(async (tx) => {
         const row = await lockDocument(tx, docId);
         const at = now();
@@ -463,11 +511,21 @@ export function createPostgresStore(options: PostgresStoreOptions) {
       }) {
         await pool.query(
           `INSERT INTO audit_log (at, subject, doc_id, operation, outcome, detail) VALUES ($1, $2, $3, $4, $5, $6)`,
-          [entry.at, entry.subject, entry.docId, entry.operation, entry.outcome, entry.detail ?? null],
+          [
+            entry.at,
+            entry.subject,
+            entry.docId,
+            entry.operation,
+            entry.outcome,
+            entry.detail ?? null,
+          ],
         );
       },
       async recent(limit = 100) {
-        const result = await pool.query(`SELECT at, subject, doc_id, operation, outcome, detail FROM audit_log ORDER BY id DESC LIMIT $1`, [limit]);
+        const result = await pool.query(
+          `SELECT at, subject, doc_id, operation, outcome, detail FROM audit_log ORDER BY id DESC LIMIT $1`,
+          [limit],
+        );
         return result.rows;
       },
     },
@@ -487,14 +545,19 @@ export type PostgresStore = ReturnType<typeof createPostgresStore>;
 export function createPostgresWorkspaceIndex(pool: pg.Pool): WorkspaceIndexStore {
   return {
     async get(workspaceId) {
-      const result = await pool.query<{ sealed: Buffer; version: string; updated_at: Date; generation: number }>(
+      const result = await pool.query<{
+        sealed: Buffer;
+        version: string;
+        updated_at: Date;
+        generation: number;
+      }>(
         `SELECT sealed, version, updated_at, generation FROM workspace_index WHERE workspace_id = $1`,
         [workspaceId],
       );
       const row = result.rows[0];
       return row
         ? {
-            sealed: row.sealed.toString("base64"),
+            sealed: row.sealed.toString('base64'),
             version: Number(row.version),
             updatedAt: row.updated_at.toISOString(),
             generation: row.generation,
@@ -503,9 +566,13 @@ export function createPostgresWorkspaceIndex(pool: pg.Pool): WorkspaceIndexStore
     },
 
     async put(workspaceId, sealed, expectedVersion, generation) {
-      const bytes = Buffer.from(sealed, "base64");
+      const bytes = Buffer.from(sealed, 'base64');
       if (expectedVersion === null) {
-        const inserted = await pool.query<{ version: string; updated_at: Date; generation: number }>(
+        const inserted = await pool.query<{
+          version: string;
+          updated_at: Date;
+          generation: number;
+        }>(
           `INSERT INTO workspace_index (workspace_id, sealed, version, generation) VALUES ($1, $2, 1, $3)
            ON CONFLICT (workspace_id) DO NOTHING RETURNING version, updated_at, generation`,
           [workspaceId, bytes, generation ?? 1],
@@ -521,7 +588,7 @@ export function createPostgresWorkspaceIndex(pool: pg.Pool): WorkspaceIndexStore
         const current = await this.get(workspaceId);
         throw new IndexError(
           `There is already an index for ${workspaceId} (version ${current?.version}). Re-read it and apply your change again.`,
-          "conflict",
+          'conflict',
           current?.version,
         );
       }
@@ -534,8 +601,8 @@ export function createPostgresWorkspaceIndex(pool: pg.Pool): WorkspaceIndexStore
       if (!updated.rows[0]) {
         const current = await this.get(workspaceId);
         throw new IndexError(
-          `The workspace index has moved on: you wrote against version ${expectedVersion}, and it is at ${current?.version ?? "none"}. Re-read it and apply your change again.`,
-          "conflict",
+          `The workspace index has moved on: you wrote against version ${expectedVersion}, and it is at ${current?.version ?? 'none'}. Re-read it and apply your change again.`,
+          'conflict',
           current?.version,
         );
       }

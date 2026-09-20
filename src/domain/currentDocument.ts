@@ -11,27 +11,28 @@
  * persisting under since the unified model landed, so existing work reopens
  * without any migration step.
  */
-export const DOCUMENT_URL_PARAM = "doc";
-export const LAST_DOCUMENT_KEY = "system-design-editor:last-document";
-export const DEFAULT_DOCUMENT_ID = "local";
+export const DOCUMENT_URL_PARAM = 'doc';
+export const LAST_DOCUMENT_KEY = 'system-design-editor:last-document';
+export const DEFAULT_DOCUMENT_ID = 'local';
 
 /** Ids become IndexedDB database names and URL parameters, so only a
  * conservative alphabet is accepted from either source. */
 const VALID_ID = /^[A-Za-z0-9][A-Za-z0-9_:.-]{0,127}$/;
 
 export function isValidDocumentId(id: unknown): id is string {
-  return typeof id === "string" && VALID_ID.test(id);
+  return typeof id === 'string' && VALID_ID.test(id);
 }
 
-export type DocumentIdSource = "url" | "last-opened" | "default";
+export type DocumentIdSource = 'url' | 'last-opened' | 'default';
 
-export function resolveDocumentId(inputs: {
-  urlDocId: string | null;
-  lastDocId: string | null;
-}): { docId: string; source: DocumentIdSource } {
-  if (isValidDocumentId(inputs.urlDocId)) return { docId: inputs.urlDocId, source: "url" };
-  if (isValidDocumentId(inputs.lastDocId)) return { docId: inputs.lastDocId, source: "last-opened" };
-  return { docId: DEFAULT_DOCUMENT_ID, source: "default" };
+export function resolveDocumentId(inputs: { urlDocId: string | null; lastDocId: string | null }): {
+  docId: string;
+  source: DocumentIdSource;
+} {
+  if (isValidDocumentId(inputs.urlDocId)) return { docId: inputs.urlDocId, source: 'url' };
+  if (isValidDocumentId(inputs.lastDocId))
+    return { docId: inputs.lastDocId, source: 'last-opened' };
+  return { docId: DEFAULT_DOCUMENT_ID, source: 'default' };
 }
 
 export function readDocumentParam(href: string): string | null {
@@ -65,6 +66,6 @@ export function withDocumentParam(href: string, docId: string): string {
  * room updates the same entry (WS13-R12 needs the room to rehost it).
  */
 export function sessionDocumentId(roomName: string): string {
-  const safe = roomName.replace(/[^A-Za-z0-9_.-]/g, "_").slice(0, 100);
+  const safe = roomName.replace(/[^A-Za-z0-9_.-]/g, '_').slice(0, 100);
   return `session:${safe}`;
 }

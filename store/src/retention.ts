@@ -12,9 +12,10 @@
  * deployment does not accumulate data it never decided to keep. A legal hold
  * (WS10-R8) prevents purge in every mode, including `immediate`.
  */
-export type RetentionPeriod = { kind: "immediate" } | { kind: "duration"; ms: number; label: string } | { kind: "indefinite" };
+export type RetentionPeriod =
+  { kind: 'immediate' } | { kind: 'duration'; ms: number; label: string } | { kind: 'indefinite' };
 
-export const DEFAULT_RETENTION = "30d";
+export const DEFAULT_RETENTION = '30d';
 
 const UNITS: Record<string, number> = {
   d: 86_400_000,
@@ -32,8 +33,8 @@ export class RetentionConfigError extends Error {}
  */
 export function parseRetentionPeriod(raw: string | undefined | null): RetentionPeriod {
   const value = (raw ?? DEFAULT_RETENTION).trim().toLowerCase();
-  if (value === "immediate") return { kind: "immediate" };
-  if (value === "indefinite" || value === "forever") return { kind: "indefinite" };
+  if (value === 'immediate') return { kind: 'immediate' };
+  if (value === 'indefinite' || value === 'forever') return { kind: 'indefinite' };
   const match = /^(\d+)\s*([dwmy])$/.exec(value);
   if (!match) {
     throw new RetentionConfigError(
@@ -41,20 +42,23 @@ export function parseRetentionPeriod(raw: string | undefined | null): RetentionP
     );
   }
   const amount = Number(match[1]);
-  if (amount <= 0) throw new RetentionConfigError(`A retention period must be greater than zero (got "${raw}").`);
-  return { kind: "duration", ms: amount * UNITS[match[2]], label: `${amount}${match[2]}` };
+  if (amount <= 0)
+    throw new RetentionConfigError(`A retention period must be greater than zero (got "${raw}").`);
+  return { kind: 'duration', ms: amount * UNITS[match[2]], label: `${amount}${match[2]}` };
 }
 
 /** When a document deleted now becomes eligible for purge, or null where it
  * never does on its own. */
 export function purgeDueAt(period: RetentionPeriod, deletedAt: Date): Date | null {
-  if (period.kind === "immediate") return deletedAt;
-  if (period.kind === "indefinite") return null;
+  if (period.kind === 'immediate') return deletedAt;
+  if (period.kind === 'indefinite') return null;
   return new Date(deletedAt.getTime() + period.ms);
 }
 
 export function describeRetention(period: RetentionPeriod): string {
-  if (period.kind === "immediate") return "Deleted documents are removed immediately and cannot be restored.";
-  if (period.kind === "indefinite") return "Deleted documents are kept until an administrator purges them.";
+  if (period.kind === 'immediate')
+    return 'Deleted documents are removed immediately and cannot be restored.';
+  if (period.kind === 'indefinite')
+    return 'Deleted documents are kept until an administrator purges them.';
   return `Deleted documents are kept, and can be restored, for ${period.label} before being purged.`;
 }

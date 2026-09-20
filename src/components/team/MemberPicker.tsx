@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { User, UserX, Check, ChevronDown } from "lucide-react";
-import type { TeamDocument } from "../../domain/teamTypes";
-import { computeFlippedPosition } from "../../domain/popoverPosition";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { User, UserX, Check, ChevronDown } from 'lucide-react';
+import type { TeamDocument } from '../../domain/teamTypes';
+import { computeFlippedPosition } from '../../domain/popoverPosition';
 
 interface MemberPickerProps {
   team: TeamDocument;
@@ -26,7 +26,13 @@ const MENU_WIDTH = 210;
  * had z-index:300, already higher than its siblings, and was still
  * getting clipped.
  */
-export function MemberPicker({ team, assigneeId, onAssign, onClear, compact = false }: MemberPickerProps) {
+export function MemberPicker({
+  team,
+  assigneeId,
+  onAssign,
+  onClear,
+  compact = false,
+}: MemberPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -53,7 +59,7 @@ export function MemberPicker({ team, assigneeId, onAssign, onClear, compact = fa
     const next = computeFlippedPosition(
       triggerRect,
       { width: menuRect.width, height: menuRect.height },
-      { width: window.innerWidth, height: window.innerHeight }
+      { width: window.innerWidth, height: window.innerHeight },
     );
     setMenuPos((prev) => (prev && prev.top === next.top && prev.left === next.left ? prev : next));
   }, [isOpen]);
@@ -68,8 +74,8 @@ export function MemberPicker({ team, assigneeId, onAssign, onClear, compact = fa
       computeFlippedPosition(
         triggerRect,
         { width: menuRect.width, height: menuRect.height },
-        { width: window.innerWidth, height: window.innerHeight }
-      )
+        { width: window.innerWidth, height: window.innerHeight },
+      ),
     );
   }, []);
 
@@ -82,23 +88,23 @@ export function MemberPicker({ team, assigneeId, onAssign, onClear, compact = fa
       close();
     };
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
+      if (e.key === 'Escape') close();
     };
-    document.addEventListener("mousedown", handleMouseDown);
-    document.addEventListener("keydown", handleEscape);
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('keydown', handleEscape);
     return () => {
-      document.removeEventListener("mousedown", handleMouseDown);
-      document.removeEventListener("keydown", handleEscape);
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('keydown', handleEscape);
     };
   }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
-    window.addEventListener("scroll", reposition, true);
-    window.addEventListener("resize", reposition);
+    window.addEventListener('scroll', reposition, true);
+    window.addEventListener('resize', reposition);
     return () => {
-      window.removeEventListener("scroll", reposition, true);
-      window.removeEventListener("resize", reposition);
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
     };
   }, [isOpen, reposition]);
 
@@ -107,7 +113,7 @@ export function MemberPicker({ team, assigneeId, onAssign, onClear, compact = fa
       .trim()
       .split(/\s+/)
       .map((n) => n[0])
-      .join("")
+      .join('')
       .toUpperCase()
       .slice(0, 2);
   };
@@ -117,19 +123,19 @@ export function MemberPicker({ team, assigneeId, onAssign, onClear, compact = fa
       <button
         ref={triggerRef}
         type="button"
-        className={`member-picker__trigger${compact ? " member-picker__trigger--compact" : ""}${
-          assignedMember ? " is-assigned" : ""
+        className={`member-picker__trigger${compact ? ' member-picker__trigger--compact' : ''}${
+          assignedMember ? ' is-assigned' : ''
         }`}
         onClick={() => (isOpen ? close() : open())}
-        title={assignedMember ? `Assigned to ${assignedMember.name}` : "Assign team member"}
-        aria-label={assignedMember ? `Assigned to ${assignedMember.name}` : "Assign team member"}
+        title={assignedMember ? `Assigned to ${assignedMember.name}` : 'Assign team member'}
+        aria-label={assignedMember ? `Assigned to ${assignedMember.name}` : 'Assign team member'}
       >
         {assignedMember ? (
           <>
             <span
               className="member-picker__avatar"
               style={{
-                backgroundColor: assignedMember.avatarColor ?? "#5b7cfa",
+                backgroundColor: assignedMember.avatarColor ?? '#5b7cfa',
               }}
             >
               {getInitials(assignedMember.name)}
@@ -152,11 +158,13 @@ export function MemberPicker({ team, assigneeId, onAssign, onClear, compact = fa
             ref={menuRef}
             className="member-picker__menu"
             role="menu"
-            style={{ position: "fixed", top: menuPos.top, left: menuPos.left, width: MENU_WIDTH }}
+            style={{ position: 'fixed', top: menuPos.top, left: menuPos.left, width: MENU_WIDTH }}
           >
             <div className="member-picker__menu-header">Assign Member</div>
             {team.members.length === 0 ? (
-              <div className="member-picker__empty">No team members added yet. Go to the Team tab to add members.</div>
+              <div className="member-picker__empty">
+                No team members added yet. Go to the Team tab to add members.
+              </div>
             ) : (
               <div className="member-picker__list">
                 {assignedMember && (
@@ -179,7 +187,7 @@ export function MemberPicker({ team, assigneeId, onAssign, onClear, compact = fa
                     <button
                       key={member.id}
                       type="button"
-                      className={`member-picker__option${isSelected ? " is-selected" : ""}`}
+                      className={`member-picker__option${isSelected ? ' is-selected' : ''}`}
                       onClick={() => {
                         onAssign(member.id);
                         close();
@@ -189,14 +197,16 @@ export function MemberPicker({ team, assigneeId, onAssign, onClear, compact = fa
                       <span
                         className="member-picker__avatar"
                         style={{
-                          backgroundColor: member.avatarColor ?? "#5b7cfa",
+                          backgroundColor: member.avatarColor ?? '#5b7cfa',
                         }}
                       >
                         {getInitials(member.name)}
                       </span>
                       <div className="member-picker__option-info">
                         <span className="member-picker__option-name">{member.name}</span>
-                        {member.role && <span className="member-picker__option-role">{member.role}</span>}
+                        {member.role && (
+                          <span className="member-picker__option-role">{member.role}</span>
+                        )}
                       </div>
                       {isSelected && <Check size={13} className="member-picker__check" />}
                     </button>
@@ -205,7 +215,7 @@ export function MemberPicker({ team, assigneeId, onAssign, onClear, compact = fa
               </div>
             )}
           </div>,
-          document.body
+          document.body,
         )}
     </div>
   );

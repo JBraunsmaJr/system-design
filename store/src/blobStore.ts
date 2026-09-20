@@ -19,7 +19,7 @@ export interface BlobRef {
 }
 
 export interface BlobStore<Tx = unknown> {
-  readonly kind: "postgres" | "memory" | "object-store";
+  readonly kind: 'postgres' | 'memory' | 'object-store';
   put(ref: BlobRef, bytes: Uint8Array, tx: Tx): Promise<void>;
   get(ref: BlobRef): Promise<Uint8Array | null>;
   deleteMany(refs: BlobRef[], tx: Tx): Promise<void>;
@@ -30,7 +30,7 @@ export interface BlobStore<Tx = unknown> {
 const key = (ref: BlobRef) => `${ref.docId}\u0000${ref.blobId}`;
 
 /**
- * For tests and for a store run without PostgreSQL. It honours the same
+ * For tests and for a store run without PostgreSQL. It honors the same
  * transaction discipline: writes are buffered until the transaction commits,
  * so a failure part-way leaves nothing behind - the property WS8-R16 asks to
  * be tested by injecting failures.
@@ -52,14 +52,14 @@ export function createMemoryBlobStore(): MemoryBlobStore {
   const blobs = new Map<string, Uint8Array>();
 
   return {
-    kind: "memory",
+    kind: 'memory',
 
     begin() {
       return { writes: new Map(), deletes: new Set(), committed: false };
     },
 
     commit(tx) {
-      if (tx.committed) throw new Error("This transaction has already been committed.");
+      if (tx.committed) throw new Error('This transaction has already been committed.');
       for (const [k, bytes] of tx.writes) blobs.set(k, bytes);
       for (const k of tx.deletes) blobs.delete(k);
       tx.committed = true;

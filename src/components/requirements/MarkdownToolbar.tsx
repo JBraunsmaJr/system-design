@@ -1,6 +1,6 @@
-import type { RefObject } from "react";
-import { Bold, Italic, List, ListOrdered, ListTodo, Table } from "lucide-react";
-import { insertLinePrefix, insertTableSkeleton, wrapSelection } from "../../domain/markdownEditing";
+import type { RefObject } from 'react';
+import { Bold, Italic, List, ListOrdered, ListTodo, Table } from 'lucide-react';
+import { insertLinePrefix, insertTableSkeleton, wrapSelection } from '../../domain/markdownEditing';
 
 interface MarkdownToolbarProps {
   textareaRef: RefObject<HTMLTextAreaElement | null>;
@@ -33,35 +33,49 @@ export function MarkdownToolbar({ textareaRef, value, onChange }: MarkdownToolba
   const onBold = () => {
     const textarea = textareaRef.current;
     if (!textarea) return;
-    const r = wrapSelection(value, textarea.selectionStart, textarea.selectionEnd, "**", "**", "bold text");
+    const r = wrapSelection(
+      value,
+      textarea.selectionStart,
+      textarea.selectionEnd,
+      '**',
+      '**',
+      'bold text',
+    );
     applyAndFocus(r.newText, r.newSelStart, r.newSelEnd);
   };
 
   const onItalic = () => {
     const textarea = textareaRef.current;
     if (!textarea) return;
-    const r = wrapSelection(value, textarea.selectionStart, textarea.selectionEnd, "_", "_", "italic text");
+    const r = wrapSelection(
+      value,
+      textarea.selectionStart,
+      textarea.selectionEnd,
+      '_',
+      '_',
+      'italic text',
+    );
     applyAndFocus(r.newText, r.newSelStart, r.newSelEnd);
   };
 
   const onBulletList = () => {
     const textarea = textareaRef.current;
     if (!textarea) return;
-    const r = insertLinePrefix(value, textarea.selectionStart, "- ");
+    const r = insertLinePrefix(value, textarea.selectionStart, '- ');
     applyAndFocus(r.newText, r.newCaretPos, r.newCaretPos);
   };
 
   const onNumberedList = () => {
     const textarea = textareaRef.current;
     if (!textarea) return;
-    const r = insertLinePrefix(value, textarea.selectionStart, "1. ");
+    const r = insertLinePrefix(value, textarea.selectionStart, '1. ');
     applyAndFocus(r.newText, r.newCaretPos, r.newCaretPos);
   };
 
   const onChecklist = () => {
     const textarea = textareaRef.current;
     if (!textarea) return;
-    const r = insertLinePrefix(value, textarea.selectionStart, "- [ ] ");
+    const r = insertLinePrefix(value, textarea.selectionStart, '- [ ] ');
     applyAndFocus(r.newText, r.newCaretPos, r.newCaretPos);
   };
 
@@ -74,10 +88,22 @@ export function MarkdownToolbar({ textareaRef, value, onChange }: MarkdownToolba
 
   return (
     <div className="markdown-toolbar">
-      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={onBold} title="Bold" aria-label="Bold">
+      <button
+        type="button"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={onBold}
+        title="Bold"
+        aria-label="Bold"
+      >
         <Bold size={13} />
       </button>
-      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={onItalic} title="Italic" aria-label="Italic">
+      <button
+        type="button"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={onItalic}
+        title="Italic"
+        aria-label="Italic"
+      >
         <Italic size={13} />
       </button>
       <span className="markdown-toolbar__divider" />
@@ -109,7 +135,13 @@ export function MarkdownToolbar({ textareaRef, value, onChange }: MarkdownToolba
         <ListTodo size={13} />
       </button>
       <span className="markdown-toolbar__divider" />
-      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={onTable} title="Table" aria-label="Table">
+      <button
+        type="button"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={onTable}
+        title="Table"
+        aria-label="Table"
+      >
         <Table size={13} />
       </button>
     </div>

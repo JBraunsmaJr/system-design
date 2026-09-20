@@ -3,16 +3,16 @@ import {
   parseEdgeGestureBroadcast,
   type GestureBroadcast,
   type EdgeGestureBroadcast,
-} from "../domain/gestureGeometry.ts";
-import { WebrtcProvider } from "y-webrtc";
-import { buildPeerOpts } from "./transport.ts";
-import type * as Y from "yjs";
+} from '../domain/gestureGeometry.ts';
+import { WebrtcProvider } from 'y-webrtc';
+import { buildPeerOpts } from './transport.ts';
+import type * as Y from 'yjs';
 import {
   attachPersistence,
   createNullPersistence,
   persistenceKeyForRoom,
   type DocPersistence,
-} from "./persistence.ts";
+} from './persistence.ts';
 
 /**
  * Wires a Y.Doc to a WebRTC-based collaborative session. This is the
@@ -254,9 +254,12 @@ function borrowPersistence(owned: DocPersistence): DocPersistence {
 
 export function parsePresenceState(clientId: number, state: unknown): PresenceInfo | null {
   const candidate = state as Partial<LocalPresenceInfo> | null;
-  if (!candidate || typeof candidate.name !== "string" || typeof candidate.color !== "string") return null;
+  if (!candidate || typeof candidate.name !== 'string' || typeof candidate.color !== 'string')
+    return null;
   const cursor =
-    candidate.cursor && typeof candidate.cursor.x === "number" && typeof candidate.cursor.y === "number"
+    candidate.cursor &&
+    typeof candidate.cursor.x === 'number' &&
+    typeof candidate.cursor.y === 'number'
       ? { x: candidate.cursor.x, y: candidate.cursor.y }
       : null;
   return {
@@ -266,9 +269,9 @@ export function parsePresenceState(clientId: number, state: unknown): PresenceIn
     cursor,
     selectedNodeIds: Array.isArray(candidate.selectedNodeIds) ? candidate.selectedNodeIds : [],
     selectedEdgeIds: Array.isArray(candidate.selectedEdgeIds) ? candidate.selectedEdgeIds : [],
-    viewMode: typeof candidate.viewMode === "string" ? candidate.viewMode : null,
-    focusedItemId: typeof candidate.focusedItemId === "string" ? candidate.focusedItemId : null,
-    diagramPath: typeof candidate.diagramPath === "string" ? candidate.diagramPath : "",
+    viewMode: typeof candidate.viewMode === 'string' ? candidate.viewMode : null,
+    focusedItemId: typeof candidate.focusedItemId === 'string' ? candidate.focusedItemId : null,
+    diagramPath: typeof candidate.diagramPath === 'string' ? candidate.diagramPath : '',
     // Untrusted and rendered directly, so validated rather than passed on.
     gesture: parseGestureBroadcast(candidate.gesture),
     edgeGesture: parseEdgeGestureBroadcast(candidate.edgeGesture),
@@ -286,10 +289,7 @@ export function parsePresenceState(clientId: number, state: unknown): PresenceIn
  * includes this peer, and the question being answered here is "how many copies
  * of this document exist", which very much includes ours.
  */
-export function countPersistedReplicas(
-  peers: PresenceInfo[],
-  selfHasReplica: boolean,
-): number {
+export function countPersistedReplicas(peers: PresenceInfo[], selfHasReplica: boolean): number {
   const others = peers.filter((p) => p.hasPersistedReplica).length;
   return others + (selfHasReplica ? 1 : 0);
 }
@@ -301,10 +301,14 @@ export function countPersistedReplicas(
  * React's lifecycle itself; a caller (e.g. a hook) is responsible for
  * disconnecting when a session ends or a component unmounts.
  */
-export function startCollabSession(doc: Y.Doc, roomName: string, options: CollabSessionOptions): CollabSession {
+export function startCollabSession(
+  doc: Y.Doc,
+  roomName: string,
+  options: CollabSessionOptions,
+): CollabSession {
   if (options.signalingUrls.length === 0) {
     throw new Error(
-      "startCollabSession requires at least one self-hosted signaling server URL - refusing to silently fall back to y-webrtc's own public defaults."
+      "startCollabSession requires at least one self-hosted signaling server URL - refusing to silently fall back to y-webrtc's own public defaults.",
     );
   }
 
@@ -368,14 +372,14 @@ export function startCollabSession(doc: Y.Doc, roomName: string, options: Collab
       const isConnected = () => provider.signalingConns.some((conn) => conn.connected);
       const handler = () => callback(isConnected());
       for (const conn of provider.signalingConns) {
-        conn.on("connect", handler);
-        conn.on("disconnect", handler);
+        conn.on('connect', handler);
+        conn.on('disconnect', handler);
       }
       callback(isConnected()); // fire immediately - the relay may already be up (or already failing) before anyone subscribes
       return () => {
         for (const conn of provider.signalingConns) {
-          conn.off("connect", handler);
-          conn.off("disconnect", handler);
+          conn.off('connect', handler);
+          conn.off('disconnect', handler);
         }
       };
     },
@@ -390,9 +394,9 @@ export function startCollabSession(doc: Y.Doc, roomName: string, options: Collab
         return peers;
       };
       const handler = () => callback(getOtherPeers());
-      provider.awareness.on("change", handler);
+      provider.awareness.on('change', handler);
       callback(getOtherPeers()); // fire immediately with whatever's already known, not just on the next change
-      return () => provider.awareness.off("change", handler);
+      return () => provider.awareness.off('change', handler);
     },
   };
 }

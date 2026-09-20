@@ -13,28 +13,28 @@
  *
  * Run with: npx tsx --tsconfig tsconfig.app.json src/collab/edgeManipulation.verify.ts
  */
-import * as Y from "yjs";
-import { createLocalDiagramStore } from "./diagramStore";
-import { createYjsDiagramStore, seedYjsDiagramDoc } from "./yjsDiagramStore";
-import type { DiagramStore } from "./diagramStore";
-import type { ArchNodeData, ArchEdgeData, EdgeWaypoint, SubDiagram } from "../domain/types";
+import * as Y from 'yjs';
+import { createLocalDiagramStore } from './diagramStore';
+import { createYjsDiagramStore, seedYjsDiagramDoc } from './yjsDiagramStore';
+import type { DiagramStore } from './diagramStore';
+import type { ArchNodeData, ArchEdgeData, EdgeWaypoint, SubDiagram } from '../domain/types';
 
 let failures = 0;
 function assert(cond: boolean, msg: string) {
   if (!cond) {
-    console.error("FAIL:", msg);
+    console.error('FAIL:', msg);
     failures++;
   } else {
-    console.log("ok:", msg);
+    console.log('ok:', msg);
   }
 }
 
 function mkNodeData(label: string): ArchNodeData {
-  return { nodeType: "custom", label, description: "", properties: {}, tags: [] };
+  return { nodeType: 'custom', label, description: '', properties: {}, tags: [] };
 }
 
 function mkEdgeData(): ArchEdgeData {
-  return { edgeType: "blank-solid", label: "", direction: "forward", properties: {} };
+  return { edgeType: 'blank-solid', label: '', direction: 'forward', properties: {} };
 }
 
 function wp(id: string, x: number, y: number): EdgeWaypoint {
@@ -61,7 +61,7 @@ function waypointsOf(store: DiagramStore, edgeId: string): EdgeWaypoint[] {
 }
 
 function ids(waypoints: EdgeWaypoint[]): string {
-  return waypoints.map((w) => w.id).join(",");
+  return waypoints.map((w) => w.id).join(',');
 }
 
 /**
@@ -79,10 +79,10 @@ function makeYjsStore(): DiagramStore {
 
 /** Builds the same two-node, one-edge starting point in any store. */
 function seedEdge(store: DiagramStore): { a: string; b: string; c: string; edgeId: string } {
-  const a = store.addNode([], "typed", { x: 0, y: 0 }, mkNodeData("A"));
-  const b = store.addNode([], "typed", { x: 300, y: 0 }, mkNodeData("B"));
-  const c = store.addNode([], "typed", { x: 300, y: 300 }, mkNodeData("C"));
-  const edgeId = store.addEdge([], a, b, mkEdgeData(), "right", "left");
+  const a = store.addNode([], 'typed', { x: 0, y: 0 }, mkNodeData('A'));
+  const b = store.addNode([], 'typed', { x: 300, y: 0 }, mkNodeData('B'));
+  const c = store.addNode([], 'typed', { x: 300, y: 300 }, mkNodeData('C'));
+  const edgeId = store.addEdge([], a, b, mkEdgeData(), 'right', 'left');
   return { a, b, c, edgeId };
 }
 
@@ -95,23 +95,28 @@ function seedEdge(store: DiagramStore): { a: string; b: string; c: string; edgeI
   function runSequence(store: DiagramStore) {
     const { a, b, c, edgeId } = seedEdge(store);
     const idMap = new Map([
-      [a, "node-a"],
-      [b, "node-b"],
-      [c, "node-c"],
+      [a, 'node-a'],
+      [b, 'node-b'],
+      [c, 'node-c'],
     ]);
-    store.addEdgeWaypoint(edgeId, 0, wp("w1", 100, 50));
-    store.addEdgeWaypoint(edgeId, 1, wp("w2", 200, 50));
-    store.addEdgeWaypoint(edgeId, 0, wp("w0", 40, 50));
-    store.moveEdgeWaypoint(edgeId, "w2", { x: 250, y: 75 });
-    store.removeEdgeWaypoint(edgeId, "w1");
-    store.reconnectEdge(edgeId, { source: c, target: store.getSnapshot().nodes[1].id, sourceHandle: "top", targetHandle: "bottom" });
+    store.addEdgeWaypoint(edgeId, 0, wp('w1', 100, 50));
+    store.addEdgeWaypoint(edgeId, 1, wp('w2', 200, 50));
+    store.addEdgeWaypoint(edgeId, 0, wp('w0', 40, 50));
+    store.moveEdgeWaypoint(edgeId, 'w2', { x: 250, y: 75 });
+    store.removeEdgeWaypoint(edgeId, 'w1');
+    store.reconnectEdge(edgeId, {
+      source: c,
+      target: store.getSnapshot().nodes[1].id,
+      sourceHandle: 'top',
+      targetHandle: 'bottom',
+    });
     return { store, edgeId, idMap };
   }
 
   const impls: { name: string; store: DiagramStore }[] = [
-    { name: "local", store: createLocalDiagramStore() },
-    { name: "yjs", store: createYjsDiagramStore(new Y.Doc()) },
-    { name: "yjs", store: makeYjsStore() },
+    { name: 'local', store: createLocalDiagramStore() },
+    { name: 'yjs', store: createYjsDiagramStore(new Y.Doc()) },
+    { name: 'yjs', store: makeYjsStore() },
   ];
 
   const results = impls.map(({ name, store }) => {
@@ -131,7 +136,7 @@ function seedEdge(store: DiagramStore): { a: string; b: string; c: string; edgeI
 
   assert(
     results.every((r) => r.shape === results[0].shape),
-    `all DiagramStore implementations produce an identical edge after the same sequence of waypoint and reconnect operations - ${results.map((r) => `${r.name}: ${r.shape}`).join(" | ")}`
+    `all DiagramStore implementations produce an identical edge after the same sequence of waypoint and reconnect operations - ${results.map((r) => `${r.name}: ${r.shape}`).join(' | ')}`,
   );
 }
 
@@ -144,33 +149,33 @@ function seedEdge(store: DiagramStore): { a: string; b: string; c: string; edgeI
 // indistinguishable from one that never had any.
 {
   for (const [name, store] of [
-    ["local", createLocalDiagramStore()],
-    ["yjs", createYjsDiagramStore(new Y.Doc())],
-    ["yjs", makeYjsStore()],
+    ['local', createLocalDiagramStore()],
+    ['yjs', createYjsDiagramStore(new Y.Doc())],
+    ['yjs', makeYjsStore()],
   ] as const) {
     const { edgeId } = seedEdge(store);
 
     assert(
-      !("waypoints" in (edgeById(store, edgeId).data as object)),
-      `${name}: a freshly created edge has no waypoints key present at all, not an empty array`
+      !('waypoints' in (edgeById(store, edgeId).data as object)),
+      `${name}: a freshly created edge has no waypoints key present at all, not an empty array`,
     );
 
-    store.addEdgeWaypoint(edgeId, 0, wp("w1", 10, 10));
-    store.addEdgeWaypoint(edgeId, 1, wp("w2", 20, 20));
+    store.addEdgeWaypoint(edgeId, 0, wp('w1', 10, 10));
+    store.addEdgeWaypoint(edgeId, 1, wp('w2', 20, 20));
     assert(waypointsOf(store, edgeId).length === 2, `${name}: both bends are there once added`);
 
-    store.removeEdgeWaypoint(edgeId, "w1");
-    store.removeEdgeWaypoint(edgeId, "w2");
+    store.removeEdgeWaypoint(edgeId, 'w1');
+    store.removeEdgeWaypoint(edgeId, 'w2');
     assert(
-      !("waypoints" in (edgeById(store, edgeId).data as object)),
-      `${name}: removing the last bend one at a time drops the key entirely, so the edge is indistinguishable from one that was never bent`
+      !('waypoints' in (edgeById(store, edgeId).data as object)),
+      `${name}: removing the last bend one at a time drops the key entirely, so the edge is indistinguishable from one that was never bent`,
     );
 
-    store.addEdgeWaypoint(edgeId, 0, wp("w3", 30, 30));
+    store.addEdgeWaypoint(edgeId, 0, wp('w3', 30, 30));
     store.clearEdgeWaypoints(edgeId);
     assert(
-      !("waypoints" in (edgeById(store, edgeId).data as object)),
-      `${name}: and clearEdgeWaypoints leaves the same no-key state rather than an empty array`
+      !('waypoints' in (edgeById(store, edgeId).data as object)),
+      `${name}: and clearEdgeWaypoints leaves the same no-key state rather than an empty array`,
     );
   }
 }
@@ -185,19 +190,21 @@ function seedEdge(store: DiagramStore): { a: string; b: string; c: string; edgeI
   const { edgeId } = seedEdge(storeA);
   const peerB = forkPeer(docA);
 
-  storeA.addEdgeWaypoint(edgeId, 0, wp("from-a", 100, -50));
-  peerB.store.addEdgeWaypoint(edgeId, 0, wp("from-b", 200, 50));
+  storeA.addEdgeWaypoint(edgeId, 0, wp('from-a', 100, -50));
+  peerB.store.addEdgeWaypoint(edgeId, 0, wp('from-b', 200, 50));
 
   sync(docA, peerB.doc);
 
   const merged = waypointsOf(storeA, edgeId);
   assert(
-    merged.length === 2 && merged.some((w) => w.id === "from-a") && merged.some((w) => w.id === "from-b"),
-    "two peers each adding a bend to the same edge concurrently end up with BOTH bends, not just whichever write landed last"
+    merged.length === 2 &&
+      merged.some((w) => w.id === 'from-a') &&
+      merged.some((w) => w.id === 'from-b'),
+    'two peers each adding a bend to the same edge concurrently end up with BOTH bends, not just whichever write landed last',
   );
   assert(
     ids(merged) === ids(waypointsOf(peerB.store, edgeId)),
-    "and both peers agree on the resulting order of those bends - convergence, not just survival"
+    'and both peers agree on the resulting order of those bends - convergence, not just survival',
   );
 }
 
@@ -208,28 +215,28 @@ function seedEdge(store: DiagramStore): { a: string; b: string; c: string; edgeI
   const docA = new Y.Doc();
   const storeA = createYjsDiagramStore(docA);
   const { edgeId } = seedEdge(storeA);
-  storeA.addEdgeWaypoint(edgeId, 0, wp("left", 100, 0));
-  storeA.addEdgeWaypoint(edgeId, 1, wp("right", 200, 0));
+  storeA.addEdgeWaypoint(edgeId, 0, wp('left', 100, 0));
+  storeA.addEdgeWaypoint(edgeId, 1, wp('right', 200, 0));
   const peerB = forkPeer(docA);
 
   // Several writes each, the way a real pointermove stream arrives.
   for (let i = 1; i <= 5; i++) {
-    storeA.moveEdgeWaypoint(edgeId, "left", { x: 100, y: -10 * i });
-    peerB.store.moveEdgeWaypoint(edgeId, "right", { x: 200, y: 10 * i });
+    storeA.moveEdgeWaypoint(edgeId, 'left', { x: 100, y: -10 * i });
+    peerB.store.moveEdgeWaypoint(edgeId, 'right', { x: 200, y: 10 * i });
   }
 
   sync(docA, peerB.doc);
 
   const merged = waypointsOf(storeA, edgeId);
-  const left = merged.find((w) => w.id === "left")!;
-  const right = merged.find((w) => w.id === "right")!;
+  const left = merged.find((w) => w.id === 'left')!;
+  const right = merged.find((w) => w.id === 'right')!;
   assert(
     left.y === -50 && right.y === 50,
-    `two peers dragging two different bends on the same edge simultaneously both keep their result (left.y=${left.y}, right.y=${right.y}) - per-waypoint nested maps mean neither drag overwrites the other`
+    `two peers dragging two different bends on the same edge simultaneously both keep their result (left.y=${left.y}, right.y=${right.y}) - per-waypoint nested maps mean neither drag overwrites the other`,
   );
   assert(
     JSON.stringify(merged) === JSON.stringify(waypointsOf(peerB.store, edgeId)),
-    "and both peers converge on the identical waypoint list"
+    'and both peers converge on the identical waypoint list',
   );
 }
 
@@ -241,27 +248,28 @@ function seedEdge(store: DiagramStore): { a: string; b: string; c: string; edgeI
   const docA = new Y.Doc();
   const storeA = createYjsDiagramStore(docA);
   const { edgeId } = seedEdge(storeA);
-  storeA.addEdgeWaypoint(edgeId, 0, wp("dragged", 200, 0));
+  storeA.addEdgeWaypoint(edgeId, 0, wp('dragged', 200, 0));
   const peerB = forkPeer(docA);
 
   // A drags its bend; B inserts a new one ahead of it, shifting A's from
   // index 0 to index 1 mid-gesture.
-  storeA.moveEdgeWaypoint(edgeId, "dragged", { x: 200, y: 40 });
-  peerB.store.addEdgeWaypoint(edgeId, 0, wp("inserted", 80, 0));
+  storeA.moveEdgeWaypoint(edgeId, 'dragged', { x: 200, y: 40 });
+  peerB.store.addEdgeWaypoint(edgeId, 0, wp('inserted', 80, 0));
   sync(docA, peerB.doc);
 
   // A's drag continues after the merge, still addressing by id.
-  storeA.moveEdgeWaypoint(edgeId, "dragged", { x: 200, y: 90 });
+  storeA.moveEdgeWaypoint(edgeId, 'dragged', { x: 200, y: 90 });
   sync(docA, peerB.doc);
 
   const merged = waypointsOf(storeA, edgeId);
   assert(
-    ids(merged) === "inserted,dragged",
-    `the peer's inserted bend takes its place ahead of the dragged one (got ${ids(merged)})`
+    ids(merged) === 'inserted,dragged',
+    `the peer's inserted bend takes its place ahead of the dragged one (got ${ids(merged)})`,
   );
   assert(
-    merged.find((w) => w.id === "dragged")!.y === 90 && merged.find((w) => w.id === "inserted")!.y === 0,
-    "and the rest of the drag still moves the bend it started on, not the one that shifted into its old index"
+    merged.find((w) => w.id === 'dragged')!.y === 90 &&
+      merged.find((w) => w.id === 'inserted')!.y === 0,
+    'and the rest of the drag still moves the bend it started on, not the one that shifted into its old index',
   );
 }
 
@@ -271,18 +279,19 @@ function seedEdge(store: DiagramStore): { a: string; b: string; c: string; edgeI
   const docA = new Y.Doc();
   const storeA = createYjsDiagramStore(docA);
   const { edgeId } = seedEdge(storeA);
-  storeA.addEdgeWaypoint(edgeId, 0, wp("doomed", 100, 0));
-  storeA.addEdgeWaypoint(edgeId, 1, wp("keeper", 200, 0));
+  storeA.addEdgeWaypoint(edgeId, 0, wp('doomed', 100, 0));
+  storeA.addEdgeWaypoint(edgeId, 1, wp('keeper', 200, 0));
   const peerB = forkPeer(docA);
 
-  peerB.store.removeEdgeWaypoint(edgeId, "doomed");
+  peerB.store.removeEdgeWaypoint(edgeId, 'doomed');
   sync(docA, peerB.doc);
-  storeA.moveEdgeWaypoint(edgeId, "doomed", { x: 100, y: 999 });
+  storeA.moveEdgeWaypoint(edgeId, 'doomed', { x: 100, y: 999 });
   sync(docA, peerB.doc);
 
   assert(
-    ids(waypointsOf(storeA, edgeId)) === "keeper" && ids(waypointsOf(peerB.store, edgeId)) === "keeper",
-    "continuing to drag a bend another peer just deleted quietly does nothing, rather than resurrecting it or throwing mid-gesture"
+    ids(waypointsOf(storeA, edgeId)) === 'keeper' &&
+      ids(waypointsOf(peerB.store, edgeId)) === 'keeper',
+    'continuing to drag a bend another peer just deleted quietly does nothing, rather than resurrecting it or throwing mid-gesture',
   );
 }
 
@@ -294,18 +303,18 @@ function seedEdge(store: DiagramStore): { a: string; b: string; c: string; edgeI
   const docA = new Y.Doc();
   const storeA = createYjsDiagramStore(docA);
   const { edgeId } = seedEdge(storeA);
-  storeA.addEdgeWaypoint(edgeId, 0, wp("old", 100, 0));
+  storeA.addEdgeWaypoint(edgeId, 0, wp('old', 100, 0));
   const peerB = forkPeer(docA);
 
   storeA.clearEdgeWaypoints(edgeId);
-  peerB.store.addEdgeWaypoint(edgeId, 1, wp("new", 250, 30));
+  peerB.store.addEdgeWaypoint(edgeId, 1, wp('new', 250, 30));
   sync(docA, peerB.doc);
 
   const a = waypointsOf(storeA, edgeId);
   const b = waypointsOf(peerB.store, edgeId);
   assert(
-    ids(a) === "new" && ids(b) === "new",
-    `one peer clearing every bend while another adds one leaves exactly the newly added bend on both peers (got ${ids(a)} / ${ids(b)}) - the clear removes what existed, and the concurrent insert isn't lost into a detached array`
+    ids(a) === 'new' && ids(b) === 'new',
+    `one peer clearing every bend while another adds one leaves exactly the newly added bend on both peers (got ${ids(a)} / ${ids(b)}) - the clear removes what existed, and the concurrent insert isn't lost into a detached array`,
   );
 }
 
@@ -319,8 +328,18 @@ function seedEdge(store: DiagramStore): { a: string; b: string; c: string; edgeI
   const { a, b, c, edgeId } = seedEdge(storeA);
   const peerB = forkPeer(docA);
 
-  storeA.reconnectEdge(edgeId, { source: a, target: c, sourceHandle: "bottom", targetHandle: "top" });
-  peerB.store.reconnectEdge(edgeId, { source: c, target: b, sourceHandle: "right", targetHandle: "left" });
+  storeA.reconnectEdge(edgeId, {
+    source: a,
+    target: c,
+    sourceHandle: 'bottom',
+    targetHandle: 'top',
+  });
+  peerB.store.reconnectEdge(edgeId, {
+    source: c,
+    target: b,
+    sourceHandle: 'right',
+    targetHandle: 'left',
+  });
 
   sync(docA, peerB.doc);
 
@@ -331,18 +350,18 @@ function seedEdge(store: DiagramStore): { a: string; b: string; c: string; edgeI
       edgeA.target === edgeB.target &&
       edgeA.sourceHandle === edgeB.sourceHandle &&
       edgeA.targetHandle === edgeB.targetHandle,
-    "two peers reconnecting the same edge at once converge on identical endpoints"
+    'two peers reconnecting the same edge at once converge on identical endpoints',
   );
   const isAsWrittenByA = edgeA.source === a && edgeA.target === c;
   const isAsWrittenByB = edgeA.source === c && edgeA.target === b;
   assert(
     isAsWrittenByA || isAsWrittenByB,
-    `the surviving edge is one of the two edges someone actually drew (got ${edgeA.source} -> ${edgeA.target}), not a splice of one peer's source onto the other's target`
+    `the surviving edge is one of the two edges someone actually drew (got ${edgeA.source} -> ${edgeA.target}), not a splice of one peer's source onto the other's target`,
   );
   assert(
-    (isAsWrittenByA && edgeA.sourceHandle === "bottom" && edgeA.targetHandle === "top") ||
-      (isAsWrittenByB && edgeA.sourceHandle === "right" && edgeA.targetHandle === "left"),
-    "and its handles came from the same peer as its nodes did, rather than being mixed between the two"
+    (isAsWrittenByA && edgeA.sourceHandle === 'bottom' && edgeA.targetHandle === 'top') ||
+      (isAsWrittenByB && edgeA.sourceHandle === 'right' && edgeA.targetHandle === 'left'),
+    'and its handles came from the same peer as its nodes did, rather than being mixed between the two',
   );
 }
 
@@ -354,8 +373,8 @@ function seedEdge(store: DiagramStore): { a: string; b: string; c: string; edgeI
 {
   const local = createLocalDiagramStore();
   const { edgeId } = seedEdge(local);
-  local.addEdgeWaypoint(edgeId, 0, wp("pre-existing", 120, 60));
-  local.addEdgeWaypoint(edgeId, 1, wp("also-pre-existing", 220, 60));
+  local.addEdgeWaypoint(edgeId, 0, wp('pre-existing', 120, 60));
+  local.addEdgeWaypoint(edgeId, 1, wp('also-pre-existing', 220, 60));
 
   // Sessions start from the recursive tree shape, so go through it the
   // way App.tsx does rather than handing the flat snapshot over directly.
@@ -370,23 +389,23 @@ function seedEdge(store: DiagramStore): { a: string; b: string; c: string; edgeI
   const storeA = createYjsDiagramStore(docA);
 
   assert(
-    ids(waypointsOf(storeA, edgeId)) === "pre-existing,also-pre-existing",
-    "bends made before a session starts are carried into the shared document in the right order"
+    ids(waypointsOf(storeA, edgeId)) === 'pre-existing,also-pre-existing',
+    'bends made before a session starts are carried into the shared document in the right order',
   );
 
   const peerB = forkPeer(docA);
-  peerB.store.moveEdgeWaypoint(edgeId, "pre-existing", { x: 120, y: 500 });
-  storeA.moveEdgeWaypoint(edgeId, "also-pre-existing", { x: 220, y: -500 });
+  peerB.store.moveEdgeWaypoint(edgeId, 'pre-existing', { x: 120, y: 500 });
+  storeA.moveEdgeWaypoint(edgeId, 'also-pre-existing', { x: 220, y: -500 });
   sync(docA, peerB.doc);
 
   const merged = waypointsOf(storeA, edgeId);
   assert(
     merged[0].y === 500 && merged[1].y === -500,
-    "and once in the session they merge per-bend exactly like ones created during it - proving seeding rebuilt them as nested shared types rather than setting a plain array"
+    'and once in the session they merge per-bend exactly like ones created during it - proving seeding rebuilt them as nested shared types rather than setting a plain array',
   );
 }
 
-console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);
+console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);
 // scripts/run-tests.ts decides pass/fail from the process exit status, so
 // a failed assertion has to actually set one - printing FAIL and exiting
 // 0 would report the suite as passing. Reached through globalThis

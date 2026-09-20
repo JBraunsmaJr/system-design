@@ -1,6 +1,6 @@
-import React from "react";
-import type { ShapeGeometry, ShapeStyle } from "../../domain/shapeRegistry";
-import { IconRenderer } from "../IconRenderer";
+import React from 'react';
+import type { ShapeGeometry, ShapeStyle } from '../../domain/shapeRegistry';
+import { IconRenderer } from '../IconRenderer';
 
 interface SvgShapeRendererProps {
   geometry: ShapeGeometry;
@@ -22,13 +22,13 @@ export function SvgShapeRenderer({
   const strokeColor = style?.stroke || color;
   const strokeWidth = style?.strokeWidth ?? 2;
   const fillColor =
-    style?.fill || (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(color) ? `${color}22` : "transparent");
+    style?.fill || (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(color) ? `${color}22` : 'transparent');
   const strokeDasharray = style?.strokeDasharray;
   const opacity = style?.opacity ?? 1;
 
   const renderGeometry = (geom: ShapeGeometry, key?: string | number): React.ReactNode => {
     switch (geom.type) {
-      case "rectangle": {
+      case 'rectangle': {
         const rx = geom.rx ?? 0;
         const ry = geom.ry ?? 0;
         return (
@@ -48,7 +48,7 @@ export function SvgShapeRenderer({
         );
       }
 
-      case "rounded-rectangle": {
+      case 'rounded-rectangle': {
         const radius = geom.radius ?? 10;
         return (
           <rect
@@ -67,8 +67,8 @@ export function SvgShapeRenderer({
         );
       }
 
-      case "circle":
-      case "ellipse": {
+      case 'circle':
+      case 'ellipse': {
         return (
           <ellipse
             key={key}
@@ -84,7 +84,7 @@ export function SvgShapeRenderer({
         );
       }
 
-      case "diamond": {
+      case 'diamond': {
         const cx = width / 2;
         const cy = height / 2;
         const inset = strokeWidth / 2;
@@ -102,7 +102,7 @@ export function SvgShapeRenderer({
         );
       }
 
-      case "parallelogram": {
+      case 'parallelogram': {
         const inset = strokeWidth / 2;
         const offset = width * 0.18;
         const pts = `${offset + inset},${inset} ${width - inset},${inset} ${width - offset - inset},${height - inset} ${inset},${height - inset}`;
@@ -119,7 +119,7 @@ export function SvgShapeRenderer({
         );
       }
 
-      case "hexagon": {
+      case 'hexagon': {
         const inset = strokeWidth / 2;
         const offset = width * 0.18;
         const cy = height / 2;
@@ -137,8 +137,8 @@ export function SvgShapeRenderer({
         );
       }
 
-      case "polygon": {
-        const pts = geom.points.map((p) => `${p.x * width},${p.y * height}`).join(" ");
+      case 'polygon': {
+        const pts = geom.points.map((p) => `${p.x * width},${p.y * height}`).join(' ');
         return (
           <polygon
             key={key}
@@ -152,7 +152,7 @@ export function SvgShapeRenderer({
         );
       }
 
-      case "line": {
+      case 'line': {
         return (
           <line
             key={key}
@@ -167,7 +167,7 @@ export function SvgShapeRenderer({
         );
       }
 
-      case "cylinder": {
+      case 'cylinder': {
         const capH = Math.min(height * 0.25, 24);
         const w = width - strokeWidth;
         const h = height - strokeWidth;
@@ -178,13 +178,30 @@ export function SvgShapeRenderer({
         return (
           <g key={key}>
             <path d={bodyD} fill={fillColor} stroke={strokeColor} strokeWidth={strokeWidth} />
-            <ellipse cx={x + w / 2} cy={y + capH / 2} rx={w / 2} ry={capH / 2} fill={fillColor} stroke={strokeColor} strokeWidth={strokeWidth} />
-            <ellipse cx={x + w / 2} cy={y + h - capH / 2} rx={w / 2} ry={capH / 2} fill="none" stroke={strokeColor} strokeWidth={strokeWidth} strokeDasharray={strokeDasharray} />
+            <ellipse
+              cx={x + w / 2}
+              cy={y + capH / 2}
+              rx={w / 2}
+              ry={capH / 2}
+              fill={fillColor}
+              stroke={strokeColor}
+              strokeWidth={strokeWidth}
+            />
+            <ellipse
+              cx={x + w / 2}
+              cy={y + h - capH / 2}
+              rx={w / 2}
+              ry={capH / 2}
+              fill="none"
+              stroke={strokeColor}
+              strokeWidth={strokeWidth}
+              strokeDasharray={strokeDasharray}
+            />
           </g>
         );
       }
 
-      case "database": {
+      case 'database': {
         const diskH = height / 3;
         const capH = Math.min(diskH * 0.45, 14);
         const w = width - strokeWidth;
@@ -198,7 +215,15 @@ export function SvgShapeRenderer({
               return (
                 <g key={i}>
                   <path d={d} fill={fillColor} stroke={strokeColor} strokeWidth={strokeWidth} />
-                  <ellipse cx={x + w / 2} cy={y + capH / 2} rx={w / 2} ry={capH / 2} fill={fillColor} stroke={strokeColor} strokeWidth={strokeWidth} />
+                  <ellipse
+                    cx={x + w / 2}
+                    cy={y + capH / 2}
+                    rx={w / 2}
+                    ry={capH / 2}
+                    fill={fillColor}
+                    stroke={strokeColor}
+                    strokeWidth={strokeWidth}
+                  />
                 </g>
               );
             })}
@@ -206,7 +231,7 @@ export function SvgShapeRenderer({
         );
       }
 
-      case "queue": {
+      case 'queue': {
         const capW = Math.min(width * 0.2, 20);
         const w = width - strokeWidth;
         const h = height - strokeWidth;
@@ -217,13 +242,29 @@ export function SvgShapeRenderer({
         return (
           <g key={key}>
             <path d={d} fill={fillColor} stroke={strokeColor} strokeWidth={strokeWidth} />
-            <ellipse cx={x + capW / 2} cy={y + h / 2} rx={capW / 2} ry={h / 2} fill="none" stroke={strokeColor} strokeWidth={strokeWidth} />
-            <ellipse cx={x + w - capW / 2} cy={y + h / 2} rx={capW / 2} ry={h / 2} fill={fillColor} stroke={strokeColor} strokeWidth={strokeWidth} />
+            <ellipse
+              cx={x + capW / 2}
+              cy={y + h / 2}
+              rx={capW / 2}
+              ry={h / 2}
+              fill="none"
+              stroke={strokeColor}
+              strokeWidth={strokeWidth}
+            />
+            <ellipse
+              cx={x + w - capW / 2}
+              cy={y + h / 2}
+              rx={capW / 2}
+              ry={h / 2}
+              fill={fillColor}
+              stroke={strokeColor}
+              strokeWidth={strokeWidth}
+            />
           </g>
         );
       }
 
-      case "document": {
+      case 'document': {
         const fold = Math.min(width * 0.25, 24);
         const w = width - strokeWidth;
         const h = height - strokeWidth;
@@ -234,13 +275,19 @@ export function SvgShapeRenderer({
         const foldD = `M ${x + w - fold} ${y} L ${x + w - fold} ${y + fold} L ${x + w} ${y + fold}`;
         return (
           <g key={key}>
-            <path d={bodyD} fill={fillColor} stroke={strokeColor} strokeWidth={strokeWidth} strokeLinejoin="round" />
+            <path
+              d={bodyD}
+              fill={fillColor}
+              stroke={strokeColor}
+              strokeWidth={strokeWidth}
+              strokeLinejoin="round"
+            />
             <path d={foldD} fill="none" stroke={strokeColor} strokeWidth={strokeWidth} />
           </g>
         );
       }
 
-      case "actor": {
+      case 'actor': {
         const headR = Math.min(width * 0.2, height * 0.15);
         const headCx = width / 2;
         const headCy = strokeWidth + headR;
@@ -253,20 +300,55 @@ export function SvgShapeRenderer({
         return (
           <g key={key}>
             {/* Head */}
-            <circle cx={headCx} cy={headCy} r={headR} fill={fillColor} stroke={strokeColor} strokeWidth={strokeWidth} />
+            <circle
+              cx={headCx}
+              cy={headCy}
+              r={headR}
+              fill={fillColor}
+              stroke={strokeColor}
+              strokeWidth={strokeWidth}
+            />
             {/* Spine */}
-            <line x1={headCx} y1={neckY} x2={headCx} y2={waistY} stroke={strokeColor} strokeWidth={strokeWidth} />
+            <line
+              x1={headCx}
+              y1={neckY}
+              x2={headCx}
+              y2={waistY}
+              stroke={strokeColor}
+              strokeWidth={strokeWidth}
+            />
             {/* Arms */}
-            <line x1={width * 0.15} y1={armY} x2={width * 0.85} y2={armY} stroke={strokeColor} strokeWidth={strokeWidth} />
+            <line
+              x1={width * 0.15}
+              y1={armY}
+              x2={width * 0.85}
+              y2={armY}
+              stroke={strokeColor}
+              strokeWidth={strokeWidth}
+            />
             {/* Left Leg */}
-            <line x1={headCx} y1={waistY} x2={width * 0.2} y2={feetY} stroke={strokeColor} strokeWidth={strokeWidth} />
+            <line
+              x1={headCx}
+              y1={waistY}
+              x2={width * 0.2}
+              y2={feetY}
+              stroke={strokeColor}
+              strokeWidth={strokeWidth}
+            />
             {/* Right Leg */}
-            <line x1={headCx} y1={waistY} x2={width * 0.8} y2={feetY} stroke={strokeColor} strokeWidth={strokeWidth} />
+            <line
+              x1={headCx}
+              y1={waistY}
+              x2={width * 0.8}
+              y2={feetY}
+              stroke={strokeColor}
+              strokeWidth={strokeWidth}
+            />
           </g>
         );
       }
 
-      case "cloud": {
+      case 'cloud': {
         const w = width - strokeWidth;
         const h = height - strokeWidth;
         const x = strokeWidth / 2;
@@ -278,10 +360,19 @@ export function SvgShapeRenderer({
                    A ${w * 0.2} ${h * 0.3} 0 0 1 ${x + w * 0.9} ${y + h * 0.55}
                    A ${w * 0.18} ${h * 0.25} 0 0 1 ${x + w * 0.8} ${y + h * 0.8}
                    Z`;
-        return <path key={key} d={d} fill={fillColor} stroke={strokeColor} strokeWidth={strokeWidth} strokeLinejoin="round" />;
+        return (
+          <path
+            key={key}
+            d={d}
+            fill={fillColor}
+            stroke={strokeColor}
+            strokeWidth={strokeWidth}
+            strokeLinejoin="round"
+          />
+        );
       }
 
-      case "path": {
+      case 'path': {
         return (
           <path
             key={key}
@@ -294,18 +385,18 @@ export function SvgShapeRenderer({
         );
       }
 
-      case "group": {
+      case 'group': {
         return <g key={key}>{geom.children.map((child, idx) => renderGeometry(child, idx))}</g>;
       }
 
-      case "text": {
+      case 'text': {
         return (
           <text
             key={key}
             x={(geom.x ?? 0.5) * width}
             y={(geom.y ?? 0.5) * height}
             fontSize={geom.fontSize ?? 14}
-            textAnchor={geom.align === "left" ? "start" : geom.align === "right" ? "end" : "middle"}
+            textAnchor={geom.align === 'left' ? 'start' : geom.align === 'right' ? 'end' : 'middle'}
             dominantBaseline="middle"
             fill={strokeColor}
           >
@@ -314,7 +405,7 @@ export function SvgShapeRenderer({
         );
       }
 
-      case "icon": {
+      case 'icon': {
         return null; // Handled separately
       }
 
@@ -336,7 +427,7 @@ export function SvgShapeRenderer({
     }
   };
 
-  const activeIcon = iconId && iconId !== "none" ? iconId : undefined;
+  const activeIcon = iconId && iconId !== 'none' ? iconId : undefined;
 
   return (
     <svg
@@ -344,18 +435,27 @@ export function SvgShapeRenderer({
       width={width}
       height={height}
       style={{
-        position: "absolute",
+        position: 'absolute',
         top: 0,
         left: 0,
-        pointerEvents: "none",
+        pointerEvents: 'none',
         opacity,
-        overflow: "visible",
+        overflow: 'visible',
       }}
     >
       {renderGeometry(geometry)}
       {activeIcon && (
         <foreignObject x={width / 2 - 12} y={10} width={24} height={24}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "100%", color: strokeColor }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '100%',
+              height: '100%',
+              color: strokeColor,
+            }}
+          >
             <IconRenderer icon={activeIcon} size={18} />
           </div>
         </foreignObject>

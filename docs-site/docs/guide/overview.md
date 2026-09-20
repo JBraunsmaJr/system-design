@@ -14,7 +14,6 @@ designed for engineering teams.
   timelines.
 - **Scenario Presentations**: Walk stakeholders through state transitions and system scenarios like presentation slides.
 
-
 ## Architecture & Tenets
 
 ### 100% Static Single-Page Application
@@ -32,7 +31,6 @@ central server—it flows directly over encrypted WebRTC data channels between p
 The client bundle has zero external CDN dependencies (fonts and icons are fully bundled). When deployed in isolated or
 classified networks, internal STUN/TURN and relay servers can be configured to keep all communication strictly
 on-premises.
-
 
 ## Technology Stack
 

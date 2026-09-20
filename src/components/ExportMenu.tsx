@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { ChevronDown, Download } from "lucide-react";
-import { computeFlippedPosition } from "../domain/popoverPosition";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { ChevronDown, Download } from 'lucide-react';
+import { computeFlippedPosition } from '../domain/popoverPosition';
 
 interface ExportMenuProps {
   onExportPng: () => void;
@@ -36,9 +36,11 @@ export function ExportMenu({ onExportPng, onExportSvg, disabled }: ExportMenuPro
     const next = computeFlippedPosition(
       triggerRect,
       { width: dropdownRect.width, height: dropdownRect.height },
-      { width: window.innerWidth, height: window.innerHeight }
+      { width: window.innerWidth, height: window.innerHeight },
     );
-    setDropdownPos((prev) => (prev && prev.top === next.top && prev.left === next.left ? prev : next));
+    setDropdownPos((prev) =>
+      prev && prev.top === next.top && prev.left === next.left ? prev : next,
+    );
   }, [isOpen]);
 
   const reposition = useCallback(() => {
@@ -51,8 +53,8 @@ export function ExportMenu({ onExportPng, onExportSvg, disabled }: ExportMenuPro
       computeFlippedPosition(
         triggerRect,
         { width: dropdownRect.width, height: dropdownRect.height },
-        { width: window.innerWidth, height: window.innerHeight }
-      )
+        { width: window.innerWidth, height: window.innerHeight },
+      ),
     );
   }, []);
 
@@ -65,23 +67,23 @@ export function ExportMenu({ onExportPng, onExportSvg, disabled }: ExportMenuPro
       close();
     };
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
+      if (e.key === 'Escape') close();
     };
-    document.addEventListener("mousedown", handleMouseDown);
-    document.addEventListener("keydown", handleEscape);
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('keydown', handleEscape);
     return () => {
-      document.removeEventListener("mousedown", handleMouseDown);
-      document.removeEventListener("keydown", handleEscape);
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('keydown', handleEscape);
     };
   }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
-    window.addEventListener("scroll", reposition, true);
-    window.addEventListener("resize", reposition);
+    window.addEventListener('scroll', reposition, true);
+    window.addEventListener('resize', reposition);
     return () => {
-      window.removeEventListener("scroll", reposition, true);
-      window.removeEventListener("resize", reposition);
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
     };
   }, [isOpen, reposition]);
 
@@ -104,7 +106,12 @@ export function ExportMenu({ onExportPng, onExportSvg, disabled }: ExportMenuPro
           <div
             ref={dropdownRef}
             className="export-menu__dropdown"
-            style={{ position: "fixed", top: dropdownPos.top, left: dropdownPos.left, minWidth: DROPDOWN_WIDTH }}
+            style={{
+              position: 'fixed',
+              top: dropdownPos.top,
+              left: dropdownPos.left,
+              minWidth: DROPDOWN_WIDTH,
+            }}
           >
             <button
               type="button"
@@ -125,7 +132,7 @@ export function ExportMenu({ onExportPng, onExportSvg, disabled }: ExportMenuPro
               Download SVG
             </button>
           </div>,
-          document.body
+          document.body,
         )}
     </div>
   );

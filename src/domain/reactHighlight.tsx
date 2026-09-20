@@ -1,5 +1,5 @@
-import React from "react";
-import { splitByHighlight } from "./textHighlight";
+import React from 'react';
+import { splitByHighlight } from './textHighlight';
 
 /**
  * Recursively traverses a React node tree and highlights matching text segments.
@@ -7,7 +7,7 @@ import { splitByHighlight } from "./textHighlight";
 export function highlightInReactNode(node: React.ReactNode, search?: string): React.ReactNode {
   if (!search || !search.trim() || node == null) return node;
 
-  if (typeof node === "string") {
+  if (typeof node === 'string') {
     const segments = splitByHighlight(node, search);
     return (
       <>
@@ -18,13 +18,13 @@ export function highlightInReactNode(node: React.ReactNode, search?: string): Re
             </mark>
           ) : (
             <React.Fragment key={idx}>{seg.text}</React.Fragment>
-          )
+          ),
         )}
       </>
     );
   }
 
-  if (typeof node === "number" || typeof node === "boolean") {
+  if (typeof node === 'number' || typeof node === 'boolean') {
     return node;
   }
 
@@ -37,11 +37,7 @@ export function highlightInReactNode(node: React.ReactNode, search?: string): Re
   if (React.isValidElement(node)) {
     const props = node.props as { children?: React.ReactNode };
     if (props && props.children) {
-      return React.cloneElement(
-        node,
-        undefined,
-        highlightInReactNode(props.children, search)
-      );
+      return React.cloneElement(node, undefined, highlightInReactNode(props.children, search));
     }
   }
 

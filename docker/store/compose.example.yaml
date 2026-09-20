@@ -13,10 +13,12 @@ services:
       POSTGRES_USER: store
       POSTGRES_PASSWORD: change-me
       POSTGRES_DB: store
+    ports:
+      - '5432:5432'
     volumes:
       - store-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U store"]
+      test: ['CMD-SHELL', 'pg_isready -U store']
       interval: 5s
       retries: 10
 
@@ -40,9 +42,13 @@ services:
       # demo account: read the file before using it for anything real.
       - ./keycloak/system-design-realm.json:/opt/keycloak/data/import/system-design-realm.json:ro
     ports:
-      - "8081:8080"
+      - '8081:8080'
     healthcheck:
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /realms/system-design HTTP/1.1\r\nhost: localhost\r\nconnection: close\r\n\r\n' >&3 && grep -q '200 OK' <&3"]
+      test:
+        [
+          'CMD-SHELL',
+          "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /realms/system-design HTTP/1.1\r\nhost: localhost\r\nconnection: close\r\n\r\n' >&3 && grep -q '200 OK' <&3",
+        ]
       interval: 5s
       timeout: 5s
       retries: 30
@@ -79,7 +85,7 @@ services:
       OIDC_CLIENT_SECRET: change-me
       # issuer#subject for each administrator: who may place legal holds and
       # purge. With none set, those actions are refused to everyone.
-      ADMIN_SUBJECTS: ""
+      ADMIN_SUBJECTS: ''
       # immediate | a duration (7d, 6m, 7y) | indefinite. Default 30d.
       RETENTION_PERIOD: 30d
       # The organisation's recovery PUBLIC key. Generate the pair with
@@ -89,14 +95,14 @@ services:
     volumes:
       - ./recovery-public.pem:/run/secrets/recovery-public.pem:ro
     ports:
-      - "8080:8080"
+      - '8080:8080'
 
   relay:
     build:
       context: ../..
       dockerfile: docker/signaling/Dockerfile
     ports:
-      - "4444:4444"
+      - '4444:4444'
 
   editor:
     build:
@@ -109,7 +115,7 @@ services:
       # as it does with no store.
       STORE_URL: http://localhost:8080
     ports:
-      - "8088:80"
+      - '8088:80'
 
 volumes:
   store-data:

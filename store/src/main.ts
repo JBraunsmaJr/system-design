@@ -7,18 +7,18 @@
  * the schema, and serves. Without DATABASE_URL it runs in memory, which is
  * useful for a demonstration and says so at startup and in /v1/health.
  */
-import { createMemoryBlobStore, type MemoryTx } from "./blobStore.ts";
-import { createDocumentService } from "./documentService.ts";
-import { createPostgresStore, createPostgresWorkspaceIndex } from "./postgresStore.ts";
-import { createPostgresUserDirectory } from "./postgresUserDirectory.ts";
-import { createMemoryUserDirectory } from "./userDirectory.ts";
-import { createMemoryWorkspaceIndex } from "./workspaceIndex.ts";
-import { createHttpService, createMemoryAuditSink, type StoreBackend } from "./httpService.ts";
-import { createSessionStore } from "./auth/sessions.ts";
-import { createPostgresSessionStore } from "./auth/postgresSessions.ts";
-import { createProvider } from "./auth/providers.ts";
-import { ConfigError, describeConfig, loadStoreConfig } from "./config.ts";
-import pg from "pg";
+import { createMemoryBlobStore, type MemoryTx } from './blobStore.ts';
+import { createDocumentService } from './documentService.ts';
+import { createPostgresStore, createPostgresWorkspaceIndex } from './postgresStore.ts';
+import { createPostgresUserDirectory } from './postgresUserDirectory.ts';
+import { createMemoryUserDirectory } from './userDirectory.ts';
+import { createMemoryWorkspaceIndex } from './workspaceIndex.ts';
+import { createHttpService, createMemoryAuditSink, type StoreBackend } from './httpService.ts';
+import { createSessionStore } from './auth/sessions.ts';
+import { createPostgresSessionStore } from './auth/postgresSessions.ts';
+import { createProvider } from './auth/providers.ts';
+import { ConfigError, describeConfig, loadStoreConfig } from './config.ts';
+import pg from 'pg';
 
 async function main() {
   let config;
@@ -27,11 +27,13 @@ async function main() {
   } catch (error) {
     // Configuration problems are the operator's to fix, so they get a
     // sentence rather than a stack trace.
-    console.error(`\nThe store cannot start:\n\n  ${error instanceof ConfigError ? error.message : String(error)}\n`);
+    console.error(
+      `\nThe store cannot start:\n\n  ${error instanceof ConfigError ? error.message : String(error)}\n`,
+    );
     process.exit(2);
   }
 
-  console.log("system-design store");
+  console.log('system-design store');
   for (const line of describeConfig(config)) console.log(`  ${line}`);
 
   let store: StoreBackend;
@@ -103,9 +105,10 @@ async function main() {
     void (store as unknown as { purgeDue?: () => Promise<string[]> })
       .purgeDue?.()
       .then((purged) => {
-        if (purged.length > 0) console.log(`Purged ${purged.length} document(s) past their retention.`);
+        if (purged.length > 0)
+          console.log(`Purged ${purged.length} document(s) past their retention.`);
       })
-      .catch((error) => console.error("Purge sweep failed:", error));
+      .catch((error) => console.error('Purge sweep failed:', error));
   }, config.purgeIntervalMs);
 
   server.listen(config.port, () => console.log(`Ready on port ${config.port}.`));
@@ -117,11 +120,11 @@ async function main() {
     await close();
     process.exit(0);
   };
-  process.on("SIGTERM", () => void shutdown("SIGTERM"));
-  process.on("SIGINT", () => void shutdown("SIGINT"));
-  process.on("message", (msg) => {
-    if (msg === "SIGTERM" || msg === "SIGINT" || msg === "shutdown") {
-      void shutdown(typeof msg === "string" && msg.startsWith("SIG") ? msg : "SIGTERM");
+  process.on('SIGTERM', () => void shutdown('SIGTERM'));
+  process.on('SIGINT', () => void shutdown('SIGINT'));
+  process.on('message', (msg) => {
+    if (msg === 'SIGTERM' || msg === 'SIGINT' || msg === 'shutdown') {
+      void shutdown(typeof msg === 'string' && msg.startsWith('SIG') ? msg : 'SIGTERM');
     }
   });
 }

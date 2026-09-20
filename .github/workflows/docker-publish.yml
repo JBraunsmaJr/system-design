@@ -5,7 +5,7 @@ name: Build and publish Docker image
 # fresh image under today's date without needing an unrelated commit.
 on:
   release:
-    types: [ published ]
+    types: [published]
   workflow_dispatch:
 
 permissions:

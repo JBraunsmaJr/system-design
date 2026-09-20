@@ -1,6 +1,6 @@
-import type { RequirementItem, RequirementsDocument } from "./requirementsTypes";
+import type { RequirementItem, RequirementsDocument } from './requirementsTypes';
 
-export type SkillTreeNodeState = "done" | "in-progress" | "unlocked" | "locked";
+export type SkillTreeNodeState = 'done' | 'in-progress' | 'unlocked' | 'locked';
 
 export interface SkillTreeNode {
   item: RequirementItem;
@@ -68,7 +68,9 @@ export function computeSkillTree(doc: RequirementsDocument): SkillTree {
   const workableTypeIds = new Set(doc.itemTypes.filter((t) => t.isWorkable).map((t) => t.id));
   const workableItems = doc.items.filter((i) => workableTypeIds.has(i.typeId));
   const workableIds = new Set(workableItems.map((i) => i.id));
-  const blockingTypeIds = new Set(doc.relationshipTypes.filter((t) => t.isBlocking).map((t) => t.id));
+  const blockingTypeIds = new Set(
+    doc.relationshipTypes.filter((t) => t.isBlocking).map((t) => t.id),
+  );
 
   const blockedBy = new Map<string, string[]>(workableItems.map((i) => [i.id, []]));
   const blocks = new Map<string, string[]>(workableItems.map((i) => [i.id, []]));
@@ -86,7 +88,9 @@ export function computeSkillTree(doc: RequirementsDocument): SkillTree {
   // unprocessed afterward is exactly the set of items in, or depending
   // on, a cycle.
   const rank = new Map<string, number>();
-  const inDegree = new Map<string, number>(workableItems.map((i) => [i.id, blockedBy.get(i.id)!.length]));
+  const inDegree = new Map<string, number>(
+    workableItems.map((i) => [i.id, blockedBy.get(i.id)!.length]),
+  );
   const queue: string[] = workableItems.filter((i) => inDegree.get(i.id) === 0).map((i) => i.id);
   let queueHead = 0;
   const processed = new Set<string>();
@@ -109,21 +113,21 @@ export function computeSkillTree(doc: RequirementsDocument): SkillTree {
 
   const nodes: SkillTreeNode[] = workableItems.map((item) => {
     const inCycle = !processed.has(item.id);
-    const itemRank = inCycle ? maxProcessedRank + 1 : rank.get(item.id) ?? 0;
+    const itemRank = inCycle ? maxProcessedRank + 1 : (rank.get(item.id) ?? 0);
     const blockerIds = blockedBy.get(item.id)!;
-    const hasUndoneBlocker = blockerIds.some((bid) => itemById.get(bid)?.status !== "done");
+    const hasUndoneBlocker = blockerIds.some((bid) => itemById.get(bid)?.status !== 'done');
 
     let state: SkillTreeNodeState;
-    if (item.status === "done") state = "done";
-    else if (item.status === "in-progress") state = "in-progress";
-    else if (hasUndoneBlocker) state = "locked";
-    else state = "unlocked";
+    if (item.status === 'done') state = 'done';
+    else if (item.status === 'in-progress') state = 'in-progress';
+    else if (hasUndoneBlocker) state = 'locked';
+    else state = 'unlocked';
 
     return {
       item,
       rank: itemRank,
       state,
-      isBlockedDespiteProgress: item.status === "in-progress" && hasUndoneBlocker,
+      isBlockedDespiteProgress: item.status === 'in-progress' && hasUndoneBlocker,
       blockerIds,
       inCycle,
     };

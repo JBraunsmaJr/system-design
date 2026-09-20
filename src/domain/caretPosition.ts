@@ -16,56 +16,56 @@
  */
 export function getCaretPixelPosition(
   textarea: HTMLTextAreaElement,
-  caretIndex: number
+  caretIndex: number,
 ): { top: number; left: number; lineHeight: number } {
   const fallback = { top: 0, left: 0, lineHeight: 20 };
-  if (typeof document === "undefined") return fallback;
+  if (typeof document === 'undefined') return fallback;
 
-  const mirror = document.createElement("div");
+  const mirror = document.createElement('div');
   try {
     const style = window.getComputedStyle(textarea);
     const propertiesToCopy: (keyof CSSStyleDeclaration)[] = [
-      "boxSizing",
-      "width",
-      "paddingTop",
-      "paddingRight",
-      "paddingBottom",
-      "paddingLeft",
-      "borderTopWidth",
-      "borderRightWidth",
-      "borderBottomWidth",
-      "borderLeftWidth",
-      "fontFamily",
-      "fontSize",
-      "fontWeight",
-      "fontStyle",
-      "letterSpacing",
-      "lineHeight",
-      "textTransform",
-      "wordSpacing",
+      'boxSizing',
+      'width',
+      'paddingTop',
+      'paddingRight',
+      'paddingBottom',
+      'paddingLeft',
+      'borderTopWidth',
+      'borderRightWidth',
+      'borderBottomWidth',
+      'borderLeftWidth',
+      'fontFamily',
+      'fontSize',
+      'fontWeight',
+      'fontStyle',
+      'letterSpacing',
+      'lineHeight',
+      'textTransform',
+      'wordSpacing',
     ];
     for (const prop of propertiesToCopy) {
       const value = style[prop];
-      if (typeof value === "string") {
+      if (typeof value === 'string') {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- assigning a copied CSSStyleDeclaration value back by the same key is inherently untyped
         (mirror.style as any)[prop] = value;
       }
     }
-    mirror.style.position = "absolute";
-    mirror.style.visibility = "hidden";
-    mirror.style.top = "0";
-    mirror.style.left = "-9999px";
-    mirror.style.whiteSpace = "pre-wrap";
-    mirror.style.wordWrap = "break-word";
-    mirror.style.overflow = "hidden";
-    mirror.style.height = "auto";
+    mirror.style.position = 'absolute';
+    mirror.style.visibility = 'hidden';
+    mirror.style.top = '0';
+    mirror.style.left = '-9999px';
+    mirror.style.whiteSpace = 'pre-wrap';
+    mirror.style.wordWrap = 'break-word';
+    mirror.style.overflow = 'hidden';
+    mirror.style.height = 'auto';
 
     mirror.textContent = textarea.value.slice(0, caretIndex);
-    const marker = document.createElement("span");
+    const marker = document.createElement('span');
     // A trailing zero-width-ish placeholder so the marker has real
     // dimensions to measure even when the caret is at the very end of
     // an empty or whitespace-ending line.
-    marker.textContent = ".";
+    marker.textContent = '.';
     mirror.appendChild(marker);
 
     document.body.appendChild(mirror);

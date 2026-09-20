@@ -5,10 +5,10 @@ import type {
   ExtraDayOff,
   MemberSprintCapacity,
   SprintCapacitySummary,
-} from "./teamTypes.ts";
-import type { Sprint, ProgramIncrement, CapacityReservation } from "./programIncrements.ts";
-import { getSprintActiveReservations } from "./programIncrements.ts";
-import type { RequirementItem } from "./requirementsTypes.ts";
+} from './teamTypes.ts';
+import type { Sprint, ProgramIncrement, CapacityReservation } from './programIncrements.ts';
+import { getSprintActiveReservations } from './programIncrements.ts';
+import type { RequirementItem } from './requirementsTypes.ts';
 
 export interface HolidayInfo {
   date: string; // YYYY-MM-DD
@@ -17,14 +17,14 @@ export interface HolidayInfo {
 
 /** Converts a YYYY-MM-DD string to a day count (UTC-based days since Unix epoch). */
 export function parseISODate(iso: string): number {
-  const [y, m, d] = iso.split("-").map(Number);
+  const [y, m, d] = iso.split('-').map(Number);
   return Math.floor(Date.UTC(y, m - 1, d) / 86400000);
 }
 
 /** Formats UTC day count to YYYY-MM-DD. */
 export function formatISODate(days: number): string {
   const d = new Date(days * 86400000);
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
 }
 
 /** Returns UTC day of week: 0 = Sunday, 1 = Monday, ..., 6 = Saturday */
@@ -64,7 +64,7 @@ export function getUsFederalHolidays(year: number): HolidayInfo[] {
     name: string,
     month: number,
     targetDow: number, // 0 = Sun, 1 = Mon, ..., 4 = Thu
-    nth: number // 1-based, e.g. 1st, 2nd, 3rd, 4th
+    nth: number, // 1-based, e.g. 1st, 2nd, 3rd, 4th
   ) => {
     let days = Math.floor(Date.UTC(year, month - 1, 1) / 86400000);
     while (getDayOfWeek(days) !== targetDow) {
@@ -88,34 +88,34 @@ export function getUsFederalHolidays(year: number): HolidayInfo[] {
   addObservedFixedHoliday("New Year's Day", 1, 1);
 
   // 2. Martin Luther King Jr. Day (3rd Monday in Jan)
-  addNthWeekdayHoliday("Martin Luther King Jr. Day", 1, 1, 3);
+  addNthWeekdayHoliday('Martin Luther King Jr. Day', 1, 1, 3);
 
   // 3. Washington's Birthday / Presidents' Day (3rd Monday in Feb)
   addNthWeekdayHoliday("Presidents' Day", 2, 1, 3);
 
   // 4. Memorial Day (Last Monday in May)
-  addLastWeekdayHoliday("Memorial Day", 5, 1);
+  addLastWeekdayHoliday('Memorial Day', 5, 1);
 
   // 5. Juneteenth National Independence Day (June 19)
-  addObservedFixedHoliday("Juneteenth", 6, 19);
+  addObservedFixedHoliday('Juneteenth', 6, 19);
 
   // 6. Independence Day (July 4)
-  addObservedFixedHoliday("Independence Day", 7, 4);
+  addObservedFixedHoliday('Independence Day', 7, 4);
 
   // 7. Labor Day (1st Monday in Sept)
-  addNthWeekdayHoliday("Labor Day", 9, 1, 1);
+  addNthWeekdayHoliday('Labor Day', 9, 1, 1);
 
   // 8. Columbus Day / Indigenous Peoples' Day (2nd Monday in Oct)
-  addNthWeekdayHoliday("Columbus Day", 10, 1, 2);
+  addNthWeekdayHoliday('Columbus Day', 10, 1, 2);
 
   // 9. Veterans Day (Nov 11)
-  addObservedFixedHoliday("Veterans Day", 11, 11);
+  addObservedFixedHoliday('Veterans Day', 11, 11);
 
   // 10. Thanksgiving Day (4th Thursday in Nov)
-  addNthWeekdayHoliday("Thanksgiving Day", 11, 4, 4);
+  addNthWeekdayHoliday('Thanksgiving Day', 11, 4, 4);
 
   // 11. Christmas Day (Dec 25)
-  addObservedFixedHoliday("Christmas Day", 12, 25);
+  addObservedFixedHoliday('Christmas Day', 12, 25);
 
   return holidays;
 }
@@ -155,7 +155,7 @@ export function getMemberPtoDeductionForDay(ptoSpans: PtoSpan[], currentDays: nu
 
     if (spanStart === spanEnd) {
       // Single-day PTO
-      if (span.startHalfDay === "full") {
+      if (span.startHalfDay === 'full') {
         totalDeduction += 1.0;
       } else {
         // morning or afternoon = 0.5 day
@@ -165,10 +165,10 @@ export function getMemberPtoDeductionForDay(ptoSpans: PtoSpan[], currentDays: nu
       // Multi-day PTO
       if (currentDays === spanStart) {
         // On start day: 'afternoon' means starting afternoon off (0.5 day off); 'full' or 'morning' means full day off
-        totalDeduction += span.startHalfDay === "afternoon" ? 0.5 : 1.0;
+        totalDeduction += span.startHalfDay === 'afternoon' ? 0.5 : 1.0;
       } else if (currentDays === spanEnd) {
         // On end day: 'morning' means morning off (0.5 day off); 'full' or 'afternoon' means full day off
-        totalDeduction += span.endHalfDay === "morning" ? 0.5 : 1.0;
+        totalDeduction += span.endHalfDay === 'morning' ? 0.5 : 1.0;
       } else {
         // Intermediate day
         totalDeduction += 1.0;
@@ -188,7 +188,7 @@ export function computeSprintCapacity(
   sprintRange: { startDate: string; endDate: string } | undefined,
   team: TeamDocument,
   items: RequirementItem[],
-  reservations?: CapacityReservation[]
+  reservations?: CapacityReservation[],
 ): SprintCapacitySummary {
   if (!sprintRange) {
     return {
@@ -259,9 +259,12 @@ export function computeSprintCapacity(
   let unassignedPoints = 0;
 
   for (const item of sprintItems) {
-    const pts = typeof item.points === "number" && !isNaN(item.points) ? item.points : 0;
+    const pts = typeof item.points === 'number' && !isNaN(item.points) ? item.points : 0;
     if (item.assigneeId) {
-      memberAssignedPoints.set(item.assigneeId, (memberAssignedPoints.get(item.assigneeId) ?? 0) + pts);
+      memberAssignedPoints.set(
+        item.assigneeId,
+        (memberAssignedPoints.get(item.assigneeId) ?? 0) + pts,
+      );
       memberAssignedCount.set(item.assigneeId, (memberAssignedCount.get(item.assigneeId) ?? 0) + 1);
     } else {
       unassignedPoints += pts;
@@ -271,7 +274,7 @@ export function computeSprintCapacity(
   // Pre-calculate working days and gross capacity for each member
   const memberGrossCapacities = team.members.map((member) => {
     const pointsPerDay =
-      typeof member.defaultPointsPerDay === "number"
+      typeof member.defaultPointsPerDay === 'number'
         ? member.defaultPointsPerDay
         : team.settings.defaultPointsPerDay;
 
@@ -300,19 +303,22 @@ export function computeSprintCapacity(
     };
   });
 
-  const totalGrossCapacity = memberGrossCapacities.reduce((acc, m) => acc + m.grossCapacityPoints, 0);
+  const totalGrossCapacity = memberGrossCapacities.reduce(
+    (acc, m) => acc + m.grossCapacityPoints,
+    0,
+  );
 
   // Filter valid active reservations for this sprint
   const activeReservations = (reservations ?? []).filter(
-    (r) => typeof r.value === "number" && !isNaN(r.value) && r.value > 0
+    (r) => typeof r.value === 'number' && !isNaN(r.value) && r.value > 0,
   );
 
   const totalPercentageReserved = activeReservations
-    .filter((r) => r.unit === "percentage")
+    .filter((r) => r.unit === 'percentage')
     .reduce((sum, r) => sum + r.value, 0);
 
   const totalFixedPointsReserved = activeReservations
-    .filter((r) => r.unit === "points")
+    .filter((r) => r.unit === 'points')
     .reduce((sum, r) => sum + r.value, 0);
 
   const memberBreakdown: MemberSprintCapacity[] = [];
@@ -331,13 +337,14 @@ export function computeSprintCapacity(
         : 0;
 
     // Use ceil to ensure reserved capacity points are whole numbers and provide a safe buffer
-    const rawReservationDeduction = Math.round((percentDeduction + fixedPointsDeduction) * 1e6) / 1e6;
-    const reservedPoints = Math.min(
-      grossCapacityPoints,
-      Math.ceil(rawReservationDeduction)
-    );
+    const rawReservationDeduction =
+      Math.round((percentDeduction + fixedPointsDeduction) * 1e6) / 1e6;
+    const reservedPoints = Math.min(grossCapacityPoints, Math.ceil(rawReservationDeduction));
 
-    const capacityPoints = Math.max(0, Math.round((grossCapacityPoints - reservedPoints) * 10) / 10);
+    const capacityPoints = Math.max(
+      0,
+      Math.round((grossCapacityPoints - reservedPoints) * 10) / 10,
+    );
     const assignedPts = memberAssignedPoints.get(member.id) ?? 0;
     const assignedCount = memberAssignedCount.get(member.id) ?? 0;
     const remainingPts = Math.round((capacityPoints - assignedPts) * 10) / 10;
@@ -367,9 +374,12 @@ export function computeSprintCapacity(
   const totalGrossCapacityPoints = Math.round(totalGrossCapacity * 10) / 10;
   const totalReservedPoints = Math.min(
     totalGrossCapacityPoints,
-    Math.round(memberBreakdown.reduce((sum, m) => sum + m.reservedPoints, 0) * 10) / 10
+    Math.round(memberBreakdown.reduce((sum, m) => sum + m.reservedPoints, 0) * 10) / 10,
   );
-  const totalCapacityPoints = Math.max(0, Math.round((totalGrossCapacityPoints - totalReservedPoints) * 10) / 10);
+  const totalCapacityPoints = Math.max(
+    0,
+    Math.round((totalGrossCapacityPoints - totalReservedPoints) * 10) / 10,
+  );
   totalAssignedPoints = Math.round(totalAssignedPoints * 10) / 10;
   const remainingCapacityPoints = Math.round((totalCapacityPoints - totalAssignedPoints) * 10) / 10;
 
@@ -398,7 +408,7 @@ export function computePICapacities(
   pi: ProgramIncrement,
   sprintRanges: { sprintId: string; startDate: string; endDate: string }[],
   team: TeamDocument,
-  items: RequirementItem[]
+  items: RequirementItem[],
 ): SprintCapacitySummary[] {
   const rangeMap = new Map(sprintRanges.map((r) => [r.sprintId, r]));
   return pi.sprints.map((sprint) => {

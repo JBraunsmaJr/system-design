@@ -28,10 +28,10 @@ import {
   buildHeader,
   parseEnvelope,
   type BlobContext,
-} from "./envelope.ts";
-import { randomBytes } from "./random.ts";
+} from './envelope.ts';
+import { randomBytes } from './random.ts';
 
-export type CryptoMode = "webcrypto" | "passthrough";
+export type CryptoMode = 'webcrypto' | 'passthrough';
 
 export interface StorageCrypto {
   readonly mode: CryptoMode;
@@ -43,14 +43,15 @@ export interface StorageCrypto {
   generateContentKey(): Promise<CryptoKey>;
 }
 
-export type OpenErrorReason = EnvelopeError["reason"] | "wrong-key-or-tampered" | "missing-key" | "mode-mismatch";
+export type OpenErrorReason =
+  EnvelopeError['reason'] | 'wrong-key-or-tampered' | 'missing-key' | 'mode-mismatch';
 
 export class OpenError extends Error {
   reason: OpenErrorReason;
 
   constructor(message: string, reason: OpenErrorReason) {
     super(message);
-    this.name = "OpenError";
+    this.name = 'OpenError';
     this.reason = reason;
   }
 }
@@ -79,35 +80,39 @@ export function createWebCryptoStorage(): StorageCrypto {
   });
 
   return {
-    mode: "webcrypto",
+    mode: 'webcrypto',
 
     async generateContentKey() {
-      return subtle().generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
+      return subtle().generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
     },
 
     async seal(context, plaintext, key) {
-      if (!key) throw new OpenError("Sealing requires a key in webcrypto mode.", "missing-key");
+      if (!key) throw new OpenError('Sealing requires a key in webcrypto mode.', 'missing-key');
       const iv = randomIv();
       const aad = authenticatedData(header, context);
       const ciphertext = new Uint8Array(
-        await subtle().encrypt({ name: "AES-GCM", iv: buffer(iv), additionalData: buffer(aad) }, key, buffer(plaintext)),
+        await subtle().encrypt(
+          { name: 'AES-GCM', iv: buffer(iv), additionalData: buffer(aad) },
+          key,
+          buffer(plaintext),
+        ),
       );
       return assemble(header, iv, ciphertext);
     },
 
     async open(context, blob, key) {
-      if (!key) throw new OpenError("Opening requires a key in webcrypto mode.", "missing-key");
+      if (!key) throw new OpenError('Opening requires a key in webcrypto mode.', 'missing-key');
       const parsed = parseEnvelope(blob);
       if (parsed.algorithm !== ALG_AES_256_GCM) {
         throw new OpenError(
-          "This blob is not encrypted; it was written by a store running in passthrough mode.",
-          "mode-mismatch",
+          'This blob is not encrypted; it was written by a store running in passthrough mode.',
+          'mode-mismatch',
         );
       }
       const aad = authenticatedData(parsed.header, context);
       try {
         const plaintext = await subtle().decrypt(
-          { name: "AES-GCM", iv: buffer(parsed.iv), additionalData: buffer(aad) },
+          { name: 'AES-GCM', iv: buffer(parsed.iv), additionalData: buffer(aad) },
           key,
           buffer(parsed.body),
         );
@@ -117,8 +122,8 @@ export function createWebCryptoStorage(): StorageCrypto {
         // modified blob, or a blob belonging to another document, field, or
         // version. Callers are told what is verifiable, not a guess.
         throw new OpenError(
-          "Could not open this blob: the key is wrong, the data was modified, or it belongs to a different document, field, or version.",
-          "wrong-key-or-tampered",
+          'Could not open this blob: the key is wrong, the data was modified, or it belongs to a different document, field, or version.',
+          'wrong-key-or-tampered',
         );
       }
     },
@@ -135,11 +140,11 @@ export function createPassthroughStorage(): StorageCrypto {
   const zeroIv = new Uint8Array(IV_BYTES);
 
   return {
-    mode: "passthrough",
+    mode: 'passthrough',
 
     async generateContentKey() {
       // Still a real key: switching modes must not need different call sites.
-      return subtle().generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
+      return subtle().generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
     },
 
     async seal(context, plaintext) {
@@ -153,8 +158,8 @@ export function createPassthroughStorage(): StorageCrypto {
       const parsed = parseEnvelope(blob);
       if (parsed.algorithm !== ALG_NONE) {
         throw new OpenError(
-          "This blob is encrypted, but this deployment runs in passthrough mode and has no key for it.",
-          "mode-mismatch",
+          'This blob is encrypted, but this deployment runs in passthrough mode and has no key for it.',
+          'mode-mismatch',
         );
       }
       authenticatedData(parsed.header, context);
@@ -163,6 +168,6 @@ export function createPassthroughStorage(): StorageCrypto {
   };
 }
 
-export function createStorageCrypto(mode: CryptoMode = "webcrypto"): StorageCrypto {
-  return mode === "passthrough" ? createPassthroughStorage() : createWebCryptoStorage();
+export function createStorageCrypto(mode: CryptoMode = 'webcrypto'): StorageCrypto {
+  return mode === 'passthrough' ? createPassthroughStorage() : createWebCryptoStorage();
 }

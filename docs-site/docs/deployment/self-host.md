@@ -11,37 +11,41 @@ reverse proxy terminates TLS for both the editor and the relay.
 
 ::: details Nginx Sample Configuration
 `nginx.conf`
+
 ```conf
 <!--@include: @/files/nginx.conf -->
 ```
+
 :::
 
 ::: details Environment Variable Example
+
 ```env
 <!--@include: @/files/example.env -->
 ```
+
 :::
 
-
 | Variable      | Primary / Purpose           | Example                        | Description                                                      |
-|:--------------|:----------------------------|:-------------------------------|:-----------------------------------------------------------------|
+| :------------ | :-------------------------- | :----------------------------- | :--------------------------------------------------------------- |
 | `RELAY`       | **Primary (Signaling URL)** | `wss://relay.example.com`      | Default WebSocket URL for the WebRTC signaling relay.            |
 | `APP_URL`     | **Primary (Base URL)**      | `https://design.example.com`   | Public base URL used when generating shareable session links.    |
 | `ICE_SERVERS` | **Primary (STUN/TURN)**     | `stun:stun.l.google.com:19302` | Comma-separated list of STUN/TURN server URLs for NAT traversal. |
 
-
 ::: details Air Gapped Deployment
 Air-gapped networks will need a TURN server. This is required for WebRTC to function in such an environment.
-Use the snippets below to add the TURN service. 
+Use the snippets below to add the TURN service.
 
 ```yaml
 <!--@include: @/files/turnserver.compose.yml -->
 ```
 
 `turnserver.conf`
+
 ```conf
 <!--@include: @/files/turnserver.conf -->
 ```
+
 :::
 
 ::: tip Subpath Hosting

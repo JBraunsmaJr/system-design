@@ -7,11 +7,11 @@
  * A preference, so it lives in localStorage (WS2-R1 allows small preference
  * keys). Off unless the user turns it on.
  */
-export const TIMED_COPIES_KEY = "system-design-editor:timed-copies";
+export const TIMED_COPIES_KEY = 'system-design-editor:timed-copies';
 
 /** Instrumented builds only: seconds instead of minutes, so the browser
  * suite does not wait minutes for a download. */
-export const TIMED_COPIES_TEST_SECONDS_KEY = "system-design-editor:timed-copies-test-seconds";
+export const TIMED_COPIES_TEST_SECONDS_KEY = 'system-design-editor:timed-copies-test-seconds';
 
 export const TIMED_COPY_INTERVALS = [5, 10, 15, 30, 60] as const;
 
@@ -29,7 +29,10 @@ export function parseTimedCopies(raw: string | null): TimedCopiesSettings {
   try {
     const value = JSON.parse(raw) as Partial<TimedCopiesSettings>;
     const minutes =
-      typeof value.minutes === "number" && Number.isFinite(value.minutes) && value.minutes >= 1 && value.minutes <= 240
+      typeof value.minutes === 'number' &&
+      Number.isFinite(value.minutes) &&
+      value.minutes >= 1 &&
+      value.minutes <= 240
         ? Math.round(value.minutes)
         : DEFAULT_TIMED_COPIES.minutes;
     return { enabled: value.enabled === true, minutes };
@@ -59,8 +62,13 @@ export function saveTimedCopies(settings: TimedCopiesSettings): void {
  * every file system, and distinct per copy so none overwrites another.
  */
 export function timedCopyFileName(title: string, at: Date): string {
-  const safe = title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "diagram";
-  const pad = (n: number) => String(n).padStart(2, "0");
+  const safe =
+    title
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '') || 'diagram';
+  const pad = (n: number) => String(n).padStart(2, '0');
   const stamp =
     `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}` +
     `T${pad(at.getHours())}-${pad(at.getMinutes())}-${pad(at.getSeconds())}`;

@@ -18,6 +18,6 @@ export function randomBytes(length: number): Uint8Array {
 /** Lowercase hex, for secrets that travel in URLs (share links). */
 export function randomHex(byteLength: number): string {
   return Array.from(randomBytes(byteLength))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 }

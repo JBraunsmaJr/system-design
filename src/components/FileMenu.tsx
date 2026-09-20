@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { ChevronDown, FilePlus2 } from "lucide-react";
-import { computeFlippedPosition } from "../domain/popoverPosition";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { ChevronDown, FilePlus2 } from 'lucide-react';
+import { computeFlippedPosition } from '../domain/popoverPosition';
 
 interface FileMenuProps {
   /** Opens a new, empty document. The current one stays stored. */
@@ -26,7 +26,13 @@ const DROPDOWN_WIDTH = 150;
 // in Toolbar itself: as the single most-used action of the three, it
 // benefits from staying a direct, one-click target rather than being
 // buried behind an extra click.
-export function FileMenu({ onNew, onOpenDocuments, onLoadClick, onManageLibraries, isInSession }: FileMenuProps) {
+export function FileMenu({
+  onNew,
+  onOpenDocuments,
+  onLoadClick,
+  onManageLibraries,
+  isInSession,
+}: FileMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -51,9 +57,11 @@ export function FileMenu({ onNew, onOpenDocuments, onLoadClick, onManageLibrarie
     const next = computeFlippedPosition(
       triggerRect,
       { width: dropdownRect.width, height: dropdownRect.height },
-      { width: window.innerWidth, height: window.innerHeight }
+      { width: window.innerWidth, height: window.innerHeight },
     );
-    setDropdownPos((prev) => (prev && prev.top === next.top && prev.left === next.left ? prev : next));
+    setDropdownPos((prev) =>
+      prev && prev.top === next.top && prev.left === next.left ? prev : next,
+    );
   }, [isOpen]);
 
   const reposition = useCallback(() => {
@@ -66,8 +74,8 @@ export function FileMenu({ onNew, onOpenDocuments, onLoadClick, onManageLibrarie
       computeFlippedPosition(
         triggerRect,
         { width: dropdownRect.width, height: dropdownRect.height },
-        { width: window.innerWidth, height: window.innerHeight }
-      )
+        { width: window.innerWidth, height: window.innerHeight },
+      ),
     );
   }, []);
 
@@ -80,29 +88,34 @@ export function FileMenu({ onNew, onOpenDocuments, onLoadClick, onManageLibrarie
       close();
     };
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
+      if (e.key === 'Escape') close();
     };
-    document.addEventListener("mousedown", handleMouseDown);
-    document.addEventListener("keydown", handleEscape);
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('keydown', handleEscape);
     return () => {
-      document.removeEventListener("mousedown", handleMouseDown);
-      document.removeEventListener("keydown", handleEscape);
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('keydown', handleEscape);
     };
   }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
-    window.addEventListener("scroll", reposition, true);
-    window.addEventListener("resize", reposition);
+    window.addEventListener('scroll', reposition, true);
+    window.addEventListener('resize', reposition);
     return () => {
-      window.removeEventListener("scroll", reposition, true);
-      window.removeEventListener("resize", reposition);
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
     };
   }, [isOpen, reposition]);
 
   return (
     <div className="export-menu">
-      <button ref={triggerRef} type="button" onClick={() => (isOpen ? close() : open())} title="File">
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => (isOpen ? close() : open())}
+        title="File"
+      >
         <FilePlus2 size={14} />
         <span className="toolbar__label">File</span>
         <ChevronDown size={12} />
@@ -113,7 +126,12 @@ export function FileMenu({ onNew, onOpenDocuments, onLoadClick, onManageLibrarie
           <div
             ref={dropdownRef}
             className="export-menu__dropdown"
-            style={{ position: "fixed", top: dropdownPos.top, left: dropdownPos.left, minWidth: DROPDOWN_WIDTH }}
+            style={{
+              position: 'fixed',
+              top: dropdownPos.top,
+              left: dropdownPos.left,
+              minWidth: DROPDOWN_WIDTH,
+            }}
           >
             {/*
               During a session the document on screen is the shared one. Open
@@ -123,7 +141,11 @@ export function FileMenu({ onNew, onOpenDocuments, onLoadClick, onManageLibrarie
             <button
               type="button"
               disabled={isInSession}
-              title={isInSession ? "New is disabled during a collaborative session - opening another document would end it" : undefined}
+              title={
+                isInSession
+                  ? 'New is disabled during a collaborative session - opening another document would end it'
+                  : undefined
+              }
               onClick={() => {
                 onNew();
                 close();
@@ -135,7 +157,11 @@ export function FileMenu({ onNew, onOpenDocuments, onLoadClick, onManageLibrarie
               <button
                 type="button"
                 disabled={isInSession}
-                title={isInSession ? "Documents is disabled during a collaborative session - opening another document would end it" : undefined}
+                title={
+                  isInSession
+                    ? 'Documents is disabled during a collaborative session - opening another document would end it'
+                    : undefined
+                }
                 onClick={() => {
                   onOpenDocuments();
                   close();
@@ -147,7 +173,11 @@ export function FileMenu({ onNew, onOpenDocuments, onLoadClick, onManageLibrarie
             <button
               type="button"
               disabled={isInSession}
-              title={isInSession ? "Open is disabled during a collaborative session - it would replace the diagram for everyone in it" : undefined}
+              title={
+                isInSession
+                  ? 'Open is disabled during a collaborative session - it would replace the diagram for everyone in it'
+                  : undefined
+              }
               onClick={() => {
                 onLoadClick();
                 close();
@@ -167,7 +197,7 @@ export function FileMenu({ onNew, onOpenDocuments, onLoadClick, onManageLibrarie
               </button>
             )}
           </div>,
-          document.body
+          document.body,
         )}
     </div>
   );

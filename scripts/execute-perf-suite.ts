@@ -1,16 +1,16 @@
-import { chromium, type Browser } from "playwright";
-import { spawn, spawnSync, type ChildProcess } from "child_process";
-import { writeFileSync, mkdirSync, existsSync, readFileSync } from "fs";
-import { createHash } from "crypto";
-import { resolve, join } from "path";
-import * as os from "os";
-import * as http from "http";
-import { ALL_SCENARIOS } from "../src/perf/scenarios";
-import { runCpuCalibration } from "../src/perf/calibration";
-import type { PerfMetrics } from "../src/perf/instrumentation";
-import type { ScenarioResult, PerfRunResults } from "../src/perf/scenarios/types";
+import { chromium, type Browser } from 'playwright';
+import { spawn, spawnSync, type ChildProcess } from 'child_process';
+import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'fs';
+import { createHash } from 'crypto';
+import { resolve, join } from 'path';
+import * as os from 'os';
+import * as http from 'http';
+import { ALL_SCENARIOS } from '../src/perf/scenarios';
+import { runCpuCalibration } from '../src/perf/calibration';
+import type { PerfMetrics } from '../src/perf/instrumentation';
+import type { ScenarioResult, PerfRunResults } from '../src/perf/scenarios/types';
 
-const rootDir = resolve(".");
+const rootDir = resolve('.');
 const args = process.argv.slice(2);
 
 function getArgValue(flag: string, fallback: string): string {
@@ -21,28 +21,28 @@ function getArgValue(flag: string, fallback: string): string {
   return fallback;
 }
 
-const outputDirArg = getArgValue("--output-dir", join(rootDir, "dist"));
-const filterArg = getArgValue("--filter", "");
-const repeatsCount = parseInt(getArgValue("--repeats", "3"), 10);
-const previewPort = parseInt(getArgValue("--port", "4173"), 10);
+const outputDirArg = getArgValue('--output-dir', join(rootDir, 'dist'));
+const filterArg = getArgValue('--filter', '');
+const repeatsCount = parseInt(getArgValue('--repeats', '3'), 10);
+const previewPort = parseInt(getArgValue('--port', '4173'), 10);
 /** Opt in to measuring a server this harness did not start. Off by default:
  * a reused server may be serving anything. */
-const reuseServer = args.includes("--reuse-server");
+const reuseServer = args.includes('--reuse-server');
 /** Skip the rebuild when the stamp already matches the working tree. Saves a
  * build during repeated runs of an unchanged tree; never skips when the
  * fingerprint differs. */
-const skipRebuild = args.includes("--no-rebuild");
+const skipRebuild = args.includes('--no-rebuild');
 
 function getGitCommitSha(): string {
   try {
-    const res = spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf-8" });
+    const res = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf-8' });
     if (res.status === 0 && res.stdout.trim()) {
       return res.stdout.trim();
     }
   } catch {
     // ignore
   }
-  return process.env.GITHUB_SHA || "unknown";
+  return process.env.GITHUB_SHA || 'unknown';
 }
 
 async function checkHostOpen(host: string, port: number): Promise<boolean> {
@@ -50,7 +50,7 @@ async function checkHostOpen(host: string, port: number): Promise<boolean> {
     const req = http.get(`http://${host}:${port}/`, (res) => {
       resolve(res.statusCode !== undefined);
     });
-    req.on("error", () => resolve(false));
+    req.on('error', () => resolve(false));
     req.setTimeout(1000, () => {
       req.destroy();
       resolve(false);
@@ -59,8 +59,8 @@ async function checkHostOpen(host: string, port: number): Promise<boolean> {
 }
 
 async function findWorkingHost(port: number): Promise<string | null> {
-  if (await checkHostOpen("127.0.0.1", port)) return "127.0.0.1";
-  if (await checkHostOpen("localhost", port)) return "localhost";
+  if (await checkHostOpen('127.0.0.1', port)) return '127.0.0.1';
+  if (await checkHostOpen('localhost', port)) return 'localhost';
   return null;
 }
 
@@ -74,12 +74,12 @@ async function findWorkingHost(port: number): Promise<string | null> {
  */
 function workingTreeFingerprint(): { sha: string; dirty: string } {
   const sha = getGitCommitSha();
-  const status = spawnSync("git", ["status", "--porcelain"], {
-    encoding: "utf-8",
+  const status = spawnSync('git', ['status', '--porcelain'], {
+    encoding: 'utf-8',
     cwd: rootDir,
   });
-  const raw = status.status === 0 ? (status.stdout ?? "") : `unknown-${Date.now()}`;
-  return { sha, dirty: createHash("sha256").update(raw).digest("hex").slice(0, 16) };
+  const raw = status.status === 0 ? (status.stdout ?? '') : `unknown-${Date.now()}`;
+  return { sha, dirty: createHash('sha256').update(raw).digest('hex').slice(0, 16) };
 }
 
 /**
@@ -96,57 +96,57 @@ function workingTreeFingerprint(): { sha: string; dirty: string } {
  * yields plausible-looking zeros rather than an obvious failure.
  */
 function ensureFreshBuild() {
-  const stampPath = join(rootDir, "dist", ".perf-build-stamp.json");
-  const indexPath = join(rootDir, "dist", "index.html");
+  const stampPath = join(rootDir, 'dist', '.perf-build-stamp.json');
+  const indexPath = join(rootDir, 'dist', 'index.html');
   const fingerprint = workingTreeFingerprint();
 
-  let reason = "no previous instrumented build";
+  let reason = 'no previous instrumented build';
   if (existsSync(indexPath) && existsSync(stampPath)) {
     try {
-      const stamp = JSON.parse(readFileSync(stampPath, "utf-8")) as {
+      const stamp = JSON.parse(readFileSync(stampPath, 'utf-8')) as {
         sha?: string;
         dirty?: string;
         instrumented?: boolean;
       };
       if (!stamp.instrumented) {
-        reason = "existing build has instrumentation compiled out";
+        reason = 'existing build has instrumentation compiled out';
       } else if (stamp.sha !== fingerprint.sha) {
         reason = `existing build is from ${String(stamp.sha).slice(0, 8)}, working tree is ${fingerprint.sha.slice(0, 8)}`;
       } else if (stamp.dirty !== fingerprint.dirty) {
-        reason = "working tree has changed since the existing build";
+        reason = 'working tree has changed since the existing build';
       } else if (skipRebuild) {
-        console.log("📦 Reusing current instrumented build (--no-rebuild).");
+        console.log('📦 Reusing current instrumented build (--no-rebuild).');
         return;
       } else {
-        reason = "rebuilding to guarantee the bundle matches the working tree";
+        reason = 'rebuilding to guarantee the bundle matches the working tree';
       }
     } catch {
-      reason = "build stamp unreadable";
+      reason = 'build stamp unreadable';
     }
   }
 
   console.log(`📦 Building instrumented production bundle (${reason})...`);
-  const buildRes = spawnSync("npx", ["vite", "build", "--base=./"], {
+  const buildRes = spawnSync('npx', ['vite', 'build', '--base=./'], {
     cwd: rootDir,
-    env: { ...process.env, VITE_PERF_INSTRUMENTATION: "1" },
-    stdio: "inherit",
+    env: { ...process.env, VITE_PERF_INSTRUMENTATION: '1' },
+    stdio: 'inherit',
     shell: true,
   });
   if (buildRes.status !== 0) {
-    throw new Error("Failed to build production assets.");
+    throw new Error('Failed to build production assets.');
   }
   writeFileSync(
     stampPath,
     JSON.stringify(
       { ...fingerprint, instrumented: true, builtAt: new Date().toISOString() },
       null,
-      2
-    )
+      2,
+    ),
   );
 }
 
 async function ensurePreviewServer(): Promise<{ process: ChildProcess | null; url: string }> {
-  const explicitBase = getArgValue("--base-url", "");
+  const explicitBase = getArgValue('--base-url', '');
   if (explicitBase) {
     return { process: null, url: explicitBase };
   }
@@ -159,7 +159,7 @@ async function ensurePreviewServer(): Promise<{ process: ChildProcess | null; ur
         `A server is already listening on port ${previewPort}. Refusing to measure ` +
           `it, because there is no way to tell what build it is serving - a stale ` +
           `one silently produces results for code that is not in the working tree. ` +
-          `Stop it, or pass --reuse-server if you are certain it is current.`
+          `Stop it, or pass --reuse-server if you are certain it is current.`,
       );
     }
     console.log(`📡 Reusing server at ${existingUrl} (--reuse-server; build NOT verified)`);
@@ -171,25 +171,33 @@ async function ensurePreviewServer(): Promise<{ process: ChildProcess | null; ur
   console.log(`🚀 Starting Vite preview server on port ${previewPort} (host: 0.0.0.0)...`);
   const server = spawn(
     process.execPath,
-    ["node_modules/vite/bin/vite.js", "preview", "--host", "0.0.0.0", "--port", String(previewPort), "--strictPort"],
+    [
+      'node_modules/vite/bin/vite.js',
+      'preview',
+      '--host',
+      '0.0.0.0',
+      '--port',
+      String(previewPort),
+      '--strictPort',
+    ],
     {
       cwd: rootDir,
-      stdio: "pipe",
-      detached: process.platform !== "win32",
-    }
+      stdio: 'pipe',
+      detached: process.platform !== 'win32',
+    },
   );
 
-  let serverOutput = "";
-  server.stderr?.on("data", (chunk) => {
+  let serverOutput = '';
+  server.stderr?.on('data', (chunk) => {
     serverOutput += chunk.toString();
   });
-  server.stdout?.on("data", (chunk) => {
+  server.stdout?.on('data', (chunk) => {
     serverOutput += chunk.toString();
   });
 
   let processExited = false;
   let exitCode: number | null = null;
-  server.on("exit", (code) => {
+  server.on('exit', (code) => {
     processExited = true;
     exitCode = code;
   });
@@ -210,37 +218,39 @@ async function ensurePreviewServer(): Promise<{ process: ChildProcess | null; ur
   }
 
   if (server.pid !== undefined) {
-    if (process.platform === "win32") {
+    if (process.platform === 'win32') {
       try {
-        spawnSync("taskkill", ["/pid", String(server.pid), "/T", "/F"], { stdio: "ignore" });
+        spawnSync('taskkill', ['/pid', String(server.pid), '/T', '/F'], { stdio: 'ignore' });
       } catch {
         server.kill();
       }
     } else {
       try {
-        process.kill(-server.pid, "SIGTERM");
+        process.kill(-server.pid, 'SIGTERM');
       } catch {
         server.kill();
       }
     }
   }
-  throw new Error(`Timeout waiting for preview server on port ${previewPort}.\nCaptured output:\n${serverOutput || "(none)"}`);
+  throw new Error(
+    `Timeout waiting for preview server on port ${previewPort}.\nCaptured output:\n${serverOutput || '(none)'}`,
+  );
 }
 
 /** Terminates a spawned server and anything it started, on either platform. */
 function stopServer(child: ChildProcess | null): void {
   if (!child || child.pid === undefined) return;
-  if (process.platform === "win32") {
+  if (process.platform === 'win32') {
     try {
-      spawnSync("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+      spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
     } catch {
       child.kill();
     }
   } else {
     try {
-      process.kill(-child.pid, "SIGTERM");
+      process.kill(-child.pid, 'SIGTERM');
     } catch {
-      child.kill("SIGKILL");
+      child.kill('SIGKILL');
     }
   }
 }
@@ -257,17 +267,17 @@ function stopServer(child: ChildProcess | null): void {
  */
 async function startRelay(port: number): Promise<{ process: ChildProcess; url: string }> {
   console.log(`📡 Starting signaling relay on port ${port}...`);
-  const relay = spawn(process.execPath, ["node_modules/y-webrtc/bin/server.js"], {
+  const relay = spawn(process.execPath, ['node_modules/y-webrtc/bin/server.js'], {
     cwd: rootDir,
-    stdio: "pipe",
-    detached: process.platform !== "win32",
+    stdio: 'pipe',
+    detached: process.platform !== 'win32',
     env: { ...process.env, PORT: String(port) },
   });
-  let output = "";
-  relay.stdout?.on("data", (c) => (output += c.toString()));
-  relay.stderr?.on("data", (c) => (output += c.toString()));
+  let output = '';
+  relay.stdout?.on('data', (c) => (output += c.toString()));
+  relay.stderr?.on('data', (c) => (output += c.toString()));
   let exited = false;
-  relay.on("exit", (code) => {
+  relay.on('exit', (code) => {
     exited = true;
     output += `\n(relay exited with code ${code})`;
   });
@@ -284,7 +294,9 @@ async function startRelay(port: number): Promise<{ process: ChildProcess; url: s
     await new Promise((r) => setTimeout(r, 200));
   }
   stopServer(relay);
-  throw new Error(`Timeout waiting for the signaling relay on port ${port}.\nCaptured output:\n${output || "(none)"}`);
+  throw new Error(
+    `Timeout waiting for the signaling relay on port ${port}.\nCaptured output:\n${output || '(none)'}`,
+  );
 }
 
 function calculateMedian(values: number[]): number {
@@ -295,9 +307,9 @@ function calculateMedian(values: number[]): number {
 }
 
 async function runSuite() {
-  console.log("\n==================================================");
-  console.log("   Layer 2 Dockerized Performance Testing Suite   ");
-  console.log("==================================================\n");
+  console.log('\n==================================================');
+  console.log('   Layer 2 Dockerized Performance Testing Suite   ');
+  console.log('==================================================\n');
 
   let previewServerProcess: ChildProcess | null = null;
   let relayProcess: ChildProcess | null = null;
@@ -312,25 +324,27 @@ async function runSuite() {
     const { process: relayProc, url: relayUrl } = await startRelay(relayPort);
     relayProcess = relayProc;
 
-    console.log("⏱️  Running standalone CPU calibration benchmark (PERF-M-3)...");
+    console.log('⏱️  Running standalone CPU calibration benchmark (PERF-M-3)...');
     const cpuCalibrationMs = runCpuCalibration(2_000_000);
     console.log(`   CPU calibration baseline: ${cpuCalibrationMs.toFixed(2)} ms\n`);
 
-    console.log("🌐 Launching headless Chromium browser...");
+    console.log('🌐 Launching headless Chromium browser...');
     browser = await chromium.launch({
       headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
     });
 
     const scenariosToRun = ALL_SCENARIOS.filter((s) =>
-      filterArg ? s.id.toLowerCase().includes(filterArg.toLowerCase()) : true
+      filterArg ? s.id.toLowerCase().includes(filterArg.toLowerCase()) : true,
     );
 
     if (scenariosToRun.length === 0) {
       throw new Error(`No performance scenarios found matching filter: "${filterArg}"`);
     }
 
-    console.log(`📋 Running ${scenariosToRun.length} scenario(s) with ${repeatsCount} repeat(s) each...\n`);
+    console.log(
+      `📋 Running ${scenariosToRun.length} scenario(s) with ${repeatsCount} repeat(s) each...\n`,
+    );
 
     const scenarioResults: Record<string, ScenarioResult> = {};
 
@@ -346,8 +360,8 @@ async function runSuite() {
           // The relay this run started, as deployment config would supply it.
           window.__APP_CONFIG__ = Object.assign({}, window.__APP_CONFIG__, { RELAY: ${JSON.stringify(relayUrl)} });
         `);
-        await page.goto(resolvedBaseURL, { waitUntil: "networkidle" });
-        await page.waitForSelector(".react-flow__pane", { timeout: 10000 });
+        await page.goto(resolvedBaseURL, { waitUntil: 'networkidle' });
+        await page.waitForSelector('.react-flow__pane', { timeout: 10000 });
 
         const startTime = performance.now();
         await scenario.run(page);
@@ -355,12 +369,13 @@ async function runSuite() {
 
         const metrics = await page.evaluate(() => {
           const perfObj = (window as unknown as Record<string, unknown>).__PERF__ as
-            | { getMetrics?: () => PerfMetrics }
-            | undefined;
+            { getMetrics?: () => PerfMetrics } | undefined;
           return perfObj?.getMetrics?.() ?? null;
         });
         if (!metrics) {
-          throw new Error("Performance instrumentation is unavailable. Build with VITE_PERF_INSTRUMENTATION=1.");
+          throw new Error(
+            'Performance instrumentation is unavailable. Build with VITE_PERF_INSTRUMENTATION=1.',
+          );
         }
 
         /**
@@ -411,7 +426,7 @@ async function runSuite() {
           m.canvasRenders === firstRun.canvasRenders &&
           m.storeWrites === firstRun.storeWrites &&
           m.snapshotBuilds === firstRun.snapshotBuilds &&
-          m.unflattenCalls === firstRun.unflattenCalls
+          m.unflattenCalls === firstRun.unflattenCalls,
       );
 
       const medianCommits = calculateMedian(repeatMetrics.map((m) => m.commits));
@@ -454,17 +469,17 @@ async function runSuite() {
       };
 
       console.log(
-        `✓ [${isStable ? "STABLE" : "VARIED"}] commits=${medianCommits}, nodes=${medianNodeRenders}, edges=${medianEdgeRenders}, writes=${medianStoreWrites} (${minDuration.toFixed(0)}ms)`
+        `✓ [${isStable ? 'STABLE' : 'VARIED'}] commits=${medianCommits}, nodes=${medianNodeRenders}, edges=${medianEdgeRenders}, writes=${medianStoreWrites} (${minDuration.toFixed(0)}ms)`,
       );
     }
 
     const runResults: PerfRunResults = {
       timestamp: new Date().toISOString(),
       commitSha: getGitCommitSha(),
-      harnessVersion: "1.0.0",
+      harnessVersion: '1.0.0',
       nodeVersion: process.version,
       os: `${os.type()} ${os.release()} (${os.arch()})`,
-      cpuModel: os.cpus()[0]?.model || "unknown",
+      cpuModel: os.cpus()[0]?.model || 'unknown',
       cpuCalibrationMs,
       scenarios: scenarioResults,
     };
@@ -473,18 +488,22 @@ async function runSuite() {
       mkdirSync(outputDirArg, { recursive: true });
     }
 
-    const outputPath = join(outputDirArg, "perf-results.json");
-    writeFileSync(outputPath, JSON.stringify(runResults, null, 2), "utf-8");
+    const outputPath = join(outputDirArg, 'perf-results.json');
+    writeFileSync(outputPath, JSON.stringify(runResults, null, 2), 'utf-8');
 
     // Also write to local dist/ if different
-    const localDist = join(rootDir, "dist");
+    const localDist = join(rootDir, 'dist');
     if (outputDirArg !== localDist) {
       if (!existsSync(localDist)) mkdirSync(localDist, { recursive: true });
-      writeFileSync(join(localDist, "perf-results.json"), JSON.stringify(runResults, null, 2), "utf-8");
+      writeFileSync(
+        join(localDist, 'perf-results.json'),
+        JSON.stringify(runResults, null, 2),
+        'utf-8',
+      );
     }
 
     console.log(`\n💾 Saved performance test results to: ${outputPath}`);
-    console.log("==================================================\n");
+    console.log('==================================================\n');
   } finally {
     if (browser) {
       try {
@@ -503,6 +522,6 @@ runSuite()
     process.exit(0);
   })
   .catch((err) => {
-    console.error("❌ Performance test runner encountered an error:", err);
+    console.error('❌ Performance test runner encountered an error:', err);
     process.exit(1);
   });

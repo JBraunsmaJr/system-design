@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { ChevronDown, Plus, Search, Settings2 } from "lucide-react";
-import type { RequirementItemType } from "../../domain/requirementsTypes";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { ChevronDown, Plus, Search, Settings2 } from 'lucide-react';
+import type { RequirementItemType } from '../../domain/requirementsTypes';
 
 interface AddItemDropdownProps {
   itemTypes: RequirementItemType[];
@@ -19,7 +19,7 @@ export function AddItemDropdown({
   itemCountsByType = {},
 }: AddItemDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [filterQuery, setFilterQuery] = useState("");
+  const [filterQuery, setFilterQuery] = useState('');
   const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null);
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
 
@@ -32,7 +32,7 @@ export function AddItemDropdown({
 
   const close = useCallback(() => {
     setIsOpen(false);
-    setFilterQuery("");
+    setFilterQuery('');
     setDropdownPos(null);
   }, []);
 
@@ -85,16 +85,16 @@ export function AddItemDropdown({
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      if (e.key === 'Escape') {
         close();
       }
     };
 
-    window.addEventListener("mousedown", onMouseDown);
-    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('keydown', onKeyDown);
     return () => {
-      window.removeEventListener("mousedown", onMouseDown);
-      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener('mousedown', onMouseDown);
+      window.removeEventListener('keydown', onKeyDown);
     };
   }, [isOpen, close]);
 
@@ -125,14 +125,16 @@ export function AddItemDropdown({
           type="button"
           className="add-item-dropdown__primary-btn"
           onClick={handleQuickAdd}
-          title={activeType ? `Add new ${activeType.label} [${activeType.prefix}]` : "Add requirement"}
+          title={
+            activeType ? `Add new ${activeType.label} [${activeType.prefix}]` : 'Add requirement'
+          }
         >
           <Plus size={14} />
-          <span>New {activeType?.label ?? "Requirement"}</span>
+          <span>New {activeType?.label ?? 'Requirement'}</span>
         </button>
         <button
           type="button"
-          className={`add-item-dropdown__toggle-btn ${isOpen ? "is-open" : ""}`}
+          className={`add-item-dropdown__toggle-btn ${isOpen ? 'is-open' : ''}`}
           onClick={() => (isOpen ? close() : open())}
           aria-expanded={isOpen}
           title="Choose requirement type to add"
@@ -148,7 +150,7 @@ export function AddItemDropdown({
             ref={dropdownRef}
             className="add-item-dropdown__menu"
             style={{
-              position: "fixed",
+              position: 'fixed',
               top: `${dropdownPos.top}px`,
               left: `${dropdownPos.left}px`,
               width: `${DROPDOWN_WIDTH}px`,
@@ -176,10 +178,13 @@ export function AddItemDropdown({
                   <button
                     key={type.id}
                     type="button"
-                    className={`add-item-dropdown__item ${type.id === activeType?.id ? "is-active" : ""}`}
+                    className={`add-item-dropdown__item ${type.id === activeType?.id ? 'is-active' : ''}`}
                     onClick={() => handleSelectType(type.id)}
                   >
-                    <span className="add-item-dropdown__swatch" style={{ background: type.color }} />
+                    <span
+                      className="add-item-dropdown__swatch"
+                      style={{ background: type.color }}
+                    />
                     <span className="add-item-dropdown__item-label">{type.label}</span>
                     <span className="add-item-dropdown__item-prefix">[{type.prefix}]</span>
                     {count > 0 && <span className="add-item-dropdown__item-count">{count}</span>}
@@ -206,7 +211,7 @@ export function AddItemDropdown({
               </button>
             </div>
           </div>,
-          document.body
+          document.body,
         )}
     </div>
   );

@@ -32,9 +32,12 @@ export function computeFlippedPosition(
   anchor: AnchorRect,
   popoverSize: PopoverSize,
   viewport: Viewport,
-  gap = 4
+  gap = 4,
 ): { top: number; left: number } {
-  const left = Math.max(8, Math.min(anchor.right - popoverSize.width, viewport.width - popoverSize.width - 8));
+  const left = Math.max(
+    8,
+    Math.min(anchor.right - popoverSize.width, viewport.width - popoverSize.width - 8),
+  );
 
   const spaceBelow = viewport.height - anchor.bottom;
   const spaceAbove = anchor.top;

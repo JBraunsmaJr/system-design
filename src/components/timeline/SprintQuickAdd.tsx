@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { Plus } from "lucide-react";
-import { getItemType } from "../../domain/requirementsRegistry";
-import { computeFlippedPosition } from "../../domain/popoverPosition";
-import type { RequirementItem, RequirementsDocument } from "../../domain/requirementsTypes";
-import { HighlightedText, HighlightedTitle } from "../requirements/HighlightText";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Plus } from 'lucide-react';
+import { getItemType } from '../../domain/requirementsRegistry';
+import { computeFlippedPosition } from '../../domain/popoverPosition';
+import type { RequirementItem, RequirementsDocument } from '../../domain/requirementsTypes';
+import { HighlightedText, HighlightedTitle } from '../requirements/HighlightText';
 
 interface SprintQuickAddProps {
   backlogItems: RequirementItem[];
@@ -28,7 +28,7 @@ const DROPDOWN_WIDTH = 240;
  */
 export function SprintQuickAdd({ backlogItems, requirements, onAssign }: SprintQuickAddProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -43,7 +43,7 @@ export function SprintQuickAdd({ backlogItems, requirements, onAssign }: SprintQ
   };
   const close = () => {
     setIsOpen(false);
-    setQuery("");
+    setQuery('');
     setErrorMessage(null);
   };
 
@@ -57,9 +57,11 @@ export function SprintQuickAdd({ backlogItems, requirements, onAssign }: SprintQ
     const next = computeFlippedPosition(
       triggerRect,
       { width: dropdownRect.width, height: dropdownRect.height },
-      { width: window.innerWidth, height: window.innerHeight }
+      { width: window.innerWidth, height: window.innerHeight },
     );
-    setDropdownPos((prev) => (prev && prev.top === next.top && prev.left === next.left ? prev : next));
+    setDropdownPos((prev) =>
+      prev && prev.top === next.top && prev.left === next.left ? prev : next,
+    );
   }, [isOpen, query]);
 
   const reposition = useCallback(() => {
@@ -72,8 +74,8 @@ export function SprintQuickAdd({ backlogItems, requirements, onAssign }: SprintQ
       computeFlippedPosition(
         triggerRect,
         { width: dropdownRect.width, height: dropdownRect.height },
-        { width: window.innerWidth, height: window.innerHeight }
-      )
+        { width: window.innerWidth, height: window.innerHeight },
+      ),
     );
   }, []);
 
@@ -85,25 +87,27 @@ export function SprintQuickAdd({ backlogItems, requirements, onAssign }: SprintQ
       if (dropdownRef.current?.contains(target)) return;
       close();
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
   }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
-    window.addEventListener("scroll", reposition, true);
-    window.addEventListener("resize", reposition);
+    window.addEventListener('scroll', reposition, true);
+    window.addEventListener('resize', reposition);
     return () => {
-      window.removeEventListener("scroll", reposition, true);
-      window.removeEventListener("resize", reposition);
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
     };
   }, [isOpen, reposition]);
 
   const q = query.trim().toLowerCase();
   const candidates =
-    q === ""
+    q === ''
       ? backlogItems
-      : backlogItems.filter((item) => item.id.toLowerCase().includes(q) || item.title.toLowerCase().includes(q));
+      : backlogItems.filter(
+          (item) => item.id.toLowerCase().includes(q) || item.title.toLowerCase().includes(q),
+        );
 
   return (
     <>
@@ -131,7 +135,7 @@ export function SprintQuickAdd({ backlogItems, requirements, onAssign }: SprintQ
           <div
             ref={dropdownRef}
             className="sprint-quick-add__dropdown"
-            style={{ position: "fixed", top: dropdownPos.top, left: dropdownPos.left }}
+            style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left }}
             onMouseDown={(e) => e.stopPropagation()}
           >
             <input
@@ -144,7 +148,7 @@ export function SprintQuickAdd({ backlogItems, requirements, onAssign }: SprintQ
                 setErrorMessage(null);
               }}
               onKeyDown={(e) => {
-                if (e.key === "Escape") close();
+                if (e.key === 'Escape') close();
               }}
             />
             {errorMessage && <p className="sprint-quick-add__error">{errorMessage}</p>}
@@ -166,12 +170,15 @@ export function SprintQuickAdd({ backlogItems, requirements, onAssign }: SprintQ
                       }
                     }}
                   >
-                    <span className="sprint-quick-add__option-id" style={{ color: type?.color ?? "var(--chrome-text-dim)" }}>
+                    <span
+                      className="sprint-quick-add__option-id"
+                      style={{ color: type?.color ?? 'var(--chrome-text-dim)' }}
+                    >
                       <HighlightedText text={item.id} search={q} />
                     </span>
                     <HighlightedTitle
                       className="sprint-quick-add__option-title"
-                      text={item.title || "(untitled)"}
+                      text={item.title || '(untitled)'}
                       search={q}
                     />
                   </button>
@@ -179,12 +186,12 @@ export function SprintQuickAdd({ backlogItems, requirements, onAssign }: SprintQ
               })}
               {candidates.length === 0 && (
                 <p className="sprint-quick-add__empty">
-                  {backlogItems.length === 0 ? "Backlog is empty." : "No matching items."}
+                  {backlogItems.length === 0 ? 'Backlog is empty.' : 'No matching items.'}
                 </p>
               )}
             </div>
           </div>,
-          document.body
+          document.body,
         )}
     </>
   );

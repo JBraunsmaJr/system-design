@@ -1,16 +1,16 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { Check, ChevronDown, ChevronUp, Link2, Plus, Search, X } from "lucide-react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Check, ChevronDown, ChevronUp, Link2, Plus, Search, X } from 'lucide-react';
 import {
   getItemType,
   getRelationshipType,
   getRelationshipsForItem,
   getOtherItemId,
   getRelationshipLabelForItem,
-} from "../../domain/requirementsRegistry";
-import { computeFlippedPosition } from "../../domain/popoverPosition";
-import type { RequirementsDocument } from "../../domain/requirementsTypes";
-import { HighlightedText, HighlightedTitle } from "./HighlightText";
+} from '../../domain/requirementsRegistry';
+import { computeFlippedPosition } from '../../domain/popoverPosition';
+import type { RequirementsDocument } from '../../domain/requirementsTypes';
+import { HighlightedText, HighlightedTitle } from './HighlightText';
 
 interface RelationshipManagerProps {
   itemId: string;
@@ -34,15 +34,25 @@ interface VerbOption {
   typeId: string;
   displayLabel: string;
   color: string;
-  direction: "forward" | "backward";
+  direction: 'forward' | 'backward';
 }
 
 function buildVerbOptions(doc: RequirementsDocument): VerbOption[] {
   const options: VerbOption[] = [];
   for (const type of doc.relationshipTypes) {
-    options.push({ typeId: type.id, displayLabel: type.label, color: type.color, direction: "forward" });
+    options.push({
+      typeId: type.id,
+      displayLabel: type.label,
+      color: type.color,
+      direction: 'forward',
+    });
     if (type.inverseLabel !== type.label) {
-      options.push({ typeId: type.id, displayLabel: type.inverseLabel, color: type.color, direction: "backward" });
+      options.push({
+        typeId: type.id,
+        displayLabel: type.inverseLabel,
+        color: type.color,
+        direction: 'backward',
+      });
     }
   }
   return options;
@@ -63,7 +73,7 @@ export function RelationshipManager({
 }: RelationshipManagerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSelectingVerb, setIsSelectingVerb] = useState(false);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -93,7 +103,7 @@ export function RelationshipManager({
   const close = () => {
     setIsOpen(false);
     setIsSelectingVerb(false);
-    setQuery("");
+    setQuery('');
     setErrorMessage(null);
   };
 
@@ -107,9 +117,11 @@ export function RelationshipManager({
     const next = computeFlippedPosition(
       triggerRect,
       { width: dropdownRect.width, height: dropdownRect.height },
-      { width: window.innerWidth, height: window.innerHeight }
+      { width: window.innerWidth, height: window.innerHeight },
     );
-    setDropdownPos((prev) => (prev && prev.top === next.top && prev.left === next.left ? prev : next));
+    setDropdownPos((prev) =>
+      prev && prev.top === next.top && prev.left === next.left ? prev : next,
+    );
   }, [isOpen, query, activeVerb, isSelectingVerb, existingRelationships.length]);
 
   const reposition = useCallback(() => {
@@ -122,8 +134,8 @@ export function RelationshipManager({
       computeFlippedPosition(
         triggerRect,
         { width: dropdownRect.width, height: dropdownRect.height },
-        { width: window.innerWidth, height: window.innerHeight }
-      )
+        { width: window.innerWidth, height: window.innerHeight },
+      ),
     );
   }, []);
 
@@ -135,17 +147,17 @@ export function RelationshipManager({
       if (dropdownRef.current && path.includes(dropdownRef.current)) return;
       close();
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
   }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
-    window.addEventListener("scroll", reposition, true);
-    window.addEventListener("resize", reposition);
+    window.addEventListener('scroll', reposition, true);
+    window.addEventListener('resize', reposition);
     return () => {
-      window.removeEventListener("scroll", reposition, true);
-      window.removeEventListener("resize", reposition);
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
     };
   }, [isOpen, reposition]);
 
@@ -166,12 +178,15 @@ export function RelationshipManager({
       ? existingRelationships
           .filter((r) => r.typeId === activeVerb.typeId)
           .map((r) => getOtherItemId(r, itemId))
-      : []
+      : [],
   );
   const candidates = doc.items
     .filter((item) => item.id !== itemId)
     .filter((item) => !alreadyRelatedViaActiveVerb.has(item.id))
-    .filter((item) => q === "" || item.id.toLowerCase().includes(q) || item.title.toLowerCase().includes(q))
+    .filter(
+      (item) =>
+        q === '' || item.id.toLowerCase().includes(q) || item.title.toLowerCase().includes(q),
+    )
     .slice(0, 20);
 
   // Grouped by the direction-correct verb rather than rendered one row
@@ -184,7 +199,11 @@ export function RelationshipManager({
   const groupedRelationships = useMemo(() => {
     const groups = new Map<
       string,
-      { label: string; color: string; entries: { relationshipId: string; itemId: string; text: string }[] }
+      {
+        label: string;
+        color: string;
+        entries: { relationshipId: string; itemId: string; text: string }[];
+      }
     >();
     for (const relationship of existingRelationships) {
       const type = getRelationshipType(doc, relationship.typeId);
@@ -267,7 +286,12 @@ export function RelationshipManager({
           <div
             ref={dropdownRef}
             className="relationship-manager__dropdown"
-            style={{ position: "fixed", top: dropdownPos.top, left: dropdownPos.left, width: DROPDOWN_WIDTH }}
+            style={{
+              position: 'fixed',
+              top: dropdownPos.top,
+              left: dropdownPos.left,
+              width: DROPDOWN_WIDTH,
+            }}
             role="dialog"
             aria-label="Add relationship"
           >
@@ -275,7 +299,7 @@ export function RelationshipManager({
               <span className="relationship-manager__header-label">Relationship</span>
               <button
                 type="button"
-                className={`relationship-manager__type-btn ${isSelectingVerb ? "is-open" : ""}`}
+                className={`relationship-manager__type-btn ${isSelectingVerb ? 'is-open' : ''}`}
                 onClick={() => {
                   setIsSelectingVerb((prev) => !prev);
                   setErrorMessage(null);
@@ -285,9 +309,11 @@ export function RelationshipManager({
               >
                 <span
                   className="relationship-manager__verb-swatch"
-                  style={{ background: activeVerb?.color ?? "var(--accent)" }}
+                  style={{ background: activeVerb?.color ?? 'var(--accent)' }}
                 />
-                <span className="relationship-manager__verb-name">{activeVerb?.displayLabel ?? "Select type"}</span>
+                <span className="relationship-manager__verb-name">
+                  {activeVerb?.displayLabel ?? 'Select type'}
+                </span>
                 {isSelectingVerb ? (
                   <ChevronUp size={13} className="relationship-manager__type-chevron" />
                 ) : (
@@ -301,21 +327,30 @@ export function RelationshipManager({
                 <div className="relationship-manager__section-label">Select relationship type:</div>
                 <div className="relationship-manager__verb-list">
                   {verbOptions.map((verb) => {
-                    const isSelected = activeVerb?.typeId === verb.typeId && activeVerb?.direction === verb.direction;
+                    const isSelected =
+                      activeVerb?.typeId === verb.typeId &&
+                      activeVerb?.direction === verb.direction;
                     return (
                       <button
                         key={`${verb.typeId}-${verb.direction}`}
                         type="button"
-                        className={`relationship-manager__verb-option ${isSelected ? "is-selected" : ""}`}
+                        className={`relationship-manager__verb-option ${isSelected ? 'is-selected' : ''}`}
                         onClick={() => {
                           setSelectedVerbKey(`${verb.typeId}::${verb.direction}`);
                           setIsSelectingVerb(false);
                           setErrorMessage(null);
                         }}
                       >
-                        <span className="relationship-manager__verb-swatch" style={{ background: verb.color }} />
-                        <span className="relationship-manager__verb-option-label">{verb.displayLabel}</span>
-                        {isSelected && <Check size={13} className="relationship-manager__check-icon" />}
+                        <span
+                          className="relationship-manager__verb-swatch"
+                          style={{ background: verb.color }}
+                        />
+                        <span className="relationship-manager__verb-option-label">
+                          {verb.displayLabel}
+                        </span>
+                        {isSelected && (
+                          <Check size={13} className="relationship-manager__check-icon" />
+                        )}
                       </button>
                     );
                   })}
@@ -336,14 +371,14 @@ export function RelationshipManager({
                       setErrorMessage(null);
                     }}
                     onKeyDown={(e) => {
-                      if (e.key === "Escape") close();
+                      if (e.key === 'Escape') close();
                     }}
                   />
                   {query && (
                     <button
                       type="button"
                       className="relationship-manager__search-clear"
-                      onClick={() => setQuery("")}
+                      onClick={() => setQuery('')}
                       title="Clear search"
                       aria-label="Clear search"
                     >
@@ -366,7 +401,7 @@ export function RelationshipManager({
                           e.preventDefault();
                           if (!activeVerb) return;
                           const result =
-                            activeVerb.direction === "forward"
+                            activeVerb.direction === 'forward'
                               ? onAddRelationship(activeVerb.typeId, itemId, item.id)
                               : onAddRelationship(activeVerb.typeId, item.id, itemId);
                           if (result) {
@@ -392,7 +427,7 @@ export function RelationshipManager({
                         </span>
                         <HighlightedTitle
                           className="relationship-manager__option-title"
-                          text={item.title || "(untitled)"}
+                          text={item.title || '(untitled)'}
                           search={query.trim()}
                         />
                         <Plus size={13} className="relationship-manager__option-add" />
@@ -402,17 +437,17 @@ export function RelationshipManager({
                   {candidates.length === 0 && (
                     <p className="relationship-manager__empty">
                       {doc.items.length <= 1
-                        ? "No other items exist yet."
+                        ? 'No other items exist yet.'
                         : query
-                        ? `No items match "${query}"`
-                        : "All items are already linked."}
+                          ? `No items match "${query}"`
+                          : 'All items are already linked.'}
                     </p>
                   )}
                 </div>
               </>
             )}
           </div>,
-          document.body
+          document.body,
         )}
     </div>
   );

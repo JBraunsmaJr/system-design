@@ -1,4 +1,4 @@
-import type { Node, Edge } from "@xyflow/react";
+import type { Node, Edge } from '@xyflow/react';
 
 // Core domain types for the system-design editor.
 // These mirror the taxonomy described in the project's Requirements & Software
@@ -6,15 +6,15 @@ import type { Node, Edge } from "@xyflow/react";
 // rather than being generic shapes/lines.
 
 export type NodeCategory =
-  | "compute"
-  | "data"
-  | "networking"
-  | "messaging"
-  | "external"
-  | "observability"
-  | "logic"
-  | "vcs"
-  | "custom";
+  | 'compute'
+  | 'data'
+  | 'networking'
+  | 'messaging'
+  | 'external'
+  | 'observability'
+  | 'logic'
+  | 'vcs'
+  | 'custom';
 
 /** A node type as it appears in the palette (e.g. "microservice", "database"). */
 export interface NodeTypeDefinition {
@@ -30,7 +30,8 @@ export interface NodeTypeDefinition {
   defaultProperties?: Record<string, string>;
 }
 
-export type EdgeStyleGroup = "sync" | "async" | "data" | "file" | "control" | "vcs" | "blank" | "generic";
+export type EdgeStyleGroup =
+  'sync' | 'async' | 'data' | 'file' | 'control' | 'vcs' | 'blank' | 'generic';
 
 /** An edge/traffic type as it appears in the inspector (e.g. "grpc", "webhook"). */
 export interface EdgeTypeDefinition {
@@ -143,7 +144,7 @@ export interface ArchEdgeData extends Record<string, unknown> {
    * for when the real traffic runs opposite to how the edge was drawn,
    * and "both" puts an arrowhead on each end for a genuinely
    * bi-directional relationship. */
-  direction?: "forward" | "reverse" | "both";
+  direction?: 'forward' | 'reverse' | 'both';
   /** Forces the label pill off even if a custom label or the type's default label would otherwise show. */
   hideLabel?: boolean;
   /** Per-instance color override - overrides the edge type's own default stroke/label color. Undefined means "use the type default". */
@@ -207,7 +208,7 @@ export interface ArchEdgeData extends Record<string, unknown> {
 export interface ArchEdgeDataPatch {
   edgeType?: string;
   label?: string;
-  direction?: "forward" | "reverse" | "both";
+  direction?: 'forward' | 'reverse' | 'both';
   hideLabel?: boolean;
   color?: string;
   labelAnchorT?: number;

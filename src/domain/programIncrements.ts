@@ -1,4 +1,4 @@
-export type CapacityReservationUnit = "percentage" | "points";
+export type CapacityReservationUnit = 'percentage' | 'points';
 
 export interface CapacityReservation {
   id: string;
@@ -9,7 +9,7 @@ export interface CapacityReservation {
   /** If undefined, null, or empty string, this applies to ALL sprints in the PI.
    * If set to a specific sprintId, applies ONLY to that sprint. */
   sprintId?: string;
-  category?: "risk" | "bugs" | "techdebt" | "meetings" | "other" | string;
+  category?: 'risk' | 'bugs' | 'techdebt' | 'meetings' | 'other' | string;
   note?: string;
 }
 
@@ -52,7 +52,7 @@ export const DEFAULT_SPRINT_DURATION_DAYS = 14;
 
 export function todayISO(): string {
   const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 /** Converts a YYYY-MM-DD string to a day count (days since the Unix
@@ -61,13 +61,13 @@ export function todayISO(): string {
  * avoid local-timezone drift - a UTC-based day count is unambiguous
  * regardless of what timezone the browser or server happens to be in. */
 export function parseISODate(iso: string): number {
-  const [y, m, d] = iso.split("-").map(Number);
+  const [y, m, d] = iso.split('-').map(Number);
   return Date.UTC(y, m - 1, d) / 86400000;
 }
 
 export function formatISODate(days: number): string {
   const d = new Date(days * 86400000);
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
 }
 
 /**
@@ -82,10 +82,14 @@ export function getNextPIStartDate(pis: ProgramIncrement[]): string {
   }
   const lastPI = pis[pis.length - 1];
   if (!lastPI) return todayISO();
-  if (!lastPI.startDate || typeof lastPI.startDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(lastPI.startDate)) {
+  if (
+    !lastPI.startDate ||
+    typeof lastPI.startDate !== 'string' ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(lastPI.startDate)
+  ) {
     return todayISO();
   }
-  const [y, m, d] = lastPI.startDate.split("-").map(Number);
+  const [y, m, d] = lastPI.startDate.split('-').map(Number);
   const date = new Date(Date.UTC(y, m - 1, d));
   if (date.getUTCFullYear() !== y || date.getUTCMonth() !== m - 1 || date.getUTCDate() !== d) {
     return todayISO();
@@ -110,7 +114,11 @@ export function computeSprintDateRanges(pi: ProgramIncrement): SprintDateRange[]
   for (const sprint of pi.sprints) {
     const start = cursor;
     const end = start + sprint.durationDays - 1;
-    ranges.push({ sprintId: sprint.id, startDate: formatISODate(start), endDate: formatISODate(end) });
+    ranges.push({
+      sprintId: sprint.id,
+      startDate: formatISODate(start),
+      endDate: formatISODate(end),
+    });
     cursor = end + 1;
   }
   return ranges;
@@ -134,13 +142,20 @@ function daysBetweenInclusive(startIso: string, endIso: string): number {
  * than throwing, since this is typically called directly from a date
  * picker's onChange where invalid intermediate values are routine.
  */
-export function updateSprintEndDate(pi: ProgramIncrement, sprintId: string, newEndDate: string): ProgramIncrement {
+export function updateSprintEndDate(
+  pi: ProgramIncrement,
+  sprintId: string,
+  newEndDate: string,
+): ProgramIncrement {
   const ranges = computeSprintDateRanges(pi);
   const currentRange = ranges.find((r) => r.sprintId === sprintId);
   if (!currentRange) return pi;
   const newDuration = daysBetweenInclusive(currentRange.startDate, newEndDate);
   if (newDuration < 1) return pi;
-  return { ...pi, sprints: pi.sprints.map((s) => (s.id === sprintId ? { ...s, durationDays: newDuration } : s)) };
+  return {
+    ...pi,
+    sprints: pi.sprints.map((s) => (s.id === sprintId ? { ...s, durationDays: newDuration } : s)),
+  };
 }
 
 /**
@@ -149,10 +164,12 @@ export function updateSprintEndDate(pi: ProgramIncrement, sprintId: string, newE
  */
 export function getSprintActiveReservations(
   reservations: CapacityReservation[] | undefined,
-  sprintId: string
+  sprintId: string,
 ): CapacityReservation[] {
   if (!reservations || !Array.isArray(reservations)) return [];
-  return reservations.filter((r) => !r.sprintId || r.sprintId.trim() === "" || r.sprintId === sprintId);
+  return reservations.filter(
+    (r) => !r.sprintId || r.sprintId.trim() === '' || r.sprintId === sprintId,
+  );
 }
 
 /** Updates the PI's own overall start date - shifts every sprint's

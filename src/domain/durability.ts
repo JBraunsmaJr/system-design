@@ -12,25 +12,25 @@
  * completed, a permission that was granted - never what was attempted. If a
  * signal is unknown, the honest level is the lower one.
  */
-import type { StorageFailureReason } from "./documentStore.ts";
+import type { StorageFailureReason } from './documentStore.ts';
 
 export type DurabilityLevel =
   /** Written to a file on disk the user chose. Survives clearing the browser. */
-  | "file"
+  | 'file'
   /** Confirmed present on the server. */
-  | "synced"
+  | 'synced'
   /** In browser storage only. Survives a reload; not a cleared profile. */
-  | "local"
+  | 'local'
   /** Nothing is being written. Everything is lost on close. */
-  | "at-risk"
+  | 'at-risk'
   /** Still opening; durability genuinely unknown. */
-  | "loading";
+  | 'loading';
 
-export type DurabilityTone = "ok" | "caution" | "alert";
+export type DurabilityTone = 'ok' | 'caution' | 'alert';
 
 export interface DurabilitySignals {
   /** Local persistence, as confirmed - not as requested. */
-  localPersistence: "active" | "loading" | "unavailable";
+  localPersistence: 'active' | 'loading' | 'unavailable';
   /** True only once a file handle is attached AND a write has succeeded. */
   fileBacked?: boolean;
   /**
@@ -38,18 +38,18 @@ export interface DurabilitySignals {
    * Absent is treated as unavailable: offering file saving where it cannot
    * work is exactly what this requirement forbids.
    */
-  fileAccess?: "available" | "unavailable";
+  fileAccess?: 'available' | 'unavailable';
   /** The attached file, when there is one and it is not currently written. */
   fileAttachment?: {
     fileName: string;
     /** needs-permission: a fresh visit, one click away from resuming.
      * denied: the user declined. conflict: the file changed elsewhere.
      * failed: a write failed for another reason. */
-    status: "needs-permission" | "denied" | "conflict" | "failed";
+    status: 'needs-permission' | 'denied' | 'conflict' | 'failed';
     message?: string;
   } | null;
   /** Server sync, where a store is configured. Absent means no store. */
-  serverSync?: "synced" | "pending" | "offline";
+  serverSync?: 'synced' | 'pending' | 'offline';
   /** Updates queued for the server (WS8-R12). */
   pendingUpdates?: number;
   /** Participants in this session holding their own persisted replica
@@ -70,7 +70,7 @@ export interface DurabilityState {
   /** One sentence. On a problem it says what to do, not how bad it is. */
   detail: string;
   /** Present only when there is something the user can act on. */
-  action?: "export" | "retry" | "choose-file" | "resume-file" | "resolve-conflict";
+  action?: 'export' | 'retry' | 'choose-file' | 'resume-file' | 'resolve-conflict';
   /** True when the user should not be able to dismiss this away. */
   persistent: boolean;
 }
@@ -84,155 +84,154 @@ export interface DurabilityState {
 export function deriveDurability(signals: DurabilitySignals): DurabilityState {
   const failure = signals.storageFailure;
 
-  if (failure?.reason === "quota") {
+  if (failure?.reason === 'quota') {
     return {
-      level: "at-risk",
-      tone: "alert",
-      label: "Not saving",
-      detail:
-        "There is no space left to save. Export a copy before making more changes.",
-      action: "export",
+      level: 'at-risk',
+      tone: 'alert',
+      label: 'Not saving',
+      detail: 'There is no space left to save. Export a copy before making more changes.',
+      action: 'export',
       persistent: true,
     };
   }
 
-  if (failure?.reason === "unavailable" || signals.localPersistence === "unavailable") {
+  if (failure?.reason === 'unavailable' || signals.localPersistence === 'unavailable') {
     return {
-      level: "at-risk",
-      tone: "alert",
-      label: "Not saving",
+      level: 'at-risk',
+      tone: 'alert',
+      label: 'Not saving',
       detail:
-        "This browser is not allowing storage, so changes are kept only until you close the tab. Export a copy to keep them.",
-      action: "export",
+        'This browser is not allowing storage, so changes are kept only until you close the tab. Export a copy to keep them.',
+      action: 'export',
       persistent: true,
     };
   }
 
   if (signals.autosaveBlockedReason) {
     return {
-      level: "at-risk",
-      tone: "alert",
-      label: "Saving paused",
+      level: 'at-risk',
+      tone: 'alert',
+      label: 'Saving paused',
       detail: signals.autosaveBlockedReason,
-      action: "export",
+      action: 'export',
       persistent: true,
     };
   }
 
   if (failure) {
     return {
-      level: "at-risk",
-      tone: "alert",
-      label: "Not saving",
+      level: 'at-risk',
+      tone: 'alert',
+      label: 'Not saving',
       detail: failure.message,
-      action: "retry",
+      action: 'retry',
       persistent: true,
     };
   }
 
-  if (signals.localPersistence === "loading") {
+  if (signals.localPersistence === 'loading') {
     return {
-      level: "loading",
-      tone: "caution",
-      label: "Opening",
-      detail: "Loading this document from browser storage.",
+      level: 'loading',
+      tone: 'caution',
+      label: 'Opening',
+      detail: 'Loading this document from browser storage.',
       persistent: false,
     };
   }
 
-  if (signals.serverSync === "offline" || signals.serverSync === "pending") {
+  if (signals.serverSync === 'offline' || signals.serverSync === 'pending') {
     const queued = signals.pendingUpdates ?? 0;
     return {
-      level: "local",
-      tone: "caution",
-      label: signals.serverSync === "offline" ? "Offline" : "Syncing",
+      level: 'local',
+      tone: 'caution',
+      label: signals.serverSync === 'offline' ? 'Offline' : 'Syncing',
       detail:
-        signals.serverSync === "offline"
+        signals.serverSync === 'offline'
           ? queued > 0
-            ? `${queued} ${queued === 1 ? "change is" : "changes are"} waiting for the workspace. They are saved on this device in the meantime.`
-            : "The workspace is unreachable. Changes are saved on this device and go up when it returns."
-          : "Sending recent changes to the workspace.",
+            ? `${queued} ${queued === 1 ? 'change is' : 'changes are'} waiting for the workspace. They are saved on this device in the meantime.`
+            : 'The workspace is unreachable. Changes are saved on this device and go up when it returns.'
+          : 'Sending recent changes to the workspace.',
       persistent: false,
     };
   }
 
-  if (signals.serverSync === "synced") {
+  if (signals.serverSync === 'synced') {
     return {
-      level: "synced",
-      tone: "ok",
-      label: "In workspace",
-      detail: "Saved in the workspace, and on this device. Everyone with access sees it.",
+      level: 'synced',
+      tone: 'ok',
+      label: 'In workspace',
+      detail: 'Saved in the workspace, and on this device. Everyone with access sees it.',
       persistent: false,
     };
   }
 
   // A file attachment means nothing where files cannot be written (WS13-R8).
-  const attachment = signals.fileAccess === "available" ? signals.fileAttachment : null;
-  if (attachment?.status === "conflict") {
+  const attachment = signals.fileAccess === 'available' ? signals.fileAttachment : null;
+  if (attachment?.status === 'conflict') {
     return {
-      level: "local",
-      tone: "alert",
-      label: "File changed elsewhere",
+      level: 'local',
+      tone: 'alert',
+      label: 'File changed elsewhere',
       detail: `${attachment.fileName} was changed outside this tab. Choose whether to reload it or overwrite it; nothing is written until you do.`,
-      action: "resolve-conflict",
+      action: 'resolve-conflict',
       persistent: true,
     };
   }
 
   if (signals.fileBacked) {
     return {
-      level: "file",
-      tone: "ok",
-      label: "Saved to file",
-      detail: "Changes are written to the file you chose as you work.",
+      level: 'file',
+      tone: 'ok',
+      label: 'Saved to file',
+      detail: 'Changes are written to the file you chose as you work.',
       persistent: false,
     };
   }
 
-  if (attachment?.status === "needs-permission") {
+  if (attachment?.status === 'needs-permission') {
     return {
-      level: "local",
-      tone: "caution",
-      label: "File paused",
+      level: 'local',
+      tone: 'caution',
+      label: 'File paused',
       detail: describeReplicas(
         `Saving to ${attachment.fileName} resumes once you allow it. Until then, changes are saved in this browser only.`,
         signals.replicaCount,
       ),
-      action: "resume-file",
+      action: 'resume-file',
       persistent: false,
     };
   }
 
-  if (attachment?.status === "denied" || attachment?.status === "failed") {
+  if (attachment?.status === 'denied' || attachment?.status === 'failed') {
     return {
-      level: "local",
-      tone: "caution",
-      label: "Not saving to file",
+      level: 'local',
+      tone: 'caution',
+      label: 'Not saving to file',
       detail: describeReplicas(
-        attachment.status === "denied"
+        attachment.status === 'denied'
           ? `Permission to write ${attachment.fileName} was declined, so it is not being updated. Changes are saved in this browser only.`
           : `${attachment.message ?? `Could not write to ${attachment.fileName}.`} Changes are saved in this browser only.`,
         signals.replicaCount,
       ),
-      action: signals.fileAccess === "available" ? "choose-file" : "export",
+      action: signals.fileAccess === 'available' ? 'choose-file' : 'export',
       persistent: false,
     };
   }
 
   // WS13-R8: file saving is only ever offered where it can work. Elsewhere
   // (Firefox) the way to keep a copy outside the browser is an export.
-  const canUseFiles = signals.fileAccess === "available";
+  const canUseFiles = signals.fileAccess === 'available';
   return {
-    level: "local",
-    tone: "ok",
-    label: "Saved in browser",
+    level: 'local',
+    tone: 'ok',
+    label: 'Saved in browser',
     detail: describeReplicas(
       canUseFiles
-        ? "Saved on this device. Clearing browser data will remove it."
-        : "Saved on this device. Clearing browser data will remove it. This browser cannot save to a file as you work; export a copy to keep one outside it, or turn on timed copies under File > Documents.",
+        ? 'Saved on this device. Clearing browser data will remove it.'
+        : 'Saved on this device. Clearing browser data will remove it. This browser cannot save to a file as you work; export a copy to keep one outside it, or turn on timed copies under File > Documents.',
       signals.replicaCount,
     ),
-    action: canUseFiles ? "choose-file" : "export",
+    action: canUseFiles ? 'choose-file' : 'export',
     persistent: false,
   };
 }
@@ -254,8 +253,8 @@ function describeReplicas(base: string, replicaCount?: number): string {
  * both defeat the purpose.
  */
 export function isSoleReplicaHolder(signals: DurabilitySignals): boolean {
-  if (signals.serverSync === "synced") return false;
+  if (signals.serverSync === 'synced') return false;
   if (signals.fileBacked) return false;
-  if (signals.localPersistence !== "active") return false;
+  if (signals.localPersistence !== 'active') return false;
   return (signals.replicaCount ?? 0) <= 1;
 }

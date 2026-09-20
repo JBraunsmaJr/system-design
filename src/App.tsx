@@ -1,5 +1,16 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, Profiler, type ProfilerOnRenderCallback, type ChangeEvent } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  Profiler,
+  type ProfilerOnRenderCallback,
+  type ChangeEvent,
+} from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   ReactFlowProvider,
   type Node,
@@ -7,25 +18,30 @@ import {
   type Connection,
   type OnNodesChange,
   type OnEdgesChange,
-} from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
-import { Toolbar } from "./components/Toolbar";
-import { CollabPanel } from "./components/CollabPanel";
-import { Palette } from "./components/Palette";
-import { Canvas } from "./components/Canvas";
-import { Inspector } from "./components/Inspector";
-import { ScenarioPanel } from "./components/ScenarioPanel";
-import { LibraryManagerModal } from "./components/LibraryManagerModal";
-import { RequirementsView } from "./components/requirements/RequirementsView";
-import { TimelineView } from "./components/timeline/TimelineView";
-import { TeamView } from "./components/team/TeamView";
-import { SkillTreeView } from "./components/skilltree/SkillTreeView";
-import { NODE_TYPES } from "./domain/nodeRegistry";
-import { GROUP_TYPES } from "./domain/groupRegistry";
-import { SHAPE_TYPES, globalShapeRegistry } from "./domain/shapeRegistry";
-import { reorderWithGroupsFirst, toAbsolutePosition } from "./domain/graphUtils";
-import type { DiagramPath } from "./domain/subDiagramTree";
-import { toDiagramFile, downloadDiagram, downloadDiagramAs, parseDiagramFile } from "./domain/serialization";
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
+import { Toolbar } from './components/Toolbar';
+import { CollabPanel } from './components/CollabPanel';
+import { Palette } from './components/Palette';
+import { Canvas } from './components/Canvas';
+import { Inspector } from './components/Inspector';
+import { ScenarioPanel } from './components/ScenarioPanel';
+import { LibraryManagerModal } from './components/LibraryManagerModal';
+import { RequirementsView } from './components/requirements/RequirementsView';
+import { TimelineView } from './components/timeline/TimelineView';
+import { TeamView } from './components/team/TeamView';
+import { SkillTreeView } from './components/skilltree/SkillTreeView';
+import { NODE_TYPES } from './domain/nodeRegistry';
+import { GROUP_TYPES } from './domain/groupRegistry';
+import { SHAPE_TYPES, globalShapeRegistry } from './domain/shapeRegistry';
+import { reorderWithGroupsFirst, toAbsolutePosition } from './domain/graphUtils';
+import type { DiagramPath } from './domain/subDiagramTree';
+import {
+  toDiagramFile,
+  downloadDiagram,
+  downloadDiagramAs,
+  parseDiagramFile,
+} from './domain/serialization';
 import {
   loadTimedCopies,
   saveTimedCopies,
@@ -33,63 +49,113 @@ import {
   isCopyDue,
   TIMED_COPIES_TEST_SECONDS_KEY,
   type TimedCopiesSettings,
-} from "./domain/timedCopies";
-import { loadAutosave, clearLegacyAutosave, hasLegacyAutosave, getAutosaveBlockedReason } from "./domain/autosave";
+} from './domain/timedCopies';
+import {
+  loadAutosave,
+  clearLegacyAutosave,
+  hasLegacyAutosave,
+  getAutosaveBlockedReason,
+} from './domain/autosave';
 import {
   resolveDocumentId,
   readDocumentParam,
   withDocumentParam,
   sessionDocumentId,
   LAST_DOCUMENT_KEY,
-} from "./domain/currentDocument";
-import { createDocumentStore, newDocumentId, requestPersistentStorage, type StorageFailureReason } from "./domain/documentStore";
-import { createDocumentLibrary } from "./collab/documentLibrary";
-import { reconciliationWindowMs } from "./domain/reconciliationWindow";
-import { DocumentManager } from "./components/DocumentManager";
-import { createIndexedDbBackend } from "./domain/indexedDbBackend";
-import { DurabilityIndicator } from "./components/DurabilityIndicator";
-import { installUnloadGuard } from "./domain/unloadGuard";
-import type { DurabilitySignals } from "./domain/durability";
-import { countPersistedReplicas } from "./collab/session";
-import { isSoleReplicaHolder } from "./domain/durability";
-import { useFileSaving } from "./hooks/useFileSaving";
-import { LeaveGuardDialog } from "./components/LeaveGuardDialog";
-import { WorkspacePanel } from "./components/WorkspacePanel";
-import { getStoreUrl } from "./domain/storeConfig";
-import { useWorkspaceSync } from "./collab/useWorkspaceSync";
+} from './domain/currentDocument';
+import {
+  createDocumentStore,
+  newDocumentId,
+  requestPersistentStorage,
+  type StorageFailureReason,
+} from './domain/documentStore';
+import { createDocumentLibrary } from './collab/documentLibrary';
+import { reconciliationWindowMs } from './domain/reconciliationWindow';
+import { DocumentManager } from './components/DocumentManager';
+import { createIndexedDbBackend } from './domain/indexedDbBackend';
+import { DurabilityIndicator } from './components/DurabilityIndicator';
+import { installUnloadGuard } from './domain/unloadGuard';
+import type { DurabilitySignals } from './domain/durability';
+import { countPersistedReplicas } from './collab/session';
+import { isSoleReplicaHolder } from './domain/durability';
+import { useFileSaving } from './hooks/useFileSaving';
+import { LeaveGuardDialog } from './components/LeaveGuardDialog';
+import { WorkspacePanel } from './components/WorkspacePanel';
+import { getStoreUrl } from './domain/storeConfig';
+import { useWorkspaceSync } from './collab/useWorkspaceSync';
 import {
   acquireDocument,
   replaceDocumentContents,
   createDocumentStores,
   destroyDocumentStores,
   type OpenDocumentStores,
-} from "./collab/localDocument";
-import { undoableStore, undoControllerFor, releaseUndoController } from "./collab/undoManager";
-import { downloadRequirementsMarkdown } from "./domain/requirementsExport";
-import { exportDiagramAsPng, exportDiagramAsSvg } from "./domain/imageExport";
-import type { ArchNodeData, ArchEdgeData, ArchEdgeDataPatch, EdgeWaypoint, Scenario, ScenarioStep, SubDiagram } from "./domain/types";
-import type { RequirementsDocument } from "./domain/requirementsTypes";
-import { EMPTY_REQUIREMENTS_DOCUMENT } from "./domain/requirementsTypes";
+} from './collab/localDocument';
+import { undoableStore, undoControllerFor, releaseUndoController } from './collab/undoManager';
+import { downloadRequirementsMarkdown } from './domain/requirementsExport';
+import { exportDiagramAsPng, exportDiagramAsSvg } from './domain/imageExport';
+import type {
+  ArchNodeData,
+  ArchEdgeData,
+  ArchEdgeDataPatch,
+  EdgeWaypoint,
+  Scenario,
+  ScenarioStep,
+  SubDiagram,
+} from './domain/types';
+import type { RequirementsDocument } from './domain/requirementsTypes';
+import { EMPTY_REQUIREMENTS_DOCUMENT } from './domain/requirementsTypes';
 import {
   BUILT_IN_ITEM_TYPES,
   BUILT_IN_RELATIONSHIP_TYPES,
   withMissingBuiltInTypes,
   withMissingBuiltInRelationshipTypes,
-} from "./domain/requirementsRegistry";
-import type { ProgramIncrement } from "./domain/programIncrements";
-import type { TeamDocument } from "./domain/teamTypes";
-import { EMPTY_TEAM_DOCUMENT } from "./domain/teamTypes";
-import * as Y from "yjs";
-import { getNodesAtPath, getEdgesAtPath, unflattenToSubDiagram, getBreadcrumbLabelsFlat, levelKey, populatedLevels } from "./collab/diagramStore";
-import type { EdgeEndpoints } from "./domain/edgeReconnect";
-import type { Milestone } from "./domain/milestones";
-import { startCollabSession, type CollabSession, type PresenceInfo, type LocalPresenceInfo } from "./collab/session";
-import { loadPresenceName, savePresenceName, loadShowPeerCursors, saveShowPeerCursors } from "./domain/presenceIdentity";
-import { loadSignalingUrls, saveSignalingUrls, parseSignalingUrls, getDefaultSignalingUrl } from "./domain/signalingConfig";
-import { loadIceServers, saveIceServers, parseIceServers, getDefaultIceServers } from "./domain/iceServerConfig";
-import { createSessionLink, parseSessionLink, generateSessionKey, sanitizeCurrentUrl } from "./domain/sessionLink";
-import { Toast, type ToastType } from "./components/Toast";
-import { applyZOrderCommand, computeEffectiveZIndices, type ZOrderCommand } from "./domain/zOrder";
+} from './domain/requirementsRegistry';
+import type { ProgramIncrement } from './domain/programIncrements';
+import type { TeamDocument } from './domain/teamTypes';
+import { EMPTY_TEAM_DOCUMENT } from './domain/teamTypes';
+import * as Y from 'yjs';
+import {
+  getNodesAtPath,
+  getEdgesAtPath,
+  unflattenToSubDiagram,
+  getBreadcrumbLabelsFlat,
+  levelKey,
+  populatedLevels,
+} from './collab/diagramStore';
+import type { EdgeEndpoints } from './domain/edgeReconnect';
+import type { Milestone } from './domain/milestones';
+import {
+  startCollabSession,
+  type CollabSession,
+  type PresenceInfo,
+  type LocalPresenceInfo,
+} from './collab/session';
+import {
+  loadPresenceName,
+  savePresenceName,
+  loadShowPeerCursors,
+  saveShowPeerCursors,
+} from './domain/presenceIdentity';
+import {
+  loadSignalingUrls,
+  saveSignalingUrls,
+  parseSignalingUrls,
+  getDefaultSignalingUrl,
+} from './domain/signalingConfig';
+import {
+  loadIceServers,
+  saveIceServers,
+  parseIceServers,
+  getDefaultIceServers,
+} from './domain/iceServerConfig';
+import {
+  createSessionLink,
+  parseSessionLink,
+  generateSessionKey,
+  sanitizeCurrentUrl,
+} from './domain/sessionLink';
+import { Toast, type ToastType } from './components/Toast';
+import { applyZOrderCommand, computeEffectiveZIndices, type ZOrderCommand } from './domain/zOrder';
 import {
   mergeInFlight,
   applyInFlight,
@@ -106,11 +172,21 @@ import {
   NO_EDGE_GESTURES,
   type EdgeGesture,
   type EdgeGestureMap,
-} from "./domain/gestureGeometry";
-import { classifyNodeChanges, applySelectionChanges, isAutoSizedNodeType, type PendingNodeUpdate, type CurrentNodeGeometry } from "./domain/nodeChangeBatching";
-import { recordCommit, isPerfInstrumentationActive, isPerfAutosaveSuppressed } from "./perf/instrumentation";
-import { getStandardFixture, type FixtureName } from "./perf/fixtures";
-import "./App.css";
+} from './domain/gestureGeometry';
+import {
+  classifyNodeChanges,
+  applySelectionChanges,
+  isAutoSizedNodeType,
+  type PendingNodeUpdate,
+  type CurrentNodeGeometry,
+} from './domain/nodeChangeBatching';
+import {
+  recordCommit,
+  isPerfInstrumentationActive,
+  isPerfAutosaveSuppressed,
+} from './perf/instrumentation';
+import { getStandardFixture, type FixtureName } from './perf/fixtures';
+import './App.css';
 
 /**
  * The objects the canvas was last handed for each store node/edge, reused
@@ -121,9 +197,18 @@ import "./App.css";
  */
 const derivedNodes = new WeakMap<
   Node<ArchNodeData>,
-  { zIndex: number | undefined; measured: Node["measured"]; selected: boolean; hasSub: boolean; out: Node<ArchNodeData> }
+  {
+    zIndex: number | undefined;
+    measured: Node['measured'];
+    selected: boolean;
+    hasSub: boolean;
+    out: Node<ArchNodeData>;
+  }
 >();
-const derivedEdges = new WeakMap<Edge<ArchEdgeData>, { selected: boolean; out: Edge<ArchEdgeData> }>();
+const derivedEdges = new WeakMap<
+  Edge<ArchEdgeData>,
+  { selected: boolean; out: Edge<ArchEdgeData> }
+>();
 /**
  * The `data` object handed to each node, kept separately so that a change to
  * only its measured size, selection or stacking - which gives the node a new
@@ -188,7 +273,7 @@ function diagramFileToSnapshot(file: ReturnType<typeof parseDiagramFile>): Diagr
 }
 
 const DEFAULT_SNAPSHOT: DiagramSnapshot = {
-  title: "Untitled Diagram",
+  title: 'Untitled Diagram',
   root: EMPTY_DIAGRAM,
   scenarios: [],
   requirements: {
@@ -212,7 +297,7 @@ function snapshotToDiagramFile(snapshot: DiagramSnapshot) {
     snapshot.requirements,
     snapshot.programIncrements,
     snapshot.team,
-    snapshot.milestones
+    snapshot.milestones,
   );
 }
 
@@ -221,7 +306,16 @@ function snapshotToDiagramFile(snapshot: DiagramSnapshot) {
 // a genuinely separate concept (a person's presence color for a
 // session, not a team member's own identity), even though the actual
 // hex values happen to match for visual consistency.
-const PRESENCE_COLORS = ["#5b7cfa", "#9061f9", "#0fa36b", "#f0578c", "#f59e0b", "#06b6d4", "#ec4899", "#8b5cf6"];
+const PRESENCE_COLORS = [
+  '#5b7cfa',
+  '#9061f9',
+  '#0fa36b',
+  '#f0578c',
+  '#f59e0b',
+  '#06b6d4',
+  '#ec4899',
+  '#8b5cf6',
+];
 
 function App() {
   /**
@@ -249,11 +343,12 @@ function App() {
     } catch {
       // Storage unavailable: fall through to the default document.
     }
-    return resolveDocumentId({ urlDocId: readDocumentParam(window.location.href), lastDocId }).docId;
+    return resolveDocumentId({ urlDocId: readDocumentParam(window.location.href), lastDocId })
+      .docId;
   });
   useEffect(() => {
     const next = withDocumentParam(window.location.href, openDocId);
-    if (next !== window.location.href) window.history.replaceState(window.history.state, "", next);
+    if (next !== window.location.href) window.history.replaceState(window.history.state, '', next);
     try {
       localStorage.setItem(LAST_DOCUMENT_KEY, openDocId);
     } catch {
@@ -264,7 +359,10 @@ function App() {
   /** The catalogue of stored documents and their snapshots (WS2-R3). */
   const [documentStore] = useState(() => createDocumentStore(createIndexedDbBackend()));
   const [documentLibrary] = useState(() =>
-    createDocumentLibrary({ store: documentStore }, { reconciliationWindowMs: reconciliationWindowMs() })
+    createDocumentLibrary(
+      { store: documentStore },
+      { reconciliationWindowMs: reconciliationWindowMs() },
+    ),
   );
   const [isDocumentManagerOpen, setIsDocumentManagerOpen] = useState(false);
   /** The file this document is continuously saved to, if any (WS13-R1). */
@@ -286,7 +384,7 @@ function App() {
    */
   const openDocumentInTab = useCallback((docId: string) => {
     const url = new URL(withDocumentParam(window.location.href, docId));
-    url.hash = "";
+    url.hash = '';
     window.location.assign(url.toString());
   }, []);
 
@@ -310,7 +408,9 @@ function App() {
   }
   const [activeSession, setActiveSession] = useState<ActiveCollabSession | null>(null);
 
-  const [displayName, setDisplayName] = useState(() => loadPresenceName() ?? `Guest-${Math.random().toString(36).slice(2, 6)}`);
+  const [displayName, setDisplayName] = useState(
+    () => loadPresenceName() ?? `Guest-${Math.random().toString(36).slice(2, 6)}`,
+  );
   // Purely local, display-side preference - has NO effect on what this
   // person broadcasts about their own cursor, only on whether THEY see
   // everyone else's. See presenceIdentity.ts's own doc comment for why.
@@ -382,8 +482,8 @@ function App() {
    * synchronous state reset inside an effect (NFR-10). */
   const [sessionPersistence, setSessionPersistence] = useState<{
     session: object | null;
-    state: "active" | "loading" | "unavailable";
-  }>({ session: null, state: "loading" });
+    state: 'active' | 'loading' | 'unavailable';
+  }>({ session: null, state: 'loading' });
   /**
    * Whether the current session can actually reach a signaling relay.
    * Null outside a session, or before the first status arrives. Kept
@@ -402,10 +502,10 @@ function App() {
   } | null>(null);
 
   const showToast = useCallback(
-    (message: string, type: ToastType = "success", description?: string) => {
+    (message: string, type: ToastType = 'success', description?: string) => {
       setToast({ id: Date.now(), message, type, description });
     },
-    []
+    [],
   );
   // Reports the session document's local persistence once it has actually
   // loaded. Reset to "loading" on every session change so a new session never
@@ -420,7 +520,7 @@ function App() {
       // whenSynced resolves even when the database could not be opened - the
       // provider reports that by never having stored anything - so this is the
       // point where the state becomes known either way.
-      setSessionPersistence({ session: owner, state: "active" });
+      setSessionPersistence({ session: owner, state: 'active' });
     });
     return () => {
       cancelled = true;
@@ -444,7 +544,16 @@ function App() {
   // state at once (matching Awareness's own setLocalState semantics),
   // so broadcasting only the field that changed would silently wipe out
   // everything else that was previously set.
-  const localPresenceRef = useRef<LocalPresenceInfo>({ name: "", color: "", cursor: null, selectedNodeIds: [], selectedEdgeIds: [], viewMode: null, focusedItemId: null, diagramPath: "" });
+  const localPresenceRef = useRef<LocalPresenceInfo>({
+    name: '',
+    color: '',
+    cursor: null,
+    selectedNodeIds: [],
+    selectedEdgeIds: [],
+    viewMode: null,
+    focusedItemId: null,
+    diagramPath: '',
+  });
   // activeSessionRef lets broadcastPresence stay a permanently stable
   // function (empty deps) while still always reaching the CURRENT
   // session.
@@ -488,7 +597,7 @@ function App() {
   useEffect(() => {
     if (!activeSession) return;
     const confirmed =
-      sessionPersistence.session === activeSession.session && sessionPersistence.state === "active";
+      sessionPersistence.session === activeSession.session && sessionPersistence.state === 'active';
     if (confirmed) broadcastPresence({ hasPersistedReplica: true });
   }, [activeSession, sessionPersistence, broadcastPresence]);
 
@@ -518,7 +627,7 @@ function App() {
         cursorFlushHandle.current = requestAnimationFrame(flushCursor);
       }
     },
-    [flushCursor]
+    [flushCursor],
   );
   useEffect(() => {
     return () => {
@@ -532,7 +641,10 @@ function App() {
   // setSignalingUrlsRaw below for the runtime override.
   const buildTimeSignalingDefault = useMemo(() => getDefaultSignalingUrl(), []);
 
-  const appVersion = useMemo(() => (import.meta.env.VITE_APP_VERSION as string | undefined) ?? "Development", [])
+  const appVersion = useMemo(
+    () => (import.meta.env.VITE_APP_VERSION as string | undefined) ?? 'Development',
+    [],
+  );
 
   // The raw, comma-separated string as typed/edited in CollabPanel -
   // this person's own runtime override if they've ever set one,
@@ -542,7 +654,7 @@ function App() {
   // input without needing to serialize/deserialize on every keystroke.
   const [signalingUrlsInput, setSignalingUrlsInputState] = useState(() => {
     const saved = loadSignalingUrls();
-    return saved !== null && saved.trim() !== "" ? saved : buildTimeSignalingDefault;
+    return saved !== null && saved.trim() !== '' ? saved : buildTimeSignalingDefault;
   });
   const setSignalingUrlsInput = useCallback((raw: string) => {
     setSignalingUrlsInputState(raw);
@@ -563,7 +675,7 @@ function App() {
   const buildTimeIceServersDefault = useMemo(() => getDefaultIceServers(), []);
   const [iceServersInput, setIceServersInputState] = useState(() => {
     const saved = loadIceServers();
-    return saved !== null && saved.trim() !== "" ? saved : buildTimeIceServersDefault;
+    return saved !== null && saved.trim() !== '' ? saved : buildTimeIceServersDefault;
   });
   const setIceServersInput = useCallback((raw: string) => {
     setIceServersInputState(raw);
@@ -589,7 +701,7 @@ function App() {
         undoControllerFor(openDoc.doc).clear();
       }
     },
-    [openDoc]
+    [openDoc],
   );
 
   // Starts a brand-new session on the document already open (WS1-R4).
@@ -607,7 +719,8 @@ function App() {
       // An explicit room is a rehost (WS13-R12): the same room and key, so the
       // original session link works again.
       const roomName = explicitRoom ?? `session-${Math.random().toString(36).slice(2, 10)}`;
-      const sessionKey = explicitKey && explicitKey.trim() ? explicitKey.trim() : generateSessionKey();
+      const sessionKey =
+        explicitKey && explicitKey.trim() ? explicitKey.trim() : generateSessionKey();
       /**
        * WS1-R4: the document the user has open BECOMES the session document,
        * with the stores already built over it. Starting a session is a provider
@@ -629,14 +742,14 @@ function App() {
       });
 
       const initialPresence: LocalPresenceInfo = {
-        name: displayName.trim() || "Guest",
+        name: displayName.trim() || 'Guest',
         color: PRESENCE_COLORS[Math.floor(Math.random() * PRESENCE_COLORS.length)],
         cursor: null,
         selectedNodeIds: [],
         selectedEdgeIds: [],
         viewMode: null,
         focusedItemId: null,
-        diagramPath: "",
+        diagramPath: '',
       };
       localPresenceRef.current = initialPresence;
       session.setLocalPresence(initialPresence);
@@ -656,18 +769,30 @@ function App() {
         signalingUrlsInput,
         defaultSignalingUrls: buildTimeSignalingDefault,
       });
-      if (typeof navigator !== "undefined" && typeof navigator.clipboard?.writeText === "function") {
+      if (
+        typeof navigator !== 'undefined' &&
+        typeof navigator.clipboard?.writeText === 'function'
+      ) {
         navigator.clipboard
           .writeText(shareLink)
           .then(() => {
-            showToast("Session link copied to clipboard");
+            showToast('Session link copied to clipboard');
           })
           .catch(() => {
             // Silently ignore clipboard write failures (e.g. non-HTTPS, unfocused window)
           });
       }
     },
-    [openDoc, endSession, signalingUrls, signalingUrlsInput, buildTimeSignalingDefault, iceServers, displayName, showToast]
+    [
+      openDoc,
+      endSession,
+      signalingUrls,
+      signalingUrlsInput,
+      buildTimeSignalingDefault,
+      iceServers,
+      displayName,
+      showToast,
+    ],
   );
 
   // Joins an existing session by room name - never seeds from local state,
@@ -694,29 +819,33 @@ function App() {
       }
       const effectiveKey = passwordOrKey && passwordOrKey.trim() ? passwordOrKey.trim() : undefined;
 
-      if(effectiveKey === undefined) {
+      if (effectiveKey === undefined) {
         /*
           Every session this app creates is encrypted with its own key.
           Joining without one connects but can never decrypt a single
           update, which reads as "the session is empty".
          */
-        showToast("This session link has no key, so the session cannot be opened.", "error")
-        return
+        showToast('This session link has no key, so the session cannot be opened.', 'error');
+        return;
       }
 
       // WS1-R5: a separate document, never merged into the open one.
       const doc = new Y.Doc();
       const stores = createDocumentStores(doc);
-      const session = startCollabSession(doc, roomName, { signalingUrls: effectiveSignalingUrls, password: effectiveKey, iceServers });
+      const session = startCollabSession(doc, roomName, {
+        signalingUrls: effectiveSignalingUrls,
+        password: effectiveKey,
+        iceServers,
+      });
       const initialPresence: LocalPresenceInfo = {
-        name: displayName.trim() || "Guest",
+        name: displayName.trim() || 'Guest',
         color: PRESENCE_COLORS[Math.floor(Math.random() * PRESENCE_COLORS.length)],
         cursor: null,
         selectedNodeIds: [],
         selectedEdgeIds: [],
         viewMode: null,
         focusedItemId: null,
-        diagramPath: "",
+        diagramPath: '',
       };
       localPresenceRef.current = initialPresence;
       session.setLocalPresence(initialPresence);
@@ -729,28 +858,28 @@ function App() {
         ownsDocument: true,
       });
     },
-    [endSession, signalingUrls, setSignalingUrlsInput, iceServers, displayName, showToast]
+    [endSession, signalingUrls, setSignalingUrlsInput, iceServers, displayName, showToast],
   );
 
   // Auto-join if a session link is present in the URL on initial mount or hash change
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === 'undefined') return;
 
     const handleUrlSession = () => {
       const currentHref = window.location.href;
       const parsed = parseSessionLink(currentHref);
       if (parsed.roomName && parsed.roomName !== currentHref) {
-        joinSession(parsed.roomName, parsed.password || parsed.key || "", parsed.relay);
-        showToast(`Joined session: ${parsed.roomName}`, "info");
+        joinSession(parsed.roomName, parsed.password || parsed.key || '', parsed.relay);
+        showToast(`Joined session: ${parsed.roomName}`, 'info');
         sanitizeCurrentUrl();
       }
     };
 
     handleUrlSession();
 
-    window.addEventListener("hashchange", handleUrlSession);
+    window.addEventListener('hashchange', handleUrlSession);
     return () => {
-      window.removeEventListener("hashchange", handleUrlSession);
+      window.removeEventListener('hashchange', handleUrlSession);
     };
   }, [joinSession, showToast]);
 
@@ -811,12 +940,18 @@ function App() {
    * so identities are stable for useSyncExternalStore and memoised children.
    */
   const teamStore = useMemo(() => undoableStore(rawStores.team, undo), [rawStores, undo]);
-  const requirementsStore = useMemo(() => undoableStore(rawStores.requirements, undo), [rawStores, undo]);
+  const requirementsStore = useMemo(
+    () => undoableStore(rawStores.requirements, undo),
+    [rawStores, undo],
+  );
   const programIncrementsStore = useMemo(
     () => undoableStore(rawStores.programIncrements, undo),
-    [rawStores, undo]
+    [rawStores, undo],
   );
-  const milestonesStore = useMemo(() => undoableStore(rawStores.milestones, undo), [rawStores, undo]);
+  const milestonesStore = useMemo(
+    () => undoableStore(rawStores.milestones, undo),
+    [rawStores, undo],
+  );
   const diagramStore = useMemo(() => undoableStore(rawStores.diagram, undo), [rawStores, undo]);
   const metaStore = useMemo(() => undoableStore(rawStores.meta, undo), [rawStores, undo]);
   const metaSnapshot = useSyncExternalStore(metaStore.subscribe, metaStore.getSnapshot);
@@ -827,16 +962,16 @@ function App() {
   const setTitle = useCallback(
     (updater: string | ((prev: string) => string)) =>
       metaStore.setTitle(
-        typeof updater === "function" ? updater(metaStore.getSnapshot().title) : updater
+        typeof updater === 'function' ? updater(metaStore.getSnapshot().title) : updater,
       ),
-    [metaStore]
+    [metaStore],
   );
   const setScenarios = useCallback(
     (updater: Scenario[] | ((prev: Scenario[]) => Scenario[])) =>
       metaStore.setScenarios(
-        typeof updater === "function" ? updater(metaStore.getSnapshot().scenarios) : updater
+        typeof updater === 'function' ? updater(metaStore.getSnapshot().scenarios) : updater,
       ),
-    [metaStore]
+    [metaStore],
   );
   const diagramStoreRef = useRef(diagramStore);
 
@@ -852,10 +987,18 @@ function App() {
   // extra there - it's specifically the collaborative path this fixes.
   const diagramSnapshot = useSyncExternalStore(diagramStore.subscribe, diagramStore.getSnapshot);
   const teamSnapshot = useSyncExternalStore(teamStore.subscribe, teamStore.getSnapshot);
-  const requirementsSnapshot = useSyncExternalStore(requirementsStore.subscribe, requirementsStore.getSnapshot);
-  const programIncrementsSnapshot = useSyncExternalStore(programIncrementsStore.subscribe, programIncrementsStore.getSnapshot);
-  const milestonesSnapshot = useSyncExternalStore(milestonesStore.subscribe, milestonesStore.getSnapshot);
-
+  const requirementsSnapshot = useSyncExternalStore(
+    requirementsStore.subscribe,
+    requirementsStore.getSnapshot,
+  );
+  const programIncrementsSnapshot = useSyncExternalStore(
+    programIncrementsStore.subscribe,
+    programIncrementsStore.getSnapshot,
+  );
+  const milestonesSnapshot = useSyncExternalStore(
+    milestonesStore.subscribe,
+    milestonesStore.getSnapshot,
+  );
 
   // No tree is derived here (WS1-R3). The flat snapshot is canonical; the
   // recursive tree is built only at export boundaries (save, autosave) and for
@@ -883,7 +1026,10 @@ function App() {
   // the rest of the session - there's no real value in a live-ticking
   // "saved 3s ago" here, just confidence that it's happening at all.
   const [hasAutosaved, setHasAutosaved] = useState(false);
-  const [autosaveFailure, setAutosaveFailure] = useState<{ reason: StorageFailureReason; message: string } | null>(null);
+  const [autosaveFailure, setAutosaveFailure] = useState<{
+    reason: StorageFailureReason;
+    message: string;
+  } | null>(null);
   const [autosaveBlocked] = useState(getAutosaveBlockedReason);
   const legacyDraftPending = useRef(hasLegacyAutosave());
   const writeToFile = fileSaving.write;
@@ -898,7 +1044,9 @@ function App() {
    * overwrites the local document's snapshot (WS1-R5).
    */
   const activeDocId =
-    activeSession && activeSession.ownsDocument ? sessionDocumentId(activeSession.roomName) : openDocId;
+    activeSession && activeSession.ownsDocument
+      ? sessionDocumentId(activeSession.roomName)
+      : openDocId;
   const activeRoom = activeSession?.roomName ?? null;
   const activeKey = activeSession?.password ?? null;
 
@@ -918,7 +1066,7 @@ function App() {
         requirementsSnapshot,
         programIncrementsSnapshot,
         teamSnapshot,
-        milestonesSnapshot
+        milestonesSnapshot,
       );
       // A snapshot in the document store, alongside the live y-indexeddb
       // replica: it keeps the index's title and time current (WS2-R3), is a
@@ -927,8 +1075,12 @@ function App() {
       // localStorage draft (WS2-R1).
       const origin =
         activeRoom !== null
-          ? ({ origin: "session", sessionRoom: activeRoom, sessionKey: activeKey ?? undefined } as const)
-          : ({ origin: "local" } as const);
+          ? ({
+              origin: 'session',
+              sessionRoom: activeRoom,
+              sessionKey: activeKey ?? undefined,
+            } as const)
+          : ({ origin: 'local' } as const);
       // WS13-R1: the attached file belongs to the open local document, never
       // to a joined session's content.
       if (activeDocId === openDocId) {
@@ -958,21 +1110,41 @@ function App() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [title, diagramSnapshot, scenarios, requirementsSnapshot, programIncrementsSnapshot, teamSnapshot, milestonesSnapshot, documentStore, activeDocId, activeRoom, activeKey, openDocId, writeToFile, fileWriteEpoch, saveToWorkspace]);
+  }, [
+    title,
+    diagramSnapshot,
+    scenarios,
+    requirementsSnapshot,
+    programIncrementsSnapshot,
+    teamSnapshot,
+    milestonesSnapshot,
+    documentStore,
+    activeDocId,
+    activeRoom,
+    activeKey,
+    openDocId,
+    writeToFile,
+    fileWriteEpoch,
+    saveToWorkspace,
+  ]);
 
   /**
    * WS13-R12: the session this document was last shared in, if its room and
    * key were kept - offered as "Resume session" so a former participant can
    * host it again after everyone has left.
    */
-  const [resumableSession, setResumableSession] = useState<{ room: string; key: string } | null>(null);
+  const [resumableSession, setResumableSession] = useState<{ room: string; key: string } | null>(
+    null,
+  );
   useEffect(() => {
     let cancelled = false;
     void documentStore.listDocuments().then((listed) => {
       if (cancelled || !listed.ok) return;
       const entry = listed.value.find((e) => e.docId === openDocId);
       setResumableSession(
-        entry?.sessionRoom && entry.sessionKey ? { room: entry.sessionRoom, key: entry.sessionKey } : null
+        entry?.sessionRoom && entry.sessionKey
+          ? { room: entry.sessionRoom, key: entry.sessionKey }
+          : null,
       );
     });
     return () => {
@@ -997,12 +1169,12 @@ function App() {
     // document, or a browser that is not enrolled, reports nothing here,
     // and the file and browser levels stand as before.
     const serverSync =
-      workspaceSync.status === "saved"
-        ? ("synced" as const)
-        : workspaceSync.status === "saving"
-          ? ("pending" as const)
-          : workspaceSync.status === "offline"
-            ? ("offline" as const)
+      workspaceSync.status === 'saved'
+        ? ('synced' as const)
+        : workspaceSync.status === 'saving'
+          ? ('pending' as const)
+          : workspaceSync.status === 'offline'
+            ? ('offline' as const)
             : undefined;
     return {
       ...(serverSync ? { serverSync } : {}),
@@ -1010,12 +1182,12 @@ function App() {
       localPersistence: inSession
         ? sessionPersistence.session === activeSession.session
           ? sessionPersistence.state
-          : "loading"
-        : autosaveFailure?.reason === "unavailable"
-          ? "unavailable"
+          : 'loading'
+        : autosaveFailure?.reason === 'unavailable'
+          ? 'unavailable'
           : hasAutosaved
-            ? "active"
-            : "loading",
+            ? 'active'
+            : 'loading',
       storageFailure: autosaveFailure,
       autosaveBlockedReason: autosaveBlocked,
       // Counted only in a session; outside one there is nobody else to count,
@@ -1025,7 +1197,7 @@ function App() {
         ? countPersistedReplicas(
             presencePeers,
             sessionPersistence.session === activeSession.session &&
-              sessionPersistence.state === "active",
+              sessionPersistence.state === 'active',
           )
         : undefined,
     };
@@ -1060,14 +1232,17 @@ function App() {
   // this fix.
   useEffect(() => {
     if (!activeSession) return;
-    broadcastPresence({ diagramPath: path.join("/") });
+    broadcastPresence({ diagramPath: path.join('/') });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSession, path]);
 
   // Expose test harness helper hooks onto window.__PERF__ when active
   useEffect(() => {
-    if (typeof window !== "undefined" && (window as unknown as Record<string, unknown>).__PERF__) {
-      const perfObj = (window as unknown as Record<string, unknown>).__PERF__ as Record<string, unknown>;
+    if (typeof window !== 'undefined' && (window as unknown as Record<string, unknown>).__PERF__) {
+      const perfObj = (window as unknown as Record<string, unknown>).__PERF__ as Record<
+        string,
+        unknown
+      >;
       perfObj.Y = Y;
       (window as unknown as Record<string, unknown>).Y = Y;
       /**
@@ -1128,7 +1303,7 @@ function App() {
 
   const breadcrumbLabels = useMemo(
     () => getBreadcrumbLabelsFlat(diagramSnapshot.nodes, path),
-    [diagramSnapshot, path]
+    [diagramSnapshot, path],
   );
 
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
@@ -1155,9 +1330,9 @@ function App() {
   // no state and triggers no render. Purely local and never written to
   // any store - see the `measured` line below, and isAutoSizedNodeType,
   // for why sharing it is what broke.
-  const [measuredDimensions, setMeasuredDimensions] = useState<Map<string, { width: number; height: number }>>(
-    () => new Map()
-  );
+  const [measuredDimensions, setMeasuredDimensions] = useState<
+    Map<string, { width: number; height: number }>
+  >(() => new Map());
 
   // nodes/edges are derived from diagramStore rather than stored directly -
   // selection is deliberately NOT part of that store's schema (it's
@@ -1178,17 +1353,20 @@ function App() {
   const edgeGesturesRef = useRef(new Map<string, EdgeGesture>());
   /** Other peers' in-flight bends and labels at this level. */
   const peerEdgeInFlight = useMemo(
-    () => (activeSession ? remoteEdgeGestures(presencePeers, path.join("/")) : new Map()),
-    [activeSession, presencePeers, path]
+    () => (activeSession ? remoteEdgeGestures(presencePeers, path.join('/')) : new Map()),
+    [activeSession, presencePeers, path],
   );
   const peerEdgeLabels = useMemo(
-    () => (activeSession ? remoteEdgeLabels(presencePeers, path.join("/")) : new Map<string, LabelPlacement>()),
-    [activeSession, presencePeers, path]
+    () =>
+      activeSession
+        ? remoteEdgeLabels(presencePeers, path.join('/'))
+        : new Map<string, LabelPlacement>(),
+    [activeSession, presencePeers, path],
   );
   /** Other peers' in-flight geometry at this level (WS4-R3). */
   const peerInFlight = useMemo(
-    () => (activeSession ? remoteInFlight(presencePeers, path.join("/")) : NO_IN_FLIGHT),
-    [activeSession, presencePeers, path]
+    () => (activeSession ? remoteInFlight(presencePeers, path.join('/')) : NO_IN_FLIGHT),
+    [activeSession, presencePeers, path],
   );
 
   const subDiagramLevels = useMemo(() => populatedLevels(diagramSnapshot.nodes), [diagramSnapshot]);
@@ -1209,7 +1387,7 @@ function App() {
         width: n.width ?? measuredDimensions.get(n.id)?.width ?? 0,
         height: n.height ?? measuredDimensions.get(n.id)?.height ?? 0,
         zIndex: n.data.zIndex,
-      }))
+      })),
     );
 
     const selectedNodes = new Set(selectedNodeIds);
@@ -1235,7 +1413,13 @@ function App() {
         // object is identical to last time, and re-renders it otherwise.
         const hit = derivedNodes.get(n);
         let out: Node<ArchNodeData>;
-        if (hit && hit.zIndex === zIndex && hit.measured === measured && hit.selected === selected && hit.hasSub === hasSub) {
+        if (
+          hit &&
+          hit.zIndex === zIndex &&
+          hit.measured === measured &&
+          hit.selected === selected &&
+          hit.hasSub === hasSub
+        ) {
           out = hit.out;
         } else {
           let dataHit = derivedNodeData.get(n);
@@ -1268,13 +1452,26 @@ function App() {
         const label = own ? own.label : peerEdgeLabels.get(e.id);
         if (!own && !peer && !label) return out;
         const data = { ...(out.data as ArchEdgeData) };
-        if (own && changesWaypoints(own)) data.waypoints = applyEdgeGesture(out.data?.waypoints, own);
+        if (own && changesWaypoints(own))
+          data.waypoints = applyEdgeGesture(out.data?.waypoints, own);
         else if (peer) data.waypoints = peer as EdgeWaypoint[];
         if (label) Object.assign(data, label);
         return { ...out, data };
       }),
     };
-  }, [diagramSnapshot, subDiagramLevels, path, selectedNodeIds, selectedEdgeIds, measuredDimensions, inFlight, peerInFlight, edgeInFlight, peerEdgeInFlight, peerEdgeLabels]);
+  }, [
+    diagramSnapshot,
+    subDiagramLevels,
+    path,
+    selectedNodeIds,
+    selectedEdgeIds,
+    measuredDimensions,
+    inFlight,
+    peerInFlight,
+    edgeInFlight,
+    peerEdgeInFlight,
+    peerEdgeLabels,
+  ]);
 
   // Only position/dimensions changes need to reach the store - selection
   // changes are handled separately (and more robustly, since it's the
@@ -1321,7 +1518,7 @@ function App() {
     pending.clear();
     inFlightRef.current = next;
     setInFlight(next);
-    broadcastPresence({ gesture: toBroadcast(path.join("/"), next) });
+    broadcastPresence({ gesture: toBroadcast(path.join('/'), next) });
   }, [broadcastPresence, path]);
 
   /**
@@ -1345,7 +1542,8 @@ function App() {
           // relative to its new parent - writing it here as well would be a
           // second write for the same node.
           if (g.position && !reparents.has(id)) diagramStore.updatePosition(id, g.position);
-          if (g.width !== undefined || g.height !== undefined) diagramStore.updateDimensions(id, g.width, g.height);
+          if (g.width !== undefined || g.height !== undefined)
+            diagramStore.updateDimensions(id, g.width, g.height);
         }
         // Relative positions are derived here, from the geometry this commit
         // is writing - the last rendered frame can be a frame or two behind
@@ -1419,9 +1617,14 @@ function App() {
       setMeasuredDimensions((cur) => {
         let next: Map<string, { width: number; height: number }> | null = null;
         for (const change of changes) {
-          if (change.type !== "dimensions" || !change.dimensions) continue;
+          if (change.type !== 'dimensions' || !change.dimensions) continue;
           const prev = cur.get(change.id);
-          if (prev && prev.width === change.dimensions.width && prev.height === change.dimensions.height) continue;
+          if (
+            prev &&
+            prev.width === change.dimensions.width &&
+            prev.height === change.dimensions.height
+          )
+            continue;
           next ??= new Map(cur);
           next.set(change.id, { width: change.dimensions.width, height: change.dimensions.height });
         }
@@ -1431,10 +1634,19 @@ function App() {
       const currentNodeGeometry = new Map<string, CurrentNodeGeometry>(
         nodesRef.current.map((n) => [
           n.id,
-          { position: n.position, width: n.width, height: n.height, isAutoSized: isAutoSizedNodeType(n.type) },
-        ])
+          {
+            position: n.position,
+            width: n.width,
+            height: n.height,
+            isAutoSized: isAutoSizedNodeType(n.type),
+          },
+        ]),
       );
-      const { isActiveGesture, gestureEnded } = classifyNodeChanges(changes, pendingNodeUpdates.current, currentNodeGeometry);
+      const { isActiveGesture, gestureEnded } = classifyNodeChanges(
+        changes,
+        pendingNodeUpdates.current,
+        currentNodeGeometry,
+      );
       const gestureInProgress = inFlightRef.current.size > 0;
       if (isActiveGesture) {
         if (pendingFlushHandle.current === null) {
@@ -1454,7 +1666,11 @@ function App() {
           commitScheduled.current = true;
           queueMicrotask(commitNodeGesture);
         }
-      } else if (!gestureInProgress && !commitScheduled.current && pendingNodeUpdates.current.size > 0) {
+      } else if (
+        !gestureInProgress &&
+        !commitScheduled.current &&
+        pendingNodeUpdates.current.size > 0
+      ) {
         // A standalone change with no gesture open (an arrow-key nudge).
         // Anything arriving while a gesture is open or awaiting its commit -
         // a snap correction, a stray batch mid-drag - stays pending and is
@@ -1462,7 +1678,7 @@ function App() {
         commitNodeGesture();
       }
     },
-    [flushPendingNodeUpdates, commitNodeGesture]
+    [flushPendingNodeUpdates, commitNodeGesture],
   );
 
   // Edges have no position/dimensions concept, so the only thing this
@@ -1477,15 +1693,15 @@ function App() {
   }, []);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-
-
   const [activeScenarioId, setActiveScenarioId] = useState<string | null>(null);
   const [activeStepIndex, setActiveStepIndex] = useState(0);
   const [isPresenting, setIsPresenting] = useState(false);
   // Which top-level page is showing - the diagram canvas or the
   // requirements document. Deliberately NOT part of the undoable
   // DiagramSnapshot: switching pages isn't an edit to the content itself.
-  const [viewMode, setViewModeRaw] = useState<"diagram" | "requirements" | "timeline" | "team" | "skill-tree">("diagram");
+  const [viewMode, setViewModeRaw] = useState<
+    'diagram' | 'requirements' | 'timeline' | 'team' | 'skill-tree'
+  >('diagram');
   /**
    * The recursive tree, for the views still written against it
    * (requirements, timeline, skill tree - all to find linked nodes).
@@ -1494,10 +1710,14 @@ function App() {
    * diagram view, which is where editing and remote bursts happen, so the
    * common path never pays for an unflatten (WS1-R3).
    */
-  const viewNeedsTree = viewMode === "requirements" || viewMode === "timeline" || viewMode === "skill-tree";
+  const viewNeedsTree =
+    viewMode === 'requirements' || viewMode === 'timeline' || viewMode === 'skill-tree';
   const diagramTree = useMemo(
-    () => (viewNeedsTree ? unflattenToSubDiagram(diagramSnapshot.nodes, diagramSnapshot.edges) : EMPTY_DIAGRAM),
-    [viewNeedsTree, diagramSnapshot]
+    () =>
+      viewNeedsTree
+        ? unflattenToSubDiagram(diagramSnapshot.nodes, diagramSnapshot.edges)
+        : EMPTY_DIAGRAM,
+    [viewNeedsTree, diagramSnapshot],
   );
 
   // Which requirements/timeline item this peer currently has open -
@@ -1539,10 +1759,13 @@ function App() {
   const onFocusRequirementHandled = useCallback(() => {
     setPendingRequirementFocus(null);
   }, []);
-  const onNavigateToRequirement = useCallback((itemId: string) => {
-    setViewMode("requirements");
-    setPendingRequirementFocus(itemId);
-  }, [setViewMode]);
+  const onNavigateToRequirement = useCallback(
+    (itemId: string) => {
+      setViewMode('requirements');
+      setPendingRequirementFocus(itemId);
+    },
+    [setViewMode],
+  );
   // Mirrors onNavigateToRequirement above - jumps to the diagram, drills
   // to whichever sub-diagram level actually contains the target node
   // (path is relative to root, see findLinkedNodes), and requests the
@@ -1553,13 +1776,13 @@ function App() {
   }, []);
   const onNavigateToNode = useCallback(
     (nodePath: DiagramPath, nodeId: string) => {
-      setViewMode("diagram");
+      setViewMode('diagram');
       setPath(nodePath);
       setPendingNodeFocus(nodeId);
       setSelectedNodeIds([nodeId]);
       setSelectedEdgeIds([]);
     },
-    [setViewMode]
+    [setViewMode],
   );
   /** Quick-action from a requirement's "Linked Diagrams" section - rather
    * than making the person go create a node manually then hunt down the
@@ -1570,19 +1793,27 @@ function App() {
    * there's no meaningful "current sub-diagram" to add into; root is the
    * one predictable, always-discoverable place regardless of where they
    * were when they clicked. */
-  const onCreateLinkedNode = useCallback((itemId: string, label: string) => {
-    const id = diagramStore.addNode([], "typed", { x: 0, y: 0 }, {
-      nodeType: "custom",
-      label,
-      description: "",
-      properties: {},
-      tags: [],
-      linkedRequirementIds: [itemId],
-    });
-    setViewMode("diagram");
-    setPath([]);
-    setPendingNodeFocus(id);
-  }, [diagramStore, setViewMode]);
+  const onCreateLinkedNode = useCallback(
+    (itemId: string, label: string) => {
+      const id = diagramStore.addNode(
+        [],
+        'typed',
+        { x: 0, y: 0 },
+        {
+          nodeType: 'custom',
+          label,
+          description: '',
+          properties: {},
+          tags: [],
+          linkedRequirementIds: [itemId],
+        },
+      );
+      setViewMode('diagram');
+      setPath([]);
+      setPendingNodeFocus(id);
+    },
+    [diagramStore, setViewMode],
+  );
   const [isScenarioPanelOpen, setIsScenarioPanelOpen] = useState(false);
   const [isLibraryModalOpen, setIsLibraryModalOpen] = useState(false);
   const [activeStepId, setActiveStepId] = useState<string | null>(null);
@@ -1596,58 +1827,58 @@ function App() {
         path,
         connection.source,
         connection.target,
-        { edgeType: "blank-solid", label: "", direction: "forward", properties: {} },
+        { edgeType: 'blank-solid', label: '', direction: 'forward', properties: {} },
         connection.sourceHandle,
-        connection.targetHandle
+        connection.targetHandle,
       );
     },
-    [diagramStore, path]
+    [diagramStore, path],
   );
 
   const onAddNode = useCallback(
     (typeId: string, position: { x: number; y: number }) => {
       const def = NODE_TYPES.find((n) => n.id === typeId);
       if (!def) return;
-      diagramStore.addNode(path, "typed", position, {
+      diagramStore.addNode(path, 'typed', position, {
         nodeType: typeId,
         label: def.label,
-        description: "",
+        description: '',
         properties: { ...(def.defaultProperties ?? {}) },
         tags: [],
       });
     },
-    [diagramStore, path]
+    [diagramStore, path],
   );
 
   const onAddGroup = useCallback(
     (typeId: string, position: { x: number; y: number }) => {
       const def = GROUP_TYPES.find((g) => g.id === typeId);
       if (!def) return;
-      const id = diagramStore.addNode(path, "group", position, {
+      const id = diagramStore.addNode(path, 'group', position, {
         nodeType: typeId,
         label: def.label,
-        description: "",
+        description: '',
         properties: {},
         tags: [],
       });
       diagramStore.updateDimensions(id, 320, 220);
     },
-    [diagramStore, path]
+    [diagramStore, path],
   );
 
   const onAddText = useCallback(
     (position: { x: number; y: number }): string => {
-      return diagramStore.addNode(path, "text", position, {
-        nodeType: "text",
-        label: "",
-        description: "",
+      return diagramStore.addNode(path, 'text', position, {
+        nodeType: 'text',
+        label: '',
+        description: '',
         properties: {},
         tags: [],
-        textColor: "#e7e9ee",
+        textColor: '#e7e9ee',
         fontSize: 16,
       });
     },
-    [diagramStore, path]
+    [diagramStore, path],
   );
 
   const onAddShape = useCallback(
@@ -1659,38 +1890,38 @@ function App() {
             defaultWidth: fullDef.defaults.width,
             defaultHeight: fullDef.defaults.height,
             color: fullDef.defaults.color,
-            label: fullDef.defaults.label ?? "",
+            label: fullDef.defaults.label ?? '',
           }
         : SHAPE_TYPES.find((s) => s.id === typeId);
       if (!def) return;
-      const id = diagramStore.addNode(path, "shape", position, {
+      const id = diagramStore.addNode(path, 'shape', position, {
         nodeType: typeId,
-        label: (def as { label?: string }).label ?? "",
-        description: "",
+        label: (def as { label?: string }).label ?? '',
+        description: '',
         properties: {},
         tags: [],
         color: (def as { color?: string }).color,
       });
       diagramStore.updateDimensions(id, def.defaultWidth, def.defaultHeight);
     },
-    [diagramStore, path]
+    [diagramStore, path],
   );
 
   const onAddCode = useCallback(
     (position: { x: number; y: number }): string => {
-      const id = diagramStore.addNode(path, "code", position, {
-        nodeType: "code",
-        label: "",
-        description: "",
+      const id = diagramStore.addNode(path, 'code', position, {
+        nodeType: 'code',
+        label: '',
+        description: '',
         properties: {},
         tags: [],
-        codeContent: "",
-        codeLanguage: "json",
+        codeContent: '',
+        codeLanguage: 'json',
       });
       diagramStore.updateDimensions(id, 320, 220);
       return id;
     },
-    [diagramStore, path]
+    [diagramStore, path],
   );
 
   // Called after dragging a regular node - see Canvas.tsx's onNodeDragStop.
@@ -1719,7 +1950,7 @@ function App() {
       }
       diagramStore.updateParentId(nodeId, newParentId ?? undefined, nextPosition);
     },
-    [nodes, diagramStore]
+    [nodes, diagramStore],
   );
 
   // Called after dragging or resizing a *boundary* - see Canvas.tsx's onNodeDragStop
@@ -1746,15 +1977,12 @@ function App() {
         diagramStore.updateParentId(nodeId, groupId, relative);
       }
     },
-    [diagramStore]
+    [diagramStore],
   );
 
-  const onUpdateNode = useCallback(
-    (id: string, patch: Partial<ArchNodeData>) => {
-      diagramStoreRef.current.updateNode(id, patch);
-    },
-    []
-  );
+  const onUpdateNode = useCallback((id: string, patch: Partial<ArchNodeData>) => {
+    diagramStoreRef.current.updateNode(id, patch);
+  }, []);
 
   /**
    * Applies a z-order command to the current selection.
@@ -1788,15 +2016,12 @@ function App() {
         diagramStoreRef.current.updateNode(patch.id, { zIndex: patch.zIndex });
       }
     },
-    [nodes, selectedNodeIds]
+    [nodes, selectedNodeIds],
   );
 
-  const onUpdateEdge = useCallback(
-    (id: string, patch: ArchEdgeDataPatch) => {
-      diagramStoreRef.current.updateEdge(id, patch);
-    },
-    []
-  );
+  const onUpdateEdge = useCallback((id: string, patch: ArchEdgeDataPatch) => {
+    diagramStoreRef.current.updateEdge(id, patch);
+  }, []);
 
   /**
    * Edge manipulation - moving an edge's ends onto different nodes, and
@@ -1834,26 +2059,33 @@ function App() {
     const labels: Record<string, LabelPlacement> = {};
     for (const [edgeId, gesture] of snapshot) {
       if (changesWaypoints(gesture)) {
-        const stored = diagramStoreRef.current.getSnapshot().edges.find((e) => e.id === edgeId)?.data?.waypoints;
+        const stored = diagramStoreRef.current.getSnapshot().edges.find((e) => e.id === edgeId)
+          ?.data?.waypoints;
         edges[edgeId] = applyEdgeGesture(stored, gesture);
       }
       if (gesture.label) labels[edgeId] = gesture.label;
     }
-    broadcastPresence({ edgeGesture: snapshot.size ? { path: path.join("/"), edges, labels } : null });
+    broadcastPresence({
+      edgeGesture: snapshot.size ? { path: path.join('/'), edges, labels } : null,
+    });
   }, [broadcastPresence, path]);
   const scheduleEdgePublish = useCallback(() => {
-    if (edgeFlushHandle.current === null) edgeFlushHandle.current = requestAnimationFrame(publishEdgeGestures);
+    if (edgeFlushHandle.current === null)
+      edgeFlushHandle.current = requestAnimationFrame(publishEdgeGestures);
   }, [publishEdgeGestures]);
 
-  const onAddEdgeWaypoint = useCallback((edgeId: string, index: number, waypoint: EdgeWaypoint) => {
-    const current = edgeGesturesRef.current.get(edgeId);
-    edgeGesturesRef.current.set(edgeId, {
-      ...current,
-      created: { index, waypoint },
-      moved: current?.moved ?? new Map(),
-    });
-    scheduleEdgePublish();
-  }, [scheduleEdgePublish]);
+  const onAddEdgeWaypoint = useCallback(
+    (edgeId: string, index: number, waypoint: EdgeWaypoint) => {
+      const current = edgeGesturesRef.current.get(edgeId);
+      edgeGesturesRef.current.set(edgeId, {
+        ...current,
+        created: { index, waypoint },
+        moved: current?.moved ?? new Map(),
+      });
+      scheduleEdgePublish();
+    },
+    [scheduleEdgePublish],
+  );
 
   const onMoveEdgeWaypoint = useCallback(
     (edgeId: string, waypointId: string, position: { x: number; y: number }) => {
@@ -1863,17 +2095,21 @@ function App() {
       edgeGesturesRef.current.set(edgeId, { ...current, created: current?.created, moved });
       scheduleEdgePublish();
     },
-    [scheduleEdgePublish]
+    [scheduleEdgePublish],
   );
 
   /** A label being dragged: previewed like a bend, written once at the end. */
   const onPreviewEdgeLabel = useCallback(
     (edgeId: string, placement: LabelPlacement) => {
       const current = edgeGesturesRef.current.get(edgeId);
-      edgeGesturesRef.current.set(edgeId, { ...current, moved: current?.moved ?? new Map(), label: placement });
+      edgeGesturesRef.current.set(edgeId, {
+        ...current,
+        moved: current?.moved ?? new Map(),
+        label: placement,
+      });
       scheduleEdgePublish();
     },
-    [scheduleEdgePublish]
+    [scheduleEdgePublish],
   );
 
   const onEndEdgeGesture = useCallback(
@@ -1896,7 +2132,7 @@ function App() {
       // the bend back where it started.
       publishEdgeGestures();
     },
-    [undo, diagramStore, publishEdgeGestures]
+    [undo, diagramStore, publishEdgeGestures],
   );
 
   const onRemoveEdgeWaypoint = useCallback((edgeId: string, waypointId: string) => {
@@ -1919,7 +2155,7 @@ function App() {
       const nestedCount = getNodesAtPath(diagramStore.getSnapshot().nodes, [...path, id]).length;
       if (nestedCount > 0) {
         const ok = window.confirm(
-          `"${target.data.label}" contains a sub-diagram with ${nestedCount} node${nestedCount === 1 ? "" : "s"} inside. Delete it and everything inside?`
+          `"${target.data.label}" contains a sub-diagram with ${nestedCount} node${nestedCount === 1 ? '' : 's'} inside. Delete it and everything inside?`,
         );
         if (!ok) return;
       }
@@ -1936,7 +2172,7 @@ function App() {
       diagramStore.deleteNode(id);
       setSelectedNodeIds((cur) => cur.filter((n) => n !== id));
     },
-    [nodes, path, diagramStore]
+    [nodes, path, diagramStore],
   );
 
   const onDeleteEdge = useCallback(
@@ -1944,7 +2180,7 @@ function App() {
       diagramStore.deleteEdge(id);
       setSelectedEdgeIds((cur) => cur.filter((e) => e !== id));
     },
-    [diagramStore]
+    [diagramStore],
   );
 
   const onDeleteSelection = useCallback(() => {
@@ -1986,8 +2222,12 @@ function App() {
     const selectedSet = new Set(selectedNodeIds);
     // Copying a boundary brings its contents along, even if they weren't
     // individually selected - an empty duplicated boundary would feel broken.
-    const groupIds = new Set(nodes.filter((n) => selectedSet.has(n.id) && n.type === "group").map((n) => n.id));
-    const childNodes = nodes.filter((n) => n.parentId && groupIds.has(n.parentId) && !selectedSet.has(n.id));
+    const groupIds = new Set(
+      nodes.filter((n) => selectedSet.has(n.id) && n.type === 'group').map((n) => n.id),
+    );
+    const childNodes = nodes.filter(
+      (n) => n.parentId && groupIds.has(n.parentId) && !selectedSet.has(n.id),
+    );
     const toCopy = [...nodes.filter((n) => selectedSet.has(n.id)), ...childNodes];
     const copiedIds = new Set(toCopy.map((n) => n.id));
 
@@ -2008,8 +2248,11 @@ function App() {
     const { nodes: allNodes, edges: allEdges } = diagramStore.getSnapshot();
     function gatherDescendants(
       nodeId: string,
-      relativePath: string[]
-    ): { nodes: (Node<ArchNodeData> & { relativePath: string[] })[]; edges: (Edge<ArchEdgeData> & { relativePath: string[] })[] } {
+      relativePath: string[],
+    ): {
+      nodes: (Node<ArchNodeData> & { relativePath: string[] })[];
+      edges: (Edge<ArchEdgeData> & { relativePath: string[] })[];
+    } {
       const childPath = [...relativePath, nodeId];
       const levelNodes = getNodesAtPath(allNodes, [...path, ...childPath]);
       const levelEdges = getEdgesAtPath(allEdges, [...path, ...childPath]);
@@ -2019,7 +2262,10 @@ function App() {
       };
       for (const child of levelNodes) {
         const deeper = gatherDescendants(child.id, childPath);
-        result = { nodes: [...result.nodes, ...deeper.nodes], edges: [...result.edges, ...deeper.edges] };
+        result = {
+          nodes: [...result.nodes, ...deeper.nodes],
+          edges: [...result.edges, ...deeper.edges],
+        };
       }
       return result;
     }
@@ -2058,24 +2304,35 @@ function App() {
     // left out.
     const remaining = [...clipboard.nodes];
     const idMap = new Map<string, string>();
-    const remapPath = (relativePath: string[]) => relativePath.map((oldId) => idMap.get(oldId) ?? oldId);
+    const remapPath = (relativePath: string[]) =>
+      relativePath.map((oldId) => idMap.get(oldId) ?? oldId);
 
     const rootPastedIds: string[] = [];
     while (remaining.length > 0) {
       const readyIndex = remaining.findIndex(
-        (n) => n.relativePath.every((ancestorId) => idMap.has(ancestorId)) && (!n.parentId || idMap.has(n.parentId))
+        (n) =>
+          n.relativePath.every((ancestorId) => idMap.has(ancestorId)) &&
+          (!n.parentId || idMap.has(n.parentId)),
       );
       if (readyIndex === -1) break; // shouldn't happen - see comment above - but never hang if it somehow does
       const [n] = remaining.splice(readyIndex, 1);
 
       const isTopLevel = n.relativePath.length === 0;
       const shouldOffset = isTopLevel && !n.parentId;
-      const position = shouldOffset ? { x: n.position.x + offset, y: n.position.y + offset } : n.position;
+      const position = shouldOffset
+        ? { x: n.position.x + offset, y: n.position.y + offset }
+        : n.position;
       const newParentId = n.parentId ? idMap.get(n.parentId) : undefined;
-      const newId = diagramStore.addNode([...path, ...remapPath(n.relativePath)], n.type ?? "typed", position, n.data);
+      const newId = diagramStore.addNode(
+        [...path, ...remapPath(n.relativePath)],
+        n.type ?? 'typed',
+        position,
+        n.data,
+      );
       idMap.set(n.id, newId);
       if (newParentId !== undefined) diagramStore.updateParentId(newId, newParentId, position);
-      if (n.width !== undefined || n.height !== undefined) diagramStore.updateDimensions(newId, n.width, n.height);
+      if (n.width !== undefined || n.height !== undefined)
+        diagramStore.updateDimensions(newId, n.width, n.height);
       if (isTopLevel) rootPastedIds.push(newId);
     }
 
@@ -2088,9 +2345,9 @@ function App() {
         [...path, ...remapPath(e.relativePath)],
         newSource,
         newTarget,
-        e.data ?? { edgeType: "blank-solid", label: "", direction: "forward", properties: {} },
+        e.data ?? { edgeType: 'blank-solid', label: '', direction: 'forward', properties: {} },
         e.sourceHandle,
-        e.targetHandle
+        e.targetHandle,
       );
       newEdgeIds.push(newEdgeId);
     }
@@ -2117,7 +2374,7 @@ function App() {
       setSelectedEdgeIds([]);
       setActiveStepId(null);
     },
-    [isPresenting]
+    [isPresenting],
   );
 
   const onNavigateToRoot = useCallback(() => {
@@ -2137,7 +2394,7 @@ function App() {
   // --- Scenarios (can now span multiple diagram levels - see path below) --
 
   const onCreateScenario = useCallback(() => {
-    const id = nextId("scenario");
+    const id = nextId('scenario');
     setScenarios((s) => [...s, { id, title: `Scenario ${s.length + 1}`, steps: [] }]);
     setActiveScenarioId(id);
   }, [setScenarios]);
@@ -2146,7 +2403,7 @@ function App() {
     (id: string, newTitle: string) => {
       setScenarios((s) => s.map((sc) => (sc.id === id ? { ...sc, title: newTitle } : sc)));
     },
-    [setScenarios]
+    [setScenarios],
   );
 
   const onDeleteScenario = useCallback(
@@ -2154,7 +2411,7 @@ function App() {
       setScenarios((s) => s.filter((sc) => sc.id !== id));
       setActiveScenarioId((cur) => (cur === id ? null : cur));
     },
-    [setScenarios]
+    [setScenarios],
   );
 
   const onSelectScenario = useCallback((id: string) => {
@@ -2171,7 +2428,7 @@ function App() {
   // place deciding the fallback.
   const activeScenario = useMemo(
     () => scenarios.find((s) => s.id === activeScenarioId) ?? scenarios[0] ?? null,
-    [scenarios, activeScenarioId]
+    [scenarios, activeScenarioId],
   );
 
   // Selecting a step in the list makes it both the editor's subject AND the
@@ -2191,7 +2448,7 @@ function App() {
         }
       }
     },
-    [activeScenario, activeStepId, setPath]
+    [activeScenario, activeStepId, setPath],
   );
 
   // Captures whatever's currently selected on the canvas - AND which level
@@ -2203,24 +2460,24 @@ function App() {
   const onAddStep = useCallback(
     (scenarioId: string) => {
       if (selectedNodeIds.length === 0 && selectedEdgeIds.length === 0) return;
-      const newStepId = nextId("step");
+      const newStepId = nextId('step');
       setScenarios((s) =>
         s.map((sc) => {
           if (sc.id !== scenarioId) return sc;
           const step: ScenarioStep = {
             id: newStepId,
             title: `Step ${sc.steps.length + 1}`,
-            narration: "",
+            narration: '',
             path: [...path],
             focusNodeIds: [...selectedNodeIds],
             focusEdgeIds: [...selectedEdgeIds],
           };
           return { ...sc, steps: [...sc.steps, step] };
-        })
+        }),
       );
       setActiveStepId(newStepId);
     },
-    [selectedNodeIds, selectedEdgeIds, path, setScenarios]
+    [selectedNodeIds, selectedEdgeIds, path, setScenarios],
   );
 
   // Adds/removes the current canvas selection to/from an EXISTING step's
@@ -2243,13 +2500,13 @@ function App() {
                         ...st,
                         focusNodeIds: Array.from(new Set([...st.focusNodeIds, ...selectedNodeIds])),
                         focusEdgeIds: Array.from(new Set([...st.focusEdgeIds, ...selectedEdgeIds])),
-                      }
+                      },
                 ),
-              }
-        )
+              },
+        ),
       );
     },
-    [selectedNodeIds, selectedEdgeIds, setScenarios]
+    [selectedNodeIds, selectedEdgeIds, setScenarios],
   );
 
   const onRemoveSelectionFromStep = useCallback(
@@ -2270,13 +2527,13 @@ function App() {
                         ...st,
                         focusNodeIds: st.focusNodeIds.filter((nid) => !removeNodes.has(nid)),
                         focusEdgeIds: st.focusEdgeIds.filter((eid) => !removeEdges.has(eid)),
-                      }
+                      },
                 ),
-              }
-        )
+              },
+        ),
       );
     },
-    [selectedNodeIds, selectedEdgeIds, setScenarios]
+    [selectedNodeIds, selectedEdgeIds, setScenarios],
   );
 
   const onUpdateStep = useCallback(
@@ -2285,38 +2542,40 @@ function App() {
         s.map((sc) =>
           sc.id === scenarioId
             ? { ...sc, steps: sc.steps.map((st) => (st.id === stepId ? { ...st, ...patch } : st)) }
-            : sc
-        )
+            : sc,
+        ),
       );
     },
-    [setScenarios]
+    [setScenarios],
   );
 
   const onDeleteStep = useCallback(
     (scenarioId: string, stepId: string) => {
       setScenarios((s) =>
-        s.map((sc) => (sc.id === scenarioId ? { ...sc, steps: sc.steps.filter((st) => st.id !== stepId) } : sc))
+        s.map((sc) =>
+          sc.id === scenarioId ? { ...sc, steps: sc.steps.filter((st) => st.id !== stepId) } : sc,
+        ),
       );
       setActiveStepId((cur) => (cur === stepId ? null : cur));
     },
-    [setScenarios]
+    [setScenarios],
   );
 
   const onMoveStep = useCallback(
-    (scenarioId: string, stepId: string, direction: "up" | "down") => {
+    (scenarioId: string, stepId: string, direction: 'up' | 'down') => {
       setScenarios((s) =>
         s.map((sc) => {
           if (sc.id !== scenarioId) return sc;
           const index = sc.steps.findIndex((st) => st.id === stepId);
-          const swapWith = direction === "up" ? index - 1 : index + 1;
+          const swapWith = direction === 'up' ? index - 1 : index + 1;
           if (index === -1 || swapWith < 0 || swapWith >= sc.steps.length) return sc;
           const steps = [...sc.steps];
           [steps[index], steps[swapWith]] = [steps[swapWith], steps[index]];
           return { ...sc, steps };
-        })
+        }),
       );
     },
-    [setScenarios]
+    [setScenarios],
   );
 
   const previewFocus = useMemo(() => {
@@ -2338,7 +2597,7 @@ function App() {
       setActiveStepId(null);
       setIsPresenting(true);
     },
-    [scenarios]
+    [scenarios],
   );
 
   const onExitPresenting = useCallback(() => setIsPresenting(false), []);
@@ -2375,17 +2634,17 @@ function App() {
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if (isPresenting) return;
-      if (viewMode !== "diagram") return;
-      if (event.key !== "Backspace" && event.key !== "Delete") return;
+      if (viewMode !== 'diagram') return;
+      if (event.key !== 'Backspace' && event.key !== 'Delete') return;
       const target = event.target as HTMLElement | null;
       const tag = target?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) return;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return;
       if (selectedNodeIds.length > 0 || selectedEdgeIds.length > 0) {
         onDeleteSelection();
       }
     };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
   }, [isPresenting, viewMode, selectedNodeIds, selectedEdgeIds, onDeleteSelection]);
 
   const onUndo = useCallback(() => {
@@ -2412,24 +2671,26 @@ function App() {
       if (isPresenting) return;
       const target = event.target as HTMLElement | null;
       const tag = target?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) return;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return;
 
       const key = event.key.toLowerCase();
-      if ((event.ctrlKey || event.metaKey) && key === "c") {
+      if ((event.ctrlKey || event.metaKey) && key === 'c') {
         const selection = window.getSelection();
-        const hasTextSelection = Boolean(selection && !selection.isCollapsed && selection.toString().length > 0);
+        const hasTextSelection = Boolean(
+          selection && !selection.isCollapsed && selection.toString().length > 0,
+        );
         if (hasTextSelection) return;
-        if (viewMode !== "diagram") return;
+        if (viewMode !== 'diagram') return;
         event.preventDefault();
         onCopy();
-      } else if ((event.ctrlKey || event.metaKey) && key === "v") {
-        if (viewMode !== "diagram") return;
+      } else if ((event.ctrlKey || event.metaKey) && key === 'v') {
+        if (viewMode !== 'diagram') return;
         event.preventDefault();
         onPaste();
       }
     };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
   }, [isPresenting, viewMode, onCopy, onPaste]);
 
   // Undo/redo: Ctrl+Z / Cmd+Z, and BOTH common redo conventions - Ctrl+Y
@@ -2441,43 +2702,43 @@ function App() {
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if (isPresenting) return;
-      if (viewMode !== "diagram") return;
+      if (viewMode !== 'diagram') return;
       const target = event.target as HTMLElement | null;
       const tag = target?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) return;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return;
       if (!(event.ctrlKey || event.metaKey)) return;
       const key = event.key.toLowerCase();
-      if (key === "z" && event.shiftKey) {
+      if (key === 'z' && event.shiftKey) {
         event.preventDefault();
         onRedo();
-      } else if (key === "z") {
+      } else if (key === 'z') {
         event.preventDefault();
         onUndo();
-      } else if (key === "y") {
+      } else if (key === 'y') {
         event.preventDefault();
         onRedo();
       }
     };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
   }, [isPresenting, viewMode, onUndo, onRedo]);
 
   // Presentation navigation: arrow keys / space / escape.
   useEffect(() => {
     if (!isPresenting) return;
     const handler = (event: KeyboardEvent) => {
-      if (event.key === "ArrowRight" || event.key === " ") {
+      if (event.key === 'ArrowRight' || event.key === ' ') {
         event.preventDefault();
         onPresentNext();
-      } else if (event.key === "ArrowLeft") {
+      } else if (event.key === 'ArrowLeft') {
         event.preventDefault();
         onPresentPrev();
-      } else if (event.key === "Escape") {
+      } else if (event.key === 'Escape') {
         onExitPresenting();
       }
     };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
   }, [isPresenting, onPresentNext, onPresentPrev, onExitPresenting]);
 
   // --- File / diagram lifecycle -------------------------------------------
@@ -2505,9 +2766,17 @@ function App() {
       requirementsSnapshot,
       programIncrementsSnapshot,
       teamSnapshot,
-      milestonesSnapshot
+      milestonesSnapshot,
     );
-  }, [title, diagramSnapshot, scenarios, requirementsSnapshot, programIncrementsSnapshot, teamSnapshot, milestonesSnapshot]);
+  }, [
+    title,
+    diagramSnapshot,
+    scenarios,
+    requirementsSnapshot,
+    programIncrementsSnapshot,
+    teamSnapshot,
+    milestonesSnapshot,
+  ]);
 
   const onSave = useCallback(() => {
     downloadDiagram(buildCurrentFile());
@@ -2547,8 +2816,12 @@ function App() {
   }, [timedCopies]);
 
   const onChooseFile = useCallback(() => {
-    const safeName = title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-    void fileSaving.attach(`${safeName || "diagram"}.json`);
+    const safeName = title
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+    void fileSaving.attach(`${safeName || 'diagram'}.json`);
   }, [title, fileSaving]);
 
   /** WS13-R4: the file changed elsewhere. Overwrite it with what is on screen. */
@@ -2561,16 +2834,16 @@ function App() {
   const onReloadFromFile = useCallback(async () => {
     const text = await fileSaving.reloadExternal();
     if (text === null) {
-      showToast("Could not read the file", "error");
+      showToast('Could not read the file', 'error');
       return;
     }
     try {
       const parsed = parseDiagramFile(text);
       replaceDocumentContents(openDoc.doc, snapshotToDiagramFile(diagramFileToSnapshot(parsed)));
       undo.clear();
-      showToast("Reloaded from file");
+      showToast('Reloaded from file');
     } catch (err) {
-      showToast("The file could not be loaded", "error", (err as Error).message);
+      showToast('The file could not be loaded', 'error', (err as Error).message);
     }
   }, [fileSaving, openDoc, undo, showToast]);
 
@@ -2604,7 +2877,7 @@ function App() {
   const onFileSelected = useCallback(
     async (event: ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
-      event.target.value = "";
+      event.target.value = '';
       if (!file) return;
       try {
         const text = await file.text();
@@ -2625,7 +2898,7 @@ function App() {
         window.alert(`Couldn't open that file: ${(err as Error).message}`);
       }
     },
-    [activeDoc, undo]
+    [activeDoc, undo],
   );
 
   const selectedNodeId = selectedNodeIds[0] ?? null;
@@ -2637,7 +2910,7 @@ function App() {
     (_id, _phase, actualDuration) => {
       recordCommit(actualDuration);
     },
-    []
+    [],
   );
 
   const canvasElement = (
@@ -2650,7 +2923,7 @@ function App() {
         !activeSession
           ? []
           : presencePeers.map((p) => {
-              const onSamePath = p.diagramPath === path.join("/");
+              const onSamePath = p.diagramPath === path.join('/');
               const shouldShowCursor = showPeerCursors && onSamePath;
               return p.cursor === null || shouldShowCursor ? p : { ...p, cursor: null };
             })
@@ -2691,9 +2964,7 @@ function App() {
 
   return (
     <div className="app">
-      {appVersion && (
-          <div className="app-version">{appVersion}</div>
-      )}
+      {appVersion && <div className="app-version">{appVersion}</div>}
       {!isPresenting && (
         <Toolbar
           title={title}
@@ -2725,7 +2996,11 @@ function App() {
               onResumeFile={() => void fileSaving.resume()}
               onReloadFromFile={() => void onReloadFromFile()}
               onOverwriteFile={onOverwriteFile}
-              onStopFile={fileSaving.fileName && !activeSession?.ownsDocument ? () => void fileSaving.detach() : undefined}
+              onStopFile={
+                fileSaving.fileName && !activeSession?.ownsDocument
+                  ? () => void fileSaving.detach()
+                  : undefined
+              }
               fileName={activeSession?.ownsDocument ? null : fileSaving.fileName}
             />
           }
@@ -2757,11 +3032,13 @@ function App() {
               onStartSession={startNewSession}
               resumableRoom={resumableSession?.room ?? null}
               onResumeSession={
-                resumableSession ? () => startNewSession(resumableSession.key, resumableSession.room) : undefined
+                resumableSession
+                  ? () => startNewSession(resumableSession.key, resumableSession.room)
+                  : undefined
               }
               onJoinSession={joinSession}
               onLeaveSession={requestLeave}
-              onCopyLink={() => showToast("Session link copied to clipboard")}
+              onCopyLink={() => showToast('Session link copied to clipboard')}
             />
           }
         />
@@ -2770,102 +3047,110 @@ function App() {
         ref={fileInputRef}
         type="file"
         accept="application/json"
-        style={{ display: "none" }}
+        style={{ display: 'none' }}
         onChange={onFileSelected}
       />
       <div className="app__body">
-        {viewMode === "diagram" && (
+        {viewMode === 'diagram' && (
           <>
-        {!isPresenting && !isScenarioPanelOpen && (
-          <div className={`app__sidebar-wrap app__sidebar-wrap--left${isPaletteCollapsed ? " is-collapsed" : ""}`}>
-            {!isPaletteCollapsed && <Palette />}
-            <button
-              type="button"
-              className="app__sidebar-toggle app__sidebar-toggle--left"
-              onClick={() => setIsPaletteCollapsed((v) => !v)}
-              title={isPaletteCollapsed ? "Show component palette" : "Hide component palette"}
-              aria-label={isPaletteCollapsed ? "Show component palette" : "Hide component palette"}
-            >
-              {isPaletteCollapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
-            </button>
-          </div>
-        )}
-        <div className="app__canvas-column">
-          <ReactFlowProvider>
-            {isPerfInstrumentationActive() ? (
-              <Profiler id="CanvasProfiler" onRender={onCanvasProfilerRender}>
-                {canvasElement}
-              </Profiler>
-            ) : (
-              canvasElement
-            )}
-          </ReactFlowProvider>
-        </div>
-        {!isPresenting && (
-          <div
-            className={`app__sidebar-wrap app__sidebar-wrap--right${
-              !isScenarioPanelOpen && isInspectorCollapsed ? " is-collapsed" : ""
-            }`}
-          >
-            {isScenarioPanelOpen ? (
-              <ScenarioPanel
-                scenarios={scenarios}
-                activeScenarioId={activeScenario?.id ?? null}
-                onSelectScenario={onSelectScenario}
-                onCreateScenario={onCreateScenario}
-                onRenameScenario={onRenameScenario}
-                onDeleteScenario={onDeleteScenario}
-                onAddStep={onAddStep}
-                onAddSelectionToStep={onAddSelectionToStep}
-                onRemoveSelectionFromStep={onRemoveSelectionFromStep}
-                onUpdateStep={onUpdateStep}
-                onDeleteStep={onDeleteStep}
-                onMoveStep={onMoveStep}
-                onPresent={onStartPresenting}
-                canAddStep={canAddStep}
-                activeStepId={activeStepId}
-                onSelectStep={onSelectStep}
-                diagramNodes={diagramSnapshot.nodes}
-                currentPath={path}
-                onClose={() => {
-                  setIsScenarioPanelOpen(false);
-                  setActiveStepId(null);
-                }}
-              />
-            ) : (
-              <>
+            {!isPresenting && !isScenarioPanelOpen && (
+              <div
+                className={`app__sidebar-wrap app__sidebar-wrap--left${isPaletteCollapsed ? ' is-collapsed' : ''}`}
+              >
+                {!isPaletteCollapsed && <Palette />}
                 <button
                   type="button"
-                  className="app__sidebar-toggle app__sidebar-toggle--right"
-                  onClick={() => setIsInspectorCollapsed((v) => !v)}
-                  title={isInspectorCollapsed ? "Show inspector" : "Hide inspector"}
-                  aria-label={isInspectorCollapsed ? "Show inspector" : "Hide inspector"}
+                  className="app__sidebar-toggle app__sidebar-toggle--left"
+                  onClick={() => setIsPaletteCollapsed((v) => !v)}
+                  title={isPaletteCollapsed ? 'Show component palette' : 'Hide component palette'}
+                  aria-label={
+                    isPaletteCollapsed ? 'Show component palette' : 'Hide component palette'
+                  }
                 >
-                  {isInspectorCollapsed ? <ChevronLeft size={13} /> : <ChevronRight size={13} />}
+                  {isPaletteCollapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
                 </button>
-                {!isInspectorCollapsed && (
-                  <Inspector
-                    selectedNode={selectedNode}
-                    selectedEdge={selectedEdge}
-                    onUpdateNode={onUpdateNode}
-                    onUpdateEdge={onUpdateEdge}
-                    onClearEdgeWaypoints={onClearEdgeWaypoints}
-                    onRemoveEdgeWaypoint={onRemoveEdgeWaypoint}
-                    onDeleteNode={onDeleteNode}
-                    onDeleteEdge={onDeleteEdge}
-                    onDrillInto={onDrillInto}
-                    requirements={requirementsSnapshot}
-                    onNavigateToRequirement={onNavigateToRequirement}
-                    onZOrderCommand={onZOrderCommand}
-                  />
-                )}
-              </>
+              </div>
             )}
-          </div>
-        )}
+            <div className="app__canvas-column">
+              <ReactFlowProvider>
+                {isPerfInstrumentationActive() ? (
+                  <Profiler id="CanvasProfiler" onRender={onCanvasProfilerRender}>
+                    {canvasElement}
+                  </Profiler>
+                ) : (
+                  canvasElement
+                )}
+              </ReactFlowProvider>
+            </div>
+            {!isPresenting && (
+              <div
+                className={`app__sidebar-wrap app__sidebar-wrap--right${
+                  !isScenarioPanelOpen && isInspectorCollapsed ? ' is-collapsed' : ''
+                }`}
+              >
+                {isScenarioPanelOpen ? (
+                  <ScenarioPanel
+                    scenarios={scenarios}
+                    activeScenarioId={activeScenario?.id ?? null}
+                    onSelectScenario={onSelectScenario}
+                    onCreateScenario={onCreateScenario}
+                    onRenameScenario={onRenameScenario}
+                    onDeleteScenario={onDeleteScenario}
+                    onAddStep={onAddStep}
+                    onAddSelectionToStep={onAddSelectionToStep}
+                    onRemoveSelectionFromStep={onRemoveSelectionFromStep}
+                    onUpdateStep={onUpdateStep}
+                    onDeleteStep={onDeleteStep}
+                    onMoveStep={onMoveStep}
+                    onPresent={onStartPresenting}
+                    canAddStep={canAddStep}
+                    activeStepId={activeStepId}
+                    onSelectStep={onSelectStep}
+                    diagramNodes={diagramSnapshot.nodes}
+                    currentPath={path}
+                    onClose={() => {
+                      setIsScenarioPanelOpen(false);
+                      setActiveStepId(null);
+                    }}
+                  />
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className="app__sidebar-toggle app__sidebar-toggle--right"
+                      onClick={() => setIsInspectorCollapsed((v) => !v)}
+                      title={isInspectorCollapsed ? 'Show inspector' : 'Hide inspector'}
+                      aria-label={isInspectorCollapsed ? 'Show inspector' : 'Hide inspector'}
+                    >
+                      {isInspectorCollapsed ? (
+                        <ChevronLeft size={13} />
+                      ) : (
+                        <ChevronRight size={13} />
+                      )}
+                    </button>
+                    {!isInspectorCollapsed && (
+                      <Inspector
+                        selectedNode={selectedNode}
+                        selectedEdge={selectedEdge}
+                        onUpdateNode={onUpdateNode}
+                        onUpdateEdge={onUpdateEdge}
+                        onClearEdgeWaypoints={onClearEdgeWaypoints}
+                        onRemoveEdgeWaypoint={onRemoveEdgeWaypoint}
+                        onDeleteNode={onDeleteNode}
+                        onDeleteEdge={onDeleteEdge}
+                        onDrillInto={onDrillInto}
+                        requirements={requirementsSnapshot}
+                        onNavigateToRequirement={onNavigateToRequirement}
+                        onZOrderCommand={onZOrderCommand}
+                      />
+                    )}
+                  </>
+                )}
+              </div>
+            )}
           </>
         )}
-        {viewMode === "requirements" && (
+        {viewMode === 'requirements' && (
           <RequirementsView
             requirementsStore={requirementsStore}
             programIncrements={programIncrementsSnapshot}
@@ -2875,11 +3160,11 @@ function App() {
             onCreateLinkedNode={onCreateLinkedNode}
             focusItemId={pendingRequirementFocus}
             onFocusHandled={onFocusRequirementHandled}
-            peers={activeSession ? presencePeers.filter((p) => p.viewMode === "requirements") : []}
+            peers={activeSession ? presencePeers.filter((p) => p.viewMode === 'requirements') : []}
             onFocusedItemChange={setFocusedItemId}
           />
         )}
-        {viewMode === "timeline" && (
+        {viewMode === 'timeline' && (
           <TimelineView
             programIncrementsStore={programIncrementsStore}
             requirementsStore={requirementsStore}
@@ -2889,18 +3174,18 @@ function App() {
             onNavigateToNode={onNavigateToNode}
             onCreateLinkedNode={onCreateLinkedNode}
             onNavigateToRequirement={onNavigateToRequirement}
-            peers={activeSession ? presencePeers.filter((p) => p.viewMode === "timeline") : []}
+            peers={activeSession ? presencePeers.filter((p) => p.viewMode === 'timeline') : []}
             onFocusedItemChange={setFocusedItemId}
           />
         )}
-        {viewMode === "team" && (
+        {viewMode === 'team' && (
           <TeamView
             teamStore={teamStore}
             programIncrementsStore={programIncrementsStore}
             requirements={requirementsSnapshot}
           />
         )}
-        {viewMode === "skill-tree" && (
+        {viewMode === 'skill-tree' && (
           <SkillTreeView
             requirementsStore={requirementsStore}
             programIncrements={programIncrementsSnapshot}
@@ -2943,7 +3228,10 @@ function App() {
                 // Opened like any other document: whole-document
                 // replacement, so undo history does not reach across it
                 // (WS3-R4).
-                replaceDocumentContents(openDoc.doc, snapshotToDiagramFile(diagramFileToSnapshot(file)));
+                replaceDocumentContents(
+                  openDoc.doc,
+                  snapshotToDiagramFile(diagramFileToSnapshot(file)),
+                );
                 undo.clear();
                 setIsDocumentManagerOpen(false);
                 showToast(`Opened "${file.title}" from the workspace`);

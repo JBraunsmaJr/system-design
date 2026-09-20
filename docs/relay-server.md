@@ -165,9 +165,9 @@ For GitHub Pages, add it to the build step in
 `.github/workflows/deploy.yml`:
 
 ```yaml
-      - run: npm run build
-        env:
-          VITE_SIGNALING_URL: ${{ vars.VITE_SIGNALING_URL }}
+- run: npm run build
+  env:
+    VITE_SIGNALING_URL: ${{ vars.VITE_SIGNALING_URL }}
 ```
 
 Use a repository **variable**, not a secret. The value is inlined into
@@ -203,8 +203,8 @@ an auth check would go, and no check:
 
 ```js
 server.on('upgrade', (request, socket, head) => {
-    // You may check auth of request here..
-})
+  // You may check auth of request here..
+});
 ```
 
 Anyone who can reach the relay can subscribe to any topic, and **topics
@@ -249,7 +249,7 @@ stun:global.stun.twilio.com:3478
 What that costs you depends on your network:
 
 | Situation                                       | Works without STUN?                                                                                                   |
-|-------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | All users on the same flat LAN / subnet         | **Yes.** Host candidates are sufficient — the browsers can see each other's local addresses directly.                 |
 | Users across subnets, with routing between them | **Usually.** Depends on whether the routed addresses appear as host candidates. Test it.                              |
 | Users behind NAT from each other                | **No.** Requires STUN to discover external addresses, and often TURN to relay when a direct connection can't be made. |
@@ -291,7 +291,7 @@ There are three meaningful states, and the difference between the last
 two matters:
 
 | Value         | Result                                                  |
-|---------------|---------------------------------------------------------|
+| ------------- | ------------------------------------------------------- |
 | unset / blank | The library's own defaults stay in place (public STUN). |
 | `none`        | **No ICE servers at all.** Host candidates only.        |
 | a list        | Exactly those servers, replacing the defaults.          |
@@ -324,6 +324,7 @@ when peers can't connect directly. Host it accordingly.
    Use `none` if every user is on one LAN; point it at an internal
    STUN/TURN server if they aren't. See
    [ICE servers](#ice-servers-stun-and-turn).
+
 3. Run the relay somewhere reachable from every client.
 4. Terminate TLS in front of it if the app is served over HTTPS — an
    internal CA is fine, as long as clients trust it.

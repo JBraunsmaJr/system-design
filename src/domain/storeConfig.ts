@@ -6,11 +6,13 @@
  * is additive, so a deployment that never configures one sees no change.
  */
 export function getStoreUrl(): string | null {
-  const runtime = (globalThis as unknown as { window?: { __APP_CONFIG__?: { STORE_URL?: string } } }).window?.__APP_CONFIG__?.STORE_URL;
+  const runtime = (
+    globalThis as unknown as { window?: { __APP_CONFIG__?: { STORE_URL?: string } } }
+  ).window?.__APP_CONFIG__?.STORE_URL;
   const configured =
-    typeof runtime === "string" && runtime.trim() && !runtime.includes("__STORE_URL__")
+    typeof runtime === 'string' && runtime.trim() && !runtime.includes('__STORE_URL__')
       ? runtime
-      : ((import.meta as unknown as { env?: Record<string, string> }).env?.VITE_STORE_URL ?? "");
-  const trimmed = configured.trim().replace(/\/+$/, "");
+      : ((import.meta as unknown as { env?: Record<string, string> }).env?.VITE_STORE_URL ?? '');
+  const trimmed = configured.trim().replace(/\/+$/, '');
   return trimmed.length > 0 ? trimmed : null;
 }

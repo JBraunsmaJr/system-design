@@ -20,29 +20,27 @@
  * preserves document identity and is safe to automate - is a different
  * operation and deliberately not this one.
  */
-import * as Y from "yjs";
-import type { SubDiagram } from "../domain/types";
-import type { Milestone } from "../domain/milestones";
-import type { ProgramIncrement } from "../domain/programIncrements";
-import type { RequirementsDocument } from "../domain/requirementsTypes";
-import type { TeamDocument } from "../domain/teamTypes";
-import { seedYjsDiagramDoc, createYjsDiagramStore } from "./yjsDiagramStore.ts";
-import {
-  seedYjsMilestonesDoc,
-  createYjsMilestonesStore,
-} from "./yjsMilestonesStore.ts";
+import * as Y from 'yjs';
+import type { SubDiagram } from '../domain/types';
+import type { Milestone } from '../domain/milestones';
+import type { ProgramIncrement } from '../domain/programIncrements';
+import type { RequirementsDocument } from '../domain/requirementsTypes';
+import type { TeamDocument } from '../domain/teamTypes';
+import { seedYjsDiagramDoc, createYjsDiagramStore } from './yjsDiagramStore.ts';
+import { seedYjsMilestonesDoc, createYjsMilestonesStore } from './yjsMilestonesStore.ts';
 import {
   seedYjsProgramIncrementsDoc,
   createYjsProgramIncrementsStore,
-} from "./yjsProgramIncrementsStore.ts";
+} from './yjsProgramIncrementsStore.ts';
+import { seedYjsRequirementsDoc, createYjsRequirementsStore } from './yjsRequirementsStore.ts';
+import { createYjsTeamStore } from './yjsTeamStore.ts';
+import { seedTeamStore } from './teamStore.ts';
+import { unflattenToSubDiagram } from './diagramStore.ts';
 import {
-  seedYjsRequirementsDoc,
-  createYjsRequirementsStore,
-} from "./yjsRequirementsStore.ts";
-import { createYjsTeamStore } from "./yjsTeamStore.ts";
-import { seedTeamStore } from "./teamStore.ts";
-import { unflattenToSubDiagram } from "./diagramStore.ts";
-import { createYjsDocumentMetaStore, seedYjsDocumentMeta, type DocumentMeta } from "./yjsDocumentMetaStore.ts";
+  createYjsDocumentMetaStore,
+  seedYjsDocumentMeta,
+  type DocumentMeta,
+} from './yjsDocumentMetaStore.ts';
 
 export interface DocumentContents {
   root: SubDiagram;
@@ -57,7 +55,7 @@ export interface DocumentContents {
 export function readDocumentContents(doc: Y.Doc): DocumentContents {
   // Each store attaches observers to the document, which may well stay open,
   // so every one is destroyed once read (WS1 Step 1).
-  const read = <T,>(store: { getSnapshot(): T; destroy(): void }): T => {
+  const read = <T>(store: { getSnapshot(): T; destroy(): void }): T => {
     try {
       return store.getSnapshot();
     } finally {
@@ -136,21 +134,19 @@ export function canRebase(options: {
     return {
       allowed: false,
       reason:
-        `${options.connectedPeerCount} other ${options.connectedPeerCount === 1 ? "person is" : "people are"} ` +
+        `${options.connectedPeerCount} other ${options.connectedPeerCount === 1 ? 'person is' : 'people are'} ` +
         `in this session. Rebasing would disconnect them from the document.`,
     };
   }
 
   const now = options.now ?? Date.now();
-  const recent = options.lastSyncedAt.filter(
-    (at) => now - at < options.reconciliationWindowMs
-  );
+  const recent = options.lastSyncedAt.filter((at) => now - at < options.reconciliationWindowMs);
   if (recent.length > 0) {
     const days = Math.ceil(options.reconciliationWindowMs / 86_400_000);
     return {
       allowed: false,
       reason:
-        `${recent.length} ${recent.length === 1 ? "device has" : "devices have"} synced within the last ` +
+        `${recent.length} ${recent.length === 1 ? 'device has' : 'devices have'} synced within the last ` +
         `${days} days and may hold unsynced work. Rebasing would orphan it.`,
     };
   }

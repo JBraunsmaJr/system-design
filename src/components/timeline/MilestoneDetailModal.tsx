@@ -1,24 +1,45 @@
-import { useState, useEffect, useMemo } from "react";
-import { X, Calendar, Edit3, Trash2, Check, Plus, Tag, Diamond, Package, Flag, ClipboardCheck, Rocket, Snowflake } from "lucide-react";
-import type { Milestone } from "../../domain/milestones";
+import { useState, useEffect, useMemo } from 'react';
+import {
+  X,
+  Calendar,
+  Edit3,
+  Trash2,
+  Check,
+  Plus,
+  Tag,
+  Diamond,
+  Package,
+  Flag,
+  ClipboardCheck,
+  Rocket,
+  Snowflake,
+} from 'lucide-react';
+import type { Milestone } from '../../domain/milestones';
 import {
   BUILT_IN_MILESTONE_TYPES,
   getMilestoneColor,
   getMilestoneTypeLabel,
   validateMilestone,
-} from "../../domain/milestones";
-import type { RequirementsDocument } from "../../domain/requirementsTypes";
-import { getItemType, isItemWorkable } from "../../domain/requirementsRegistry";
-import { computeSprintDateRanges, type ProgramIncrement } from "../../domain/programIncrements";
-import { HighlightedText, HighlightedTitle } from "../requirements/HighlightText";
-import { RequirementBody } from "../requirements/RequirementBody";
+} from '../../domain/milestones';
+import type { RequirementsDocument } from '../../domain/requirementsTypes';
+import { getItemType, isItemWorkable } from '../../domain/requirementsRegistry';
+import { computeSprintDateRanges, type ProgramIncrement } from '../../domain/programIncrements';
+import { HighlightedText, HighlightedTitle } from '../requirements/HighlightText';
+import { RequirementBody } from '../requirements/RequirementBody';
 
 function formatTypeFilterLabel(label: string): string {
   const lower = label.toLowerCase();
-  if (lower === "dependency") return "Dependencies";
-  if (lower === "story") return "Stories";
-  if (label.endsWith("s") || label.endsWith("sh") || label.endsWith("ch") || label.endsWith("x") || label.endsWith("z")) return `${label}es`;
-  if (label.endsWith("y") && !/[aeiou]y$/i.test(label)) return `${label.slice(0, -1)}ies`;
+  if (lower === 'dependency') return 'Dependencies';
+  if (lower === 'story') return 'Stories';
+  if (
+    label.endsWith('s') ||
+    label.endsWith('sh') ||
+    label.endsWith('ch') ||
+    label.endsWith('x') ||
+    label.endsWith('z')
+  )
+    return `${label}es`;
+  if (label.endsWith('y') && !/[aeiou]y$/i.test(label)) return `${label.slice(0, -1)}ies`;
   return `${label}s`;
 }
 
@@ -27,7 +48,7 @@ interface MilestoneDetailModalProps {
   doc: RequirementsDocument;
   programIncrements?: ProgramIncrement[];
   onClose: () => void;
-  onUpdateMilestone: (id: string, patch: Partial<Omit<Milestone, "id">>) => void;
+  onUpdateMilestone: (id: string, patch: Partial<Omit<Milestone, 'id'>>) => void;
   onDeleteMilestone: (id: string) => void;
   onNavigateToRequirement?: (itemId: string) => void;
   onSelectItem?: (itemId: string) => void;
@@ -46,22 +67,22 @@ export function MilestoneDetailModal({
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(milestone.name);
   const [scheduledAt, setScheduledAt] = useState(milestone.scheduledAt);
-  const [type, setType] = useState(milestone.type || "release");
-  const [description, setDescription] = useState(milestone.description ?? "");
-  const [color, setColor] = useState(milestone.color ?? "");
+  const [type, setType] = useState(milestone.type || 'release');
+  const [description, setDescription] = useState(milestone.description ?? '');
+  const [color, setColor] = useState(milestone.color ?? '');
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
-  const [workableSearch, setWorkableSearch] = useState("");
+  const [workableSearch, setWorkableSearch] = useState('');
   const [isAddingWork, setIsAddingWork] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>("all");
+  const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>('all');
 
   const startEditing = () => {
     setName(milestone.name);
     setScheduledAt(milestone.scheduledAt);
-    setType(milestone.type || "release");
-    setDescription(milestone.description ?? "");
-    setColor(milestone.color ?? "");
+    setType(milestone.type || 'release');
+    setDescription(milestone.description ?? '');
+    setColor(milestone.color ?? '');
     setValidationError(null);
     setIsEditing(true);
   };
@@ -69,10 +90,10 @@ export function MilestoneDetailModal({
   // Close on Escape key press
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      if (e.key === 'Escape') {
         if (isAddingWork) {
           setIsAddingWork(false);
-          setWorkableSearch("");
+          setWorkableSearch('');
         } else if (isEditing) {
           setIsEditing(false);
         } else {
@@ -80,14 +101,12 @@ export function MilestoneDetailModal({
         }
       }
     };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose, isEditing, isAddingWork]);
 
   const effectiveColor = getMilestoneColor(
-    isEditing
-      ? { ...milestone, color: color || undefined, type }
-      : milestone
+    isEditing ? { ...milestone, color: color || undefined, type } : milestone,
   );
   const typeLabel = getMilestoneTypeLabel(isEditing ? type : milestone.type);
 
@@ -104,7 +123,7 @@ export function MilestoneDetailModal({
 
   const currentRelatedIds = useMemo(
     () => milestone.relatedItemIds ?? milestone.relatedWorkableItemIds ?? [],
-    [milestone.relatedItemIds, milestone.relatedWorkableItemIds]
+    [milestone.relatedItemIds, milestone.relatedWorkableItemIds],
   );
 
   const relatedItems = useMemo(() => {
@@ -118,15 +137,18 @@ export function MilestoneDetailModal({
     return allDocItems
       .filter((item) => !existingIds.has(item.id))
       .filter((item) => {
-        if (selectedTypeFilter !== "all" && item.typeId !== selectedTypeFilter) return false;
-        if (q === "") return true;
+        if (selectedTypeFilter !== 'all' && item.typeId !== selectedTypeFilter) return false;
+        if (q === '') return true;
         return item.id.toLowerCase().includes(q) || item.title.toLowerCase().includes(q);
       });
   }, [allDocItems, currentRelatedIds, workableSearch, selectedTypeFilter]);
 
   // Map each workable item to its sprint date range if scheduled
   const sprintRangesBySprintId = useMemo(() => {
-    const map = new Map<string, { sprintName: string; piName: string; startDate: string; endDate: string }>();
+    const map = new Map<
+      string,
+      { sprintName: string; piName: string; startDate: string; endDate: string }
+    >();
     for (const pi of programIncrements) {
       const ranges = computeSprintDateRanges(pi);
       for (const sprint of pi.sprints) {
@@ -159,8 +181,8 @@ export function MilestoneDetailModal({
       name: name.trim(),
       scheduledAt,
       type,
-      description: description.trim() !== "" ? description : undefined,
-      color: color.trim() !== "" ? color.trim() : undefined,
+      description: description.trim() !== '' ? description : undefined,
+      color: color.trim() !== '' ? color.trim() : undefined,
     };
 
     const errors = validateMilestone(patch, doc);
@@ -194,15 +216,15 @@ export function MilestoneDetailModal({
 
   const renderTypeIcon = (t: string) => {
     switch (t) {
-      case "release":
+      case 'release':
         return <Package size={16} />;
-      case "deadline":
+      case 'deadline':
         return <Flag size={16} />;
-      case "review":
+      case 'review':
         return <ClipboardCheck size={16} />;
-      case "launch":
+      case 'launch':
         return <Rocket size={16} />;
-      case "code-freeze":
+      case 'code-freeze':
         return <Snowflake size={16} />;
       default:
         return <Diamond size={16} />;
@@ -210,11 +232,24 @@ export function MilestoneDetailModal({
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label={`${typeLabel}: ${milestone.name}`}>
+    <div
+      className="modal-overlay"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${typeLabel}: ${milestone.name}`}
+    >
       <div className="milestone-detail-modal" onClick={(e) => e.stopPropagation()}>
         <div className="milestone-detail-modal__header" style={{ borderTopColor: effectiveColor }}>
           <div className="milestone-detail-modal__title-row">
-            <span className="milestone-detail-modal__type-badge" style={{ backgroundColor: `${effectiveColor}20`, color: effectiveColor, borderColor: effectiveColor }}>
+            <span
+              className="milestone-detail-modal__type-badge"
+              style={{
+                backgroundColor: `${effectiveColor}20`,
+                color: effectiveColor,
+                borderColor: effectiveColor,
+              }}
+            >
               {renderTypeIcon(type)}
               <span>{typeLabel}</span>
             </span>
@@ -263,7 +298,9 @@ export function MilestoneDetailModal({
             <h2 className="milestone-detail-modal__name">{milestone.name}</h2>
           ) : (
             <div className="milestone-detail-modal__edit-name-wrap">
-              <label htmlFor="marker-name-input" className="milestone-detail-modal__input-label">Marker Name *</label>
+              <label htmlFor="marker-name-input" className="milestone-detail-modal__input-label">
+                Marker Name *
+              </label>
               <input
                 id="marker-name-input"
                 type="text"
@@ -343,12 +380,9 @@ export function MilestoneDetailModal({
           <div className="milestone-detail-modal__section">
             <h3 className="milestone-detail-modal__section-title">Description</h3>
             {!isEditing ? (
-              <div
-                className="milestone-detail-modal__desc-wrap"
-                onDoubleClick={startEditing}
-              >
+              <div className="milestone-detail-modal__desc-wrap" onDoubleClick={startEditing}>
                 <RequirementBody
-                  text={milestone.description || ""}
+                  text={milestone.description || ''}
                   doc={doc}
                   onNavigateToItem={handleNavigateRef}
                 />
@@ -372,19 +406,20 @@ export function MilestoneDetailModal({
               </h3>
               <button
                 type="button"
-                className={`milestone-detail-modal__add-work-btn${isAddingWork ? " is-active" : ""}`}
+                className={`milestone-detail-modal__add-work-btn${isAddingWork ? ' is-active' : ''}`}
                 onClick={() => {
                   setIsAddingWork(!isAddingWork);
-                  if (isAddingWork) setWorkableSearch("");
+                  if (isAddingWork) setWorkableSearch('');
                 }}
               >
                 {isAddingWork ? <Check size={13} /> : <Plus size={13} />}
-                <span>{isAddingWork ? "Done" : "Add Associated Item"}</span>
+                <span>{isAddingWork ? 'Done' : 'Add Associated Item'}</span>
               </button>
             </div>
 
             <p className="milestone-detail-modal__info-hint">
-              Requirement items, Epics, external dependencies, or goals linked to this {typeLabel.toLowerCase()}.
+              Requirement items, Epics, external dependencies, or goals linked to this{' '}
+              {typeLabel.toLowerCase()}.
             </p>
 
             {isAddingWork && (
@@ -392,8 +427,8 @@ export function MilestoneDetailModal({
                 <div className="milestone-modal__type-filters">
                   <button
                     type="button"
-                    className={`milestone-modal__type-filter-btn${selectedTypeFilter === "all" ? " is-active" : ""}`}
-                    onClick={() => setSelectedTypeFilter("all")}
+                    className={`milestone-modal__type-filter-btn${selectedTypeFilter === 'all' ? ' is-active' : ''}`}
+                    onClick={() => setSelectedTypeFilter('all')}
                   >
                     All Types
                   </button>
@@ -401,10 +436,14 @@ export function MilestoneDetailModal({
                     <button
                       key={t.id}
                       type="button"
-                      className={`milestone-modal__type-filter-btn${selectedTypeFilter === t.id ? " is-active" : ""}`}
+                      className={`milestone-modal__type-filter-btn${selectedTypeFilter === t.id ? ' is-active' : ''}`}
                       style={
                         selectedTypeFilter === t.id
-                          ? { borderColor: t.color, color: t.color, backgroundColor: `${t.color}20` }
+                          ? {
+                              borderColor: t.color,
+                              color: t.color,
+                              backgroundColor: `${t.color}20`,
+                            }
                           : {}
                       }
                       onClick={() => setSelectedTypeFilter(t.id)}
@@ -421,10 +460,10 @@ export function MilestoneDetailModal({
                   value={workableSearch}
                   onChange={(e) => setWorkableSearch(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Escape") {
+                    if (e.key === 'Escape') {
                       e.stopPropagation();
                       setIsAddingWork(false);
-                      setWorkableSearch("");
+                      setWorkableSearch('');
                     }
                   }}
                   autoFocus
@@ -432,7 +471,9 @@ export function MilestoneDetailModal({
                 <div className="milestone-detail-modal__picker-list">
                   {availableItemsToAdd.length === 0 ? (
                     <p className="milestone-detail-modal__picker-empty">
-                      {workableSearch.trim() ? "No matching items." : "All items in this filter are already associated."}
+                      {workableSearch.trim()
+                        ? 'No matching items.'
+                        : 'All items in this filter are already associated.'}
                     </p>
                   ) : (
                     availableItemsToAdd.map((item) => {
@@ -443,21 +484,23 @@ export function MilestoneDetailModal({
                           type="button"
                           className="milestone-detail-modal__picker-item"
                           onClick={() => handleAddItem(item.id)}
-                          title={`${item.id}: ${item.title || "Untitled"}`}
+                          title={`${item.id}: ${item.title || 'Untitled'}`}
                         >
                           <span
                             className="milestone-detail-modal__item-id"
-                            style={{ color: itemType?.color ?? "var(--accent)" }}
+                            style={{ color: itemType?.color ?? 'var(--accent)' }}
                           >
                             <HighlightedText text={item.id} search={workableSearch.trim()} />
                           </span>
                           <HighlightedTitle
                             className="milestone-detail-modal__item-title"
-                            text={item.title || "Untitled"}
+                            text={item.title || 'Untitled'}
                             search={workableSearch.trim()}
                           />
                           {isItemWorkable(doc, item) && item.points !== undefined && (
-                            <span className="milestone-detail-modal__item-pts">{item.points} pts</span>
+                            <span className="milestone-detail-modal__item-pts">
+                              {item.points} pts
+                            </span>
                           )}
                         </button>
                       );
@@ -469,37 +512,42 @@ export function MilestoneDetailModal({
 
             {relatedItems.length === 0 ? (
               <p className="milestone-detail-modal__work-empty">
-                No requirement items or epics associated with this marker yet. Standalone markers are fully supported.
+                No requirement items or epics associated with this marker yet. Standalone markers
+                are fully supported.
               </p>
             ) : (
               <ul className="milestone-detail-modal__work-list">
                 {relatedItems.map((item) => {
                   const itemType = getItemType(doc, item.typeId);
-                  const sprintSchedule = item.sprintId ? sprintRangesBySprintId.get(item.sprintId) : undefined;
+                  const sprintSchedule = item.sprintId
+                    ? sprintRangesBySprintId.get(item.sprintId)
+                    : undefined;
                   return (
                     <li
                       key={item.id}
                       className="milestone-detail-modal__work-row"
-                      title={`${item.id}: ${item.title || "Untitled"}`}
+                      title={`${item.id}: ${item.title || 'Untitled'}`}
                     >
                       <div
                         className="milestone-detail-modal__work-info"
-                        title={`${item.id}: ${item.title || "Untitled"}`}
+                        title={`${item.id}: ${item.title || 'Untitled'}`}
                       >
                         <span
                           className="milestone-detail-modal__item-id"
-                          style={{ color: itemType?.color ?? "var(--accent)" }}
+                          style={{ color: itemType?.color ?? 'var(--accent)' }}
                         >
                           {item.id}
                         </span>
                         <span
                           className="milestone-detail-modal__work-title"
-                          title={item.title || "Untitled"}
+                          title={item.title || 'Untitled'}
                         >
-                          {item.title || "Untitled"}
+                          {item.title || 'Untitled'}
                         </span>
                         {item.status && (
-                          <span className={`milestone-detail-modal__status-pill milestone-detail-modal__status-pill--${item.status}`}>
+                          <span
+                            className={`milestone-detail-modal__status-pill milestone-detail-modal__status-pill--${item.status}`}
+                          >
                             {item.status}
                           </span>
                         )}
@@ -508,7 +556,8 @@ export function MilestoneDetailModal({
                             className="milestone-detail-modal__sprint-info"
                             title={`${sprintSchedule.piName} • ${sprintSchedule.sprintName}`}
                           >
-                            {sprintSchedule.sprintName} ({sprintSchedule.startDate} → {sprintSchedule.endDate})
+                            {sprintSchedule.sprintName} ({sprintSchedule.startDate} →{' '}
+                            {sprintSchedule.endDate})
                           </span>
                         )}
                       </div>
@@ -553,7 +602,9 @@ export function MilestoneDetailModal({
         <div className="milestone-detail-modal__footer">
           {isConfirmingDelete ? (
             <div className="milestone-detail-modal__confirm-delete">
-              <span>Delete this {typeLabel.toLowerCase()}? Associated work items will not be deleted.</span>
+              <span>
+                Delete this {typeLabel.toLowerCase()}? Associated work items will not be deleted.
+              </span>
               <button
                 type="button"
                 className="milestone-detail-modal__btn milestone-detail-modal__btn--danger"
@@ -583,7 +634,11 @@ export function MilestoneDetailModal({
             </button>
           )}
 
-          <button type="button" className="milestone-detail-modal__btn milestone-detail-modal__btn--close" onClick={onClose}>
+          <button
+            type="button"
+            className="milestone-detail-modal__btn milestone-detail-modal__btn--close"
+            onClick={onClose}
+          >
             Close
           </button>
         </div>

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode } from 'react';
 import {
   Check,
   ListChecks,
@@ -12,11 +12,11 @@ import {
   Route,
   FileDown,
   Package,
-} from "lucide-react";
-import { ExportMenu } from "./ExportMenu";
-import { FileMenu } from "./FileMenu";
-import {faGithub} from "@fortawesome/free-brands-svg-icons"
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
+} from 'lucide-react';
+import { ExportMenu } from './ExportMenu';
+import { FileMenu } from './FileMenu';
+import { faGithub } from '@fortawesome/free-brands-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
 interface ToolbarProps {
   title: string;
@@ -34,8 +34,8 @@ interface ToolbarProps {
   onRedo: () => void;
   canUndo: boolean;
   canRedo: boolean;
-  viewMode: "diagram" | "requirements" | "timeline" | "team" | "skill-tree";
-  onSetViewMode: (mode: "diagram" | "requirements" | "timeline" | "team" | "skill-tree") => void;
+  viewMode: 'diagram' | 'requirements' | 'timeline' | 'team' | 'skill-tree';
+  onSetViewMode: (mode: 'diagram' | 'requirements' | 'timeline' | 'team' | 'skill-tree') => void;
   onExportRequirementsMarkdown: () => void;
   canExportRequirements: boolean;
   onManageLibraries?: () => void;
@@ -62,9 +62,7 @@ interface ToolbarProps {
 }
 
 function navigateToGithubSource() {
-  window.open(
-      "https://github.com/jbraunsmajr/system-design", "_blank"
-  )
+  window.open('https://github.com/jbraunsmajr/system-design', '_blank');
 }
 
 export function Toolbar({
@@ -107,7 +105,10 @@ export function Toolbar({
           aria-label="Diagram title"
         />
         {hasAutosaved && (
-          <span className="toolbar__autosave-indicator" title="Your work is automatically saved in this browser">
+          <span
+            className="toolbar__autosave-indicator"
+            title="Your work is automatically saved in this browser"
+          >
             <Check size={14} />
             <span className="toolbar__label">Autosaved</span>
           </span>
@@ -133,10 +134,10 @@ export function Toolbar({
           >
             <Redo2 size={14} />
           </button>
-          {viewMode === "diagram" && (
+          {viewMode === 'diagram' && (
             <button
               type="button"
-              className={isScenarioPanelOpen ? "active" : undefined}
+              className={isScenarioPanelOpen ? 'active' : undefined}
               onClick={onToggleScenarioPanel}
               title="Scenarios"
             >
@@ -144,24 +145,33 @@ export function Toolbar({
               <span className="toolbar__label">Scenarios</span>
             </button>
           )}
-          {viewMode === "diagram" && onManageLibraries && (
-            <button
-              type="button"
-              onClick={onManageLibraries}
-              title="Manage Shape & Icon Libraries"
-            >
+          {viewMode === 'diagram' && onManageLibraries && (
+            <button type="button" onClick={onManageLibraries} title="Manage Shape & Icon Libraries">
               <Package size={14} />
               <span className="toolbar__label">Libraries</span>
             </button>
           )}
-          {viewMode === "diagram" && <ExportMenu onExportPng={onExportPng} onExportSvg={onExportSvg} disabled={!canExport} />}
-          {viewMode === "requirements" && (
-            <button type="button" onClick={onExportRequirementsMarkdown} disabled={!canExportRequirements} title="Export Markdown">
+          {viewMode === 'diagram' && (
+            <ExportMenu onExportPng={onExportPng} onExportSvg={onExportSvg} disabled={!canExport} />
+          )}
+          {viewMode === 'requirements' && (
+            <button
+              type="button"
+              onClick={onExportRequirementsMarkdown}
+              disabled={!canExportRequirements}
+              title="Export Markdown"
+            >
               <FileDown size={14} />
               <span className="toolbar__label">Export Markdown</span>
             </button>
           )}
-          <FileMenu onNew={onNew} onOpenDocuments={onOpenDocuments} onLoadClick={onLoadClick} onManageLibraries={onManageLibraries} isInSession={isInSession} />
+          <FileMenu
+            onNew={onNew}
+            onOpenDocuments={onOpenDocuments}
+            onLoadClick={onLoadClick}
+            onManageLibraries={onManageLibraries}
+            isInSession={isInSession}
+          />
           <button type="button" className="primary" onClick={onSave} title="Save">
             <Save size={14} />
             <span className="toolbar__label">Save</span>
@@ -183,8 +193,8 @@ export function Toolbar({
         <div className="toolbar__view-tabs">
           <button
             type="button"
-            className={viewMode === "diagram" ? "active" : undefined}
-            onClick={() => onSetViewMode("diagram")}
+            className={viewMode === 'diagram' ? 'active' : undefined}
+            onClick={() => onSetViewMode('diagram')}
             title="Diagram"
           >
             <Workflow size={13} />
@@ -192,8 +202,8 @@ export function Toolbar({
           </button>
           <button
             type="button"
-            className={viewMode === "requirements" ? "active" : undefined}
-            onClick={() => onSetViewMode("requirements")}
+            className={viewMode === 'requirements' ? 'active' : undefined}
+            onClick={() => onSetViewMode('requirements')}
             title="Requirements"
           >
             <ListChecks size={13} />
@@ -201,8 +211,8 @@ export function Toolbar({
           </button>
           <button
             type="button"
-            className={viewMode === "timeline" ? "active" : undefined}
-            onClick={() => onSetViewMode("timeline")}
+            className={viewMode === 'timeline' ? 'active' : undefined}
+            onClick={() => onSetViewMode('timeline')}
             title="Timeline"
           >
             <CalendarRange size={13} />
@@ -210,8 +220,8 @@ export function Toolbar({
           </button>
           <button
             type="button"
-            className={viewMode === "team" ? "active" : undefined}
-            onClick={() => onSetViewMode("team")}
+            className={viewMode === 'team' ? 'active' : undefined}
+            onClick={() => onSetViewMode('team')}
             title="Team & Capacity"
           >
             <Users size={13} />
@@ -219,8 +229,8 @@ export function Toolbar({
           </button>
           <button
             type="button"
-            className={viewMode === "skill-tree" ? "active" : undefined}
-            onClick={() => onSetViewMode("skill-tree")}
+            className={viewMode === 'skill-tree' ? 'active' : undefined}
+            onClick={() => onSetViewMode('skill-tree')}
             title="Skill Tree - see what's ready to work on"
           >
             <Network size={13} />

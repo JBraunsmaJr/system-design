@@ -1,0 +1,10 @@
+node_modules
+dist
+dist-ssr
+package-lock.json
+*.local
+.idea
+.junie
+*.log
+*-private.pem
+docker/store/recovery-*.pem

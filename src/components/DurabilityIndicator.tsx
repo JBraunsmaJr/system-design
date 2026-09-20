@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { HardDrive, Cloud, FileDown, Loader, TriangleAlert } from "lucide-react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { HardDrive, Cloud, FileDown, Loader, TriangleAlert } from 'lucide-react';
 import {
   deriveDurability,
   type DurabilitySignals,
   type DurabilityLevel,
-} from "../domain/durability.ts";
-import { computeFlippedPosition } from "../domain/popoverPosition";
+} from '../domain/durability.ts';
+import { computeFlippedPosition } from '../domain/popoverPosition';
 
 /**
  * Tells the user whether their work is actually safe (WS13-R8, WS13-R9).
@@ -25,7 +25,7 @@ const ICONS: Record<DurabilityLevel, typeof HardDrive> = {
   file: FileDown,
   synced: Cloud,
   local: HardDrive,
-  "at-risk": TriangleAlert,
+  'at-risk': TriangleAlert,
   loading: Loader,
 };
 
@@ -66,27 +66,27 @@ export function DurabilityIndicator({
   const Icon = ICONS[state.level];
 
   const handler =
-    state.action === "export"
+    state.action === 'export'
       ? onExport
-      : state.action === "choose-file"
+      : state.action === 'choose-file'
         ? onChooseFile
-        : state.action === "retry"
+        : state.action === 'retry'
           ? onRetry
-          : state.action === "resume-file"
+          : state.action === 'resume-file'
             ? onResumeFile
             : undefined;
 
   const actionLabel =
-    state.action === "export"
-      ? "Export a copy"
-      : state.action === "choose-file"
-        ? "Save to a file"
-        : state.action === "retry"
-          ? "Try again"
-          : state.action === "resume-file"
+    state.action === 'export'
+      ? 'Export a copy'
+      : state.action === 'choose-file'
+        ? 'Save to a file'
+        : state.action === 'retry'
+          ? 'Try again'
+          : state.action === 'resume-file'
             ? fileName
               ? `Resume saving to ${fileName}`
-              : "Resume saving to file"
+              : 'Resume saving to file'
             : null;
 
   // An alert is not something to go looking for: it opens itself and stays.
@@ -113,9 +113,11 @@ export function DurabilityIndicator({
       triggerRect,
       { width, height },
       { width: window.innerWidth, height: window.innerHeight },
-      6
+      6,
     );
-    setDropdownPos((prev) => (prev && prev.top === next.top && prev.left === next.left ? prev : next));
+    setDropdownPos((prev) =>
+      prev && prev.top === next.top && prev.left === next.left ? prev : next,
+    );
   }, [expanded, state.detail, actionLabel]);
 
   const reposition = useCallback(() => {
@@ -129,8 +131,8 @@ export function DurabilityIndicator({
         triggerRect,
         { width: dropdownRect.width, height: dropdownRect.height },
         { width: window.innerWidth, height: window.innerHeight },
-        6
-      )
+        6,
+      ),
     );
   }, []);
 
@@ -145,29 +147,29 @@ export function DurabilityIndicator({
       }
     };
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !state.persistent) closeDropdown();
+      if (e.key === 'Escape' && !state.persistent) closeDropdown();
     };
-    document.addEventListener("mousedown", handleMouseDown);
-    document.addEventListener("keydown", handleEscape);
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('keydown', handleEscape);
     return () => {
-      document.removeEventListener("mousedown", handleMouseDown);
-      document.removeEventListener("keydown", handleEscape);
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('keydown', handleEscape);
     };
   }, [expanded, state.persistent]);
 
   useEffect(() => {
     if (!expanded) return;
-    window.addEventListener("scroll", reposition, true);
-    window.addEventListener("resize", reposition);
+    window.addEventListener('scroll', reposition, true);
+    window.addEventListener('resize', reposition);
     return () => {
-      window.removeEventListener("scroll", reposition, true);
-      window.removeEventListener("resize", reposition);
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
     };
   }, [expanded, reposition]);
 
   return (
     <div
-      className={`durability durability--${state.tone}${expanded ? " durability--expanded" : ""}`}
+      className={`durability durability--${state.tone}${expanded ? ' durability--expanded' : ''}`}
     >
       <button
         ref={triggerRef}
@@ -187,7 +189,7 @@ export function DurabilityIndicator({
         <Icon
           size={14}
           aria-hidden="true"
-          className={state.level === "loading" ? "durability__icon--spin" : undefined}
+          className={state.level === 'loading' ? 'durability__icon--spin' : undefined}
         />
         <span className="toolbar__label">{state.label}</span>
       </button>
@@ -201,7 +203,7 @@ export function DurabilityIndicator({
             id={detailId}
             role="status"
             style={{
-              position: "fixed",
+              position: 'fixed',
               top: dropdownPos.top,
               left: dropdownPos.left,
               width: DETAIL_WIDTH,
@@ -220,21 +222,29 @@ export function DurabilityIndicator({
                 {actionLabel}
               </button>
             )}
-            {state.action === "resolve-conflict" && (
+            {state.action === 'resolve-conflict' && (
               <div className="durability__choices">
                 {onReloadFromFile && (
-                  <button type="button" className="durability__action durability__reload" onClick={onReloadFromFile}>
+                  <button
+                    type="button"
+                    className="durability__action durability__reload"
+                    onClick={onReloadFromFile}
+                  >
                     Reload from file
                   </button>
                 )}
                 {onOverwriteFile && (
-                  <button type="button" className="durability__action durability__overwrite" onClick={onOverwriteFile}>
+                  <button
+                    type="button"
+                    className="durability__action durability__overwrite"
+                    onClick={onOverwriteFile}
+                  >
                     Overwrite file
                   </button>
                 )}
               </div>
             )}
-            {onStopFile && state.level === "file" && (
+            {onStopFile && state.level === 'file' && (
               <button
                 type="button"
                 className="durability__secondary durability__stop-file"
@@ -243,11 +253,11 @@ export function DurabilityIndicator({
                   closeDropdown();
                 }}
               >
-                {fileName ? `Stop saving to ${fileName}` : "Stop saving to file"}
+                {fileName ? `Stop saving to ${fileName}` : 'Stop saving to file'}
               </button>
             )}
           </div>,
-          document.body
+          document.body,
         )}
     </div>
   );

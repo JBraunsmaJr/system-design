@@ -33,9 +33,9 @@ export interface PerfMetrics extends PerfCounters {
 }
 
 const isEnabled: boolean =
-  typeof import.meta !== "undefined" &&
-  typeof import.meta.env !== "undefined" &&
-  import.meta.env.VITE_PERF_INSTRUMENTATION === "1";
+  typeof import.meta !== 'undefined' &&
+  typeof import.meta.env !== 'undefined' &&
+  import.meta.env.VITE_PERF_INSTRUMENTATION === '1';
 
 const counters: PerfCounters = {
   commits: 0,
@@ -167,7 +167,7 @@ export function resetPerfCounters(): void {
 }
 
 // Attach to window for browser Playwright harness access
-if (typeof window !== "undefined") {
+if (typeof window !== 'undefined') {
   (window as unknown as Record<string, unknown>).__PERF__ = {
     isEnabled: () => isEnabled,
     getCounters: getPerfCounters,

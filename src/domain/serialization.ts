@@ -1,19 +1,19 @@
-import type { Node, Edge } from "@xyflow/react";
-import type { ArchNodeData, ArchEdgeData, Scenario } from "./types.ts";
-import type { RequirementsDocument } from "./requirementsTypes.ts";
-import { EMPTY_REQUIREMENTS_DOCUMENT } from "./requirementsTypes.ts";
-import { BUILT_IN_ITEM_TYPES, BUILT_IN_RELATIONSHIP_TYPES } from "./requirementsRegistry.ts";
-import type { ProgramIncrement } from "./programIncrements.ts";
-import { DEFAULT_SPRINT_DURATION_DAYS } from "./programIncrements.ts";
-import type { TeamDocument } from "./teamTypes.ts";
-import { EMPTY_TEAM_DOCUMENT, DEFAULT_TEAM_SETTINGS } from "./teamTypes.ts";
-import type { Milestone } from "./milestones.ts";
-import { sanitizeRelatedItemIds, validateMilestone } from "./milestones.ts";
-import { globalShapeRegistry, type ShapeDefinition } from "./shapeRegistry.ts";
-import { globalIconRegistry, type IconDefinition } from "./iconRegistry.ts";
-import { migrateToCurrent, type RawDiagramFile } from "./schemaMigrations.ts";
+import type { Node, Edge } from '@xyflow/react';
+import type { ArchNodeData, ArchEdgeData, Scenario } from './types.ts';
+import type { RequirementsDocument } from './requirementsTypes.ts';
+import { EMPTY_REQUIREMENTS_DOCUMENT } from './requirementsTypes.ts';
+import { BUILT_IN_ITEM_TYPES, BUILT_IN_RELATIONSHIP_TYPES } from './requirementsRegistry.ts';
+import type { ProgramIncrement } from './programIncrements.ts';
+import { DEFAULT_SPRINT_DURATION_DAYS } from './programIncrements.ts';
+import type { TeamDocument } from './teamTypes.ts';
+import { EMPTY_TEAM_DOCUMENT, DEFAULT_TEAM_SETTINGS } from './teamTypes.ts';
+import type { Milestone } from './milestones.ts';
+import { sanitizeRelatedItemIds, validateMilestone } from './milestones.ts';
+import { globalShapeRegistry, type ShapeDefinition } from './shapeRegistry.ts';
+import { globalIconRegistry, type IconDefinition } from './iconRegistry.ts';
+import { migrateToCurrent, type RawDiagramFile } from './schemaMigrations.ts';
 
-export const SCHEMA_VERSION = "0.7";
+export const SCHEMA_VERSION = '0.7';
 
 export interface DiagramFile {
   schemaVersion: string;
@@ -46,7 +46,7 @@ function collectAssetFallbacks(nodes: Node<ArchNodeData>[]): {
   const iconFallbacks: Record<string, IconDefinition> = {};
 
   function scanNode(node: Node<ArchNodeData>) {
-    if (node.type === "shape" && node.data?.nodeType) {
+    if (node.type === 'shape' && node.data?.nodeType) {
       const shapeDef = globalShapeRegistry.getShape(node.data.nodeType);
       if (shapeDef) {
         shapeFallbacks[shapeDef.id] = shapeDef;
@@ -54,7 +54,7 @@ function collectAssetFallbacks(nodes: Node<ArchNodeData>[]): {
     }
     if (node.data?.icon) {
       const iconDef = globalIconRegistry.getIcon(node.data.icon);
-      if (iconDef && iconDef.source.type !== "builtin") {
+      if (iconDef && iconDef.source.type !== 'builtin') {
         iconFallbacks[iconDef.id] = iconDef;
       }
     }
@@ -80,7 +80,7 @@ export function toDiagramFile(
   requirements: RequirementsDocument,
   programIncrements: ProgramIncrement[],
   team: TeamDocument,
-  milestones: Milestone[] = []
+  milestones: Milestone[] = [],
 ): DiagramFile {
   const { shapeFallbacks, iconFallbacks } = collectAssetFallbacks(nodes);
 
@@ -102,15 +102,19 @@ export function toDiagramFile(
 
 /** Triggers a browser download of the diagram as a .json file. */
 export function downloadDiagram(file: DiagramFile): void {
-  const safeName = file.title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-  downloadDiagramAs(file, `${safeName || "diagram"}.json`);
+  const safeName = file.title
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+  downloadDiagramAs(file, `${safeName || 'diagram'}.json`);
 }
 
 /** downloadDiagram under a caller-chosen file name (timed copies, WS13-R6). */
 export function downloadDiagramAs(file: DiagramFile, fileName: string): void {
-  const blob = new Blob([JSON.stringify(file, null, 2)], { type: "application/json" });
+  const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
+  const anchor = document.createElement('a');
   anchor.href = url;
   anchor.download = fileName;
   document.body.appendChild(anchor);
@@ -120,18 +124,22 @@ export function downloadDiagramAs(file: DiagramFile, fileName: string): void {
 }
 
 function parseRequirementsDocument(raw: unknown): RequirementsDocument {
-  if (!raw || typeof raw !== "object") return EMPTY_REQUIREMENTS_DOCUMENT;
+  if (!raw || typeof raw !== 'object') return EMPTY_REQUIREMENTS_DOCUMENT;
   const r = raw as Partial<RequirementsDocument>;
   const itemTypes = Array.isArray(r.itemTypes)
     ? r.itemTypes.map((t) => ({
         ...t,
-        isWorkable: t.isWorkable ?? BUILT_IN_ITEM_TYPES.find((b) => b.id === t.id)?.isWorkable ?? false,
+        isWorkable:
+          t.isWorkable ?? BUILT_IN_ITEM_TYPES.find((b) => b.id === t.id)?.isWorkable ?? false,
       }))
     : [];
   const relationshipTypes = Array.isArray(r.relationshipTypes)
     ? r.relationshipTypes.map((t) => ({
         ...t,
-        isBlocking: t.isBlocking ?? BUILT_IN_RELATIONSHIP_TYPES.find((b) => b.id === t.id)?.isBlocking ?? false,
+        isBlocking:
+          t.isBlocking ??
+          BUILT_IN_RELATIONSHIP_TYPES.find((b) => b.id === t.id)?.isBlocking ??
+          false,
       }))
     : [];
   return {
@@ -140,7 +148,7 @@ function parseRequirementsDocument(raw: unknown): RequirementsDocument {
     items: Array.isArray(r.items) ? r.items : [],
     relationshipTypes,
     relationships: Array.isArray(r.relationships) ? r.relationships : [],
-    nextSequence: r.nextSequence && typeof r.nextSequence === "object" ? r.nextSequence : {},
+    nextSequence: r.nextSequence && typeof r.nextSequence === 'object' ? r.nextSequence : {},
   };
 }
 
@@ -152,9 +160,13 @@ function parseProgramIncrements(raw: unknown): ProgramIncrement[] {
   if (!Array.isArray(raw)) return [];
   const result: ProgramIncrement[] = [];
   for (const entry of raw) {
-    if (!entry || typeof entry !== "object") continue;
+    if (!entry || typeof entry !== 'object') continue;
     const pi = entry as Partial<ProgramIncrement>;
-    if (typeof pi.id !== "string" || typeof pi.name !== "string" || typeof pi.startDate !== "string") {
+    if (
+      typeof pi.id !== 'string' ||
+      typeof pi.name !== 'string' ||
+      typeof pi.startDate !== 'string'
+    ) {
       continue;
     }
     if (!Array.isArray(pi.sprints)) continue;
@@ -163,15 +175,15 @@ function parseProgramIncrements(raw: unknown): ProgramIncrement[] {
       .filter(
         (s): s is Record<string, unknown> =>
           !!s &&
-          typeof s === "object" &&
-          typeof (s as Record<string, unknown>).id === "string" &&
-          typeof (s as Record<string, unknown>).name === "string"
+          typeof s === 'object' &&
+          typeof (s as Record<string, unknown>).id === 'string' &&
+          typeof (s as Record<string, unknown>).name === 'string',
       )
       .map((s) => ({
         id: String(s.id),
         name: String(s.name),
         durationDays:
-          typeof s.durationDays === "number" && s.durationDays > 0
+          typeof s.durationDays === 'number' && s.durationDays > 0
             ? s.durationDays
             : DEFAULT_SPRINT_DURATION_DAYS,
       }));
@@ -181,19 +193,24 @@ function parseProgramIncrements(raw: unknown): ProgramIncrement[] {
           .filter(
             (r): r is Record<string, unknown> =>
               !!r &&
-              typeof r === "object" &&
-              typeof (r as Record<string, unknown>).id === "string" &&
-              (typeof (r as Record<string, unknown>).name === "string" || typeof (r as Record<string, unknown>).title === "string") &&
-              (typeof (r as Record<string, unknown>).value === "number" || typeof (r as Record<string, unknown>).points === "number")
+              typeof r === 'object' &&
+              typeof (r as Record<string, unknown>).id === 'string' &&
+              (typeof (r as Record<string, unknown>).name === 'string' ||
+                typeof (r as Record<string, unknown>).title === 'string') &&
+              (typeof (r as Record<string, unknown>).value === 'number' ||
+                typeof (r as Record<string, unknown>).points === 'number'),
           )
           .map((rec) => ({
             id: String(rec.id),
             name: String(rec.name ?? rec.title),
-            unit: (rec.unit === "points" ? "points" : "percentage") as "percentage" | "points",
+            unit: (rec.unit === 'points' ? 'points' : 'percentage') as 'percentage' | 'points',
             value: Number(rec.value ?? rec.points),
-            sprintId: typeof rec.sprintId === "string" && rec.sprintId.trim() !== "" ? rec.sprintId : undefined,
-            category: typeof rec.category === "string" ? rec.category : undefined,
-            note: typeof rec.note === "string" ? rec.note : undefined,
+            sprintId:
+              typeof rec.sprintId === 'string' && rec.sprintId.trim() !== ''
+                ? rec.sprintId
+                : undefined,
+            category: typeof rec.category === 'string' ? rec.category : undefined,
+            note: typeof rec.note === 'string' ? rec.note : undefined,
           }))
       : undefined;
 
@@ -209,52 +226,53 @@ function parseProgramIncrements(raw: unknown): ProgramIncrement[] {
 }
 
 function parseTeamDocument(raw: unknown): TeamDocument {
-  if (!raw || typeof raw !== "object") return EMPTY_TEAM_DOCUMENT;
+  if (!raw || typeof raw !== 'object') return EMPTY_TEAM_DOCUMENT;
   const t = raw as Partial<TeamDocument>;
-  const settings: TeamDocument["settings"] = {
+  const settings: TeamDocument['settings'] = {
     defaultPointsPerDay:
-      typeof t.settings?.defaultPointsPerDay === "number" && !isNaN(t.settings.defaultPointsPerDay)
+      typeof t.settings?.defaultPointsPerDay === 'number' && !isNaN(t.settings.defaultPointsPerDay)
         ? t.settings.defaultPointsPerDay
         : DEFAULT_TEAM_SETTINGS.defaultPointsPerDay,
     excludeUsHolidays:
-      typeof t.settings?.excludeUsHolidays === "boolean"
+      typeof t.settings?.excludeUsHolidays === 'boolean'
         ? t.settings.excludeUsHolidays
         : DEFAULT_TEAM_SETTINGS.excludeUsHolidays,
     extraDaysOff: Array.isArray(t.settings?.extraDaysOff)
       ? (t.settings.extraDaysOff as unknown[]).filter(
-          (e): e is TeamDocument["settings"]["extraDaysOff"][number] =>
+          (e): e is TeamDocument['settings']['extraDaysOff'][number] =>
             !!e &&
-            typeof e === "object" &&
-            typeof (e as Record<string, unknown>).id === "string" &&
-            typeof (e as Record<string, unknown>).date === "string" &&
-            typeof (e as Record<string, unknown>).name === "string"
+            typeof e === 'object' &&
+            typeof (e as Record<string, unknown>).id === 'string' &&
+            typeof (e as Record<string, unknown>).date === 'string' &&
+            typeof (e as Record<string, unknown>).name === 'string',
         )
       : [],
   };
 
-  const members: TeamDocument["members"] = Array.isArray(t.members)
+  const members: TeamDocument['members'] = Array.isArray(t.members)
     ? (t.members as unknown[])
         .filter(
           (m): m is Record<string, unknown> =>
             !!m &&
-            typeof m === "object" &&
-            typeof (m as Record<string, unknown>).id === "string" &&
-            typeof (m as Record<string, unknown>).name === "string"
+            typeof m === 'object' &&
+            typeof (m as Record<string, unknown>).id === 'string' &&
+            typeof (m as Record<string, unknown>).name === 'string',
         )
         .map((m) => ({
           id: String(m.id),
           name: String(m.name),
-          role: typeof m.role === "string" ? m.role : undefined,
-          avatarColor: typeof m.avatarColor === "string" ? m.avatarColor : undefined,
-          defaultPointsPerDay: typeof m.defaultPointsPerDay === "number" ? m.defaultPointsPerDay : undefined,
+          role: typeof m.role === 'string' ? m.role : undefined,
+          avatarColor: typeof m.avatarColor === 'string' ? m.avatarColor : undefined,
+          defaultPointsPerDay:
+            typeof m.defaultPointsPerDay === 'number' ? m.defaultPointsPerDay : undefined,
           ptoSpans: Array.isArray(m.ptoSpans)
             ? (m.ptoSpans as unknown[]).filter(
-                (p): p is TeamDocument["members"][number]["ptoSpans"][number] =>
+                (p): p is TeamDocument['members'][number]['ptoSpans'][number] =>
                   !!p &&
-                  typeof p === "object" &&
-                  typeof (p as Record<string, unknown>).id === "string" &&
-                  typeof (p as Record<string, unknown>).startDate === "string" &&
-                  typeof (p as Record<string, unknown>).endDate === "string"
+                  typeof p === 'object' &&
+                  typeof (p as Record<string, unknown>).id === 'string' &&
+                  typeof (p as Record<string, unknown>).startDate === 'string' &&
+                  typeof (p as Record<string, unknown>).endDate === 'string',
               )
             : [],
         }))
@@ -267,26 +285,27 @@ function parseMilestones(raw: unknown): Milestone[] {
   if (!Array.isArray(raw)) return [];
   const result: Milestone[] = [];
   for (const entry of raw) {
-    if (!entry || typeof entry !== "object") continue;
+    if (!entry || typeof entry !== 'object') continue;
     const m = entry as Partial<Milestone>;
-    if (typeof m.id !== "string" || typeof m.name !== "string" || typeof m.scheduledAt !== "string") continue;
+    if (typeof m.id !== 'string' || typeof m.name !== 'string' || typeof m.scheduledAt !== 'string')
+      continue;
     const sanitizedIds = sanitizeRelatedItemIds(m.relatedItemIds ?? m.relatedWorkableItemIds);
     const candidate: Milestone = {
       // Spread first so unrecognized per-milestone fields survive, for the same
       // reason the top-level spread in parseDiagramFile exists.
       ...m,
       id: m.id,
-      type: typeof m.type === "string" && m.type.trim() !== "" ? m.type : "release",
+      type: typeof m.type === 'string' && m.type.trim() !== '' ? m.type : 'release',
       name: m.name.trim(),
       scheduledAt: m.scheduledAt,
-      version: typeof m.version === "string" ? m.version : undefined,
-      description: typeof m.description === "string" ? m.description : undefined,
-      color: typeof m.color === "string" ? m.color : undefined,
-      icon: typeof m.icon === "string" ? m.icon : undefined,
+      version: typeof m.version === 'string' ? m.version : undefined,
+      description: typeof m.description === 'string' ? m.description : undefined,
+      color: typeof m.color === 'string' ? m.color : undefined,
+      icon: typeof m.icon === 'string' ? m.icon : undefined,
       relatedItemIds: sanitizedIds,
       relatedWorkableItemIds: sanitizedIds,
-      createdAt: typeof m.createdAt === "string" ? m.createdAt : undefined,
-      updatedAt: typeof m.updatedAt === "string" ? m.updatedAt : undefined,
+      createdAt: typeof m.createdAt === 'string' ? m.createdAt : undefined,
+      updatedAt: typeof m.updatedAt === 'string' ? m.updatedAt : undefined,
     };
     const errors = validateMilestone(candidate);
     if (errors.length > 0) continue;
@@ -304,13 +323,13 @@ function parseMilestones(raw: unknown): Milestone[] {
 export function parseDiagramFile(raw: string): DiagramFile {
   const parsed = JSON.parse(raw);
   if (!Array.isArray(parsed?.nodes) || !Array.isArray(parsed?.edges)) {
-    throw new Error("File does not look like a diagram export (missing nodes/edges).");
+    throw new Error('File does not look like a diagram export (missing nodes/edges).');
   }
 
   // Restore fallback definitions into registries if present
-  if (parsed.shapeFallbacks && typeof parsed.shapeFallbacks === "object") {
+  if (parsed.shapeFallbacks && typeof parsed.shapeFallbacks === 'object') {
     for (const [id, def] of Object.entries(parsed.shapeFallbacks)) {
-      if (def && typeof def === "object" && !globalShapeRegistry.getShape(id)) {
+      if (def && typeof def === 'object' && !globalShapeRegistry.getShape(id)) {
         try {
           globalShapeRegistry.registerShape(def as ShapeDefinition);
         } catch {
@@ -320,9 +339,9 @@ export function parseDiagramFile(raw: string): DiagramFile {
     }
   }
 
-  if (parsed.iconFallbacks && typeof parsed.iconFallbacks === "object") {
+  if (parsed.iconFallbacks && typeof parsed.iconFallbacks === 'object') {
     for (const [id, def] of Object.entries(parsed.iconFallbacks)) {
-      if (def && typeof def === "object" && !globalIconRegistry.getIcon(id)) {
+      if (def && typeof def === 'object' && !globalIconRegistry.getIcon(id)) {
         try {
           globalIconRegistry.registerIcon(def as IconDefinition);
         } catch {
@@ -335,10 +354,7 @@ export function parseDiagramFile(raw: string): DiagramFile {
   // Bring the file forward before normalizing: migrations operate on raw file
   // shapes, the normalizers below operate on current-version shapes. A file
   // from a newer build throws here rather than being half-loaded.
-  const { file: upgraded } = migrateToCurrent(
-    parsed as RawDiagramFile,
-    SCHEMA_VERSION,
-  );
+  const { file: upgraded } = migrateToCurrent(parsed as RawDiagramFile, SCHEMA_VERSION);
 
   // Spread first so that any top-level key this build doesn't recognize - for
   //  instance, a field added by a newer patch release - survives the round trip
@@ -347,7 +363,7 @@ export function parseDiagramFile(raw: string): DiagramFile {
   return {
     ...(upgraded as object),
     schemaVersion: SCHEMA_VERSION,
-    title: upgraded.title ?? "Untitled Diagram",
+    title: upgraded.title ?? 'Untitled Diagram',
     nodes: upgraded.nodes,
     edges: upgraded.edges,
     scenarios: Array.isArray(upgraded.scenarios) ? upgraded.scenarios : [],

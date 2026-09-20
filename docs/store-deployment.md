@@ -28,7 +28,7 @@ and plain HTTP. Each is called out below.
 - **An identity provider**, or a decision to run without sign-in in
   development. Any OIDC provider works — Keycloak, Entra ID, Okta, Auth0,
   GitLab, Google — and GitHub is supported through an adapter.
-- **HTTPS**, unless everything is on localhost. See *Origins and HTTPS*.
+- **HTTPS**, unless everything is on localhost. See _Origins and HTTPS_.
 
 ## Setting up the identity provider
 
@@ -37,14 +37,14 @@ it holds a secret, and the browser never sees a token.
 
 Whatever the provider, register:
 
-| Setting | Value |
-|---|---|
-| Client id | Anything; `system-design-store` in the examples. Goes in `OIDC_CLIENT_ID`. |
-| Client type | Confidential (a client secret). Goes in `OIDC_CLIENT_SECRET`. |
-| Redirect URI | **Exactly** `<PUBLIC_URL>/v1/auth/callback`. |
-| Web origins | The editor's origin, where the provider asks for one. |
-| Flow | Authorization Code with PKCE. Implicit and direct grants are not used. |
-| Scopes | `openid profile`. The store reads only the subject and a display name. |
+| Setting      | Value                                                                      |
+| ------------ | -------------------------------------------------------------------------- |
+| Client id    | Anything; `system-design-store` in the examples. Goes in `OIDC_CLIENT_ID`. |
+| Client type  | Confidential (a client secret). Goes in `OIDC_CLIENT_SECRET`.              |
+| Redirect URI | **Exactly** `<PUBLIC_URL>/v1/auth/callback`.                               |
+| Web origins  | The editor's origin, where the provider asks for one.                      |
+| Flow         | Authorization Code with PKCE. Implicit and direct grants are not used.     |
+| Scopes       | `openid profile`. The store reads only the subject and a display name.     |
 
 Two things trip people up:
 
@@ -68,8 +68,8 @@ address it tried.
 Give it both addresses:
 
 ```yaml
-OIDC_ISSUER: http://localhost:8081/realms/system-design   # the browser's
-OIDC_INTERNAL_URL: http://keycloak:8080                   # this server's
+OIDC_ISSUER: http://localhost:8081/realms/system-design # the browser's
+OIDC_INTERNAL_URL: http://keycloak:8080 # this server's
 ```
 
 Only back-channel calls use the internal address: discovery, the token
@@ -110,25 +110,25 @@ is OAuth2 without OIDC, so there is no issuer to configure.
 The store reads its configuration from the environment and prints what it is
 at startup. Anything unusable stops it, with a sentence saying what to set.
 
-| Variable | Required | Meaning |
-|---|---|---|
-| `PUBLIC_URL` | yes | Where people reach the store. Sign-in returns here. |
-| `DATABASE_URL` | no | PostgreSQL. Without it the store keeps everything in memory and says so — for demonstrations only. |
-| `PORT` | no | Default 8080. |
-| `ALLOWED_ORIGINS` | where the editor is elsewhere | Exact origins the editor is served from, comma separated. No wildcards. |
-| `AFTER_LOGIN_URL` | no | Where people are sent once signed in. Defaults to the first allowed origin — the editor. Must be this store or an allowed origin, or it would be an open redirect. |
-| `AUTH_PROVIDERS` | yes | `oidc`, `github`, or both. |
-| `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | with `oidc` | The provider's issuer URL **as the browser sees it**, and this store's client. The secret stays on the server. |
-| `OIDC_INTERNAL_URL` | when the store reaches the provider elsewhere | The address *this server* uses, when it differs — a container network, typically. See below. |
-| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | with `github` | A GitHub OAuth app. |
-| `ADMIN_SUBJECTS` | no | `issuer#subject` for each administrator. **With none set, legal holds and purges are refused to everyone.** The subject is the provider's identifier, not a username: with Keycloak it is the user's UUID, which `GET /v1/users/me` reports after signing in. |
-| `RETENTION_PERIOD` | no | `immediate`, a duration (`7d`, `12w`, `6m`, `7y`), or `indefinite`. Default `30d`. |
-| `CRYPTO_MODE` | no | `webcrypto` (default) or `passthrough`. |
-| `RECOVERY_PUBLIC_KEY_FILE` | with `webcrypto` | PEM file holding the organisation's recovery **public** key. Without it the store refuses every document (see below). |
-| `RECOVERY_PUBLIC_KEY` | alternative | The same key inline, for secret managers that inject values rather than files. |
-| `MAX_BLOB_BYTES`, `MAX_BLOBS_PER_DOCUMENT`, `MAX_TOTAL_BYTES` | no | Quotas. |
-| `PURGE_INTERVAL_MINUTES` | no | How often the purge sweep runs. Default 60. |
-| `ALLOW_UNAUTHENTICATED` | no | `true` runs with no sign-in at all. Development only. |
+| Variable                                                      | Required                                      | Meaning                                                                                                                                                                                                                                                       |
+| ------------------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PUBLIC_URL`                                                  | yes                                           | Where people reach the store. Sign-in returns here.                                                                                                                                                                                                           |
+| `DATABASE_URL`                                                | no                                            | PostgreSQL. Without it the store keeps everything in memory and says so — for demonstrations only.                                                                                                                                                            |
+| `PORT`                                                        | no                                            | Default 8080.                                                                                                                                                                                                                                                 |
+| `ALLOWED_ORIGINS`                                             | where the editor is elsewhere                 | Exact origins the editor is served from, comma separated. No wildcards.                                                                                                                                                                                       |
+| `AFTER_LOGIN_URL`                                             | no                                            | Where people are sent once signed in. Defaults to the first allowed origin — the editor. Must be this store or an allowed origin, or it would be an open redirect.                                                                                            |
+| `AUTH_PROVIDERS`                                              | yes                                           | `oidc`, `github`, or both.                                                                                                                                                                                                                                    |
+| `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`         | with `oidc`                                   | The provider's issuer URL **as the browser sees it**, and this store's client. The secret stays on the server.                                                                                                                                                |
+| `OIDC_INTERNAL_URL`                                           | when the store reaches the provider elsewhere | The address _this server_ uses, when it differs — a container network, typically. See below.                                                                                                                                                                  |
+| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`                    | with `github`                                 | A GitHub OAuth app.                                                                                                                                                                                                                                           |
+| `ADMIN_SUBJECTS`                                              | no                                            | `issuer#subject` for each administrator. **With none set, legal holds and purges are refused to everyone.** The subject is the provider's identifier, not a username: with Keycloak it is the user's UUID, which `GET /v1/users/me` reports after signing in. |
+| `RETENTION_PERIOD`                                            | no                                            | `immediate`, a duration (`7d`, `12w`, `6m`, `7y`), or `indefinite`. Default `30d`.                                                                                                                                                                            |
+| `CRYPTO_MODE`                                                 | no                                            | `webcrypto` (default) or `passthrough`.                                                                                                                                                                                                                       |
+| `RECOVERY_PUBLIC_KEY_FILE`                                    | with `webcrypto`                              | PEM file holding the organisation's recovery **public** key. Without it the store refuses every document (see below).                                                                                                                                         |
+| `RECOVERY_PUBLIC_KEY`                                         | alternative                                   | The same key inline, for secret managers that inject values rather than files.                                                                                                                                                                                |
+| `MAX_BLOB_BYTES`, `MAX_BLOBS_PER_DOCUMENT`, `MAX_TOTAL_BYTES` | no                                            | Quotas.                                                                                                                                                                                                                                                       |
+| `PURGE_INTERVAL_MINUTES`                                      | no                                            | How often the purge sweep runs. Default 60.                                                                                                                                                                                                                   |
+| `ALLOW_UNAUTHENTICATED`                                       | no                                            | `true` runs with no sign-in at all. Development only.                                                                                                                                                                                                         |
 
 The editor needs one setting of its own: `STORE_URL`, the store's public
 address. Without it the editor shows no workspace.
@@ -237,6 +237,6 @@ set `PURGE_INTERVAL_MINUTES` higher where several instances run.
 ## Backups
 
 Back up PostgreSQL as usual. Its contents are encrypted, so a backup is
-useless to anyone without the keys — and equally useless to *you* without
+useless to anyone without the keys — and equally useless to _you_ without
 them, which is what the offline recovery key protects against. Store that
 key separately from the database backups.

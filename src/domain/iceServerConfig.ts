@@ -1,7 +1,7 @@
 // Namespaced to avoid colliding with anything else that might use this
 // browser's localStorage for this origin - same convention as
 // signalingConfig.ts and presenceIdentity.ts.
-const ICE_SERVERS_KEY = "system-design-editor:ice-servers";
+const ICE_SERVERS_KEY = 'system-design-editor:ice-servers';
 
 /**
  * The literal value meaning "no ICE servers at all".
@@ -18,7 +18,7 @@ const ICE_SERVERS_KEY = "system-design-editor:ice-servers";
  * all a single flat LAN ever needed, so declaring no ICE servers makes
  * those sessions connect promptly instead of slowly.
  */
-export const NO_ICE_SERVERS = "none";
+export const NO_ICE_SERVERS = 'none';
 
 /**
  * Gets the deployment default ICE servers.
@@ -29,16 +29,17 @@ export const NO_ICE_SERVERS = "none";
  * 3. Empty string if unset
  */
 export function getDefaultIceServers(): string {
-  if (typeof window !== "undefined") {
-    const runtimeConfig = (window as unknown as { __APP_CONFIG__?: { ICE_SERVERS?: string } }).__APP_CONFIG__;
+  if (typeof window !== 'undefined') {
+    const runtimeConfig = (window as unknown as { __APP_CONFIG__?: { ICE_SERVERS?: string } })
+      .__APP_CONFIG__;
     if (runtimeConfig?.ICE_SERVERS) {
       return runtimeConfig.ICE_SERVERS;
     }
   }
-  if (typeof import.meta !== "undefined" && typeof import.meta.env !== "undefined") {
-    return (import.meta.env.VITE_ICE_SERVERS as string | undefined) ?? "";
+  if (typeof import.meta !== 'undefined' && typeof import.meta.env !== 'undefined') {
+    return (import.meta.env.VITE_ICE_SERVERS as string | undefined) ?? '';
   }
-  return "";
+  return '';
 }
 
 /**
@@ -99,12 +100,12 @@ export function saveIceServers(raw: string): void {
 export function parseIceServers(raw: string | null | undefined): RTCIceServer[] | undefined {
   if (raw === null || raw === undefined) return undefined;
   const trimmed = raw.trim();
-  if (trimmed === "") return undefined;
+  if (trimmed === '') return undefined;
   if (trimmed.toLowerCase() === NO_ICE_SERVERS) return [];
 
   const servers: RTCIceServer[] = [];
-  for (const entry of trimmed.split(",")) {
-    const parts = entry.split("|").map((p) => p.trim());
+  for (const entry of trimmed.split(',')) {
+    const parts = entry.split('|').map((p) => p.trim());
     const urls = parts[0];
     if (!urls) continue; // a stray comma shouldn't produce an entry with no URL
 

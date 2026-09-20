@@ -11,8 +11,8 @@
  * every local file it reaches is under a path the Dockerfile copies. No
  * Docker needed, so it runs in the ordinary suite.
  */
-import { readFileSync, existsSync } from "fs";
-import { dirname, relative, resolve } from "path";
+import { readFileSync, existsSync } from 'fs';
+import { dirname, relative, resolve } from 'path';
 
 let failures = 0;
 function check(condition: boolean, message: string) {
@@ -23,13 +23,13 @@ function check(condition: boolean, message: string) {
   }
 }
 
-const root = resolve(".");
-const dockerfile = readFileSync("docker/store/Dockerfile", "utf8");
+const root = resolve('.');
+const dockerfile = readFileSync('docker/store/Dockerfile', 'utf8');
 
 /** Sources copied into the image, as repository-relative directories. */
 const copied = [...dockerfile.matchAll(/^COPY\s+(?!--)(.+?)\s+\S+\s*$/gm)]
   .flatMap((match) => match[1].trim().split(/\s+/))
-  .filter((source) => source !== "." && !source.startsWith("--"));
+  .filter((source) => source !== '.' && !source.startsWith('--'));
 
 /** Every local file reachable from the entry point. */
 function importGraph(entry: string): string[] {
@@ -39,7 +39,7 @@ function importGraph(entry: string): string[] {
     const file = queue.pop()!;
     if (seen.has(file) || !existsSync(file)) continue;
     seen.add(file);
-    const text = readFileSync(file, "utf8");
+    const text = readFileSync(file, 'utf8');
     for (const match of text.matchAll(/(?:from|import)\s+["'](\.[^"']+)["']/g)) {
       queue.push(resolve(dirname(file), match[1]));
     }
@@ -47,30 +47,37 @@ function importGraph(entry: string): string[] {
   return [...seen].map((file) => relative(root, file));
 }
 
-const reachable = importGraph("store/src/main.ts");
+const reachable = importGraph('store/src/main.ts');
 console.log(`=== ${reachable.length} files reachable from store/src/main.ts ===`);
 
-const outside = reachable.filter((file) => !file.startsWith("store/"));
-console.log(`  (${outside.length} of them outside store/: ${outside.join(", ") || "none"})`);
+const outside = reachable.filter((file) => !file.startsWith('store/'));
+console.log(`  (${outside.length} of them outside store/: ${outside.join(', ') || 'none'})`);
 
-const missing = reachable.filter((file) => !copied.some((source) => file === source || file.startsWith(`${source}/`)));
+const missing = reachable.filter(
+  (file) => !copied.some((source) => file === source || file.startsWith(`${source}/`)),
+);
 check(
   missing.length === 0,
   missing.length === 0
-    ? `every file the store imports is copied into the image (COPY ${copied.join(", ")})`
-    : `these are imported but never copied into the image: ${missing.join(", ")}`,
+    ? `every file the store imports is copied into the image (COPY ${copied.join(', ')})`
+    : `these are imported but never copied into the image: ${missing.join(', ')}`,
 );
 
 // The schema is read at runtime, not imported, so the graph cannot see it.
 check(
-  copied.some((source) => "store/schema.sql" === source || "store/schema.sql".startsWith(`${source}/`)),
-  "and so is schema.sql, which is read at startup rather than imported",
+  copied.some(
+    (source) => 'store/schema.sql' === source || 'store/schema.sql'.startsWith(`${source}/`),
+  ),
+  'and so is schema.sql, which is read at startup rather than imported',
 );
 
-check(/CMD .*store\/src\/main\.ts/.test(dockerfile), "the image runs the entry point this was checked against");
+check(
+  /CMD .*store\/src\/main\.ts/.test(dockerfile),
+  'the image runs the entry point this was checked against',
+);
 
 if (failures > 0) {
   console.error(`\n${failures} check(s) failed`);
   process.exit(1);
 }
-console.log("\nAll store image content checks passed.");
+console.log('\nAll store image content checks passed.');

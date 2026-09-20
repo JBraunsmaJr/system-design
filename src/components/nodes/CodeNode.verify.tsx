@@ -30,12 +30,12 @@ class MockDOMNode {
     this.style = {};
     this.attributes = {};
     this._listeners = {};
-    this._value = "";
-    this._defaultValue = "";
+    this._value = '';
+    this._defaultValue = '';
     this._dirtyValue = false;
     this.selectionStart = 0;
     this.selectionEnd = 0;
-    this.namespaceURI = "http://www.w3.org/1999/xhtml";
+    this.namespaceURI = 'http://www.w3.org/1999/xhtml';
   }
 
   get value(): string {
@@ -43,7 +43,7 @@ class MockDOMNode {
   }
 
   set value(v: string) {
-    this._value = String(v ?? "");
+    this._value = String(v ?? '');
     this._dirtyValue = true;
   }
 
@@ -52,7 +52,7 @@ class MockDOMNode {
   }
 
   set nodeValue(v: string) {
-    this._value = String(v ?? "");
+    this._value = String(v ?? '');
   }
 
   get data(): string {
@@ -60,15 +60,15 @@ class MockDOMNode {
   }
 
   set data(v: string) {
-    this._value = String(v ?? "");
+    this._value = String(v ?? '');
   }
 
   get className(): string {
-    return this.attributes.class || "";
+    return this.attributes.class || '';
   }
 
   set className(v: string) {
-    this.attributes.class = String(v ?? "");
+    this.attributes.class = String(v ?? '');
   }
 
   get defaultValue(): string {
@@ -76,7 +76,7 @@ class MockDOMNode {
   }
 
   set defaultValue(v: string) {
-    this._defaultValue = String(v ?? "");
+    this._defaultValue = String(v ?? '');
     if (!this._dirtyValue) {
       this._value = this._defaultValue;
     }
@@ -84,20 +84,20 @@ class MockDOMNode {
 
   get textContent(): string {
     if (this.childNodes.length === 0) return this._value;
-    return this.childNodes.map((c) => c.textContent).join("");
+    return this.childNodes.map((c) => c.textContent).join('');
   }
 
   set textContent(v: string) {
-    this._value = String(v ?? "");
+    this._value = String(v ?? '');
     this.childNodes = [];
   }
 
   get innerHTML(): string {
-    return this._value || "";
+    return this._value || '';
   }
 
   set innerHTML(v: string) {
-    this._value = String(v ?? "");
+    this._value = String(v ?? '');
   }
 
   appendChild<T extends MockDOMNode>(child: T): T {
@@ -138,15 +138,23 @@ class MockDOMNode {
     delete this.attributes[name];
   }
 
-  addEventListener(type: string, listener: (event: unknown) => void, options?: boolean | { capture?: boolean }) {
-    const isCapture = typeof options === "boolean" ? options : !!options?.capture;
+  addEventListener(
+    type: string,
+    listener: (event: unknown) => void,
+    options?: boolean | { capture?: boolean },
+  ) {
+    const isCapture = typeof options === 'boolean' ? options : !!options?.capture;
     const key = isCapture ? `${type}:capture` : type;
     if (!this._listeners[key]) this._listeners[key] = [];
     this._listeners[key].push(listener);
   }
 
-  removeEventListener(type: string, listener: (event: unknown) => void, options?: boolean | { capture?: boolean }) {
-    const isCapture = typeof options === "boolean" ? options : !!options?.capture;
+  removeEventListener(
+    type: string,
+    listener: (event: unknown) => void,
+    options?: boolean | { capture?: boolean },
+  ) {
+    const isCapture = typeof options === 'boolean' ? options : !!options?.capture;
     const key = isCapture ? `${type}:capture` : type;
     if (!this._listeners[key]) return;
     this._listeners[key] = this._listeners[key].filter((l) => l !== listener);
@@ -230,8 +238,8 @@ class MockDOMNode {
     for (const child of this.childNodes) {
       if (child.nodeType === 1) {
         const isTagMatch = child.tagName.toLowerCase() === selector.toLowerCase();
-        const classNames = child.attributes.class ? child.attributes.class.split(" ") : [];
-        const isClassMatch = selector.startsWith(".") && classNames.includes(selector.slice(1));
+        const classNames = child.attributes.class ? child.attributes.class.split(' ') : [];
+        const isClassMatch = selector.startsWith('.') && classNames.includes(selector.slice(1));
         if (isTagMatch || isClassMatch) {
           return child;
         }
@@ -248,9 +256,9 @@ class MockDOMNode {
       for (const child of node.childNodes) {
         if (child.nodeType === 1) {
           const isTagMatch = child.tagName.toLowerCase() === selector.toLowerCase();
-          const classNames = child.attributes.class ? child.attributes.class.split(" ") : [];
-          const isClassMatch = selector.startsWith(".") && classNames.includes(selector.slice(1));
-          if (isTagMatch || isClassMatch || selector === "*") {
+          const classNames = child.attributes.class ? child.attributes.class.split(' ') : [];
+          const isClassMatch = selector.startsWith('.') && classNames.includes(selector.slice(1));
+          if (isTagMatch || isClassMatch || selector === '*') {
             results.push(child);
           }
           walk(child);
@@ -266,7 +274,7 @@ class MockDOMNode {
     const walk = (node: MockDOMNode) => {
       for (const child of node.childNodes) {
         if (child.nodeType === 1) {
-          if (tag === "*" || child.tagName.toLowerCase() === tag.toLowerCase()) {
+          if (tag === '*' || child.tagName.toLowerCase() === tag.toLowerCase()) {
             results.push(child);
           }
           walk(child);
@@ -294,10 +302,10 @@ class MockDocument extends MockDOMNode {
   onfocusout: unknown = null;
 
   constructor() {
-    super(9, "#document", null);
+    super(9, '#document', null);
     this.ownerDocument = null;
-    this.documentElement = new MockDOMNode(1, "HTML", this);
-    this.body = new MockDOMNode(1, "BODY", this);
+    this.documentElement = new MockDOMNode(1, 'HTML', this);
+    this.body = new MockDOMNode(1, 'BODY', this);
     this.documentElement.appendChild(this.body);
     this.appendChild(this.documentElement);
     this.activeElement = null;
@@ -315,14 +323,14 @@ class MockDocument extends MockDOMNode {
   }
 
   createTextNode(text: string): MockDOMNode {
-    const node = new MockDOMNode(3, "#text", this);
+    const node = new MockDOMNode(3, '#text', this);
     node.nodeValue = text;
     node.textContent = text;
     return node;
   }
 
   createComment(text: string): MockDOMNode {
-    const node = new MockDOMNode(8, "#comment", this);
+    const node = new MockDOMNode(8, '#comment', this);
     node.nodeValue = text;
     return node;
   }
@@ -347,8 +355,11 @@ globalThis.HTMLTextAreaElement = MockDOMNode;
 globalThis.HTMLInputElement = MockDOMNode;
 // @ts-expect-error Mocking DOM in node
 globalThis.HTMLSelectElement = MockDOMNode;
-if (!("navigator" in globalThis)) {
-  Object.defineProperty(globalThis, "navigator", { value: { userAgent: "node.js" }, configurable: true });
+if (!('navigator' in globalThis)) {
+  Object.defineProperty(globalThis, 'navigator', {
+    value: { userAgent: 'node.js' },
+    configurable: true,
+  });
 }
 globalThis.requestAnimationFrame = (cb: FrameRequestCallback) => {
   cb(Date.now());
@@ -366,15 +377,15 @@ function assert(condition: boolean, message: string) {
 }
 
 async function runTests() {
-  const React = await import("react");
+  const React = await import('react');
   const { useState, act } = React;
-  const { createRoot } = await import("react-dom/client");
-  const { ReactFlowProvider } = await import("@xyflow/react");
-  const { CodeNode } = await import("./CodeNode");
-  const { CanvasContext } = await import("../CanvasContext");
+  const { createRoot } = await import('react-dom/client');
+  const { ReactFlowProvider } = await import('@xyflow/react');
+  const { CodeNode } = await import('./CodeNode');
+  const { CanvasContext } = await import('../CanvasContext');
   // --- Test 1: DOM interaction test with controlled CodeNode editor, JSON update, and Tab key press ---
   {
-    const container = mockDoc.createElement("div");
+    const container = mockDoc.createElement('div');
     const root = createRoot(container as unknown as HTMLElement);
 
     const initialCode = '{\n  "status": "ok"\n}';
@@ -388,7 +399,7 @@ async function runTests() {
             value={{
               isPresenting: false,
               onDrillInto: () => {},
-              editingLabelNodeId: "code-test-node",
+              editingLabelNodeId: 'code-test-node',
               setEditingLabelNodeId: () => {},
               onChangeTextNode: () => {},
               onChangeCodeNode: (_id, nextCode) => setCode(nextCode),
@@ -399,10 +410,10 @@ async function runTests() {
               id="code-test-node"
               type="code"
               data={{
-                nodeType: "code",
-                label: "Payload",
+                nodeType: 'code',
+                label: 'Payload',
                 codeContent: code,
-                codeLanguage: "json",
+                codeLanguage: 'json',
                 tags: [],
                 properties: {},
               }}
@@ -425,10 +436,10 @@ async function runTests() {
       root.render(<ControlledCodeNodeHarness />);
     });
 
-    const textarea = container.querySelector("textarea");
-    assert(!!textarea, "Controlled CodeNode mounts and renders textarea in editing mode");
-    assert(textarea?.value === initialCode, "Textarea has initial JSON code content");
-    assert(mockDoc.activeElement === textarea, "Textarea receives focus on mount effect");
+    const textarea = container.querySelector('textarea');
+    assert(!!textarea, 'Controlled CodeNode mounts and renders textarea in editing mode');
+    assert(textarea?.value === initialCode, 'Textarea has initial JSON code content');
+    assert(mockDoc.activeElement === textarea, 'Textarea receives focus on mount effect');
 
     // 1. Perform a JSON update and exercise caret-preservation behavior
     // Simulate user editing JSON at position 18 (e.g. changing "ok" to "pending")
@@ -440,15 +451,15 @@ async function runTests() {
         textarea.selectionStart = targetCaretPos;
         textarea.selectionEnd = targetCaretPos;
         textarea.value = updatedCode;
-        textarea.dispatchEvent({ type: "input", bubbles: true });
-        textarea.dispatchEvent({ type: "change", bubbles: true });
+        textarea.dispatchEvent({ type: 'input', bubbles: true });
+        textarea.dispatchEvent({ type: 'change', bubbles: true });
       }
     });
 
-    assert(textarea?.value === updatedCode, "Textarea value updated to new JSON content");
+    assert(textarea?.value === updatedCode, 'Textarea value updated to new JSON content');
     assert(
       textarea?.selectionStart === targetCaretPos && textarea?.selectionEnd === targetCaretPos,
-      `Caret preserved after JSON update: selectionStart=${textarea?.selectionStart}, selectionEnd=${textarea?.selectionEnd} (expected ${targetCaretPos})`
+      `Caret preserved after JSON update: selectionStart=${textarea?.selectionStart}, selectionEnd=${textarea?.selectionEnd} (expected ${targetCaretPos})`,
     );
 
     // 2. Simulate a Tab key press at a specific caret offset
@@ -458,8 +469,8 @@ async function runTests() {
       if (textarea) {
         textarea.setSelectionRange(tabInsertPos, tabInsertPos);
         textarea.dispatchEvent({
-          type: "keydown",
-          key: "Tab",
+          type: 'keydown',
+          key: 'Tab',
           bubbles: true,
           cancelable: true,
         });
@@ -469,10 +480,13 @@ async function runTests() {
     const expectedTabCode = '{\n    "status": "pending"\n}';
     const expectedTabCaret = tabInsertPos + 2; // INDENT is "  " (2 spaces)
 
-    assert(textarea?.value === expectedTabCode, "Textarea value updated with indentation on Tab key");
+    assert(
+      textarea?.value === expectedTabCode,
+      'Textarea value updated with indentation on Tab key',
+    );
     assert(
       textarea?.selectionStart === expectedTabCaret && textarea?.selectionEnd === expectedTabCaret,
-      `Caret preserved after Tab key: selectionStart=${textarea?.selectionStart}, selectionEnd=${textarea?.selectionEnd} (expected ${expectedTabCaret})`
+      `Caret preserved after Tab key: selectionStart=${textarea?.selectionStart}, selectionEnd=${textarea?.selectionEnd} (expected ${expectedTabCaret})`,
     );
 
     // Clean up
@@ -483,7 +497,7 @@ async function runTests() {
 
   // --- Test 2: Display mode when not editing ---
   {
-    const container = mockDoc.createElement("div");
+    const container = mockDoc.createElement('div');
     const root = createRoot(container as unknown as HTMLElement);
 
     await act(async () => {
@@ -504,10 +518,10 @@ async function runTests() {
               id="code-display-node"
               type="code"
               data={{
-                nodeType: "code",
-                label: "Payload",
+                nodeType: 'code',
+                label: 'Payload',
                 codeContent: '{\n  "status": "ok"\n}',
-                codeLanguage: "json",
+                codeLanguage: 'json',
                 tags: [],
                 properties: {},
               }}
@@ -522,21 +536,21 @@ async function runTests() {
               draggable={true}
             />
           </CanvasContext.Provider>
-        </ReactFlowProvider>
+        </ReactFlowProvider>,
       );
     });
 
-    const display = container.querySelector(".code-node__display");
-    assert(!!display, "CodeNode renders display mode container when not editing");
-    const lang = container.querySelector(".code-node__lang");
-    assert(lang?.textContent === "JSON", "CodeNode renders language label in header");
+    const display = container.querySelector('.code-node__display');
+    assert(!!display, 'CodeNode renders display mode container when not editing');
+    const lang = container.querySelector('.code-node__lang');
+    assert(lang?.textContent === 'JSON', 'CodeNode renders language label in header');
 
     await act(async () => {
       root.unmount();
     });
   }
 
-  console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);
+  console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);
   if (failures > 0) throw new Error(`${failures} test(s) failed`);
 }
 

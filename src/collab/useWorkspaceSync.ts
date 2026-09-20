@@ -11,25 +11,30 @@
  * never registers one: enrolling is something a person does deliberately,
  * not something background saving does on their behalf.
  */
-import { useCallback, useEffect, useRef, useState } from "react";
-import { createStoreClient, StoreClientError, type StoreClient } from "./storeClient.ts";
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { createStoreClient, StoreClientError, type StoreClient } from './storeClient.ts';
 import {
   attachExistingDevice,
   createIndexedDbDeviceKeyStorage,
   type DeviceKeyStorage,
   type EnrollmentApi,
-} from "./deviceIdentity.ts";
-import { documentKeyFor, escrowDocumentKey, indexKeyFor, upsertEntry } from "./workspaceDocuments.ts";
-import type { DiagramFile } from "../domain/serialization.ts";
+} from './deviceIdentity.ts';
+import {
+  documentKeyFor,
+  escrowDocumentKey,
+  indexKeyFor,
+  upsertEntry,
+} from './workspaceDocuments.ts';
+import type { DiagramFile } from '../domain/serialization.ts';
 
 export type WorkspaceSyncStatus =
   /** No store, no device, or this document is not in the workspace. */
-  | "inactive"
-  | "saving"
-  | "saved"
+  | 'inactive'
+  | 'saving'
+  | 'saved'
   /** The store is unreachable. The work is still saved in this browser. */
-  | "offline"
-  | "error";
+  | 'offline'
+  | 'error';
 
 export interface WorkspaceSyncState {
   status: WorkspaceSyncStatus;
@@ -40,13 +45,13 @@ export interface WorkspaceSyncState {
 
 /** Told to the panel and back, so a document saved to the workspace starts
  * syncing without a reload. */
-export const WORKSPACE_CHANGED_EVENT = "system-design:workspace-changed";
+export const WORKSPACE_CHANGED_EVENT = 'system-design:workspace-changed';
 
 export function announceWorkspaceChange(): void {
   globalThis.dispatchEvent?.(new Event(WORKSPACE_CHANGED_EVENT));
 }
 
-const WORKSPACE_ID = "default";
+const WORKSPACE_ID = 'default';
 
 export interface WorkspaceSyncOptions {
   storeUrl: string | null;
@@ -57,12 +62,24 @@ export interface WorkspaceSyncOptions {
 
 export function useWorkspaceSync(options: WorkspaceSyncOptions) {
   const { storeUrl, docId } = options;
-  const [client] = useState<StoreClient | null>(() => options.client ?? (storeUrl ? createStoreClient({ baseUrl: storeUrl }) : null));
-  const [storage] = useState<DeviceKeyStorage>(() => options.keyStorage ?? createIndexedDbDeviceKeyStorage());
-  const [state, setState] = useState<WorkspaceSyncState>({ status: "inactive", version: null, message: null });
+  const [client] = useState<StoreClient | null>(
+    () => options.client ?? (storeUrl ? createStoreClient({ baseUrl: storeUrl }) : null),
+  );
+  const [storage] = useState<DeviceKeyStorage>(
+    () => options.keyStorage ?? createIndexedDbDeviceKeyStorage(),
+  );
+  const [state, setState] = useState<WorkspaceSyncState>({
+    status: 'inactive',
+    version: null,
+    message: null,
+  });
   /** What this document needs to be saved: set once the document is known
    * to be in the workspace, cleared when it is not. */
-  const tracked = useRef<{ workspaceKey: CryptoKey; documentKey: string; wrappedDocKey: string } | null>(null);
+  const tracked = useRef<{
+    workspaceKey: CryptoKey;
+    documentKey: string;
+    wrappedDocKey: string;
+  } | null>(null);
   const saving = useRef(false);
   const pending = useRef<DiagramFile | null>(null);
 
@@ -72,7 +89,8 @@ export function useWorkspaceSync(options: WorkspaceSyncOptions) {
     publishUserPublicKey: (publicKey) => client.publishUserPublicKey(publicKey),
     putWorkspaceKey: (generation, wrappedKey) => client.putWorkspaceKey(generation, wrappedKey),
     listDevices: () => client.listDevices(),
-    approveDevice: (deviceId, code, wrapped, from) => client.approveDevice(deviceId, code, wrapped, from),
+    approveDevice: (deviceId, code, wrapped, from) =>
+      client.approveDevice(deviceId, code, wrapped, from),
     setOwnUserKey: (deviceId, wrapped) => client.setOwnUserKey(deviceId, wrapped),
   };
 
@@ -81,18 +99,20 @@ export function useWorkspaceSync(options: WorkspaceSyncOptions) {
     if (!client || !api) return;
     try {
       const device = await attachExistingDevice({ api, storage });
-      if (device.status !== "ready" || !device.workspaceKey) {
+      if (device.status !== 'ready' || !device.workspaceKey) {
         tracked.current = null;
-        setState({ status: "inactive", version: null, message: null });
+        setState({ status: 'inactive', version: null, message: null });
         return;
       }
       const indexKey = await indexKeyFor(device.workspaceKey);
-      const entry = (await client.readIndex(WORKSPACE_ID, indexKey)).entries.find((candidate) => candidate.docId === docId);
+      const entry = (await client.readIndex(WORKSPACE_ID, indexKey)).entries.find(
+        (candidate) => candidate.docId === docId,
+      );
       if (!entry) {
         // Not in the workspace: this document is a local one, and nothing
         // should be uploaded for it.
         tracked.current = null;
-        setState({ status: "inactive", version: null, message: null });
+        setState({ status: 'inactive', version: null, message: null });
         return;
       }
       tracked.current = {
@@ -100,11 +120,16 @@ export function useWorkspaceSync(options: WorkspaceSyncOptions) {
         documentKey: await documentKeyFor(entry, device.workspaceKey),
         wrappedDocKey: entry.wrappedDocKey,
       };
-      setState((current) => ({ ...current, status: current.status === "inactive" ? "saved" : current.status, version: client.versionOf(docId) }));
+      setState((current) => ({
+        ...current,
+        status: current.status === 'inactive' ? 'saved' : current.status,
+        version: client.versionOf(docId),
+      }));
     } catch (error) {
       tracked.current = null;
       setState({
-        status: error instanceof StoreClientError && error.reason === "offline" ? "offline" : "inactive",
+        status:
+          error instanceof StoreClientError && error.reason === 'offline' ? 'offline' : 'inactive',
         version: null,
         message: null,
       });
@@ -140,7 +165,9 @@ export function useWorkspaceSync(options: WorkspaceSyncOptions) {
         const recoveryPem = await client.recoveryPublicKey();
         const version = await client.putDocument(docId, target.documentKey, file, {
           wrappedForWorkspace: target.wrappedDocKey,
-          ...(recoveryPem ? { wrappedForRecovery: await escrowDocumentKey(target.documentKey, recoveryPem) } : {}),
+          ...(recoveryPem
+            ? { wrappedForRecovery: await escrowDocumentKey(target.documentKey, recoveryPem) }
+            : {}),
         });
         // The index carries the title, so renaming a document shows up in
         // everyone's list rather than only in the document itself.
@@ -153,14 +180,14 @@ export function useWorkspaceSync(options: WorkspaceSyncOptions) {
             updatedAt: new Date().toISOString(),
           }),
         );
-        setState({ status: "saved", version, message: null });
+        setState({ status: 'saved', version, message: null });
       } catch (error) {
-        const offline = error instanceof StoreClientError && error.reason === "offline";
+        const offline = error instanceof StoreClientError && error.reason === 'offline';
         setState({
-          status: offline ? "offline" : "error",
+          status: offline ? 'offline' : 'error',
           version: client.versionOf(docId),
           message: offline
-            ? "The workspace is unreachable. Your work is saved in this browser and will go up when it returns."
+            ? 'The workspace is unreachable. Your work is saved in this browser and will go up when it returns.'
             : error instanceof StoreClientError
               ? error.message
               : String(error),
@@ -180,7 +207,7 @@ export function useWorkspaceSync(options: WorkspaceSyncOptions) {
         return;
       }
       saving.current = true;
-      setState((current) => ({ ...current, status: "saving" }));
+      setState((current) => ({ ...current, status: 'saving' }));
       // A loop rather than a recursive call: the queued document is saved
       // by this invocation, which keeps the callback a plain function.
       let next: DiagramFile | null = file;
@@ -194,5 +221,5 @@ export function useWorkspaceSync(options: WorkspaceSyncOptions) {
     [client, saveOnce],
   );
 
-  return { ...state, save, refresh: check, active: state.status !== "inactive" };
+  return { ...state, save, refresh: check, active: state.status !== 'inactive' };
 }

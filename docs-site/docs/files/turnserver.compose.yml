@@ -5,5 +5,5 @@ services:
     container_name: coturn
     network_mode: host
     volumes:
-      - "./turnserver.conf:/etc/coturn/turnserver.conf:ro"
+      - './turnserver.conf:/etc/coturn/turnserver.conf:ro'
     restart: unless-stopped

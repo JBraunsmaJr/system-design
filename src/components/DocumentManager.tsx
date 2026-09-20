@@ -1,9 +1,20 @@
-import { useCallback, useEffect, useState } from "react";
-import { Copy, FileText, FolderOpen, Minimize2, Pencil, Plus, RefreshCcw, Trash2, Users, X } from "lucide-react";
-import type { DocumentIndexEntry, StorageHealth } from "../domain/documentStore";
-import { requestPersistentStorage } from "../domain/documentStore";
-import type { DocumentLibrary } from "../collab/documentLibrary";
-import { TIMED_COPY_INTERVALS, type TimedCopiesSettings } from "../domain/timedCopies";
+import { useCallback, useEffect, useState } from 'react';
+import {
+  Copy,
+  FileText,
+  FolderOpen,
+  Minimize2,
+  Pencil,
+  Plus,
+  RefreshCcw,
+  Trash2,
+  Users,
+  X,
+} from 'lucide-react';
+import type { DocumentIndexEntry, StorageHealth } from '../domain/documentStore';
+import { requestPersistentStorage } from '../domain/documentStore';
+import type { DocumentLibrary } from '../collab/documentLibrary';
+import { TIMED_COPY_INTERVALS, type TimedCopiesSettings } from '../domain/timedCopies';
 
 interface DocumentManagerProps {
   isOpen: boolean;
@@ -25,7 +36,7 @@ interface DocumentManagerProps {
 }
 
 function formatBytes(bytes: number | undefined): string {
-  if (bytes === undefined) return "unknown";
+  if (bytes === undefined) return 'unknown';
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -34,7 +45,7 @@ function formatBytes(bytes: number | undefined): string {
 
 function formatWhen(iso: string): string {
   const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? "unknown" : date.toLocaleString();
+  return Number.isNaN(date.getTime()) ? 'unknown' : date.toLocaleString();
 }
 
 /**
@@ -92,10 +103,10 @@ export function DocumentManager({
   useEffect(() => {
     if (!isOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === 'Escape') onClose();
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, [isOpen, onClose]);
 
   const run = useCallback(
@@ -109,7 +120,7 @@ export function DocumentManager({
         await refresh();
       }
     },
-    [refresh]
+    [refresh],
   );
 
   const commitRename = useCallback(
@@ -121,7 +132,9 @@ export function DocumentManager({
       if (entry.docId === currentDocId) {
         onRenameCurrent(title);
         // The open document saves itself a moment later; show it now.
-        setEntries((prev) => prev?.map((e) => (e.docId === entry.docId ? { ...e, title } : e)) ?? prev);
+        setEntries(
+          (prev) => prev?.map((e) => (e.docId === entry.docId ? { ...e, title } : e)) ?? prev,
+        );
         return;
       }
       void run(async () => {
@@ -129,7 +142,7 @@ export function DocumentManager({
         if (!result.ok) setError(result.message);
       });
     },
-    [renaming, currentDocId, onRenameCurrent, library, run]
+    [renaming, currentDocId, onRenameCurrent, library, run],
   );
 
   const duplicate = useCallback(
@@ -143,7 +156,7 @@ export function DocumentManager({
         if (thenOpen) onOpenDocument(result.value.docId);
         else setNotice(`Created "${result.value.title}".`);
       }),
-    [library, run, onOpenDocument]
+    [library, run, onOpenDocument],
   );
 
   const forget = useCallback(
@@ -152,22 +165,22 @@ export function DocumentManager({
         `Forget "${entry.title}"?\n\n` +
           `This permanently deletes it from this browser - its content and its saved copy. ` +
           `It cannot be undone.\n\n` +
-          `Export it to a file first if you might need it again.`
+          `Export it to a file first if you might need it again.`,
       );
       if (!ok) return;
       void run(async () => {
         const result = await library.forget(entry);
         if (!result.ok) setError(result.message);
-        else if (result.value === "blocked") {
+        else if (result.value === 'blocked') {
           setNotice(
-            `"${entry.title}" is no longer listed. It is still open in another tab; its content is removed once that tab is closed.`
+            `"${entry.title}" is no longer listed. It is still open in another tab; its content is removed once that tab is closed.`,
           );
         } else {
           setNotice(`"${entry.title}" was forgotten.`);
         }
       });
     },
-    [library, run]
+    [library, run],
   );
 
   /** WS4-R7: safe at any time, so no confirmation. */
@@ -180,10 +193,10 @@ export function DocumentManager({
           setNotice(
             result.value.updatesBefore > 1
               ? `Compacted "${entry.title}": ${result.value.updatesBefore} stored updates became 1.`
-              : `"${entry.title}" is already compact.`
+              : `"${entry.title}" is already compact.`,
           );
       }),
-    [library, run]
+    [library, run],
   );
 
   /**
@@ -210,11 +223,13 @@ export function DocumentManager({
           return;
         }
         const kb = (n: number) => `${(n / 1024).toFixed(1)} KB`;
-        setNotice(`Rebased "${entry.title}": ${kb(result.value.bytesBefore)} became ${kb(result.value.bytesAfter)}.`);
+        setNotice(
+          `Rebased "${entry.title}": ${kb(result.value.bytesBefore)} became ${kb(result.value.bytesAfter)}.`,
+        );
         if (entry.docId === currentDocId) onOpenDocument(result.value.entry.docId);
       });
     },
-    [library, run, currentDocId, onOpenDocument]
+    [library, run, currentDocId, onOpenDocument],
   );
 
   if (!isOpen) return null;
@@ -222,7 +237,15 @@ export function DocumentManager({
   return (
     <div
       className="modal-overlay"
-      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0,0,0,0.6)',
+        zIndex: 1000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -233,26 +256,39 @@ export function DocumentManager({
         aria-modal="true"
         aria-label="Documents"
         style={{
-          background: "var(--bg-panel, #1e222b)",
-          color: "var(--text, #e7e9ee)",
+          background: 'var(--bg-panel, #1e222b)',
+          color: 'var(--text, #e7e9ee)',
           borderRadius: 8,
           width: 760,
-          maxWidth: "95vw",
-          maxHeight: "85vh",
-          display: "flex",
-          flexDirection: "column",
-          boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
-          border: "1px solid var(--border, #2d3342)",
-          overflow: "hidden",
+          maxWidth: '95vw',
+          maxHeight: '85vh',
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+          border: '1px solid var(--border, #2d3342)',
+          overflow: 'hidden',
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", borderBottom: "1px solid var(--border, #2d3342)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <FileText size={18} style={{ color: "var(--accent, #5B7CFA)" }} />
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '12px 18px',
+            borderBottom: '1px solid var(--border, #2d3342)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <FileText size={18} style={{ color: 'var(--accent, #5B7CFA)' }} />
             <strong>Documents in this browser</strong>
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button type="button" className="primary document-manager__new" onClick={onNewDocument} disabled={busy}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              className="primary document-manager__new"
+              onClick={onNewDocument}
+              disabled={busy}
+            >
               <Plus size={14} /> New document
             </button>
             <button type="button" aria-label="Close" onClick={onClose}>
@@ -261,20 +297,33 @@ export function DocumentManager({
           </div>
         </div>
 
-        <div className="document-manager__storage" style={{ padding: "8px 18px", fontSize: 12, color: "var(--text-muted, #9aa3b2)", borderBottom: "1px solid var(--border, #2d3342)" }}>
+        <div
+          className="document-manager__storage"
+          style={{
+            padding: '8px 18px',
+            fontSize: 12,
+            color: 'var(--text-muted, #9aa3b2)',
+            borderBottom: '1px solid var(--border, #2d3342)',
+          }}
+        >
           {health ? (
             <>
-              Using {formatBytes(health.usageBytes)} of {formatBytes(health.quotaBytes)} available.{" "}
+              Using {formatBytes(health.usageBytes)} of {formatBytes(health.quotaBytes)} available.{' '}
               {health.persisted ? (
-                <span className="document-manager__persisted">The browser will keep this storage.</span>
+                <span className="document-manager__persisted">
+                  The browser will keep this storage.
+                </span>
               ) : (
-                <span className="document-manager__not-persisted" style={{ color: "var(--warning, #e0a84a)" }}>
+                <span
+                  className="document-manager__not-persisted"
+                  style={{ color: 'var(--warning, #e0a84a)' }}
+                >
                   The browser may clear this storage when space runs low. Export anything important.
                 </span>
               )}
             </>
           ) : (
-            "Checking storage..."
+            'Checking storage...'
           )}
         </div>
 
@@ -283,19 +332,31 @@ export function DocumentManager({
         {timedCopies && onTimedCopiesChange && (
           <div
             className="document-manager__timed-copies"
-            style={{ padding: "8px 18px", fontSize: 12, borderBottom: "1px solid var(--border, #2d3342)", display: "grid", gap: 6 }}
+            style={{
+              padding: '8px 18px',
+              fontSize: 12,
+              borderBottom: '1px solid var(--border, #2d3342)',
+              display: 'grid',
+              gap: 6,
+            }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <strong>Timed copies</strong>
-              <span className="document-manager__timed-copies-state">{timedCopies.enabled ? "On" : "Off"}</span>
-              <label style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <span className="document-manager__timed-copies-state">
+                {timedCopies.enabled ? 'On' : 'Off'}
+              </span>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                 every
                 <select
                   aria-label="Minutes between copies"
                   value={timedCopies.minutes}
-                  onChange={(e) => onTimedCopiesChange({ ...timedCopies, minutes: Number(e.target.value) })}
+                  onChange={(e) =>
+                    onTimedCopiesChange({ ...timedCopies, minutes: Number(e.target.value) })
+                  }
                 >
-                  {(TIMED_COPY_INTERVALS as readonly number[]).includes(timedCopies.minutes) ? null : (
+                  {(TIMED_COPY_INTERVALS as readonly number[]).includes(
+                    timedCopies.minutes,
+                  ) ? null : (
                     <option value={timedCopies.minutes}>{timedCopies.minutes}</option>
                   )}
                   {TIMED_COPY_INTERVALS.map((m) => (
@@ -309,32 +370,44 @@ export function DocumentManager({
               <button
                 type="button"
                 className="document-manager__timed-copies-toggle"
-                onClick={() => onTimedCopiesChange({ ...timedCopies, enabled: !timedCopies.enabled })}
+                onClick={() =>
+                  onTimedCopiesChange({ ...timedCopies, enabled: !timedCopies.enabled })
+                }
               >
-                {timedCopies.enabled ? "Turn off" : "Turn on"}
+                {timedCopies.enabled ? 'Turn off' : 'Turn on'}
               </button>
             </div>
-            <p className="document-manager__timed-copies-explain" style={{ margin: 0, color: "var(--text-muted, #9aa3b2)" }}>
-              When on, this browser downloads a copy of the open document at that interval, but only if it changed
-              since the last copy. Copies go to your download folder with the date and time in the name. If your
-              browser asks where to save each download, set it to save downloads automatically, or it will ask every
-              time.
+            <p
+              className="document-manager__timed-copies-explain"
+              style={{ margin: 0, color: 'var(--text-muted, #9aa3b2)' }}
+            >
+              When on, this browser downloads a copy of the open document at that interval, but only
+              if it changed since the last copy. Copies go to your download folder with the date and
+              time in the name. If your browser asks where to save each download, set it to save
+              downloads automatically, or it will ask every time.
             </p>
           </div>
         )}
 
         {error && (
-          <div role="alert" style={{ padding: "8px 18px", color: "var(--danger, #e5534b)", fontSize: 13 }}>
+          <div
+            role="alert"
+            style={{ padding: '8px 18px', color: 'var(--danger, #e5534b)', fontSize: 13 }}
+          >
             {error}
           </div>
         )}
         {notice && (
-          <div role="status" className="document-manager__notice" style={{ padding: "8px 18px", fontSize: 13 }}>
+          <div
+            role="status"
+            className="document-manager__notice"
+            style={{ padding: '8px 18px', fontSize: 13 }}
+          >
             {notice}
           </div>
         )}
 
-        <div style={{ overflowY: "auto", padding: "6px 10px 12px" }}>
+        <div style={{ overflowY: 'auto', padding: '6px 10px 12px' }}>
           {entries === null ? (
             <div style={{ padding: 12 }}>Loading...</div>
           ) : entries.length === 0 ? (
@@ -342,7 +415,7 @@ export function DocumentManager({
           ) : (
             entries.map((entry) => {
               const isCurrent = entry.docId === currentDocId;
-              const fromSession = entry.origin === "session" && !!entry.sessionRoom;
+              const fromSession = entry.origin === 'session' && !!entry.sessionRoom;
               const isRenaming = renaming?.docId === entry.docId;
               return (
                 <div
@@ -350,12 +423,12 @@ export function DocumentManager({
                   className="document-manager__row"
                   data-doc-id={entry.docId}
                   style={{
-                    display: "flex",
-                    alignItems: "center",
+                    display: 'flex',
+                    alignItems: 'center',
                     gap: 10,
-                    padding: "8px",
+                    padding: '8px',
                     borderRadius: 6,
-                    background: isCurrent ? "var(--bg-active, #313848)" : "transparent",
+                    background: isCurrent ? 'var(--bg-active, #313848)' : 'transparent',
                   }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -367,22 +440,40 @@ export function DocumentManager({
                         value={renaming.title}
                         onChange={(e) => setRenaming({ docId: entry.docId, title: e.target.value })}
                         onKeyDown={(e) => {
-                          if (e.key === "Enter") commitRename(entry);
-                          if (e.key === "Escape") {
+                          if (e.key === 'Enter') commitRename(entry);
+                          if (e.key === 'Escape') {
                             e.stopPropagation();
                             setRenaming(null);
                           }
                         }}
                         onBlur={() => commitRename(entry)}
-                        style={{ width: "100%" }}
+                        style={{ width: '100%' }}
                       />
                     ) : (
-                      <div className="document-manager__title" style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <div
+                        className="document-manager__title"
+                        style={{
+                          fontWeight: 600,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
                         {entry.title}
                       </div>
                     )}
-                    <div style={{ fontSize: 11, color: "var(--text-muted, #9aa3b2)", display: "flex", gap: 10, flexWrap: "wrap" }}>
-                      {isCurrent && <span className="document-manager__current">Open in this tab</span>}
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: 'var(--text-muted, #9aa3b2)',
+                        display: 'flex',
+                        gap: 10,
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      {isCurrent && (
+                        <span className="document-manager__current">Open in this tab</span>
+                      )}
                       {fromSession && (
                         <span
                           className="document-manager__session"
@@ -450,7 +541,11 @@ export function DocumentManager({
                     disabled={isCurrent || busy}
                     onClick={() => forget(entry)}
                     aria-label={`Forget ${entry.title}`}
-                    title={isCurrent ? "Open another document to forget this one" : "Forget - permanently delete from this browser"}
+                    title={
+                      isCurrent
+                        ? 'Open another document to forget this one'
+                        : 'Forget - permanently delete from this browser'
+                    }
                   >
                     <Trash2 size={14} />
                   </button>

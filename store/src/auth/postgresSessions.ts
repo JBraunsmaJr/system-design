@@ -10,10 +10,10 @@
  * id - and expired rows are swept as they are touched, so a store left
  * running does not accumulate them.
  */
-import { randomBytes } from "crypto";
-import pg from "pg";
-import type { Identity, PendingLogin } from "./providers.ts";
-import type { Session, SessionStore } from "./sessions.ts";
+import { randomBytes } from 'crypto';
+import pg from 'pg';
+import type { Identity, PendingLogin } from './providers.ts';
+import type { Session, SessionStore } from './sessions.ts';
 
 export interface PostgresSessionOptions {
   ttlMs?: number;
@@ -31,7 +31,10 @@ interface SessionRow {
   expires_at: Date;
 }
 
-export function createPostgresSessionStore(pool: pg.Pool, options: PostgresSessionOptions = {}): SessionStore {
+export function createPostgresSessionStore(
+  pool: pg.Pool,
+  options: PostgresSessionOptions = {},
+): SessionStore {
   const ttl = options.ttlMs ?? 8 * 60 * 60 * 1000;
   const pendingTtl = options.pendingTtlMs ?? 10 * 60 * 1000;
   const now = options.now ?? Date.now;
@@ -43,7 +46,10 @@ export function createPostgresSessionStore(pool: pg.Pool, options: PostgresSessi
     if (now() - lastSweep < 60_000) return;
     lastSweep = now();
     await pool.query(`DELETE FROM sessions WHERE expires_at <= now()`);
-    await pool.query(`DELETE FROM pending_logins WHERE created_at <= now() - ($1::int * interval '1 millisecond')`, [pendingTtl]);
+    await pool.query(
+      `DELETE FROM pending_logins WHERE created_at <= now() - ($1::int * interval '1 millisecond')`,
+      [pendingTtl],
+    );
   }
 
   const toSession = (row: SessionRow): Session => ({
@@ -59,11 +65,18 @@ export function createPostgresSessionStore(pool: pg.Pool, options: PostgresSessi
   return {
     async create(identity: Identity) {
       await sweep();
-      const id = randomBytes(32).toString("base64url");
+      const id = randomBytes(32).toString('base64url');
       const result = await pool.query<SessionRow>(
         `INSERT INTO sessions (session_id, issuer, subject, display_name, created_at, expires_at)
          VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-        [id, identity.issuer, identity.subject, identity.displayName ?? null, new Date(now()), new Date(now() + ttl)],
+        [
+          id,
+          identity.issuer,
+          identity.subject,
+          identity.displayName ?? null,
+          new Date(now()),
+          new Date(now() + ttl),
+        ],
       );
       return toSession(result.rows[0]);
     },
@@ -72,7 +85,10 @@ export function createPostgresSessionStore(pool: pg.Pool, options: PostgresSessi
       if (!id) return null;
       // Expiry is part of the query: a session cannot outlive it even if
       // the sweep has not run.
-      const result = await pool.query<SessionRow>(`SELECT * FROM sessions WHERE session_id = $1 AND expires_at > now()`, [id]);
+      const result = await pool.query<SessionRow>(
+        `SELECT * FROM sessions WHERE session_id = $1 AND expires_at > now()`,
+        [id],
+      );
       return result.rows[0] ? toSession(result.rows[0]) : null;
     },
 
@@ -89,7 +105,14 @@ export function createPostgresSessionStore(pool: pg.Pool, options: PostgresSessi
       await pool.query(
         `INSERT INTO pending_logins (state, provider, nonce, code_verifier, redirect_uri, created_at)
          VALUES ($1, $2, $3, $4, $5, $6)`,
-        [login.state, login.provider, login.nonce, login.codeVerifier, login.redirectUri, new Date(login.createdAt)],
+        [
+          login.state,
+          login.provider,
+          login.nonce,
+          login.codeVerifier,
+          login.redirectUri,
+          new Date(login.createdAt),
+        ],
       );
     },
 

@@ -14,9 +14,26 @@
  * A document saved here is sealed in this browser. The store never sees a
  * title, a diagram, or a key - except in passthrough mode, which says so.
  */
-import { useCallback, useEffect, useRef, useState } from "react";
-import { CloudOff, Cloud, Loader2, ShieldAlert, Upload, FolderOpen, Trash2, Check, KeyRound, Laptop } from "lucide-react";
-import { createStoreClient, StoreClientError, type IndexEntry, type SessionInfo, type StoreClient } from "../collab/storeClient";
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  CloudOff,
+  Cloud,
+  Loader2,
+  ShieldAlert,
+  Upload,
+  FolderOpen,
+  Trash2,
+  Check,
+  KeyRound,
+  Laptop,
+} from 'lucide-react';
+import {
+  createStoreClient,
+  StoreClientError,
+  type IndexEntry,
+  type SessionInfo,
+  type StoreClient,
+} from '../collab/storeClient';
 import {
   approveOtherDevice,
   bootstrapFirstDevice,
@@ -25,14 +42,21 @@ import {
   type DeviceKeyStorage,
   type DeviceState,
   type EnrollmentApi,
-} from "../collab/deviceIdentity";
-import { documentKeyFor, escrowDocumentKey, indexKeyFor, newDocumentKey, removeEntry, upsertEntry } from "../collab/workspaceDocuments";
-import { rotateWorkspaceKey } from "../collab/workspaceRotation";
-import { announceWorkspaceChange } from "../collab/useWorkspaceSync";
-import { unwrapPrivateKeyWithPrivateKey } from "../crypto/keys";
-import type { DiagramFile } from "../domain/serialization";
+} from '../collab/deviceIdentity';
+import {
+  documentKeyFor,
+  escrowDocumentKey,
+  indexKeyFor,
+  newDocumentKey,
+  removeEntry,
+  upsertEntry,
+} from '../collab/workspaceDocuments';
+import { rotateWorkspaceKey } from '../collab/workspaceRotation';
+import { announceWorkspaceChange } from '../collab/useWorkspaceSync';
+import { unwrapPrivateKeyWithPrivateKey } from '../crypto/keys';
+import type { DiagramFile } from '../domain/serialization';
 
-const WORKSPACE_ID = "default";
+const WORKSPACE_ID = 'default';
 
 export interface WorkspacePanelProps {
   storeUrl: string;
@@ -46,7 +70,8 @@ export interface WorkspacePanelProps {
   client?: StoreClient;
 }
 
-type Phase = "checking" | "offline" | "signed-out" | "enrolling" | "awaiting-approval" | "ready" | "error";
+type Phase =
+  'checking' | 'offline' | 'signed-out' | 'enrolling' | 'awaiting-approval' | 'ready' | 'error';
 
 interface PendingDevice {
   deviceId: string;
@@ -56,15 +81,21 @@ interface PendingDevice {
 }
 
 export function WorkspacePanel(props: WorkspacePanelProps) {
-  const [client] = useState<StoreClient>(() => props.client ?? createStoreClient({ baseUrl: props.storeUrl }));
-  const [storage] = useState<DeviceKeyStorage>(() => props.keyStorage ?? createIndexedDbDeviceKeyStorage());
-  const [phase, setPhase] = useState<Phase>("checking");
+  const [client] = useState<StoreClient>(
+    () => props.client ?? createStoreClient({ baseUrl: props.storeUrl }),
+  );
+  const [storage] = useState<DeviceKeyStorage>(
+    () => props.keyStorage ?? createIndexedDbDeviceKeyStorage(),
+  );
+  const [phase, setPhase] = useState<Phase>('checking');
   const [session, setSession] = useState<SessionInfo | null>(null);
   const [providers, setProviders] = useState<string[]>([]);
   const [serverReadsContent, setServerReadsContent] = useState(false);
   const [device, setDevice] = useState<DeviceState | null>(null);
   const [pending, setPending] = useState<PendingDevice[]>([]);
-  const [devices, setDevices] = useState<{ deviceId: string; label?: string; approvedAt: string | null; revokedAt: string | null }[]>([]);
+  const [devices, setDevices] = useState<
+    { deviceId: string; label?: string; approvedAt: string | null; revokedAt: string | null }[]
+  >([]);
   const [generation, setGeneration] = useState(1);
   /** Set after revoking: a revoked device keeps the workspace key it
    * already unwrapped, and only rotation makes that key worthless. */
@@ -80,65 +111,89 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
     publishUserPublicKey: (publicKey) => client.publishUserPublicKey(publicKey),
     putWorkspaceKey: (generation, wrappedKey) => client.putWorkspaceKey(generation, wrappedKey),
     listDevices: () => client.listDevices(),
-    approveDevice: (deviceId, code, wrapped, from) => client.approveDevice(deviceId, code, wrapped, from),
+    approveDevice: (deviceId, code, wrapped, from) =>
+      client.approveDevice(deviceId, code, wrapped, from),
     setOwnUserKey: (deviceId, wrapped) => client.setOwnUserKey(deviceId, wrapped),
   };
 
   const say = (error: unknown): string => {
     if (error instanceof StoreClientError) {
-      if (error.reason === "offline") return "The workspace is unreachable. Your work is saved in this browser.";
-      if (error.reason === "rolled-back") return "The workspace offered an older version than this browser has seen. Nothing was applied.";
+      if (error.reason === 'offline')
+        return 'The workspace is unreachable. Your work is saved in this browser.';
+      if (error.reason === 'rolled-back')
+        return 'The workspace offered an older version than this browser has seen. Nothing was applied.';
       return error.message;
     }
     return String(error);
   };
 
-  const loadEntries = useCallback(async (key: CryptoKey) => {
-    const listed = await client.readIndex(WORKSPACE_ID, await indexKeyFor(key));
-    setEntries(listed.entries);
-    if (listed.generation) setGeneration(listed.generation);
-  }, [client]);
+  const loadEntries = useCallback(
+    async (key: CryptoKey) => {
+      const listed = await client.readIndex(WORKSPACE_ID, await indexKeyFor(key));
+      setEntries(listed.entries);
+      if (listed.generation) setGeneration(listed.generation);
+    },
+    [client],
+  );
 
   const refresh = useCallback(async () => {
     setBusy(true);
     try {
       const health = await client.health();
-      setServerReadsContent(health.cryptoMode === "passthrough");
+      setServerReadsContent(health.cryptoMode === 'passthrough');
       const who = await client.session();
       setSession(who);
       if (!who) {
         setProviders(await client.providers());
-        setPhase("signed-out");
+        setPhase('signed-out');
         return;
       }
       const state = await enrollDevice({ api, storage });
       setDevice(state);
-      if (state.status === "ready" && state.workspaceKey) {
+      if (state.status === 'ready' && state.workspaceKey) {
         workspaceKey.current = state.workspaceKey;
-        setPhase("ready");
+        setPhase('ready');
         await loadEntries(state.workspaceKey);
         // Devices of this person still waiting for approval (WS7-R11).
         const listed = await client.listDevices();
-        setDevices(listed.map((d) => ({ deviceId: d.deviceId, label: d.label, approvedAt: d.approvedAt, revokedAt: d.revokedAt })));
-        setPending(listed.filter((d) => !d.approvedAt && !d.revokedAt).map((d) => ({ deviceId: d.deviceId, publicKey: d.publicKey, verificationCode: d.verificationCode, label: d.label })));
-      } else if (state.status === "awaiting-approval") {
-        setPhase("awaiting-approval");
-      } else if (state.status === "needs-setup") {
+        setDevices(
+          listed.map((d) => ({
+            deviceId: d.deviceId,
+            label: d.label,
+            approvedAt: d.approvedAt,
+            revokedAt: d.revokedAt,
+          })),
+        );
+        setPending(
+          listed
+            .filter((d) => !d.approvedAt && !d.revokedAt)
+            .map((d) => ({
+              deviceId: d.deviceId,
+              publicKey: d.publicKey,
+              verificationCode: d.verificationCode,
+              label: d.label,
+            })),
+        );
+      } else if (state.status === 'awaiting-approval') {
+        setPhase('awaiting-approval');
+      } else if (state.status === 'needs-setup') {
         // The person's first browser: it makes the keys.
-        setPhase("enrolling");
+        setPhase('enrolling');
       } else {
-        setPhase("error");
+        setPhase('error');
         setMessage(state.message ?? null);
       }
       setMessage(null);
     } catch (error) {
-      setPhase(error instanceof StoreClientError && error.reason === "offline" ? "offline" : "error");
+      setPhase(
+        error instanceof StoreClientError && error.reason === 'offline' ? 'offline' : 'error',
+      );
       setMessage(say(error));
     } finally {
       setBusy(false);
     }
-  // api and storage are stable for the life of the panel.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // api and storage are stable for the life of the panel.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client, loadEntries, storage]);
 
   useEffect(() => {
@@ -167,14 +222,18 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
 
   const setUpKeys = () =>
     run(async () => {
-      const state = await bootstrapFirstDevice({ api, storage, label: navigator.userAgent.slice(0, 60) });
+      const state = await bootstrapFirstDevice({
+        api,
+        storage,
+        label: navigator.userAgent.slice(0, 60),
+      });
       setDevice(state);
-      if (state.status === "ready" && state.workspaceKey) {
+      if (state.status === 'ready' && state.workspaceKey) {
         workspaceKey.current = state.workspaceKey;
-        setPhase("ready");
+        setPhase('ready');
         await loadEntries(state.workspaceKey);
       } else {
-        setPhase(state.status === "awaiting-approval" ? "awaiting-approval" : "error");
+        setPhase(state.status === 'awaiting-approval' ? 'awaiting-approval' : 'error');
         setMessage(state.message ?? null);
       }
     });
@@ -182,11 +241,14 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
   const saveHere = () =>
     run(async () => {
       const key = workspaceKey.current;
-      if (!key) throw new Error("This browser cannot write to the workspace yet.");
+      if (!key) throw new Error('This browser cannot write to the workspace yet.');
       const file = props.buildCurrentFile();
       const existing = entries.find((entry) => entry.docId === props.currentDocId);
       const keys = existing
-        ? { documentKey: await documentKeyFor(existing, key), wrappedDocKey: existing.wrappedDocKey }
+        ? {
+            documentKey: await documentKeyFor(existing, key),
+            wrappedDocKey: existing.wrappedDocKey,
+          }
         : await newDocumentKey(key);
       // Also wrapped to the organization's recovery key, so the document
       // survives the loss of every workspace key (WS7-R4). The store
@@ -194,11 +256,18 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
       const recoveryPem = await client.recoveryPublicKey();
       await client.putDocument(props.currentDocId, keys.documentKey, file, {
         wrappedForWorkspace: keys.wrappedDocKey,
-        ...(recoveryPem ? { wrappedForRecovery: await escrowDocumentKey(keys.documentKey, recoveryPem) } : {}),
+        ...(recoveryPem
+          ? { wrappedForRecovery: await escrowDocumentKey(keys.documentKey, recoveryPem) }
+          : {}),
       });
       const indexKey = await indexKeyFor(key);
       const next = await client.updateIndex(WORKSPACE_ID, indexKey, (current) =>
-        upsertEntry(current, { docId: props.currentDocId, wrappedDocKey: keys.wrappedDocKey, title: file.title, updatedAt: new Date().toISOString() }),
+        upsertEntry(current, {
+          docId: props.currentDocId,
+          wrappedDocKey: keys.wrappedDocKey,
+          title: file.title,
+          updatedAt: new Date().toISOString(),
+        }),
       );
       setEntries(next);
       // From here the document keeps itself up to date: the editor picks
@@ -209,7 +278,7 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
   const openEntry = (entry: IndexEntry) =>
     run(async () => {
       const key = workspaceKey.current;
-      if (!key) throw new Error("This browser cannot read the workspace yet.");
+      if (!key) throw new Error('This browser cannot read the workspace yet.');
       const { file } = await client.getDocument(entry.docId, await documentKeyFor(entry, key));
       props.onOpenFile(file, entry.docId);
     });
@@ -219,7 +288,9 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
       const key = workspaceKey.current;
       if (!key) return;
       await client.deleteDocument(entry.docId);
-      const next = await client.updateIndex(WORKSPACE_ID, await indexKeyFor(key), (current) => removeEntry(current, entry.docId));
+      const next = await client.updateIndex(WORKSPACE_ID, await indexKeyFor(key), (current) =>
+        removeEntry(current, entry.docId),
+      );
       setEntries(next);
       announceWorkspaceChange();
     });
@@ -227,7 +298,11 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
   const revoke = (deviceId: string) =>
     run(async () => {
       await client.revokeDevice(deviceId);
-      setDevices((current) => current.map((d) => (d.deviceId === deviceId ? { ...d, revokedAt: new Date().toISOString() } : d)));
+      setDevices((current) =>
+        current.map((d) =>
+          d.deviceId === deviceId ? { ...d, revokedAt: new Date().toISOString() } : d,
+        ),
+      );
       setPending((current) => current.filter((d) => d.deviceId !== deviceId));
       // Revoking stops the store serving that browser, but it still holds
       // the workspace key it unwrapped. Only rotation ends that.
@@ -235,79 +310,132 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
     });
 
   const rotate = () =>
-    run(async () => {
-      const key = workspaceKey.current;
-      if (!key) throw new Error("This browser cannot rotate the workspace key yet.");
-      const result = await rotateWorkspaceKey({ client, workspaceId: WORKSPACE_ID, currentKey: key, currentGeneration: generation });
-      workspaceKey.current = result.workspaceKey;
-      setGeneration(result.generation);
-      setRotationAdvised(false);
-      await loadEntries(result.workspaceKey);
-      const others = result.selfOnly
-        ? " Only your own key was replaced: ask an administrator to give the new one to everyone else."
-        : "";
-      const skipped = result.membersSkipped.length
-        ? ` ${result.membersSkipped.length} member(s) have not signed in since publishing a key and will get the new one when they do: ${result.membersSkipped.join(", ")}.`
-        : "";
-      setMessage(
-        `Rotated to key ${result.generation}: ${result.documentsRewrapped} document(s) re-wrapped, ${result.membersGranted} member(s) given the new key. No document content was re-encrypted.${others}${skipped}`,
-      );
-    }, { keepMessage: true });
+    run(
+      async () => {
+        const key = workspaceKey.current;
+        if (!key) throw new Error('This browser cannot rotate the workspace key yet.');
+        const result = await rotateWorkspaceKey({
+          client,
+          workspaceId: WORKSPACE_ID,
+          currentKey: key,
+          currentGeneration: generation,
+        });
+        workspaceKey.current = result.workspaceKey;
+        setGeneration(result.generation);
+        setRotationAdvised(false);
+        await loadEntries(result.workspaceKey);
+        const others = result.selfOnly
+          ? ' Only your own key was replaced: ask an administrator to give the new one to everyone else.'
+          : '';
+        const skipped = result.membersSkipped.length
+          ? ` ${result.membersSkipped.length} member(s) have not signed in since publishing a key and will get the new one when they do: ${result.membersSkipped.join(', ')}.`
+          : '';
+        setMessage(
+          `Rotated to key ${result.generation}: ${result.documentsRewrapped} document(s) re-wrapped, ${result.membersGranted} member(s) given the new key. No document content was re-encrypted.${others}${skipped}`,
+        );
+      },
+      { keepMessage: true },
+    );
 
   const approve = (target: PendingDevice) =>
     run(async () => {
       const held = await storage.load();
       const key = workspaceKey.current;
-      if (!held || !key) throw new Error("This browser cannot approve another yet.");
+      if (!held || !key) throw new Error('This browser cannot approve another yet.');
       const keys = await client.keysForDevice(held.deviceId);
-      if (keys.status !== "approved") throw new Error("This browser is not approved itself.");
+      if (keys.status !== 'approved') throw new Error('This browser is not approved itself.');
       const userKey = await unwrapPrivateKeyWithPrivateKey(
         {
           keyWrap: Uint8Array.from(atob(keys.wrappedUserKey.keyWrap), (c) => c.charCodeAt(0)),
           body: Uint8Array.from(atob(keys.wrappedUserKey.body), (c) => c.charCodeAt(0)),
         },
         held.keyPair.privateKey,
-        { docId: "user-key", kind: "key-wrap", version: 1 },
+        { docId: 'user-key', kind: 'key-wrap', version: 1 },
       );
       await approveOtherDevice({ api, storage, thisDeviceId: held.deviceId, userKey }, target);
       // Re-read rather than patch the list: the approved browser now counts
       // among those with access, and appears in the list below.
       const listed = await client.listDevices();
-      setDevices(listed.map((d) => ({ deviceId: d.deviceId, label: d.label, approvedAt: d.approvedAt, revokedAt: d.revokedAt })));
+      setDevices(
+        listed.map((d) => ({
+          deviceId: d.deviceId,
+          label: d.label,
+          approvedAt: d.approvedAt,
+          revokedAt: d.revokedAt,
+        })),
+      );
       setPending(
         listed
           .filter((d) => !d.approvedAt && !d.revokedAt)
-          .map((d) => ({ deviceId: d.deviceId, publicKey: d.publicKey, verificationCode: d.verificationCode, label: d.label })),
+          .map((d) => ({
+            deviceId: d.deviceId,
+            publicKey: d.publicKey,
+            verificationCode: d.verificationCode,
+            label: d.label,
+          })),
       );
     });
 
   return (
-    <div className="workspace-panel" data-phase={phase} style={{ padding: "10px 18px", borderBottom: "1px solid var(--border, #2d3342)", display: "grid", gap: 8, fontSize: 12 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        {phase === "offline" ? <CloudOff size={14} /> : <Cloud size={14} />}
+    <div
+      className="workspace-panel"
+      data-phase={phase}
+      style={{
+        padding: '10px 18px',
+        borderBottom: '1px solid var(--border, #2d3342)',
+        display: 'grid',
+        gap: 8,
+        fontSize: 12,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        {phase === 'offline' ? <CloudOff size={14} /> : <Cloud size={14} />}
         <strong>Workspace</strong>
         {busy && <Loader2 size={12} className="workspace-panel__busy" />}
-        {session && <span className="workspace-panel__who" style={{ color: "var(--text-muted, #9aa3b2)" }}>{session.displayName ?? session.subject}</span>}
+        {session && (
+          <span className="workspace-panel__who" style={{ color: 'var(--text-muted, #9aa3b2)' }}>
+            {session.displayName ?? session.subject}
+          </span>
+        )}
       </div>
 
       {serverReadsContent && (
         // WS6-R3: not dismissible, and stated plainly.
-        <p className="workspace-panel__passthrough" role="alert" style={{ margin: 0, color: "var(--warning, #e0a84a)", display: "flex", gap: 6, alignItems: "center" }}>
-          <ShieldAlert size={14} /> This workspace stores documents unencrypted: the server can read their contents.
+        <p
+          className="workspace-panel__passthrough"
+          role="alert"
+          style={{
+            margin: 0,
+            color: 'var(--warning, #e0a84a)',
+            display: 'flex',
+            gap: 6,
+            alignItems: 'center',
+          }}
+        >
+          <ShieldAlert size={14} /> This workspace stores documents unencrypted: the server can read
+          their contents.
         </p>
       )}
 
-      {phase === "offline" && <p className="workspace-panel__status" style={{ margin: 0 }}>The workspace is unreachable. Your work is saved in this browser.</p>}
+      {phase === 'offline' && (
+        <p className="workspace-panel__status" style={{ margin: 0 }}>
+          The workspace is unreachable. Your work is saved in this browser.
+        </p>
+      )}
 
-      {phase === "signed-out" && (
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+      {phase === 'signed-out' && (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <span>Sign in to use the workspace:</span>
           {providers.map((provider) => (
             <button
               key={provider}
               type="button"
               className="workspace-panel__sign-in"
-              onClick={() => globalThis.location.assign(`${props.storeUrl}/v1/auth/${encodeURIComponent(provider)}/start`)}
+              onClick={() =>
+                globalThis.location.assign(
+                  `${props.storeUrl}/v1/auth/${encodeURIComponent(provider)}/start`,
+                )
+              }
             >
               {provider}
             </button>
@@ -315,37 +443,60 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
         </div>
       )}
 
-      {phase === "enrolling" && (
-        <div style={{ display: "grid", gap: 6 }}>
+      {phase === 'enrolling' && (
+        <div style={{ display: 'grid', gap: 6 }}>
           <p style={{ margin: 0 }}>This browser has no workspace keys yet.</p>
-          <button type="button" className="workspace-panel__bootstrap" onClick={() => void setUpKeys()} disabled={busy}>
+          <button
+            type="button"
+            className="workspace-panel__bootstrap"
+            onClick={() => void setUpKeys()}
+            disabled={busy}
+          >
             Set up this browser
           </button>
         </div>
       )}
 
-      {phase === "awaiting-approval" && (
-        <div style={{ display: "grid", gap: 6 }}>
+      {phase === 'awaiting-approval' && (
+        <div style={{ display: 'grid', gap: 6 }}>
           <p style={{ margin: 0 }}>
-            Waiting for approval. On a browser you already use, open File &gt; Documents and approve this one, checking the code matches.
+            Waiting for approval. On a browser you already use, open File &gt; Documents and approve
+            this one, checking the code matches.
           </p>
-          <code className="workspace-panel__code" style={{ fontSize: 16, letterSpacing: 1 }}>{device?.verificationCode}</code>
-          <button type="button" className="workspace-panel__recheck" onClick={() => void refresh()} disabled={busy}>
+          <code className="workspace-panel__code" style={{ fontSize: 16, letterSpacing: 1 }}>
+            {device?.verificationCode}
+          </code>
+          <button
+            type="button"
+            className="workspace-panel__recheck"
+            onClick={() => void refresh()}
+            disabled={busy}
+          >
             Check again
           </button>
         </div>
       )}
 
-      {phase === "ready" && (
-        <div style={{ display: "grid", gap: 8 }}>
+      {phase === 'ready' && (
+        <div style={{ display: 'grid', gap: 8 }}>
           {pending.length > 0 && (
-            <div className="workspace-panel__pending" style={{ display: "grid", gap: 4 }}>
+            <div className="workspace-panel__pending" style={{ display: 'grid', gap: 4 }}>
               <strong>Waiting to be approved</strong>
               {pending.map((target) => (
-                <div key={target.deviceId} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <div
+                  key={target.deviceId}
+                  style={{ display: 'flex', gap: 8, alignItems: 'center' }}
+                >
                   <code>{target.verificationCode}</code>
-                  <span style={{ color: "var(--text-muted, #9aa3b2)" }}>{target.label ?? "another browser"}</span>
-                  <button type="button" className="workspace-panel__approve" onClick={() => void approve(target)} disabled={busy}>
+                  <span style={{ color: 'var(--text-muted, #9aa3b2)' }}>
+                    {target.label ?? 'another browser'}
+                  </span>
+                  <button
+                    type="button"
+                    className="workspace-panel__approve"
+                    onClick={() => void approve(target)}
+                    disabled={busy}
+                  >
                     <Check size={12} /> Codes match, approve
                   </button>
                 </div>
@@ -353,8 +504,13 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
             </div>
           )}
 
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <button type="button" className="workspace-panel__save" onClick={() => void saveHere()} disabled={busy}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="workspace-panel__save"
+              onClick={() => void saveHere()}
+              disabled={busy}
+            >
               <Upload size={12} /> Save this document to the workspace
             </button>
             <button
@@ -363,7 +519,7 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
               onClick={() => {
                 if (
                   window.confirm(
-                    "Replace the workspace key?\n\nEvery document is re-wrapped under a new key; their contents are not re-encrypted and nothing is lost. Anyone holding the old key - including a device you have revoked - can no longer open anything saved afterwards.\n\nMembers who have not signed in recently will get the new key when they next do.",
+                    'Replace the workspace key?\n\nEvery document is re-wrapped under a new key; their contents are not re-encrypted and nothing is lost. Anyone holding the old key - including a device you have revoked - can no longer open anything saved afterwards.\n\nMembers who have not signed in recently will get the new key when they next do.',
                   )
                 ) {
                   void rotate();
@@ -374,28 +530,45 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
             >
               <KeyRound size={12} /> Rotate key
             </button>
-            <span className="workspace-panel__generation" style={{ color: "var(--text-muted, #9aa3b2)" }}>
+            <span
+              className="workspace-panel__generation"
+              style={{ color: 'var(--text-muted, #9aa3b2)' }}
+            >
               key {generation}
             </span>
           </div>
 
           {rotationAdvised && (
-            <p className="workspace-panel__rotation-advice" role="alert" style={{ margin: 0, color: "var(--warning, #e0a84a)" }}>
-              That browser can no longer reach the workspace, but it still holds the key it already had. Rotate the key so it
-              cannot open anything saved from now on.
+            <p
+              className="workspace-panel__rotation-advice"
+              role="alert"
+              style={{ margin: 0, color: 'var(--warning, #e0a84a)' }}
+            >
+              That browser can no longer reach the workspace, but it still holds the key it already
+              had. Rotate the key so it cannot open anything saved from now on.
             </p>
           )}
 
           {devices.length > 1 && (
-            <div className="workspace-panel__devices" style={{ display: "grid", gap: 4 }}>
+            <div className="workspace-panel__devices" style={{ display: 'grid', gap: 4 }}>
               <strong>Browsers with access</strong>
               {devices
                 .filter((device) => device.approvedAt && !device.revokedAt)
                 .map((device) => (
-                  <div key={device.deviceId} className="workspace-panel__device" data-device-id={device.deviceId} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <div
+                    key={device.deviceId}
+                    className="workspace-panel__device"
+                    data-device-id={device.deviceId}
+                    style={{ display: 'flex', gap: 8, alignItems: 'center' }}
+                  >
                     <Laptop size={12} />
                     <span style={{ flex: 1 }}>{device.label ?? device.deviceId}</span>
-                    <button type="button" className="workspace-panel__revoke" onClick={() => void revoke(device.deviceId)} disabled={busy}>
+                    <button
+                      type="button"
+                      className="workspace-panel__revoke"
+                      onClick={() => void revoke(device.deviceId)}
+                      disabled={busy}
+                    >
                       Revoke
                     </button>
                   </div>
@@ -404,16 +577,38 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
           )}
 
           {entries.length === 0 ? (
-            <p style={{ margin: 0, color: "var(--text-muted, #9aa3b2)" }}>No documents in the workspace yet.</p>
+            <p style={{ margin: 0, color: 'var(--text-muted, #9aa3b2)' }}>
+              No documents in the workspace yet.
+            </p>
           ) : (
-            <ul className="workspace-panel__list" style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 4 }}>
+            <ul
+              className="workspace-panel__list"
+              style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 4 }}
+            >
               {entries.map((entry) => (
-                <li key={entry.docId} className="workspace-panel__entry" data-doc-id={entry.docId} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <span className="workspace-panel__title" style={{ flex: 1 }}>{entry.title}</span>
-                  <button type="button" className="workspace-panel__open" onClick={() => void openEntry(entry)} disabled={busy}>
+                <li
+                  key={entry.docId}
+                  className="workspace-panel__entry"
+                  data-doc-id={entry.docId}
+                  style={{ display: 'flex', gap: 8, alignItems: 'center' }}
+                >
+                  <span className="workspace-panel__title" style={{ flex: 1 }}>
+                    {entry.title}
+                  </span>
+                  <button
+                    type="button"
+                    className="workspace-panel__open"
+                    onClick={() => void openEntry(entry)}
+                    disabled={busy}
+                  >
                     <FolderOpen size={12} /> Open
                   </button>
-                  <button type="button" className="workspace-panel__remove" onClick={() => void removeEntryFromWorkspace(entry)} disabled={busy}>
+                  <button
+                    type="button"
+                    className="workspace-panel__remove"
+                    onClick={() => void removeEntryFromWorkspace(entry)}
+                    disabled={busy}
+                  >
                     <Trash2 size={12} />
                   </button>
                 </li>
@@ -424,7 +619,11 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
       )}
 
       {message && (
-        <p className="workspace-panel__message" role="alert" style={{ margin: 0, color: "var(--danger, #e06c75)" }}>
+        <p
+          className="workspace-panel__message"
+          role="alert"
+          style={{ margin: 0, color: 'var(--danger, #e06c75)' }}
+        >
           {message}
         </p>
       )}

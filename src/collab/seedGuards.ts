@@ -17,20 +17,20 @@
  *  2. The seeds themselves skip ids that are already present, so a caller that
  *     forgets defence 1 still cannot corrupt anything.
  */
-import * as Y from "yjs";
+import * as Y from 'yjs';
 
 /** Root collections that indicate a document already holds content. Keep in
  * step with the seedYjs*Doc functions - a collection seeded but not listed
  * here would let an emptiness check pass against a populated document. */
 const CONTENT_COLLECTIONS = [
-  "nodeOrder",
-  "edgeOrder",
-  "itemTypeOrder",
-  "categoryOrder",
-  "itemOrder",
-  "piOrder",
-  "milestoneOrder",
-  "memberOrder",
+  'nodeOrder',
+  'edgeOrder',
+  'itemTypeOrder',
+  'categoryOrder',
+  'itemOrder',
+  'piOrder',
+  'milestoneOrder',
+  'memberOrder',
 ] as const;
 
 /**
@@ -41,9 +41,7 @@ const CONTENT_COLLECTIONS = [
  * instantiating every nested Y.Map just to count them.
  */
 export function isYjsDocEmpty(doc: Y.Doc): boolean {
-  return CONTENT_COLLECTIONS.every(
-    (name) => doc.getArray<string>(name).length === 0,
-  );
+  return CONTENT_COLLECTIONS.every((name) => doc.getArray<string>(name).length === 0);
 }
 
 /** Ids already present in an ordering array, as a set for O(1) lookup during
@@ -58,11 +56,7 @@ export function orderIdSet(order: Y.Array<string>): Set<string> {
  * Returns whether the id was appended, so callers can skip building the
  * associated Y.Map entirely rather than constructing one and discarding it.
  */
-export function pushIfAbsent(
-  order: Y.Array<string>,
-  seen: Set<string>,
-  id: string,
-): boolean {
+export function pushIfAbsent(order: Y.Array<string>, seen: Set<string>, id: string): boolean {
   if (seen.has(id)) return false;
   order.push([id]);
   seen.add(id);

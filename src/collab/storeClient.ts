@@ -15,10 +15,14 @@
  * - **Index writes are conditional** (WS9-R3). A collision means re-reading
  *   and re-applying the change, not overwriting someone else's.
  */
-import { createStorageCrypto, type CryptoMode, type StorageCrypto } from "../crypto/storageCrypto.ts";
-import { deriveStorageKey } from "../crypto/keys.ts";
-import type { BlobContext } from "../crypto/envelope.ts";
-import type { DiagramFile } from "../domain/serialization.ts";
+import {
+  createStorageCrypto,
+  type CryptoMode,
+  type StorageCrypto,
+} from '../crypto/storageCrypto.ts';
+import { deriveStorageKey } from '../crypto/keys.ts';
+import type { BlobContext } from '../crypto/envelope.ts';
+import type { DiagramFile } from '../domain/serialization.ts';
 
 export interface StoreClientOptions {
   /** Where the store is, e.g. https://store.example.com */
@@ -29,16 +33,16 @@ export interface StoreClientOptions {
 }
 
 export type StoreClientErrorReason =
-  | "unauthenticated"
-  | "not-found"
-  | "deleted"
-  | "conflict"
-  | "rolled-back"
-  | "quota"
-  | "too-large"
-  | "offline"
-  | "unreadable"
-  | "store-error";
+  | 'unauthenticated'
+  | 'not-found'
+  | 'deleted'
+  | 'conflict'
+  | 'rolled-back'
+  | 'quota'
+  | 'too-large'
+  | 'offline'
+  | 'unreadable'
+  | 'store-error';
 
 export class StoreClientError extends Error {
   reason: StoreClientErrorReason;
@@ -46,7 +50,7 @@ export class StoreClientError extends Error {
 
   constructor(message: string, reason: StoreClientErrorReason, status?: number) {
     super(message);
-    this.name = "StoreClientError";
+    this.name = 'StoreClientError';
     this.reason = reason;
     this.status = status;
   }
@@ -72,9 +76,12 @@ const toBase64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes));
 const fromBase64 = (value: string) => Uint8Array.from(atob(value), (c) => c.charCodeAt(0));
 
 export function createStoreClient(options: StoreClientOptions) {
-  const call = options.fetch ?? ((input: RequestInfo | URL, init?: RequestInit) => fetch(input, { ...init, credentials: "include" }));
-  const crypto: StorageCrypto = createStorageCrypto(options.mode ?? "webcrypto");
-  const base = options.baseUrl.replace(/\/+$/, "");
+  const call =
+    options.fetch ??
+    ((input: RequestInfo | URL, init?: RequestInit) =>
+      fetch(input, { ...init, credentials: 'include' }));
+  const crypto: StorageCrypto = createStorageCrypto(options.mode ?? 'webcrypto');
+  const base = options.baseUrl.replace(/\/+$/, '');
   /** The highest version seen per document (WS8-R15). */
   const seen = new Map<string, number>();
   let recoveryKeyPem: string | null | undefined;
@@ -90,31 +97,35 @@ export function createStoreClient(options: StoreClientOptions) {
       response = await call(`${base}${path}`, {
         ...init,
         headers: {
-          ...(init.body ? { "content-type": "application/json" } : {}),
-          ...(known !== undefined ? { "if-document-version": String(known) } : {}),
+          ...(init.body ? { 'content-type': 'application/json' } : {}),
+          ...(known !== undefined ? { 'if-document-version': String(known) } : {}),
           ...(init.headers ?? {}),
         },
       });
     } catch (error) {
       // The store being unreachable is ordinary - the editor works without
       // it - so it is its own reason rather than an error to surface raw.
-      throw new StoreClientError(`The store could not be reached: ${String(error)}`, "offline");
+      throw new StoreClientError(`The store could not be reached: ${String(error)}`, 'offline');
     }
     const text = await response.text();
     let body: Record<string, unknown>;
     try {
       body = text ? (JSON.parse(text) as Record<string, unknown>) : {};
     } catch {
-      throw new StoreClientError("The store returned something that is not JSON.", "store-error", response.status);
+      throw new StoreClientError(
+        'The store returned something that is not JSON.',
+        'store-error',
+        response.status,
+      );
     }
-    const header = response.headers.get("x-document-version");
+    const header = response.headers.get('x-document-version');
     const version = header === null ? null : Number(header);
     if (docId && version !== null) {
       const highest = seen.get(docId);
       if (highest !== undefined && version < highest) {
         throw new StoreClientError(
           `The store returned version ${version} of ${docId}, older than version ${highest} already seen. Not applying it.`,
-          "rolled-back",
+          'rolled-back',
         );
       }
       seen.set(docId, version);
@@ -122,28 +133,46 @@ export function createStoreClient(options: StoreClientOptions) {
     if (!response.ok) {
       const error = (body.error ?? {}) as { reason?: string; message?: string };
       const reason: StoreClientErrorReason =
-        error.reason === "stale-version"
-          ? "rolled-back"
-          : (["unauthenticated", "not-found", "deleted", "conflict", "quota", "too-large"] as const).includes(
-                error.reason as never,
-              )
+        error.reason === 'stale-version'
+          ? 'rolled-back'
+          : (
+                [
+                  'unauthenticated',
+                  'not-found',
+                  'deleted',
+                  'conflict',
+                  'quota',
+                  'too-large',
+                ] as const
+              ).includes(error.reason as never)
             ? (error.reason as StoreClientErrorReason)
-            : "store-error";
-      throw new StoreClientError(error.message ?? `The store refused the request (${response.status}).`, reason, response.status);
+            : 'store-error';
+      throw new StoreClientError(
+        error.message ?? `The store refused the request (${response.status}).`,
+        reason,
+        response.status,
+      );
     }
     return { status: response.status, body, version };
   }
 
-  const contextFor = (docId: string, kind: BlobContext["kind"], version: number): BlobContext => ({ docId, kind, version });
+  const contextFor = (docId: string, kind: BlobContext['kind'], version: number): BlobContext => ({
+    docId,
+    kind,
+    version,
+  });
 
   return {
     /** What the store is: its mode, and whether it requires sign-in. A
      * client shows the WS6-R3 warning from `cryptoMode: "passthrough"`. */
-    async health(): Promise<{ cryptoMode: "webcrypto" | "passthrough"; authentication: "none" | "required" }> {
-      const { body } = await request("/v1/health");
+    async health(): Promise<{
+      cryptoMode: 'webcrypto' | 'passthrough';
+      authentication: 'none' | 'required';
+    }> {
+      const { body } = await request('/v1/health');
       return {
-        cryptoMode: (body.cryptoMode as "webcrypto" | "passthrough") ?? "webcrypto",
-        authentication: (body.authentication as "none" | "required") ?? "required",
+        cryptoMode: (body.cryptoMode as 'webcrypto' | 'passthrough') ?? 'webcrypto',
+        authentication: (body.authentication as 'none' | 'required') ?? 'required',
       };
     },
 
@@ -154,7 +183,7 @@ export function createStoreClient(options: StoreClientOptions) {
      */
     async recoveryPublicKey(): Promise<string | null> {
       if (recoveryKeyPem === undefined) {
-        const { body } = await request("/v1/recovery-key");
+        const { body } = await request('/v1/recovery-key');
         recoveryKeyPem = (body.publicKey as string | null) ?? null;
       }
       return recoveryKeyPem;
@@ -163,21 +192,21 @@ export function createStoreClient(options: StoreClientOptions) {
     /** Who the store thinks we are, or null when not signed in. */
     async session(): Promise<SessionInfo | null> {
       try {
-        const { body } = await request("/v1/auth/session");
+        const { body } = await request('/v1/auth/session');
         return (body.session as SessionInfo) ?? null;
       } catch (error) {
-        if (error instanceof StoreClientError && error.reason === "unauthenticated") return null;
+        if (error instanceof StoreClientError && error.reason === 'unauthenticated') return null;
         throw error;
       }
     },
 
     /** Ends the session at the store, so the cookie stops working. */
     async logout(): Promise<void> {
-      await request("/v1/auth/logout", { method: "POST" });
+      await request('/v1/auth/logout', { method: 'POST' });
     },
 
     async providers(): Promise<string[]> {
-      const { body } = await request("/v1/auth/providers");
+      const { body } = await request('/v1/auth/providers');
       return (body.providers as string[]) ?? [];
     },
 
@@ -191,7 +220,12 @@ export function createStoreClient(options: StoreClientOptions) {
      * The blob is sealed with the storage key derived from the document key
      * (WS7-R1), bound to this document and version (WS6-R4).
      */
-    async putDocument(docId: string, documentKey: string, file: DiagramFile, wraps: { wrappedForWorkspace: string; wrappedForRecovery?: string }): Promise<number> {
+    async putDocument(
+      docId: string,
+      documentKey: string,
+      file: DiagramFile,
+      wraps: { wrappedForWorkspace: string; wrappedForRecovery?: string },
+    ): Promise<number> {
       const key = await deriveStorageKey(documentKey);
       let version = seen.get(docId) ?? null;
       if (version === null) {
@@ -199,9 +233,9 @@ export function createStoreClient(options: StoreClientOptions) {
           const head = await request(`/v1/docs/${encodeURIComponent(docId)}`, { docId });
           version = (head.body.document as { version: number }).version;
         } catch (error) {
-          if (!(error instanceof StoreClientError) || error.reason !== "not-found") throw error;
-          const created = await request("/v1/docs", {
-            method: "POST",
+          if (!(error instanceof StoreClientError) || error.reason !== 'not-found') throw error;
+          const created = await request('/v1/docs', {
+            method: 'POST',
             docId,
             body: JSON.stringify({ docId, keys: wraps }),
           });
@@ -211,45 +245,64 @@ export function createStoreClient(options: StoreClientOptions) {
       // Sealed against the version it will carry: the store increments on
       // accepting it, so a blob written at version n is opened at n.
       const next = version + 1;
-      const sealed = await crypto.seal(contextFor(docId, "snapshot", next), encoder.encode(JSON.stringify(file)), key);
+      const sealed = await crypto.seal(
+        contextFor(docId, 'snapshot', next),
+        encoder.encode(JSON.stringify(file)),
+        key,
+      );
       const appended = await request(`/v1/docs/${encodeURIComponent(docId)}/compact`, {
-        method: "POST",
+        method: 'POST',
         docId,
-        body: JSON.stringify({ kind: "snapshot", bytes: toBase64(sealed) }),
+        body: JSON.stringify({ kind: 'snapshot', bytes: toBase64(sealed) }),
       });
       return (appended.body.document as { version: number }).version;
     },
 
     /** Fetches and opens a document. */
-    async getDocument(docId: string, documentKey: string): Promise<{ file: DiagramFile; version: number }> {
+    async getDocument(
+      docId: string,
+      documentKey: string,
+    ): Promise<{ file: DiagramFile; version: number }> {
       const key = await deriveStorageKey(documentKey);
       const { body } = await request(`/v1/docs/${encodeURIComponent(docId)}`, { docId });
       const record = body.document as { version: number };
       const blobs = (body.blobs as { kind: string; version: number; bytes: string }[]) ?? [];
-      const snapshot = [...blobs].reverse().find((blob) => blob.kind === "snapshot") ?? blobs[blobs.length - 1];
-      if (!snapshot) throw new StoreClientError(`Document ${docId} holds nothing yet.`, "not-found");
+      const snapshot =
+        [...blobs].reverse().find((blob) => blob.kind === 'snapshot') ?? blobs[blobs.length - 1];
+      if (!snapshot)
+        throw new StoreClientError(`Document ${docId} holds nothing yet.`, 'not-found');
       let plaintext: Uint8Array;
       try {
-        plaintext = await crypto.open(contextFor(docId, snapshot.kind as BlobContext["kind"], snapshot.version), fromBase64(snapshot.bytes), key);
+        plaintext = await crypto.open(
+          contextFor(docId, snapshot.kind as BlobContext['kind'], snapshot.version),
+          fromBase64(snapshot.bytes),
+          key,
+        );
       } catch (error) {
         // The link's key does not match what sealed this, or the blob was
         // altered. Either way it is not something to open.
         throw new StoreClientError(
           `Could not open ${docId}: the key does not match, or the stored data was altered. (${String(error)})`,
-          "unreadable",
+          'unreadable',
         );
       }
       try {
-        return { file: JSON.parse(decoder.decode(plaintext)) as DiagramFile, version: record.version };
+        return {
+          file: JSON.parse(decoder.decode(plaintext)) as DiagramFile,
+          version: record.version,
+        };
       } catch {
-        throw new StoreClientError(`Document ${docId} opened, but does not contain a diagram.`, "unreadable");
+        throw new StoreClientError(
+          `Document ${docId} opened, but does not contain a diagram.`,
+          'unreadable',
+        );
       }
     },
 
     /** WS7-R7: the document key re-wrapped under a new workspace key. */
     async rewrapDocument(docId: string, wrappedForWorkspace: string): Promise<void> {
       await request(`/v1/docs/${encodeURIComponent(docId)}/keys`, {
-        method: "PUT",
+        method: 'PUT',
         body: JSON.stringify({ wrappedForWorkspace }),
       });
     },
@@ -257,53 +310,76 @@ export function createStoreClient(options: StoreClientOptions) {
     /** Members and their public user keys, for wrapping a new workspace key
      * to each of them (WS7-R7, R8). Administrators only. */
     async listMembers(): Promise<{ userId: string; displayName?: string; publicKey?: string }[]> {
-      const { body } = await request("/v1/admin/users");
+      const { body } = await request('/v1/admin/users');
       return body.users as { userId: string; displayName?: string; publicKey?: string }[];
     },
 
     async grantWorkspaceKey(userId: string, generation: number, wrappedKey: string): Promise<void> {
       await request(`/v1/admin/users/${encodeURIComponent(userId)}/workspace-key`, {
-        method: "PUT",
+        method: 'PUT',
         body: JSON.stringify({ generation, wrappedKey }),
       });
     },
 
     async deleteDocument(docId: string): Promise<void> {
-      await request(`/v1/docs/${encodeURIComponent(docId)}`, { method: "DELETE", docId });
+      await request(`/v1/docs/${encodeURIComponent(docId)}`, { method: 'DELETE', docId });
     },
 
     // -- devices and keys (WS7-R8, R11) ------------------------------------
 
     async registerDevice(publicKey: string, label?: string) {
-      const { body } = await request("/v1/users/me/devices", { method: "POST", body: JSON.stringify({ publicKey, label }) });
-      return body.device as { deviceId: string; verificationCode: string; approvedAt: string | null };
+      const { body } = await request('/v1/users/me/devices', {
+        method: 'POST',
+        body: JSON.stringify({ publicKey, label }),
+      });
+      return body.device as {
+        deviceId: string;
+        verificationCode: string;
+        approvedAt: string | null;
+      };
     },
 
     /** This person, as the directory holds them, including their public
      * user key. */
     async me(): Promise<{ userId: string; displayName?: string; publicKey?: string }> {
-      const { body } = await request("/v1/users/me");
+      const { body } = await request('/v1/users/me');
       return body.user as { userId: string; displayName?: string; publicKey?: string };
     },
 
     async listDevices() {
-      const { body } = await request("/v1/users/me/devices");
-      return body.devices as { deviceId: string; publicKey: string; verificationCode: string; approvedAt: string | null; revokedAt: string | null; label?: string }[];
+      const { body } = await request('/v1/users/me/devices');
+      return body.devices as {
+        deviceId: string;
+        publicKey: string;
+        verificationCode: string;
+        approvedAt: string | null;
+        revokedAt: string | null;
+        label?: string;
+      }[];
     },
 
     /** What this device is given: nothing until another approves it. */
     async keysForDevice(deviceId: string) {
-      const { body } = await request("/v1/users/me/keys", { headers: { "x-device-id": deviceId } });
+      const { body } = await request('/v1/users/me/keys', { headers: { 'x-device-id': deviceId } });
       return body as
-        | { status: "awaiting-approval"; verificationCode: string }
-        | { status: "needs-setup"; verificationCode: string }
-        | { status: "approved"; wrappedUserKey: { keyWrap: string; body: string }; workspaceKeys: { generation: number; wrappedKey: string }[] };
+        | { status: 'awaiting-approval'; verificationCode: string }
+        | { status: 'needs-setup'; verificationCode: string }
+        | {
+            status: 'approved';
+            wrappedUserKey: { keyWrap: string; body: string };
+            workspaceKeys: { generation: number; wrappedKey: string }[];
+          };
     },
 
-    async approveDevice(deviceId: string, verificationCode: string, wrappedUserKey: { keyWrap: string; body: string }, fromDeviceId: string) {
+    async approveDevice(
+      deviceId: string,
+      verificationCode: string,
+      wrappedUserKey: { keyWrap: string; body: string },
+      fromDeviceId: string,
+    ) {
       await request(`/v1/users/me/devices/${encodeURIComponent(deviceId)}/approve`, {
-        method: "POST",
-        headers: { "x-device-id": fromDeviceId },
+        method: 'POST',
+        headers: { 'x-device-id': fromDeviceId },
         body: JSON.stringify({ verificationCode, wrappedUserKey }),
       });
     },
@@ -312,45 +388,57 @@ export function createStoreClient(options: StoreClientOptions) {
      * itself, so its next visit can recover it. */
     async setOwnUserKey(deviceId: string, wrappedUserKey: { keyWrap: string; body: string }) {
       await request(`/v1/users/me/devices/${encodeURIComponent(deviceId)}/user-key`, {
-        method: "PUT",
-        headers: { "x-device-id": deviceId },
+        method: 'PUT',
+        headers: { 'x-device-id': deviceId },
         body: JSON.stringify({ wrappedUserKey }),
       });
     },
 
     async revokeDevice(deviceId: string) {
-      await request(`/v1/users/me/devices/${encodeURIComponent(deviceId)}`, { method: "DELETE" });
+      await request(`/v1/users/me/devices/${encodeURIComponent(deviceId)}`, { method: 'DELETE' });
     },
 
     async publishUserPublicKey(publicKey: string) {
-      await request("/v1/users/me/public-key", { method: "PUT", body: JSON.stringify({ publicKey }) });
+      await request('/v1/users/me/public-key', {
+        method: 'PUT',
+        body: JSON.stringify({ publicKey }),
+      });
     },
 
     async putWorkspaceKey(generation: number, wrappedKey: string) {
-      await request("/v1/users/me/keys", { method: "PUT", body: JSON.stringify({ generation, wrappedKey }) });
+      await request('/v1/users/me/keys', {
+        method: 'PUT',
+        body: JSON.stringify({ generation, wrappedKey }),
+      });
     },
 
     /** WS7-R12: the sealed user key and its salt, for unlocking with a
      * recovery code on a browser with no approved device. */
     async putRecovery(salt: string, sealedUserKey: string) {
-      await request("/v1/users/me/recovery", { method: "PUT", body: JSON.stringify({ salt, sealedUserKey }) });
+      await request('/v1/users/me/recovery', {
+        method: 'PUT',
+        body: JSON.stringify({ salt, sealedUserKey }),
+      });
     },
 
     async getRecovery() {
-      const { body } = await request("/v1/users/me/recovery");
+      const { body } = await request('/v1/users/me/recovery');
       return (body.recovery as { salt: string; sealedUserKey: string } | null) ?? null;
     },
 
     // -- the workspace index (WS9) -----------------------------------------
 
-    async readIndex(workspaceId: string, indexKey: CryptoKey): Promise<{ entries: IndexEntry[]; version: number | null; generation: number | null }> {
+    async readIndex(
+      workspaceId: string,
+      indexKey: CryptoKey,
+    ): Promise<{ entries: IndexEntry[]; version: number | null; generation: number | null }> {
       const { body } = await request(`/v1/workspaces/${encodeURIComponent(workspaceId)}/index`);
       const sealed = body.index as string | null;
       const version = (body.version as number | null) ?? null;
       const generation = (body.generation as number | null) ?? null;
       if (!sealed) return { entries: [], version, generation };
       const opened = await crypto.open(
-        { docId: workspaceId, kind: "index", version: 1 },
+        { docId: workspaceId, kind: 'index', version: 1 },
         fromBase64(sealed),
         indexKey,
       );
@@ -370,13 +458,17 @@ export function createStoreClient(options: StoreClientOptions) {
       generation?: number,
     ): Promise<void> {
       const sealed = await crypto.seal(
-        { docId: workspaceId, kind: "index", version: 1 },
+        { docId: workspaceId, kind: 'index', version: 1 },
         encoder.encode(JSON.stringify(entries)),
         indexKey,
       );
       await request(`/v1/workspaces/${encodeURIComponent(workspaceId)}/index`, {
-        method: "PUT",
-        body: JSON.stringify({ index: toBase64(sealed), expectedVersion, ...(generation ? { generation } : {}) }),
+        method: 'PUT',
+        body: JSON.stringify({
+          index: toBase64(sealed),
+          expectedVersion,
+          ...(generation ? { generation } : {}),
+        }),
       });
     },
 
@@ -396,24 +488,31 @@ export function createStoreClient(options: StoreClientOptions) {
         const { entries, version } = await this.readIndex(workspaceId, indexKey);
         const next = change(entries);
         const sealed = await crypto.seal(
-          { docId: workspaceId, kind: "index", version: 1 },
+          { docId: workspaceId, kind: 'index', version: 1 },
           encoder.encode(JSON.stringify(next)),
           indexKey,
         );
         try {
           await request(`/v1/workspaces/${encodeURIComponent(workspaceId)}/index`, {
-            method: "PUT",
-            body: JSON.stringify({ index: toBase64(sealed), expectedVersion: version, ...(generation ? { generation } : {}) }),
+            method: 'PUT',
+            body: JSON.stringify({
+              index: toBase64(sealed),
+              expectedVersion: version,
+              ...(generation ? { generation } : {}),
+            }),
           });
           return next;
         } catch (error) {
-          const isCollision = error instanceof StoreClientError && error.reason === "conflict";
+          const isCollision = error instanceof StoreClientError && error.reason === 'conflict';
           if (!isCollision || attempt === attempts) throw error;
           // Someone else wrote between the read and the write: read again
           // and apply the change to what is now there.
         }
       }
-      throw new StoreClientError("The workspace index is being changed faster than this client can keep up.", "conflict");
+      throw new StoreClientError(
+        'The workspace index is being changed faster than this client can keep up.',
+        'conflict',
+      );
     },
   };
 }

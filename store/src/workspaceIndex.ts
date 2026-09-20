@@ -19,7 +19,7 @@ export interface IndexSnapshot {
   generation: number;
 }
 
-export type IndexErrorReason = "conflict" | "not-found";
+export type IndexErrorReason = 'conflict' | 'not-found';
 
 export class IndexError extends Error {
   reason: IndexErrorReason;
@@ -29,7 +29,7 @@ export class IndexError extends Error {
 
   constructor(message: string, reason: IndexErrorReason, currentVersion?: number) {
     super(message);
-    this.name = "IndexError";
+    this.name = 'IndexError';
     this.reason = reason;
     this.currentVersion = currentVersion;
   }
@@ -41,10 +41,17 @@ export interface WorkspaceIndexStore {
    * `expectedVersion` is the version the client read. Absent means "this
    * workspace has no index yet"; anything else is a conflict.
    */
-  put(workspaceId: string, sealed: string, expectedVersion: number | null, generation?: number): Promise<IndexSnapshot>;
+  put(
+    workspaceId: string,
+    sealed: string,
+    expectedVersion: number | null,
+    generation?: number,
+  ): Promise<IndexSnapshot>;
 }
 
-export function createMemoryWorkspaceIndex(now: () => Date = () => new Date()): WorkspaceIndexStore {
+export function createMemoryWorkspaceIndex(
+  now: () => Date = () => new Date(),
+): WorkspaceIndexStore {
   const indexes = new Map<string, IndexSnapshot>();
 
   return {
@@ -59,9 +66,9 @@ export function createMemoryWorkspaceIndex(now: () => Date = () => new Date()): 
       if (current !== expectedVersion) {
         throw new IndexError(
           existing
-            ? `The workspace index has moved on: you wrote against version ${expectedVersion ?? "none"}, and it is at ${current}. Re-read it and apply your change again.`
+            ? `The workspace index has moved on: you wrote against version ${expectedVersion ?? 'none'}, and it is at ${current}. Re-read it and apply your change again.`
             : `There is no index for ${workspaceId} yet; write against no version to create one.`,
-          "conflict",
+          'conflict',
           current ?? undefined,
         );
       }

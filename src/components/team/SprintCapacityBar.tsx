@@ -1,8 +1,16 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { Users, ChevronDown, ChevronUp, AlertTriangle, CheckCircle2, Calendar, ShieldAlert } from "lucide-react";
-import type { SprintCapacitySummary } from "../../domain/teamTypes";
-import { computeFlippedPosition } from "../../domain/popoverPosition";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import {
+  Users,
+  ChevronDown,
+  ChevronUp,
+  AlertTriangle,
+  CheckCircle2,
+  Calendar,
+  ShieldAlert,
+} from 'lucide-react';
+import type { SprintCapacitySummary } from '../../domain/teamTypes';
+import { computeFlippedPosition } from '../../domain/popoverPosition';
 
 interface SprintCapacityBarProps {
   summary: SprintCapacitySummary;
@@ -28,7 +36,11 @@ interface SprintCapacityBarProps {
  */
 export function SprintCapacityBar({ summary, compact = false }: SprintCapacityBarProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [breakdownPos, setBreakdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [breakdownPos, setBreakdownPos] = useState<{
+    top: number;
+    left: number;
+    width: number;
+  } | null>(null);
   const triggerRef = useRef<HTMLDivElement>(null);
   const breakdownRef = useRef<HTMLDivElement>(null);
 
@@ -48,11 +60,11 @@ export function SprintCapacityBar({ summary, compact = false }: SprintCapacityBa
   const percent = hasCapacity ? Math.round((totalAssignedPoints / totalCapacityPoints) * 100) : 0;
   const isOverCapacity = totalAssignedPoints > totalCapacityPoints && hasCapacity;
 
-  let barColorClass = "sprint-capacity-bar__fill--normal";
+  let barColorClass = 'sprint-capacity-bar__fill--normal';
   if (isOverCapacity) {
-    barColorClass = "sprint-capacity-bar__fill--danger";
+    barColorClass = 'sprint-capacity-bar__fill--danger';
   } else if (percent >= 90) {
-    barColorClass = "sprint-capacity-bar__fill--warning";
+    barColorClass = 'sprint-capacity-bar__fill--warning';
   }
 
   const getInitials = (name: string) => {
@@ -60,7 +72,7 @@ export function SprintCapacityBar({ summary, compact = false }: SprintCapacityBa
       .trim()
       .split(/\s+/)
       .map((n) => n[0])
-      .join("")
+      .join('')
       .toUpperCase()
       .slice(0, 2);
   };
@@ -84,10 +96,12 @@ export function SprintCapacityBar({ summary, compact = false }: SprintCapacityBa
     const next = computeFlippedPosition(
       triggerRect,
       { width: breakdownRect.width, height: breakdownRect.height },
-      { width: window.innerWidth, height: window.innerHeight }
+      { width: window.innerWidth, height: window.innerHeight },
     );
     setBreakdownPos((prev) =>
-      prev && prev.top === next.top && prev.left === next.left ? prev : { ...next, width: triggerRect.width }
+      prev && prev.top === next.top && prev.left === next.left
+        ? prev
+        : { ...next, width: triggerRect.width },
     );
   }, [isExpanded]);
 
@@ -107,28 +121,28 @@ export function SprintCapacityBar({ summary, compact = false }: SprintCapacityBa
       close();
     };
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
+      if (e.key === 'Escape') close();
     };
-    document.addEventListener("mousedown", handleMouseDown);
-    document.addEventListener("keydown", handleEscape);
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('keydown', handleEscape);
     return () => {
-      document.removeEventListener("mousedown", handleMouseDown);
-      document.removeEventListener("keydown", handleEscape);
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('keydown', handleEscape);
     };
   }, [isExpanded]);
 
   useEffect(() => {
     if (!isExpanded) return;
-    window.addEventListener("scroll", reposition, true);
-    window.addEventListener("resize", reposition);
+    window.addEventListener('scroll', reposition, true);
+    window.addEventListener('resize', reposition);
     return () => {
-      window.removeEventListener("scroll", reposition, true);
-      window.removeEventListener("resize", reposition);
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
     };
   }, [isExpanded, reposition]);
 
   return (
-    <div className={`sprint-capacity-bar${compact ? " sprint-capacity-bar--compact" : ""}`}>
+    <div className={`sprint-capacity-bar${compact ? ' sprint-capacity-bar--compact' : ''}`}>
       <div
         ref={triggerRef}
         className="sprint-capacity-bar__header"
@@ -136,7 +150,7 @@ export function SprintCapacityBar({ summary, compact = false }: SprintCapacityBa
         role="button"
         tabIndex={0}
         onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
+          if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             if (isExpanded) {
               close();
@@ -156,7 +170,10 @@ export function SprintCapacityBar({ summary, compact = false }: SprintCapacityBa
             <span className="sprint-capacity-bar__points">
               <strong>{totalAssignedPoints}</strong> / {totalCapacityPoints} pts
               {totalReservedPoints > 0 && (
-                <span className="sprint-capacity-bar__reserved-pill" title={`Gross: ${grossCapacityPoints} pts, Reserved: ${totalReservedPoints} pts`}>
+                <span
+                  className="sprint-capacity-bar__reserved-pill"
+                  title={`Gross: ${grossCapacityPoints} pts, Reserved: ${totalReservedPoints} pts`}
+                >
                   <ShieldAlert size={10} /> -{totalReservedPoints} res
                 </span>
               )}
@@ -185,7 +202,8 @@ export function SprintCapacityBar({ summary, compact = false }: SprintCapacityBa
               )}
             </span>
             <span className="sprint-capacity-bar__days-badge">
-              <Calendar size={12} /> <span className="sprint-capacity-bar__b-days">{sprintBusinessDays} b-days</span>
+              <Calendar size={12} />{' '}
+              <span className="sprint-capacity-bar__b-days">{sprintBusinessDays} b-days</span>
             </span>
           </div>
         </div>
@@ -193,7 +211,7 @@ export function SprintCapacityBar({ summary, compact = false }: SprintCapacityBa
         <button
           type="button"
           className="sprint-capacity-bar__toggle-btn"
-          aria-label={isExpanded ? "Collapse member breakdown" : "Expand member breakdown"}
+          aria-label={isExpanded ? 'Collapse member breakdown' : 'Expand member breakdown'}
         >
           {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
         </button>
@@ -205,7 +223,12 @@ export function SprintCapacityBar({ summary, compact = false }: SprintCapacityBa
           <div
             ref={breakdownRef}
             className="sprint-capacity-bar__breakdown"
-            style={{ position: "fixed", top: breakdownPos.top, left: breakdownPos.left, width: breakdownPos.width }}
+            style={{
+              position: 'fixed',
+              top: breakdownPos.top,
+              left: breakdownPos.left,
+              width: breakdownPos.width,
+            }}
           >
             <div className="sprint-capacity-bar__breakdown-title">Sprint Capacity Breakdown</div>
 
@@ -223,7 +246,7 @@ export function SprintCapacityBar({ summary, compact = false }: SprintCapacityBa
                   {appliedReservations.map((r) => (
                     <span key={r.id} className="sprint-capacity-bar__res-tag">
                       {r.name}: {r.value}
-                      {r.unit === "percentage" ? "%" : " pts"}
+                      {r.unit === 'percentage' ? '%' : ' pts'}
                     </span>
                   ))}
                 </div>
@@ -237,7 +260,10 @@ export function SprintCapacityBar({ summary, compact = false }: SprintCapacityBa
             ) : (
               <div className="sprint-capacity-bar__member-list">
                 {memberBreakdown.map((m) => {
-                  const memberPercent = m.capacityPoints > 0 ? Math.round((m.assignedPoints / m.capacityPoints) * 100) : 0;
+                  const memberPercent =
+                    m.capacityPoints > 0
+                      ? Math.round((m.assignedPoints / m.capacityPoints) * 100)
+                      : 0;
                   const memberOver = m.assignedPoints > m.capacityPoints && m.capacityPoints > 0;
                   return (
                     <div key={m.memberId} className="sprint-capacity-bar__member-item">
@@ -245,14 +271,14 @@ export function SprintCapacityBar({ summary, compact = false }: SprintCapacityBa
                         <div className="sprint-capacity-bar__member-info">
                           <span
                             className="sprint-capacity-bar__member-avatar"
-                            style={{ backgroundColor: m.avatarColor ?? "#5b7cfa" }}
+                            style={{ backgroundColor: m.avatarColor ?? '#5b7cfa' }}
                           >
                             {getInitials(m.memberName)}
                           </span>
                           <div className="sprint-capacity-bar__member-names">
                             <span className="sprint-capacity-bar__member-name">{m.memberName}</span>
                             <span className="sprint-capacity-bar__member-sub">
-                              {m.workingDays}d work {m.ptoDays > 0 ? `(${m.ptoDays}d PTO)` : ""}
+                              {m.workingDays}d work {m.ptoDays > 0 ? `(${m.ptoDays}d PTO)` : ''}
                               {m.reservedPoints > 0 && ` • -${m.reservedPoints} res`}
                             </span>
                           </div>
@@ -264,7 +290,11 @@ export function SprintCapacityBar({ summary, compact = false }: SprintCapacityBa
                           </span>
                           <span
                             className={`sprint-capacity-bar__member-remaining${
-                              memberOver ? " is-over" : m.remainingPoints === 0 ? " is-exact" : " is-available"
+                              memberOver
+                                ? ' is-over'
+                                : m.remainingPoints === 0
+                                  ? ' is-exact'
+                                  : ' is-available'
                             }`}
                           >
                             {memberOver
@@ -278,10 +308,10 @@ export function SprintCapacityBar({ summary, compact = false }: SprintCapacityBa
                         <div
                           className={`sprint-capacity-bar__member-fill${
                             memberOver
-                              ? " sprint-capacity-bar__fill--danger"
+                              ? ' sprint-capacity-bar__fill--danger'
                               : memberPercent >= 90
-                              ? " sprint-capacity-bar__fill--warning"
-                              : " sprint-capacity-bar__fill--normal"
+                                ? ' sprint-capacity-bar__fill--warning'
+                                : ' sprint-capacity-bar__fill--normal'
                           }`}
                           style={{ width: `${Math.min(100, memberPercent)}%` }}
                         />
@@ -299,7 +329,7 @@ export function SprintCapacityBar({ summary, compact = false }: SprintCapacityBa
               </div>
             )}
           </div>,
-          document.body
+          document.body,
         )}
     </div>
   );

@@ -22,7 +22,7 @@ export interface EdgeEndpoints {
 }
 
 /** Which end of the edge is being dragged. */
-export type EdgeEnd = "source" | "target";
+export type EdgeEnd = 'source' | 'target';
 
 /**
  * The end being dragged, from the `handleType` React Flow passes to
@@ -37,8 +37,10 @@ export type EdgeEnd = "source" | "target";
  * discarded the gesture - so dragging an edge end onto another node did
  * nothing at all.
  */
-export function draggedEndFromReconnectStart(anchoredHandleType: string | null | undefined): EdgeEnd {
-  return anchoredHandleType === "source" ? "target" : "source";
+export function draggedEndFromReconnectStart(
+  anchoredHandleType: string | null | undefined,
+): EdgeEnd {
+  return anchoredHandleType === 'source' ? 'target' : 'source';
 }
 
 /** Handles are `string | null | undefined` depending on who produced
@@ -76,28 +78,30 @@ export function isSameEndpoints(a: EdgeEndpoints, b: EdgeEndpoints): boolean {
 export function normalizeReconnection(
   oldEdge: EdgeEndpoints,
   connection: EdgeEndpoints,
-  draggedEnd: EdgeEnd
+  draggedEnd: EdgeEnd,
 ): EdgeEndpoints {
-  const anchoredNode = draggedEnd === "target" ? oldEdge.source : oldEdge.target;
-  const anchoredHandle = draggedEnd === "target" ? oldEdge.sourceHandle : oldEdge.targetHandle;
+  const anchoredNode = draggedEnd === 'target' ? oldEdge.source : oldEdge.target;
+  const anchoredHandle = draggedEnd === 'target' ? oldEdge.sourceHandle : oldEdge.targetHandle;
 
   const ends = [
     { node: connection.source, handle: connection.sourceHandle },
     { node: connection.target, handle: connection.targetHandle },
   ];
 
-  let anchoredIndex = ends.findIndex((e) => e.node === anchoredNode && sameHandle(e.handle, anchoredHandle));
+  let anchoredIndex = ends.findIndex(
+    (e) => e.node === anchoredNode && sameHandle(e.handle, anchoredHandle),
+  );
   if (anchoredIndex === -1) anchoredIndex = ends.findIndex((e) => e.node === anchoredNode);
   if (anchoredIndex === -1) {
     // Neither end of the Connection is the anchored one at all. That
     // shouldn't happen, but guessing wrong here would reverse an edge,
     // so fall back to React Flow's own orientation rather than to
     // whichever end happens to be first.
-    anchoredIndex = draggedEnd === "target" ? 0 : 1;
+    anchoredIndex = draggedEnd === 'target' ? 0 : 1;
   }
   const dragged = ends[anchoredIndex === 0 ? 1 : 0];
 
-  return draggedEnd === "target"
+  return draggedEnd === 'target'
     ? {
         source: anchoredNode,
         sourceHandle: anchoredHandle,
@@ -133,7 +137,7 @@ export type ReconnectionCheck = { ok: true } | { ok: false; reason: string };
  */
 export function validateReconnection(
   next: EdgeEndpoints,
-  nodeIdsAtLevel: ReadonlySet<string>
+  nodeIdsAtLevel: ReadonlySet<string>,
 ): ReconnectionCheck {
   if (!nodeIdsAtLevel.has(next.source)) {
     return { ok: false, reason: `source node ${next.source} is not at this diagram level` };

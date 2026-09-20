@@ -18,7 +18,7 @@ export function runCpuCalibration(iterations: number = 2_000_000): number {
   const duration = performance.now() - start;
   // Ensure optimizer doesn't eliminate loop
   if (acc === 0) {
-    console.log("zero acc");
+    console.log('zero acc');
   }
   return Number(duration.toFixed(2));
 }

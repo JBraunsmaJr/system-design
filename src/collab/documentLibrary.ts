@@ -10,13 +10,18 @@
  * save would put the old title back), and forgetting removes the content
  * database as well as the index entry.
  */
-import * as Y from "yjs";
-import type { DocumentIndexEntry, DocumentStore, StorageResult } from "../domain/documentStore.ts";
-import { newDocumentId } from "../domain/documentStore.ts";
-import { toDiagramFile, type DiagramFile } from "../domain/serialization.ts";
-import { openDocument, storageKeyForDocument, type OpenDocument } from "./localDocument.ts";
-import { readDocumentContents, rebaseDocument, canRebase, type RebaseEligibility } from "./rebase.ts";
-import type { CompactionResult } from "./persistence.ts";
+import * as Y from 'yjs';
+import type { DocumentIndexEntry, DocumentStore, StorageResult } from '../domain/documentStore.ts';
+import { newDocumentId } from '../domain/documentStore.ts';
+import { toDiagramFile, type DiagramFile } from '../domain/serialization.ts';
+import { openDocument, storageKeyForDocument, type OpenDocument } from './localDocument.ts';
+import {
+  readDocumentContents,
+  rebaseDocument,
+  canRebase,
+  type RebaseEligibility,
+} from './rebase.ts';
+import type { CompactionResult } from './persistence.ts';
 
 export interface DocumentLibraryDeps {
   store: DocumentStore;
@@ -29,7 +34,7 @@ export interface DocumentLibraryDeps {
 /** `blocked`: another tab still has the database open. The deletion completes
  * once that tab lets go, so the caller should say so rather than report
  * failure. */
-export type DeleteOutcome = "deleted" | "blocked";
+export type DeleteOutcome = 'deleted' | 'blocked';
 
 export interface DocumentLibrary {
   list(): Promise<StorageResult<DocumentIndexEntry[]>>;
@@ -67,7 +72,7 @@ export interface DocumentLibraryOptions {
 
 /** The content database a document's live replica is kept in: its document
  * key, or - for a joined session's replica - the room key it was stored under. */
-export function contentDatabaseFor(entry: Pick<DocumentIndexEntry, "docId">): string {
+export function contentDatabaseFor(entry: Pick<DocumentIndexEntry, 'docId'>): string {
   return storageKeyForDocument(entry.docId);
 }
 
@@ -88,22 +93,27 @@ function fileFromDoc(doc: Y.Doc): DiagramFile {
 function defaultDeleteDatabase(name: string): Promise<DeleteOutcome> {
   return new Promise((resolve, reject) => {
     const request = globalThis.indexedDB.deleteDatabase(name);
-    request.onsuccess = () => resolve("deleted");
+    request.onsuccess = () => resolve('deleted');
     request.onerror = () => reject(request.error);
     // Another tab holds it open. The request stays queued and completes when
     // that tab closes; waiting here would hang the UI on the other tab.
-    request.onblocked = () => resolve("blocked");
+    request.onblocked = () => resolve('blocked');
   });
 }
 
-const failed = <T,>(message: string): StorageResult<T> => ({ ok: false, reason: "unknown", message });
+const failed = <T>(message: string): StorageResult<T> => ({
+  ok: false,
+  reason: 'unknown',
+  message,
+});
 
 export function createDocumentLibrary(
   deps: DocumentLibraryDeps,
   options: DocumentLibraryOptions = { reconciliationWindowMs: 30 * 86_400_000 },
 ): DocumentLibrary {
   const { store } = deps;
-  const open = deps.open ?? ((docId: string, initial?: DiagramFile) => openDocument({ docId, initial }));
+  const open =
+    deps.open ?? ((docId: string, initial?: DiagramFile) => openDocument({ docId, initial }));
   const deleteDatabase = deps.deleteDatabase ?? defaultDeleteDatabase;
 
   /** The live content of a stored document. */
@@ -120,12 +130,15 @@ export function createDocumentLibrary(
     async list() {
       const listed = await store.listDocuments();
       if (!listed.ok) return listed;
-      return { ok: true, value: [...listed.value].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) };
+      return {
+        ok: true,
+        value: [...listed.value].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+      };
     },
 
     async rename(entry, title) {
       const trimmed = title.trim();
-      if (!trimmed) return failed("A document needs a name.");
+      if (!trimmed) return failed('A document needs a name.');
       // Inside the content as well: the title lives in the document, and the
       // next save would otherwise restore the old one to the index.
       const opened = await open(entry.docId);
@@ -140,13 +153,16 @@ export function createDocumentLibrary(
     async duplicate(entry) {
       const content = await contentOf(entry);
       if (!content.ok) return content;
-      const copy: DiagramFile = { ...content.value, title: `Copy of ${content.value.title || "Untitled Diagram"}` };
+      const copy: DiagramFile = {
+        ...content.value,
+        title: `Copy of ${content.value.title || 'Untitled Diagram'}`,
+      };
       const docId = newDocumentId();
       // Seeded fresh rather than copied update-by-update: the copy is a new
       // document with its own history, not a fork that could merge back.
       const opened = await open(docId, copy);
       try {
-        return await store.writeDocument(docId, fileFromDoc(opened.doc), { origin: "local" });
+        return await store.writeDocument(docId, fileFromDoc(opened.doc), { origin: 'local' });
       } finally {
         await opened.close();
       }
@@ -155,7 +171,8 @@ export function createDocumentLibrary(
     async compact(entry) {
       const opened = await open(entry.docId);
       try {
-        if (!opened.persistence.compact) return failed("This document is not stored in a way that can be compacted.");
+        if (!opened.persistence.compact)
+          return failed('This document is not stored in a way that can be compacted.');
         return { ok: true, value: await opened.persistence.compact() };
       } catch (error) {
         return failed(`Could not compact "${entry.title}": ${String(error)}`);
@@ -200,12 +217,22 @@ export function createDocumentLibrary(
       rebased.doc.destroy();
       // A fresh document: no session room or key, since nobody holding the old
       // one can sync with it.
-      const written = await store.writeDocument(docId, file, { origin: "local" });
+      const written = await store.writeDocument(docId, file, { origin: 'local' });
       if (!written.ok) return written;
       // The original stays, clearly labelled, rather than being deleted.
-      const relabelled = await library.rename(entry, `${file.title || "Untitled Diagram"} (before rebase)`);
+      const relabelled = await library.rename(
+        entry,
+        `${file.title || 'Untitled Diagram'} (before rebase)`,
+      );
       if (!relabelled.ok) return relabelled;
-      return { ok: true, value: { entry: written.value, bytesBefore: rebased.bytesBefore, bytesAfter: rebased.bytesAfter } };
+      return {
+        ok: true,
+        value: {
+          entry: written.value,
+          bytesBefore: rebased.bytesBefore,
+          bytesAfter: rebased.bytesAfter,
+        },
+      };
     },
 
     async forget(entry) {

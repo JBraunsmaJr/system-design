@@ -10,19 +10,19 @@
  * browser after approving it, and see the passthrough warning when the
  * store reads content.
  */
-import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
-import type { AddressInfo } from "net";
-import { startDevServers, type DevServers } from "./lib/devServers";
-import { startTestOidcProvider } from "./lib/testIdentityProviders";
-import { createMemoryBlobStore, type MemoryTx } from "../store/src/blobStore";
-import { createDocumentService } from "../store/src/documentService";
-import { createHttpService, type StoreBackend } from "../store/src/httpService";
-import { createMemoryUserDirectory } from "../store/src/userDirectory";
-import { createMemoryWorkspaceIndex } from "../store/src/workspaceIndex";
-import { createSessionStore } from "../store/src/auth/sessions";
-import { createProvider } from "../store/src/auth/providers";
-import { exportPublicKey, generateWrappingKeyPair } from "../src/crypto/keys";
-import { toPem } from "../src/crypto/documentPackage";
+import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
+import type { AddressInfo } from 'net';
+import { startDevServers, type DevServers } from './lib/devServers';
+import { startTestOidcProvider } from './lib/testIdentityProviders';
+import { createMemoryBlobStore, type MemoryTx } from '../store/src/blobStore';
+import { createDocumentService } from '../store/src/documentService';
+import { createHttpService, type StoreBackend } from '../store/src/httpService';
+import { createMemoryUserDirectory } from '../store/src/userDirectory';
+import { createMemoryWorkspaceIndex } from '../store/src/workspaceIndex';
+import { createSessionStore } from '../store/src/auth/sessions';
+import { createProvider } from '../store/src/auth/providers';
+import { exportPublicKey, generateWrappingKeyPair } from '../src/crypto/keys';
+import { toPem } from '../src/crypto/documentPackage';
 
 let failures = 0;
 function check(condition: boolean, message: string) {
@@ -34,7 +34,7 @@ function check(condition: boolean, message: string) {
 }
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function startStore(appOrigin: string, cryptoMode: "webcrypto" | "passthrough") {
+async function startStore(appOrigin: string, cryptoMode: 'webcrypto' | 'passthrough') {
   const blobs = createMemoryBlobStore();
   const store = createDocumentService<MemoryTx>({
     blobs,
@@ -42,24 +42,32 @@ async function startStore(appOrigin: string, cryptoMode: "webcrypto" | "passthro
     commit: (tx) => blobs.commit(tx),
     rollback: (tx) => blobs.rollback(tx),
   }) as unknown as StoreBackend;
-  const idp = await startTestOidcProvider({ subject: "person-1" });
+  const idp = await startTestOidcProvider({ subject: 'person-1' });
   // WS7-R4: a store with encryption on refuses documents that are not also
   // recoverable with the organization's offline key.
-  const recovery = await generateWrappingKeyPair("recovery");
-  let origin = "";
+  const recovery = await generateWrappingKeyPair('recovery');
+  let origin = '';
   const server = createHttpService({
     store,
     directory: createMemoryUserDirectory(),
     workspaceIndex: createMemoryWorkspaceIndex(),
     sessions: createSessionStore(),
-    providers: [createProvider({ id: "oidc", kind: "oidc", issuer: idp.issuer, clientId: idp.clientId, clientSecret: idp.clientSecret })],
+    providers: [
+      createProvider({
+        id: 'oidc',
+        kind: 'oidc',
+        issuer: idp.issuer,
+        clientId: idp.clientId,
+        clientSecret: idp.clientSecret,
+      }),
+    ],
     publicUrl: () => origin,
     afterLoginUrl: `${appOrigin}/system-design/`,
     allowedOrigins: [appOrigin],
     cryptoMode,
-    recoveryPublicKeyPem: toPem(await exportPublicKey(recovery.publicKey), "PUBLIC KEY"),
+    recoveryPublicKeyPem: toPem(await exportPublicKey(recovery.publicKey), 'PUBLIC KEY'),
   });
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   return {
     origin,
@@ -83,7 +91,7 @@ async function run() {
     servers = await startDevServers({ vitePort: 5193, signalingPort: 14464, quiet: true });
     browser = await chromium.launch({ headless: true });
     const appOrigin = servers.appUrl;
-    store = await startStore(appOrigin, "webcrypto");
+    store = await startStore(appOrigin, 'webcrypto');
 
     /** A browser that knows where the store is. */
     const openBrowser = async (storeOrigin: string): Promise<Page> => {
@@ -94,214 +102,293 @@ async function run() {
       });
       contexts.push(context);
       const page = await context.newPage();
-      page.on("pageerror", (error) => check(false, `page threw: ${error.message}`));
-      page.on("console", (m) => {
-        if (m.type() === "error" || m.type() === "warning") console.log(`  [browser ${m.type()}] ${m.text().slice(0, 180)}`);
+      page.on('pageerror', (error) => check(false, `page threw: ${error.message}`));
+      page.on('console', (m) => {
+        if (m.type() === 'error' || m.type() === 'warning')
+          console.log(`  [browser ${m.type()}] ${m.text().slice(0, 180)}`);
       });
       await page.goto(`${appOrigin}/system-design/`);
-      await page.waitForFunction("typeof window.__PERF__?.loadFixture === 'function'", null, { timeout: 15000 });
+      await page.waitForFunction("typeof window.__PERF__?.loadFixture === 'function'", null, {
+        timeout: 15000,
+      });
       return page;
     };
 
     const closeManager = async (page: Page) => {
-      if (await page.locator(".workspace-panel").count()) {
-        await page.keyboard.press("Escape");
-        await page.waitForSelector(".workspace-panel", { state: "detached" }).catch(() => {});
+      if (await page.locator('.workspace-panel').count()) {
+        await page.keyboard.press('Escape');
+        await page.waitForSelector('.workspace-panel', { state: 'detached' }).catch(() => {});
       }
     };
 
     const openManager = async (page: Page) => {
       // Idempotent: the panel stays open across several steps.
-      if (await page.locator(".workspace-panel").count()) return;
+      if (await page.locator('.workspace-panel').count()) return;
       await page.click('button[title="File"]');
       await page.click('.export-menu__dropdown button:has-text("Documents")');
-      await page.waitForSelector(".workspace-panel");
+      await page.waitForSelector('.workspace-panel');
       // The panel asks the store what it is before it can show anything;
       // "checking" is that moment, not a state to assert against.
       await page
-        .waitForFunction(() => document.querySelector(".workspace-panel")?.getAttribute("data-phase") !== "checking", null, { timeout: 20000 })
+        .waitForFunction(
+          () =>
+            document.querySelector('.workspace-panel')?.getAttribute('data-phase') !== 'checking',
+          null,
+          { timeout: 20000 },
+        )
         .catch(() => {});
     };
 
     const signIn = async (page: Page) => {
-      await page.click(".workspace-panel__sign-in");
+      await page.click('.workspace-panel__sign-in');
       await page.waitForURL(/system-design/, { timeout: 15000 });
-      await page.waitForFunction("typeof window.__PERF__?.loadFixture === 'function'", null, { timeout: 15000 });
+      await page.waitForFunction("typeof window.__PERF__?.loadFixture === 'function'", null, {
+        timeout: 15000,
+      });
     };
 
-    console.log("=== The first browser ===");
+    console.log('=== The first browser ===');
     const first = await openBrowser(store.origin);
     await openManager(first);
-    check((await first.locator(".workspace-panel__sign-in").count()) > 0, "the workspace offers the providers the store accepts");
-    check((await first.locator(".workspace-panel__passthrough").count()) === 0, "and shows no warning, because this store cannot read content");
+    check(
+      (await first.locator('.workspace-panel__sign-in').count()) > 0,
+      'the workspace offers the providers the store accepts',
+    );
+    check(
+      (await first.locator('.workspace-panel__passthrough').count()) === 0,
+      'and shows no warning, because this store cannot read content',
+    );
 
     await signIn(first);
     await openManager(first);
-    await first.waitForSelector(".workspace-panel__bootstrap, .workspace-panel__save", { timeout: 15000 });
-    if (await first.locator(".workspace-panel__bootstrap").count()) {
-      await first.click(".workspace-panel__bootstrap");
+    await first.waitForSelector('.workspace-panel__bootstrap, .workspace-panel__save', {
+      timeout: 15000,
+    });
+    if (await first.locator('.workspace-panel__bootstrap').count()) {
+      await first.click('.workspace-panel__bootstrap');
     }
-    await first.waitForSelector(".workspace-panel__save", { timeout: 20000 });
-    check(true, "signing in and setting up this browser reaches the workspace");
+    await first.waitForSelector('.workspace-panel__save', { timeout: 20000 });
+    check(true, 'signing in and setting up this browser reaches the workspace');
 
     await closeManager(first);
-    await first.fill('[aria-label="Diagram title"]', "Shared architecture");
+    await first.fill('[aria-label="Diagram title"]', 'Shared architecture');
     await first.evaluate(`window.__PERF__.loadFixture("small")`);
     await openManager(first);
-    await first.click(".workspace-panel__save");
-    await first.waitForSelector(".workspace-panel__entry", { timeout: 20000 });
-    check((await first.textContent(".workspace-panel__title")) === "Shared architecture", "saving lists the document by title");
+    await first.click('.workspace-panel__save');
+    await first.waitForSelector('.workspace-panel__entry', { timeout: 20000 });
+    check(
+      (await first.textContent('.workspace-panel__title')) === 'Shared architecture',
+      'saving lists the document by title',
+    );
 
-    console.log("\n=== Editing afterwards keeps the workspace up to date (WS8-R2) ===");
+    console.log('\n=== Editing afterwards keeps the workspace up to date (WS8-R2) ===');
     {
       await closeManager(first);
       const versionOf = async () => {
-        const documents = await (store!.service as unknown as { list(): Promise<{ docId: string; version: number }[]> }).list();
+        const documents = await (
+          store!.service as unknown as { list(): Promise<{ docId: string; version: number }[]> }
+        ).list();
         return documents[0]?.version ?? 0;
       };
       const before = await versionOf();
 
       // An ordinary edit, with the workspace dialog closed.
-      await first.fill('[aria-label="Diagram title"]', "Shared architecture, revised");
+      await first.fill('[aria-label="Diagram title"]', 'Shared architecture, revised');
       // The autosave debounce, then the upload: polled rather than timed.
       let after = before;
       for (let attempt = 0; attempt < 30 && after <= before; attempt++) {
         await sleep(500);
         after = await versionOf();
       }
-      check(after > before, `the edit reaches the workspace on its own (version ${before} -> ${after})`);
+      check(
+        after > before,
+        `the edit reaches the workspace on its own (version ${before} -> ${after})`,
+      );
 
       // And the person is told where their work is.
-      await first.click(".durability__chip");
-      const detail = (await first.textContent(".durability__detail")) ?? "";
-      const label = (await first.textContent(".durability__chip span")) ?? "";
-      check(/workspace/i.test(label) || /workspace/i.test(detail), `the save status says so (${label.trim()}: ${detail.trim().slice(0, 80)})`);
-      await first.keyboard.press("Escape");
+      await first.click('.durability__chip');
+      const detail = (await first.textContent('.durability__detail')) ?? '';
+      const label = (await first.textContent('.durability__chip span')) ?? '';
+      check(
+        /workspace/i.test(label) || /workspace/i.test(detail),
+        `the save status says so (${label.trim()}: ${detail.trim().slice(0, 80)})`,
+      );
+      await first.keyboard.press('Escape');
 
       // The title change is in the list everyone sees, not just the document.
       await openManager(first);
-      await first.waitForSelector(".workspace-panel__entry", { timeout: 20000 });
-      const listed = await first.textContent(".workspace-panel__title");
-      check(listed === "Shared architecture, revised", `and the workspace list shows the new title (${listed})`);
+      await first.waitForSelector('.workspace-panel__entry', { timeout: 20000 });
+      const listed = await first.textContent('.workspace-panel__title');
+      check(
+        listed === 'Shared architecture, revised',
+        `and the workspace list shows the new title (${listed})`,
+      );
       await closeManager(first);
-      await first.fill('[aria-label="Diagram title"]', "Shared architecture");
+      await first.fill('[aria-label="Diagram title"]', 'Shared architecture');
       await sleep(2500);
     }
 
-    console.log("\n=== What the store holds ===");
+    console.log('\n=== What the store holds ===');
     {
       // Read from the store's own data, as an operator with database access
       // would - the strongest form of this check.
-      const documents = await (store.service as unknown as { list(): Promise<{ docId: string }[]> }).list();
+      const documents = await (
+        store.service as unknown as { list(): Promise<{ docId: string }[]> }
+      ).list();
       check(documents.length > 0, `the store holds the document (${documents.length})`);
-      let bytes = "";
+      let bytes = '';
       for (const record of documents) {
-        const read = await (store.service as unknown as { read(id: string): Promise<{ blobs: { bytes: Uint8Array }[] }> }).read(record.docId);
-        for (const blob of read.blobs) bytes += Buffer.from(blob.bytes).toString("latin1");
+        const read = await (
+          store.service as unknown as {
+            read(id: string): Promise<{ blobs: { bytes: Uint8Array }[] }>;
+          }
+        ).read(record.docId);
+        for (const blob of read.blobs) bytes += Buffer.from(blob.bytes).toString('latin1');
       }
       check(bytes.length > 0, `and their blobs are there (${bytes.length} bytes)`);
-      check(!bytes.includes("Shared architecture") && !bytes.includes("react-flow"), "with no title and no diagram content readable in them");
+      check(
+        !bytes.includes('Shared architecture') && !bytes.includes('react-flow'),
+        'with no title and no diagram content readable in them',
+      );
     }
 
     await closeManager(first);
 
-    console.log("\n=== A second browser ===");
+    console.log('\n=== A second browser ===');
     const second = await openBrowser(store.origin);
     await openManager(second);
     await signIn(second);
     await openManager(second);
-    await second.waitForSelector(".workspace-panel__code", { timeout: 20000 });
-    const code = (await second.textContent(".workspace-panel__code"))?.trim() ?? "";
-    check(/^[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{3}$/.test(code), `it waits for approval, showing a code (${code})`);
-    check((await second.locator(".workspace-panel__entry").count()) === 0, "and shows no documents meanwhile");
+    await second.waitForSelector('.workspace-panel__code', { timeout: 20000 });
+    const code = (await second.textContent('.workspace-panel__code'))?.trim() ?? '';
+    check(
+      /^[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{3}$/.test(code),
+      `it waits for approval, showing a code (${code})`,
+    );
+    check(
+      (await second.locator('.workspace-panel__entry').count()) === 0,
+      'and shows no documents meanwhile',
+    );
 
     await openManager(first);
-    await first.click(".workspace-panel__recheck").catch(() => {});
+    await first.click('.workspace-panel__recheck').catch(() => {});
     await sleep(300);
-    await first.waitForSelector(".workspace-panel__approve", { timeout: 20000 });
-    const shown = (await first.textContent(".workspace-panel__pending code"))?.trim();
+    await first.waitForSelector('.workspace-panel__approve', { timeout: 20000 });
+    const shown = (await first.textContent('.workspace-panel__pending code'))?.trim();
     check(shown === code, `the first browser shows the same code for it (${shown})`);
-    await first.click(".workspace-panel__approve");
+    await first.click('.workspace-panel__approve');
     await sleep(500);
 
-    await second.click(".workspace-panel__recheck");
-    await second.waitForSelector(".workspace-panel__entry", { timeout: 20000 });
-    check((await second.textContent(".workspace-panel__title")) === "Shared architecture", "once approved, the second browser lists the workspace");
+    await second.click('.workspace-panel__recheck');
+    await second.waitForSelector('.workspace-panel__entry', { timeout: 20000 });
+    check(
+      (await second.textContent('.workspace-panel__title')) === 'Shared architecture',
+      'once approved, the second browser lists the workspace',
+    );
 
-    await second.click(".workspace-panel__open");
-    await second.waitForFunction(() => document.querySelectorAll(".react-flow__node").length === 25, null, { timeout: 20000 });
-    check((await second.inputValue('[aria-label="Diagram title"]')) === "Shared architecture", "and opens the document the first browser saved");
+    await second.click('.workspace-panel__open');
+    await second.waitForFunction(
+      () => document.querySelectorAll('.react-flow__node').length === 25,
+      null,
+      { timeout: 20000 },
+    );
+    check(
+      (await second.inputValue('[aria-label="Diagram title"]')) === 'Shared architecture',
+      'and opens the document the first browser saved',
+    );
 
-    console.log("\n=== Losing a browser: revoke, then rotate (WS7-R7, R14) ===");
+    console.log('\n=== Losing a browser: revoke, then rotate (WS7-R7, R14) ===');
     {
       await openManager(first);
-      await first.waitForSelector(".workspace-panel__device", { timeout: 20000 });
-      const before = (await first.textContent(".workspace-panel__generation"))?.trim();
-      check(before === "key 1", `the workspace starts on its first key (${before})`);
+      await first.waitForSelector('.workspace-panel__device', { timeout: 20000 });
+      const before = (await first.textContent('.workspace-panel__generation'))?.trim();
+      check(before === 'key 1', `the workspace starts on its first key (${before})`);
 
       // The second browser is the one that was lost.
-      const target = first.locator(".workspace-panel__device").nth(1);
-      await target.locator(".workspace-panel__revoke").click();
-      await first.waitForSelector(".workspace-panel__rotation-advice", { timeout: 20000 });
-      const advice = (await first.textContent(".workspace-panel__rotation-advice")) ?? "";
-      check(/still holds the key/.test(advice), "revoking says what revoking alone does not solve");
+      const target = first.locator('.workspace-panel__device').nth(1);
+      await target.locator('.workspace-panel__revoke').click();
+      await first.waitForSelector('.workspace-panel__rotation-advice', { timeout: 20000 });
+      const advice = (await first.textContent('.workspace-panel__rotation-advice')) ?? '';
+      check(/still holds the key/.test(advice), 'revoking says what revoking alone does not solve');
 
-      first.once("dialog", (dialog) => {
-        check(/re-wrapped/.test(dialog.message()), "rotating explains what it does before doing it");
+      first.once('dialog', (dialog) => {
+        check(
+          /re-wrapped/.test(dialog.message()),
+          'rotating explains what it does before doing it',
+        );
         void dialog.accept();
       });
-      await first.click(".workspace-panel__rotate");
+      await first.click('.workspace-panel__rotate');
       await first.waitForFunction(
-        () => (document.querySelector(".workspace-panel__generation")?.textContent ?? "").includes("key 2"),
+        () =>
+          (document.querySelector('.workspace-panel__generation')?.textContent ?? '').includes(
+            'key 2',
+          ),
         null,
         { timeout: 30000 },
       );
-      check(true, "the workspace moves to its second key");
-      const summary = (await first.textContent(".workspace-panel__message")) ?? "";
+      check(true, 'the workspace moves to its second key');
+      const summary = (await first.textContent('.workspace-panel__message')) ?? '';
       check(
-        /document\(s\) re-wrapped/.test(summary) && /No document content was re-encrypted/.test(summary),
-        `and says what happened (${summary.slice(0, 110)})`
+        /document\(s\) re-wrapped/.test(summary) &&
+          /No document content was re-encrypted/.test(summary),
+        `and says what happened (${summary.slice(0, 110)})`,
       );
-      check((await first.locator(".workspace-panel__entry").count()) === 1, "the documents are still listed");
+      check(
+        (await first.locator('.workspace-panel__entry').count()) === 1,
+        'the documents are still listed',
+      );
 
       // The point of it: this browser still works afterwards.
-      await first.click(".workspace-panel__open");
-      await first.waitForFunction(() => document.querySelectorAll(".react-flow__node").length === 25, null, { timeout: 20000 });
-      check(true, "and still open, with the new key");
+      await first.click('.workspace-panel__open');
+      await first.waitForFunction(
+        () => document.querySelectorAll('.react-flow__node').length === 25,
+        null,
+        { timeout: 20000 },
+      );
+      check(true, 'and still open, with the new key');
 
       // And the revoked browser is out.
       await openManager(second);
-      await second.click(".workspace-panel__recheck").catch(() => {});
+      await second.click('.workspace-panel__recheck').catch(() => {});
       await sleep(1000);
-      const phase = await second.getAttribute(".workspace-panel", "data-phase");
-      check(phase !== "ready", `the revoked browser no longer reaches the workspace (${phase})`);
+      const phase = await second.getAttribute('.workspace-panel', 'data-phase');
+      check(phase !== 'ready', `the revoked browser no longer reaches the workspace (${phase})`);
       await closeManager(second);
     }
 
-    console.log("\n=== A store that reads content (WS6-R3) ===");
-    passthroughStore = await startStore(appOrigin, "passthrough");
+    console.log('\n=== A store that reads content (WS6-R3) ===');
+    passthroughStore = await startStore(appOrigin, 'passthrough');
     const third = await openBrowser(passthroughStore.origin);
     await openManager(third);
-    const warning = await third.textContent(".workspace-panel__passthrough");
-    check(!!warning && /server can read/i.test(warning), `the warning is shown and says what it means (${warning?.trim()})`);
+    const warning = await third.textContent('.workspace-panel__passthrough');
+    check(
+      !!warning && /server can read/i.test(warning),
+      `the warning is shown and says what it means (${warning?.trim()})`,
+    );
 
-    console.log("\n=== No store configured ===");
+    console.log('\n=== No store configured ===');
     {
       const plain = await browser.newContext();
       contexts.push(plain);
       const page = await plain.newPage();
       await page.goto(`${appOrigin}/system-design/`);
-      await page.waitForFunction("typeof window.__PERF__?.loadFixture === 'function'", null, { timeout: 15000 });
+      await page.waitForFunction("typeof window.__PERF__?.loadFixture === 'function'", null, {
+        timeout: 15000,
+      });
       await page.click('button[title="File"]');
       await page.click('.export-menu__dropdown button:has-text("Documents")');
       // The manager itself, whatever it holds: the point is only that no
       // workspace section appears.
-      await page.waitForSelector(".document-manager__storage", { timeout: 10000 });
-      check((await page.locator(".workspace-panel").count()) === 0, "the editor shows no workspace at all, and is otherwise unchanged");
+      await page.waitForSelector('.document-manager__storage', { timeout: 10000 });
+      check(
+        (await page.locator('.workspace-panel').count()) === 0,
+        'the editor shows no workspace at all, and is otherwise unchanged',
+      );
     }
   } catch (error) {
     failures++;
-    console.error("Verification failed with error:", error);
+    console.error('Verification failed with error:', error);
   } finally {
     for (const context of contexts) await context.close().catch(() => {});
     await browser?.close().catch(() => {});
@@ -314,7 +401,7 @@ async function run() {
     console.error(`\n${failures} check(s) failed`);
     process.exit(1);
   }
-  console.log("\nAll workspace browser checks passed.");
+  console.log('\nAll workspace browser checks passed.');
   process.exit(0);
 }
 

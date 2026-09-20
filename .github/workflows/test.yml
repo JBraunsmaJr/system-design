@@ -4,7 +4,7 @@ on:
   push:
   pull_request:
   release:
-    types: [ published ]
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -205,7 +205,7 @@ jobs:
           KEYCLOAK_CLIENT_SECRET: store-secret
           KEYCLOAK_USERNAME: tester
           KEYCLOAK_PASSWORD: tester-password
-          AUTH_TEST_PORT: "8090"
+          AUTH_TEST_PORT: '8090'
 
       - name: Keycloak log
         if: failure()

@@ -8,7 +8,7 @@ import {
   useState,
   type DragEvent,
   type MouseEvent as ReactMouseEvent,
-} from "react";
+} from 'react';
 import {
   ReactFlow,
   Background,
@@ -34,27 +34,40 @@ import {
   type NodeMouseHandler,
   type NodeTypes,
   type EdgeTypes,
-} from "@xyflow/react";
-import { MousePointer2, BringToFront, SendToBack, ChevronUp, ChevronDown } from "lucide-react";
-import { createPortal } from "react-dom";
-import { TypedNode } from "./nodes/TypedNode";
-import { TypedEdge } from "./edges/TypedEdge";
-import { GroupNode } from "./nodes/GroupNode";
-import { TextNode } from "./nodes/TextNode";
-import { ShapeNode } from "./nodes/ShapeNode";
-import { CodeNode } from "./nodes/CodeNode";
-import { PresentationOverlay } from "./PresentationOverlay";
-import { Breadcrumb } from "./Breadcrumb";
-import { DocumentationPopup } from "./documentation/DocumentationPopup";
-import { useDiagramHoverDocumentation } from "./documentation/useDiagramHoverDocumentation";
-import { NODE_TYPES } from "../domain/nodeRegistry";
-import { GROUP_TYPES } from "../domain/groupRegistry";
-import { SHAPE_TYPES, globalShapeRegistry } from "../domain/shapeRegistry";
-import { computeAlignment, type AlignBox, type AlignmentGuide } from "../domain/alignmentGuides";
-import type { ZOrderCommand } from "../domain/zOrder";
-import { toAbsolutePosition } from "../domain/graphUtils";
-import { DRAG_MIME_TYPE, GROUP_DRAG_MIME_TYPE, TEXT_DRAG_MIME_TYPE, SHAPE_DRAG_MIME_TYPE, CODE_DRAG_MIME_TYPE } from "./Palette";
-import type { ArchNodeData, ArchEdgeData, ArchEdgeDataPatch, EdgeWaypoint, Scenario, ScenarioStep } from "../domain/types";
+} from '@xyflow/react';
+import { MousePointer2, BringToFront, SendToBack, ChevronUp, ChevronDown } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { TypedNode } from './nodes/TypedNode';
+import { TypedEdge } from './edges/TypedEdge';
+import { GroupNode } from './nodes/GroupNode';
+import { TextNode } from './nodes/TextNode';
+import { ShapeNode } from './nodes/ShapeNode';
+import { CodeNode } from './nodes/CodeNode';
+import { PresentationOverlay } from './PresentationOverlay';
+import { Breadcrumb } from './Breadcrumb';
+import { DocumentationPopup } from './documentation/DocumentationPopup';
+import { useDiagramHoverDocumentation } from './documentation/useDiagramHoverDocumentation';
+import { NODE_TYPES } from '../domain/nodeRegistry';
+import { GROUP_TYPES } from '../domain/groupRegistry';
+import { SHAPE_TYPES, globalShapeRegistry } from '../domain/shapeRegistry';
+import { computeAlignment, type AlignBox, type AlignmentGuide } from '../domain/alignmentGuides';
+import type { ZOrderCommand } from '../domain/zOrder';
+import { toAbsolutePosition } from '../domain/graphUtils';
+import {
+  DRAG_MIME_TYPE,
+  GROUP_DRAG_MIME_TYPE,
+  TEXT_DRAG_MIME_TYPE,
+  SHAPE_DRAG_MIME_TYPE,
+  CODE_DRAG_MIME_TYPE,
+} from './Palette';
+import type {
+  ArchNodeData,
+  ArchEdgeData,
+  ArchEdgeDataPatch,
+  EdgeWaypoint,
+  Scenario,
+  ScenarioStep,
+} from '../domain/types';
 import {
   normalizeReconnection,
   validateReconnection,
@@ -62,10 +75,10 @@ import {
   type EdgeEnd,
   draggedEndFromReconnectStart,
   type EdgeEndpoints,
-} from "../domain/edgeReconnect";
-import type { PresenceInfo } from "../collab/session";
-import { CanvasContext, type CanvasContextValue } from "./CanvasContext";
-import { recordCanvasRender, registerPerfViewportFramer } from "../perf/instrumentation";
+} from '../domain/edgeReconnect';
+import type { PresenceInfo } from '../collab/session';
+import { CanvasContext, type CanvasContextValue } from './CanvasContext';
+import { recordCanvasRender, registerPerfViewportFramer } from '../perf/instrumentation';
 
 /**
  * Memoised, because React Flow renders a custom node or edge whenever it
@@ -88,9 +101,9 @@ const CANVAS_EDGE_TYPES: EdgeTypes = {
 };
 
 const DEFAULT_EDGE_OPTIONS = {
-  type: "typed",
-  markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16, color: "#98a2b3" },
-  markerStart: { type: MarkerType.ArrowClosed, width: 16, height: 16, color: "#98a2b3" },
+  type: 'typed',
+  markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16, color: '#98a2b3' },
+  markerStart: { type: MarkerType.ArrowClosed, width: 16, height: 16, color: '#98a2b3' },
 };
 
 const PRO_OPTIONS = { hideAttribution: true };
@@ -150,15 +163,23 @@ interface CanvasProps {
    * component's job - see handleReconnect. */
   onReconnectEdge: (edgeId: string, endpoints: EdgeEndpoints) => void;
   onAddEdgeWaypoint: (edgeId: string, index: number, waypoint: EdgeWaypoint) => void;
-  onMoveEdgeWaypoint: (edgeId: string, waypointId: string, position: { x: number; y: number }) => void;
+  onMoveEdgeWaypoint: (
+    edgeId: string,
+    waypointId: string,
+    position: { x: number; y: number },
+  ) => void;
   onEndEdgeGesture?: (edgeId: string) => void;
   onPreviewEdgeLabel?: (
     edgeId: string,
-    placement: { labelAnchorT: number; labelOffsetX: number; labelOffsetY: number }
+    placement: { labelAnchorT: number; labelOffsetX: number; labelOffsetY: number },
   ) => void;
   onRemoveEdgeWaypoint: (edgeId: string, waypointId: string) => void;
   onReparentNode: (nodeId: string, newParentId: string | null) => void;
-  onAdoptIntoGroup: (groupId: string, nodeIds: string[], groupPosition?: { x: number; y: number }) => void;
+  onAdoptIntoGroup: (
+    groupId: string,
+    nodeIds: string[],
+    groupPosition?: { x: number; y: number },
+  ) => void;
   /** Applies a stacking command. targetIds is explicit rather than
    * implied by the current selection, because right-clicking a node
    * that ISN'T selected should act on that node - not on whatever
@@ -233,16 +254,22 @@ export function Canvas({
   onCursorMove,
 }: CanvasProps) {
   recordCanvasRender();
-  const { screenToFlowPosition, getIntersectingNodes, fitView } = useReactFlow<Node<ArchNodeData>>();
+  const { screenToFlowPosition, getIntersectingNodes, fitView } =
+    useReactFlow<Node<ArchNodeData>>();
   // Perf harness only (a no-op unless instrumented): lets scenarios frame the
   // nodes they are about to drag. Immediate rather than animated, and never
   // zoomed past 1, so a single node is shown at its natural size.
   useEffect(
     () =>
       registerPerfViewportFramer((nodeIds) => {
-        void fitView({ nodes: nodeIds.map((id) => ({ id })), padding: 0.25, maxZoom: 1, duration: 0 });
+        void fitView({
+          nodes: nodeIds.map((id) => ({ id })),
+          padding: 0.25,
+          maxZoom: 1,
+          duration: 0,
+        });
       }),
-    [fitView]
+    [fitView],
   );
   const updateNodeInternals = useUpdateNodeInternals();
   const nodesRef = useRef(nodes);
@@ -271,8 +298,10 @@ export function Canvas({
   // (see App.tsx), so this is mostly a defensive fallback.
   const presentationFocus: FocusSet | null = useMemo(
     () =>
-      presentation ? { nodeIds: presentation.step.focusNodeIds, edgeIds: presentation.step.focusEdgeIds } : null,
-    [presentation]
+      presentation
+        ? { nodeIds: presentation.step.focusNodeIds, edgeIds: presentation.step.focusEdgeIds }
+        : null,
+    [presentation],
   );
   /**
    * Deliberately kept separate from presentationFocus, not merged into one
@@ -292,7 +321,7 @@ export function Canvas({
    * not dim the rest of the canvas the way an active presentation does. */
   const navigationFocus: FocusSet | null = useMemo(
     () => (focusNodeId ? { nodeIds: [focusNodeId], edgeIds: [] } : null),
-    [focusNodeId]
+    [focusNodeId],
   );
   const activeFocus: FocusSet | null = presentationFocus ?? previewFocus ?? navigationFocus;
 
@@ -307,12 +336,12 @@ export function Canvas({
 
   const onChangeTextNode = useCallback(
     (nodeId: string, text: string) => onUpdateNode(nodeId, { label: text }),
-    [onUpdateNode]
+    [onUpdateNode],
   );
 
   const onChangeCodeNode = useCallback(
     (nodeId: string, code: string) => onUpdateNode(nodeId, { codeContent: code }),
-    [onUpdateNode]
+    [onUpdateNode],
   );
 
   const canvasContextValue = useMemo<CanvasContextValue>(
@@ -327,8 +356,8 @@ export function Canvas({
       onAdoptIntoGroup,
       onAddEdgeWaypoint,
       onMoveEdgeWaypoint,
-  onEndEdgeGesture,
-  onPreviewEdgeLabel,
+      onEndEdgeGesture,
+      onPreviewEdgeLabel,
       onRemoveEdgeWaypoint,
     }),
     [
@@ -341,13 +370,13 @@ export function Canvas({
       onAdoptIntoGroup,
       onAddEdgeWaypoint,
       onMoveEdgeWaypoint,
-  onEndEdgeGesture,
-  onPreviewEdgeLabel,
+      onEndEdgeGesture,
+      onPreviewEdgeLabel,
       onRemoveEdgeWaypoint,
-    ]
+    ],
   );
 
-  const pathKey = breadcrumbLabels.join(">");
+  const pathKey = breadcrumbLabels.join('>');
 
   // Each node has both a source-type and a target-type handle stacked at
   // every position (see TypedNode.tsx), so a connection can be dragged
@@ -379,7 +408,7 @@ export function Canvas({
       }
       onConnect(connection);
     },
-    [onConnect]
+    [onConnect],
   );
 
   /**
@@ -396,7 +425,7 @@ export function Canvas({
       // draggedEndFromReconnectStart.
       reconnectEndRef.current = draggedEndFromReconnectStart(handleType);
     },
-    []
+    [],
   );
 
   /**
@@ -421,7 +450,7 @@ export function Canvas({
    */
   const handleReconnect = useCallback<OnReconnect<Edge<ArchEdgeData>>>(
     (oldEdge, connection) => {
-      const draggedEnd = reconnectEndRef.current ?? "target";
+      const draggedEnd = reconnectEndRef.current ?? 'target';
       reconnectEndRef.current = null;
 
       const next = normalizeReconnection(oldEdge, connection, draggedEnd);
@@ -432,12 +461,12 @@ export function Canvas({
 
       onReconnectEdge(oldEdge.id, next);
     },
-    [onReconnectEdge]
+    [onReconnectEdge],
   );
 
   const onDragOver = useCallback((event: DragEvent) => {
     event.preventDefault();
-    event.dataTransfer.dropEffect = "move";
+    event.dataTransfer.dropEffect = 'move';
   }, []);
 
   const onDrop = useCallback(
@@ -458,7 +487,10 @@ export function Canvas({
       }
 
       const shapeTypeId = event.dataTransfer.getData(SHAPE_DRAG_MIME_TYPE);
-      if (shapeTypeId && (SHAPE_TYPES.some((s) => s.id === shapeTypeId) || globalShapeRegistry.getShape(shapeTypeId))) {
+      if (
+        shapeTypeId &&
+        (SHAPE_TYPES.some((s) => s.id === shapeTypeId) || globalShapeRegistry.getShape(shapeTypeId))
+      ) {
         onAddShape(shapeTypeId, position);
         return;
       }
@@ -472,7 +504,7 @@ export function Canvas({
         setEditingLabelNodeId(onAddText(position));
       }
     },
-    [screenToFlowPosition, onAddNode, onAddGroup, onAddShape, onAddCode, onAddText]
+    [screenToFlowPosition, onAddNode, onAddGroup, onAddShape, onAddCode, onAddText],
   );
 
   // Double-clicking truly empty canvas creates a text annotation right
@@ -484,33 +516,33 @@ export function Canvas({
     (event: ReactMouseEvent) => {
       if (isPresenting) return;
       const target = event.target as HTMLElement;
-      if (!target.classList.contains("react-flow__pane")) return;
+      if (!target.classList.contains('react-flow__pane')) return;
       const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
       setEditingLabelNodeId(onAddText(position));
     },
-    [isPresenting, screenToFlowPosition, onAddText]
+    [isPresenting, screenToFlowPosition, onAddText],
   );
 
   const getAlignmentCandidates = useCallback(
     (draggedNode: Node<ArchNodeData>) =>
       nodesRef.current.filter((n) => {
         if (n.id === draggedNode.id) return false;
-        return !(draggedNode.type === "group" && n.parentId === draggedNode.id);
+        return !(draggedNode.type === 'group' && n.parentId === draggedNode.id);
       }),
-    []
+    [],
   );
 
   const onNodeDrag = useCallback<OnNodeDrag<Node<ArchNodeData>>>(
     (_event, draggedNode) => {
       const boxes = [draggedNode, ...getAlignmentCandidates(draggedNode)].map((n) =>
-        nodeToAlignBox(n, nodesRef.current)
+        nodeToAlignBox(n, nodesRef.current),
       );
       const movingBox = boxes.find((b) => b.id === draggedNode.id);
       if (!movingBox) return;
       const { guides } = computeAlignment(movingBox, boxes);
       setAlignmentGuides(guides);
     },
-    [getAlignmentCandidates]
+    [getAlignmentCandidates],
   );
 
   // Two symmetric cases here:
@@ -526,7 +558,7 @@ export function Canvas({
       setAlignmentGuides([]);
 
       const boxes = [draggedNode, ...getAlignmentCandidates(draggedNode)].map((n) =>
-        nodeToAlignBox(n, nodesRef.current)
+        nodeToAlignBox(n, nodesRef.current),
       );
       const movingBox = boxes.find((b) => b.id === draggedNode.id);
       if (movingBox) {
@@ -535,44 +567,44 @@ export function Canvas({
           onNodesChange([
             {
               id: draggedNode.id,
-              type: "position",
+              type: 'position',
               position: { x: draggedNode.position.x + snapDx, y: draggedNode.position.y + snapDy },
             },
           ]);
         }
       }
 
-      if (draggedNode.type === "group") {
+      if (draggedNode.type === 'group') {
         const contained = getIntersectingNodes(draggedNode, false).filter(
-          (n) => n.type !== "group" && n.parentId !== draggedNode.id
+          (n) => n.type !== 'group' && n.parentId !== draggedNode.id,
         );
         if (contained.length > 0) {
           onAdoptIntoGroup(
             draggedNode.id,
-            contained.map((n) => n.id)
+            contained.map((n) => n.id),
           );
         }
         return;
       }
-      const intersectingGroup = getIntersectingNodes(draggedNode).find((n) => n.type === "group");
+      const intersectingGroup = getIntersectingNodes(draggedNode).find((n) => n.type === 'group');
       onReparentNode(draggedNode.id, intersectingGroup ? intersectingGroup.id : null);
     },
-    [getAlignmentCandidates, onNodesChange, getIntersectingNodes, onReparentNode, onAdoptIntoGroup]
+    [getAlignmentCandidates, onNodesChange, getIntersectingNodes, onReparentNode, onAdoptIntoGroup],
   );
 
   const onNodeDoubleClick = useCallback<NodeMouseHandler<Node<ArchNodeData>>>(
     (_event, node) => {
       if (
         isPresenting ||
-        node.type === "group" ||
-        node.type === "text" ||
-        node.type === "shape" ||
-        node.type === "code"
+        node.type === 'group' ||
+        node.type === 'text' ||
+        node.type === 'shape' ||
+        node.type === 'code'
       )
         return;
       onDrillInto(node.id);
     },
-    [isPresenting, onDrillInto]
+    [isPresenting, onDrillInto],
   );
 
   // Dims everything except the active focus set (full presentation step, or
@@ -586,7 +618,11 @@ export function Canvas({
    * coordinates - it should stay under the cursor, not pinned to a spot
    * on the canvas that moves when you pan.
    */
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; targetIds: string[] } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    targetIds: string[];
+  } | null>(null);
 
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
 
@@ -611,7 +647,7 @@ export function Canvas({
       const top = Math.min(event.clientY, window.innerHeight - CONTEXT_MENU_HEIGHT - 8);
       setContextMenu({ x: Math.max(8, left), y: Math.max(8, top), targetIds });
     },
-    [isPresenting]
+    [isPresenting],
   );
 
   /**
@@ -625,25 +661,25 @@ export function Canvas({
    */
   const onNodeContextMenu = useCallback(
     (event: ReactMouseEvent, node: Node<ArchNodeData>) => openContextMenu(event, node.id),
-    [openContextMenu]
+    [openContextMenu],
   );
   const onSelectionContextMenu = useCallback(
     (event: ReactMouseEvent) => openContextMenu(event, null),
-    [openContextMenu]
+    [openContextMenu],
   );
 
   useEffect(() => {
     if (!contextMenu) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeContextMenu();
+      if (e.key === 'Escape') closeContextMenu();
     };
     // Any click anywhere dismisses, including one that lands on the menu
     // itself - the item's own onClick has already run by then.
-    document.addEventListener("click", closeContextMenu);
-    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener('click', closeContextMenu);
+    document.addEventListener('keydown', onKeyDown);
     return () => {
-      document.removeEventListener("click", closeContextMenu);
-      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener('click', closeContextMenu);
+      document.removeEventListener('keydown', onKeyDown);
     };
   }, [contextMenu, closeContextMenu]);
 
@@ -656,18 +692,18 @@ export function Canvas({
       const focusIds = new Set(presentationFocus.nodeIds);
       return nodes.map((n) => ({
         ...n,
-        className: focusIds.has(n.id) ? "is-presentation-focus" : undefined,
+        className: focusIds.has(n.id) ? 'is-presentation-focus' : undefined,
         style: { ...n.style, opacity: focusIds.has(n.id) ? 1 : DIMMED_NODE_OPACITY },
       }));
     }
     if (previewFocus) {
       const memberIds = new Set(previewFocus.nodeIds);
       return nodes.map((n) => {
-        if (memberIds.has(n.id)) return { ...n, className: "is-step-member" };
+        if (memberIds.has(n.id)) return { ...n, className: 'is-step-member' };
         // Selected while a step is being edited, but not (yet) part of it -
         // a distinct highlight from is-step-member, signaling "you could
         // add this" rather than "this is already included".
-        if (n.selected) return { ...n, className: "is-step-candidate" };
+        if (n.selected) return { ...n, className: 'is-step-candidate' };
         return n;
       });
     }
@@ -706,7 +742,7 @@ export function Canvas({
   // derived string (not the object itself) so this only re-fits when the
   // actual focused ids change, not on every render. Clearing focus doesn't
   // trigger a re-fit - only a newly (re)activated focus does.
-  const focusKey = activeFocus ? activeFocus.nodeIds.join(",") : null;
+  const focusKey = activeFocus ? activeFocus.nodeIds.join(',') : null;
   useEffect(() => {
     if (!activeFocus || activeFocus.nodeIds.length === 0) return;
     fitView({ nodes: activeFocus.nodeIds.map((id) => ({ id })), padding: 0.35, duration: 450 });
@@ -745,7 +781,7 @@ export function Canvas({
     return () => cancelAnimationFrame(frame);
   }, [focusNodeId]);
 
-  const levelLabel = breadcrumbLabels.length === 0 ? "Root" : breadcrumbLabels.join(" › ");
+  const levelLabel = breadcrumbLabels.length === 0 ? 'Root' : breadcrumbLabels.join(' › ');
 
   const docHover = useDiagramHoverDocumentation({
     nodes: displayNodes,
@@ -769,7 +805,7 @@ export function Canvas({
       docHover.closeDocumentation();
       onConnectStart(event, params);
     },
-    [closeContextMenu, docHover.closeDocumentation, onConnectStart]
+    [closeContextMenu, docHover.closeDocumentation, onConnectStart],
   );
 
   const onNodeDragStart = useCallback(() => {
@@ -781,7 +817,7 @@ export function Canvas({
     (event: ReactMouseEvent) => {
       onCursorMove(screenToFlowPosition({ x: event.clientX, y: event.clientY }));
     },
-    [screenToFlowPosition, onCursorMove]
+    [screenToFlowPosition, onCursorMove],
   );
   const handlePaneMouseLeave = useCallback(() => {
     onCursorMove(null);
@@ -790,7 +826,7 @@ export function Canvas({
   return (
     <CanvasContext.Provider value={canvasContextValue}>
       <div
-        className={`canvas${isSelectMode ? " is-select-mode" : ""}`}
+        className={`canvas${isSelectMode ? ' is-select-mode' : ''}`}
         onDragOver={onDragOver}
         onDrop={onDrop}
         onDoubleClick={onCanvasDoubleClick}
@@ -841,7 +877,12 @@ export function Canvas({
           fitView
           proOptions={PRO_OPTIONS}
         >
-          <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="rgba(255, 255, 255, 0.07)" />
+          <Background
+            variant={BackgroundVariant.Dots}
+            gap={22}
+            size={1}
+            color="rgba(255, 255, 255, 0.07)"
+          />
           {!isPresenting && peers.length > 0 && (
             <ViewportPortal>
               {peers.flatMap((peer) =>
@@ -869,12 +910,15 @@ export function Canvas({
                           borderColor: peer.color,
                         }}
                       >
-                        <span className="peer-selection-outline__label" style={{ backgroundColor: peer.color }}>
+                        <span
+                          className="peer-selection-outline__label"
+                          style={{ backgroundColor: peer.color }}
+                        >
                           {peer.name}
                         </span>
                       </div>
                     );
-                  })
+                  }),
               )}
               {peers
                 .filter((peer) => peer.cursor !== null)
@@ -899,9 +943,19 @@ export function Canvas({
                   key={i}
                   className="alignment-guide"
                   style={
-                    guide.orientation === "vertical"
-                      ? { left: guide.position, top: guide.start, width: 0, height: guide.end - guide.start }
-                      : { top: guide.position, left: guide.start, width: guide.end - guide.start, height: 0 }
+                    guide.orientation === 'vertical'
+                      ? {
+                          left: guide.position,
+                          top: guide.start,
+                          width: 0,
+                          height: guide.end - guide.start,
+                        }
+                      : {
+                          top: guide.position,
+                          left: guide.start,
+                          width: guide.end - guide.start,
+                          height: 0,
+                        }
                   }
                 />
               ))}
@@ -920,11 +974,11 @@ export function Canvas({
             <Controls>
               <ControlButton
                 onClick={onToggleSelectMode}
-                className={isSelectMode ? "is-active" : undefined}
+                className={isSelectMode ? 'is-active' : undefined}
                 title={
                   isSelectMode
-                    ? "Select mode - drag to marquee-select. Click to switch back to pan."
-                    : "Pan mode - drag to move the canvas. Click to switch to select mode."
+                    ? 'Select mode - drag to marquee-select. Click to switch back to pan.'
+                    : 'Pan mode - drag to move the canvas. Click to switch to select mode.'
                 }
               >
                 <MousePointer2 size={13} />
@@ -959,27 +1013,48 @@ export function Canvas({
           createPortal(
             <div
               className="canvas-context-menu"
-              style={{ position: "fixed", top: contextMenu.y, left: contextMenu.x, width: CONTEXT_MENU_WIDTH }}
+              style={{
+                position: 'fixed',
+                top: contextMenu.y,
+                left: contextMenu.x,
+                width: CONTEXT_MENU_WIDTH,
+              }}
               role="menu"
             >
-              <button type="button" role="menuitem" onClick={() => onZOrderCommand("front", contextMenu.targetIds)}>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => onZOrderCommand('front', contextMenu.targetIds)}
+              >
                 <BringToFront size={13} />
                 Bring to front
               </button>
-              <button type="button" role="menuitem" onClick={() => onZOrderCommand("forward", contextMenu.targetIds)}>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => onZOrderCommand('forward', contextMenu.targetIds)}
+              >
                 <ChevronUp size={13} />
                 Bring forward
               </button>
-              <button type="button" role="menuitem" onClick={() => onZOrderCommand("backward", contextMenu.targetIds)}>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => onZOrderCommand('backward', contextMenu.targetIds)}
+              >
                 <ChevronDown size={13} />
                 Send backward
               </button>
-              <button type="button" role="menuitem" onClick={() => onZOrderCommand("back", contextMenu.targetIds)}>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => onZOrderCommand('back', contextMenu.targetIds)}
+              >
                 <SendToBack size={13} />
                 Send to back
               </button>
             </div>,
-            document.body
+            document.body,
           )}
 
         <DocumentationPopup

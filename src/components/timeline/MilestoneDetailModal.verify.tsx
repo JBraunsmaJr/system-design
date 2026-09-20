@@ -1,12 +1,12 @@
 /**
  * Run with: npx tsx --tsconfig tsconfig.app.json src/components/timeline/MilestoneDetailModal.verify.tsx
  */
-import React from "react";
-import { renderToStaticMarkup } from "react-dom/server";
-import { MilestoneDetailModal } from "./MilestoneDetailModal";
-import { AddMilestoneModal } from "./AddMilestoneModal";
-import type { Milestone } from "../../domain/milestones";
-import type { RequirementsDocument } from "../../domain/requirementsTypes";
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { MilestoneDetailModal } from './MilestoneDetailModal';
+import { AddMilestoneModal } from './AddMilestoneModal';
+import type { Milestone } from '../../domain/milestones';
+import type { RequirementsDocument } from '../../domain/requirementsTypes';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {
@@ -18,19 +18,40 @@ function assert(condition: boolean, message: string) {
   }
 }
 
-console.log("=== Running MilestoneDetailModal Verification Suite ===\n");
+console.log('=== Running MilestoneDetailModal Verification Suite ===\n');
 
 const mockDoc: RequirementsDocument = {
   itemTypes: [
-    { id: "ticket", label: "Ticket", prefix: "TICKET", color: "#22B8CF", isBuiltIn: true, isWorkable: true },
-    { id: "requirement", label: "Requirement", prefix: "REQ", color: "#5b7cfa", isBuiltIn: true, isWorkable: false },
+    {
+      id: 'ticket',
+      label: 'Ticket',
+      prefix: 'TICKET',
+      color: '#22B8CF',
+      isBuiltIn: true,
+      isWorkable: true,
+    },
+    {
+      id: 'requirement',
+      label: 'Requirement',
+      prefix: 'REQ',
+      color: '#5b7cfa',
+      isBuiltIn: true,
+      isWorkable: false,
+    },
   ],
   categories: [],
   items: [
-    { id: "T-1", typeId: "ticket", title: "Auth Feature", body: "", status: "todo", points: 5 },
-    { id: "T-2", typeId: "ticket", title: "DB Migration", body: "", status: "in-progress", points: 3 },
-    { id: "T-3", typeId: "ticket", title: "API Gateway", body: "", status: "todo", points: 8 },
-    { id: "REQ-1", typeId: "requirement", title: "Overview", body: "" },
+    { id: 'T-1', typeId: 'ticket', title: 'Auth Feature', body: '', status: 'todo', points: 5 },
+    {
+      id: 'T-2',
+      typeId: 'ticket',
+      title: 'DB Migration',
+      body: '',
+      status: 'in-progress',
+      points: 3,
+    },
+    { id: 'T-3', typeId: 'ticket', title: 'API Gateway', body: '', status: 'todo', points: 8 },
+    { id: 'REQ-1', typeId: 'requirement', title: 'Overview', body: '' },
   ],
   relationshipTypes: [],
   relationships: [],
@@ -40,16 +61,16 @@ const mockDoc: RequirementsDocument = {
 // --- Test 1: Milestone Detail Modal renders with related items ---
 {
   const milestone: Milestone = {
-    id: "m-1",
-    type: "release",
-    name: "Release 2.4",
-    scheduledAt: "2026-09-30",
-    version: "2.4.0",
-    description: "Scope overview",
-    relatedWorkableItemIds: ["T-1"],
+    id: 'm-1',
+    type: 'release',
+    name: 'Release 2.4',
+    scheduledAt: '2026-09-30',
+    version: '2.4.0',
+    description: 'Scope overview',
+    relatedWorkableItemIds: ['T-1'],
   };
 
-  const updates: Array<{ id: string; patch: Partial<Omit<Milestone, "id">> }> = [];
+  const updates: Array<{ id: string; patch: Partial<Omit<Milestone, 'id'>> }> = [];
 
   const html = renderToStaticMarkup(
     React.createElement(MilestoneDetailModal, {
@@ -58,25 +79,28 @@ const mockDoc: RequirementsDocument = {
       onClose: () => {},
       onUpdateMilestone: (id, patch) => updates.push({ id, patch }),
       onDeleteMilestone: () => {},
-    })
+    }),
   );
 
-  assert(html.includes("Release 2.4"), "Milestone title is rendered");
-  assert(html.includes("T-1"), "Related workable item T-1 is rendered");
-  assert(html.includes("Associated Requirement Items &amp; Epics (1)"), "Related work items count is 1");
+  assert(html.includes('Release 2.4'), 'Milestone title is rendered');
+  assert(html.includes('T-1'), 'Related workable item T-1 is rendered');
+  assert(
+    html.includes('Associated Requirement Items &amp; Epics (1)'),
+    'Related work items count is 1',
+  );
 }
 
 // --- Test 2: Simulating multiple work item additions ---
 {
   let currentMilestone: Milestone = {
-    id: "m-1",
-    type: "release",
-    name: "Release 2.4",
-    scheduledAt: "2026-09-30",
+    id: 'm-1',
+    type: 'release',
+    name: 'Release 2.4',
+    scheduledAt: '2026-09-30',
     relatedWorkableItemIds: [],
   };
 
-  const handleUpdate = (_id: string, patch: Partial<Omit<Milestone, "id">>) => {
+  const handleUpdate = (_id: string, patch: Partial<Omit<Milestone, 'id'>>) => {
     currentMilestone = { ...currentMilestone, ...patch };
   };
 
@@ -90,27 +114,28 @@ const mockDoc: RequirementsDocument = {
     }
   };
 
-  addWork("T-1");
+  addWork('T-1');
   assert(
-    currentMilestone.relatedWorkableItemIds?.length === 1 && currentMilestone.relatedWorkableItemIds[0] === "T-1",
-    "First work item T-1 is added"
+    currentMilestone.relatedWorkableItemIds?.length === 1 &&
+      currentMilestone.relatedWorkableItemIds[0] === 'T-1',
+    'First work item T-1 is added',
   );
 
   // Add T-2 without closing/resetting
-  addWork("T-2");
+  addWork('T-2');
   assert(
     currentMilestone.relatedWorkableItemIds?.length === 2 &&
-      currentMilestone.relatedWorkableItemIds[0] === "T-1" &&
-      currentMilestone.relatedWorkableItemIds[1] === "T-2",
-    "Second work item T-2 is added consecutively"
+      currentMilestone.relatedWorkableItemIds[0] === 'T-1' &&
+      currentMilestone.relatedWorkableItemIds[1] === 'T-2',
+    'Second work item T-2 is added consecutively',
   );
 
   // Add T-3
-  addWork("T-3");
+  addWork('T-3');
   assert(
     currentMilestone.relatedWorkableItemIds?.length === 3 &&
-      currentMilestone.relatedWorkableItemIds.includes("T-3"),
-    "Third work item T-3 is added consecutively"
+      currentMilestone.relatedWorkableItemIds.includes('T-3'),
+    'Third work item T-3 is added consecutively',
   );
 
   // Render with all 3 items
@@ -122,21 +147,24 @@ const mockDoc: RequirementsDocument = {
       onUpdateMilestone: handleUpdate,
       onDeleteMilestone: () => {},
       onSelectItem: () => {},
-    })
+    }),
   );
 
-  assert(html.includes("Associated Requirement Items &amp; Epics (3)"), "Modal displays all 3 selected related items");
-  assert(html.includes("View Item"), "View Item buttons are rendered for associated items");
+  assert(
+    html.includes('Associated Requirement Items &amp; Epics (3)'),
+    'Modal displays all 3 selected related items',
+  );
+  assert(html.includes('View Item'), 'View Item buttons are rendered for associated items');
 }
 
 // --- Test 3: View Item action triggers onSelectItem callback ---
 {
   const milestone: Milestone = {
-    id: "m-1",
-    type: "release",
-    name: "Release 2.4",
-    scheduledAt: "2026-09-30",
-    relatedWorkableItemIds: ["T-1"],
+    id: 'm-1',
+    type: 'release',
+    name: 'Release 2.4',
+    scheduledAt: '2026-09-30',
+    relatedWorkableItemIds: ['T-1'],
   };
 
   const html = renderToStaticMarkup(
@@ -147,11 +175,14 @@ const mockDoc: RequirementsDocument = {
       onUpdateMilestone: () => {},
       onDeleteMilestone: () => {},
       onSelectItem: (_id) => {},
-    })
+    }),
   );
 
-  assert(html.includes("View Item"), "View Item button is rendered when onSelectItem is provided");
-  assert(html.includes(`title="Open T-1 details"`), "View Item button has title to open item details");
+  assert(html.includes('View Item'), 'View Item button is rendered when onSelectItem is provided');
+  assert(
+    html.includes(`title="Open T-1 details"`),
+    'View Item button has title to open item details',
+  );
 }
 
 // --- Test 4: AddMilestoneModal does not render a version input field and uses Marker terminology ---
@@ -160,16 +191,22 @@ const mockDoc: RequirementsDocument = {
     React.createElement(AddMilestoneModal, {
       doc: mockDoc,
       onClose: () => {},
-      onCreateMilestone: () => "m-new",
-    })
+      onCreateMilestone: () => 'm-new',
+    }),
   );
 
-  assert(!html.includes("Version (Optional)"), "AddMilestoneModal does not render Version (Optional) input");
-  assert(!html.includes('id="milestone-version"'), "AddMilestoneModal does not render milestone-version input");
-  assert(html.includes("Marker Type"), "AddMilestoneModal renders Marker Type label");
+  assert(
+    !html.includes('Version (Optional)'),
+    'AddMilestoneModal does not render Version (Optional) input',
+  );
+  assert(
+    !html.includes('id="milestone-version"'),
+    'AddMilestoneModal does not render milestone-version input',
+  );
+  assert(html.includes('Marker Type'), 'AddMilestoneModal renders Marker Type label');
 }
 
-console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);
+console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);
 if (failures > 0) {
   throw new Error(`${failures} test(s) failed`);
 }

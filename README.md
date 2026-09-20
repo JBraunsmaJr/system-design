@@ -14,7 +14,7 @@ Features:
 - Create PowerPoint like presentations using the "scenario" ability in diagrams.
 
 Ships as a fully static site. No backend, no database — runs entirely in the
-browser and deploys straight to GitHub Pages. The collaboration feature requires a relay to 
+browser and deploys straight to GitHub Pages. The collaboration feature requires a relay to
 handle the handshake between clients. Once the connection is established, clients no longer need the relay.
 
 ## Collaborative editing

@@ -11,13 +11,13 @@
  * browser only ever holds a session cookie (sessions.ts). A subject is
  * `(issuer, subject)`, never an email address - emails change hands.
  */
-import { randomBytes, createHash } from "crypto";
-import { verifyIdToken, type JsonWebKey } from "./jwt.ts";
+import { randomBytes, createHash } from 'crypto';
+import { verifyIdToken, type JsonWebKey } from './jwt.ts';
 
 export interface ProviderConfig {
   /** As named in AUTH_PROVIDERS. */
   id: string;
-  kind: "oidc" | "github";
+  kind: 'oidc' | 'github';
   clientId: string;
   clientSecret: string;
   /**
@@ -66,7 +66,7 @@ export interface Provider {
   complete(code: string, pending: PendingLogin): Promise<Identity>;
 }
 
-const base64url = (bytes: Buffer) => bytes.toString("base64url");
+const base64url = (bytes: Buffer) => bytes.toString('base64url');
 const randomToken = () => base64url(randomBytes(32));
 
 export type Fetcher = typeof fetch;
@@ -76,7 +76,7 @@ export type Fetcher = typeof fetch;
 export class ProviderUnreachable extends Error {
   constructor(message: string) {
     super(message);
-    this.name = "ProviderUnreachable";
+    this.name = 'ProviderUnreachable';
   }
 }
 
@@ -94,8 +94,8 @@ interface Discovery {
  */
 export function createOidcProvider(config: ProviderConfig, fetcher: Fetcher = fetch): Provider {
   if (!config.issuer) throw new Error(`Provider ${config.id} needs an issuer URL.`);
-  const issuer = config.issuer.replace(/\/+$/, "");
-  const internalBase = config.internalUrl?.replace(/\/+$/, "") ?? null;
+  const issuer = config.issuer.replace(/\/+$/, '');
+  const internalBase = config.internalUrl?.replace(/\/+$/, '') ?? null;
 
   /**
    * A provider's own endpoints come back as public URLs, which this server
@@ -117,7 +117,7 @@ export function createOidcProvider(config: ProviderConfig, fetcher: Fetcher = fe
     if (discovered) return discovered;
     // The issuer's path, if it has one (a Keycloak realm does), joined
     // without leaving a double slash when it does not.
-    const issuerPath = new URL(issuer).pathname.replace(/\/+$/, "");
+    const issuerPath = new URL(issuer).pathname.replace(/\/+$/, '');
     const discoveryUrl = internalBase
       ? `${internalBase}${issuerPath}/.well-known/openid-configuration`
       : `${issuer}/.well-known/openid-configuration`;
@@ -128,15 +128,16 @@ export function createOidcProvider(config: ProviderConfig, fetcher: Fetcher = fe
       throw new ProviderUnreachable(
         `The store could not reach the identity provider at ${discoveryUrl}. ` +
           (internalBase
-            ? "Check OIDC_INTERNAL_URL: it is the address this server uses, which in a container network is usually the service name, not localhost."
-            : "Check OIDC_ISSUER, and whether this server can reach it - inside a container, localhost is the container itself.") +
+            ? 'Check OIDC_INTERNAL_URL: it is the address this server uses, which in a container network is usually the service name, not localhost.'
+            : 'Check OIDC_ISSUER, and whether this server can reach it - inside a container, localhost is the container itself.') +
           ` (${String((error as Error).cause ?? error).slice(0, 120)})`,
       );
     }
     if (!response.ok) throw new Error(`Discovery failed for ${discoveryUrl}: ${response.status}`);
     const document = (await response.json()) as Discovery;
-    for (const field of ["authorization_endpoint", "token_endpoint", "jwks_uri"] as const) {
-      if (typeof document[field] !== "string") throw new Error(`Discovery for ${issuer} has no ${field}.`);
+    for (const field of ['authorization_endpoint', 'token_endpoint', 'jwks_uri'] as const) {
+      if (typeof document[field] !== 'string')
+        throw new Error(`Discovery for ${issuer} has no ${field}.`);
     }
     if (document.issuer !== issuer) {
       throw new Error(
@@ -172,16 +173,16 @@ export function createOidcProvider(config: ProviderConfig, fetcher: Fetcher = fe
         redirectUri,
         createdAt: Date.now(),
       };
-      const challenge = base64url(createHash("sha256").update(pending.codeVerifier).digest());
+      const challenge = base64url(createHash('sha256').update(pending.codeVerifier).digest());
       const query = new URLSearchParams({
-        response_type: "code",
+        response_type: 'code',
         client_id: config.clientId,
         redirect_uri: redirectUri,
-        scope: (config.scopes ?? ["openid", "profile"]).join(" "),
+        scope: (config.scopes ?? ['openid', 'profile']).join(' '),
         state: pending.state,
         nonce: pending.nonce,
         code_challenge: challenge,
-        code_challenge_method: "S256",
+        code_challenge_method: 'S256',
       });
       return { url: `${document.authorization_endpoint}?${query}`, pending };
     },
@@ -189,10 +190,13 @@ export function createOidcProvider(config: ProviderConfig, fetcher: Fetcher = fe
     async complete(code, pending) {
       const document = await discover();
       const response = await fetcher(backChannel(document.token_endpoint), {
-        method: "POST",
-        headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" },
+        method: 'POST',
+        headers: {
+          'content-type': 'application/x-www-form-urlencoded',
+          accept: 'application/json',
+        },
         body: new URLSearchParams({
-          grant_type: "authorization_code",
+          grant_type: 'authorization_code',
           code,
           redirect_uri: pending.redirectUri,
           client_id: config.clientId,
@@ -200,15 +204,26 @@ export function createOidcProvider(config: ProviderConfig, fetcher: Fetcher = fe
           code_verifier: pending.codeVerifier,
         }),
       });
-      if (!response.ok) throw new Error(`The provider refused the code exchange (${response.status}).`);
+      if (!response.ok)
+        throw new Error(`The provider refused the code exchange (${response.status}).`);
       const token = (await response.json()) as { id_token?: string };
-      if (!token.id_token) throw new Error("The provider returned no ID token.");
+      if (!token.id_token) throw new Error('The provider returned no ID token.');
       let claims;
       try {
-        claims = verifyIdToken(token.id_token, { issuer, audience: config.clientId, nonce: pending.nonce, keys: keys.length ? keys : await jwks() });
+        claims = verifyIdToken(token.id_token, {
+          issuer,
+          audience: config.clientId,
+          nonce: pending.nonce,
+          keys: keys.length ? keys : await jwks(),
+        });
       } catch {
         // One retry with fresh keys, for a provider that has rotated.
-        claims = verifyIdToken(token.id_token, { issuer, audience: config.clientId, nonce: pending.nonce, keys: await jwks() });
+        claims = verifyIdToken(token.id_token, {
+          issuer,
+          audience: config.clientId,
+          nonce: pending.nonce,
+          keys: await jwks(),
+        });
       }
       return {
         issuer,
@@ -225,9 +240,9 @@ export function createOidcProvider(config: ProviderConfig, fetcher: Fetcher = fe
  * account id - the login name can be changed and reused.
  */
 export function createGitHubProvider(config: ProviderConfig, fetcher: Fetcher = fetch): Provider {
-  const authorizeUrl = config.authorizeUrl ?? "https://github.com/login/oauth/authorize";
-  const tokenUrl = config.tokenUrl ?? "https://github.com/login/oauth/access_token";
-  const userUrl = config.userUrl ?? "https://api.github.com/user";
+  const authorizeUrl = config.authorizeUrl ?? 'https://github.com/login/oauth/authorize';
+  const tokenUrl = config.tokenUrl ?? 'https://github.com/login/oauth/access_token';
+  const userUrl = config.userUrl ?? 'https://api.github.com/user';
   const issuer = new URL(authorizeUrl).origin;
 
   return {
@@ -237,15 +252,15 @@ export function createGitHubProvider(config: ProviderConfig, fetcher: Fetcher = 
       const pending: PendingLogin = {
         provider: config.id,
         state: randomToken(),
-        nonce: "",
-        codeVerifier: "",
+        nonce: '',
+        codeVerifier: '',
         redirectUri,
         createdAt: Date.now(),
       };
       const query = new URLSearchParams({
         client_id: config.clientId,
         redirect_uri: redirectUri,
-        scope: (config.scopes ?? ["read:user"]).join(" "),
+        scope: (config.scopes ?? ['read:user']).join(' '),
         state: pending.state,
       });
       return { url: `${authorizeUrl}?${query}`, pending };
@@ -253,8 +268,11 @@ export function createGitHubProvider(config: ProviderConfig, fetcher: Fetcher = 
 
     async complete(code, pending) {
       const response = await fetcher(tokenUrl, {
-        method: "POST",
-        headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" },
+        method: 'POST',
+        headers: {
+          'content-type': 'application/x-www-form-urlencoded',
+          accept: 'application/json',
+        },
         body: new URLSearchParams({
           client_id: config.clientId,
           client_secret: config.clientSecret,
@@ -264,18 +282,28 @@ export function createGitHubProvider(config: ProviderConfig, fetcher: Fetcher = 
       });
       if (!response.ok) throw new Error(`GitHub refused the code exchange (${response.status}).`);
       const token = (await response.json()) as { access_token?: string; error?: string };
-      if (!token.access_token) throw new Error(`GitHub returned no access token${token.error ? ` (${token.error})` : ""}.`);
+      if (!token.access_token)
+        throw new Error(
+          `GitHub returned no access token${token.error ? ` (${token.error})` : ''}.`,
+        );
       const user = await fetcher(userUrl, {
-        headers: { authorization: `Bearer ${token.access_token}`, accept: "application/vnd.github+json", "user-agent": "system-design-store" },
+        headers: {
+          authorization: `Bearer ${token.access_token}`,
+          accept: 'application/vnd.github+json',
+          'user-agent': 'system-design-store',
+        },
       });
       if (!user.ok) throw new Error(`Could not read the GitHub account (${user.status}).`);
       const account = (await user.json()) as { id?: number; login?: string; name?: string };
-      if (typeof account.id !== "number") throw new Error("GitHub returned an account without an id.");
+      if (typeof account.id !== 'number')
+        throw new Error('GitHub returned an account without an id.');
       return { issuer, subject: String(account.id), displayName: account.name ?? account.login };
     },
   };
 }
 
 export function createProvider(config: ProviderConfig, fetcher: Fetcher = fetch): Provider {
-  return config.kind === "github" ? createGitHubProvider(config, fetcher) : createOidcProvider(config, fetcher);
+  return config.kind === 'github'
+    ? createGitHubProvider(config, fetcher)
+    : createOidcProvider(config, fetcher);
 }

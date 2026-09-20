@@ -11,7 +11,7 @@
  * and never sent over the wire to web servers during HTTP requests.
  */
 
-import { randomHex } from "../crypto/random.ts";
+import { randomHex } from '../crypto/random.ts';
 
 export interface CreateSessionLinkOptions {
   roomName: string;
@@ -35,8 +35,10 @@ export interface ParsedSessionInfo {
  * from one place (WS6-R1).
  */
 export function generateSessionKey(): string {
-  if (typeof crypto === "undefined" || typeof crypto.getRandomValues !== "function") {
-    throw new Error("Secure random generation (crypto.getRandomValues) is not available in this environment.");
+  if (typeof crypto === 'undefined' || typeof crypto.getRandomValues !== 'function') {
+    throw new Error(
+      'Secure random generation (crypto.getRandomValues) is not available in this environment.',
+    );
   }
   return randomHex(16);
 }
@@ -50,7 +52,7 @@ export function generateSessionKey(): string {
  * 3. `window.location.origin + window.location.pathname` (or stripped href)
  */
 export function getBaseAppUrl(): string {
-  if (typeof window !== "undefined") {
+  if (typeof window !== 'undefined') {
     const runtimeConfig = (
       window as unknown as {
         __APP_CONFIG__?: {
@@ -67,23 +69,23 @@ export function getBaseAppUrl(): string {
         runtimeConfig.BASE_URL ||
         runtimeConfig.appUrl ||
         runtimeConfig.baseUrl;
-      if (val && typeof val === "string" && val.trim()) {
-        return val.trim().replace(/\/+$/, "");
+      if (val && typeof val === 'string' && val.trim()) {
+        return val.trim().replace(/\/+$/, '');
       }
     }
   }
-  if (typeof import.meta !== "undefined" && typeof import.meta.env !== "undefined") {
+  if (typeof import.meta !== 'undefined' && typeof import.meta.env !== 'undefined') {
     const envVal =
       (import.meta.env.VITE_APP_URL as string | undefined) ||
       (import.meta.env.VITE_BASE_URL as string | undefined);
-    if (envVal && typeof envVal === "string" && envVal.trim()) {
-      return envVal.trim().replace(/\/+$/, "");
+    if (envVal && typeof envVal === 'string' && envVal.trim()) {
+      return envVal.trim().replace(/\/+$/, '');
     }
   }
-  if (typeof window !== "undefined" && window.location) {
-    return window.location.href.split("#")[0].split("?")[0];
+  if (typeof window !== 'undefined' && window.location) {
+    return window.location.href.split('#')[0].split('?')[0];
   }
-  return "";
+  return '';
 }
 
 /**
@@ -97,26 +99,23 @@ export function getBaseAppUrl(): string {
  * standard deployment relay.
  */
 export function createSessionLink(options: CreateSessionLinkOptions): string {
-  const base =
-    options.baseUrl !== undefined
-      ? options.baseUrl
-      : getBaseAppUrl();
+  const base = options.baseUrl !== undefined ? options.baseUrl : getBaseAppUrl();
 
   const params = new URLSearchParams();
   if (options.roomName) {
-    params.set("session", options.roomName);
+    params.set('session', options.roomName);
   }
 
   const encryptionKey = options.key || options.password;
   if (encryptionKey) {
-    params.set("key", encryptionKey);
+    params.set('key', encryptionKey);
   }
 
   const currentRelay = options.signalingUrlsInput?.trim();
   const defaultRelay = options.defaultSignalingUrls?.trim();
 
   if (currentRelay && currentRelay !== defaultRelay) {
-    params.set("relay", currentRelay);
+    params.set('relay', currentRelay);
   }
 
   const queryString = params.toString();
@@ -131,26 +130,26 @@ export function createSessionLink(options: CreateSessionLinkOptions): string {
  * session identifiers or cryptographic keys to screen shares or livestreams.
  */
 export function cleanSessionFromUrl(rawUrl: string): string {
-  if (!rawUrl || typeof rawUrl !== "string") return "";
+  if (!rawUrl || typeof rawUrl !== 'string') return '';
   try {
-    const isRelative = !rawUrl.startsWith("http://") && !rawUrl.startsWith("https://");
-    const dummyBase = "https://system-design.local";
+    const isRelative = !rawUrl.startsWith('http://') && !rawUrl.startsWith('https://');
+    const dummyBase = 'https://system-design.local';
     const parsedUrl = new URL(rawUrl, isRelative ? dummyBase : undefined);
 
     const sessionParamNames = [
-      "session",
-      "room",
-      "id",
-      "key",
-      "k",
-      "password",
-      "pwd",
-      "p",
-      "secret",
-      "relay",
-      "signaling",
-      "relayUrl",
-      "signalingUrl",
+      'session',
+      'room',
+      'id',
+      'key',
+      'k',
+      'password',
+      'pwd',
+      'p',
+      'secret',
+      'relay',
+      'signaling',
+      'relayUrl',
+      'signalingUrl',
     ];
 
     // 1. Clean query search params
@@ -161,10 +160,10 @@ export function cleanSessionFromUrl(rawUrl: string): string {
     // 2. Clean hash params if hash formatted as params
     if (parsedUrl.hash) {
       let hashContent = parsedUrl.hash.slice(1);
-      const prefix = hashContent.startsWith("/") ? "/" : "";
+      const prefix = hashContent.startsWith('/') ? '/' : '';
       if (prefix) hashContent = hashContent.slice(1);
 
-      if (hashContent.includes("=") || hashContent.includes("&")) {
+      if (hashContent.includes('=') || hashContent.includes('&')) {
         const hashParams = new URLSearchParams(hashContent);
         let hashModified = false;
         for (const param of sessionParamNames) {
@@ -175,10 +174,10 @@ export function cleanSessionFromUrl(rawUrl: string): string {
         }
         if (hashModified) {
           const remaining = hashParams.toString();
-          parsedUrl.hash = remaining ? `${prefix}${remaining}` : "";
+          parsedUrl.hash = remaining ? `${prefix}${remaining}` : '';
         }
       } else if (sessionParamNames.some((p) => hashContent.startsWith(`${p}=`))) {
-        parsedUrl.hash = "";
+        parsedUrl.hash = '';
       }
     }
 
@@ -187,7 +186,7 @@ export function cleanSessionFromUrl(rawUrl: string): string {
     }
     return parsedUrl.toString();
   } catch {
-    return rawUrl.split("#")[0].split("?")[0];
+    return rawUrl.split('#')[0].split('?')[0];
   }
 }
 
@@ -197,7 +196,7 @@ export function cleanSessionFromUrl(rawUrl: string): string {
  * are not visible in the address bar during screen sharing or livestreaming.
  */
 export function sanitizeCurrentUrl(): void {
-  if (typeof window === "undefined" || !window.history?.replaceState) return;
+  if (typeof window === 'undefined' || !window.history?.replaceState) return;
   try {
     const currentUrl = window.location.href;
     const cleanUrl = cleanSessionFromUrl(currentUrl);
@@ -224,7 +223,7 @@ export function sanitizeCurrentUrl(): void {
 export function parseSessionLink(rawInput: string): ParsedSessionInfo {
   let text = rawInput.trim();
   if (!text) {
-    return { roomName: "" };
+    return { roomName: '' };
   }
 
   // 1. Strip markdown links, angle brackets, or quotes wrapping a URL or code
@@ -232,25 +231,29 @@ export function parseSessionLink(rawInput: string): ParsedSessionInfo {
   if (mdMatch) {
     text = mdMatch[1].trim();
   } else {
-    text = text.replace(/^<([^>]+)>$/, "$1").trim();
-    text = text.replace(/^["'`](.*)["'`]$/s, "$1").trim();
+    text = text.replace(/^<([^>]+)>$/, '$1').trim();
+    text = text.replace(/^["'`](.*)["'`]$/s, '$1').trim();
   }
 
   // 2. Check for JSON format (e.g. {"session": "session-123", "key": "...", "relay": "..."})
-  if (text.startsWith("{") && text.endsWith("}")) {
+  if (text.startsWith('{') && text.endsWith('}')) {
     try {
       const obj = JSON.parse(text);
-      if (typeof obj === "object" && obj !== null) {
+      if (typeof obj === 'object' && obj !== null) {
         const roomName = obj.session || obj.roomName || obj.room || obj.id;
         const keyVal = obj.key || obj.k || obj.password || obj.pwd || obj.p || obj.secret;
         const relay = obj.relay || obj.signaling || obj.relayUrl || obj.signalingUrl || obj.server;
-        if (roomName && typeof roomName === "string" && roomName.trim()) {
-          const effectiveKey = keyVal !== undefined && keyVal !== null && keyVal !== "" ? String(keyVal) : undefined;
+        if (roomName && typeof roomName === 'string' && roomName.trim()) {
+          const effectiveKey =
+            keyVal !== undefined && keyVal !== null && keyVal !== '' ? String(keyVal) : undefined;
           return {
             roomName: roomName.trim(),
             key: effectiveKey,
             password: effectiveKey,
-            relay: relay !== undefined && relay !== null && String(relay).trim() ? String(relay).trim() : undefined,
+            relay:
+              relay !== undefined && relay !== null && String(relay).trim()
+                ? String(relay).trim()
+                : undefined,
           };
         }
       }
@@ -260,14 +263,19 @@ export function parseSessionLink(rawInput: string): ParsedSessionInfo {
   }
 
   // 3. Check for URL with hash/query params, or raw URL-encoded query params (e.g. #session=... or ?session=... or session=...&key=...)
-  let paramString = "";
-  if (text.includes("#")) {
-    paramString = text.slice(text.indexOf("#") + 1);
-  } else if (text.includes("?")) {
-    paramString = text.slice(text.indexOf("?") + 1);
+  let paramString = '';
+  if (text.includes('#')) {
+    paramString = text.slice(text.indexOf('#') + 1);
+  } else if (text.includes('?')) {
+    paramString = text.slice(text.indexOf('?') + 1);
   } else if (
-    (text.includes("session=") || text.includes("room=") || text.includes("id=")) &&
-    (text.includes("&") || text.includes("key=") || text.includes("password=") || text.includes("pwd=") || text.includes("relay=") || text.includes("signaling="))
+    (text.includes('session=') || text.includes('room=') || text.includes('id=')) &&
+    (text.includes('&') ||
+      text.includes('key=') ||
+      text.includes('password=') ||
+      text.includes('pwd=') ||
+      text.includes('relay=') ||
+      text.includes('signaling='))
   ) {
     paramString = text;
   }
@@ -275,22 +283,22 @@ export function parseSessionLink(rawInput: string): ParsedSessionInfo {
   if (paramString) {
     try {
       const params = new URLSearchParams(paramString);
-      const roomName = params.get("session") || params.get("room") || params.get("id");
+      const roomName = params.get('session') || params.get('room') || params.get('id');
       const keyVal =
-        params.get("key") ||
-        params.get("k") ||
-        params.get("password") ||
-        params.get("pwd") ||
-        params.get("p") ||
-        params.get("secret");
+        params.get('key') ||
+        params.get('k') ||
+        params.get('password') ||
+        params.get('pwd') ||
+        params.get('p') ||
+        params.get('secret');
       const relay =
-        params.get("relay") ||
-        params.get("signaling") ||
-        params.get("relayUrl") ||
-        params.get("signalingUrl");
+        params.get('relay') ||
+        params.get('signaling') ||
+        params.get('relayUrl') ||
+        params.get('signalingUrl');
 
       if (roomName && roomName.trim()) {
-        const effectiveKey = keyVal !== null && keyVal !== "" ? keyVal : undefined;
+        const effectiveKey = keyVal !== null && keyVal !== '' ? keyVal : undefined;
         return {
           roomName: roomName.trim(),
           key: effectiveKey,
@@ -304,17 +312,24 @@ export function parseSessionLink(rawInput: string): ParsedSessionInfo {
   }
 
   // 4. Check for formatted DM text (e.g. "Session: session-xyz\nKey: ...\nRelay: ...")
-  if (/(?:^|[\r\n,;])\s*(?:session(?:\s*id)?|room(?:\s*name)?)\s*[:=]\s*([^\r\n,;|]+)/i.test(text)) {
-    const sessionMatch = text.match(/(?:^|[\r\n,;])\s*(?:session(?:\s*id)?|room(?:\s*name)?)\s*[:=]\s*([^\r\n,;|]+)/i);
+  if (
+    /(?:^|[\r\n,;])\s*(?:session(?:\s*id)?|room(?:\s*name)?)\s*[:=]\s*([^\r\n,;|]+)/i.test(text)
+  ) {
+    const sessionMatch = text.match(
+      /(?:^|[\r\n,;])\s*(?:session(?:\s*id)?|room(?:\s*name)?)\s*[:=]\s*([^\r\n,;|]+)/i,
+    );
     const keyMatch = text.match(/(?:key|k|password|pwd|pass|secret)\s*[:=]\s*([^\r\n,;|]+)/i);
-    const relayMatch = text.match(/(?:relay(?:\s*url|\s*server)?|signaling(?:\s*url)?|server)\s*[:=]\s*([^\r\n,;|]+)/i);
+    const relayMatch = text.match(
+      /(?:relay(?:\s*url|\s*server)?|signaling(?:\s*url)?|server)\s*[:=]\s*([^\r\n,;|]+)/i,
+    );
 
     if (sessionMatch && sessionMatch[1].trim()) {
       const rawRoom = sessionMatch[1].trim();
-      if (rawRoom.includes("#") || rawRoom.includes("?") || rawRoom.includes("session=")) {
+      if (rawRoom.includes('#') || rawRoom.includes('?') || rawRoom.includes('session=')) {
         const nested = parseSessionLink(rawRoom);
         if (nested.roomName) {
-          const effectiveKey = nested.key ?? nested.password ?? (keyMatch ? keyMatch[1].trim() : undefined);
+          const effectiveKey =
+            nested.key ?? nested.password ?? (keyMatch ? keyMatch[1].trim() : undefined);
           return {
             roomName: nested.roomName,
             key: effectiveKey,
@@ -334,9 +349,17 @@ export function parseSessionLink(rawInput: string): ParsedSessionInfo {
   }
 
   // 5. Check pipe-separated format: "session-xyz | key123 | wss://relay..."
-  if (text.includes("|") && !/^[a-z]+:\/\//i.test(text) && !text.startsWith("#") && !text.startsWith("?")) {
-    const parts = text.split("|").map((p) => p.trim()).filter(Boolean);
-    if (parts.length >= 1 && (parts[0].startsWith("session-") || parts[0].length >= 4)) {
+  if (
+    text.includes('|') &&
+    !/^[a-z]+:\/\//i.test(text) &&
+    !text.startsWith('#') &&
+    !text.startsWith('?')
+  ) {
+    const parts = text
+      .split('|')
+      .map((p) => p.trim())
+      .filter(Boolean);
+    if (parts.length >= 1 && (parts[0].startsWith('session-') || parts[0].length >= 4)) {
       const effectiveKey = parts[1] ? parts[1] : undefined;
       return {
         roomName: parts[0],
@@ -348,10 +371,10 @@ export function parseSessionLink(rawInput: string): ParsedSessionInfo {
   }
 
   // 6. Bare session code / room name (or simple key-value like "session=abc")
-  if (text.startsWith("session=") || text.startsWith("room=") || text.startsWith("id=")) {
+  if (text.startsWith('session=') || text.startsWith('room=') || text.startsWith('id=')) {
     try {
       const params = new URLSearchParams(text);
-      const roomName = params.get("session") || params.get("room") || params.get("id");
+      const roomName = params.get('session') || params.get('room') || params.get('id');
       if (roomName && roomName.trim()) {
         return { roomName: roomName.trim() };
       }

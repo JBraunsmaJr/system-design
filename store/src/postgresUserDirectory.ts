@@ -4,8 +4,8 @@
  * The same contract as the in-memory one, so scripts/verify-store-devices.ts
  * covers both. Every key column holds a wrap; the store can use none of them.
  */
-import { randomUUID } from "crypto";
-import pg from "pg";
+import { randomUUID } from 'crypto';
+import pg from 'pg';
 import {
   DirectoryError,
   verificationCodeFor,
@@ -14,7 +14,7 @@ import {
   type UserDirectory,
   type UserRecord,
   type WrappedUserKey,
-} from "./userDirectory.ts";
+} from './userDirectory.ts';
 
 interface UserRow {
   user_id: string;
@@ -29,7 +29,7 @@ const toUser = (row: UserRow): UserRecord => ({
   issuer: row.issuer,
   subject: row.subject,
   displayName: row.display_name ?? undefined,
-  publicKey: row.user_public_key ? row.user_public_key.toString("base64") : undefined,
+  publicKey: row.user_public_key ? row.user_public_key.toString('base64') : undefined,
 });
 
 interface DeviceRow {
@@ -44,25 +44,34 @@ interface DeviceRow {
   revoked_at: Date | null;
 }
 
-export function createPostgresUserDirectory(pool: pg.Pool, now: () => Date = () => new Date()): UserDirectory {
+export function createPostgresUserDirectory(
+  pool: pg.Pool,
+  now: () => Date = () => new Date(),
+): UserDirectory {
   const toDevice = async (row: DeviceRow): Promise<DeviceRecord> => ({
     deviceId: row.device_id,
     userId: row.user_id,
     label: row.label ?? undefined,
-    publicKey: row.public_key.toString("base64"),
-    verificationCode: await verificationCodeFor(row.public_key.toString("base64")),
+    publicKey: row.public_key.toString('base64'),
+    verificationCode: await verificationCodeFor(row.public_key.toString('base64')),
     createdAt: row.created_at.toISOString(),
     approvedAt: row.approved_at ? row.approved_at.toISOString() : null,
     revokedAt: row.revoked_at ? row.revoked_at.toISOString() : null,
     wrappedUserKey:
       row.wrapped_user_key_body && row.wrapped_user_key_wrap
-        ? { body: row.wrapped_user_key_body.toString("base64"), keyWrap: row.wrapped_user_key_wrap.toString("base64") }
+        ? {
+            body: row.wrapped_user_key_body.toString('base64'),
+            keyWrap: row.wrapped_user_key_wrap.toString('base64'),
+          }
         : null,
   });
 
   async function requireRow(userId: string, deviceId: string): Promise<DeviceRow> {
-    const result = await pool.query<DeviceRow>(`SELECT * FROM devices WHERE device_id = $1 AND user_id = $2`, [deviceId, userId]);
-    if (!result.rows[0]) throw new DirectoryError(`No device ${deviceId}.`, "not-found");
+    const result = await pool.query<DeviceRow>(
+      `SELECT * FROM devices WHERE device_id = $1 AND user_id = $2`,
+      [deviceId, userId],
+    );
+    if (!result.rows[0]) throw new DirectoryError(`No device ${deviceId}.`, 'not-found');
     return result.rows[0];
   }
 
@@ -81,9 +90,9 @@ export function createPostgresUserDirectory(pool: pg.Pool, now: () => Date = () 
       const result = await pool.query<UserRow>(
         `UPDATE users SET user_public_key = $2 WHERE user_id = $1
          RETURNING user_id, issuer, subject, display_name, user_public_key`,
-        [userId, Buffer.from(publicKey, "base64")],
+        [userId, Buffer.from(publicKey, 'base64')],
       );
-      if (!result.rows[0]) throw new DirectoryError(`No user ${userId}.`, "not-found");
+      if (!result.rows[0]) throw new DirectoryError(`No user ${userId}.`, 'not-found');
       return toUser(result.rows[0]);
     },
 
@@ -92,7 +101,7 @@ export function createPostgresUserDirectory(pool: pg.Pool, now: () => Date = () 
         `SELECT user_id, issuer, subject, display_name, user_public_key FROM users WHERE user_id = $1`,
         [userId],
       );
-      if (!result.rows[0]) throw new DirectoryError(`No user ${userId}.`, "not-found");
+      if (!result.rows[0]) throw new DirectoryError(`No user ${userId}.`, 'not-found');
       return toUser(result.rows[0]);
     },
 
@@ -117,12 +126,13 @@ export function createPostgresUserDirectory(pool: pg.Pool, now: () => Date = () 
          RETURNING user_id, issuer, subject, display_name, user_public_key`,
         [userId],
       );
-      if (!result.rows[0]) throw new DirectoryError(`No user ${userId}.`, "not-found");
+      if (!result.rows[0]) throw new DirectoryError(`No user ${userId}.`, 'not-found');
       return toUser(result.rows[0]);
     },
 
     async registerDevice(userId, device) {
-      if (!device.publicKey) throw new DirectoryError("A device must register a public key.", "bad-request");
+      if (!device.publicKey)
+        throw new DirectoryError('A device must register a public key.', 'bad-request');
       // The user's first device is approved as it registers - it generates
       // the user key - and every later one needs approval (WS7-R11).
       const existing = await pool.query<{ count: string }>(
@@ -133,13 +143,23 @@ export function createPostgresUserDirectory(pool: pg.Pool, now: () => Date = () 
       const at = now();
       const result = await pool.query<DeviceRow>(
         `INSERT INTO devices (device_id, user_id, label, public_key, created_at, approved_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-        [randomUUID(), userId, device.label ?? null, Buffer.from(device.publicKey, "base64"), at, isFirst ? at : null],
+        [
+          randomUUID(),
+          userId,
+          device.label ?? null,
+          Buffer.from(device.publicKey, 'base64'),
+          at,
+          isFirst ? at : null,
+        ],
       );
       return toDevice(result.rows[0]);
     },
 
     async listDevices(userId) {
-      const result = await pool.query<DeviceRow>(`SELECT * FROM devices WHERE user_id = $1 ORDER BY created_at`, [userId]);
+      const result = await pool.query<DeviceRow>(
+        `SELECT * FROM devices WHERE user_id = $1 ORDER BY created_at`,
+        [userId],
+      );
       return Promise.all(result.rows.map(toDevice));
     },
 
@@ -149,27 +169,43 @@ export function createPostgresUserDirectory(pool: pg.Pool, now: () => Date = () 
 
     async approveDevice(userId, deviceId, approvedBy, wrapped: WrappedUserKey) {
       const approver = await requireRow(userId, approvedBy);
-      if (approver.revoked_at) throw new DirectoryError("A revoked device cannot approve another.", "revoked");
-      if (!approver.approved_at) throw new DirectoryError("Only an approved device can approve another.", "not-approved");
+      if (approver.revoked_at)
+        throw new DirectoryError('A revoked device cannot approve another.', 'revoked');
+      if (!approver.approved_at)
+        throw new DirectoryError('Only an approved device can approve another.', 'not-approved');
       const device = await requireRow(userId, deviceId);
-      if (device.revoked_at) throw new DirectoryError("That device has been revoked.", "revoked");
-      if (device.approved_at) throw new DirectoryError("That device is already approved.", "conflict");
+      if (device.revoked_at) throw new DirectoryError('That device has been revoked.', 'revoked');
+      if (device.approved_at)
+        throw new DirectoryError('That device is already approved.', 'conflict');
       const result = await pool.query<DeviceRow>(
         `UPDATE devices SET approved_at = $3, wrapped_user_key_body = $4, wrapped_user_key_wrap = $5
           WHERE device_id = $1 AND user_id = $2 RETURNING *`,
-        [deviceId, userId, now(), Buffer.from(wrapped.body, "base64"), Buffer.from(wrapped.keyWrap, "base64")],
+        [
+          deviceId,
+          userId,
+          now(),
+          Buffer.from(wrapped.body, 'base64'),
+          Buffer.from(wrapped.keyWrap, 'base64'),
+        ],
       );
       return toDevice(result.rows[0]);
     },
 
     async setOwnUserKey(userId, deviceId, wrapped) {
       const device = await requireRow(userId, deviceId);
-      if (device.revoked_at) throw new DirectoryError("That device has been revoked.", "revoked");
-      if (!device.approved_at) throw new DirectoryError("That device is not approved.", "not-approved");
-      if (device.wrapped_user_key_body) throw new DirectoryError("That device already holds a wrapped user key.", "conflict");
+      if (device.revoked_at) throw new DirectoryError('That device has been revoked.', 'revoked');
+      if (!device.approved_at)
+        throw new DirectoryError('That device is not approved.', 'not-approved');
+      if (device.wrapped_user_key_body)
+        throw new DirectoryError('That device already holds a wrapped user key.', 'conflict');
       const result = await pool.query<DeviceRow>(
         `UPDATE devices SET wrapped_user_key_body = $3, wrapped_user_key_wrap = $4 WHERE device_id = $1 AND user_id = $2 RETURNING *`,
-        [deviceId, userId, Buffer.from(wrapped.body, "base64"), Buffer.from(wrapped.keyWrap, "base64")],
+        [
+          deviceId,
+          userId,
+          Buffer.from(wrapped.body, 'base64'),
+          Buffer.from(wrapped.keyWrap, 'base64'),
+        ],
       );
       return toDevice(result.rows[0]);
     },
@@ -189,7 +225,12 @@ export function createPostgresUserDirectory(pool: pg.Pool, now: () => Date = () 
       await pool.query(
         `INSERT INTO user_recovery (user_id, salt, sealed_user_key, updated_at) VALUES ($1, $2, $3, $4)
          ON CONFLICT (user_id) DO UPDATE SET salt = EXCLUDED.salt, sealed_user_key = EXCLUDED.sealed_user_key, updated_at = EXCLUDED.updated_at`,
-        [userId, Buffer.from(recovery.salt, "base64"), Buffer.from(recovery.sealedUserKey, "base64"), now()],
+        [
+          userId,
+          Buffer.from(recovery.salt, 'base64'),
+          Buffer.from(recovery.sealedUserKey, 'base64'),
+          now(),
+        ],
       );
     },
 
@@ -199,14 +240,19 @@ export function createPostgresUserDirectory(pool: pg.Pool, now: () => Date = () 
         [userId],
       );
       const row = result.rows[0];
-      return row ? { salt: row.salt.toString("base64"), sealedUserKey: row.sealed_user_key.toString("base64") } : null;
+      return row
+        ? {
+            salt: row.salt.toString('base64'),
+            sealedUserKey: row.sealed_user_key.toString('base64'),
+          }
+        : null;
     },
 
     async putWorkspaceKey(userId, generation, wrappedKey) {
       await pool.query(
         `INSERT INTO workspace_keys (user_id, generation, wrapped_key) VALUES ($1, $2, $3)
          ON CONFLICT (user_id, generation) DO UPDATE SET wrapped_key = EXCLUDED.wrapped_key`,
-        [userId, generation, Buffer.from(wrappedKey, "base64")],
+        [userId, generation, Buffer.from(wrappedKey, 'base64')],
       );
     },
 
@@ -215,7 +261,10 @@ export function createPostgresUserDirectory(pool: pg.Pool, now: () => Date = () 
         `SELECT generation, wrapped_key FROM workspace_keys WHERE user_id = $1 ORDER BY generation`,
         [userId],
       );
-      return result.rows.map((row) => ({ generation: row.generation, wrappedKey: row.wrapped_key.toString("base64") }));
+      return result.rows.map((row) => ({
+        generation: row.generation,
+        wrappedKey: row.wrapped_key.toString('base64'),
+      }));
     },
   };
 }

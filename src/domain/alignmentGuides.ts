@@ -7,7 +7,7 @@ export interface AlignBox {
 }
 
 export interface AlignmentGuide {
-  orientation: "vertical" | "horizontal";
+  orientation: 'vertical' | 'horizontal';
   /** The X (vertical guide) or Y (horizontal guide) position of the line, in flow coordinates. */
   position: number;
   /** The line only needs to span the two aligned boxes, not the whole canvas. */
@@ -41,7 +41,7 @@ function edgesY(box: AlignBox) {
  */
 export function computeAlignment(
   moving: AlignBox,
-  candidates: AlignBox[]
+  candidates: AlignBox[],
 ): { guides: AlignmentGuide[]; snapDx: number; snapDy: number } {
   const mX = edgesX(moving);
   const mY = edgesY(moving);
@@ -57,10 +57,16 @@ export function computeAlignment(
     for (const mv of [mX.left, mX.centerX, mX.right]) {
       for (const ov of [oX.left, oX.centerX, oX.right]) {
         const delta = ov - mv;
-        if (Math.abs(delta) <= ALIGNMENT_THRESHOLD && (!bestX || Math.abs(delta) < Math.abs(bestX.delta))) {
+        if (
+          Math.abs(delta) <= ALIGNMENT_THRESHOLD &&
+          (!bestX || Math.abs(delta) < Math.abs(bestX.delta))
+        ) {
           const top = Math.min(moving.y, other.y);
           const bottom = Math.max(moving.y + moving.height, other.y + other.height);
-          bestX = { delta, guide: { orientation: "vertical", position: ov, start: top, end: bottom } };
+          bestX = {
+            delta,
+            guide: { orientation: 'vertical', position: ov, start: top, end: bottom },
+          };
         }
       }
     }
@@ -68,10 +74,16 @@ export function computeAlignment(
     for (const mv of [mY.top, mY.centerY, mY.bottom]) {
       for (const ov of [oY.top, oY.centerY, oY.bottom]) {
         const delta = ov - mv;
-        if (Math.abs(delta) <= ALIGNMENT_THRESHOLD && (!bestY || Math.abs(delta) < Math.abs(bestY.delta))) {
+        if (
+          Math.abs(delta) <= ALIGNMENT_THRESHOLD &&
+          (!bestY || Math.abs(delta) < Math.abs(bestY.delta))
+        ) {
           const left = Math.min(moving.x, other.x);
           const right = Math.max(moving.x + moving.width, other.x + other.width);
-          bestY = { delta, guide: { orientation: "horizontal", position: ov, start: left, end: right } };
+          bestY = {
+            delta,
+            guide: { orientation: 'horizontal', position: ov, start: left, end: right },
+          };
         }
       }
     }

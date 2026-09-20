@@ -15,18 +15,18 @@ export interface GroupTypeDefinition {
  * distinguishable on the canvas at a glance, not just via the Inspector.
  */
 export const GROUP_TYPES: GroupTypeDefinition[] = [
-  { id: "region", label: "Region", icon: "Globe", color: "#5B7CFA" },
-  { id: "vpc", label: "VPC / Subnet", icon: "Network", color: "#0FA36B" },
-  { id: "namespace", label: "Kubernetes Namespace", icon: "Boxes", color: "#22B8CF" },
-  { id: "bounded-context", label: "Bounded Context", icon: "Layers", color: "#9061F9" },
+  { id: 'region', label: 'Region', icon: 'Globe', color: '#5B7CFA' },
+  { id: 'vpc', label: 'VPC / Subnet', icon: 'Network', color: '#0FA36B' },
+  { id: 'namespace', label: 'Kubernetes Namespace', icon: 'Boxes', color: '#22B8CF' },
+  { id: 'bounded-context', label: 'Bounded Context', icon: 'Layers', color: '#9061F9' },
   {
-    id: "trust-boundary",
-    label: "Trust Boundary",
-    icon: "ShieldAlert",
-    color: "#E03131",
-    borderStyle: "double",
+    id: 'trust-boundary',
+    label: 'Trust Boundary',
+    icon: 'ShieldAlert',
+    color: '#E03131',
+    borderStyle: 'double',
   },
-  { id: "team", label: "Team Ownership", icon: "Users", color: "#FAB005" },
+  { id: 'team', label: 'Team Ownership', icon: 'Users', color: '#FAB005' },
 ];
 
 export function getGroupType(id: string): GroupTypeDefinition | undefined {

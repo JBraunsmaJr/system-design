@@ -6,17 +6,17 @@ import {
   type ChangeEvent as ReactChangeEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type UIEvent as ReactUIEvent,
-} from "react";
-import { NodeResizer, type NodeProps, type Node } from "@xyflow/react";
-import * as Icons from "lucide-react";
-import { getCodeLanguage } from "../../domain/codeRegistry";
-import { highlightCode } from "../../domain/prismSetup";
-import { BidirectionalHandles } from "./BidirectionalHandles";
-import type { ArchNodeData } from "../../domain/types";
-import { useCanvasContext } from "../CanvasContext";
-import { recordNodeRender } from "../../perf/instrumentation";
+} from 'react';
+import { NodeResizer, type NodeProps, type Node } from '@xyflow/react';
+import * as Icons from 'lucide-react';
+import { getCodeLanguage } from '../../domain/codeRegistry';
+import { highlightCode } from '../../domain/prismSetup';
+import { BidirectionalHandles } from './BidirectionalHandles';
+import type { ArchNodeData } from '../../domain/types';
+import { useCanvasContext } from '../CanvasContext';
+import { recordNodeRender } from '../../perf/instrumentation';
 
-type CodeNodeType = Node<ArchNodeData, "code">;
+type CodeNodeType = Node<ArchNodeData, 'code'>;
 
 interface CodeNodeProps extends NodeProps<CodeNodeType> {
   isEditing?: boolean;
@@ -25,7 +25,7 @@ interface CodeNodeProps extends NodeProps<CodeNodeType> {
   onChangeCode?: (nodeId: string, code: string) => void;
 }
 
-const INDENT = "  ";
+const INDENT = '  ';
 
 export function CodeNode({
   id,
@@ -38,15 +38,17 @@ export function CodeNode({
 }: CodeNodeProps) {
   recordNodeRender();
   const canvasContext = useCanvasContext();
-  const isEditing = propIsEditing ?? (canvasContext?.editingLabelNodeId === id);
-  const onStartEditing = propOnStartEditing ?? (canvasContext?.isPresenting ? undefined : canvasContext?.setEditingLabelNodeId);
+  const isEditing = propIsEditing ?? canvasContext?.editingLabelNodeId === id;
+  const onStartEditing =
+    propOnStartEditing ??
+    (canvasContext?.isPresenting ? undefined : canvasContext?.setEditingLabelNodeId);
   const onFinishEditing = propOnFinishEditing ?? (() => canvasContext?.setEditingLabelNodeId(null));
   const onChangeCode = propOnChangeCode ?? canvasContext?.onChangeCodeNode;
 
-  const languageId = data.codeLanguage ?? "json";
+  const languageId = data.codeLanguage ?? 'json';
   const lang = getCodeLanguage(languageId);
-  const code = data.codeContent ?? "";
-  const accent = data.color ?? "#22B8CF";
+  const code = data.codeContent ?? '';
+  const accent = data.color ?? '#22B8CF';
   // Prism's syntax highlighting is genuinely expensive (several ms for a
   // realistic snippet) and was previously called directly inline,
   // recomputing on every single render regardless of whether THIS
@@ -86,11 +88,11 @@ export function CodeNode({
   };
 
   const onCodeKeyDown = (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === "Escape") {
+    if (event.key === 'Escape') {
       event.currentTarget.blur();
       return;
     }
-    if (event.key !== "Tab" || !onChangeCode) return;
+    if (event.key !== 'Tab' || !onChangeCode) return;
     event.preventDefault();
     const textarea = event.currentTarget;
     const { selectionStart: start, selectionEnd: end } = textarea;
@@ -127,8 +129,8 @@ export function CodeNode({
       />
       <BidirectionalHandles />
       <div
-        className={`code-node${selected ? " is-selected" : ""}`}
-        style={{ borderColor: selected ? "var(--accent)" : `${accent}66` }}
+        className={`code-node${selected ? ' is-selected' : ''}`}
+        style={{ borderColor: selected ? 'var(--accent)' : `${accent}66` }}
       >
         <div className="code-node__header">
           <Icons.FileCode2 size={12} color={accent} />
@@ -146,7 +148,7 @@ export function CodeNode({
               // is safe. Trailing newline keeps the last line's height
               // consistent with the textarea's own (which always renders
               // at least one trailing empty line's worth of space).
-              dangerouslySetInnerHTML={{ __html: highlightedHtml + "\n" }}
+              dangerouslySetInnerHTML={{ __html: highlightedHtml + '\n' }}
             />
             <textarea
               ref={textareaRef}

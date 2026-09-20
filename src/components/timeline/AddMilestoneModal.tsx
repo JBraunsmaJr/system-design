@@ -1,67 +1,84 @@
-import { useState, useEffect, useMemo } from "react";
-import { X, Calendar, Plus, Package, Flag, ClipboardCheck, Rocket, Snowflake, Diamond } from "lucide-react";
-import type { Milestone } from "../../domain/milestones";
+import { useState, useEffect, useMemo } from 'react';
+import {
+  X,
+  Calendar,
+  Plus,
+  Package,
+  Flag,
+  ClipboardCheck,
+  Rocket,
+  Snowflake,
+  Diamond,
+} from 'lucide-react';
+import type { Milestone } from '../../domain/milestones';
 import {
   BUILT_IN_MILESTONE_TYPES,
   getMilestoneTypeLabel,
   validateMilestone,
-} from "../../domain/milestones";
-import type { RequirementsDocument } from "../../domain/requirementsTypes";
-import { getItemType } from "../../domain/requirementsRegistry";
-import { HighlightedText, HighlightedTitle } from "../requirements/HighlightText";
+} from '../../domain/milestones';
+import type { RequirementsDocument } from '../../domain/requirementsTypes';
+import { getItemType } from '../../domain/requirementsRegistry';
+import { HighlightedText, HighlightedTitle } from '../requirements/HighlightText';
 
 interface AddMilestoneModalProps {
   initialDate?: string;
   initialType?: string;
   doc: RequirementsDocument;
   onClose: () => void;
-  onCreateMilestone: (milestone: Omit<Milestone, "id" | "createdAt" | "updatedAt">) => string;
+  onCreateMilestone: (milestone: Omit<Milestone, 'id' | 'createdAt' | 'updatedAt'>) => string;
   onMilestoneCreated?: (id: string) => void;
 }
 
 function todayISO(): string {
   const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 function formatTypeFilterLabel(label: string): string {
   const lower = label.toLowerCase();
-  if (lower === "dependency") return "Dependencies";
-  if (lower === "story") return "Stories";
-  if (label.endsWith("s") || label.endsWith("sh") || label.endsWith("ch") || label.endsWith("x") || label.endsWith("z")) return `${label}es`;
-  if (label.endsWith("y") && !/[aeiou]y$/i.test(label)) return `${label.slice(0, -1)}ies`;
+  if (lower === 'dependency') return 'Dependencies';
+  if (lower === 'story') return 'Stories';
+  if (
+    label.endsWith('s') ||
+    label.endsWith('sh') ||
+    label.endsWith('ch') ||
+    label.endsWith('x') ||
+    label.endsWith('z')
+  )
+    return `${label}es`;
+  if (label.endsWith('y') && !/[aeiou]y$/i.test(label)) return `${label.slice(0, -1)}ies`;
   return `${label}s`;
 }
 
 export function AddMilestoneModal({
   initialDate,
-  initialType = "release",
+  initialType = 'release',
   doc,
   onClose,
   onCreateMilestone,
   onMilestoneCreated,
 }: AddMilestoneModalProps) {
-  const [name, setName] = useState("");
+  const [name, setName] = useState('');
   const [type, setType] = useState(initialType);
   const [scheduledAt, setScheduledAt] = useState(initialDate || todayISO());
-  const [description, setDescription] = useState("");
+  const [description, setDescription] = useState('');
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
-  const [itemSearch, setItemSearch] = useState("");
-  const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>("all");
+  const [itemSearch, setItemSearch] = useState('');
+  const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>('all');
   const [error, setError] = useState<string | null>(null);
 
   // Close on Escape
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === 'Escape') onClose();
     };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
   const typeLabel = getMilestoneTypeLabel(type);
   const typeDef = BUILT_IN_MILESTONE_TYPES.find((t) => t.id === type);
-  const themeColor = typeDef?.color ?? "#9061f9";
+  const themeColor = typeDef?.color ?? '#9061f9';
 
   const uniqueItemTypes = useMemo(() => {
     const map = new Map<string, (typeof doc.itemTypes)[number]>();
@@ -76,7 +93,7 @@ export function AddMilestoneModal({
   const filteredItems = useMemo(() => {
     const q = itemSearch.trim().toLowerCase();
     return allDocItems.filter((item) => {
-      if (selectedTypeFilter !== "all" && item.typeId !== selectedTypeFilter) return false;
+      if (selectedTypeFilter !== 'all' && item.typeId !== selectedTypeFilter) return false;
       if (!q) return true;
       return item.id.toLowerCase().includes(q) || item.title.toLowerCase().includes(q);
     });
@@ -96,7 +113,7 @@ export function AddMilestoneModal({
       type,
       name: name.trim(),
       scheduledAt,
-      description: description.trim() !== "" ? description.trim() : undefined,
+      description: description.trim() !== '' ? description.trim() : undefined,
       relatedItemIds: selectedItemIds.length > 0 ? selectedItemIds : undefined,
       relatedWorkableItemIds: selectedItemIds.length > 0 ? selectedItemIds : undefined,
     };
@@ -114,15 +131,15 @@ export function AddMilestoneModal({
 
   const renderTypeIcon = (t: string) => {
     switch (t) {
-      case "release":
+      case 'release':
         return <Package size={15} />;
-      case "deadline":
+      case 'deadline':
         return <Flag size={15} />;
-      case "review":
+      case 'review':
         return <ClipboardCheck size={15} />;
-      case "launch":
+      case 'launch':
         return <Rocket size={15} />;
-      case "code-freeze":
+      case 'code-freeze':
         return <Snowflake size={15} />;
       default:
         return <Diamond size={15} />;
@@ -130,13 +147,23 @@ export function AddMilestoneModal({
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label={`Add ${typeLabel}`}>
+    <div
+      className="modal-overlay"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Add ${typeLabel}`}
+    >
       <div className="add-milestone-modal" onClick={(e) => e.stopPropagation()}>
         <div className="add-milestone-modal__header" style={{ borderTopColor: themeColor }}>
           <div className="add-milestone-modal__title-row">
             <span
               className="add-milestone-modal__type-badge"
-              style={{ backgroundColor: `${themeColor}20`, color: themeColor, borderColor: themeColor }}
+              style={{
+                backgroundColor: `${themeColor}20`,
+                color: themeColor,
+                borderColor: themeColor,
+              }}
             >
               {renderTypeIcon(type)}
               <span>Add {typeLabel}</span>
@@ -161,15 +188,13 @@ export function AddMilestoneModal({
             {error && <p className="add-milestone-modal__error-message">{error}</p>}
 
             <div className="add-milestone-modal__field">
-              <label className="add-milestone-modal__label">
-                Marker Type
-              </label>
+              <label className="add-milestone-modal__label">Marker Type</label>
               <div className="add-milestone-modal__type-selector">
                 {BUILT_IN_MILESTONE_TYPES.map((t) => (
                   <button
                     key={t.id}
                     type="button"
-                    className={`add-milestone-modal__type-btn${type === t.id ? " is-active" : ""}`}
+                    className={`add-milestone-modal__type-btn${type === t.id ? ' is-active' : ''}`}
                     style={type === t.id ? { borderColor: t.color, color: t.color } : {}}
                     onClick={() => setType(t.id)}
                   >
@@ -188,7 +213,9 @@ export function AddMilestoneModal({
                 id="milestone-name"
                 type="text"
                 className="add-milestone-modal__input"
-                placeholder={type === "release" ? "e.g. Release 2.4" : "e.g. Q3 Architecture Review"}
+                placeholder={
+                  type === 'release' ? 'e.g. Release 2.4' : 'e.g. Q3 Architecture Review'
+                }
                 value={name}
                 onChange={(e) => {
                   setName(e.target.value);
@@ -236,14 +263,15 @@ export function AddMilestoneModal({
                 Associated Requirement Items & Epics ({selectedItemIds.length} selected)
               </label>
               <p className="add-milestone-modal__hint">
-                Optionally link workable items, Epics, external dependencies, or goals that culminate in this {typeLabel.toLowerCase()}.
+                Optionally link workable items, Epics, external dependencies, or goals that
+                culminate in this {typeLabel.toLowerCase()}.
               </p>
 
               <div className="milestone-modal__type-filters">
                 <button
                   type="button"
-                  className={`milestone-modal__type-filter-btn${selectedTypeFilter === "all" ? " is-active" : ""}`}
-                  onClick={() => setSelectedTypeFilter("all")}
+                  className={`milestone-modal__type-filter-btn${selectedTypeFilter === 'all' ? ' is-active' : ''}`}
+                  onClick={() => setSelectedTypeFilter('all')}
                 >
                   All Types
                 </button>
@@ -251,7 +279,7 @@ export function AddMilestoneModal({
                   <button
                     key={t.id}
                     type="button"
-                    className={`milestone-modal__type-filter-btn${selectedTypeFilter === t.id ? " is-active" : ""}`}
+                    className={`milestone-modal__type-filter-btn${selectedTypeFilter === t.id ? ' is-active' : ''}`}
                     style={
                       selectedTypeFilter === t.id
                         ? { borderColor: t.color, color: t.color, backgroundColor: `${t.color}20` }
@@ -275,7 +303,9 @@ export function AddMilestoneModal({
               <div className="add-milestone-modal__workable-picker">
                 {filteredItems.length === 0 ? (
                   <p className="add-milestone-modal__workable-empty">
-                    {allDocItems.length === 0 ? "No items in requirements doc." : "No matching items."}
+                    {allDocItems.length === 0
+                      ? 'No items in requirements doc.'
+                      : 'No matching items.'}
                   </p>
                 ) : (
                   filteredItems.map((item) => {
@@ -284,8 +314,8 @@ export function AddMilestoneModal({
                     return (
                       <label
                         key={item.id}
-                        className={`add-milestone-modal__workable-option${isSelected ? " is-selected" : ""}`}
-                        title={`${item.id}: ${item.title || "Untitled"}`}
+                        className={`add-milestone-modal__workable-option${isSelected ? ' is-selected' : ''}`}
+                        title={`${item.id}: ${item.title || 'Untitled'}`}
                       >
                         <input
                           type="checkbox"
@@ -294,13 +324,13 @@ export function AddMilestoneModal({
                         />
                         <span
                           className="add-milestone-modal__item-id"
-                          style={{ color: itemType?.color ?? "var(--accent)" }}
+                          style={{ color: itemType?.color ?? 'var(--accent)' }}
                         >
                           <HighlightedText text={item.id} search={itemSearch.trim()} />
                         </span>
                         <HighlightedTitle
                           className="add-milestone-modal__item-title"
-                          text={item.title || "Untitled"}
+                          text={item.title || 'Untitled'}
                           search={itemSearch.trim()}
                         />
                       </label>

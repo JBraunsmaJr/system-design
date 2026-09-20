@@ -13,9 +13,9 @@ import {
   unwrapKey,
   wrapKey,
   wrapKeyForPublicKey,
-} from "../crypto/keys.ts";
-import { generateSessionKey } from "../domain/sessionLink.ts";
-import type { IndexEntry } from "./storeClient.ts";
+} from '../crypto/keys.ts';
+import { generateSessionKey } from '../domain/sessionLink.ts';
+import type { IndexEntry } from './storeClient.ts';
 
 export const fromBase64 = (value: string) => Uint8Array.from(atob(value), (c) => c.charCodeAt(0));
 export const toBase64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes));
@@ -34,19 +34,29 @@ export async function indexKeyFor(workspaceKey: CryptoKey): Promise<CryptoKey> {
  * never sent anywhere unwrapped (WS7-R3). The same 128 bits a share link
  * would carry, so a document can be both stored and shared.
  */
-export async function newDocumentKey(workspaceKey: CryptoKey): Promise<{ documentKey: string; wrappedDocKey: string }> {
+export async function newDocumentKey(
+  workspaceKey: CryptoKey,
+): Promise<{ documentKey: string; wrappedDocKey: string }> {
   const documentKey = generateSessionKey();
   // The document key itself is wrapped, not the storage key derived from
   // it: the document stays shareable by link, and a reader derives the
   // storage key the same way the writer did. Wrapping the derived key would
   // make a re-opened document derive twice and decrypt nothing.
-  return { documentKey, wrappedDocKey: toBase64(await wrapKey(await importDocumentKey(documentKey), workspaceKey)) };
+  return {
+    documentKey,
+    wrappedDocKey: toBase64(await wrapKey(await importDocumentKey(documentKey), workspaceKey)),
+  };
 }
 
 /** Recovers a listed document's key. Fails if the workspace key is wrong,
  * which is what stops one workspace reading another's documents. */
-export async function documentKeyFor(entry: Pick<IndexEntry, "wrappedDocKey">, workspaceKey: CryptoKey): Promise<string> {
-  return exportSymmetricKeyHex(await unwrapKey(fromBase64(entry.wrappedDocKey), workspaceKey, "AES-GCM", 128));
+export async function documentKeyFor(
+  entry: Pick<IndexEntry, 'wrappedDocKey'>,
+  workspaceKey: CryptoKey,
+): Promise<string> {
+  return exportSymmetricKeyHex(
+    await unwrapKey(fromBase64(entry.wrappedDocKey), workspaceKey, 'AES-GCM', 128),
+  );
 }
 
 /** Replaces an entry, or adds it, keeping the list sorted by recency - the
@@ -66,7 +76,10 @@ export function removeEntry(entries: readonly IndexEntry[], docId: string): Inde
  * a document can be recovered when every workspace key is gone. The store
  * refuses documents without this, which is what stops it being forgotten.
  */
-export async function escrowDocumentKey(documentKey: string, recoveryPublicKeyPem: string): Promise<string> {
+export async function escrowDocumentKey(
+  documentKey: string,
+  recoveryPublicKeyPem: string,
+): Promise<string> {
   const recoveryKey = await importPublicKeyPem(recoveryPublicKeyPem);
   return toBase64(await wrapKeyForPublicKey(await importDocumentKey(documentKey), recoveryKey));
 }

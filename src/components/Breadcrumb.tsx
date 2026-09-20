@@ -1,4 +1,4 @@
-import { Panel } from "@xyflow/react";
+import { Panel } from '@xyflow/react';
 
 interface BreadcrumbProps {
   labels: string[];

@@ -1,9 +1,13 @@
-import type { RequirementsDocument, RequirementItem, EpicInferredSchedule } from "./requirementsTypes.ts";
-import type { ProgramIncrement, SprintDateRange } from "./programIncrements.ts";
-import { computeSprintDateRanges, parseISODate, formatISODate } from "./programIncrements.ts";
-import { isItemWorkable } from "./requirementsRegistry.ts";
-import type { Milestone } from "./milestones.ts";
-import { getMilestoneRelatedItemIds } from "./milestones.ts";
+import type {
+  RequirementsDocument,
+  RequirementItem,
+  EpicInferredSchedule,
+} from './requirementsTypes.ts';
+import type { ProgramIncrement, SprintDateRange } from './programIncrements.ts';
+import { computeSprintDateRanges, parseISODate, formatISODate } from './programIncrements.ts';
+import { isItemWorkable } from './requirementsRegistry.ts';
+import type { Milestone } from './milestones.ts';
+import { getMilestoneRelatedItemIds } from './milestones.ts';
 
 /**
  * Returns all child requirement items directly linked to a parent (e.g. Epic).
@@ -11,12 +15,12 @@ import { getMilestoneRelatedItemIds } from "./milestones.ts";
  */
 export function getChildItemsForParent(
   parentId: string,
-  doc: RequirementsDocument
+  doc: RequirementsDocument,
 ): RequirementItem[] {
   const childItemIds = new Set<string>();
 
   for (const rel of doc.relationships) {
-    if (rel.fromItemId === parentId && rel.typeId === "parent-of") {
+    if (rel.fromItemId === parentId && rel.typeId === 'parent-of') {
       childItemIds.add(rel.toItemId);
     }
   }
@@ -32,7 +36,7 @@ export function computeEpicInferredSchedule(
   epicId: string,
   doc: RequirementsDocument,
   programIncrements: ProgramIncrement[],
-  milestones: Milestone[] = []
+  milestones: Milestone[] = [],
 ): EpicInferredSchedule {
   const childItems = getChildItemsForParent(epicId, doc);
   const childItemIds = childItems.map((item) => item.id);
@@ -54,10 +58,10 @@ export function computeEpicInferredSchedule(
   const scheduledSprintIds = new Set<string>();
 
   for (const child of workableChildren) {
-    if (typeof child.points === "number" && !isNaN(child.points)) {
+    if (typeof child.points === 'number' && !isNaN(child.points)) {
       totalPoints += child.points;
     }
-    if (child.status === "done") {
+    if (child.status === 'done') {
       completedCount++;
     }
 
@@ -93,9 +97,8 @@ export function computeEpicInferredSchedule(
   if (workableChildren.length > 0) {
     // Has workable items
     if (scheduledCount > 0) {
-      const effectiveStart = milestoneMinDays !== Infinity
-        ? Math.min(minStartDays, milestoneMinDays)
-        : minStartDays;
+      const effectiveStart =
+        milestoneMinDays !== Infinity ? Math.min(minStartDays, milestoneMinDays) : minStartDays;
       startDate = formatISODate(effectiveStart);
     } else if (milestoneMinDays !== Infinity) {
       startDate = formatISODate(milestoneMinDays);
@@ -144,10 +147,10 @@ export function computeEpicInferredSchedule(
 export function getAllEpicsWithInferredSchedule(
   doc: RequirementsDocument,
   programIncrements: ProgramIncrement[],
-  milestones: Milestone[] = []
+  milestones: Milestone[] = [],
 ): Array<{ epic: RequirementItem; schedule: EpicInferredSchedule }> {
   return doc.items
-    .filter((item) => item.typeId === "epic" || item.typeId.toLowerCase().includes("epic"))
+    .filter((item) => item.typeId === 'epic' || item.typeId.toLowerCase().includes('epic'))
     .map((epic) => ({
       epic,
       schedule: computeEpicInferredSchedule(epic.id, doc, programIncrements, milestones),

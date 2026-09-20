@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { Plus, Workflow, FileText } from "lucide-react";
-import type { LinkedNodeRef, DiagramPath } from "../../domain/subDiagramTree";
+import { useState } from 'react';
+import { Plus, Workflow, FileText } from 'lucide-react';
+import type { LinkedNodeRef, DiagramPath } from '../../domain/subDiagramTree';
 
 interface LinkedDiagramsSectionProps {
   itemId: string;
@@ -35,7 +35,8 @@ export function LinkedDiagramsSection({
   const [expanded, setExpanded] = useState(false);
 
   const isCollapsible = linkedNodes.length > COLLAPSE_THRESHOLD;
-  const visible = isCollapsible && !expanded ? linkedNodes.slice(0, COLLAPSE_THRESHOLD) : linkedNodes;
+  const visible =
+    isCollapsible && !expanded ? linkedNodes.slice(0, COLLAPSE_THRESHOLD) : linkedNodes;
   const hiddenCount = linkedNodes.length - visible.length;
 
   return (
@@ -63,12 +64,16 @@ export function LinkedDiagramsSection({
               type="button"
               className="requirement-card__diagram-chip"
               onClick={() => onNavigateToNode?.(ref.path, ref.nodeId)}
-              title={`Go to "${ref.label || "Untitled"}" in the diagram`}
+              title={`Go to "${ref.label || 'Untitled'}" in the diagram`}
             >
               <Workflow size={11} />
-              <span>{ref.label || "Untitled"}</span>
+              <span>{ref.label || 'Untitled'}</span>
               {ref.hasSubDiagram && (
-                <FileText size={10} className="requirement-card__diagram-chip-doc" aria-label="Has sub-diagram documentation" />
+                <FileText
+                  size={10}
+                  className="requirement-card__diagram-chip-doc"
+                  aria-label="Has sub-diagram documentation"
+                />
               )}
             </button>
           ))}
@@ -78,7 +83,7 @@ export function LinkedDiagramsSection({
               className="requirement-card__diagrams-toggle"
               onClick={() => setExpanded((v) => !v)}
             >
-              {expanded ? "Show fewer" : `+${hiddenCount} more`}
+              {expanded ? 'Show fewer' : `+${hiddenCount} more`}
             </button>
           )}
         </div>

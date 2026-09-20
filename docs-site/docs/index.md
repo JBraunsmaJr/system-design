@@ -2,8 +2,8 @@
 layout: home
 
 hero:
-  name: "System Design Editor"
-  text: "Collaborative Architecture & Planning"
+  name: 'System Design Editor'
+  text: 'Collaborative Architecture & Planning'
   tagline: Real-time peer-to-peer diagrams, requirement traceability, and capacity planning.
   actions:
     - theme: brand

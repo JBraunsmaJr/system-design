@@ -1,9 +1,9 @@
-import type { DiagramFile } from "./serialization";
-import { parseDiagramFile } from "./serialization";
-import { SchemaVersionError } from "./schemaMigrations.ts";
+import type { DiagramFile } from './serialization';
+import { parseDiagramFile } from './serialization';
+import { SchemaVersionError } from './schemaMigrations.ts';
 
 // The retired localStorage slot (WS2-R1) - read once for import, then cleared.
-const AUTOSAVE_KEY = "system-design-editor:autosave";
+const AUTOSAVE_KEY = 'system-design-editor:autosave';
 
 /** Set when the stored autosave was written by a NEWER build than this one.
  *

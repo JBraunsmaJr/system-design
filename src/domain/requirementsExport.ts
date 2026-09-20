@@ -1,4 +1,4 @@
-import type { RequirementsDocument } from "./requirementsTypes";
+import type { RequirementsDocument } from './requirementsTypes';
 
 /**
  * Renders the full requirements document as a single markdown string,
@@ -13,34 +13,38 @@ import type { RequirementsDocument } from "./requirementsTypes";
  * it being a live link.
  */
 export function toMarkdownDocument(title: string, doc: RequirementsDocument): string {
-  const lines: string[] = [`# ${title}`, ""];
+  const lines: string[] = [`# ${title}`, ''];
   for (const type of doc.itemTypes) {
     const items = doc.items.filter((i) => i.typeId === type.id);
     if (items.length === 0) continue;
-    lines.push(`## ${type.label}s`, "");
+    lines.push(`## ${type.label}s`, '');
     for (const item of items) {
-      lines.push(`### ${item.id}${item.title ? `: ${item.title}` : ""}`, "");
+      lines.push(`### ${item.id}${item.title ? `: ${item.title}` : ''}`, '');
       const category = doc.categories.find((c) => c.id === item.categoryId);
       if (category) {
-        lines.push(`*Category: ${category.label}*`, "");
+        lines.push(`*Category: ${category.label}*`, '');
       }
       if (item.body.trim()) {
-        lines.push(item.body.trim(), "");
+        lines.push(item.body.trim(), '');
       }
     }
   }
-  return lines.join("\n");
+  return lines.join('\n');
 }
 
 /** Triggers a browser download of the requirements document as a .md file. */
 export function downloadRequirementsMarkdown(title: string, doc: RequirementsDocument): void {
   const markdown = toMarkdownDocument(title, doc);
-  const blob = new Blob([markdown], { type: "text/markdown" });
+  const blob = new Blob([markdown], { type: 'text/markdown' });
   const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
+  const anchor = document.createElement('a');
   anchor.href = url;
-  const safeName = title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-  anchor.download = `${safeName || "requirements"}.md`;
+  const safeName = title
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+  anchor.download = `${safeName || 'requirements'}.md`;
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();

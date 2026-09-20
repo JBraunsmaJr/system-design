@@ -1,4 +1,4 @@
-import * as Icons from "lucide-react";
+import * as Icons from 'lucide-react';
 
 export interface IconAttribution {
   author?: string;
@@ -8,15 +8,15 @@ export interface IconAttribution {
 
 export type IconSource =
   | {
-      type: "builtin";
+      type: 'builtin';
       key: string;
     }
   | {
-      type: "svg";
+      type: 'svg';
       data: string;
     }
   | {
-      type: "image";
+      type: 'image';
       data: string;
       mimeType: string;
     };
@@ -34,41 +34,91 @@ export interface IconDefinition {
 
 // Extract valid Lucide icon names
 export const BUILTIN_LUCIDE_NAMES = Object.keys(Icons)
-  .filter((name) => /^[A-Z]/.test(name) && !name.endsWith("Icon") && !name.startsWith("Lucide"))
+  .filter((name) => /^[A-Z]/.test(name) && !name.endsWith('Icon') && !name.startsWith('Lucide'))
   .sort();
 
 // Categorization helper for built-in icons
 function getBuiltinCategory(name: string): string {
   const n = name.toLowerCase();
-  if (n.includes("server") || n.includes("cpu") || n.includes("harddrive") || n.includes("zap") || n.includes("terminal") || n.includes("chip")) {
-    return "Compute & Hardware";
+  if (
+    n.includes('server') ||
+    n.includes('cpu') ||
+    n.includes('harddrive') ||
+    n.includes('zap') ||
+    n.includes('terminal') ||
+    n.includes('chip')
+  ) {
+    return 'Compute & Hardware';
   }
-  if (n.includes("database") || n.includes("table") || n.includes("layers") || n.includes("file") || n.includes("folder") || n.includes("archive")) {
-    return "Data & Storage";
+  if (
+    n.includes('database') ||
+    n.includes('table') ||
+    n.includes('layers') ||
+    n.includes('file') ||
+    n.includes('folder') ||
+    n.includes('archive')
+  ) {
+    return 'Data & Storage';
   }
-  if (n.includes("network") || n.includes("globe") || n.includes("wifi") || n.includes("radio") || n.includes("router") || n.includes("signal") || n.includes("share")) {
-    return "Networking";
+  if (
+    n.includes('network') ||
+    n.includes('globe') ||
+    n.includes('wifi') ||
+    n.includes('radio') ||
+    n.includes('router') ||
+    n.includes('signal') ||
+    n.includes('share')
+  ) {
+    return 'Networking';
   }
-  if (n.includes("lock") || n.includes("key") || n.includes("shield") || n.includes("user") || n.includes("fingerprint")) {
-    return "Security & Identity";
+  if (
+    n.includes('lock') ||
+    n.includes('key') ||
+    n.includes('shield') ||
+    n.includes('user') ||
+    n.includes('fingerprint')
+  ) {
+    return 'Security & Identity';
   }
-  if (n.includes("mail") || n.includes("message") || n.includes("bell") || n.includes("send") || n.includes("inbox")) {
-    return "Messaging";
+  if (
+    n.includes('mail') ||
+    n.includes('message') ||
+    n.includes('bell') ||
+    n.includes('send') ||
+    n.includes('inbox')
+  ) {
+    return 'Messaging';
   }
-  if (n.includes("chart") || n.includes("activity") || n.includes("gauge") || n.includes("eye") || n.includes("search")) {
-    return "Observability";
+  if (
+    n.includes('chart') ||
+    n.includes('activity') ||
+    n.includes('gauge') ||
+    n.includes('eye') ||
+    n.includes('search')
+  ) {
+    return 'Observability';
   }
-  if (n.includes("git") || n.includes("code") || n.includes("branch") || n.includes("commit") || n.includes("workflow") || n.includes("play")) {
-    return "Development & Logic";
+  if (
+    n.includes('git') ||
+    n.includes('code') ||
+    n.includes('branch') ||
+    n.includes('commit') ||
+    n.includes('workflow') ||
+    n.includes('play')
+  ) {
+    return 'Development & Logic';
   }
-  return "General";
+  return 'General';
 }
 
 // Generate tags for built-in icons
 function getBuiltinTags(name: string): string[] {
   const tags: string[] = [name.toLowerCase()];
   // Split camelCase
-  const parts = name.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase().split(" ");
+  const parts = name
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .toLowerCase()
+    .split(' ');
   for (const part of parts) {
     if (!tags.includes(part)) tags.push(part);
   }
@@ -76,114 +126,106 @@ function getBuiltinTags(name: string): string[] {
 }
 
 const ALLOWED_SVG_TAGS = new Set([
-  "svg",
-  "g",
-  "path",
-  "circle",
-  "ellipse",
-  "line",
-  "rect",
-  "polygon",
-  "polyline",
-  "text",
-  "tspan",
-  "defs",
-  "clippath",
-  "mask",
-  "pattern",
-  "lineargradient",
-  "radialgradient",
-  "stop",
-  "use",
-  "symbol",
+  'svg',
+  'g',
+  'path',
+  'circle',
+  'ellipse',
+  'line',
+  'rect',
+  'polygon',
+  'polyline',
+  'text',
+  'tspan',
+  'defs',
+  'clippath',
+  'mask',
+  'pattern',
+  'lineargradient',
+  'radialgradient',
+  'stop',
+  'use',
+  'symbol',
 ]);
 
 const ALLOWED_SVG_ATTRS = new Set([
-  "id",
-  "class",
-  "viewbox",
-  "xmlns",
-  "version",
-  "width",
-  "height",
-  "x",
-  "y",
-  "x1",
-  "y1",
-  "x2",
-  "y2",
-  "cx",
-  "cy",
-  "r",
-  "rx",
-  "ry",
-  "d",
-  "points",
-  "fill",
-  "fill-opacity",
-  "fill-rule",
-  "stroke",
-  "stroke-width",
-  "stroke-linecap",
-  "stroke-linejoin",
-  "stroke-miterlimit",
-  "stroke-dasharray",
-  "stroke-dashoffset",
-  "stroke-opacity",
-  "opacity",
-  "transform",
-  "clip-path",
-  "clip-rule",
-  "mask",
-  "offset",
-  "stop-color",
-  "stop-opacity",
-  "gradientunits",
-  "gradienttransform",
-  "spreadmethod",
-  "font-family",
-  "font-size",
-  "font-weight",
-  "text-anchor",
-  "dominant-baseline",
-  "dx",
-  "dy",
-  "href",
-  "xlink:href",
-  "xml:space",
+  'id',
+  'class',
+  'viewbox',
+  'xmlns',
+  'version',
+  'width',
+  'height',
+  'x',
+  'y',
+  'x1',
+  'y1',
+  'x2',
+  'y2',
+  'cx',
+  'cy',
+  'r',
+  'rx',
+  'ry',
+  'd',
+  'points',
+  'fill',
+  'fill-opacity',
+  'fill-rule',
+  'stroke',
+  'stroke-width',
+  'stroke-linecap',
+  'stroke-linejoin',
+  'stroke-miterlimit',
+  'stroke-dasharray',
+  'stroke-dashoffset',
+  'stroke-opacity',
+  'opacity',
+  'transform',
+  'clip-path',
+  'clip-rule',
+  'mask',
+  'offset',
+  'stop-color',
+  'stop-opacity',
+  'gradientunits',
+  'gradienttransform',
+  'spreadmethod',
+  'font-family',
+  'font-size',
+  'font-weight',
+  'text-anchor',
+  'dominant-baseline',
+  'dx',
+  'dy',
+  'href',
+  'xlink:href',
+  'xml:space',
 ]);
 
-const ACTIVE_CONTAINER_TAGS = new Set([
-  "script",
-  "style",
-  "foreignobject",
-]);
+const ACTIVE_CONTAINER_TAGS = new Set(['script', 'style', 'foreignobject']);
 
-const ALLOWED_TEXT_TAGS = new Set([
-  "text",
-  "tspan",
-]);
+const ALLOWED_TEXT_TAGS = new Set(['text', 'tspan']);
 
 function isDangerousHref(val: string): boolean {
-  if (!val || typeof val !== "string") return false;
+  if (!val || typeof val !== 'string') return false;
   const trimmed = val.trim().toLowerCase();
   return (
-    trimmed.startsWith("javascript:") ||
-    trimmed.startsWith("vbscript:") ||
-    trimmed.startsWith("data:") ||
-    trimmed.startsWith("file:") ||
-    trimmed.startsWith("blob:")
+    trimmed.startsWith('javascript:') ||
+    trimmed.startsWith('vbscript:') ||
+    trimmed.startsWith('data:') ||
+    trimmed.startsWith('file:') ||
+    trimmed.startsWith('blob:')
   );
 }
 
 function escapeAttributeValue(val: string): string {
   return val
-    .replace(/&/g, "&amp;")
-    .replace(/"/g, "&quot;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
-
 
 /**
  * Tokenizes raw SVG content and reconstructs it using only allowed tags and attributes.
@@ -196,7 +238,7 @@ function sanitizeSvgTokens(svgContent: string): string {
   let openTextTagCount = 0;
 
   while (pos < len) {
-    const nextLt = svgContent.indexOf("<", pos);
+    const nextLt = svgContent.indexOf('<', pos);
     if (nextLt === -1) {
       if (openTextTagCount > 0) {
         output.push(svgContent.slice(pos));
@@ -211,20 +253,20 @@ function sanitizeSvgTokens(svgContent: string): string {
     pos = nextLt;
 
     // 1. Skip comments: <!-- ... -->
-    if (svgContent.startsWith("<!--", pos)) {
-      const endComment = svgContent.indexOf("-->", pos + 4);
+    if (svgContent.startsWith('<!--', pos)) {
+      const endComment = svgContent.indexOf('-->', pos + 4);
       pos = endComment === -1 ? len : endComment + 3;
       continue;
     }
 
     // 2. Skip XML declarations and DOCTYPE: <?...?> or <!DOCTYPE ...>
-    if (svgContent.startsWith("<?", pos)) {
-      const endDecl = svgContent.indexOf("?>", pos + 2);
+    if (svgContent.startsWith('<?', pos)) {
+      const endDecl = svgContent.indexOf('?>', pos + 2);
       pos = endDecl === -1 ? len : endDecl + 2;
       continue;
     }
-    if (svgContent.startsWith("<!", pos)) {
-      const endDoc = svgContent.indexOf(">", pos + 2);
+    if (svgContent.startsWith('<!', pos)) {
+      const endDoc = svgContent.indexOf('>', pos + 2);
       pos = endDoc === -1 ? len : endDoc + 1;
       continue;
     }
@@ -251,10 +293,10 @@ function sanitizeSvgTokens(svgContent: string): string {
         if (char === inQuotes) inQuotes = null;
       } else if (char === '"' || char === "'") {
         inQuotes = char;
-      } else if (char === "<") {
+      } else if (char === '<') {
         hitNestedLt = true;
         break;
-      } else if (char === ">") {
+      } else if (char === '>') {
         break;
       }
       tagEnd++;
@@ -270,7 +312,7 @@ function sanitizeSvgTokens(svgContent: string): string {
     }
 
     const fullTagContent = svgContent.slice(pos, tagEnd + 1);
-    const isSelfClosing = fullTagContent.endsWith("/>") || fullTagContent.endsWith("/ >");
+    const isSelfClosing = fullTagContent.endsWith('/>') || fullTagContent.endsWith('/ >');
     const rawAttrs = svgContent.slice(pos + tagMatch[0].length, tagEnd - (isSelfClosing ? 1 : 0));
     pos = tagEnd + 1;
 
@@ -288,7 +330,7 @@ function sanitizeSvgTokens(svgContent: string): string {
     // If tag is active container (script, style, foreignObject), skip to closing tag
     if (ACTIVE_CONTAINER_TAGS.has(lowerTag)) {
       if (!isSelfClosing) {
-        const closeTagRegex = new RegExp(`</\\s*${lowerTag}[^>]*>`, "i");
+        const closeTagRegex = new RegExp(`</\\s*${lowerTag}[^>]*>`, 'i');
         const match = closeTagRegex.exec(svgContent.slice(pos));
         if (match) {
           pos = pos + match.index + match[0].length;
@@ -315,12 +357,15 @@ function sanitizeSvgTokens(svgContent: string): string {
       while ((attrMatch = attrRegex.exec(rawAttrs)) !== null) {
         const attrName = attrMatch[1];
         const lowerName = attrName.toLowerCase();
-        const attrVal = attrMatch[2] ?? attrMatch[3] ?? attrMatch[4] ?? "";
+        const attrVal = attrMatch[2] ?? attrMatch[3] ?? attrMatch[4] ?? '';
 
-        if (lowerName.startsWith("on")) continue;
-        if (!ALLOWED_SVG_ATTRS.has(lowerName) && !lowerName.startsWith("data-")) continue;
+        if (lowerName.startsWith('on')) continue;
+        if (!ALLOWED_SVG_ATTRS.has(lowerName) && !lowerName.startsWith('data-')) continue;
 
-        if ((lowerName === "href" || lowerName === "xlink:href" || lowerName === "src") && isDangerousHref(attrVal)) {
+        if (
+          (lowerName === 'href' || lowerName === 'xlink:href' || lowerName === 'src') &&
+          isDangerousHref(attrVal)
+        ) {
           continue;
         }
 
@@ -328,11 +373,11 @@ function sanitizeSvgTokens(svgContent: string): string {
       }
     }
 
-    const attrsString = cleanAttrs.length > 0 ? " " + cleanAttrs.join(" ") : "";
-    output.push(`<${lowerTag}${attrsString}${isSelfClosing ? " />" : ">"}`);
+    const attrsString = cleanAttrs.length > 0 ? ' ' + cleanAttrs.join(' ') : '';
+    output.push(`<${lowerTag}${attrsString}${isSelfClosing ? ' />' : '>'}`);
   }
 
-  return output.join("").trim();
+  return output.join('').trim();
 }
 
 /**
@@ -341,7 +386,7 @@ function sanitizeSvgTokens(svgContent: string): string {
  * and dangerous hrefs, handling nested evasions and arbitrary whitespace.
  */
 export function sanitizeSvg(svgContent: string): string {
-  if (!svgContent || typeof svgContent !== "string") return "";
+  if (!svgContent || typeof svgContent !== 'string') return '';
   // Avoid reparsing untrusted input with DOMParser; sanitize through strict token whitelist
   return sanitizeSvgTokens(svgContent);
 }
@@ -350,25 +395,25 @@ export function sanitizeSvg(svgContent: string): string {
  * Validates whether an SVG string is valid and safe.
  */
 export function isValidSvg(svg: string): boolean {
-  if (!svg || typeof svg !== "string") return false;
+  if (!svg || typeof svg !== 'string') return false;
   const trimmed = svg.trim();
   const lower = trimmed.toLowerCase();
-  if (!lower.startsWith("<svg") || !lower.endsWith("</svg>")) {
+  if (!lower.startsWith('<svg') || !lower.endsWith('</svg>')) {
     return false;
   }
   const disallowed = [
-    "script",
-    "style",
-    "foreignobject",
-    "iframe",
-    "object",
-    "embed",
-    "applet",
-    "template",
-    "meta",
-    "link",
-    "body",
-    "html",
+    'script',
+    'style',
+    'foreignobject',
+    'iframe',
+    'object',
+    'embed',
+    'applet',
+    'template',
+    'meta',
+    'link',
+    'body',
+    'html',
   ];
   for (const tag of disallowed) {
     if (lower.includes(`<${tag}`) || lower.includes(`</${tag}`)) {
@@ -395,7 +440,7 @@ export class IconRegistry {
         tags: getBuiltinTags(name),
         version: 1,
         source: {
-          type: "builtin",
+          type: 'builtin',
           key: name,
         },
       };
@@ -416,10 +461,10 @@ export class IconRegistry {
 
   public registerIcon(definition: IconDefinition): void {
     if (!definition.id || !definition.name) {
-      throw new Error("Icon definition must have id and name");
+      throw new Error('Icon definition must have id and name');
     }
 
-    if (definition.source.type === "svg") {
+    if (definition.source.type === 'svg') {
       definition.source.data = sanitizeSvg(definition.source.data);
     }
 
@@ -471,7 +516,7 @@ export class IconRegistry {
     const q = query.trim().toLowerCase();
     let results = this.getAllIcons();
 
-    if (categoryFilter && categoryFilter !== "all") {
+    if (categoryFilter && categoryFilter !== 'all') {
       results = results.filter((icon) => icon.category === categoryFilter);
     }
 

@@ -5,7 +5,7 @@ import {
   useState,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
-} from "react";
+} from 'react';
 import {
   BaseEdge,
   EdgeLabelRenderer,
@@ -14,8 +14,8 @@ import {
   useStore,
   type EdgeProps,
   type Edge,
-} from "@xyflow/react";
-import { getEdgeType } from "../../domain/edgeRegistry";
+} from '@xyflow/react';
+import { getEdgeType } from '../../domain/edgeRegistry';
 import {
   createWaypointId,
   getSegmentInsertions,
@@ -23,18 +23,18 @@ import {
   getWaypointPath,
   snapWaypoint,
   type WaypointInsertion,
-} from "../../domain/edgeRouting";
+} from '../../domain/edgeRouting';
 import {
   getClickBandEndpoints,
   getContainmentAwarePositions,
   getContainmentRelation,
   type ContainmentRelation,
-} from "../../domain/edgeContainment";
-import type { ArchEdgeData, ArchEdgeDataPatch, EdgeWaypoint } from "../../domain/types";
-import { useCanvasContext } from "../CanvasContext";
-import { recordEdgeRender } from "../../perf/instrumentation";
+} from '../../domain/edgeContainment';
+import type { ArchEdgeData, ArchEdgeDataPatch, EdgeWaypoint } from '../../domain/types';
+import { useCanvasContext } from '../CanvasContext';
+import { recordEdgeRender } from '../../perf/instrumentation';
 
-type TypedEdgeType = Edge<ArchEdgeData, "typed">;
+type TypedEdgeType = Edge<ArchEdgeData, 'typed'>;
 
 interface TypedEdgeProps extends EdgeProps<TypedEdgeType> {
   onUpdateEdge?: (id: string, patch: ArchEdgeDataPatch) => void;
@@ -49,7 +49,7 @@ const INSERT_DRAG_THRESHOLD = 3;
 // edge, so there's something for the flow animation to actually move.
 // Edges that already have their own dash pattern (async/data/file types)
 // keep using it - it already supports the same marching effect.
-const FLOW_FALLBACK_DASH = "8 6";
+const FLOW_FALLBACK_DASH = '8 6';
 
 // Below this many pixels of pointer movement, a press-and-release on the
 // label is treated as a click, not a drag.
@@ -111,12 +111,14 @@ export function TypedEdge({
   const onEndEdgeGesture = canvasContext?.onEndEdgeGesture;
   // Only for canvas edges: an edge given its own onUpdateEdge writes directly.
   const onPreviewEdgeLabel =
-    isEditable && !propOnUpdateEdge && onEndEdgeGesture ? canvasContext?.onPreviewEdgeLabel : undefined;
+    isEditable && !propOnUpdateEdge && onEndEdgeGesture
+      ? canvasContext?.onPreviewEdgeLabel
+      : undefined;
   const canBend = Boolean(onAddEdgeWaypoint && onMoveEdgeWaypoint && onRemoveEdgeWaypoint);
   const { screenToFlowPosition } = useReactFlow();
-  const def = getEdgeType(data?.edgeType ?? "generic");
+  const def = getEdgeType(data?.edgeType ?? 'generic');
   const color = data?.color ?? def.color;
-  const direction = data?.direction ?? "forward";
+  const direction = data?.direction ?? 'forward';
 
   /**
    * Whether one end of this edge is a boundary containing the other.
@@ -131,8 +133,8 @@ export function TypedEdge({
     useCallback(
       (state): ContainmentRelation =>
         getContainmentRelation(source, target, (id) => state.nodeLookup.get(id)?.parentId),
-      [source, target]
-    )
+      [source, target],
+    ),
   );
 
   const routed = getContainmentAwarePositions(containment, sourcePosition, targetPosition);
@@ -164,7 +166,7 @@ export function TypedEdge({
         routed.sourcePosition,
         waypoints!,
         { x: targetX, y: targetY },
-        routed.targetPosition
+        routed.targetPosition,
       )
     : smoothPath;
 
@@ -179,7 +181,7 @@ export function TypedEdge({
    * Flow's default band untouched.
    */
   const clickBandPath = (() => {
-    if (containment === "none") return null;
+    if (containment === 'none') return null;
     // A bent edge no longer follows the smooth-step route this inset
     // band is derived from, so the band would sit somewhere other than
     // the line. Bends are themselves a way out of the problem the band
@@ -187,7 +189,11 @@ export function TypedEdge({
     // connector - so a bent containment edge just uses React Flow's own
     // band, which follows whatever path is actually drawn.
     if (hasWaypoints) return null;
-    const inset = getClickBandEndpoints(containment, { sourceX, sourceY, targetX, targetY }, routed);
+    const inset = getClickBandEndpoints(
+      containment,
+      { sourceX, sourceY, targetX, targetY },
+      routed,
+    );
     const [p] = getSmoothStepPath({
       sourceX: inset.sourceX,
       sourceY: inset.sourceY,
@@ -274,7 +280,7 @@ export function TypedEdge({
           routed.sourcePosition,
           waypoints!,
           { x: targetX, y: targetY },
-          routed.targetPosition
+          routed.targetPosition,
         )
       : [{ index: 0, x: pathMidpoint.x, y: pathMidpoint.y }];
 
@@ -301,14 +307,14 @@ export function TypedEdge({
         { x: geometry.sourceX, y: geometry.sourceY },
         list,
         { x: geometry.targetX, y: geometry.targetY },
-        index
+        index,
       );
       return snapWaypoint(flowPoint, neighbours);
     },
-    []
+    [],
   );
 
-  const lastWaypointClickRef = useRef<{ id: string; time: number }>({ id: "", time: 0 });
+  const lastWaypointClickRef = useRef<{ id: string; time: number }>({ id: '', time: 0 });
 
   const onWaypointPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>, waypointId: string) => {
@@ -342,31 +348,41 @@ export function TypedEdge({
       };
 
       const handleUp = () => {
-        document.removeEventListener("pointermove", handleMove);
-        document.removeEventListener("pointerup", handleUp);
-        document.removeEventListener("pointercancel", handleUp);
+        document.removeEventListener('pointermove', handleMove);
+        document.removeEventListener('pointerup', handleUp);
+        document.removeEventListener('pointercancel', handleUp);
         // Moves were previews; this writes the bend once (WS4-R1, R2).
         if (moved) onEndEdgeGesture?.(id);
 
         // If the pointer did not drag, track double-click timing as a reliable fallback
         if (!moved) {
           const now = Date.now();
-          if (lastWaypointClickRef.current.id === waypointId && now - lastWaypointClickRef.current.time < 350) {
+          if (
+            lastWaypointClickRef.current.id === waypointId &&
+            now - lastWaypointClickRef.current.time < 350
+          ) {
             if (onRemoveEdgeWaypoint) {
               onRemoveEdgeWaypoint(id, waypointId);
             }
-            lastWaypointClickRef.current = { id: "", time: 0 };
+            lastWaypointClickRef.current = { id: '', time: 0 };
           } else {
             lastWaypointClickRef.current = { id: waypointId, time: now };
           }
         }
       };
 
-      document.addEventListener("pointermove", handleMove);
-      document.addEventListener("pointerup", handleUp);
-      document.addEventListener("pointercancel", handleUp);
+      document.addEventListener('pointermove', handleMove);
+      document.addEventListener('pointerup', handleUp);
+      document.addEventListener('pointercancel', handleUp);
     },
-    [id, onMoveEdgeWaypoint, onRemoveEdgeWaypoint, onEndEdgeGesture, resolveDragPosition, screenToFlowPosition]
+    [
+      id,
+      onMoveEdgeWaypoint,
+      onRemoveEdgeWaypoint,
+      onEndEdgeGesture,
+      resolveDragPosition,
+      screenToFlowPosition,
+    ],
   );
 
   const onWaypointContextMenu = useCallback(
@@ -376,7 +392,7 @@ export function TypedEdge({
       event.stopPropagation();
       onRemoveEdgeWaypoint(id, waypointId);
     },
-    [id, onRemoveEdgeWaypoint]
+    [id, onRemoveEdgeWaypoint],
   );
 
   /**
@@ -411,17 +427,24 @@ export function TypedEdge({
         if (next) onMoveEdgeWaypoint(id, createdId, next);
       };
       const handleUp = () => {
-        document.removeEventListener("pointermove", handleMove);
-        document.removeEventListener("pointerup", handleUp);
-        document.removeEventListener("pointercancel", handleUp);
+        document.removeEventListener('pointermove', handleMove);
+        document.removeEventListener('pointerup', handleUp);
+        document.removeEventListener('pointercancel', handleUp);
         // The new bend and its moves were previews; this writes it once.
         if (createdId !== null) onEndEdgeGesture?.(id);
       };
-      document.addEventListener("pointermove", handleMove);
-      document.addEventListener("pointerup", handleUp);
-      document.addEventListener("pointercancel", handleUp);
+      document.addEventListener('pointermove', handleMove);
+      document.addEventListener('pointerup', handleUp);
+      document.addEventListener('pointercancel', handleUp);
     },
-    [id, onAddEdgeWaypoint, onMoveEdgeWaypoint, onEndEdgeGesture, resolveDragPosition, screenToFlowPosition]
+    [
+      id,
+      onAddEdgeWaypoint,
+      onMoveEdgeWaypoint,
+      onEndEdgeGesture,
+      resolveDragPosition,
+      screenToFlowPosition,
+    ],
   );
 
   const onWaypointDoubleClick = useCallback(
@@ -430,7 +453,7 @@ export function TypedEdge({
       event.stopPropagation();
       onRemoveEdgeWaypoint(id, waypointId);
     },
-    [id, onRemoveEdgeWaypoint]
+    [id, onRemoveEdgeWaypoint],
   );
 
   // Drag state lives in a ref + document-level listeners, NOT React state
@@ -476,27 +499,31 @@ export function TypedEdge({
       };
 
       const handleUp = () => {
-        document.removeEventListener("pointermove", handleMove);
-        document.removeEventListener("pointerup", handleUp);
+        document.removeEventListener('pointermove', handleMove);
+        document.removeEventListener('pointerup', handleUp);
         if (moved && onPreviewEdgeLabel) onEndEdgeGesture?.(id);
       };
 
-      document.addEventListener("pointermove", handleMove);
-      document.addEventListener("pointerup", handleUp);
+      document.addEventListener('pointermove', handleMove);
+      document.addEventListener('pointerup', handleUp);
     },
-    [id, onUpdateEdge, onPreviewEdgeLabel, onEndEdgeGesture, screenToFlowPosition]
+    [id, onUpdateEdge, onPreviewEdgeLabel, onEndEdgeGesture, screenToFlowPosition],
   );
 
   const onLabelDoubleClick = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
       if (!onUpdateEdge) return;
       event.stopPropagation();
-      onUpdateEdge(id, { labelAnchorT: undefined, labelOffsetX: undefined, labelOffsetY: undefined });
+      onUpdateEdge(id, {
+        labelAnchorT: undefined,
+        labelOffsetX: undefined,
+        labelOffsetY: undefined,
+      });
     },
-    [id, onUpdateEdge]
+    [id, onUpdateEdge],
   );
 
-  const shownLabel = data?.hideLabel ? "" : data?.label?.trim() ? data.label : def.label;
+  const shownLabel = data?.hideLabel ? '' : data?.label?.trim() ? data.label : def.label;
   // `style.opacity` is how Canvas.tsx applies Presentation Mode / step-preview
   // dimming - unlike nodes, React Flow doesn't apply it automatically for
   // custom edge components, so it has to be merged in here explicitly.
@@ -506,7 +533,7 @@ export function TypedEdge({
   const isFocused = opacity === 1;
   const isStepMember = data?.isStepMember === true;
   const isStepCandidate = selected && data?.isStepMember === false;
-  const flowClass = animated ? ` typed-edge--flow-${direction}` : "";
+  const flowClass = animated ? ` typed-edge--flow-${direction}` : '';
 
   return (
     <>
@@ -529,23 +556,33 @@ export function TypedEdge({
         // arrowhead to the source end, indicating the real traffic runs
         // opposite to how the edge happens to be drawn; "both" keeps one
         // at each end for a genuinely bi-directional relationship.
-        markerEnd={direction === "reverse" ? undefined : markerEnd}
-        markerStart={direction === "reverse" || direction === "both" ? markerStart : undefined}
+        markerEnd={direction === 'reverse' ? undefined : markerEnd}
+        markerStart={direction === 'reverse' || direction === 'both' ? markerStart : undefined}
         className={`typed-edge${flowClass}`}
         style={{
-          stroke: isStepCandidate ? "#fbbf24" : color,
+          stroke: isStepCandidate ? '#fbbf24' : color,
           strokeWidth: selected || isFocused || isStepMember || isStepCandidate ? 2.5 : 1.75,
-          strokeDasharray: isStepCandidate ? "6 4" : animated ? def.dash ?? FLOW_FALLBACK_DASH : def.dash,
+          strokeDasharray: isStepCandidate
+            ? '6 4'
+            : animated
+              ? (def.dash ?? FLOW_FALLBACK_DASH)
+              : def.dash,
           opacity,
           filter: isFocused
             ? `drop-shadow(0 0 5px ${color})`
             : isStepMember || isStepCandidate
-              ? "drop-shadow(0 0 5px #fbbf24)"
+              ? 'drop-shadow(0 0 5px #fbbf24)'
               : undefined,
         }}
       />
 
-      <path ref={measurePathRef} d={path} fill="none" stroke="none" style={{ opacity: 0, pointerEvents: "none" }} />
+      <path
+        ref={measurePathRef}
+        d={path}
+        fill="none"
+        stroke="none"
+        style={{ opacity: 0, pointerEvents: 'none' }}
+      />
 
       {showBendHandles && (
         <EdgeLabelRenderer>
@@ -554,7 +591,7 @@ export function TypedEdge({
               key={`insert-${insertion.index}`}
               className="typed-edge__insert-dot nodrag nopan nowheel"
               style={{
-                position: "absolute",
+                position: 'absolute',
                 transform: `translate(-50%, -50%) translate(${insertion.x}px, ${insertion.y}px)`,
               }}
               onPointerDown={(event) => onInsertionPointerDown(event, insertion.index)}
@@ -566,7 +603,7 @@ export function TypedEdge({
               key={waypoint.id}
               className="typed-edge__waypoint nodrag nopan nowheel"
               style={{
-                position: "absolute",
+                position: 'absolute',
                 transform: `translate(-50%, -50%) translate(${waypoint.x}px, ${waypoint.y}px)`,
               }}
               onPointerDown={(event) => onWaypointPointerDown(event, waypoint.id)}
@@ -583,7 +620,7 @@ export function TypedEdge({
           <div
             className="typed-edge__anchor-dot"
             style={{
-              position: "absolute",
+              position: 'absolute',
               transform: `translate(-50%, -50%) translate(${anchorPoint.x}px, ${anchorPoint.y}px)`,
             }}
             title="Where this label is anchored on the line"
@@ -594,24 +631,24 @@ export function TypedEdge({
       {shownLabel && (
         <EdgeLabelRenderer>
           <div
-            className={`typed-edge__label nodrag nopan nowheel${selected ? " is-selected" : ""}`}
+            className={`typed-edge__label nodrag nopan nowheel${selected ? ' is-selected' : ''}`}
             style={{
-              position: "absolute",
+              position: 'absolute',
               transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-              borderColor: isStepMember ? "var(--accent)" : isStepCandidate ? "#fbbf24" : color,
+              borderColor: isStepMember ? 'var(--accent)' : isStepCandidate ? '#fbbf24' : color,
               color,
               opacity,
               boxShadow: isFocused
                 ? `0 0 8px ${color}99`
                 : isStepMember
-                  ? "0 0 0 2px var(--accent)"
+                  ? '0 0 0 2px var(--accent)'
                   : isStepCandidate
-                    ? "0 0 0 2px #fbbf24"
+                    ? '0 0 0 2px #fbbf24'
                     : undefined,
             }}
             onPointerDown={onLabelPointerDown}
             onDoubleClick={onLabelDoubleClick}
-            title={onUpdateEdge ? "Drag to reposition, double-click to re-center" : undefined}
+            title={onUpdateEdge ? 'Drag to reposition, double-click to re-center' : undefined}
           >
             {shownLabel}
           </div>

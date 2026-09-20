@@ -17,8 +17,8 @@
  * member reaches it through the workspace key, and the organization reaches
  * it through the offline recovery key with no workspace key involved.
  */
-import { createWebCryptoStorage } from "./storageCrypto.ts";
-import type { BlobContext, BlobKind } from "./envelope.ts";
+import { createWebCryptoStorage } from './storageCrypto.ts';
+import type { BlobContext, BlobKind } from './envelope.ts';
 import {
   deriveStorageKey,
   exportSymmetricKeyHex,
@@ -27,7 +27,7 @@ import {
   unwrapKeyWithPrivateKey,
   wrapKey,
   wrapKeyForPublicKey,
-} from "./keys.ts";
+} from './keys.ts';
 
 export interface SealedBlob {
   kind: BlobKind;
@@ -49,7 +49,7 @@ export interface DocumentPackage {
 }
 
 export function toBase64(bytes: Uint8Array): string {
-  let binary = "";
+  let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary);
 }
@@ -62,7 +62,10 @@ export function fromBase64(value: string): Uint8Array {
 }
 
 const crypto = createWebCryptoStorage();
-const contextFor = (pkg: Pick<DocumentPackage, "docId" | "version">, kind: BlobKind): BlobContext => ({
+const contextFor = (
+  pkg: Pick<DocumentPackage, 'docId' | 'version'>,
+  kind: BlobKind,
+): BlobContext => ({
   docId: pkg.docId,
   kind,
   version: pkg.version,
@@ -105,7 +108,11 @@ export async function sealDocument(
     keys: {
       wrappedForWorkspace: toBase64(await wrapKey(documentKey, options.workspaceKey)),
       ...(options.recoveryPublicKey
-        ? { wrappedForRecovery: toBase64(await wrapKeyForPublicKey(documentKey, options.recoveryPublicKey)) }
+        ? {
+            wrappedForRecovery: toBase64(
+              await wrapKeyForPublicKey(documentKey, options.recoveryPublicKey),
+            ),
+          }
         : {}),
     },
     blobs,
@@ -114,18 +121,29 @@ export async function sealDocument(
 
 /** The unwrapped document key opens nothing by itself: the storage key is
  * derived from it, exactly as the client that sealed the blobs did. */
-async function openBlobs(pkg: DocumentPackage, documentKey: CryptoKey): Promise<{ kind: BlobKind; data: Uint8Array }[]> {
+async function openBlobs(
+  pkg: DocumentPackage,
+  documentKey: CryptoKey,
+): Promise<{ kind: BlobKind; data: Uint8Array }[]> {
   const storageKey = await deriveStorageKey(await exportSymmetricKeyHex(documentKey));
   const out: { kind: BlobKind; data: Uint8Array }[] = [];
   for (const blob of pkg.blobs) {
-    out.push({ kind: blob.kind, data: await crypto.open(contextFor(pkg, blob.kind), fromBase64(blob.sealed), storageKey) });
+    out.push({
+      kind: blob.kind,
+      data: await crypto.open(contextFor(pkg, blob.kind), fromBase64(blob.sealed), storageKey),
+    });
   }
   return out;
 }
 
 /** The everyday route: a member with the workspace key. */
 export async function openDocumentPackage(pkg: DocumentPackage, workspaceKey: CryptoKey) {
-  const documentKey = await unwrapKey(fromBase64(pkg.keys.wrappedForWorkspace), workspaceKey, "AES-GCM", 128);
+  const documentKey = await unwrapKey(
+    fromBase64(pkg.keys.wrappedForWorkspace),
+    workspaceKey,
+    'AES-GCM',
+    128,
+  );
   return openBlobs(pkg, documentKey);
 }
 
@@ -139,23 +157,30 @@ export async function recoverDocumentPackage(pkg: DocumentPackage, recoveryPriva
       `Document ${pkg.docId} has no recovery wrap. It was stored by a deployment running in passthrough mode, where content is not encrypted.`,
     );
   }
-  const documentKey = await unwrapKeyWithPrivateKey(fromBase64(pkg.keys.wrappedForRecovery), recoveryPrivateKey, "AES-GCM", 128);
+  const documentKey = await unwrapKeyWithPrivateKey(
+    fromBase64(pkg.keys.wrappedForRecovery),
+    recoveryPrivateKey,
+    'AES-GCM',
+    128,
+  );
   return openBlobs(pkg, documentKey);
 }
 
 // ---------------------------------------------------------------------------
 // PEM, for the recovery private key as it is kept offline (WS7-R10)
 
-export function toPem(pkcs8: Uint8Array, label = "PRIVATE KEY"): string {
-  const body = toBase64(pkcs8).replace(/(.{64})/g, "$1\n").trimEnd();
+export function toPem(pkcs8: Uint8Array, label = 'PRIVATE KEY'): string {
+  const body = toBase64(pkcs8)
+    .replace(/(.{64})/g, '$1\n')
+    .trimEnd();
   return `-----BEGIN ${label}-----\n${body}\n-----END ${label}-----\n`;
 }
 
 export function fromPem(pem: string): Uint8Array {
   const body = pem
-    .replace(/-----BEGIN [^-]+-----/, "")
-    .replace(/-----END [^-]+-----/, "")
-    .replace(/\s+/g, "");
-  if (body.length === 0) throw new Error("That file does not contain a PEM key block.");
+    .replace(/-----BEGIN [^-]+-----/, '')
+    .replace(/-----END [^-]+-----/, '')
+    .replace(/\s+/g, '');
+  if (body.length === 0) throw new Error('That file does not contain a PEM key block.');
   return fromBase64(body);
 }

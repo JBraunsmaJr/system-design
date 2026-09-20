@@ -1,9 +1,10 @@
-import js from '@eslint/js'
-import globals from 'globals'
-import reactHooks from 'eslint-plugin-react-hooks'
-import reactRefresh from 'eslint-plugin-react-refresh'
-import tseslint from 'typescript-eslint'
-import { defineConfig, globalIgnores } from 'eslint/config'
+import js from '@eslint/js';
+import globals from 'globals';
+import reactHooks from 'eslint-plugin-react-hooks';
+import reactRefresh from 'eslint-plugin-react-refresh';
+import tseslint from 'typescript-eslint';
+import prettierConfig from 'eslint-config-prettier';
+import { defineConfig, globalIgnores } from 'eslint/config';
 
 export default defineConfig([
   globalIgnores(['dist']),
@@ -30,7 +31,8 @@ export default defineConfig([
             'Use StorageCrypto (src/crypto/storageCrypto.ts) instead of crypto.subtle directly (WS6-R1).',
         },
         {
-          selector: "CallExpression[callee.object.name='crypto'][callee.property.name='getRandomValues']",
+          selector:
+            "CallExpression[callee.object.name='crypto'][callee.property.name='getRandomValues']",
           message:
             'Generate key material and IVs through src/crypto (WS6-R1); crypto.getRandomValues is allowed there.',
         },
@@ -44,4 +46,5 @@ export default defineConfig([
       'no-restricted-syntax': 'off',
     },
   },
-])
+  prettierConfig,
+]);

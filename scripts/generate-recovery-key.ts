@@ -12,26 +12,31 @@
  * key is gone. Keep it offline, and keep it somewhere other than the
  * database backups it would be used to recover.
  */
-import { writeFileSync, existsSync } from "fs";
-import { generateWrappingKeyPair, exportPrivateKey, exportPublicKey } from "../src/crypto/keys.ts";
-import { toPem } from "../src/crypto/documentPackage.ts";
+import { writeFileSync, existsSync } from 'fs';
+import { generateWrappingKeyPair, exportPrivateKey, exportPublicKey } from '../src/crypto/keys.ts';
+import { toPem } from '../src/crypto/documentPackage.ts';
 
 const args = process.argv.slice(2);
-const outIndex = args.indexOf("--out");
-const prefix = outIndex === -1 ? "./recovery" : (args[outIndex + 1] ?? "./recovery");
+const outIndex = args.indexOf('--out');
+const prefix = outIndex === -1 ? './recovery' : (args[outIndex + 1] ?? './recovery');
 const publicPath = `${prefix}-public.pem`;
 const privatePath = `${prefix}-private.pem`;
 
 for (const path of [publicPath, privatePath]) {
   if (existsSync(path)) {
-    console.error(`${path} already exists. Refusing to overwrite a recovery key: if it is in use, replacing it makes every escrowed document unrecoverable.`);
+    console.error(
+      `${path} already exists. Refusing to overwrite a recovery key: if it is in use, replacing it makes every escrowed document unrecoverable.`,
+    );
     process.exit(1);
   }
 }
 
-const pair = await generateWrappingKeyPair("recovery");
-writeFileSync(publicPath, toPem(await exportPublicKey(pair.publicKey), "PUBLIC KEY"), "utf8");
-writeFileSync(privatePath, toPem(await exportPrivateKey(pair.privateKey)), { encoding: "utf8", mode: 0o600 });
+const pair = await generateWrappingKeyPair('recovery');
+writeFileSync(publicPath, toPem(await exportPublicKey(pair.publicKey), 'PUBLIC KEY'), 'utf8');
+writeFileSync(privatePath, toPem(await exportPrivateKey(pair.privateKey)), {
+  encoding: 'utf8',
+  mode: 0o600,
+});
 
 console.log(`Wrote:
   ${publicPath}   give this to the store (RECOVERY_PUBLIC_KEY_FILE)

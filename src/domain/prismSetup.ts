@@ -1,4 +1,4 @@
-import Prism from "prismjs";
+import Prism from 'prismjs';
 
 // Import order matters here - each of these registers itself onto the
 // shared `Prism.languages` object as a side effect, and a few extend an
@@ -8,16 +8,16 @@ import Prism from "prismjs";
 // would silently leave the extending language broken (it would be
 // extending whatever partial/undefined grammar existed at that point), so
 // each base is imported immediately before what builds on it.
-import "prismjs/components/prism-clike";
-import "prismjs/components/prism-javascript";
-import "prismjs/components/prism-typescript";
-import "prismjs/components/prism-markup";
-import "prismjs/components/prism-markdown";
-import "prismjs/components/prism-json";
-import "prismjs/components/prism-python";
-import "prismjs/components/prism-yaml";
-import "prismjs/components/prism-sql";
-import "prismjs/components/prism-bash";
+import 'prismjs/components/prism-clike';
+import 'prismjs/components/prism-javascript';
+import 'prismjs/components/prism-typescript';
+import 'prismjs/components/prism-markup';
+import 'prismjs/components/prism-markdown';
+import 'prismjs/components/prism-json';
+import 'prismjs/components/prism-python';
+import 'prismjs/components/prism-yaml';
+import 'prismjs/components/prism-sql';
+import 'prismjs/components/prism-bash';
 
 export { Prism };
 
@@ -30,7 +30,7 @@ export { Prism };
 export function highlightCode(code: string, languageId: string): string {
   const grammar = Prism.languages[languageId];
   if (!grammar) {
-    return code.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
   return Prism.highlight(code, grammar, languageId);
 }

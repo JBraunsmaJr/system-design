@@ -3,7 +3,7 @@
  *
  * Run with: npx tsx --tsconfig tsconfig.app.json src/domain/edgeRouting.verify.ts
  */
-import { Position } from "@xyflow/react";
+import { Position } from '@xyflow/react';
 import {
   buildOrthogonalRoute,
   simplifyOrthogonalPoints,
@@ -14,8 +14,8 @@ import {
   getWaypointNeighbours,
   createWaypointId,
   type Point,
-} from "./edgeRouting";
-import type { EdgeWaypoint } from "./types";
+} from './edgeRouting';
+import type { EdgeWaypoint } from './types';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {
@@ -56,16 +56,22 @@ function passesThrough(points: Point[], p: Point): boolean {
 
   const route = buildOrthogonalRoute(source, Position.Right, waypoints, target, Position.Left);
 
-  assert(everySegmentOrthogonal(route), "every segment of a routed edge is horizontal or vertical - no diagonals");
+  assert(
+    everySegmentOrthogonal(route),
+    'every segment of a routed edge is horizontal or vertical - no diagonals',
+  );
   for (const w of waypoints) {
-    assert(passesThrough(route, w), `the route passes exactly through the bend at (${w.x}, ${w.y})`);
+    assert(
+      passesThrough(route, w),
+      `the route passes exactly through the bend at (${w.x}, ${w.y})`,
+    );
   }
   assert(
     route[0].x === source.x && route[0].y === source.y,
-    "the route starts at the source handle"
+    'the route starts at the source handle',
   );
   const last = route[route.length - 1];
-  assert(last.x === target.x && last.y === target.y, "and ends at the target handle");
+  assert(last.x === target.x && last.y === target.y, 'and ends at the target handle');
 }
 
 // === Part 2: the first and last segments respect their handle's axis ===
@@ -78,11 +84,17 @@ function passesThrough(points: Point[], p: Point): boolean {
     Position.Right,
     [{ x: 150, y: 120 }],
     { x: 300, y: 240 },
-    Position.Left
+    Position.Left,
   );
-  assert(route[0].y === route[1].y, "leaving a Right-facing source handle, the first segment runs horizontally");
+  assert(
+    route[0].y === route[1].y,
+    'leaving a Right-facing source handle, the first segment runs horizontally',
+  );
   const [beforeLast, last] = route.slice(-2);
-  assert(beforeLast.y === last.y, "arriving at a Left-facing target handle, the last segment runs horizontally");
+  assert(
+    beforeLast.y === last.y,
+    'arriving at a Left-facing target handle, the last segment runs horizontally',
+  );
 }
 {
   const route = buildOrthogonalRoute(
@@ -90,11 +102,17 @@ function passesThrough(points: Point[], p: Point): boolean {
     Position.Bottom,
     [{ x: 150, y: 120 }],
     { x: 300, y: 240 },
-    Position.Top
+    Position.Top,
   );
-  assert(route[0].x === route[1].x, "leaving a Bottom-facing source handle, the first segment runs vertically");
+  assert(
+    route[0].x === route[1].x,
+    'leaving a Bottom-facing source handle, the first segment runs vertically',
+  );
   const [beforeLast, last] = route.slice(-2);
-  assert(beforeLast.x === last.x, "arriving at a Top-facing target handle, the last segment runs vertically");
+  assert(
+    beforeLast.x === last.x,
+    'arriving at a Top-facing target handle, the last segment runs vertically',
+  );
 }
 
 // === Part 3: points that don't change the shape are dropped ===
@@ -108,17 +126,23 @@ function passesThrough(points: Point[], p: Point): boolean {
     { x: 100, y: 0 },
     { x: 100, y: 80 },
   ]);
-  assert(simplified.length === 3, `duplicate and collinear points are dropped (kept ${simplified.length} of 5)`);
   assert(
-    simplified[0].x === 0 && simplified[1].x === 100 && simplified[1].y === 0 && simplified[2].y === 80,
-    "and the ones kept are the genuine corners, in order"
+    simplified.length === 3,
+    `duplicate and collinear points are dropped (kept ${simplified.length} of 5)`,
+  );
+  assert(
+    simplified[0].x === 0 &&
+      simplified[1].x === 100 &&
+      simplified[1].y === 0 &&
+      simplified[2].y === 80,
+    'and the ones kept are the genuine corners, in order',
   );
 
   const allSame = simplifyOrthogonalPoints([
     { x: 5, y: 5 },
     { x: 5, y: 5 },
   ]);
-  assert(allSame.length === 1, "a run of identical points collapses to one rather than to none");
+  assert(allSame.length === 1, 'a run of identical points collapses to one rather than to none');
 }
 
 // === Part 4: a bend dragged almost on top of its neighbour ===
@@ -137,10 +161,10 @@ function passesThrough(points: Point[], p: Point): boolean {
   const ys = coords.filter((_, i) => i % 2 === 1);
   assert(
     ys.every((y) => y >= -0.01 && y <= 6.01),
-    "corner rounding is clamped to half the shortest adjacent segment, so a 6px segment's two curves never overshoot past each other"
+    "corner rounding is clamped to half the shortest adjacent segment, so a 6px segment's two curves never overshoot past each other",
   );
-  assert(d.startsWith("M 0,0"), "the path still starts at the first point");
-  assert(d.trimEnd().endsWith("200,6"), "and still ends at the last one");
+  assert(d.startsWith('M 0,0'), 'the path still starts at the first point');
+  assert(d.trimEnd().endsWith('200,6'), 'and still ends at the last one');
 }
 
 // === Part 5: a straight line needs no curves at all ===
@@ -150,9 +174,9 @@ function passesThrough(points: Point[], p: Point): boolean {
       { x: 0, y: 0 },
       { x: 100, y: 0 },
     ],
-    10
+    10,
   );
-  assert(!d.includes("Q"), `a two-point straight run produces no quadratic curves (got "${d}")`);
+  assert(!d.includes('Q'), `a two-point straight run produces no quadratic curves (got "${d}")`);
 }
 
 // === Part 6: insertion handles sit ON the line ===
@@ -166,15 +190,15 @@ function passesThrough(points: Point[], p: Point): boolean {
   const target: Point = { x: 200, y: 200 };
 
   const none = getSegmentInsertions(source, Position.Right, [], target, Position.Left);
-  assert(none.length === 1, "an edge with no bends offers exactly one place to add one");
-  assert(none[0].index === 0, "and it inserts at index 0");
+  assert(none.length === 1, 'an edge with no bends offers exactly one place to add one');
+  assert(none[0].index === 0, 'and it inserts at index 0');
 
   const waypoints: Point[] = [{ x: 100, y: -100 }];
   const one = getSegmentInsertions(source, Position.Right, waypoints, target, Position.Left);
-  assert(one.length === 2, "an edge with one bend offers two - one either side of it");
+  assert(one.length === 2, 'an edge with one bend offers two - one either side of it');
   assert(
     one[0].index === 0 && one[1].index === 1,
-    "each reporting the waypoint index a new bend dragged out of it belongs at"
+    'each reporting the waypoint index a new bend dragged out of it belongs at',
   );
 
   const route = buildOrthogonalRoute(source, Position.Right, waypoints, target, Position.Left);
@@ -191,7 +215,10 @@ function passesThrough(points: Point[], p: Point): boolean {
       // being on it.
       return within;
     });
-    assert(onSomeSegment, `the insertion handle at (${insertion.x}, ${insertion.y}) lies on the drawn route, not off beside it`);
+    assert(
+      onSomeSegment,
+      `the insertion handle at (${insertion.x}, ${insertion.y}) lies on the drawn route, not off beside it`,
+    );
   }
 }
 
@@ -204,11 +231,14 @@ function passesThrough(points: Point[], p: Point): boolean {
   ]);
   assert(
     mid.x === 100 && mid.y === 0,
-    `the halfway point of an L is measured along the line (got ${mid.x}, ${mid.y}), which for two equal arms is the corner itself`
+    `the halfway point of an L is measured along the line (got ${mid.x}, ${mid.y}), which for two equal arms is the corner itself`,
   );
 
   const degenerate = polylineMidpoint([{ x: 7, y: 9 }]);
-  assert(degenerate.x === 7 && degenerate.y === 9, "a single point is its own midpoint rather than dividing by zero");
+  assert(
+    degenerate.x === 7 && degenerate.y === 9,
+    'a single point is its own midpoint rather than dividing by zero',
+  );
 }
 
 // === Part 8: snapping is per-axis ===
@@ -222,17 +252,20 @@ function passesThrough(points: Point[], p: Point): boolean {
   ];
 
   const snapped = snapWaypoint({ x: 103, y: 250 }, neighbours, 6);
-  assert(snapped.x === 100, "a bend within the threshold of a neighbour's x snaps into line with it");
-  assert(snapped.y === 250, "while its y is left exactly where it was dropped");
+  assert(
+    snapped.x === 100,
+    "a bend within the threshold of a neighbour's x snaps into line with it",
+  );
+  assert(snapped.y === 250, 'while its y is left exactly where it was dropped');
 
   const untouched = snapWaypoint({ x: 150, y: 250 }, neighbours, 6);
   assert(
     untouched.x === 150 && untouched.y === 250,
-    "a bend outside the threshold on both axes is not moved at all - this is an assist, not a grid"
+    'a bend outside the threshold on both axes is not moved at all - this is an assist, not a grid',
   );
 
   const both = snapWaypoint({ x: 302, y: 403 }, neighbours, 6);
-  assert(both.x === 300 && both.y === 400, "and a bend close on both axes can still snap on both");
+  assert(both.x === 300 && both.y === 400, 'and a bend close on both axes can still snap on both');
 }
 
 // === Part 9: which anchors a bend snaps against ===
@@ -240,33 +273,33 @@ function passesThrough(points: Point[], p: Point): boolean {
   const source: Point = { x: 0, y: 0 };
   const target: Point = { x: 500, y: 500 };
   const waypoints: EdgeWaypoint[] = [
-    { id: "a", x: 100, y: 100 },
-    { id: "b", x: 200, y: 200 },
-    { id: "c", x: 300, y: 300 },
+    { id: 'a', x: 100, y: 100 },
+    { id: 'b', x: 200, y: 200 },
+    { id: 'c', x: 300, y: 300 },
   ];
 
   const first = getWaypointNeighbours(source, waypoints, target, 0);
   assert(
     first.length === 2 && first[0].x === 0 && first[1].x === 200,
-    "the first bend snaps against the source handle and the bend after it"
+    'the first bend snaps against the source handle and the bend after it',
   );
 
   const middle = getWaypointNeighbours(source, waypoints, target, 1);
   assert(
     middle[0].x === 100 && middle[1].x === 300,
-    "a middle bend snaps against the bends either side of it"
+    'a middle bend snaps against the bends either side of it',
   );
 
   const lastOne = getWaypointNeighbours(source, waypoints, target, 2);
   assert(
     lastOne[0].x === 200 && lastOne[1].x === 500,
-    "and the last bend snaps against the bend before it and the target handle"
+    'and the last bend snaps against the bend before it and the target handle',
   );
 
-  const only = getWaypointNeighbours(source, [{ id: "solo", x: 50, y: 50 }], target, 0);
+  const only = getWaypointNeighbours(source, [{ id: 'solo', x: 50, y: 50 }], target, 0);
   assert(
     only.length === 2 && only[0].x === 0 && only[1].x === 500,
-    "an edge's only bend snaps against both handles"
+    "an edge's only bend snaps against both handles",
   );
 }
 
@@ -286,14 +319,17 @@ function passesThrough(points: Point[], p: Point): boolean {
   try {
     const generated = new Set<string>();
     for (let i = 0; i < 2000; i++) generated.add(createWaypointId());
-    assert(generated.size === 2000, `2000 generated waypoint ids are all distinct (got ${generated.size})`);
+    assert(
+      generated.size === 2000,
+      `2000 generated waypoint ids are all distinct (got ${generated.size})`,
+    );
   } finally {
     Date.now = originalDateNow;
     Math.random = originalMathRandom;
   }
 }
 
-console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);
+console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);
 // scripts/run-tests.ts decides pass/fail from the process exit status, so
 // a failed assertion has to actually set one - printing FAIL and exiting
 // 0 would report the suite as passing. Reached through globalThis

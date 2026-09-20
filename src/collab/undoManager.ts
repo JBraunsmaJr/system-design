@@ -17,7 +17,7 @@
  * whether or not a session is active: solo editing is simply the case where no
  * other origin ever appears.
  */
-import * as Y from "yjs";
+import * as Y from 'yjs';
 
 /**
  * Root collections the UndoManager watches, split by concrete type.
@@ -38,32 +38,32 @@ import * as Y from "yjs";
  * step with the seeds it mirrors.
  */
 const TRACKED_ARRAYS = [
-  "nodeOrder",
-  "edgeOrder",
-  "itemTypeOrder",
-  "categoryOrder",
-  "itemOrder",
-  "piOrder",
-  "milestoneOrder",
-  "memberOrder",
+  'nodeOrder',
+  'edgeOrder',
+  'itemTypeOrder',
+  'categoryOrder',
+  'itemOrder',
+  'piOrder',
+  'milestoneOrder',
+  'memberOrder',
 ] as const;
 
 const TRACKED_MAPS = [
-  "nodes",
-  "edges",
-  "itemTypes",
-  "categories",
-  "items",
-  "relationshipTypes",
-  "relationships",
-  "nextSequence",
-  "pis",
-  "milestones",
-  "members",
-  "extraDaysOff",
-  "settings",
+  'nodes',
+  'edges',
+  'itemTypes',
+  'categories',
+  'items',
+  'relationshipTypes',
+  'relationships',
+  'nextSequence',
+  'pis',
+  'milestones',
+  'members',
+  'extraDaysOff',
+  'settings',
   // Title and scenarios (yjsDocumentMetaStore.ts).
-  "meta",
+  'meta',
 ] as const;
 
 export interface UndoController {
@@ -122,9 +122,9 @@ export function createUndoController(
     for (const listener of listeners) listener();
   };
 
-  manager.on("stack-item-added", notify);
-  manager.on("stack-item-popped", notify);
-  manager.on("stack-cleared", notify);
+  manager.on('stack-item-added', notify);
+  manager.on('stack-item-popped', notify);
+  manager.on('stack-cleared', notify);
 
   return {
     origin,
@@ -150,9 +150,9 @@ export function createUndoController(
       notify();
     },
     destroy() {
-      manager.off("stack-item-added", notify);
-      manager.off("stack-item-popped", notify);
-      manager.off("stack-cleared", notify);
+      manager.off('stack-item-added', notify);
+      manager.off('stack-item-popped', notify);
+      manager.off('stack-cleared', notify);
       listeners.clear();
       manager.destroy();
     },
@@ -165,7 +165,7 @@ export function createUndoController(
  * `replaceAll` is a whole-document replacement - a file load or a perf fixture
  * - which is a document boundary (WS3-R4), not something to undo back across.
  */
-const NOT_EDITS = new Set(["getSnapshot", "subscribe", "destroy", "replaceAll"]);
+const NOT_EDITS = new Set(['getSnapshot', 'subscribe', 'destroy', 'replaceAll']);
 
 /**
  * Returns `store` with every mutating method run under `undo.transact`.
@@ -179,12 +179,16 @@ const NOT_EDITS = new Set(["getSnapshot", "subscribe", "destroy", "replaceAll"])
  * `getSnapshot` and `subscribe` are passed through by identity, since
  * useSyncExternalStore resubscribes whenever they change.
  */
-export function undoableStore<S extends object>(store: S, undo: Pick<UndoController, "transact">): S {
+export function undoableStore<S extends object>(
+  store: S,
+  undo: Pick<UndoController, 'transact'>,
+): S {
   const wrapped = {} as Record<string, unknown>;
   for (const [key, value] of Object.entries(store)) {
     wrapped[key] =
-      typeof value === "function" && !NOT_EDITS.has(key)
-        ? (...args: unknown[]) => undo.transact(() => (value as (...a: unknown[]) => unknown)(...args))
+      typeof value === 'function' && !NOT_EDITS.has(key)
+        ? (...args: unknown[]) =>
+            undo.transact(() => (value as (...a: unknown[]) => unknown)(...args))
         : value;
   }
   return wrapped as S;

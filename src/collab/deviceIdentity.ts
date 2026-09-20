@@ -20,11 +20,7 @@
  * browser it is IndexedDB, holding non-extractable CryptoKeys that cannot be
  * read out even by this application.
  */
-import {
-  documentKeyFor,
-  fromBase64,
-  toBase64,
-} from "./workspaceDocuments.ts";
+import { documentKeyFor, fromBase64, toBase64 } from './workspaceDocuments.ts';
 import {
   exportPublicKey,
   generateWorkspaceKey,
@@ -34,19 +30,19 @@ import {
   unwrapPrivateKeyWithPrivateKey,
   wrapKeyForPublicKey,
   wrapPrivateKeyForPublicKey,
-} from "../crypto/keys.ts";
-import type { BlobContext } from "../crypto/envelope.ts";
+} from '../crypto/keys.ts';
+import type { BlobContext } from '../crypto/envelope.ts';
 
 export type EnrollmentStatus =
   /** No store configured, or not signed in. */
-  | "inactive"
+  | 'inactive'
   /** Registered, waiting for another device to approve this one. */
-  | "awaiting-approval"
+  | 'awaiting-approval'
   /** The person's first device: approved, but it has to make the keys. */
-  | "needs-setup"
+  | 'needs-setup'
   /** Holds the workspace key; documents can be opened and saved. */
-  | "ready"
-  | "error";
+  | 'ready'
+  | 'error';
 
 export interface DeviceState {
   status: EnrollmentStatus;
@@ -66,20 +62,40 @@ export interface DeviceKeyStorage {
 
 /** The store operations enrolment needs. */
 export interface EnrollmentApi {
-  registerDevice(publicKey: string, label?: string): Promise<{ deviceId: string; verificationCode: string; approvedAt: string | null }>;
+  registerDevice(
+    publicKey: string,
+    label?: string,
+  ): Promise<{ deviceId: string; verificationCode: string; approvedAt: string | null }>;
   keysForDevice(deviceId: string): Promise<
-    | { status: "awaiting-approval"; verificationCode: string }
-    | { status: "needs-setup"; verificationCode: string }
-    | { status: "approved"; wrappedUserKey: { keyWrap: string; body: string }; workspaceKeys: { generation: number; wrappedKey: string }[] }
+    | { status: 'awaiting-approval'; verificationCode: string }
+    | { status: 'needs-setup'; verificationCode: string }
+    | {
+        status: 'approved';
+        wrappedUserKey: { keyWrap: string; body: string };
+        workspaceKeys: { generation: number; wrappedKey: string }[];
+      }
   >;
   publishUserPublicKey(publicKey: string): Promise<void>;
   putWorkspaceKey(generation: number, wrappedKey: string): Promise<void>;
-  listDevices(): Promise<{ deviceId: string; verificationCode: string; approvedAt: string | null; revokedAt: string | null; label?: string }[]>;
+  listDevices(): Promise<
+    {
+      deviceId: string;
+      verificationCode: string;
+      approvedAt: string | null;
+      revokedAt: string | null;
+      label?: string;
+    }[]
+  >;
   setOwnUserKey(deviceId: string, wrappedUserKey: { keyWrap: string; body: string }): Promise<void>;
-  approveDevice(deviceId: string, verificationCode: string, wrappedUserKey: { keyWrap: string; body: string }, fromDeviceId: string): Promise<void>;
+  approveDevice(
+    deviceId: string,
+    verificationCode: string,
+    wrappedUserKey: { keyWrap: string; body: string },
+    fromDeviceId: string,
+  ): Promise<void>;
 }
 
-const KEY_CONTEXT: BlobContext = { docId: "user-key", kind: "key-wrap", version: 1 };
+const KEY_CONTEXT: BlobContext = { docId: 'user-key', kind: 'key-wrap', version: 1 };
 
 export interface EnrollOptions {
   api: EnrollmentApi;
@@ -98,36 +114,58 @@ export async function enrollDevice(options: EnrollOptions): Promise<DeviceState>
     if (!held) {
       // Non-extractable: this key is the anchor of the browser's access and
       // must never be copied anywhere, not even by this code.
-      const keyPair = await generateWrappingKeyPair("device");
-      const registered = await api.registerDevice(toBase64(await exportPublicKey(keyPair.publicKey)), options.label);
+      const keyPair = await generateWrappingKeyPair('device');
+      const registered = await api.registerDevice(
+        toBase64(await exportPublicKey(keyPair.publicKey)),
+        options.label,
+      );
       await storage.save(registered.deviceId, keyPair);
       held = { deviceId: registered.deviceId, keyPair };
     }
 
     const keys = await api.keysForDevice(held.deviceId);
-    if (keys.status === "awaiting-approval" || keys.status === "needs-setup") {
-      return { status: keys.status, deviceId: held.deviceId, verificationCode: keys.verificationCode, workspaceKey: null };
+    if (keys.status === 'awaiting-approval' || keys.status === 'needs-setup') {
+      return {
+        status: keys.status,
+        deviceId: held.deviceId,
+        verificationCode: keys.verificationCode,
+        workspaceKey: null,
+      };
     }
 
     const userKey = await unwrapPrivateKeyWithPrivateKey(
-      { keyWrap: fromBase64(keys.wrappedUserKey.keyWrap), body: fromBase64(keys.wrappedUserKey.body) },
+      {
+        keyWrap: fromBase64(keys.wrappedUserKey.keyWrap),
+        body: fromBase64(keys.wrappedUserKey.body),
+      },
       held.keyPair.privateKey,
       KEY_CONTEXT,
     );
     const newest = [...keys.workspaceKeys].sort((a, b) => b.generation - a.generation)[0];
     if (!newest) {
       return {
-        status: "error",
+        status: 'error',
         deviceId: held.deviceId,
         verificationCode: null,
         workspaceKey: null,
-        message: "This device is approved, but no workspace key has been shared with you yet. An administrator can grant one.",
+        message:
+          'This device is approved, but no workspace key has been shared with you yet. An administrator can grant one.',
       };
     }
-    const workspaceKey = await unwrapKeyWithPrivateKey(fromBase64(newest.wrappedKey), userKey, "AES-KW");
-    return { status: "ready", deviceId: held.deviceId, verificationCode: null, workspaceKey };
+    const workspaceKey = await unwrapKeyWithPrivateKey(
+      fromBase64(newest.wrappedKey),
+      userKey,
+      'AES-KW',
+    );
+    return { status: 'ready', deviceId: held.deviceId, verificationCode: null, workspaceKey };
   } catch (error) {
-    return { status: "error", deviceId: null, verificationCode: null, workspaceKey: null, message: String(error) };
+    return {
+      status: 'error',
+      deviceId: null,
+      verificationCode: null,
+      workspaceKey: null,
+      message: String(error),
+    };
   }
 }
 
@@ -145,7 +183,8 @@ export async function enrollDevice(options: EnrollOptions): Promise<DeviceState>
  */
 export async function attachExistingDevice(options: EnrollOptions): Promise<DeviceState> {
   const held = await options.storage.load();
-  if (!held) return { status: "inactive", deviceId: null, verificationCode: null, workspaceKey: null };
+  if (!held)
+    return { status: 'inactive', deviceId: null, verificationCode: null, workspaceKey: null };
   return enrollDevice(options);
 }
 
@@ -156,31 +195,49 @@ export async function bootstrapFirstDevice(options: EnrollOptions): Promise<Devi
   const held = await storage.load();
   if (others.some((device) => device.deviceId !== held?.deviceId && device.approvedAt)) {
     return {
-      status: "awaiting-approval",
+      status: 'awaiting-approval',
       deviceId: held?.deviceId ?? null,
-      verificationCode: held ? (existing.find((d) => d.deviceId === held.deviceId)?.verificationCode ?? null) : null,
+      verificationCode: held
+        ? (existing.find((d) => d.deviceId === held.deviceId)?.verificationCode ?? null)
+        : null,
       workspaceKey: null,
-      message: "Another device already holds your keys. Approve this one from it, or use your recovery code.",
+      message:
+        'Another device already holds your keys. Approve this one from it, or use your recovery code.',
     };
   }
 
   const device = held ?? (await registerHere(options));
-  const userKeyPair = await generateWrappingKeyPair("user");
+  const userKeyPair = await generateWrappingKeyPair('user');
   const workspaceKey = await generateWorkspaceKey();
 
   // The user key, sealed to this device, so the next visit can reach it.
   // Not an approval: the first device is approved as it registers, since
   // there is nothing that could approve it.
-  const wrapped = await wrapPrivateKeyForPublicKey(userKeyPair.privateKey, device.keyPair.publicKey, KEY_CONTEXT);
-  await api.setOwnUserKey(device.deviceId, { keyWrap: toBase64(wrapped.keyWrap), body: toBase64(wrapped.body) });
+  const wrapped = await wrapPrivateKeyForPublicKey(
+    userKeyPair.privateKey,
+    device.keyPair.publicKey,
+    KEY_CONTEXT,
+  );
+  await api.setOwnUserKey(device.deviceId, {
+    keyWrap: toBase64(wrapped.keyWrap),
+    body: toBase64(wrapped.body),
+  });
   await api.publishUserPublicKey(toBase64(await exportPublicKey(userKeyPair.publicKey)));
-  await api.putWorkspaceKey(1, toBase64(await wrapKeyForPublicKey(workspaceKey, userKeyPair.publicKey)));
-  return { status: "ready", deviceId: device.deviceId, verificationCode: null, workspaceKey };
+  await api.putWorkspaceKey(
+    1,
+    toBase64(await wrapKeyForPublicKey(workspaceKey, userKeyPair.publicKey)),
+  );
+  return { status: 'ready', deviceId: device.deviceId, verificationCode: null, workspaceKey };
 }
 
-async function registerHere(options: EnrollOptions): Promise<{ deviceId: string; keyPair: CryptoKeyPair }> {
-  const keyPair = await generateWrappingKeyPair("device");
-  const registered = await options.api.registerDevice(toBase64(await exportPublicKey(keyPair.publicKey)), options.label);
+async function registerHere(
+  options: EnrollOptions,
+): Promise<{ deviceId: string; keyPair: CryptoKeyPair }> {
+  const keyPair = await generateWrappingKeyPair('device');
+  const registered = await options.api.registerDevice(
+    toBase64(await exportPublicKey(keyPair.publicKey)),
+    options.label,
+  );
   await options.storage.save(registered.deviceId, keyPair);
   return { deviceId: registered.deviceId, keyPair };
 }
@@ -228,11 +285,13 @@ export function createMemoryDeviceKeyStorage(): DeviceKeyStorage {
  * non-extractable private key is kept without this application ever being
  * able to read its bytes.
  */
-export function createIndexedDbDeviceKeyStorage(databaseName = "system-design:device"): DeviceKeyStorage {
+export function createIndexedDbDeviceKeyStorage(
+  databaseName = 'system-design:device',
+): DeviceKeyStorage {
   const open = () =>
     new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open(databaseName, 1);
-      request.onupgradeneeded = () => request.result.createObjectStore("keys");
+      request.onupgradeneeded = () => request.result.createObjectStore('keys');
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
@@ -242,8 +301,11 @@ export function createIndexedDbDeviceKeyStorage(databaseName = "system-design:de
       const db = await open();
       try {
         return await new Promise((resolve, reject) => {
-          const get = db.transaction("keys").objectStore("keys").get("device");
-          get.onsuccess = () => resolve((get.result as { deviceId: string; keyPair: CryptoKeyPair } | undefined) ?? null);
+          const get = db.transaction('keys').objectStore('keys').get('device');
+          get.onsuccess = () =>
+            resolve(
+              (get.result as { deviceId: string; keyPair: CryptoKeyPair } | undefined) ?? null,
+            );
           get.onerror = () => reject(get.error);
         });
       } finally {
@@ -254,8 +316,8 @@ export function createIndexedDbDeviceKeyStorage(databaseName = "system-design:de
       const db = await open();
       try {
         await new Promise<void>((resolve, reject) => {
-          const tx = db.transaction("keys", "readwrite");
-          tx.objectStore("keys").put({ deviceId, keyPair }, "device");
+          const tx = db.transaction('keys', 'readwrite');
+          tx.objectStore('keys').put({ deviceId, keyPair }, 'device');
           tx.oncomplete = () => resolve();
           tx.onerror = () => reject(tx.error);
         });
@@ -267,8 +329,8 @@ export function createIndexedDbDeviceKeyStorage(databaseName = "system-design:de
       const db = await open();
       try {
         await new Promise<void>((resolve, reject) => {
-          const tx = db.transaction("keys", "readwrite");
-          tx.objectStore("keys").delete("device");
+          const tx = db.transaction('keys', 'readwrite');
+          tx.objectStore('keys').delete('device');
           tx.oncomplete = () => resolve();
           tx.onerror = () => reject(tx.error);
         });

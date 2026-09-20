@@ -10,10 +10,10 @@
  * content: that still requires a device to be approved, or the recovery code,
  * or an administrator (WS7-R11 to R13).
  */
-import { randomBytes } from "crypto";
-import type { Identity, PendingLogin } from "./providers.ts";
+import { randomBytes } from 'crypto';
+import type { Identity, PendingLogin } from './providers.ts';
 
-export const SESSION_COOKIE = "sd_session";
+export const SESSION_COOKIE = 'sd_session';
 
 export interface Session {
   id: string;
@@ -62,7 +62,8 @@ export function createSessionStore(options: SessionOptions = {}): SessionStore {
   function sweep() {
     const at = now();
     for (const [id, session] of sessions) if (session.expiresAt <= at) sessions.delete(id);
-    for (const [state, login] of pending) if (login.createdAt + pendingTtl <= at) pending.delete(state);
+    for (const [state, login] of pending)
+      if (login.createdAt + pendingTtl <= at) pending.delete(state);
   }
 
   return {
@@ -70,7 +71,7 @@ export function createSessionStore(options: SessionOptions = {}): SessionStore {
       sweep();
       const session: Session = {
         // 256 bits from the platform CSPRNG: the cookie is the credential.
-        id: randomBytes(32).toString("base64url"),
+        id: randomBytes(32).toString('base64url'),
         issuer: identity.issuer,
         subject: identity.subject,
         displayName: identity.displayName,
@@ -119,8 +120,8 @@ export function createSessionStore(options: SessionOptions = {}): SessionStore {
 
 export function parseCookies(header: string | undefined): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const part of (header ?? "").split(";")) {
-    const index = part.indexOf("=");
+  for (const part of (header ?? '').split(';')) {
+    const index = part.indexOf('=');
     if (index === -1) continue;
     out[part.slice(0, index).trim()] = decodeURIComponent(part.slice(index + 1).trim());
   }
@@ -149,15 +150,15 @@ export function serializeSessionCookie(
   const crossSite = options.crossSite ?? false;
   const parts = [
     `${SESSION_COOKIE}=${encodeURIComponent(id)}`,
-    "Path=/",
-    "HttpOnly",
-    `SameSite=${crossSite ? "None" : "Lax"}`,
+    'Path=/',
+    'HttpOnly',
+    `SameSite=${crossSite ? 'None' : 'Lax'}`,
     `Max-Age=${options.maxAgeSeconds}`,
   ];
-  if (options.secure || crossSite) parts.push("Secure");
-  return parts.join("; ");
+  if (options.secure || crossSite) parts.push('Secure');
+  return parts.join('; ');
 }
 
 export function expiredSessionCookie(secure: boolean, crossSite = false): string {
-  return serializeSessionCookie("", { secure, maxAgeSeconds: 0, crossSite });
+  return serializeSessionCookie('', { secure, maxAgeSeconds: 0, crossSite });
 }

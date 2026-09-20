@@ -1,4 +1,4 @@
-import type { ArchNodeData, SubDiagram } from "./types";
+import type { ArchNodeData, SubDiagram } from './types';
 
 /**
  * `path` is a stack of node ids representing how deep you've drilled in -
@@ -30,7 +30,7 @@ export function getSubDiagramAtPath(root: SubDiagram, path: DiagramPath): SubDia
 export function updateSubDiagramAtPath(
   root: SubDiagram,
   path: DiagramPath,
-  updater: (sd: SubDiagram) => SubDiagram
+  updater: (sd: SubDiagram) => SubDiagram,
 ): SubDiagram {
   if (path.length === 0) {
     return updater(root);
@@ -53,7 +53,7 @@ export function getBreadcrumbLabels(root: SubDiagram, path: DiagramPath): string
   let current = root;
   for (const nodeId of path) {
     const node = current.nodes.find((n) => n.id === nodeId);
-    labels.push(node?.data.label ?? "Untitled");
+    labels.push(node?.data.label ?? 'Untitled');
     current = node?.data.subDiagram ?? EMPTY_SUB_DIAGRAM;
   }
   return labels;

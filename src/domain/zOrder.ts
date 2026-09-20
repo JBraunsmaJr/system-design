@@ -111,7 +111,7 @@ export function computeEffectiveZIndices(boxes: ZOrderBox[]): Map<string, number
   return result;
 }
 
-export type ZOrderCommand = "front" | "back" | "forward" | "backward";
+export type ZOrderCommand = 'front' | 'back' | 'forward' | 'backward';
 
 /**
  * Works out the new explicit zIndex values for a z-order command,
@@ -135,7 +135,7 @@ export type ZOrderCommand = "front" | "back" | "forward" | "backward";
 export function applyZOrderCommand(
   boxes: ZOrderBox[],
   selectedIds: string[],
-  command: ZOrderCommand
+  command: ZOrderCommand,
 ): { id: string; zIndex: number }[] {
   const selected = new Set(selectedIds);
   const selectedBoxes = boxes.filter((b) => selected.has(b.id));
@@ -145,14 +145,16 @@ export function applyZOrderCommand(
   const others = boxes.filter((b) => !selected.has(b.id));
   if (others.length === 0) return [];
 
-  if (command === "front" || command === "back") {
+  if (command === 'front' || command === 'back') {
     const otherZs = others.map((b) => effective.get(b.id)!);
-    const target = command === "front" ? Math.max(...otherZs) + 1 : Math.min(...otherZs) - 1;
+    const target = command === 'front' ? Math.max(...otherZs) + 1 : Math.min(...otherZs) - 1;
 
     // Already clear of everything - don't rewrite, or repeated clicks
     // would push the value up forever for no visible effect.
     const alreadyClear = selectedBoxes.every((b) =>
-      command === "front" ? effective.get(b.id)! > Math.max(...otherZs) : effective.get(b.id)! < Math.min(...otherZs)
+      command === 'front'
+        ? effective.get(b.id)! > Math.max(...otherZs)
+        : effective.get(b.id)! < Math.min(...otherZs),
     );
     if (alreadyClear) return [];
 
@@ -161,7 +163,7 @@ export function applyZOrderCommand(
     const ordered = [...selectedBoxes].sort((a, b) => effective.get(a.id)! - effective.get(b.id)!);
     return ordered.map((box, index) => ({
       id: box.id,
-      zIndex: command === "front" ? target + index : target - (ordered.length - 1 - index),
+      zIndex: command === 'front' ? target + index : target - (ordered.length - 1 - index),
     }));
   }
 
@@ -172,7 +174,7 @@ export function applyZOrderCommand(
     const overlapping = others.filter((other) => boxesOverlap(box, other));
     if (overlapping.length === 0) continue;
 
-    if (command === "forward") {
+    if (command === 'forward') {
       const above = overlapping.map((o) => effective.get(o.id)!).filter((z) => z > myZ);
       if (above.length === 0) continue; // already in front of everything it touches
       patches.push({ id: box.id, zIndex: Math.min(...above) + 1 });

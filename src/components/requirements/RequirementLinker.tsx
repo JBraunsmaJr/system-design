@@ -1,10 +1,10 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { Link2, X } from "lucide-react";
-import { getItemType } from "../../domain/requirementsRegistry";
-import { computeFlippedPosition } from "../../domain/popoverPosition";
-import type { RequirementsDocument } from "../../domain/requirementsTypes";
-import { HighlightedText, HighlightedTitle } from "./HighlightText";
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Link2, X } from 'lucide-react';
+import { getItemType } from '../../domain/requirementsRegistry';
+import { computeFlippedPosition } from '../../domain/popoverPosition';
+import type { RequirementsDocument } from '../../domain/requirementsTypes';
+import { HighlightedText, HighlightedTitle } from './HighlightText';
 
 interface RequirementLinkerProps {
   linkedIds: string[];
@@ -27,9 +27,15 @@ const DROPDOWN_WIDTH = 240;
  * selection rather than closing - linking several requirements to one
  * node in a row shouldn't require reopening the list every time.
  */
-export function RequirementLinker({ linkedIds, doc, onLink, onUnlink, onNavigate }: RequirementLinkerProps) {
+export function RequirementLinker({
+  linkedIds,
+  doc,
+  onLink,
+  onUnlink,
+  onNavigate,
+}: RequirementLinkerProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState('');
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -50,7 +56,7 @@ export function RequirementLinker({ linkedIds, doc, onLink, onUnlink, onNavigate
   };
   const close = () => {
     setIsOpen(false);
-    setQuery("");
+    setQuery('');
   };
 
   useLayoutEffect(() => {
@@ -63,9 +69,11 @@ export function RequirementLinker({ linkedIds, doc, onLink, onUnlink, onNavigate
     const next = computeFlippedPosition(
       triggerRect,
       { width: dropdownRect.width, height: dropdownRect.height },
-      { width: window.innerWidth, height: window.innerHeight }
+      { width: window.innerWidth, height: window.innerHeight },
     );
-    setDropdownPos((prev) => (prev && prev.top === next.top && prev.left === next.left ? prev : next));
+    setDropdownPos((prev) =>
+      prev && prev.top === next.top && prev.left === next.left ? prev : next,
+    );
   }, [isOpen, query, linkedIds.length]);
 
   useEffect(() => {
@@ -76,14 +84,17 @@ export function RequirementLinker({ linkedIds, doc, onLink, onUnlink, onNavigate
       if (dropdownRef.current?.contains(target)) return;
       close();
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
   }, [isOpen]);
 
   const q = query.trim().toLowerCase();
   const candidates = doc.items
     .filter((item) => !linkedIds.includes(item.id))
-    .filter((item) => q === "" || item.id.toLowerCase().includes(q) || item.title.toLowerCase().includes(q))
+    .filter(
+      (item) =>
+        q === '' || item.id.toLowerCase().includes(q) || item.title.toLowerCase().includes(q),
+    )
     .slice(0, 20);
 
   return (
@@ -96,17 +107,17 @@ export function RequirementLinker({ linkedIds, doc, onLink, onUnlink, onNavigate
               <span
                 key={item.id}
                 className="requirement-linker__pill"
-                style={{ borderColor: `${type?.color ?? "#8b90a0"}66` }}
+                style={{ borderColor: `${type?.color ?? '#8b90a0'}66` }}
               >
                 <button
                   type="button"
                   className="requirement-linker__pill-label"
                   onClick={() => onNavigate(item.id)}
-                  style={{ color: type?.color ?? "var(--chrome-text)" }}
+                  style={{ color: type?.color ?? 'var(--chrome-text)' }}
                   title={`Go to ${item.id}`}
                 >
                   {item.id}
-                  {item.title ? `: ${item.title}` : ""}
+                  {item.title ? `: ${item.title}` : ''}
                 </button>
                 <button
                   type="button"
@@ -139,7 +150,7 @@ export function RequirementLinker({ linkedIds, doc, onLink, onUnlink, onNavigate
           <div
             ref={dropdownRef}
             className="requirement-linker__dropdown"
-            style={{ position: "fixed", top: dropdownPos.top, left: dropdownPos.left }}
+            style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left }}
           >
             <input
               autoFocus
@@ -148,7 +159,7 @@ export function RequirementLinker({ linkedIds, doc, onLink, onUnlink, onNavigate
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Escape") close();
+                if (e.key === 'Escape') close();
               }}
             />
             <div className="requirement-linker__list">
@@ -168,18 +179,18 @@ export function RequirementLinker({ linkedIds, doc, onLink, onUnlink, onNavigate
                     onMouseDown={(e) => {
                       e.preventDefault();
                       onLink(item.id);
-                      setQuery("");
+                      setQuery('');
                     }}
                   >
                     <span
                       className="requirement-linker__option-id"
-                      style={{ color: type?.color ?? "var(--chrome-text-dim)" }}
+                      style={{ color: type?.color ?? 'var(--chrome-text-dim)' }}
                     >
                       <HighlightedText text={item.id} search={query.trim()} />
                     </span>
                     <HighlightedTitle
                       className="requirement-linker__option-title"
-                      text={item.title || "(untitled)"}
+                      text={item.title || '(untitled)'}
                       search={query.trim()}
                     />
                   </button>
@@ -187,12 +198,14 @@ export function RequirementLinker({ linkedIds, doc, onLink, onUnlink, onNavigate
               })}
               {candidates.length === 0 && (
                 <p className="requirement-linker__empty">
-                  {doc.items.length === 0 ? "No requirements exist yet." : "No matching requirements."}
+                  {doc.items.length === 0
+                    ? 'No requirements exist yet.'
+                    : 'No matching requirements.'}
                 </p>
               )}
             </div>
           </div>,
-          document.body
+          document.body,
         )}
     </div>
   );

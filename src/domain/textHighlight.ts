@@ -77,12 +77,12 @@ export function computeTruncationWithHighlight(
   query: string,
   availableWidth: number,
   measureText: (s: string) => number,
-  ellipsis: string = "..."
+  ellipsis: string = '...',
 ): TruncationHighlightResult {
   if (!text) {
     return {
       isTruncated: false,
-      visibleText: "",
+      visibleText: '',
       hasMatchInVisible: false,
       hasMatchInTruncated: false,
       leadingEllipsis: false,

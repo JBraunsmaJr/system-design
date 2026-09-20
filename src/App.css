@@ -11,7 +11,7 @@
   padding: 4px;
   margin-right: 4px;
   opacity: 0.6;
-  z-index: 9999
+  z-index: 9999;
 }
 
 /* ---------- Toolbar ---------- */
@@ -104,7 +104,9 @@
   color: var(--chrome-text-dim);
   box-sizing: border-box;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
 }
 
 .toolbar__view-tabs button:hover {
@@ -182,7 +184,10 @@
   white-space: nowrap;
   box-sizing: border-box;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .toolbar__actions button:hover {
@@ -399,7 +404,9 @@ option {
      these arrive at whatever rate the network delivers them, not a
      guaranteed steady stream, so a short transition reads as fluid
      movement rather than the cursor teleporting between points. */
-  transition: left 0.08s linear, top 0.08s linear;
+  transition:
+    left 0.08s linear,
+    top 0.08s linear;
 }
 
 .peer-cursor__label {
@@ -613,7 +620,10 @@ option {
   justify-content: center;
   padding: 0;
   cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease;
 }
 
 .waypoint-row__remove:hover {
@@ -1231,7 +1241,9 @@ option {
   cursor: grab;
   touch-action: none;
   z-index: 5;
-  transition: opacity 120ms ease, transform 120ms ease;
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
 }
 
 .typed-edge__insert-dot:hover {
@@ -1305,7 +1317,9 @@ option {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: color 0.15s ease, background 0.15s ease;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease;
 }
 
 .scenario-panel__close:hover {
@@ -1547,7 +1561,9 @@ option {
   border-radius: var(--radius-sm);
   padding: 6px 8px;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
   flex-shrink: 0;
 }
 
@@ -2110,7 +2126,10 @@ option {
   font-weight: 500;
   color: var(--chrome-text-dim);
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
   user-select: none;
 }
 
@@ -2241,7 +2260,7 @@ option {
 
 /* ---------- Inspector: color input ---------- */
 
-.inspector__field input[type="color"] {
+.inspector__field input[type='color'] {
   width: 52px;
   height: 32px;
   padding: 2px;
@@ -2262,7 +2281,7 @@ option {
   cursor: pointer;
 }
 
-.inspector__checkbox input[type="checkbox"] {
+.inspector__checkbox input[type='checkbox'] {
   width: 14px;
   height: 14px;
   accent-color: var(--accent);
@@ -3023,7 +3042,9 @@ option {
   color: var(--chrome-text-dim);
   cursor: pointer;
   padding: 0;
-  transition: background 0.1s ease, color 0.1s ease;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
 }
 
 .requirements-view__search-nav-btn:hover:not(:disabled) {
@@ -3109,7 +3130,9 @@ option {
   border-radius: var(--radius-md);
   margin-bottom: 12px;
   overflow: hidden;
-  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+  transition:
+    box-shadow 0.3s ease,
+    border-color 0.3s ease;
 }
 
 .requirement-card.is-highlighted {
@@ -3180,7 +3203,7 @@ option {
 }
 
 .requirement-card__title--display:empty::before {
-  content: "Untitled";
+  content: 'Untitled';
   color: var(--chrome-text-dim);
 }
 
@@ -3575,7 +3598,7 @@ mark.search-highlight--ellipsis {
   border-top: 1px solid var(--chrome-border);
 }
 
-.manage-types-modal__form input[type="text"],
+.manage-types-modal__form input[type='text'],
 .manage-types-modal__form input:not([type]) {
   flex: 1;
   min-width: 0;
@@ -3587,7 +3610,7 @@ mark.search-highlight--ellipsis {
   font-size: 12.5px;
 }
 
-.manage-types-modal__form input[type="color"] {
+.manage-types-modal__form input[type='color'] {
   width: 32px;
   height: 32px;
   padding: 2px;
@@ -3838,7 +3861,9 @@ mark.search-highlight--ellipsis {
   color: var(--chrome-text-dim);
   white-space: nowrap;
   cursor: pointer;
-  transition: color 0.15s ease, background 0.15s ease;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease;
 }
 
 .requirements-view__group-toggle button:hover {
@@ -3878,7 +3903,10 @@ mark.search-highlight--ellipsis {
   color: var(--chrome-text-dim);
   white-space: nowrap;
   cursor: pointer;
-  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .requirements-view__manage-btn:hover {
@@ -4142,7 +4170,9 @@ mark.search-highlight--ellipsis {
   opacity: 0;
   pointer-events: none;
   transform: translateY(-4px);
-  transition: opacity 0.15s ease, transform 0.15s ease;
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
 }
 
 .timeline-view_presence-stack:focus-within .timeline-view__presence-popover,
@@ -4668,7 +4698,10 @@ mark.search-highlight--ellipsis {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .pi-board-column.is-drag-over {
@@ -4774,7 +4807,11 @@ mark.search-highlight--ellipsis {
   gap: 5px;
   cursor: grab;
   user-select: none;
-  transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+  transition:
+    transform 0.12s ease,
+    border-color 0.12s ease,
+    box-shadow 0.12s ease,
+    opacity 0.12s ease;
 }
 
 .pi-board-item:hover {
@@ -4909,7 +4946,9 @@ mark.search-highlight--ellipsis {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: color 0.12s ease, background 0.12s ease;
+  transition:
+    color 0.12s ease,
+    background 0.12s ease;
 }
 
 .requirement-detail-modal__action-btn:hover {
@@ -5454,7 +5493,6 @@ mark.search-highlight--ellipsis {
 
 /* ---------- Relationship manager (Requirements) ---------- */
 
-
 /* ---------- Timeline view mode toggle (Board / Gantt) ---------- */
 
 .timeline-view__mode-toggle {
@@ -5894,7 +5932,9 @@ mark.search-highlight--ellipsis {
   background: var(--chrome-bg-raised);
   border: 1px solid var(--chrome-border);
   border-radius: var(--radius-md, 8px);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.2);
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.45),
+    0 2px 6px rgba(0, 0, 0, 0.2);
   padding: 8px;
 }
 
@@ -5931,7 +5971,9 @@ mark.search-highlight--ellipsis {
   font-weight: 500;
   color: var(--chrome-text);
   cursor: pointer;
-  transition: border-color 0.15s, background-color 0.15s;
+  transition:
+    border-color 0.15s,
+    background-color 0.15s;
 }
 
 .relationship-manager__type-btn:hover {
@@ -5998,7 +6040,9 @@ mark.search-highlight--ellipsis {
   color: var(--chrome-text);
   text-align: left;
   cursor: pointer;
-  transition: background-color 0.12s, border-color 0.12s;
+  transition:
+    background-color 0.12s,
+    border-color 0.12s;
 }
 
 .relationship-manager__verb-option:hover {
@@ -6097,7 +6141,9 @@ mark.search-highlight--ellipsis {
   text-align: left;
   width: 100%;
   cursor: pointer;
-  transition: background-color 0.12s, border-color 0.12s;
+  transition:
+    background-color 0.12s,
+    border-color 0.12s;
 }
 
 .relationship-manager__option:hover {
@@ -6129,7 +6175,9 @@ mark.search-highlight--ellipsis {
 .relationship-manager__option-add {
   color: var(--chrome-text-dim);
   opacity: 0;
-  transition: opacity 0.12s, color 0.12s;
+  transition:
+    opacity 0.12s,
+    color 0.12s;
   flex-shrink: 0;
 }
 
@@ -6145,8 +6193,6 @@ mark.search-highlight--ellipsis {
   font-size: 12px;
   text-align: center;
 }
-
-
 
 /* ==========================================================================
    Team & Capacity Management Styles
@@ -6171,7 +6217,9 @@ mark.search-highlight--ellipsis {
   color: var(--chrome-text-dim);
   cursor: pointer;
   max-width: 150px;
-  transition: border-color 0.15s, background-color 0.15s;
+  transition:
+    border-color 0.15s,
+    background-color 0.15s;
 }
 
 .member-picker__trigger:hover {
@@ -6337,7 +6385,9 @@ mark.search-highlight--ellipsis {
   font-size: 12.5px;
   color: var(--chrome-text-dim);
   cursor: pointer;
-  transition: border-color 0.15s, background-color 0.15s;
+  transition:
+    border-color 0.15s,
+    background-color 0.15s;
 }
 
 .points-picker__trigger:hover {
@@ -7651,7 +7701,7 @@ mark.search-highlight--ellipsis {
 
 .toggle-slider:before {
   position: absolute;
-  content: "";
+  content: '';
   height: 14px;
   width: 14px;
   left: 3px;
@@ -8010,7 +8060,7 @@ mark.search-highlight--ellipsis {
   flex-shrink: 0;
 }
 
-.manage-types-modal__workable-toggle input[type="checkbox"] {
+.manage-types-modal__workable-toggle input[type='checkbox'] {
   accent-color: var(--accent);
 }
 
@@ -8158,7 +8208,10 @@ mark.search-highlight--ellipsis {
   font-weight: 600;
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .type-picker__trigger:hover:not(:disabled) {
@@ -8340,7 +8393,7 @@ mark.search-highlight--ellipsis {
   flex-shrink: 0;
 }
 
-.manage-types-modal__workable-toggle input[type="checkbox"] {
+.manage-types-modal__workable-toggle input[type='checkbox'] {
   accent-color: var(--accent);
 }
 
@@ -8564,7 +8617,7 @@ mark.search-highlight--ellipsis {
 }
 
 .skill-tree__card.is-done .skill-tree__card-state-icon {
-  color: #0FA36B;
+  color: #0fa36b;
 }
 
 .skill-tree__card.is-unlocked .skill-tree__card-state-icon,
@@ -8612,7 +8665,9 @@ mark.search-highlight--ellipsis {
 .pi-board-column.is-blocked.is-drag-over {
   border-color: var(--danger);
   background: rgba(240, 87, 140, 0.15);
-  box-shadow: 0 0 0 1px var(--danger), inset 0 0 16px rgba(240, 87, 140, 0.12);
+  box-shadow:
+    0 0 0 1px var(--danger),
+    inset 0 0 16px rgba(240, 87, 140, 0.12);
 }
 
 .pi-board-column__blocked-banner {
@@ -8658,18 +8713,25 @@ mark.search-highlight--ellipsis {
 .pi-board-item.is-blocker-highlight {
   border-color: #f0578c;
   background: rgba(240, 87, 140, 0.14);
-  box-shadow: 0 0 0 2px rgba(240, 87, 140, 0.5), 0 4px 12px rgba(240, 87, 140, 0.25);
+  box-shadow:
+    0 0 0 2px rgba(240, 87, 140, 0.5),
+    0 4px 12px rgba(240, 87, 140, 0.25);
   position: relative;
   z-index: 2;
   animation: blocker-pulse 2s infinite ease-in-out;
 }
 
 @keyframes blocker-pulse {
-  0%, 100% {
-    box-shadow: 0 0 0 2px rgba(240, 87, 140, 0.5), 0 4px 12px rgba(240, 87, 140, 0.25);
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 2px rgba(240, 87, 140, 0.5),
+      0 4px 12px rgba(240, 87, 140, 0.25);
   }
   50% {
-    box-shadow: 0 0 0 3px rgba(240, 87, 140, 0.85), 0 6px 18px rgba(240, 87, 140, 0.4);
+    box-shadow:
+      0 0 0 3px rgba(240, 87, 140, 0.85),
+      0 6px 18px rgba(240, 87, 140, 0.4);
   }
 }
 
@@ -8718,7 +8780,9 @@ mark.search-highlight--ellipsis {
 .pi-board-column.is-at-risk.is-drag-over {
   border-color: #f2994a;
   background: rgba(242, 153, 74, 0.15);
-  box-shadow: 0 0 0 1px #f2994a, inset 0 0 16px rgba(242, 153, 74, 0.12);
+  box-shadow:
+    0 0 0 1px #f2994a,
+    inset 0 0 16px rgba(242, 153, 74, 0.12);
 }
 
 .pi-board-column__blocked-banner.is-risk {
@@ -9544,7 +9608,10 @@ mark.search-highlight--ellipsis {
   white-space: nowrap;
   box-sizing: border-box;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .collab-panel__trigger:hover {
@@ -9653,7 +9720,7 @@ mark.search-highlight--ellipsis {
 
 .collab-panel__divider::before,
 .collab-panel__divider::after {
-  content: "";
+  content: '';
   position: absolute;
   top: 50%;
   width: 38%;
@@ -9877,7 +9944,7 @@ mark.search-highlight--ellipsis {
 }
 
 .collab-panel__room-code code {
-  font-family: "JetBrains Mono", monospace;
+  font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
   color: var(--chrome-text);
   overflow: hidden;
@@ -10828,7 +10895,9 @@ mark.search-highlight--ellipsis {
   cursor: pointer;
   opacity: 0.75;
   filter: invert(48%) sepia(79%) saturate(2476%) hue-rotate(209deg) brightness(98%) contrast(97%);
-  transition: opacity 0.15s ease, filter 0.15s ease;
+  transition:
+    opacity 0.15s ease,
+    filter 0.15s ease;
 }
 
 .milestone-detail-modal__date-input::-webkit-calendar-picker-indicator:hover,
@@ -11473,7 +11542,9 @@ mark.search-highlight--ellipsis {
   background: var(--chrome-bg-raised);
   border: 1px solid var(--chrome-border);
   border-radius: var(--radius-md);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.25);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.45),
+    0 2px 6px rgba(0, 0, 0, 0.25);
   padding: 10px 12px;
   overflow-y: auto;
   overflow-x: hidden;
@@ -11629,7 +11700,9 @@ mark.search-highlight--ellipsis {
   border-radius: var(--radius-md);
   font-size: 13px;
   font-weight: 500;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.25);
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.45),
+    0 2px 8px rgba(0, 0, 0, 0.25);
   animation: app-toast-enter 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   max-width: 90vw;
 }
@@ -11718,7 +11791,9 @@ mark.search-highlight--ellipsis {
   align-items: center;
   justify-content: center;
   border-radius: 4px;
-  transition: color 0.15s ease, background-color 0.15s ease;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
 }
 
 .app-toast__close-btn:hover {
@@ -11767,7 +11842,10 @@ mark.search-highlight--ellipsis {
   white-space: nowrap;
   box-sizing: border-box;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .durability__chip:hover {

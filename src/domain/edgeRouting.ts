@@ -1,5 +1,5 @@
-import { Position } from "@xyflow/react";
-import type { EdgeWaypoint } from "./types";
+import { Position } from '@xyflow/react';
+import type { EdgeWaypoint } from './types';
 
 /**
  * Orthogonal routing through user-placed waypoints - the geometry half
@@ -60,14 +60,14 @@ function pointTowards(from: Point, to: Point, dist: number): Point {
   return { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t };
 }
 
-type Axis = "h" | "v";
+type Axis = 'h' | 'v';
 
 function perpendicular(axis: Axis): Axis {
-  return axis === "h" ? "v" : "h";
+  return axis === 'h' ? 'v' : 'h';
 }
 
 function axisOf(position: Position): Axis {
-  return isHorizontal(position) ? "h" : "v";
+  return isHorizontal(position) ? 'h' : 'v';
 }
 
 /**
@@ -89,24 +89,16 @@ function axisOf(position: Position): Axis {
 function routePair(a: Point, b: Point, leave: Axis, arrive: Axis): Point[] {
   if (leave !== arrive) {
     if (a.x === b.x || a.y === b.y) return [b];
-    return leave === "h" ? [{ x: b.x, y: a.y }, b] : [{ x: a.x, y: b.y }, b];
+    return leave === 'h' ? [{ x: b.x, y: a.y }, b] : [{ x: a.x, y: b.y }, b];
   }
-  if (leave === "h") {
+  if (leave === 'h') {
     if (a.y === b.y) return [b];
     const midX = (a.x + b.x) / 2;
-    return [
-      { x: midX, y: a.y },
-      { x: midX, y: b.y },
-      b,
-    ];
+    return [{ x: midX, y: a.y }, { x: midX, y: b.y }, b];
   }
   if (a.x === b.x) return [b];
   const midY = (a.y + b.y) / 2;
-  return [
-    { x: a.x, y: midY },
-    { x: b.x, y: midY },
-    b,
-  ];
+  return [{ x: a.x, y: midY }, { x: b.x, y: midY }, b];
 }
 
 /**
@@ -120,7 +112,12 @@ function routePair(a: Point, b: Point, leave: Axis, arrive: Axis): Point[] {
  * rule also means the leave axis never changes from pair to pair, so
  * there's no state to thread through the loop.
  */
-function pairAxes(index: number, pairCount: number, sourceAxis: Axis, targetAxis: Axis): { leave: Axis; arrive: Axis } {
+function pairAxes(
+  index: number,
+  pairCount: number,
+  sourceAxis: Axis,
+  targetAxis: Axis,
+): { leave: Axis; arrive: Axis } {
   const isLastPair = index === pairCount - 1;
   return {
     leave: sourceAxis,
@@ -185,7 +182,7 @@ export function buildOrthogonalRoute(
   sourcePosition: Position,
   waypoints: readonly Point[],
   target: Point,
-  targetPosition: Position
+  targetPosition: Position,
 ): Point[] {
   const anchors: Point[] = [source, ...waypoints, target];
   const route: Point[] = [source];
@@ -209,8 +206,11 @@ export function buildOrthogonalRoute(
  * neighbour degrades into a sharp corner instead of the two rounded
  * corners overlapping and turning the segment inside out.
  */
-export function roundedPolylinePath(points: readonly Point[], radius: number = CORNER_RADIUS): string {
-  if (points.length === 0) return "";
+export function roundedPolylinePath(
+  points: readonly Point[],
+  radius: number = CORNER_RADIUS,
+): string {
+  if (points.length === 0) return '';
   if (points.length === 1) return `M ${fmt(points[0].x)},${fmt(points[0].y)}`;
 
   let d = `M ${fmt(points[0].x)},${fmt(points[0].y)}`;
@@ -238,11 +238,11 @@ export function getWaypointPath(
   waypoints: readonly Point[],
   target: Point,
   targetPosition: Position,
-  radius: number = CORNER_RADIUS
+  radius: number = CORNER_RADIUS,
 ): string {
   return roundedPolylinePath(
     buildOrthogonalRoute(source, sourcePosition, waypoints, target, targetPosition),
-    radius
+    radius,
   );
 }
 
@@ -273,7 +273,7 @@ export function getSegmentInsertions(
   sourcePosition: Position,
   waypoints: readonly Point[],
   target: Point,
-  targetPosition: Position
+  targetPosition: Position,
 ): WaypointInsertion[] {
   const anchors: Point[] = [source, ...waypoints, target];
   const sourceAxis = axisOf(sourcePosition);
@@ -285,7 +285,10 @@ export function getSegmentInsertions(
     // Routed with the exact same rules the drawn path uses, so a handle
     // can't drift off the line it's supposed to sit on.
     const { leave, arrive } = pairAxes(i, pairCount, sourceAxis, targetAxis);
-    const subRoute = simplifyOrthogonalPoints([anchors[i], ...routePair(anchors[i], anchors[i + 1], leave, arrive)]);
+    const subRoute = simplifyOrthogonalPoints([
+      anchors[i],
+      ...routePair(anchors[i], anchors[i + 1], leave, arrive),
+    ]);
     const mid = polylineMidpoint(subRoute);
     insertions.push({ index: i, x: mid.x, y: mid.y });
   }
@@ -323,7 +326,7 @@ export function polylineMidpoint(points: readonly Point[]): Point {
 export function snapWaypoint(
   point: Point,
   neighbours: readonly Point[],
-  threshold: number = WAYPOINT_SNAP_THRESHOLD
+  threshold: number = WAYPOINT_SNAP_THRESHOLD,
 ): Point {
   let x = point.x;
   let y = point.y;
@@ -348,11 +351,13 @@ export function getWaypointNeighbours(
   source: Point,
   waypoints: readonly EdgeWaypoint[],
   target: Point,
-  index: number
+  index: number,
 ): Point[] {
   const before = index === 0 ? source : waypoints[index - 1];
   const after = index === waypoints.length - 1 ? target : waypoints[index + 1];
-  return [before, after].filter((p): p is Point => p !== undefined).map((p) => ({ x: p.x, y: p.y }));
+  return [before, after]
+    .filter((p): p is Point => p !== undefined)
+    .map((p) => ({ x: p.x, y: p.y }));
 }
 
 /** Trims coordinates to 2dp. Keeps path strings short, and stops a

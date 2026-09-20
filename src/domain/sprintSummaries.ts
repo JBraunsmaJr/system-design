@@ -1,9 +1,9 @@
-import type { RequirementsDocument, RequirementItem } from "./requirementsTypes.ts";
-import type { Sprint, SprintDateRange, ProgramIncrement } from "./programIncrements.ts";
-import type { Milestone } from "./milestones.ts";
-import { getMilestoneItems } from "./milestones.ts";
-import { isItemWorkable } from "./requirementsRegistry.ts";
-import { getChildItemsForParent } from "./epicScheduling.ts";
+import type { RequirementsDocument, RequirementItem } from './requirementsTypes.ts';
+import type { Sprint, SprintDateRange, ProgramIncrement } from './programIncrements.ts';
+import type { Milestone } from './milestones.ts';
+import { getMilestoneItems } from './milestones.ts';
+import { isItemWorkable } from './requirementsRegistry.ts';
+import { getChildItemsForParent } from './epicScheduling.ts';
 
 export interface ImpactedReleaseInfo {
   milestone: Milestone;
@@ -49,15 +49,16 @@ export function computeSprintMilestoneSummary(
   sprint: Sprint,
   sprintRange: { startDate: string; endDate: string } | undefined,
   milestones: Milestone[] = [],
-  requirementsDoc: RequirementsDocument
+  requirementsDoc: RequirementsDocument,
 ): SprintMilestoneSummary {
-  const startDate = sprintRange?.startDate ?? "";
-  const endDate = sprintRange?.endDate ?? "";
+  const startDate = sprintRange?.startDate ?? '';
+  const endDate = sprintRange?.endDate ?? '';
 
   // 1. Direct milestones occurring within sprint date window
-  const directMilestones = startDate && endDate
-    ? milestones.filter((m) => m.scheduledAt >= startDate && m.scheduledAt <= endDate)
-    : [];
+  const directMilestones =
+    startDate && endDate
+      ? milestones.filter((m) => m.scheduledAt >= startDate && m.scheduledAt <= endDate)
+      : [];
 
   // 2. Items assigned to this sprint
   const itemsInSprint = requirementsDoc.items.filter((item) => item.sprintId === sprint.id);
@@ -76,9 +77,10 @@ export function computeSprintMilestoneSummary(
       impactedMilestoneIds.add(milestone.id);
       const totalCount = allRelatedItems.length;
       const scheduledCount = allRelatedItems.filter((i) => !!i.sprintId).length;
-      const completedCount = allRelatedItems.filter((i) => i.status === "done").length;
+      const completedCount = allRelatedItems.filter((i) => i.status === 'done').length;
       const isFullyContainedInSprint = totalCount > 0 && relatedInSprint.length === totalCount;
-      const completionPercentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+      const completionPercentage =
+        totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
       impactedReleases.push({
         milestone,
@@ -95,7 +97,7 @@ export function computeSprintMilestoneSummary(
   // 4. External dependencies affecting items in this sprint (e.g. DEP-1 items)
   const externalDepIds = new Set<string>();
   for (const rel of requirementsDoc.relationships) {
-    if (itemsInSprintIds.has(rel.fromItemId) && rel.typeId === "depends-on") {
+    if (itemsInSprintIds.has(rel.fromItemId) && rel.typeId === 'depends-on') {
       externalDepIds.add(rel.toItemId);
     }
   }
@@ -105,7 +107,7 @@ export function computeSprintMilestoneSummary(
   // 5. Epics whose workable child items are assigned to this sprint
   const impactedEpics: ImpactedEpicInfo[] = [];
   const epics = requirementsDoc.items.filter(
-    (item) => item.typeId === "epic" || item.typeId.toLowerCase().includes("epic")
+    (item) => item.typeId === 'epic' || item.typeId.toLowerCase().includes('epic'),
   );
 
   for (const epic of epics) {
@@ -116,8 +118,9 @@ export function computeSprintMilestoneSummary(
     if (itemsInSprintForEpic.length > 0) {
       const totalCount = workableChildren.length;
       const scheduledCount = workableChildren.filter((c) => !!c.sprintId).length;
-      const completedCount = workableChildren.filter((c) => c.status === "done").length;
-      const completionPercentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+      const completedCount = workableChildren.filter((c) => c.status === 'done').length;
+      const completionPercentage =
+        totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
       impactedEpics.push({
         epic,
@@ -156,7 +159,7 @@ export function computePIMilestoneSummaries(
   pi: ProgramIncrement,
   sprintRanges: SprintDateRange[],
   milestones: Milestone[] = [],
-  requirementsDoc: RequirementsDocument
+  requirementsDoc: RequirementsDocument,
 ): Map<string, SprintMilestoneSummary> {
   const rangeMap = new Map(sprintRanges.map((r) => [r.sprintId, r]));
   const summaryMap = new Map<string, SprintMilestoneSummary>();

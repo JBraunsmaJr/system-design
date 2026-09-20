@@ -13,14 +13,14 @@
  * The recovery private key never belongs on a server or in a browser. Keep it
  * offline, and delete any copy this run needed.
  */
-import { readFileSync, writeFileSync } from "fs";
-import { basename } from "path";
+import { readFileSync, writeFileSync } from 'fs';
+import { basename } from 'path';
 import {
   fromPem,
   recoverDocumentPackage,
   type DocumentPackage,
-} from "../src/crypto/documentPackage.ts";
-import { importRecoveryPrivateKey } from "../src/crypto/keys.ts";
+} from '../src/crypto/documentPackage.ts';
+import { importRecoveryPrivateKey } from '../src/crypto/keys.ts';
 
 interface Options {
   keyPath: string;
@@ -48,25 +48,25 @@ Recover a document with the organization's offline recovery key.
 }
 
 function parseArgs(argv: string[]): Options {
-  const options: Options = { keyPath: "", packagePath: "", outPath: null, quiet: false };
+  const options: Options = { keyPath: '', packagePath: '', outPath: null, quiet: false };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     const next = () => argv[++i] ?? usage(`${arg} needs a value.`);
-    if (arg === "--key") options.keyPath = next();
-    else if (arg === "--package") options.packagePath = next();
-    else if (arg === "--out") options.outPath = next();
-    else if (arg === "--quiet") options.quiet = true;
-    else if (arg === "--help" || arg === "-h") usage();
+    if (arg === '--key') options.keyPath = next();
+    else if (arg === '--package') options.packagePath = next();
+    else if (arg === '--out') options.outPath = next();
+    else if (arg === '--quiet') options.quiet = true;
+    else if (arg === '--help' || arg === '-h') usage();
     else usage(`Unknown argument: ${arg}`);
   }
-  if (!options.keyPath) usage("--key is required.");
-  if (!options.packagePath) usage("--package is required.");
+  if (!options.keyPath) usage('--key is required.');
+  if (!options.packagePath) usage('--package is required.');
   return options;
 }
 
 function read(path: string, what: string): string {
   try {
-    return readFileSync(path, "utf8");
+    return readFileSync(path, 'utf8');
   } catch (error) {
     console.error(`Could not read the ${what} at ${path}: ${(error as Error).message}`);
     process.exit(1);
@@ -79,18 +79,22 @@ async function main() {
     if (!options.quiet) console.log(message);
   };
 
-  const pem = read(options.keyPath, "recovery key");
-  const packageText = read(options.packagePath, "document package");
+  const pem = read(options.keyPath, 'recovery key');
+  const packageText = read(options.packagePath, 'document package');
 
   let pkg: DocumentPackage;
   try {
     pkg = JSON.parse(packageText) as DocumentPackage;
   } catch (error) {
-    console.error(`${basename(options.packagePath)} is not valid JSON: ${(error as Error).message}`);
+    console.error(
+      `${basename(options.packagePath)} is not valid JSON: ${(error as Error).message}`,
+    );
     process.exit(1);
   }
   if (!pkg?.docId || !Array.isArray(pkg.blobs) || !pkg.keys) {
-    console.error(`${basename(options.packagePath)} does not look like a document package (expected docId, keys, and blobs).`);
+    console.error(
+      `${basename(options.packagePath)} does not look like a document package (expected docId, keys, and blobs).`,
+    );
     process.exit(1);
   }
 
@@ -98,7 +102,9 @@ async function main() {
   try {
     privateKey = await importRecoveryPrivateKey(fromPem(pem));
   } catch (error) {
-    console.error(`That does not look like a usable recovery private key: ${(error as Error).message}`);
+    console.error(
+      `That does not look like a usable recovery private key: ${(error as Error).message}`,
+    );
     process.exit(1);
   }
 
@@ -116,21 +122,23 @@ async function main() {
   }
 
   // The document itself is the snapshot; other blobs are its update log.
-  const snapshot = recovered.find((blob) => blob.kind === "snapshot") ?? recovered[0];
+  const snapshot = recovered.find((blob) => blob.kind === 'snapshot') ?? recovered[0];
   if (!snapshot) {
-    console.error("The package contains no blobs to recover.");
+    console.error('The package contains no blobs to recover.');
     process.exit(1);
   }
   const text = new TextDecoder().decode(snapshot.data);
   try {
     JSON.parse(text);
   } catch {
-    console.error("The recovered content is not a diagram file. The package may be from a different application.");
+    console.error(
+      'The recovered content is not a diagram file. The package may be from a different application.',
+    );
     process.exit(1);
   }
 
   const outPath = options.outPath ?? `${pkg.docId}-recovered.json`;
-  writeFileSync(outPath, text, "utf8");
+  writeFileSync(outPath, text, 'utf8');
   say(`Recovered ${recovered.length} blob(s).`);
   console.log(outPath);
   say(`\nOpen it with File > Open. Delete any copy of the recovery key used for this run.`);

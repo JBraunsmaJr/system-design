@@ -1,5 +1,5 @@
-import type { Milestone } from "../domain/milestones";
-import { sanitizeRelatedItemIds } from "../domain/milestones";
+import type { Milestone } from '../domain/milestones';
+import { sanitizeRelatedItemIds } from '../domain/milestones';
 
 export interface MilestonesStore {
   /**
@@ -23,12 +23,12 @@ export interface MilestonesStore {
   /**
    * Adds a new milestone (release or other type) and returns its stable unique id.
    */
-  addMilestone(milestone: Omit<Milestone, "id" | "createdAt" | "updatedAt">): string;
+  addMilestone(milestone: Omit<Milestone, 'id' | 'createdAt' | 'updatedAt'>): string;
 
   /**
    * Updates an existing milestone's metadata (name, date, version, description, color, etc.).
    */
-  updateMilestone(id: string, patch: Partial<Omit<Milestone, "id">>): void;
+  updateMilestone(id: string, patch: Partial<Omit<Milestone, 'id'>>): void;
 
   /**
    * Deletes a milestone. Preserves all related workable items (FR-006, DR-006, AC-005).
@@ -67,7 +67,7 @@ export interface MilestonesStore {
 }
 
 let idCounter = 0;
-function nextMilestoneId(prefix = "milestone"): string {
+function nextMilestoneId(prefix = 'milestone'): string {
   idCounter += 1;
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}-${idCounter}`;
 }
@@ -93,11 +93,13 @@ export function createLocalMilestonesStore(initial: Milestone[] = []): Milestone
 
     addMilestone: (milestone) => {
       const now = new Date().toISOString();
-      const sanitized = sanitizeRelatedItemIds(milestone.relatedItemIds ?? milestone.relatedWorkableItemIds);
+      const sanitized = sanitizeRelatedItemIds(
+        milestone.relatedItemIds ?? milestone.relatedWorkableItemIds,
+      );
       const newMilestone: Milestone = {
         ...milestone,
-        id: nextMilestoneId(milestone.type || "milestone"),
-        type: milestone.type || "release",
+        id: nextMilestoneId(milestone.type || 'milestone'),
+        type: milestone.type || 'release',
         name: milestone.name.trim(),
         scheduledAt: milestone.scheduledAt,
         relatedItemIds: sanitized,
@@ -114,7 +116,8 @@ export function createLocalMilestonesStore(initial: Milestone[] = []): Milestone
       const now = new Date().toISOString();
       milestones = milestones.map((m) => {
         if (m.id !== id) return m;
-        const hasNewRelated = patch.relatedItemIds !== undefined || patch.relatedWorkableItemIds !== undefined;
+        const hasNewRelated =
+          patch.relatedItemIds !== undefined || patch.relatedWorkableItemIds !== undefined;
         const sanitized = hasNewRelated
           ? sanitizeRelatedItemIds(patch.relatedItemIds ?? patch.relatedWorkableItemIds)
           : (m.relatedItemIds ?? m.relatedWorkableItemIds);
@@ -202,7 +205,7 @@ export function createLocalMilestonesStore(initial: Milestone[] = []): Milestone
  */
 export function createAdapterMilestonesStore(
   getMilestones: () => Milestone[],
-  setMilestones: (updater: (prev: Milestone[]) => Milestone[]) => void
+  setMilestones: (updater: (prev: Milestone[]) => Milestone[]) => void,
 ): MilestonesStore {
   // Listeners are informed whenever React state changes
   const listeners = new Set<() => void>();
@@ -220,11 +223,13 @@ export function createAdapterMilestonesStore(
 
     addMilestone: (milestone) => {
       const now = new Date().toISOString();
-      const sanitized = sanitizeRelatedItemIds(milestone.relatedItemIds ?? milestone.relatedWorkableItemIds);
+      const sanitized = sanitizeRelatedItemIds(
+        milestone.relatedItemIds ?? milestone.relatedWorkableItemIds,
+      );
       const newMilestone: Milestone = {
         ...milestone,
-        id: nextMilestoneId(milestone.type || "milestone"),
-        type: milestone.type || "release",
+        id: nextMilestoneId(milestone.type || 'milestone'),
+        type: milestone.type || 'release',
         name: milestone.name.trim(),
         scheduledAt: milestone.scheduledAt,
         relatedItemIds: sanitized,
@@ -241,7 +246,8 @@ export function createAdapterMilestonesStore(
       setMilestones((prev) =>
         (prev ?? []).map((m) => {
           if (m.id !== id) return m;
-          const hasNewRelated = patch.relatedItemIds !== undefined || patch.relatedWorkableItemIds !== undefined;
+          const hasNewRelated =
+            patch.relatedItemIds !== undefined || patch.relatedWorkableItemIds !== undefined;
           const sanitized = hasNewRelated
             ? sanitizeRelatedItemIds(patch.relatedItemIds ?? patch.relatedWorkableItemIds)
             : (m.relatedItemIds ?? m.relatedWorkableItemIds);
@@ -253,7 +259,7 @@ export function createAdapterMilestonesStore(
             relatedWorkableItemIds: sanitized,
             updatedAt: now,
           };
-        })
+        }),
       );
     },
 
@@ -275,7 +281,7 @@ export function createAdapterMilestonesStore(
             relatedWorkableItemIds: updated,
             updatedAt: now,
           };
-        })
+        }),
       );
     },
 
@@ -293,7 +299,7 @@ export function createAdapterMilestonesStore(
             relatedWorkableItemIds: updated,
             updatedAt: now,
           };
-        })
+        }),
       );
     },
 
@@ -309,7 +315,7 @@ export function createAdapterMilestonesStore(
             relatedWorkableItemIds: sanitized,
             updatedAt: now,
           };
-        })
+        }),
       );
     },
 

@@ -44,7 +44,7 @@ export const IV_BYTES = 12; // 96-bit, per WS6-R5
 const HEADER_FIXED_BYTES = 9;
 
 /** What a blob is, so one kind cannot be served in place of another. */
-export type BlobKind = "update" | "snapshot" | "index" | "key-wrap" | "recovery-wrap" | "test";
+export type BlobKind = 'update' | 'snapshot' | 'index' | 'key-wrap' | 'recovery-wrap' | 'test';
 
 /**
  * The context a blob belongs to. Every field is authenticated, so all of them
@@ -73,18 +73,18 @@ export interface ParsedEnvelope extends EnvelopeHeader {
 
 /** Thrown for anything malformed, unknown, or truncated. */
 export type EnvelopeErrorReason =
-  | "not-an-envelope"
-  | "unsupported-version"
-  | "unsupported-algorithm"
-  | "truncated"
-  | "invalid-context";
+  | 'not-an-envelope'
+  | 'unsupported-version'
+  | 'unsupported-algorithm'
+  | 'truncated'
+  | 'invalid-context';
 
 export class EnvelopeError extends Error {
   reason: EnvelopeErrorReason;
 
   constructor(message: string, reason: EnvelopeErrorReason) {
     super(message);
-    this.name = "EnvelopeError";
+    this.name = 'EnvelopeError';
     this.reason = reason;
   }
 }
@@ -107,7 +107,8 @@ function concat(parts: Uint8Array[]): Uint8Array {
 }
 
 export function buildHeader(header: EnvelopeHeader): Uint8Array {
-  if (header.kdfParams.length > 0xffff) throw new EnvelopeError("KDF parameters are too long.", "truncated");
+  if (header.kdfParams.length > 0xffff)
+    throw new EnvelopeError('KDF parameters are too long.', 'truncated');
   return concat([
     ENVELOPE_MAGIC,
     new Uint8Array([header.formatVersion, header.algorithm, header.kdf]),
@@ -121,50 +122,62 @@ export function buildHeader(header: EnvelopeHeader): Uint8Array {
  * length-prefixed so that ("ab","c") and ("a","bc") cannot collide.
  */
 export function authenticatedData(header: Uint8Array, context: BlobContext): Uint8Array {
-  if (!context || typeof context.docId !== "string" || context.docId.length === 0) {
-    throw new EnvelopeError("A blob context needs a document id.", "invalid-context");
+  if (!context || typeof context.docId !== 'string' || context.docId.length === 0) {
+    throw new EnvelopeError('A blob context needs a document id.', 'invalid-context');
   }
-  if (typeof context.kind !== "string" || context.kind.length === 0) {
-    throw new EnvelopeError("A blob context needs a kind.", "invalid-context");
+  if (typeof context.kind !== 'string' || context.kind.length === 0) {
+    throw new EnvelopeError('A blob context needs a kind.', 'invalid-context');
   }
   if (!Number.isSafeInteger(context.version) || context.version < 0) {
-    throw new EnvelopeError("A blob context needs a non-negative integer version.", "invalid-context");
+    throw new EnvelopeError(
+      'A blob context needs a non-negative integer version.',
+      'invalid-context',
+    );
   }
   const docId = textEncoder.encode(context.docId);
   const kind = textEncoder.encode(context.kind);
   const version = new Uint8Array(8);
   new DataView(version.buffer).setBigUint64(0, BigInt(context.version));
-  return concat([header, writeUint16(docId.length), docId, writeUint16(kind.length), kind, version]);
+  return concat([
+    header,
+    writeUint16(docId.length),
+    docId,
+    writeUint16(kind.length),
+    kind,
+    version,
+  ]);
 }
 
 export function assemble(header: Uint8Array, iv: Uint8Array, body: Uint8Array): Uint8Array {
-  if (iv.length !== IV_BYTES) throw new EnvelopeError(`An IV must be ${IV_BYTES} bytes.`, "truncated");
+  if (iv.length !== IV_BYTES)
+    throw new EnvelopeError(`An IV must be ${IV_BYTES} bytes.`, 'truncated');
   return concat([header, iv, body]);
 }
 
 export function parseEnvelope(blob: Uint8Array): ParsedEnvelope {
   if (blob.length < HEADER_FIXED_BYTES + IV_BYTES) {
-    throw new EnvelopeError("Too short to be an envelope.", "truncated");
+    throw new EnvelopeError('Too short to be an envelope.', 'truncated');
   }
   for (let i = 0; i < ENVELOPE_MAGIC.length; i++) {
-    if (blob[i] !== ENVELOPE_MAGIC[i]) throw new EnvelopeError("Not an envelope.", "not-an-envelope");
+    if (blob[i] !== ENVELOPE_MAGIC[i])
+      throw new EnvelopeError('Not an envelope.', 'not-an-envelope');
   }
   const formatVersion = blob[4];
   if (!KNOWN_ENVELOPE_VERSIONS.has(formatVersion)) {
     throw new EnvelopeError(
       `Envelope format version ${formatVersion} is not supported by this build (expected ${ENVELOPE_VERSION}). A newer version wrote it.`,
-      "unsupported-version",
+      'unsupported-version',
     );
   }
   const algorithm = blob[5];
   if (algorithm !== ALG_AES_256_GCM && algorithm !== ALG_NONE) {
-    throw new EnvelopeError(`Unknown envelope algorithm ${algorithm}.`, "unsupported-algorithm");
+    throw new EnvelopeError(`Unknown envelope algorithm ${algorithm}.`, 'unsupported-algorithm');
   }
   const kdf = blob[6];
   const kdfLength = (blob[7] << 8) | blob[8];
   const kdfEnd = HEADER_FIXED_BYTES + kdfLength;
   const ivEnd = kdfEnd + IV_BYTES;
-  if (blob.length < ivEnd) throw new EnvelopeError("Envelope is truncated.", "truncated");
+  if (blob.length < ivEnd) throw new EnvelopeError('Envelope is truncated.', 'truncated');
   return {
     formatVersion,
     algorithm,

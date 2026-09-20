@@ -1,42 +1,51 @@
-import React, { useMemo } from "react";
-import * as Icons from "lucide-react";
-import { globalIconRegistry, sanitizeSvg, isValidSvg, type IconDefinition } from "../domain/iconRegistry";
+import React, { useMemo } from 'react';
+import * as Icons from 'lucide-react';
+import {
+  globalIconRegistry,
+  sanitizeSvg,
+  isValidSvg,
+  type IconDefinition,
+} from '../domain/iconRegistry';
 
 interface IconRendererProps {
   icon?: string;
   size?: number;
   className?: string;
   style?: React.CSSProperties;
-  fallback?: React.ComponentType<{ size?: number; className?: string; style?: React.CSSProperties }>;
+  fallback?: React.ComponentType<{
+    size?: number;
+    className?: string;
+    style?: React.CSSProperties;
+  }>;
   iconDefinition?: IconDefinition;
 }
 
 const SVG_ATTR_MAP: Record<string, string> = {
-  "class": "className",
-  "stroke-width": "strokeWidth",
-  "stroke-linecap": "strokeLinecap",
-  "stroke-linejoin": "strokeLinejoin",
-  "stroke-miterlimit": "strokeMiterlimit",
-  "stroke-dasharray": "strokeDasharray",
-  "stroke-dashoffset": "strokeDashoffset",
-  "stroke-opacity": "strokeOpacity",
-  "fill-rule": "fillRule",
-  "fill-opacity": "fillOpacity",
-  "clip-path": "clipPath",
-  "clip-rule": "clipRule",
-  "stop-color": "stopColor",
-  "stop-opacity": "stopOpacity",
-  "font-family": "fontFamily",
-  "font-size": "fontSize",
-  "font-weight": "fontWeight",
-  "text-anchor": "textAnchor",
-  "dominant-baseline": "dominantBaseline",
-  "gradientunits": "gradientUnits",
-  "gradienttransform": "gradientTransform",
-  "spreadmethod": "spreadMethod",
-  "xlink:href": "xlinkHref",
-  "xml:space": "xmlSpace",
-  "viewbox": "viewBox",
+  class: 'className',
+  'stroke-width': 'strokeWidth',
+  'stroke-linecap': 'strokeLinecap',
+  'stroke-linejoin': 'strokeLinejoin',
+  'stroke-miterlimit': 'strokeMiterlimit',
+  'stroke-dasharray': 'strokeDasharray',
+  'stroke-dashoffset': 'strokeDashoffset',
+  'stroke-opacity': 'strokeOpacity',
+  'fill-rule': 'fillRule',
+  'fill-opacity': 'fillOpacity',
+  'clip-path': 'clipPath',
+  'clip-rule': 'clipRule',
+  'stop-color': 'stopColor',
+  'stop-opacity': 'stopOpacity',
+  'font-family': 'fontFamily',
+  'font-size': 'fontSize',
+  'font-weight': 'fontWeight',
+  'text-anchor': 'textAnchor',
+  'dominant-baseline': 'dominantBaseline',
+  gradientunits: 'gradientUnits',
+  gradienttransform: 'gradientTransform',
+  spreadmethod: 'spreadMethod',
+  'xlink:href': 'xlinkHref',
+  'xml:space': 'xmlSpace',
+  viewbox: 'viewBox',
 };
 
 interface SvgAstNode {
@@ -78,7 +87,7 @@ function parseSvgToAst(svgString: string): SvgAstNode | null {
       let attrMatch: RegExpExecArray | null;
       while ((attrMatch = attrRegex.exec(rawAttrs)) !== null) {
         const name = attrMatch[1].toLowerCase();
-        const val = attrMatch[2] ?? attrMatch[3] ?? attrMatch[4] ?? "";
+        const val = attrMatch[2] ?? attrMatch[3] ?? attrMatch[4] ?? '';
         const reactName = SVG_ATTR_MAP[name] || attrMatch[1];
         props[reactName] = val;
       }
@@ -90,7 +99,7 @@ function parseSvgToAst(svgString: string): SvgAstNode | null {
       children: [],
     };
 
-    const isSelfClosing = fullMatch.trimEnd().endsWith("/>");
+    const isSelfClosing = fullMatch.trimEnd().endsWith('/>');
     if (stack.length > 0) {
       stack[stack.length - 1].children.push(node);
     }
@@ -107,9 +116,9 @@ function parseSvgToAst(svgString: string): SvgAstNode | null {
 function astToReact(
   node: SvgAstNode | string,
   overrideProps?: Record<string, unknown>,
-  key = 0
+  key = 0,
 ): React.ReactNode {
-  if (typeof node === "string") {
+  if (typeof node === 'string') {
     return node;
   }
   const props = { key, ...node.props, ...overrideProps };
@@ -122,12 +131,12 @@ function astToReact(
 function domNodeToReact(
   node: Node,
   overrideProps?: Record<string, unknown>,
-  key = 0
+  key = 0,
 ): React.ReactNode {
-  if (node.nodeType === (typeof Node !== "undefined" ? Node.TEXT_NODE : 3)) {
+  if (node.nodeType === (typeof Node !== 'undefined' ? Node.TEXT_NODE : 3)) {
     return node.textContent || null;
   }
-  if (node.nodeType !== (typeof Node !== "undefined" ? Node.ELEMENT_NODE : 1)) {
+  if (node.nodeType !== (typeof Node !== 'undefined' ? Node.ELEMENT_NODE : 1)) {
     return null;
   }
   const el = node as Element;
@@ -158,7 +167,7 @@ function renderSafeSvgToReact(
     style?: React.CSSProperties;
     width?: number;
     height?: number;
-  }
+  },
 ): React.ReactNode {
   if (!cleanSvg || !isValidSvg(cleanSvg)) {
     return null;
@@ -171,13 +180,13 @@ function renderSafeSvgToReact(
     height: options.height,
   };
 
-  if (typeof DOMParser !== "undefined") {
+  if (typeof DOMParser !== 'undefined') {
     try {
       const parser = new DOMParser();
-      const doc = parser.parseFromString(cleanSvg, "image/svg+xml");
-      if (!doc.querySelector("parsererror")) {
+      const doc = parser.parseFromString(cleanSvg, 'image/svg+xml');
+      if (!doc.querySelector('parsererror')) {
         const root = doc.documentElement;
-        if (root && root.nodeName.toLowerCase() === "svg") {
+        if (root && root.nodeName.toLowerCase() === 'svg') {
           return domNodeToReact(root, overrides, 0);
         }
       }
@@ -187,7 +196,7 @@ function renderSafeSvgToReact(
   }
 
   const ast = parseSvgToAst(cleanSvg);
-  if (!ast || ast.tag !== "svg") return null;
+  if (!ast || ast.tag !== 'svg') return null;
   return astToReact(ast, overrides, 0);
 }
 
@@ -209,7 +218,7 @@ export function IconRenderer({
   if (!resolvedDef) {
     if (icon && icon in Icons) {
       const LucideComp = Icons[icon as keyof typeof Icons] as Icons.LucideIcon;
-      if (typeof LucideComp === "function") {
+      if (typeof LucideComp === 'function') {
         return <LucideComp size={size} className={className} style={style} />;
       }
     }
@@ -218,20 +227,21 @@ export function IconRenderer({
 
   const { source } = resolvedDef;
 
-  if (source.type === "builtin") {
-    const LucideComp = (Icons[source.key as keyof typeof Icons] as Icons.LucideIcon) || FallbackIcon;
+  if (source.type === 'builtin') {
+    const LucideComp =
+      (Icons[source.key as keyof typeof Icons] as Icons.LucideIcon) || FallbackIcon;
     return <LucideComp size={size} className={className} style={style} />;
   }
 
-  if (source.type === "svg") {
+  if (source.type === 'svg') {
     const sanitized = sanitizeSvg(source.data);
     const svgElement = renderSafeSvgToReact(sanitized, {
-      className: `custom-svg-icon ${className || ""}`.trim(),
+      className: `custom-svg-icon ${className || ''}`.trim(),
       width: size,
       height: size,
       style: {
-        display: "inline-block",
-        verticalAlign: "middle",
+        display: 'inline-block',
+        verticalAlign: 'middle',
         flexShrink: 0,
         ...style,
       },
@@ -240,16 +250,16 @@ export function IconRenderer({
     return svgElement || <FallbackIcon size={size} className={className} style={style} />;
   }
 
-  if (source.type === "image") {
+  if (source.type === 'image') {
     return (
       <img
         src={source.data}
         alt={resolvedDef.name}
-        className={`custom-raster-icon ${className || ""}`}
+        className={`custom-raster-icon ${className || ''}`}
         style={{
           width: size,
           height: size,
-          objectFit: "contain",
+          objectFit: 'contain',
           ...style,
         }}
       />

@@ -33,42 +33,37 @@ export interface FileHandleLike {
   name: string;
   getFile(): Promise<FileLike>;
   createWritable(options?: { keepExistingData?: boolean }): Promise<WritableLike>;
-  queryPermission?(descriptor: {
-    mode: "read" | "readwrite";
-  }): Promise<PermissionState>;
-  requestPermission?(descriptor: {
-    mode: "read" | "readwrite";
-  }): Promise<PermissionState>;
+  queryPermission?(descriptor: { mode: 'read' | 'readwrite' }): Promise<PermissionState>;
+  requestPermission?(descriptor: { mode: 'read' | 'readwrite' }): Promise<PermissionState>;
 }
 
 export type FileAttachmentState =
   /** No file chosen. */
-  | "none"
+  | 'none'
   /** Handle held and permission granted; writes are happening. */
-  | "attached"
+  | 'attached'
   /** Handle held but permission must be re-requested on a user gesture.
    * Write permission does NOT silently persist across visits, so this is the
    * normal state on a fresh page load, not an error. */
-  | "needs-permission"
+  | 'needs-permission'
   /** Permission refused, or the handle is no longer usable. */
-  | "denied";
+  | 'denied';
 
 export type FileWriteResult =
   | { ok: true; lastModified: number }
-  | { ok: false; reason: "permission"; message: string }
+  | { ok: false; reason: 'permission'; message: string }
   | {
       ok: false;
-      reason: "conflict";
+      reason: 'conflict';
       message: string;
       /** What the file says now, so the caller can offer a real choice rather
        * than just refusing. */
       externalLastModified: number;
     }
-  | { ok: false; reason: "write-failed"; message: string };
+  | { ok: false; reason: 'write-failed'; message: string };
 
 export function isFileAccessSupported(): boolean {
-  return typeof (globalThis as { showSaveFilePicker?: unknown })
-    .showSaveFilePicker === "function";
+  return typeof (globalThis as { showSaveFilePicker?: unknown }).showSaveFilePicker === 'function';
 }
 
 export interface FileBackedAutosave {
@@ -92,56 +87,44 @@ export interface FileBackedAutosave {
 
 export function createFileBackedAutosave(): FileBackedAutosave {
   let handle: FileHandleLike | null = null;
-  let state: FileAttachmentState = "none";
+  let state: FileAttachmentState = 'none';
   /** lastModified as of our own last write. A file whose timestamp has moved
    * since then was changed by something else - a git checkout, another
    * editor - and blindly writing over that is data loss. */
   let observedLastModified: number | null = null;
 
-  async function permissionState(
-    h: FileHandleLike,
-    prompt: boolean,
-  ): Promise<PermissionState> {
+  async function permissionState(h: FileHandleLike, prompt: boolean): Promise<PermissionState> {
     const query = prompt ? h.requestPermission : h.queryPermission;
     if (!query) {
       // An implementation without the permission API behaves as granted; the
       // write itself will fail if it is not.
-      return "granted";
+      return 'granted';
     }
     try {
-      return await query.call(h, { mode: "readwrite" });
+      return await query.call(h, { mode: 'readwrite' });
     } catch {
-      return "denied";
+      return 'denied';
     }
   }
 
   function applyPermission(result: PermissionState): FileAttachmentState {
-    state =
-      result === "granted"
-        ? "attached"
-        : result === "prompt"
-          ? "needs-permission"
-          : "denied";
+    state = result === 'granted' ? 'attached' : result === 'prompt' ? 'needs-permission' : 'denied';
     return state;
   }
 
-  async function writeInternal(
-    contents: string,
-    force: boolean,
-  ): Promise<FileWriteResult> {
+  async function writeInternal(contents: string, force: boolean): Promise<FileWriteResult> {
     if (!handle) {
       return {
         ok: false,
-        reason: "permission",
-        message: "No file is attached to this document.",
+        reason: 'permission',
+        message: 'No file is attached to this document.',
       };
     }
-    if (state !== "attached") {
+    if (state !== 'attached') {
       return {
         ok: false,
-        reason: "permission",
-        message:
-          "This browser needs permission again before it can write to the file.",
+        reason: 'permission',
+        message: 'This browser needs permission again before it can write to the file.',
       };
     }
 
@@ -151,7 +134,7 @@ export function createFileBackedAutosave(): FileBackedAutosave {
         if (current.lastModified !== observedLastModified) {
           return {
             ok: false,
-            reason: "conflict",
+            reason: 'conflict',
             message: `${handle.name} was changed by something else since it was last saved from here.`,
             externalLastModified: current.lastModified,
           };
@@ -177,21 +160,21 @@ export function createFileBackedAutosave(): FileBackedAutosave {
       return { ok: true, lastModified: after.lastModified };
     } catch (error) {
       const name =
-        typeof error === "object" && error !== null && "name" in error
+        typeof error === 'object' && error !== null && 'name' in error
           ? String((error as { name: unknown }).name)
-          : "";
-      if (name === "NotAllowedError" || name === "SecurityError") {
-        state = "needs-permission";
+          : '';
+      if (name === 'NotAllowedError' || name === 'SecurityError') {
+        state = 'needs-permission';
         return {
           ok: false,
-          reason: "permission",
+          reason: 'permission',
           message:
-            "Permission to write to the file was withdrawn. Grant it again to resume saving.",
+            'Permission to write to the file was withdrawn. Grant it again to resume saving.',
         };
       }
       return {
         ok: false,
-        reason: "write-failed",
+        reason: 'write-failed',
         message: `Could not write to ${handle.name}.`,
       };
     }
@@ -205,7 +188,7 @@ export function createFileBackedAutosave(): FileBackedAutosave {
       handle = next;
       observedLastModified = null;
       const result = applyPermission(await permissionState(next, false));
-      if (result === "attached") {
+      if (result === 'attached') {
         try {
           observedLastModified = (await next.getFile()).lastModified;
         } catch {
@@ -218,7 +201,7 @@ export function createFileBackedAutosave(): FileBackedAutosave {
     async requestPermission() {
       if (!handle) return state;
       const result = applyPermission(await permissionState(handle, true));
-      if (result === "attached" && observedLastModified === null) {
+      if (result === 'attached' && observedLastModified === null) {
         try {
           observedLastModified = (await handle.getFile()).lastModified;
         } catch {
@@ -242,7 +225,7 @@ export function createFileBackedAutosave(): FileBackedAutosave {
 
     detach() {
       handle = null;
-      state = "none";
+      state = 'none';
       observedLastModified = null;
     },
   };
@@ -262,8 +245,8 @@ export interface FileHandleStore {
   delete(docId: string): Promise<void>;
 }
 
-const HANDLE_DB = "system-design-file-handles";
-const HANDLE_STORE = "handles";
+const HANDLE_DB = 'system-design-file-handles';
+const HANDLE_STORE = 'handles';
 
 export function createIndexedDbHandleStore(
   factory: IDBFactory = globalThis.indexedDB,
@@ -299,17 +282,17 @@ export function createIndexedDbHandleStore(
   return {
     async get(docId) {
       try {
-        const value = await run<unknown>("readonly", (s) => s.get(docId));
+        const value = await run<unknown>('readonly', (s) => s.get(docId));
         return (value as FileHandleLike | undefined) ?? null;
       } catch {
         return null;
       }
     },
     async set(docId, handle) {
-      await run("readwrite", (s) => s.put(handle, docId));
+      await run('readwrite', (s) => s.put(handle, docId));
     },
     async delete(docId) {
-      await run("readwrite", (s) => s.delete(docId));
+      await run('readwrite', (s) => s.delete(docId));
     },
   };
 }
