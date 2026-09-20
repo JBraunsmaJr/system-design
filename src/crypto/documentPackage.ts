@@ -19,7 +19,15 @@
  */
 import { createWebCryptoStorage } from "./storageCrypto.ts";
 import type { BlobContext, BlobKind } from "./envelope.ts";
-import { unwrapKey, unwrapKeyWithPrivateKey, wrapKey, wrapKeyForPublicKey } from "./keys.ts";
+import {
+  deriveStorageKey,
+  exportSymmetricKeyHex,
+  importDocumentKey,
+  unwrapKey,
+  unwrapKeyWithPrivateKey,
+  wrapKey,
+  wrapKeyForPublicKey,
+} from "./keys.ts";
 
 export interface SealedBlob {
   kind: BlobKind;
@@ -63,8 +71,13 @@ const contextFor = (pkg: Pick<DocumentPackage, "docId" | "version">, kind: BlobK
 export interface SealDocumentOptions {
   docId: string;
   version: number;
-  /** Opens the blobs. Wrapped twice below, never stored as it is. */
-  documentKey: CryptoKey;
+  /**
+   * The document key as a share link carries it: 128 bits of hex. It is
+   * what gets wrapped, both ways; the key that seals the blobs is derived
+   * from it (WS7-R1). Wrapping the derived key instead would make a
+   * document unshareable and, worse, silently underivable on recovery.
+   */
+  documentKey: string;
   workspaceKey: CryptoKey;
   /** WS7-R4. Omitted only in passthrough deployments. */
   recoveryPublicKey?: CryptoKey;
@@ -76,11 +89,13 @@ export async function sealDocument(
   options: SealDocumentOptions,
 ): Promise<DocumentPackage> {
   const header = { docId: options.docId, version: options.version };
+  const storageKey = await deriveStorageKey(options.documentKey);
+  const documentKey = await importDocumentKey(options.documentKey);
   const blobs: SealedBlob[] = [];
   for (const item of contents) {
     blobs.push({
       kind: item.kind,
-      sealed: toBase64(await crypto.seal(contextFor(header, item.kind), item.data, options.documentKey)),
+      sealed: toBase64(await crypto.seal(contextFor(header, item.kind), item.data, storageKey)),
     });
   }
   return {
@@ -88,26 +103,29 @@ export async function sealDocument(
     docId: options.docId,
     version: options.version,
     keys: {
-      wrappedForWorkspace: toBase64(await wrapKey(options.documentKey, options.workspaceKey)),
+      wrappedForWorkspace: toBase64(await wrapKey(documentKey, options.workspaceKey)),
       ...(options.recoveryPublicKey
-        ? { wrappedForRecovery: toBase64(await wrapKeyForPublicKey(options.documentKey, options.recoveryPublicKey)) }
+        ? { wrappedForRecovery: toBase64(await wrapKeyForPublicKey(documentKey, options.recoveryPublicKey)) }
         : {}),
     },
     blobs,
   };
 }
 
+/** The unwrapped document key opens nothing by itself: the storage key is
+ * derived from it, exactly as the client that sealed the blobs did. */
 async function openBlobs(pkg: DocumentPackage, documentKey: CryptoKey): Promise<{ kind: BlobKind; data: Uint8Array }[]> {
+  const storageKey = await deriveStorageKey(await exportSymmetricKeyHex(documentKey));
   const out: { kind: BlobKind; data: Uint8Array }[] = [];
   for (const blob of pkg.blobs) {
-    out.push({ kind: blob.kind, data: await crypto.open(contextFor(pkg, blob.kind), fromBase64(blob.sealed), documentKey) });
+    out.push({ kind: blob.kind, data: await crypto.open(contextFor(pkg, blob.kind), fromBase64(blob.sealed), storageKey) });
   }
   return out;
 }
 
 /** The everyday route: a member with the workspace key. */
 export async function openDocumentPackage(pkg: DocumentPackage, workspaceKey: CryptoKey) {
-  const documentKey = await unwrapKey(fromBase64(pkg.keys.wrappedForWorkspace), workspaceKey, "AES-GCM");
+  const documentKey = await unwrapKey(fromBase64(pkg.keys.wrappedForWorkspace), workspaceKey, "AES-GCM", 128);
   return openBlobs(pkg, documentKey);
 }
 
@@ -121,7 +139,7 @@ export async function recoverDocumentPackage(pkg: DocumentPackage, recoveryPriva
       `Document ${pkg.docId} has no recovery wrap. It was stored by a deployment running in passthrough mode, where content is not encrypted.`,
     );
   }
-  const documentKey = await unwrapKeyWithPrivateKey(fromBase64(pkg.keys.wrappedForRecovery), recoveryPrivateKey, "AES-GCM");
+  const documentKey = await unwrapKeyWithPrivateKey(fromBase64(pkg.keys.wrappedForRecovery), recoveryPrivateKey, "AES-GCM", 128);
   return openBlobs(pkg, documentKey);
 }
 

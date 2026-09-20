@@ -77,6 +77,7 @@ export function createStoreClient(options: StoreClientOptions) {
   const base = options.baseUrl.replace(/\/+$/, "");
   /** The highest version seen per document (WS8-R15). */
   const seen = new Map<string, number>();
+  let recoveryKeyPem: string | null | undefined;
 
   async function request(
     path: string,
@@ -144,6 +145,19 @@ export function createStoreClient(options: StoreClientOptions) {
         cryptoMode: (body.cryptoMode as "webcrypto" | "passthrough") ?? "webcrypto",
         authentication: (body.authentication as "none" | "required") ?? "required",
       };
+    },
+
+    /**
+     * The organization's recovery public key (WS7-R4), PEM, or null where a
+     * store does not use escrow. Fetched once and remembered: it changes
+     * only when an organization rotates it, which means re-wrapping anyway.
+     */
+    async recoveryPublicKey(): Promise<string | null> {
+      if (recoveryKeyPem === undefined) {
+        const { body } = await request("/v1/recovery-key");
+        recoveryKeyPem = (body.publicKey as string | null) ?? null;
+      }
+      return recoveryKeyPem;
     },
 
     /** Who the store thinks we are, or null when not signed in. */

@@ -21,7 +21,10 @@ function check(condition: boolean, message: string) {
 }
 
 const base64 = (value: string) => Buffer.from(value).toString("base64");
+// A store with encryption on refuses documents that carry no recovery wrap
+// (WS7-R4), so every document here carries one.
 const KEYS = { wrappedForWorkspace: base64("workspace"), wrappedForRecovery: base64("recovery") };
+const RECOVERY_PEM = "-----BEGIN PUBLIC KEY-----\ntest\n-----END PUBLIC KEY-----";
 const DATABASE_URL = process.env.DATABASE_URL ?? "";
 
 interface Backend {
@@ -103,6 +106,7 @@ async function run(backend: Backend) {
     store: backend.store,
     audit: sink,
     allowUnauthenticated: true,
+    recoveryPublicKeyPem: RECOVERY_PEM,
     // Unauthenticated development mode signs requests as "anonymous"; here
     // that subject is the administrator, so the admin routes are exercised.
     isAdmin: (subject) => subject === "anonymous",
@@ -133,6 +137,8 @@ async function run(backend: Backend) {
     check(created.status === 201 && created.version === 1, `creating a document returns 201 and its version (${created.status}, v${created.version})`);
     check((await call("POST", "/v1/docs", { docId: "doc-http", keys: KEYS })).status === 409, "creating it again is 409");
     check((await call("POST", "/v1/docs", { docId: "x" })).status === 400, "a document without wrapped keys is 400");
+    const unescrowed = await call("POST", "/v1/docs", { docId: "doc-unescrowed", keys: { wrappedForWorkspace: base64("workspace") } });
+    check(unescrowed.status === 400 && unescrowed.body.error?.reason === "escrow-required", "and one with no recovery wrap is refused (WS7-R4)");
     check((await call("GET", "/v1/docs")).status === 200, "listing works");
 
     console.log("  -- updates");
@@ -185,7 +191,7 @@ async function run(backend: Backend) {
     check(((await call("POST", "/v1/admin/purge-due")).body.purged as unknown[]).length >= 0, "the purge sweep runs");
     {
       // Without an administrator configured, nobody may do any of this.
-      const locked = createHttpService({ store: backend.store, allowUnauthenticated: true });
+      const locked = createHttpService({ store: backend.store, allowUnauthenticated: true, recoveryPublicKeyPem: RECOVERY_PEM });
       await new Promise<void>((resolve) => locked.listen(0, "127.0.0.1", resolve));
       const lockedPort = (locked.address() as AddressInfo).port;
       const attempt = await fetch(`http://127.0.0.1:${lockedPort}/v1/docs/doc-http/hold`, {

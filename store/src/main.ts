@@ -86,6 +86,7 @@ async function main() {
     allowedOrigins: config.allowedOrigins,
     allowUnauthenticated: config.allowUnauthenticated,
     cryptoMode: config.cryptoMode,
+    recoveryPublicKeyPem: config.recoveryPublicKeyPem,
     isAdmin: (subject) => admins.has(subject),
   });
 

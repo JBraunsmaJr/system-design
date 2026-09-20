@@ -134,6 +134,18 @@ export async function exportPublicKey(key: CryptoKey): Promise<Uint8Array> {
   return new Uint8Array(await subtle().exportKey("spki", key));
 }
 
+/** A PEM public key, as the store publishes the organization's recovery
+ * key (WS7-R4). */
+export async function importPublicKeyPem(pem: string): Promise<CryptoKey> {
+  const body = pem
+    .replace(/-----BEGIN [^-]+-----/, "")
+    .replace(/-----END [^-]+-----/, "")
+    .replace(/\s+/g, "");
+  if (!body) throw new Error("That is not a PEM public key.");
+  const bytes = Uint8Array.from(atob(body), (c) => c.charCodeAt(0));
+  return importPublicKey(bytes);
+}
+
 export async function importPublicKey(spki: Uint8Array): Promise<CryptoKey> {
   return subtle().importKey("spki", buffer(spki), { name: "RSA-OAEP", hash: "SHA-256" }, true, ["wrapKey"]);
 }
@@ -175,9 +187,11 @@ export async function unwrapKeyWithPrivateKey(
   wrapped: Uint8Array,
   privateKey: CryptoKey,
   as: "AES-GCM" | "AES-KW",
+  /** 128 for a document key, 256 for everything else. */
+  length: 128 | 256 = 256,
 ): Promise<CryptoKey> {
   const usages: KeyUsage[] = as === "AES-KW" ? ["wrapKey", "unwrapKey"] : ["encrypt", "decrypt"];
-  return subtle().unwrapKey("raw", buffer(wrapped), privateKey, { name: "RSA-OAEP" }, { name: as, length: 256 }, true, usages);
+  return subtle().unwrapKey("raw", buffer(wrapped), privateKey, { name: "RSA-OAEP" }, { name: as, length }, true, usages);
 }
 
 /**

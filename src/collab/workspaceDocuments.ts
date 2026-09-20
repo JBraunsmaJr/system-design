@@ -5,7 +5,15 @@
  * where a document key is made, wrapped, and recovered, and getting it wrong
  * would mean either an unreadable document or a key reaching the store.
  */
-import { deriveStorageKey, exportSymmetricKeyHex, importDocumentKey, unwrapKey, wrapKey } from "../crypto/keys.ts";
+import {
+  deriveStorageKey,
+  exportSymmetricKeyHex,
+  importDocumentKey,
+  importPublicKeyPem,
+  unwrapKey,
+  wrapKey,
+  wrapKeyForPublicKey,
+} from "../crypto/keys.ts";
 import { generateSessionKey } from "../domain/sessionLink.ts";
 import type { IndexEntry } from "./storeClient.ts";
 
@@ -51,4 +59,14 @@ export function upsertEntry(entries: readonly IndexEntry[], entry: IndexEntry): 
 
 export function removeEntry(entries: readonly IndexEntry[], docId: string): IndexEntry[] {
   return entries.filter((entry) => entry.docId !== docId);
+}
+
+/**
+ * The document key wrapped to the organization's recovery key (WS7-R4), so
+ * a document can be recovered when every workspace key is gone. The store
+ * refuses documents without this, which is what stops it being forgotten.
+ */
+export async function escrowDocumentKey(documentKey: string, recoveryPublicKeyPem: string): Promise<string> {
+  const recoveryKey = await importPublicKeyPem(recoveryPublicKeyPem);
+  return toBase64(await wrapKeyForPublicKey(await importDocumentKey(documentKey), recoveryKey));
 }

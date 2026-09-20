@@ -33,12 +33,36 @@ at startup. Anything unusable stops it, with a sentence saying what to set.
 | `ADMIN_SUBJECTS` | no | `issuer#subject` for each administrator. **With none set, legal holds and purges are refused to everyone.** |
 | `RETENTION_PERIOD` | no | `immediate`, a duration (`7d`, `12w`, `6m`, `7y`), or `indefinite`. Default `30d`. |
 | `CRYPTO_MODE` | no | `webcrypto` (default) or `passthrough`. |
+| `RECOVERY_PUBLIC_KEY_FILE` | with `webcrypto` | PEM file holding the organisation's recovery **public** key. Without it the store refuses every document (see below). |
+| `RECOVERY_PUBLIC_KEY` | alternative | The same key inline, for secret managers that inject values rather than files. |
 | `MAX_BLOB_BYTES`, `MAX_BLOBS_PER_DOCUMENT`, `MAX_TOTAL_BYTES` | no | Quotas. |
 | `PURGE_INTERVAL_MINUTES` | no | How often the purge sweep runs. Default 60. |
 | `ALLOW_UNAUTHENTICATED` | no | `true` runs with no sign-in at all. Development only. |
 
 The editor needs one setting of its own: `STORE_URL`, the store's public
 address. Without it the editor shows no workspace.
+
+## Before the first document: the recovery key
+
+Generate the organisation's recovery pair once, on a machine that is not the
+server:
+
+```bash
+npx tsx scripts/generate-recovery-key.ts --out ./recovery
+```
+
+Give the store the **public** half (`RECOVERY_PUBLIC_KEY_FILE`). Keep the
+private half offline, and somewhere other than your database backups.
+
+Every document is wrapped to this key as well as to the workspace key, so
+the organisation can recover content when workspace keys are lost, someone
+leaves, or a records request has to be answered without the members'
+cooperation. **A store with encryption on and no recovery key refuses to
+accept documents at all**, rather than quietly accumulating content that
+nobody could ever recover.
+
+Replacing the key later does not re-wrap existing documents: keep the old
+private half for as long as documents escrowed to it exist.
 
 ## Origins and HTTPS
 

@@ -26,7 +26,7 @@ import {
   type DeviceState,
   type EnrollmentApi,
 } from "../collab/deviceIdentity";
-import { documentKeyFor, indexKeyFor, newDocumentKey, removeEntry, upsertEntry } from "../collab/workspaceDocuments";
+import { documentKeyFor, escrowDocumentKey, indexKeyFor, newDocumentKey, removeEntry, upsertEntry } from "../collab/workspaceDocuments";
 import { unwrapPrivateKeyWithPrivateKey } from "../crypto/keys";
 import type { DiagramFile } from "../domain/serialization";
 
@@ -177,7 +177,14 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
       const keys = existing
         ? { documentKey: await documentKeyFor(existing, key), wrappedDocKey: existing.wrappedDocKey }
         : await newDocumentKey(key);
-      await client.putDocument(props.currentDocId, keys.documentKey, file, { wrappedForWorkspace: keys.wrappedDocKey });
+      // Also wrapped to the organization's recovery key, so the document
+      // survives the loss of every workspace key (WS7-R4). The store
+      // refuses it otherwise.
+      const recoveryPem = await client.recoveryPublicKey();
+      await client.putDocument(props.currentDocId, keys.documentKey, file, {
+        wrappedForWorkspace: keys.wrappedDocKey,
+        ...(recoveryPem ? { wrappedForRecovery: await escrowDocumentKey(keys.documentKey, recoveryPem) } : {}),
+      });
       const indexKey = await indexKeyFor(key);
       const next = await client.updateIndex(WORKSPACE_ID, indexKey, (current) =>
         upsertEntry(current, { docId: props.currentDocId, wrappedDocKey: keys.wrappedDocKey, title: file.title, updatedAt: new Date().toISOString() }),

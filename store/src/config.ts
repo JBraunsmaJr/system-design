@@ -6,6 +6,7 @@
  * with a quiet default - is how a deployment ends up unauthenticated, or
  * keeping records for thirty days when it meant seven years.
  */
+import { readFileSync } from "fs";
 import { parseRetentionPeriod, describeRetention, type RetentionPeriod } from "./retention.ts";
 import type { ProviderConfig } from "./auth/providers.ts";
 
@@ -22,6 +23,13 @@ export interface StoreConfig {
   admins: string[];
   retention: RetentionPeriod;
   cryptoMode: "webcrypto" | "passthrough";
+  /**
+   * The organization's recovery public key, PEM (WS7-R4, R10). Clients wrap
+   * every document key to it, and the store refuses documents that arrive
+   * without that wrap. Its private half is generated once at first-run
+   * setup and kept offline; the store never holds it.
+   */
+  recoveryPublicKeyPem: string | null;
   maxBlobBytes: number;
   maxBlobsPerDocument: number;
   maxTotalBytes: number;
@@ -111,6 +119,20 @@ export function loadStoreConfig(env: Env = process.env): StoreConfig {
     );
   }
 
+  const recoveryPublicKeyPem = (() => {
+    const inline = env.RECOVERY_PUBLIC_KEY?.trim();
+    const path = env.RECOVERY_PUBLIC_KEY_FILE?.trim();
+    if (inline && path) throw new ConfigError("Set RECOVERY_PUBLIC_KEY or RECOVERY_PUBLIC_KEY_FILE, not both.");
+    const pem = inline ?? (path ? readFileSync(path, "utf8") : "");
+    if (!pem.trim()) return null;
+    if (!/-----BEGIN PUBLIC KEY-----/.test(pem)) {
+      throw new ConfigError(
+        `The recovery key does not look like a PEM public key. It must be the PUBLIC half - the private half is kept offline and never given to the store (WS7-R5). Generate a pair with: npx tsx scripts/generate-recovery-key.ts`,
+      );
+    }
+    return pem.trim();
+  })();
+
   const cryptoMode = (env.CRYPTO_MODE ?? "webcrypto").trim();
   if (cryptoMode !== "webcrypto" && cryptoMode !== "passthrough") {
     throw new ConfigError(`CRYPTO_MODE must be "webcrypto" or "passthrough", not "${cryptoMode}".`);
@@ -125,6 +147,7 @@ export function loadStoreConfig(env: Env = process.env): StoreConfig {
     admins: list(env.ADMIN_SUBJECTS),
     retention: parseRetentionPeriod(env.RETENTION_PERIOD),
     cryptoMode,
+    recoveryPublicKeyPem,
     maxBlobBytes: positive(env, "MAX_BLOB_BYTES", 8 * 1024 * 1024),
     maxBlobsPerDocument: positive(env, "MAX_BLOBS_PER_DOCUMENT", 100_000),
     maxTotalBytes: positive(env, "MAX_TOTAL_BYTES", Number.POSITIVE_INFINITY),
@@ -145,5 +168,10 @@ export function describeConfig(config: StoreConfig): string[] {
     config.cryptoMode === "passthrough"
       ? "Crypto mode: PASSTHROUGH - documents are stored unencrypted and this server can read them"
       : "Crypto mode: webcrypto - documents arrive sealed and this server cannot read them",
+    config.cryptoMode === "passthrough"
+      ? "Recovery escrow: not applicable in passthrough mode"
+      : config.recoveryPublicKeyPem
+        ? "Recovery escrow: configured - every document is also recoverable with the organization's offline key"
+        : "Recovery escrow: NOT CONFIGURED - documents will be refused (WS7-R4). Set RECOVERY_PUBLIC_KEY_FILE.",
   ];
 }

@@ -20,7 +20,6 @@ import {
   type DocumentPackage,
 } from "../src/crypto/documentPackage.ts";
 import {
-  deriveStorageKey,
   exportPrivateKey,
   generateDocumentKeyHex,
   generateWorkspaceKey,
@@ -72,7 +71,9 @@ try {
   const keyPath = join(workDir, "recovery-private.pem");
   writeFileSync(keyPath, recoveryPem, "utf8");
 
-  const documentKey = await deriveStorageKey(generateDocumentKeyHex());
+  // The document key as a link carries it; the storage key is derived from
+  // it inside sealDocument (WS7-R1).
+  const documentKey = generateDocumentKeyHex();
   const workspaceKey = await generateWorkspaceKey();
   const body = new TextEncoder().encode(JSON.stringify(DOCUMENT));
   const pkg = await sealDocument([{ kind: "snapshot", data: body }], {

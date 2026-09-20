@@ -123,6 +123,14 @@ export interface HttpServiceOptions {
    * signed-in person's session.
    */
   allowedOrigins?: string[];
+  /**
+   * WS7-R4. The organization's recovery public key (PEM), published so
+   * clients can wrap document keys to it. With encryption on and no key
+   * configured, documents are refused: a store that quietly accepted them
+   * would hold content nobody could recover if the workspace keys were
+   * lost, which is the failure escrow exists to prevent.
+   */
+  recoveryPublicKeyPem?: string | null;
   /** WS8-R8: refused before the body is read. */
   maxRequestBytes?: number;
 }
@@ -138,6 +146,8 @@ const STATUS: Record<string, number> = {
   unsupported: 404,
   "too-many-bytes": 413,
   forbidden: 403,
+  "escrow-required": 400,
+  "escrow-unavailable": 503,
   revoked: 403,
   "not-approved": 403,
   unauthenticated: 401,
@@ -186,6 +196,10 @@ export function createHttpService(options: HttpServiceOptions): Server {
       "The store needs at least one sign-in provider and a session store. Pass allowUnauthenticated: true only for development and tests (WS10-R1).",
     );
   }
+  // Declared here, not below the return: everything after createServer()
+  // never runs, and a const used by a handler would be in its dead zone.
+  /** Escrow applies only where the store cannot read content anyway. */
+  const escrowRequired = () => (options.cryptoMode ?? "webcrypto") !== "passthrough";
   const publicUrl = () => (typeof options.publicUrl === "function" ? options.publicUrl() : options.publicUrl ?? "http://127.0.0.1");
   const secureCookies = () => publicUrl().startsWith("https://");
   /** An editor on another origin cannot send a Lax cookie at all. */
@@ -261,7 +275,14 @@ export function createHttpService(options: HttpServiceOptions): Server {
           status: "ok",
           cryptoMode: options.cryptoMode ?? "webcrypto",
           authentication: options.allowUnauthenticated ? "none" : "required",
+          escrow: escrowRequired() ? (options.recoveryPublicKeyPem ? "configured" : "missing") : "not-applicable",
         });
+      }
+
+      // The public half only. A client fetches it to wrap document keys to
+      // the organization (WS7-R4); the private half is offline (WS7-R5).
+      if (parts[1] === "recovery-key" && method === "GET") {
+        return send(response, 200, { publicKey: options.recoveryPublicKeyPem ?? null });
       }
 
       if (parts[1] === "auth") {
@@ -341,6 +362,22 @@ export function createHttpService(options: HttpServiceOptions): Server {
           const keys = body.keys as { wrappedForWorkspace?: unknown; wrappedForRecovery?: unknown } | undefined;
           if (!keys || typeof keys.wrappedForWorkspace !== "string") {
             throw new HttpError(400, "bad-request", "keys.wrappedForWorkspace is required.");
+          }
+          if (escrowRequired()) {
+            if (!options.recoveryPublicKeyPem) {
+              throw new HttpError(
+                503,
+                "escrow-unavailable",
+                "This store has no recovery key configured, so a document stored here could never be recovered if the workspace keys were lost. An administrator must set RECOVERY_PUBLIC_KEY_FILE.",
+              );
+            }
+            if (typeof keys.wrappedForRecovery !== "string" || keys.wrappedForRecovery.length === 0) {
+              throw new HttpError(
+                400,
+                "escrow-required",
+                "This document has no recovery wrap. Wrap its key to the organization's recovery key (GET /v1/recovery-key) and try again (WS7-R4).",
+              );
+            }
           }
           const created = await options.store.create({
             docId,

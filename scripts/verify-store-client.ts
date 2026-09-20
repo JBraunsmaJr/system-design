@@ -14,6 +14,9 @@ import { createHttpService, type StoreBackend } from "../store/src/httpService.t
 import { createMemoryWorkspaceIndex } from "../store/src/workspaceIndex.ts";
 import { createPostgresStore, createPostgresWorkspaceIndex } from "../store/src/postgresStore.ts";
 import { createStoreClient, StoreClientError } from "../src/collab/storeClient.ts";
+import { escrowDocumentKey } from "../src/collab/workspaceDocuments.ts";
+import { recoverDocumentPackage, toPem, type DocumentPackage } from "../src/crypto/documentPackage.ts";
+import { exportPrivateKey, exportPublicKey, generateWrappingKeyPair, importRecoveryPrivateKey } from "../src/crypto/keys.ts";
 import { createWebCryptoStorage } from "../src/crypto/storageCrypto.ts";
 import { deriveStorageKey, exportSymmetricKey, generateWorkspaceKey, wrapKey } from "../src/crypto/keys.ts";
 import { generateSessionKey } from "../src/domain/sessionLink.ts";
@@ -70,7 +73,15 @@ function memoryBackend(): { store: StoreBackend; index: ReturnType<typeof create
 
 async function run(name: string, backend: { store: StoreBackend; index: ReturnType<typeof createMemoryWorkspaceIndex> }) {
   console.log(`\n########## ${name} ##########`);
-  const server = createHttpService({ store: backend.store, workspaceIndex: backend.index, allowUnauthenticated: true });
+  // The organization's recovery keypair, as first-run setup produces it.
+  const recoveryPair = await generateWrappingKeyPair("recovery");
+  const recoveryPublicPem = toPem(await exportPublicKey(recoveryPair.publicKey), "PUBLIC KEY");
+  const server = createHttpService({
+    store: backend.store,
+    workspaceIndex: backend.index,
+    allowUnauthenticated: true,
+    recoveryPublicKeyPem: recoveryPublicPem,
+  });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   const client = createStoreClient({ baseUrl: origin });
@@ -83,8 +94,21 @@ async function run(name: string, backend: { store: StoreBackend; index: ReturnTy
   const docId = "doc-payments";
 
   try {
+    console.log("  -- escrow is required (WS7-R4)");
+    const published = await client.recoveryPublicKey();
+    check(published === recoveryPublicPem, "the store publishes its recovery public key, so clients can wrap to it");
+    await rejects(
+      () => client.putDocument("doc-unescrowed", documentKey, DOCUMENT, { wrappedForWorkspace: wrappedDocKey }),
+      "store-error",
+      "a document offered with no recovery wrap is refused"
+    );
+    const escrowed = await escrowDocumentKey(documentKey, published!);
+
     console.log("  -- a document goes out sealed and comes back");
-    const version = await client.putDocument(docId, documentKey, DOCUMENT, { wrappedForWorkspace: wrappedDocKey });
+    const version = await client.putDocument(docId, documentKey, DOCUMENT, {
+      wrappedForWorkspace: wrappedDocKey,
+      wrappedForRecovery: escrowed,
+    });
     check(version > 1, `uploading returns the new version (${version})`);
     const fetched = await client.getDocument(docId, documentKey);
     check(JSON.stringify(fetched.file) === JSON.stringify(DOCUMENT), "and it comes back byte for byte");
@@ -179,6 +203,27 @@ async function run(name: string, backend: { store: StoreBackend; index: ReturnTy
         after.entries.some((e) => e.docId === "doc-theirs") && after.entries.some((e) => e.docId === "doc-mine"),
         "and neither client's document is lost"
       );
+    }
+
+    console.log("  -- the organization can recover it with nothing else (WS7-R4, R6)");
+    {
+      // Everything the store holds for this document, and the offline key:
+      // no workspace key, no session, no client.
+      const raw = (await (await fetch(`${origin}/v1/docs/${docId}`)).json()) as {
+        document: { version: number; keys: { wrappedForWorkspace: string; wrappedForRecovery?: string } };
+        blobs: { kind: string; bytes: string }[];
+      };
+      check(!!raw.document.keys.wrappedForRecovery, "the store kept the recovery wrap alongside the document");
+      const pkg: DocumentPackage = {
+        packageVersion: 1,
+        docId,
+        version: raw.document.version,
+        keys: raw.document.keys,
+        blobs: raw.blobs.map((blob) => ({ kind: blob.kind as "snapshot", sealed: blob.bytes })),
+      };
+      const recovered = await recoverDocumentPackage(pkg, await importRecoveryPrivateKey(await exportPrivateKey(recoveryPair.privateKey)));
+      const file = JSON.parse(new TextDecoder().decode(recovered[0].data)) as { title: string };
+      check(file.title === "Payments platform v2", "and the offline recovery key alone opens what the workspace saved");
     }
 
     console.log("  -- deletion and absence");

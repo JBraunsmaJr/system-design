@@ -21,6 +21,8 @@ import { createMemoryUserDirectory } from "../store/src/userDirectory";
 import { createMemoryWorkspaceIndex } from "../store/src/workspaceIndex";
 import { createSessionStore } from "../store/src/auth/sessions";
 import { createProvider } from "../store/src/auth/providers";
+import { exportPublicKey, generateWrappingKeyPair } from "../src/crypto/keys";
+import { toPem } from "../src/crypto/documentPackage";
 
 let failures = 0;
 function check(condition: boolean, message: string) {
@@ -41,6 +43,9 @@ async function startStore(appOrigin: string, cryptoMode: "webcrypto" | "passthro
     rollback: (tx) => blobs.rollback(tx),
   }) as unknown as StoreBackend;
   const idp = await startTestOidcProvider({ subject: "person-1" });
+  // WS7-R4: a store with encryption on refuses documents that are not also
+  // recoverable with the organization's offline key.
+  const recovery = await generateWrappingKeyPair("recovery");
   let origin = "";
   const server = createHttpService({
     store,
@@ -52,6 +57,7 @@ async function startStore(appOrigin: string, cryptoMode: "webcrypto" | "passthro
     afterLoginUrl: `${appOrigin}/system-design/`,
     allowedOrigins: [appOrigin],
     cryptoMode,
+    recoveryPublicKeyPem: toPem(await exportPublicKey(recovery.publicKey), "PUBLIC KEY"),
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;

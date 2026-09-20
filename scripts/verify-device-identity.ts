@@ -25,7 +25,9 @@ import {
   type EnrollmentApi,
 } from "../src/collab/deviceIdentity.ts";
 import { documentKeyFor, indexKeyFor, newDocumentKey, upsertEntry } from "../src/collab/workspaceDocuments.ts";
-import { exportSymmetricKeyHex, unwrapPrivateKeyWithPrivateKey } from "../src/crypto/keys.ts";
+import { exportPublicKey, exportSymmetricKeyHex, generateWrappingKeyPair, unwrapPrivateKeyWithPrivateKey } from "../src/crypto/keys.ts";
+import { escrowDocumentKey } from "../src/collab/workspaceDocuments.ts";
+import { toPem } from "../src/crypto/documentPackage.ts";
 import type { DiagramFile } from "../src/domain/serialization.ts";
 
 let failures = 0;
@@ -69,6 +71,8 @@ const store = createDocumentService<MemoryTx>({
   rollback: (tx) => blobs.rollback(tx),
 }) as unknown as StoreBackend;
 
+const recoveryPair = await generateWrappingKeyPair("recovery");
+const recoveryPublicPem = toPem(await exportPublicKey(recoveryPair.publicKey), "PUBLIC KEY");
 const idp = await startTestOidcProvider({ subject: "person-1" });
 const sessions = createSessionStore();
 const directory = createMemoryUserDirectory();
@@ -80,6 +84,7 @@ const server = createHttpService({
   workspaceIndex: createMemoryWorkspaceIndex(),
   providers: [createProvider({ id: "oidc", kind: "oidc", issuer: idp.issuer, clientId: idp.clientId, clientSecret: idp.clientSecret })],
   publicUrl: () => origin,
+  recoveryPublicKeyPem: recoveryPublicPem,
 });
 await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
 origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -118,7 +123,10 @@ try {
   const workspaceKey = firstState.workspaceKey!;
   const indexKey = await indexKeyFor(workspaceKey);
   const { documentKey, wrappedDocKey } = await newDocumentKey(workspaceKey);
-  await first.client.putDocument("doc-shared", documentKey, DOCUMENT, { wrappedForWorkspace: wrappedDocKey });
+  await first.client.putDocument("doc-shared", documentKey, DOCUMENT, {
+    wrappedForWorkspace: wrappedDocKey,
+    wrappedForRecovery: await escrowDocumentKey(documentKey, recoveryPublicPem),
+  });
   await first.client.updateIndex("default", indexKey, (entries) =>
     upsertEntry(entries, { docId: "doc-shared", wrappedDocKey, title: DOCUMENT.title, updatedAt: new Date().toISOString() }),
   );

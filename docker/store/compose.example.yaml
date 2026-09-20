@@ -52,6 +52,12 @@ services:
       ADMIN_SUBJECTS: ""
       # immediate | a duration (7d, 6m, 7y) | indefinite. Default 30d.
       RETENTION_PERIOD: 30d
+      # The organisation's recovery PUBLIC key. Generate the pair with
+      # scripts/generate-recovery-key.ts and keep the private half offline;
+      # without this the store refuses every document (WS7-R4).
+      RECOVERY_PUBLIC_KEY_FILE: /run/secrets/recovery-public.pem
+    volumes:
+      - ./recovery-public.pem:/run/secrets/recovery-public.pem:ro
     ports:
       - "8080:8080"
 
