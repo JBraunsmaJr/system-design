@@ -56,6 +56,7 @@ import { useFileSaving } from "./hooks/useFileSaving";
 import { LeaveGuardDialog } from "./components/LeaveGuardDialog";
 import { WorkspacePanel } from "./components/WorkspacePanel";
 import { getStoreUrl } from "./domain/storeConfig";
+import { useWorkspaceSync } from "./collab/useWorkspaceSync";
 import {
   acquireDocument,
   replaceDocumentContents,
@@ -271,6 +272,12 @@ function App() {
   /** Where the workspace is, if this deployment has one. Absent means the
    * editor behaves exactly as it does with no store at all. */
   const [storeUrl] = useState(() => getStoreUrl());
+  /**
+   * Once a document is in a workspace, every autosave goes there too
+   * (WS8-R2). Inactive for local documents, and for a browser that has
+   * not been enrolled.
+   */
+  const workspaceSync = useWorkspaceSync({ storeUrl, docId: openDocId });
 
   /**
    * Switches this tab to another stored document by navigating, so the open
@@ -880,6 +887,7 @@ function App() {
   const [autosaveBlocked] = useState(getAutosaveBlockedReason);
   const legacyDraftPending = useRef(hasLegacyAutosave());
   const writeToFile = fileSaving.write;
+  const saveToWorkspace = workspaceSync.save;
   // Bumped when an attached file becomes writable, so it is written straight
   // away rather than on the next edit.
   const fileWriteEpoch = fileSaving.writeEpoch;
@@ -923,7 +931,12 @@ function App() {
           : ({ origin: "local" } as const);
       // WS13-R1: the attached file belongs to the open local document, never
       // to a joined session's content.
-      if (activeDocId === openDocId) void writeToFile(JSON.stringify(file, null, 2));
+      if (activeDocId === openDocId) {
+        void writeToFile(JSON.stringify(file, null, 2));
+        // The same debounce as the local save: a burst of edits is one
+        // upload, not one per keystroke.
+        void saveToWorkspace(file);
+      }
       void documentStore.writeDocument(activeDocId, file, origin).then((result) => {
         if (cancelled) return;
         // Set from the confirmed outcome, never the attempt (NFR-10).
@@ -945,7 +958,7 @@ function App() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [title, diagramSnapshot, scenarios, requirementsSnapshot, programIncrementsSnapshot, teamSnapshot, milestonesSnapshot, documentStore, activeDocId, activeRoom, activeKey, openDocId, writeToFile, fileWriteEpoch]);
+  }, [title, diagramSnapshot, scenarios, requirementsSnapshot, programIncrementsSnapshot, teamSnapshot, milestonesSnapshot, documentStore, activeDocId, activeRoom, activeKey, openDocId, writeToFile, fileWriteEpoch, saveToWorkspace]);
 
   /**
    * WS13-R12: the session this document was last shared in, if its room and
@@ -980,7 +993,19 @@ function App() {
     const file = activeSession?.ownsDocument
       ? { fileAccess: fileSaving.signals.fileAccess, fileAttachment: null, fileBacked: false }
       : fileSaving.signals;
+    // The workspace, when this document is in one (WS8-R2). A local
+    // document, or a browser that is not enrolled, reports nothing here,
+    // and the file and browser levels stand as before.
+    const serverSync =
+      workspaceSync.status === "saved"
+        ? ("synced" as const)
+        : workspaceSync.status === "saving"
+          ? ("pending" as const)
+          : workspaceSync.status === "offline"
+            ? ("offline" as const)
+            : undefined;
     return {
+      ...(serverSync ? { serverSync } : {}),
       ...file,
       localPersistence: inSession
         ? sessionPersistence.session === activeSession.session
@@ -1012,6 +1037,7 @@ function App() {
     hasAutosaved,
     presencePeers,
     fileSaving.signals,
+    workspaceSync.status,
   ]);
 
   // WS13-R7. Read live rather than captured, so the prompt reflects the state

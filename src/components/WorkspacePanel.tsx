@@ -28,6 +28,7 @@ import {
 } from "../collab/deviceIdentity";
 import { documentKeyFor, escrowDocumentKey, indexKeyFor, newDocumentKey, removeEntry, upsertEntry } from "../collab/workspaceDocuments";
 import { rotateWorkspaceKey } from "../collab/workspaceRotation";
+import { announceWorkspaceChange } from "../collab/useWorkspaceSync";
 import { unwrapPrivateKeyWithPrivateKey } from "../crypto/keys";
 import type { DiagramFile } from "../domain/serialization";
 
@@ -200,6 +201,9 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
         upsertEntry(current, { docId: props.currentDocId, wrappedDocKey: keys.wrappedDocKey, title: file.title, updatedAt: new Date().toISOString() }),
       );
       setEntries(next);
+      // From here the document keeps itself up to date: the editor picks
+      // this up without a reload (WS8-R2).
+      announceWorkspaceChange();
     });
 
   const openEntry = (entry: IndexEntry) =>
@@ -217,6 +221,7 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
       await client.deleteDocument(entry.docId);
       const next = await client.updateIndex(WORKSPACE_ID, await indexKeyFor(key), (current) => removeEntry(current, entry.docId));
       setEntries(next);
+      announceWorkspaceChange();
     });
 
   const revoke = (deviceId: string) =>

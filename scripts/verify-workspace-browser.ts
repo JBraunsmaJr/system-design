@@ -152,6 +152,42 @@ async function run() {
     await first.waitForSelector(".workspace-panel__entry", { timeout: 20000 });
     check((await first.textContent(".workspace-panel__title")) === "Shared architecture", "saving lists the document by title");
 
+    console.log("\n=== Editing afterwards keeps the workspace up to date (WS8-R2) ===");
+    {
+      await closeManager(first);
+      const versionOf = async () => {
+        const documents = await (store!.service as unknown as { list(): Promise<{ docId: string; version: number }[]> }).list();
+        return documents[0]?.version ?? 0;
+      };
+      const before = await versionOf();
+
+      // An ordinary edit, with the workspace dialog closed.
+      await first.fill('[aria-label="Diagram title"]', "Shared architecture, revised");
+      // The autosave debounce, then the upload: polled rather than timed.
+      let after = before;
+      for (let attempt = 0; attempt < 30 && after <= before; attempt++) {
+        await sleep(500);
+        after = await versionOf();
+      }
+      check(after > before, `the edit reaches the workspace on its own (version ${before} -> ${after})`);
+
+      // And the person is told where their work is.
+      await first.click(".durability__chip");
+      const detail = (await first.textContent(".durability__detail")) ?? "";
+      const label = (await first.textContent(".durability__chip span")) ?? "";
+      check(/workspace/i.test(label) || /workspace/i.test(detail), `the save status says so (${label.trim()}: ${detail.trim().slice(0, 80)})`);
+      await first.keyboard.press("Escape");
+
+      // The title change is in the list everyone sees, not just the document.
+      await openManager(first);
+      await first.waitForSelector(".workspace-panel__entry", { timeout: 20000 });
+      const listed = await first.textContent(".workspace-panel__title");
+      check(listed === "Shared architecture, revised", `and the workspace list shows the new title (${listed})`);
+      await closeManager(first);
+      await first.fill('[aria-label="Diagram title"]', "Shared architecture");
+      await sleep(2500);
+    }
+
     console.log("\n=== What the store holds ===");
     {
       // Read from the store's own data, as an operator with database access

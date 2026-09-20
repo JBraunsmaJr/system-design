@@ -137,6 +137,18 @@ export async function enrollDevice(options: EnrollOptions): Promise<DeviceState>
  * the person has no other device - otherwise their existing devices would be
  * left holding a key nothing uses.
  */
+/**
+ * Like enrollDevice, but never registers: it reports what this browser
+ * already has. Background work uses this, so that saving in the
+ * background can never create a second device for someone who has not
+ * enrolled this browser yet.
+ */
+export async function attachExistingDevice(options: EnrollOptions): Promise<DeviceState> {
+  const held = await options.storage.load();
+  if (!held) return { status: "inactive", deviceId: null, verificationCode: null, workspaceKey: null };
+  return enrollDevice(options);
+}
+
 export async function bootstrapFirstDevice(options: EnrollOptions): Promise<DeviceState> {
   const { api, storage } = options;
   const existing = await api.listDevices();

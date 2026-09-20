@@ -149,9 +149,9 @@ export function deriveDurability(signals: DurabilitySignals): DurabilityState {
       detail:
         signals.serverSync === "offline"
           ? queued > 0
-            ? `${queued} ${queued === 1 ? "change is" : "changes are"} waiting to sync. They are saved on this device in the meantime.`
-            : "Changes are saved on this device and will sync when the connection returns."
-          : "Sending recent changes to the server.",
+            ? `${queued} ${queued === 1 ? "change is" : "changes are"} waiting for the workspace. They are saved on this device in the meantime.`
+            : "The workspace is unreachable. Changes are saved on this device and go up when it returns."
+          : "Sending recent changes to the workspace.",
       persistent: false,
     };
   }
@@ -160,8 +160,8 @@ export function deriveDurability(signals: DurabilitySignals): DurabilityState {
     return {
       level: "synced",
       tone: "ok",
-      label: "Synced",
-      detail: "Saved on this device and on the server.",
+      label: "In workspace",
+      detail: "Saved in the workspace, and on this device. Everyone with access sees it.",
       persistent: false,
     };
   }
