@@ -258,6 +258,73 @@ export function createStoreClient(options: StoreClientOptions) {
       return (appended.body.document as { version: number }).version;
     },
 
+    /** Registers a document, with its wrapped keys and nothing in it. */
+    async createDocument(docId: string, wraps: { wrappedForWorkspace: string; wrappedForRecovery?: string }): Promise<number> {
+      const { body } = await request("/v1/docs", { method: "POST", docId, body: JSON.stringify({ docId, keys: wraps }) });
+      return (body.document as { version: number }).version;
+    },
+
+    /**
+     * Appends one sealed CRDT update (WS8-R2). The blob is sealed against
+     * the version the store will give it, so it is bound to its place in
+     * the document's history (WS6-R4); `expectedVersion` makes the append
+     * conditional, so two clients appending at once cannot both believe
+     * they were first (WS8-R15). A conflict is reported, not retried here:
+     * the caller re-reads what it missed and appends again.
+     */
+    async appendUpdate(docId: string, documentKey: string, update: Uint8Array, atVersion: number): Promise<number> {
+      const key = await deriveStorageKey(documentKey);
+      const sealed = await crypto.seal(contextFor(docId, "update", atVersion + 1), update, key);
+      const { body } = await request(`/v1/docs/${encodeURIComponent(docId)}/updates`, {
+        method: "POST",
+        docId,
+        body: JSON.stringify({ kind: "update", bytes: toBase64(sealed), expectedVersion: atVersion }),
+      });
+      return (body.document as { version: number }).version;
+    },
+
+    /** Updates written after `since`, opened (WS8-R2). */
+    async updatesSince(docId: string, documentKey: string, since: number): Promise<{ version: number; updates: Uint8Array[] }> {
+      const key = await deriveStorageKey(documentKey);
+      const { body } = await request(`/v1/docs/${encodeURIComponent(docId)}/updates?since=${since}`, { docId });
+      const record = body.document as { version: number };
+      const blobs = (body.blobs as { kind: string; version: number; bytes: string }[]) ?? [];
+      const updates: Uint8Array[] = [];
+      for (const blob of blobs) {
+        updates.push(await crypto.open(contextFor(docId, blob.kind as BlobContext["kind"], blob.version), fromBase64(blob.bytes), key));
+      }
+      return { version: record.version, updates };
+    },
+
+    /** Every blob of a document, opened, in order (WS8-R4: order does not
+     * matter to a CRDT, but the store returns them as written). */
+    async allUpdates(docId: string, documentKey: string): Promise<{ version: number; blobs: { kind: string; bytes: Uint8Array }[] }> {
+      const key = await deriveStorageKey(documentKey);
+      const { body } = await request(`/v1/docs/${encodeURIComponent(docId)}`, { docId });
+      const record = body.document as { version: number };
+      const blobs = (body.blobs as { kind: string; version: number; bytes: string }[]) ?? [];
+      const opened: { kind: string; bytes: Uint8Array }[] = [];
+      for (const blob of blobs) {
+        opened.push({
+          kind: blob.kind,
+          bytes: await crypto.open(contextFor(docId, blob.kind as BlobContext["kind"], blob.version), fromBase64(blob.bytes), key),
+        });
+      }
+      return { version: record.version, blobs: opened };
+    },
+
+    /** Replaces the log with one sealed state (WS8-R5). */
+    async compactDocument(docId: string, documentKey: string, state: Uint8Array, atVersion: number): Promise<number> {
+      const key = await deriveStorageKey(documentKey);
+      const sealed = await crypto.seal(contextFor(docId, "snapshot", atVersion + 1), state, key);
+      const { body } = await request(`/v1/docs/${encodeURIComponent(docId)}/compact`, {
+        method: "POST",
+        docId,
+        body: JSON.stringify({ kind: "snapshot", bytes: toBase64(sealed) }),
+      });
+      return (body.document as { version: number }).version;
+    },
+
     /** Fetches and opens a document. */
     async getDocument(
       docId: string,

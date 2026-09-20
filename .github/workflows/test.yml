@@ -124,6 +124,11 @@ jobs:
         env:
           DATABASE_URL: postgresql://store:store@localhost:5432/store
 
+      - name: Merge concurrent workspace edits against PostgreSQL
+        run: npx tsx scripts/verify-workspace-merge.ts
+        env:
+          DATABASE_URL: postgresql://store:store@localhost:5432/store
+
       - name: Rotate a workspace key against PostgreSQL
         run: npx tsx scripts/verify-workspace-rotation.ts
         env:
