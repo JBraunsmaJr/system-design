@@ -370,12 +370,6 @@ function App() {
   /** Where the workspace is, if this deployment has one. Absent means the
    * editor behaves exactly as it does with no store at all. */
   const [storeUrl] = useState(() => getStoreUrl());
-  /**
-   * Once a document is in a workspace, every autosave goes there too
-   * (WS8-R2). Inactive for local documents, and for a browser that has
-   * not been enrolled.
-   */
-  const workspaceSync = useWorkspaceSync({ storeUrl, docId: openDocId });
 
   /**
    * Switches this tab to another stored document by navigating, so the open
@@ -957,6 +951,14 @@ function App() {
   const metaSnapshot = useSyncExternalStore(metaStore.subscribe, metaStore.getSnapshot);
   const { title, scenarios } = metaSnapshot;
 
+  /**
+   * A workspace document keeps itself up to date (WS8-R2): its CRDT
+   * updates go to the store as they happen, and other people's arrive the
+   * same way, so two editors merge rather than overwrite. Inactive for a
+   * local document, or a browser that has not been enrolled.
+   */
+  const workspaceSync = useWorkspaceSync({ storeUrl, docId: openDocId, doc: openDoc.doc, title });
+
   // Same value-or-updater shape as the useState setters these replaced, so
   // every existing call site is unchanged.
   const setTitle = useCallback(
@@ -1033,7 +1035,7 @@ function App() {
   const [autosaveBlocked] = useState(getAutosaveBlockedReason);
   const legacyDraftPending = useRef(hasLegacyAutosave());
   const writeToFile = fileSaving.write;
-  const saveToWorkspace = workspaceSync.save;
+  const flushWorkspace = workspaceSync.flush;
   // Bumped when an attached file becomes writable, so it is written straight
   // away rather than on the next edit.
   const fileWriteEpoch = fileSaving.writeEpoch;
@@ -1083,11 +1085,13 @@ function App() {
           : ({ origin: 'local' } as const);
       // WS13-R1: the attached file belongs to the open local document, never
       // to a joined session's content.
+      // The workspace receives the document's own CRDT updates as they
+      // happen (useWorkspaceSync), not a snapshot from here. Autosave
+      // only pushes it along, so a pause in typing lands in the workspace
+      // at the same moment it lands in the browser.
       if (activeDocId === openDocId) {
         void writeToFile(JSON.stringify(file, null, 2));
-        // The same debounce as the local save: a burst of edits is one
-        // upload, not one per keystroke.
-        void saveToWorkspace(file);
+        void flushWorkspace();
       }
       void documentStore.writeDocument(activeDocId, file, origin).then((result) => {
         if (cancelled) return;
@@ -1125,7 +1129,7 @@ function App() {
     openDocId,
     writeToFile,
     fileWriteEpoch,
-    saveToWorkspace,
+    flushWorkspace,
   ]);
 
   /**
@@ -1263,6 +1267,18 @@ function App() {
       perfObj.setDiagram = (diagram: SubDiagram) => {
         diagramStore.replaceAll(diagram);
       };
+      /**
+       * One node, through the seam. Needed to exercise two browsers
+       * editing the same document at once: replaceAll would rewrite the
+       * whole diagram and prove nothing about merging.
+       */
+      perfObj.addNode = (label: string) =>
+        diagramStore.addNode(
+          [],
+          'typed',
+          { x: Math.random() * 400, y: Math.random() * 400 },
+          { nodeType: 'service', label, properties: {}, tags: [] },
+        );
       perfObj.setPath = (newPath: string[]) => {
         setPath(newPath);
       };
@@ -3223,18 +3239,14 @@ function App() {
             <WorkspacePanel
               storeUrl={storeUrl}
               currentDocId={openDocId}
-              buildCurrentFile={buildCurrentFile}
-              onOpenFile={(file) => {
-                // Opened like any other document: whole-document
-                // replacement, so undo history does not reach across it
-                // (WS3-R4).
-                replaceDocumentContents(
-                  openDoc.doc,
-                  snapshotToDiagramFile(diagramFileToSnapshot(file)),
-                );
-                undo.clear();
+              currentTitle={title}
+              // What a workspace document holds: this document's CRDT
+              // state, so the workspace copy merges with everyone else's
+              // rather than replacing it (WS8-R2).
+              getDocumentState={() => Y.encodeStateAsUpdate(openDoc.doc)}
+              onOpenDocument={(docId) => {
                 setIsDocumentManagerOpen(false);
-                showToast(`Opened "${file.title}" from the workspace`);
+                openDocumentInTab(docId);
               }}
             />
           ) : undefined

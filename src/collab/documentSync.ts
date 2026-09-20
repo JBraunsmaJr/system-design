@@ -19,13 +19,13 @@
  * back, and so undo ignores them - the same rule a live session follows
  * (WS3-R3).
  */
-import * as Y from "yjs";
-import type { StoreClient } from "./storeClient.ts";
-import { StoreClientError } from "./storeClient.ts";
+import * as Y from 'yjs';
+import type { StoreClient } from './storeClient.ts';
+import { StoreClientError } from './storeClient.ts';
 
 /** Marks updates that came from the store, so they are not echoed back
  * and undo leaves them alone. */
-export const WORKSPACE_ORIGIN = Symbol("workspace");
+export const WORKSPACE_ORIGIN = Symbol('workspace');
 
 export interface DocumentSyncOptions {
   client: StoreClient;
@@ -41,7 +41,7 @@ export interface DocumentSyncOptions {
   onStatus?: (status: DocumentSyncStatus, detail?: string) => void;
 }
 
-export type DocumentSyncStatus = "starting" | "saving" | "saved" | "offline" | "error";
+export type DocumentSyncStatus = 'starting' | 'saving' | 'saved' | 'offline' | 'error';
 
 export interface DocumentSync {
   /** Applies what the store holds, then keeps the two in step. */
@@ -95,7 +95,7 @@ export function createDocumentSync(options: DocumentSyncOptions): DocumentSync {
     }
     sending = (async () => {
       try {
-        say("saving");
+        say('saving');
         // Fetch first: appending against a version someone else has moved
         // past is refused, and this is also how their changes arrive
         // promptly when two people are typing.
@@ -109,21 +109,24 @@ export function createDocumentSync(options: DocumentSyncOptions): DocumentSync {
           Y.applyUpdate(mirror, update, WORKSPACE_ORIGIN);
           blobCount += 1;
         }
-        say("saved");
+        say('saved');
         if (blobCount > compactAfterBlobs) await compact();
       } catch (error) {
         // Anything unsent stays unsent: the next change, or the next poll,
         // tries again from the same state vector.
         dirty = true;
-        if (error instanceof StoreClientError && error.reason === "offline") {
-          say("offline", "The workspace is unreachable. Your work is saved in this browser and goes up when it returns.");
-        } else if (error instanceof StoreClientError && error.reason === "conflict") {
+        if (error instanceof StoreClientError && error.reason === 'offline') {
+          say(
+            'offline',
+            'The workspace is unreachable. Your work is saved in this browser and goes up when it returns.',
+          );
+        } else if (error instanceof StoreClientError && error.reason === 'conflict') {
           // Someone appended between our fetch and our append. Their work
           // is not lost and neither is ours: pull and try again.
-          say("saving", "Catching up with another editor.");
+          say('saving', 'Catching up with another editor.');
           await pull().catch(() => {});
         } else {
-          say("error", error instanceof Error ? error.message : String(error));
+          say('error', error instanceof Error ? error.message : String(error));
         }
       } finally {
         sending = null;
@@ -156,10 +159,10 @@ export function createDocumentSync(options: DocumentSyncOptions): DocumentSync {
 
   return {
     async start() {
-      say("starting");
+      say('starting');
       const { version: current, blobs } = await client.allUpdates(docId, documentKey);
       for (const blob of blobs) {
-        if (blob.kind === "update" || blob.kind === "snapshot") {
+        if (blob.kind === 'update' || blob.kind === 'snapshot') {
           // A snapshot here is a compacted state, not a diagram file: both
           // are Yjs updates as far as merging is concerned.
           Y.applyUpdate(doc, blob.bytes, WORKSPACE_ORIGIN);
@@ -172,14 +175,14 @@ export function createDocumentSync(options: DocumentSyncOptions): DocumentSync {
       // done offline, or a document being added to the workspace - is now
       // a difference to send.
       dirty = true;
-      doc.on("update", onLocalUpdate);
+      doc.on('update', onLocalUpdate);
       poller = setInterval(() => {
         void pull().catch(() => {
           // A failed poll is not worth reporting: the next one, or the
           // next save, will say so if the store is really gone.
         });
       }, pollMs);
-      say("saved");
+      say('saved');
     },
 
     async flush() {
@@ -192,7 +195,7 @@ export function createDocumentSync(options: DocumentSyncOptions): DocumentSync {
       mirror.destroy();
       if (timer) clearTimeout(timer);
       if (poller) clearInterval(poller);
-      doc.off("update", onLocalUpdate);
+      doc.off('update', onLocalUpdate);
     },
 
     version: () => version,

@@ -10,6 +10,10 @@
  * dialog is open. It attaches to the device this browser already has and
  * never registers one: enrolling is something a person does deliberately,
  * not something background saving does on their behalf.
+ *
+ * What travels is CRDT updates, not snapshots (documentSync.ts), so two
+ * people editing the same workspace document merge rather than overwrite
+ * each other - the same guarantee a live session gives.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createStoreClient, StoreClientError, type StoreClient } from './storeClient.ts';
@@ -19,13 +23,9 @@ import {
   type DeviceKeyStorage,
   type EnrollmentApi,
 } from './deviceIdentity.ts';
-import {
-  documentKeyFor,
-  escrowDocumentKey,
-  indexKeyFor,
-  upsertEntry,
-} from './workspaceDocuments.ts';
-import type { DiagramFile } from '../domain/serialization.ts';
+import { documentKeyFor, indexKeyFor, upsertEntry } from './workspaceDocuments.ts';
+import { createDocumentSync, type DocumentSync } from './documentSync.ts';
+import type * as Y from 'yjs';
 
 export type WorkspaceSyncStatus =
   /** No store, no device, or this document is not in the workspace. */
@@ -56,6 +56,11 @@ const WORKSPACE_ID = 'default';
 export interface WorkspaceSyncOptions {
   storeUrl: string | null;
   docId: string;
+  /** The open document. Its updates are what the workspace holds. */
+  doc: Y.Doc;
+  /** The document's title, kept in the index so renaming shows up in
+   * everyone's list rather than only inside the document. */
+  title: string;
   client?: StoreClient;
   keyStorage?: DeviceKeyStorage;
 }
@@ -73,15 +78,13 @@ export function useWorkspaceSync(options: WorkspaceSyncOptions) {
     version: null,
     message: null,
   });
-  /** What this document needs to be saved: set once the document is known
-   * to be in the workspace, cleared when it is not. */
+  /** Running while this document is in the workspace. */
+  const sync = useRef<DocumentSync | null>(null);
   const tracked = useRef<{
     workspaceKey: CryptoKey;
     documentKey: string;
     wrappedDocKey: string;
   } | null>(null);
-  const saving = useRef(false);
-  const pending = useRef<DiagramFile | null>(null);
 
   const api: EnrollmentApi | null = client && {
     registerDevice: (publicKey, label) => client.registerDevice(publicKey, label),
@@ -94,13 +97,20 @@ export function useWorkspaceSync(options: WorkspaceSyncOptions) {
     setOwnUserKey: (deviceId, wrapped) => client.setOwnUserKey(deviceId, wrapped),
   };
 
+  const stop = useCallback(() => {
+    sync.current?.stop();
+    sync.current = null;
+    tracked.current = null;
+  }, []);
+
   /** Is this document in the workspace, and can this browser reach it? */
   const check = useCallback(async () => {
     if (!client || !api) return;
     try {
       const device = await attachExistingDevice({ api, storage });
       if (device.status !== 'ready' || !device.workspaceKey) {
-        tracked.current = null;
+        // Not enrolled, or waiting for approval: nothing to sync yet.
+        stop();
         setState({ status: 'inactive', version: null, message: null });
         return;
       }
@@ -109,24 +119,34 @@ export function useWorkspaceSync(options: WorkspaceSyncOptions) {
         (candidate) => candidate.docId === docId,
       );
       if (!entry) {
-        // Not in the workspace: this document is a local one, and nothing
-        // should be uploaded for it.
-        tracked.current = null;
+        // A local document: nothing of it belongs in the workspace.
+        stop();
         setState({ status: 'inactive', version: null, message: null });
         return;
       }
+      if (sync.current) return;
+      const documentKey = await documentKeyFor(entry, device.workspaceKey);
       tracked.current = {
         workspaceKey: device.workspaceKey,
-        documentKey: await documentKeyFor(entry, device.workspaceKey),
+        documentKey,
         wrappedDocKey: entry.wrappedDocKey,
       };
-      setState((current) => ({
-        ...current,
-        status: current.status === 'inactive' ? 'saved' : current.status,
-        version: client.versionOf(docId),
-      }));
+      const started = createDocumentSync({
+        client,
+        docId,
+        documentKey,
+        doc: options.doc,
+        onStatus: (status, detail) =>
+          setState({
+            status: status === 'starting' ? 'saving' : status,
+            version: client.versionOf(docId),
+            message: detail ?? null,
+          }),
+      });
+      await started.start();
+      sync.current = started;
     } catch (error) {
-      tracked.current = null;
+      stop();
       setState({
         status:
           error instanceof StoreClientError && error.reason === 'offline' ? 'offline' : 'inactive',
@@ -136,90 +156,73 @@ export function useWorkspaceSync(options: WorkspaceSyncOptions) {
     }
     // api is rebuilt each render from the stable client.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [client, docId, storage]);
+  }, [client, docId, storage, stop, options.doc]);
 
   useEffect(() => {
     let cancelled = false;
     void Promise.resolve().then(() => {
       if (!cancelled) return check();
     });
-    // A document added to the workspace starts syncing without a reload.
     const onChanged = () => void check();
     globalThis.addEventListener?.(WORKSPACE_CHANGED_EVENT, onChanged);
     return () => {
       cancelled = true;
       globalThis.removeEventListener?.(WORKSPACE_CHANGED_EVENT, onChanged);
+      stop();
     };
-  }, [check]);
+  }, [check, stop]);
 
   /**
-   * Saves the document as it is now. Calls that arrive while a save is in
-   * flight collapse into one more save afterwards, so a burst of edits
-   * costs two uploads rather than one per edit.
+   * The title, which the index carries so that renaming a document shows
+   * up in everyone's list. The document's own changes need no help: they
+   * are already on their way as CRDT updates.
    */
-  const saveOnce = useCallback(
-    async (file: DiagramFile) => {
+  const writtenTitle = useRef<string | null>(null);
+  useEffect(() => {
+    if (!client) return;
+    let cancelled = false;
+    // Retried rather than cancelled: the first attempt often lands while
+    // the sync is still attaching, and an earlier version marked the
+    // title as written before writing it, so a cancelled timer meant the
+    // new name never reached anyone else's list.
+    const attempt = async (): Promise<void> => {
+      if (cancelled) return;
       const target = tracked.current;
-      if (!client || !target) return;
+      if (!target) {
+        if (!cancelled) timer = setTimeout(() => void attempt(), 2000);
+        return;
+      }
+      if (writtenTitle.current === options.title) return;
       try {
-        const recoveryPem = await client.recoveryPublicKey();
-        const version = await client.putDocument(docId, target.documentKey, file, {
-          wrappedForWorkspace: target.wrappedDocKey,
-          ...(recoveryPem
-            ? { wrappedForRecovery: await escrowDocumentKey(target.documentKey, recoveryPem) }
-            : {}),
-        });
-        // The index carries the title, so renaming a document shows up in
-        // everyone's list rather than only in the document itself.
         const indexKey = await indexKeyFor(target.workspaceKey);
         await client.updateIndex(WORKSPACE_ID, indexKey, (entries) =>
           upsertEntry(entries, {
             docId,
             wrappedDocKey: target.wrappedDocKey,
-            title: file.title,
+            title: options.title,
             updatedAt: new Date().toISOString(),
           }),
         );
-        setState({ status: 'saved', version, message: null });
+        writtenTitle.current = options.title;
       } catch (error) {
-        const offline = error instanceof StoreClientError && error.reason === 'offline';
-        setState({
-          status: offline ? 'offline' : 'error',
-          version: client.versionOf(docId),
-          message: offline
-            ? 'The workspace is unreachable. Your work is saved in this browser and will go up when it returns.'
-            : error instanceof StoreClientError
-              ? error.message
-              : String(error),
-        });
+        // Not fatal - the document itself is unaffected - but silence
+        // here once hid a title that never reached anyone else's list.
+        console.warn('Could not update the workspace list entry:', error);
+        if (!cancelled) timer = setTimeout(() => void attempt(), 5000);
       }
-    },
-    [client, docId],
-  );
+    };
+    let timer = setTimeout(() => void attempt(), 1000);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [client, docId, options.title]);
 
-  const save = useCallback(
-    async (file: DiagramFile) => {
-      if (!client || !tracked.current) return;
-      if (saving.current) {
-        // A save is in flight: keep only the newest document, so a burst
-        // of edits costs two uploads rather than one per edit.
-        pending.current = file;
-        return;
-      }
-      saving.current = true;
-      setState((current) => ({ ...current, status: 'saving' }));
-      // A loop rather than a recursive call: the queued document is saved
-      // by this invocation, which keeps the callback a plain function.
-      let next: DiagramFile | null = file;
-      while (next) {
-        await saveOnce(next);
-        next = pending.current;
-        pending.current = null;
-      }
-      saving.current = false;
-    },
-    [client, saveOnce],
-  );
-
-  return { ...state, save, refresh: check, active: state.status !== 'inactive' };
+  return {
+    ...state,
+    /** Sends anything outstanding now, for a caller about to close. */
+    flush: async () => sync.current?.flush(),
+    refresh: check,
+    active: state.status !== 'inactive',
+  };
 }

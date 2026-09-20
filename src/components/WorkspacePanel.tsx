@@ -54,7 +54,6 @@ import {
 import { rotateWorkspaceKey } from '../collab/workspaceRotation';
 import { announceWorkspaceChange } from '../collab/useWorkspaceSync';
 import { unwrapPrivateKeyWithPrivateKey } from '../crypto/keys';
-import type { DiagramFile } from '../domain/serialization';
 
 const WORKSPACE_ID = 'default';
 
@@ -62,9 +61,12 @@ export interface WorkspacePanelProps {
   storeUrl: string;
   /** The document on screen, for "Save to workspace". */
   currentDocId: string;
-  buildCurrentFile: () => DiagramFile;
-  /** Opens a workspace document in the editor. */
-  onOpenFile: (file: DiagramFile, docId: string) => void;
+  currentTitle: string;
+  /** Its CRDT state, which is what a workspace document holds (WS8-R2). */
+  getDocumentState: () => Uint8Array;
+  /** Opens a workspace document: the editor opens that document and its
+   * contents arrive from the store, merging with anything already here. */
+  onOpenDocument: (docId: string) => void;
   /** Test seam; the browser uses IndexedDB. */
   keyStorage?: DeviceKeyStorage;
   client?: StoreClient;
@@ -242,7 +244,6 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
     run(async () => {
       const key = workspaceKey.current;
       if (!key) throw new Error('This browser cannot write to the workspace yet.');
-      const file = props.buildCurrentFile();
       const existing = entries.find((entry) => entry.docId === props.currentDocId);
       const keys = existing
         ? {
@@ -250,22 +251,30 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
             wrappedDocKey: existing.wrappedDocKey,
           }
         : await newDocumentKey(key);
-      // Also wrapped to the organization's recovery key, so the document
-      // survives the loss of every workspace key (WS7-R4). The store
-      // refuses it otherwise.
-      const recoveryPem = await client.recoveryPublicKey();
-      await client.putDocument(props.currentDocId, keys.documentKey, file, {
-        wrappedForWorkspace: keys.wrappedDocKey,
-        ...(recoveryPem
-          ? { wrappedForRecovery: await escrowDocumentKey(keys.documentKey, recoveryPem) }
-          : {}),
-      });
+      if (!existing) {
+        // Registered, then seeded with the document's CRDT state as its
+        // first update. From here the editor keeps it up to date, and two
+        // people editing it merge rather than overwrite (WS8-R2).
+        const recoveryPem = await client.recoveryPublicKey();
+        const version = await client.createDocument(props.currentDocId, {
+          wrappedForWorkspace: keys.wrappedDocKey,
+          ...(recoveryPem
+            ? { wrappedForRecovery: await escrowDocumentKey(keys.documentKey, recoveryPem) }
+            : {}),
+        });
+        await client.appendUpdate(
+          props.currentDocId,
+          keys.documentKey,
+          props.getDocumentState(),
+          version,
+        );
+      }
       const indexKey = await indexKeyFor(key);
       const next = await client.updateIndex(WORKSPACE_ID, indexKey, (current) =>
         upsertEntry(current, {
           docId: props.currentDocId,
           wrappedDocKey: keys.wrappedDocKey,
-          title: file.title,
+          title: props.currentTitle,
           updatedAt: new Date().toISOString(),
         }),
       );
@@ -277,10 +286,10 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
 
   const openEntry = (entry: IndexEntry) =>
     run(async () => {
-      const key = workspaceKey.current;
-      if (!key) throw new Error('This browser cannot read the workspace yet.');
-      const { file } = await client.getDocument(entry.docId, await documentKeyFor(entry, key));
-      props.onOpenFile(file, entry.docId);
+      // Opening means opening that document, not copying its contents into
+      // this one: its updates arrive from the store and merge with
+      // whatever this browser already had of it.
+      props.onOpenDocument(entry.docId);
     });
 
   const removeEntryFromWorkspace = (entry: IndexEntry) =>
