@@ -1,5 +1,11 @@
 # Deploying the store
 
+> The same material, written for operators and kept alongside the rest of
+> the product documentation, is on the docs site under **Deployment →
+> Workspace Store**, with **Guide → How your work is protected** covering
+> the encryption. This file is the repository copy; keep the two in step
+> when changing either.
+
 The store keeps documents for a team, encrypted so that it cannot read them.
 It is optional: an editor with no store configured behaves exactly as it
 always has, and nothing leaves the browser.

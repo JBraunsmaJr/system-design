@@ -23,6 +23,8 @@ export default defineConfig({
           { text: 'Requirements', link: '/guide/requirement' },
           { text: 'Timeline & Planning', link: '/guide/timeline' },
           { text: 'Team & Capacity', link: '/guide/team' },
+          { text: 'Workspaces', link: '/guide/workspaces' },
+          { text: 'How your work is protected', link: '/guide/security' },
         ],
       },
       {
@@ -30,6 +32,7 @@ export default defineConfig({
         items: [
           { text: 'Self Hosting', link: '/deployment/self-host' },
           { text: 'Relay Server (Signaling)', link: '/deployment/relay-server' },
+          { text: 'Workspace Store', link: '/deployment/workspace-store' },
         ],
       },
     ],
