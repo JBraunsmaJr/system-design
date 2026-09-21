@@ -358,7 +358,8 @@ export function Inspector({
     const groupDef = isGroup ? getGroupType(data.nodeType) : undefined;
     const headerLabel = nodeDef?.label ?? groupDef?.label ?? data.nodeType;
     const defaultColor = nodeDef?.color ?? groupDef?.color ?? '#98A2B3';
-    const subCount = data.subDiagram?.nodes.length ?? 0;
+    const subCount = data.subDiagramNodeCount ?? data.subDiagram?.nodes.length ?? 0;
+    const hasSubDiagram = data.hasSubDiagram ?? subCount > 0;
 
     return (
       <aside className="inspector">
@@ -412,7 +413,11 @@ export function Inspector({
             className="inspector__drill"
             onClick={() => onDrillInto(selectedNode.id)}
           >
-            {subCount > 0 ? `Open sub-diagram (${subCount})` : 'Create sub-diagram'} →
+            {subCount > 0
+              ? `Open sub-diagram (${subCount})`
+              : hasSubDiagram
+                ? 'Open sub-diagram'
+                : 'Create sub-diagram'} →
           </button>
         )}
 
@@ -438,10 +443,10 @@ export function Inspector({
             Deleting a boundary keeps the nodes inside it - they're released, not deleted.
           </p>
         )}
-        {!isGroup && subCount > 0 && (
+        {!isGroup && (subCount > 0 || hasSubDiagram) && (
           <p className="inspector__hint">
-            Deleting this node also deletes its sub-diagram ({subCount} node
-            {subCount === 1 ? '' : 's'} inside).
+            Deleting this node also deletes its sub-diagram
+            {subCount > 0 ? ` (${subCount} node${subCount === 1 ? '' : 's'} inside)` : ''}.
           </p>
         )}
       </aside>

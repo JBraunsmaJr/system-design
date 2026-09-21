@@ -75,6 +75,9 @@ export interface ArchNodeData extends Record<string, unknown> {
    * node component should actually check to show a "has sub-diagram"
    * indicator. */
   hasSubDiagram?: boolean;
+  /** Number of nodes in this node's sub-diagram - computed fresh by App.tsx
+   * on every render from the flat diagram store's own data. */
+  subDiagramNodeCount?: number;
   /** An explicit stacking override set with the Inspector's z-order
    * controls. Undefined means "order me automatically by area" - see
    * domain/zOrder.ts for why the automatic rule is what it is. */

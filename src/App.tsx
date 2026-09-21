@@ -126,7 +126,7 @@ import {
   unflattenToSubDiagram,
   getBreadcrumbLabelsFlat,
   levelKey,
-  populatedLevels,
+  populatedLevelCounts,
 } from './collab/diagramStore';
 import type { EdgeEndpoints } from './domain/edgeReconnect';
 import type { Milestone } from './domain/milestones';
@@ -208,6 +208,7 @@ const derivedNodes = new WeakMap<
     measured: Node['measured'];
     selected: boolean;
     hasSub: boolean;
+    subCount: number;
     out: Node<ArchNodeData>;
   }
 >();
@@ -221,7 +222,10 @@ const derivedEdges = new WeakMap<
  * object - does not also give it new `data`. Memoised node components compare
  * `data` by identity, so this is what lets them skip those renders.
  */
-const derivedNodeData = new WeakMap<Node<ArchNodeData>, { hasSub: boolean; data: ArchNodeData }>();
+const derivedNodeData = new WeakMap<
+  Node<ArchNodeData>,
+  { hasSub: boolean; subCount: number; data: ArchNodeData }
+>();
 
 let idSeed = 0;
 const nextId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${idSeed++}`;
@@ -1509,7 +1513,10 @@ function App() {
     [activeSession, presencePeers, path],
   );
 
-  const subDiagramLevels = useMemo(() => populatedLevels(diagramSnapshot.nodes), [diagramSnapshot]);
+  const subDiagramLevelCounts = useMemo(
+    () => populatedLevelCounts(diagramSnapshot.nodes),
+    [diagramSnapshot],
+  );
   const { nodes, edges } = useMemo(() => {
     const rawNodes = reorderWithGroupsFirst(getNodesAtPath(diagramSnapshot.nodes, path));
     const rawEdges = getEdgesAtPath(diagramSnapshot.edges, path);
@@ -1548,7 +1555,8 @@ function App() {
         // never sent over the session - see isAutoSizedNodeType.
         const measured = measuredDimensions.get(n.id) ?? n.measured;
         const selected = selectedNodes.has(n.id);
-        const hasSub = subDiagramLevels.has(levelKey([...path, n.id]));
+        const subCount = subDiagramLevelCounts.get(levelKey([...path, n.id])) ?? 0;
+        const hasSub = subCount > 0;
         // Same inputs, same object (WS1-R8): React Flow skips a node whose
         // object is identical to last time, and re-renders it otherwise.
         const hit = derivedNodes.get(n);
@@ -1558,17 +1566,22 @@ function App() {
           hit.zIndex === zIndex &&
           hit.measured === measured &&
           hit.selected === selected &&
-          hit.hasSub === hasSub
+          hit.hasSub === hasSub &&
+          hit.subCount === subCount
         ) {
           out = hit.out;
         } else {
           let dataHit = derivedNodeData.get(n);
-          if (!dataHit || dataHit.hasSub !== hasSub) {
-            dataHit = { hasSub, data: { ...n.data, hasSubDiagram: hasSub } };
+          if (!dataHit || dataHit.hasSub !== hasSub || dataHit.subCount !== subCount) {
+            dataHit = {
+              hasSub,
+              subCount,
+              data: { ...n.data, hasSubDiagram: hasSub, subDiagramNodeCount: subCount },
+            };
             derivedNodeData.set(n, dataHit);
           }
           out = { ...n, zIndex, measured, selected, data: dataHit.data };
-          derivedNodes.set(n, { zIndex, measured, selected, hasSub, out });
+          derivedNodes.set(n, { zIndex, measured, selected, hasSub, subCount, out });
         }
         // In-flight geometry over the document's (WS4-R1, WS4-R3): this
         // user's own gesture first, since they are the one holding the node.
@@ -1601,7 +1614,7 @@ function App() {
     };
   }, [
     diagramSnapshot,
-    subDiagramLevels,
+    subDiagramLevelCounts,
     path,
     selectedNodeIds,
     selectedEdgeIds,

@@ -311,6 +311,25 @@ export function populatedLevels(nodes: Node<ArchNodeData>[]): Set<string> {
   return levels;
 }
 
+/**
+ * Node count per level, keyed by levelKey string - so the number of nodes
+ * in node X's sub-diagram at `path` is
+ * `counts.get(levelKey([...path, X])) ?? 0`.
+ *
+ * Built once per snapshot, running in O(nodes) time.
+ */
+export function populatedLevelCounts(nodes: Node<ArchNodeData>[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const n of nodes) {
+    const parentPath = (n.data as ArchNodeData & { parentPath?: string[] }).parentPath ?? [];
+    if (parentPath.length > 0) {
+      const key = levelKey(parentPath);
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+  }
+  return counts;
+}
+
 /** Flattens a recursive SubDiagram tree - root plus every nested
  * sub-diagram, at any depth - into the flat, parentPath-tagged shape
  * this whole module works with. Originally written inline inside

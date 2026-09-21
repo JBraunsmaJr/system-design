@@ -13,6 +13,9 @@ import {
   getNodesAtPath,
   getEdgesAtPath,
   hasSubDiagram,
+  populatedLevels,
+  populatedLevelCounts,
+  levelKey,
   flattenSubDiagramTree,
   unflattenToSubDiagram,
 } from './diagramStore';
@@ -293,6 +296,25 @@ function canonicalJSON(value: unknown): string {
   assert(
     hasSubDiagram(nodes, [], populatedNode),
     "a node with at least one child correctly reports having a sub-diagram - matching the real app's own existing findLinkedNodes definition exactly, not a separate invented flag",
+  );
+
+  const levels = populatedLevels(nodes);
+  const counts = populatedLevelCounts(nodes);
+  assert(
+    !levels.has(levelKey([emptyNode])),
+    'populatedLevels does not contain empty node path',
+  );
+  assert(
+    levels.has(levelKey([populatedNode])),
+    'populatedLevels contains populated node path',
+  );
+  assert(
+    counts.get(levelKey([emptyNode])) === undefined,
+    'populatedLevelCounts has undefined/0 for empty node path',
+  );
+  assert(
+    counts.get(levelKey([populatedNode])) === 1,
+    'populatedLevelCounts has 1 child node count for populated node path',
   );
 }
 
