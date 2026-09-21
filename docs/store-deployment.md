@@ -18,7 +18,7 @@ A complete example — editor, relay, store, PostgreSQL and Keycloak — is in
 ```bash
 cd docker/store
 # Generate the recovery key pair using the store container image (or npx tsx ../../scripts/generate-recovery-key.ts):
-docker run --rm -v $(pwd):/keys ghcr.io/jbraunsmajr/system-design-store:latest generate-recovery-key --out /keys/recovery
+docker run --rm -u $(id -u):$(id -g) -v ./keys:/keys ghcr.io/jbraunsmajr/system-design-store:latest generate-recovery-key --out /keys/recovery
 docker compose -f compose.yaml up --build
 ```
 

@@ -89,7 +89,7 @@ services:
       # immediate | a duration (7d, 6m, 7y) | indefinite. Default 30d.
       RETENTION_PERIOD: 30d
       # The organization's recovery PUBLIC key. Generate the pair with
-      # `docker run --rm -v $(pwd):/keys ghcr.io/jbraunsmajr/system-design-store:latest generate-recovery-key --out /keys/recovery`
+      # `docker run --rm -u $(id -u):$(id -g) -v ./keys:/keys ghcr.io/jbraunsmajr/system-design-store:latest generate-recovery-key --out /keys/recovery`
       # (or scripts/generate-recovery-key.ts) and keep the private half offline;
       # without this the store refuses every document (WS7-R4).
       RECOVERY_PUBLIC_KEY_FILE: /run/secrets/recovery-public.pem
