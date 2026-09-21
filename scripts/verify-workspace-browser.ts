@@ -73,6 +73,8 @@ async function startStore(appOrigin: string, cryptoMode: 'webcrypto' | 'passthro
     origin,
     blobs,
     service: store,
+    /** So a test can sign a different person in. */
+    idp,
     async stop() {
       await new Promise<void>((resolve) => server.close(() => resolve()));
       await idp.close();
@@ -424,6 +426,50 @@ async function run() {
         );
       const peerName = ((await first.textContent('.collab-panel__peer-name')) ?? '').trim();
       check(named, `and names the other person as their sign-in does (${peerName})`);
+    }
+
+    console.log('\n=== Someone else asks, and is let in from the editor (WS7-R8) ===');
+    {
+      // A different person, not another browser of the first one.
+      store!.idp.setSubject('person-2', 'Second Person');
+      const newcomer = await openBrowser(store!.origin);
+      await openManager(newcomer);
+      await signIn(newcomer);
+      await openManager(newcomer);
+      await newcomer.waitForSelector('.workspace-panel__awaiting-access', { timeout: 20000 });
+      check(true, 'the newcomer is told they are waiting to be let in');
+
+      // The first person is working, with no dialog open. The request has
+      // to reach them where they are.
+      await closeManager(first);
+      const noticed = await first
+        .waitForFunction(
+          () =>
+            document.querySelector('.access-request')?.textContent?.includes('Second Person') ??
+            false,
+          null,
+          { timeout: 30000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        );
+      check(noticed, 'the person who can let them in sees the request over the document, by name');
+
+      await first.click('.access-request__grant');
+      await first.waitForSelector('.access-request', { state: 'detached', timeout: 20000 });
+      check(true, 'giving access from the notice clears it');
+
+      await newcomer.click('.workspace-panel__recheck');
+      await newcomer.waitForSelector('.workspace-panel__entry', { timeout: 20000 });
+      check(
+        (await newcomer.textContent('.workspace-panel__title'))?.startsWith(
+          'Shared architecture',
+        ) ?? false,
+        'and the newcomer can now see the workspace',
+      );
+      await closeManager(newcomer);
+      store!.idp.setSubject('person-1', 'Test User');
     }
 
     console.log('\n=== Losing a browser: revoke, then rotate (WS7-R7, R14) ===');

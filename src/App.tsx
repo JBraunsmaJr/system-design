@@ -84,6 +84,8 @@ import { WorkspacePanel } from './components/WorkspacePanel';
 import { getStoreUrl } from './domain/storeConfig';
 import { useWorkspaceSync } from './collab/useWorkspaceSync';
 import { useStoreIdentity } from './collab/useStoreIdentity';
+import { useAccessRequests } from './collab/useAccessRequests';
+import { AccessRequestNotice } from './components/AccessRequestNotice';
 import { authorizeRelayUrls } from './collab/relayAccess';
 import {
   acquireDocument,
@@ -443,6 +445,9 @@ function App() {
    * appear as the last one.
    */
   const storeIdentity = useStoreIdentity(storeUrl);
+  /** People waiting to be let into the workspace, noticed from here rather
+   * than only from inside File > Documents (WS7-R8). */
+  const accessRequests = useAccessRequests({ storeUrl });
   const signedInName = storeIdentity?.displayName?.trim() || null;
   const presenceName = nameChosen ? displayName : (signedInName ?? displayName);
 
@@ -3173,7 +3178,20 @@ function App() {
                 </button>
               </div>
             )}
-            <div className="app__canvas-column">
+            <div className="app__canvas-column" style={{ position: 'relative' }}>
+              {/* Someone waiting to be let in, shown where the person who
+                  can let them in is working (WS7-R8). */}
+              <AccessRequestNotice
+                requests={accessRequests.requests}
+                granting={accessRequests.granting}
+                onGrant={(userId) => {
+                  void accessRequests.grant(userId).then(
+                    () =>
+                      showToast('Access given. They will see the workspace within a few seconds.'),
+                    () => showToast('Could not give access. Try again from File > Documents.'),
+                  );
+                }}
+              />
               <ReactFlowProvider>
                 {isPerfInstrumentationActive() ? (
                   <Profiler id="CanvasProfiler" onRender={onCanvasProfilerRender}>
