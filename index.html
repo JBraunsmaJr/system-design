@@ -2,6 +2,22 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      (function () {
+        var path = window.location.pathname;
+        if (
+          path === '/system-design/docs' ||
+          path === '/system-design/docs/' ||
+          path === '/docs' ||
+          path === '/docs/' ||
+          path.endsWith('/docs') ||
+          path.endsWith('/docs/')
+        ) {
+          var target = path.replace(/\/docs\/?$/, '/docs/index.html');
+          window.location.replace(target + window.location.search + window.location.hash);
+        }
+      })();
+    </script>
     <link rel="icon" type="image/svg+xml" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>System Design Editor</title>

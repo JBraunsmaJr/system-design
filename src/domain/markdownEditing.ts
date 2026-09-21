@@ -48,9 +48,12 @@ export function matchListLine(line: string): ListMatch | null {
 /** Finds the boundaries of the line containing `caretPos` within `text` -
  * shared by getListEnterBehavior and the Tab-to-indent handler, which both
  * need to isolate "the current line" before doing anything else with it. */
-export function getCurrentLineBounds(text: string, caretPos: number): { lineStart: number; lineEnd: number; line: string } {
-  const lineStart = text.lastIndexOf("\n", caretPos - 1) + 1;
-  const lineEndSearch = text.indexOf("\n", caretPos);
+export function getCurrentLineBounds(
+  text: string,
+  caretPos: number,
+): { lineStart: number; lineEnd: number; line: string } {
+  const lineStart = text.lastIndexOf('\n', caretPos - 1) + 1;
+  const lineEndSearch = text.indexOf('\n', caretPos);
   const lineEnd = lineEndSearch === -1 ? text.length : lineEndSearch;
   return { lineStart, lineEnd, line: text.slice(lineStart, lineEnd) };
 }
@@ -84,7 +87,7 @@ export function getListEnterBehavior(text: string, caretPos: number): EnterResul
   const match = matchListLine(line);
   if (!match) return null;
 
-  if (match.content.trim() === "") {
+  if (match.content.trim() === '') {
     return { insertText: match.indent, replaceCurrentLine: true, lineStart, lineEnd };
   }
 
@@ -97,7 +100,7 @@ export function getListEnterBehavior(text: string, caretPos: number): EnterResul
   return { insertText: `\n${nextMarker}`, lineStart, lineEnd };
 }
 
-const INDENT_UNIT = "  ";
+const INDENT_UNIT = '  ';
 
 export interface IndentResult {
   /** The full replacement text for the current line. */
@@ -152,7 +155,7 @@ export function wrapSelection(
   selEnd: number,
   before: string,
   after: string,
-  placeholder: string
+  placeholder: string,
 ): { newText: string; newSelStart: number; newSelEnd: number } {
   const selected = text.slice(selStart, selEnd);
   const leading = /^\s*/.exec(selected)![0];
@@ -175,9 +178,9 @@ export function wrapSelection(
 export function insertLinePrefix(
   text: string,
   caretPos: number,
-  prefix: string
+  prefix: string,
 ): { newText: string; newCaretPos: number } {
-  const lineStart = text.lastIndexOf("\n", caretPos - 1) + 1;
+  const lineStart = text.lastIndexOf('\n', caretPos - 1) + 1;
   const newText = text.slice(0, lineStart) + prefix + text.slice(lineStart);
   return { newText, newCaretPos: caretPos + prefix.length };
 }
@@ -187,9 +190,12 @@ export function insertLinePrefix(
  * line (avoiding a redundant blank line in the common case of inserting
  * right after an existing paragraph). Caret lands in the first header
  * cell, ready to type over "Column 1". */
-export function insertTableSkeleton(text: string, caretPos: number): { newText: string; newCaretPos: number } {
-  const needsLeadingNewline = caretPos > 0 && text[caretPos - 1] !== "\n";
-  const table = `${needsLeadingNewline ? "\n" : ""}| Column 1 | Column 2 |\n| --- | --- |\n|  |  |\n`;
+export function insertTableSkeleton(
+  text: string,
+  caretPos: number,
+): { newText: string; newCaretPos: number } {
+  const needsLeadingNewline = caretPos > 0 && text[caretPos - 1] !== '\n';
+  const table = `${needsLeadingNewline ? '\n' : ''}| Column 1 | Column 2 |\n| --- | --- |\n|  |  |\n`;
   const newText = text.slice(0, caretPos) + table + text.slice(caretPos);
   const firstCellOffset = (needsLeadingNewline ? 1 : 0) + 2;
   return { newText, newCaretPos: caretPos + firstCellOffset };

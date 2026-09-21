@@ -1,5 +1,11 @@
-import type { TeamDocument, TeamMember, PtoSpan, ExtraDayOff, TeamSettings } from "../domain/teamTypes";
-import { EMPTY_TEAM_DOCUMENT } from "../domain/teamTypes";
+import type {
+  TeamDocument,
+  TeamMember,
+  PtoSpan,
+  ExtraDayOff,
+  TeamSettings,
+} from '../domain/teamTypes';
+import { EMPTY_TEAM_DOCUMENT } from '../domain/teamTypes';
 
 /**
  * TeamStore is the seam between "how the team document is stored" and
@@ -52,7 +58,7 @@ export interface TeamStore {
   subscribe(listener: () => void): () => void;
 
   addMember(member: TeamMember): void;
-  updateMember(memberId: string, patch: Partial<Omit<TeamMember, "id" | "ptoSpans">>): void;
+  updateMember(memberId: string, patch: Partial<Omit<TeamMember, 'id' | 'ptoSpans'>>): void;
   deleteMember(memberId: string): void;
 
   addPtoSpan(memberId: string, span: PtoSpan): void;
@@ -65,7 +71,9 @@ export interface TeamStore {
    * add/delete operations above precisely because two different paths
    * that could both touch the same array is a footgun, especially once
    * a Yjs-backed implementation is involved. */
-  updateSettings(patch: Partial<Pick<TeamSettings, "defaultPointsPerDay" | "excludeUsHolidays">>): void;
+  updateSettings(
+    patch: Partial<Pick<TeamSettings, 'defaultPointsPerDay' | 'excludeUsHolidays'>>,
+  ): void;
 }
 
 export function createLocalTeamStore(initial: TeamDocument = EMPTY_TEAM_DOCUMENT): TeamStore {
@@ -108,7 +116,9 @@ export function createLocalTeamStore(initial: TeamDocument = EMPTY_TEAM_DOCUMENT
     addPtoSpan: (memberId, span) => {
       doc = {
         ...doc,
-        members: doc.members.map((m) => (m.id === memberId ? { ...m, ptoSpans: [...m.ptoSpans, span] } : m)),
+        members: doc.members.map((m) =>
+          m.id === memberId ? { ...m, ptoSpans: [...m.ptoSpans, span] } : m,
+        ),
       };
       notify();
     },
@@ -117,21 +127,27 @@ export function createLocalTeamStore(initial: TeamDocument = EMPTY_TEAM_DOCUMENT
       doc = {
         ...doc,
         members: doc.members.map((m) =>
-          m.id === memberId ? { ...m, ptoSpans: m.ptoSpans.filter((p) => p.id !== ptoId) } : m
+          m.id === memberId ? { ...m, ptoSpans: m.ptoSpans.filter((p) => p.id !== ptoId) } : m,
         ),
       };
       notify();
     },
 
     addExtraDayOff: (extra) => {
-      doc = { ...doc, settings: { ...doc.settings, extraDaysOff: [...doc.settings.extraDaysOff, extra] } };
+      doc = {
+        ...doc,
+        settings: { ...doc.settings, extraDaysOff: [...doc.settings.extraDaysOff, extra] },
+      };
       notify();
     },
 
     deleteExtraDayOff: (extraId) => {
       doc = {
         ...doc,
-        settings: { ...doc.settings, extraDaysOff: doc.settings.extraDaysOff.filter((e) => e.id !== extraId) },
+        settings: {
+          ...doc.settings,
+          extraDaysOff: doc.settings.extraDaysOff.filter((e) => e.id !== extraId),
+        },
       };
       notify();
     },
@@ -178,7 +194,7 @@ export function createLocalTeamStore(initial: TeamDocument = EMPTY_TEAM_DOCUMENT
  */
 export function createAdapterTeamStore(
   getSnapshot: () => TeamDocument,
-  setSnapshot: (updater: (prev: TeamDocument) => TeamDocument) => void
+  setSnapshot: (updater: (prev: TeamDocument) => TeamDocument) => void,
 ): TeamStore {
   return {
     getSnapshot,
@@ -206,7 +222,9 @@ export function createAdapterTeamStore(
     addPtoSpan: (memberId, span) => {
       setSnapshot((prev) => ({
         ...prev,
-        members: prev.members.map((m) => (m.id === memberId ? { ...m, ptoSpans: [...m.ptoSpans, span] } : m)),
+        members: prev.members.map((m) =>
+          m.id === memberId ? { ...m, ptoSpans: [...m.ptoSpans, span] } : m,
+        ),
       }));
     },
 
@@ -214,7 +232,7 @@ export function createAdapterTeamStore(
       setSnapshot((prev) => ({
         ...prev,
         members: prev.members.map((m) =>
-          m.id === memberId ? { ...m, ptoSpans: m.ptoSpans.filter((p) => p.id !== ptoId) } : m
+          m.id === memberId ? { ...m, ptoSpans: m.ptoSpans.filter((p) => p.id !== ptoId) } : m,
         ),
       }));
     },
@@ -229,7 +247,10 @@ export function createAdapterTeamStore(
     deleteExtraDayOff: (extraId) => {
       setSnapshot((prev) => ({
         ...prev,
-        settings: { ...prev.settings, extraDaysOff: prev.settings.extraDaysOff.filter((e) => e.id !== extraId) },
+        settings: {
+          ...prev.settings,
+          extraDaysOff: prev.settings.extraDaysOff.filter((e) => e.id !== extraId),
+        },
       }));
     },
 
@@ -258,9 +279,7 @@ export function seedTeamStore(store: TeamStore, initial: TeamDocument): void {
   // duplicate of every member.
   const current = store.getSnapshot();
   const existingMembers = new Set(current.members.map((m) => m.id));
-  const existingExtras = new Set(
-    current.settings.extraDaysOff.map((e) => e.id),
-  );
+  const existingExtras = new Set(current.settings.extraDaysOff.map((e) => e.id));
 
   for (const member of initial.members) {
     if (existingMembers.has(member.id)) continue;

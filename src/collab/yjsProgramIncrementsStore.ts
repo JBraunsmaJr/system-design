@@ -1,8 +1,12 @@
-import * as Y from "yjs";
-import { orderIdSet, pushIfAbsent } from "./seedGuards.ts";
-import type { ProgramIncrement, Sprint, CapacityReservation } from "../domain/programIncrements";
-import { updateSprintEndDate, getNextPIStartDate, DEFAULT_SPRINT_DURATION_DAYS } from "../domain/programIncrements";
-import type { ProgramIncrementsStore } from "./programIncrementsStore";
+import * as Y from 'yjs';
+import { orderIdSet, pushIfAbsent } from './seedGuards.ts';
+import type { ProgramIncrement, Sprint, CapacityReservation } from '../domain/programIncrements';
+import {
+  updateSprintEndDate,
+  getNextPIStartDate,
+  DEFAULT_SPRINT_DURATION_DAYS,
+} from '../domain/programIncrements';
+import type { ProgramIncrementsStore } from './programIncrementsStore';
 
 /** PI and sprint ids are purely internal (never displayed - see
  * programIncrementsStore.ts's doc comment), so there's no reason not to
@@ -14,7 +18,6 @@ import type { ProgramIncrementsStore } from "./programIncrementsStore";
 function collisionResistantId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
-
 
 /**
  * Populates a Y.Doc directly from an existing, already-populated
@@ -33,8 +36,8 @@ function collisionResistantId(prefix: string): string {
  * be used directly as the Y.Map key with no split needed.
  */
 export function seedYjsProgramIncrementsDoc(doc: Y.Doc, initial: ProgramIncrement[]): void {
-  const piOrder = doc.getArray<string>("piOrder");
-  const pis = doc.getMap<Y.Map<unknown>>("pis");
+  const piOrder = doc.getArray<string>('piOrder');
+  const pis = doc.getMap<Y.Map<unknown>>('pis');
   const seen = orderIdSet(piOrder);
 
   doc.transact(() => {
@@ -44,8 +47,8 @@ export function seedYjsProgramIncrementsDoc(doc: Y.Doc, initial: ProgramIncremen
       const sprintOrderArr = new Y.Array<string>();
       for (const sprint of pi.sprints) {
         const sprintM = new Y.Map<unknown>();
-        sprintM.set("name", sprint.name);
-        sprintM.set("durationDays", sprint.durationDays);
+        sprintM.set('name', sprint.name);
+        sprintM.set('durationDays', sprint.durationDays);
         sprintsMap.set(sprint.id, sprintM);
         sprintOrderArr.push([sprint.id]);
       }
@@ -56,11 +59,11 @@ export function seedYjsProgramIncrementsDoc(doc: Y.Doc, initial: ProgramIncremen
       }
 
       const piM = new Y.Map<unknown>();
-      piM.set("name", pi.name);
-      piM.set("startDate", pi.startDate);
-      piM.set("sprintOrder", sprintOrderArr);
-      piM.set("sprints", sprintsMap);
-      piM.set("reservations", reservationsMap);
+      piM.set('name', pi.name);
+      piM.set('startDate', pi.startDate);
+      piM.set('sprintOrder', sprintOrderArr);
+      piM.set('sprints', sprintsMap);
+      piM.set('reservations', reservationsMap);
 
       pis.set(pi.id, piM);
       pushIfAbsent(piOrder, seen, pi.id);
@@ -94,21 +97,21 @@ export function seedYjsProgramIncrementsDoc(doc: Y.Doc, initial: ProgramIncremen
  *        requirements' categories/relationshipTypes.
  */
 export function createYjsProgramIncrementsStore(doc: Y.Doc): ProgramIncrementsStore {
-  const piOrder = doc.getArray<string>("piOrder");
-  const pis = doc.getMap<Y.Map<unknown>>("pis");
+  const piOrder = doc.getArray<string>('piOrder');
+  const pis = doc.getMap<Y.Map<unknown>>('pis');
 
   function sprintMapToPlain(id: string, m: Y.Map<unknown>): Sprint {
-    return { id, name: m.get("name") as string, durationDays: m.get("durationDays") as number };
+    return { id, name: m.get('name') as string, durationDays: m.get('durationDays') as number };
   }
 
   function piMapToPlain(id: string, m: Y.Map<unknown>): ProgramIncrement {
-    const sprintOrder = m.get("sprintOrder") as Y.Array<string>;
-    const sprints = m.get("sprints") as Y.Map<Y.Map<unknown>>;
-    const reservations = m.get("reservations") as Y.Map<CapacityReservation>;
+    const sprintOrder = m.get('sprintOrder') as Y.Array<string>;
+    const sprints = m.get('sprints') as Y.Map<Y.Map<unknown>>;
+    const reservations = m.get('reservations') as Y.Map<CapacityReservation>;
     return {
       id,
-      name: m.get("name") as string,
-      startDate: m.get("startDate") as string,
+      name: m.get('name') as string,
+      startDate: m.get('startDate') as string,
       sprints: sprintOrder
         .toArray()
         .map((sid) => {
@@ -163,24 +166,24 @@ export function createYjsProgramIncrementsStore(doc: Y.Doc): ProgramIncrementsSt
     },
 
     addPI: () => {
-      const piId = collisionResistantId("pi");
-      const sprintId = collisionResistantId("sprint");
+      const piId = collisionResistantId('pi');
+      const sprintId = collisionResistantId('sprint');
       const nextStart = getNextPIStartDate(cached);
       doc.transact(() => {
         const sprintM = new Y.Map<unknown>();
-        sprintM.set("name", "Sprint 1");
-        sprintM.set("durationDays", DEFAULT_SPRINT_DURATION_DAYS);
+        sprintM.set('name', 'Sprint 1');
+        sprintM.set('durationDays', DEFAULT_SPRINT_DURATION_DAYS);
         const sprintsMap = new Y.Map<Y.Map<unknown>>();
         sprintsMap.set(sprintId, sprintM);
         const sprintOrderArr = new Y.Array<string>();
         sprintOrderArr.push([sprintId]);
 
         const piM = new Y.Map<unknown>();
-        piM.set("name", `PI ${piOrder.length + 1}`);
-        piM.set("startDate", nextStart);
-        piM.set("sprintOrder", sprintOrderArr);
-        piM.set("sprints", sprintsMap);
-        piM.set("reservations", new Y.Map<CapacityReservation>());
+        piM.set('name', `PI ${piOrder.length + 1}`);
+        piM.set('startDate', nextStart);
+        piM.set('sprintOrder', sprintOrderArr);
+        piM.set('sprints', sprintsMap);
+        piM.set('reservations', new Y.Map<CapacityReservation>());
 
         pis.set(piId, piM);
         piOrder.push([piId]);
@@ -190,12 +193,12 @@ export function createYjsProgramIncrementsStore(doc: Y.Doc): ProgramIncrementsSt
 
     updatePIName: (piId, name) => {
       const m = getPIMap(piId);
-      if (m) m.set("name", name);
+      if (m) m.set('name', name);
     },
 
     updatePIStart: (piId, startDate) => {
       const m = getPIMap(piId);
-      if (m) m.set("startDate", startDate);
+      if (m) m.set('startDate', startDate);
     },
 
     deletePI: (piId) => {
@@ -209,13 +212,13 @@ export function createYjsProgramIncrementsStore(doc: Y.Doc): ProgramIncrementsSt
     addSprint: (piId) => {
       const m = getPIMap(piId);
       if (!m) return;
-      const sprintOrder = m.get("sprintOrder") as Y.Array<string>;
-      const sprints = m.get("sprints") as Y.Map<Y.Map<unknown>>;
-      const sprintId = collisionResistantId("sprint");
+      const sprintOrder = m.get('sprintOrder') as Y.Array<string>;
+      const sprints = m.get('sprints') as Y.Map<Y.Map<unknown>>;
+      const sprintId = collisionResistantId('sprint');
       doc.transact(() => {
         const sprintM = new Y.Map<unknown>();
-        sprintM.set("name", `Sprint ${sprintOrder.length + 1}`);
-        sprintM.set("durationDays", DEFAULT_SPRINT_DURATION_DAYS);
+        sprintM.set('name', `Sprint ${sprintOrder.length + 1}`);
+        sprintM.set('durationDays', DEFAULT_SPRINT_DURATION_DAYS);
         sprints.set(sprintId, sprintM);
         sprintOrder.push([sprintId]);
       });
@@ -223,9 +226,9 @@ export function createYjsProgramIncrementsStore(doc: Y.Doc): ProgramIncrementsSt
 
     updateSprintName: (piId, sprintId, name) => {
       const piM = getPIMap(piId);
-      const sprints = piM?.get("sprints") as Y.Map<Y.Map<unknown>> | undefined;
+      const sprints = piM?.get('sprints') as Y.Map<Y.Map<unknown>> | undefined;
       const sprintM = sprints?.get(sprintId);
-      if (sprintM) sprintM.set("name", name);
+      if (sprintM) sprintM.set('name', name);
     },
 
     // Reuses the exact same pure helper the local store and the rest of
@@ -242,16 +245,16 @@ export function createYjsProgramIncrementsStore(doc: Y.Doc): ProgramIncrementsSt
       const updatedSprint = updated.sprints.find((s) => s.id === sprintId);
       if (!updatedSprint) return;
       const piM = getPIMap(piId);
-      const sprints = piM?.get("sprints") as Y.Map<Y.Map<unknown>> | undefined;
+      const sprints = piM?.get('sprints') as Y.Map<Y.Map<unknown>> | undefined;
       const sprintM = sprints?.get(sprintId);
-      if (sprintM) sprintM.set("durationDays", updatedSprint.durationDays);
+      if (sprintM) sprintM.set('durationDays', updatedSprint.durationDays);
     },
 
     deleteSprint: (piId, sprintId) => {
       const piM = getPIMap(piId);
       if (!piM) return;
-      const sprintOrder = piM.get("sprintOrder") as Y.Array<string>;
-      const sprints = piM.get("sprints") as Y.Map<Y.Map<unknown>>;
+      const sprintOrder = piM.get('sprintOrder') as Y.Array<string>;
+      const sprints = piM.get('sprints') as Y.Map<Y.Map<unknown>>;
       doc.transact(() => {
         sprints.delete(sprintId);
         const idx = sprintOrder.toArray().indexOf(sprintId);
@@ -262,10 +265,10 @@ export function createYjsProgramIncrementsStore(doc: Y.Doc): ProgramIncrementsSt
     moveSprint: (piId, sprintId, direction) => {
       const piM = getPIMap(piId);
       if (!piM) return;
-      const sprintOrder = piM.get("sprintOrder") as Y.Array<string>;
+      const sprintOrder = piM.get('sprintOrder') as Y.Array<string>;
       const arr = sprintOrder.toArray();
       const index = arr.indexOf(sprintId);
-      const swapWith = direction === "up" ? index - 1 : index + 1;
+      const swapWith = direction === 'up' ? index - 1 : index + 1;
       if (index === -1 || swapWith < 0 || swapWith >= arr.length) return;
       doc.transact(() => {
         // Y.Array has no in-place swap - remove both affected entries
@@ -284,15 +287,15 @@ export function createYjsProgramIncrementsStore(doc: Y.Doc): ProgramIncrementsSt
     addReservation: (piId, reservation) => {
       const piM = getPIMap(piId);
       if (!piM) return;
-      const reservations = piM.get("reservations") as Y.Map<CapacityReservation>;
-      const id = collisionResistantId("cres");
+      const reservations = piM.get('reservations') as Y.Map<CapacityReservation>;
+      const id = collisionResistantId('cres');
       reservations.set(id, { ...reservation, id });
     },
 
     updateReservation: (piId, reservationId, patch) => {
       const piM = getPIMap(piId);
       if (!piM) return;
-      const reservations = piM.get("reservations") as Y.Map<CapacityReservation>;
+      const reservations = piM.get('reservations') as Y.Map<CapacityReservation>;
       if (!reservations.has(reservationId)) return;
       reservations.set(reservationId, { ...patch, id: reservationId });
     },
@@ -300,7 +303,7 @@ export function createYjsProgramIncrementsStore(doc: Y.Doc): ProgramIncrementsSt
     deleteReservation: (piId, reservationId) => {
       const piM = getPIMap(piId);
       if (!piM) return;
-      const reservations = piM.get("reservations") as Y.Map<CapacityReservation>;
+      const reservations = piM.get('reservations') as Y.Map<CapacityReservation>;
       reservations.delete(reservationId);
     },
   };

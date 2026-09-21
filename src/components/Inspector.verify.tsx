@@ -1,11 +1,11 @@
 /**
  * Run with: npx tsx --tsconfig tsconfig.app.json src/components/Inspector.verify.tsx
  */
-import { renderToStaticMarkup } from "react-dom/server";
-import { Inspector } from "./Inspector";
-import type { Edge } from "@xyflow/react";
-import type { ArchEdgeData } from "../domain/types";
-import { EMPTY_REQUIREMENTS_DOCUMENT } from "../domain/requirementsTypes";
+import { renderToStaticMarkup } from 'react-dom/server';
+import { Inspector } from './Inspector';
+import type { Edge } from '@xyflow/react';
+import type { ArchEdgeData } from '../domain/types';
+import { EMPTY_REQUIREMENTS_DOCUMENT } from '../domain/requirementsTypes';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {
@@ -20,13 +20,13 @@ function assert(condition: boolean, message: string) {
 // 1. Inspector with selected edge having no waypoints
 {
   const edge: Edge<ArchEdgeData> = {
-    id: "e1",
-    source: "n1",
-    target: "n2",
+    id: 'e1',
+    source: 'n1',
+    target: 'n2',
     data: {
-      edgeType: "generic",
-      label: "My Edge",
-      direction: "forward",
+      edgeType: 'generic',
+      label: 'My Edge',
+      direction: 'forward',
       properties: {},
     },
   };
@@ -45,30 +45,31 @@ function assert(condition: boolean, message: string) {
       requirements={EMPTY_REQUIREMENTS_DOCUMENT}
       onNavigateToRequirement={() => {}}
       onZOrderCommand={() => {}}
-    />
+    />,
   );
 
   assert(
-    html.includes('<div class="panel-header">Edge</div>') || html.includes('<div class="panel-header">Inspector</div>'),
-    "Renders Edge panel header"
+    html.includes('<div class="panel-header">Edge</div>') ||
+      html.includes('<div class="panel-header">Inspector</div>'),
+    'Renders Edge panel header',
   );
-  assert(!html.includes("Bends / Waypoints"), "Does not render waypoint section when no waypoints");
+  assert(!html.includes('Bends / Waypoints'), 'Does not render waypoint section when no waypoints');
 }
 
 // 2. Inspector with selected edge having waypoints renders list and individual remove buttons
 {
   const edgeWithWaypoints: Edge<ArchEdgeData> = {
-    id: "e2",
-    source: "n1",
-    target: "n2",
+    id: 'e2',
+    source: 'n1',
+    target: 'n2',
     data: {
-      edgeType: "generic",
-      label: "Connected",
-      direction: "forward",
+      edgeType: 'generic',
+      label: 'Connected',
+      direction: 'forward',
       properties: {},
       waypoints: [
-        { id: "wp-1", x: 120, y: 250 },
-        { id: "wp-2", x: 340, y: 250 },
+        { id: 'wp-1', x: 120, y: 250 },
+        { id: 'wp-2', x: 340, y: 250 },
       ],
     },
   };
@@ -87,18 +88,24 @@ function assert(condition: boolean, message: string) {
       requirements={EMPTY_REQUIREMENTS_DOCUMENT}
       onNavigateToRequirement={() => {}}
       onZOrderCommand={() => {}}
-    />
+    />,
   );
 
-  assert(html.includes("Bends / Waypoints (2)"), "Renders waypoints header with count");
-  assert(html.includes("Bend 1"), "Renders Bend 1 label");
-  assert(html.includes("(120, 250)"), "Renders Bend 1 coordinates");
-  assert(html.includes("Bend 2"), "Renders Bend 2 label");
-  assert(html.includes("(340, 250)"), "Renders Bend 2 coordinates");
-  assert(html.includes('aria-label="Remove Bend 1"'), "Renders accessible remove button for Bend 1");
-  assert(html.includes('aria-label="Remove Bend 2"'), "Renders accessible remove button for Bend 2");
-  assert(html.includes("Straighten edge (remove all bends)"), "Renders straighten edge button");
+  assert(html.includes('Bends / Waypoints (2)'), 'Renders waypoints header with count');
+  assert(html.includes('Bend 1'), 'Renders Bend 1 label');
+  assert(html.includes('(120, 250)'), 'Renders Bend 1 coordinates');
+  assert(html.includes('Bend 2'), 'Renders Bend 2 label');
+  assert(html.includes('(340, 250)'), 'Renders Bend 2 coordinates');
+  assert(
+    html.includes('aria-label="Remove Bend 1"'),
+    'Renders accessible remove button for Bend 1',
+  );
+  assert(
+    html.includes('aria-label="Remove Bend 2"'),
+    'Renders accessible remove button for Bend 2',
+  );
+  assert(html.includes('Straighten edge (remove all bends)'), 'Renders straighten edge button');
 }
 
-console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);
+console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);
 if (failures > 0) throw new Error(`${failures} test(s) failed`);

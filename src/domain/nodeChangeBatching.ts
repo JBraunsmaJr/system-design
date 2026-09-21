@@ -1,8 +1,8 @@
-import type { NodeChange, EdgeChange } from "@xyflow/react";
+import type { NodeChange, EdgeChange } from '@xyflow/react';
 
 export type PendingNodeUpdate =
-  | { type: "position"; position: { x: number; y: number } }
-  | { type: "dimensions"; width?: number; height?: number };
+  | { type: 'position'; position: { x: number; y: number } }
+  | { type: 'dimensions'; width?: number; height?: number };
 
 /**
  * Pure logic behind onNodesChange's/onEdgesChange's synchronous
@@ -27,10 +27,13 @@ export type PendingNodeUpdate =
  * `current` one at a time, in order, is the correct way to interpret a
  * batch, not an approximation of it.
  */
-export function applySelectionChanges(changes: (NodeChange | EdgeChange)[], current: string[]): string[] {
+export function applySelectionChanges(
+  changes: (NodeChange | EdgeChange)[],
+  current: string[],
+): string[] {
   let result = current;
   for (const change of changes) {
-    if (change.type !== "select") continue;
+    if (change.type !== 'select') continue;
     if (change.selected) {
       if (!result.includes(change.id)) result = [...result, change.id];
     } else if (result.includes(change.id)) {
@@ -75,7 +78,7 @@ export interface CurrentNodeGeometry {
  * wrapper, not the card - sit inside the card's visible bounds.
  */
 export function isAutoSizedNodeType(type: string | undefined): boolean {
-  return type === "typed";
+  return type === 'typed';
 }
 
 /**
@@ -121,7 +124,7 @@ export function isAutoSizedNodeType(type: string | undefined): boolean {
 export function classifyNodeChanges(
   changes: NodeChange[],
   pending: Map<string, PendingNodeUpdate>,
-  currentNodes: Map<string, CurrentNodeGeometry>
+  currentNodes: Map<string, CurrentNodeGeometry>,
 ): { isActiveGesture: boolean; gestureEnded: boolean } {
   let isActiveGesture = false;
   // Set by the release itself, even when the release lands exactly where the
@@ -129,16 +132,19 @@ export function classifyNodeChanges(
   // the gesture it ends would never be committed.
   let gestureEnded = false;
   for (const change of changes) {
-    if (change.type === "position" && change.dragging === false) gestureEnded = true;
-    if (change.type === "dimensions" && change.resizing === false) gestureEnded = true;
-    if (change.type === "position" && change.position) {
+    if (change.type === 'position' && change.dragging === false) gestureEnded = true;
+    if (change.type === 'dimensions' && change.resizing === false) gestureEnded = true;
+    if (change.type === 'position' && change.position) {
       const current = currentNodes.get(change.id);
-      const isNoOp = !!current && current.position.x === change.position.x && current.position.y === change.position.y;
+      const isNoOp =
+        !!current &&
+        current.position.x === change.position.x &&
+        current.position.y === change.position.y;
       if (!isNoOp) {
-        pending.set(change.id, { type: "position", position: change.position });
+        pending.set(change.id, { type: 'position', position: change.position });
         if (change.dragging === true) isActiveGesture = true;
       }
-    } else if (change.type === "dimensions" && change.dimensions) {
+    } else if (change.type === 'dimensions' && change.dimensions) {
       // Passive measurements from React Flow's internal ResizeObserver
       // (where `change.resizing` is undefined) must NEVER be committed
       // to the document store - they are local rendering measurements,
@@ -148,10 +154,13 @@ export function classifyNodeChanges(
       if (change.resizing === undefined) continue;
       const current = currentNodes.get(change.id);
       if (current?.isAutoSized) continue;
-      const isNoOp = !!current && current.width === change.dimensions.width && current.height === change.dimensions.height;
+      const isNoOp =
+        !!current &&
+        current.width === change.dimensions.width &&
+        current.height === change.dimensions.height;
       if (!isNoOp) {
         pending.set(change.id, {
-          type: "dimensions",
+          type: 'dimensions',
           width: change.dimensions.width,
           height: change.dimensions.height,
         });

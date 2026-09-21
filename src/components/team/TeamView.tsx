@@ -1,4 +1,4 @@
-import { useState, useMemo, useSyncExternalStore } from "react";
+import { useState, useMemo, useSyncExternalStore } from 'react';
 import {
   Users,
   UserPlus,
@@ -12,25 +12,23 @@ import {
   ChevronDown,
   ChevronUp,
   CalendarRange,
-} from "lucide-react";
-import type {
-  TeamMember,
-  PtoSpan,
-  ExtraDayOff,
-  HalfDayType,
-} from "../../domain/teamTypes";
-import type { ProgramIncrement } from "../../domain/programIncrements";
-import type { ProgramIncrementsStore } from "../../collab/programIncrementsStore";
-import type { RequirementsDocument } from "../../domain/requirementsTypes";
-import { isItemWorkable } from "../../domain/requirementsRegistry";
-import type { TeamStore } from "../../collab/teamStore";
-import { computeSprintDateRanges, getSprintActiveReservations } from "../../domain/programIncrements";
+} from 'lucide-react';
+import type { TeamMember, PtoSpan, ExtraDayOff, HalfDayType } from '../../domain/teamTypes';
+import type { ProgramIncrement } from '../../domain/programIncrements';
+import type { ProgramIncrementsStore } from '../../collab/programIncrementsStore';
+import type { RequirementsDocument } from '../../domain/requirementsTypes';
+import { isItemWorkable } from '../../domain/requirementsRegistry';
+import type { TeamStore } from '../../collab/teamStore';
+import {
+  computeSprintDateRanges,
+  getSprintActiveReservations,
+} from '../../domain/programIncrements';
 import {
   computeSprintCapacity,
   calculateTotalPtoDays,
   getUsFederalHolidays,
-} from "../../domain/teamCapacity";
-import { ManageReservationsModal } from "../timeline/ManageReservationsModal";
+} from '../../domain/teamCapacity';
+import { ManageReservationsModal } from '../timeline/ManageReservationsModal';
 
 interface TeamViewProps {
   teamStore: TeamStore;
@@ -39,16 +37,16 @@ interface TeamViewProps {
 }
 
 const AVATAR_COLORS = [
-  "#5b7cfa",
-  "#9061f9",
-  "#0fa36b",
-  "#f0578c",
-  "#f59e0b",
-  "#06b6d4",
-  "#ec4899",
-  "#8b5cf6",
-  "#10b981",
-  "#6366f1",
+  '#5b7cfa',
+  '#9061f9',
+  '#0fa36b',
+  '#f0578c',
+  '#f59e0b',
+  '#06b6d4',
+  '#ec4899',
+  '#8b5cf6',
+  '#10b981',
+  '#6366f1',
 ];
 
 function nextId(prefix: string): string {
@@ -57,35 +55,39 @@ function nextId(prefix: string): string {
 
 function todayISO(): string {
   const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 export function TeamView({ teamStore, programIncrementsStore, requirements }: TeamViewProps) {
   const team = useSyncExternalStore(teamStore.subscribe, teamStore.getSnapshot);
-  const programIncrements = useSyncExternalStore(programIncrementsStore.subscribe, programIncrementsStore.getSnapshot);
-  const [activeTab, setActiveTab] = useState<"members" | "settings" | "sprints">("members");
+  const programIncrements = useSyncExternalStore(
+    programIncrementsStore.subscribe,
+    programIncrementsStore.getSnapshot,
+  );
+  const [activeTab, setActiveTab] = useState<'members' | 'settings' | 'sprints'>('members');
   const [isAddingMember, setIsAddingMember] = useState(false);
-  const [newMemberName, setNewMemberName] = useState("");
-  const [newMemberRole, setNewMemberRole] = useState("");
+  const [newMemberName, setNewMemberName] = useState('');
+  const [newMemberRole, setNewMemberRole] = useState('');
   const [newMemberColor, setNewMemberColor] = useState(AVATAR_COLORS[0]);
-  const [newMemberPointsPerDay, setNewMemberPointsPerDay] = useState<string>("");
+  const [newMemberPointsPerDay, setNewMemberPointsPerDay] = useState<string>('');
   const [managingReservationsPIId, setManagingReservationsPIId] = useState<string | null>(null);
-  const managingReservationsPI = programIncrements.find((pi) => pi.id === managingReservationsPIId) ?? null;
+  const managingReservationsPI =
+    programIncrements.find((pi) => pi.id === managingReservationsPIId) ?? null;
 
   // PTO modal state
   const [ptoModalMemberId, setPtoModalMemberId] = useState<string | null>(null);
   const [ptoStartDate, setPtoStartDate] = useState(todayISO());
   const [ptoEndDate, setPtoEndDate] = useState(todayISO());
-  const [ptoStartHalf, setPtoStartHalf] = useState<HalfDayType>("full");
-  const [ptoEndHalf, setPtoEndHalf] = useState<HalfDayType>("full");
-  const [ptoNote, setPtoNote] = useState("");
+  const [ptoStartHalf, setPtoStartHalf] = useState<HalfDayType>('full');
+  const [ptoEndHalf, setPtoEndHalf] = useState<HalfDayType>('full');
+  const [ptoNote, setPtoNote] = useState('');
 
   // Extra day off modal state
   const [isAddingExtraDay, setIsAddingExtraDay] = useState(false);
-  const [extraDayName, setExtraDayName] = useState("");
+  const [extraDayName, setExtraDayName] = useState('');
   const [extraDayDate, setExtraDayDate] = useState(todayISO());
   const [extraDayIsHalf, setExtraDayIsHalf] = useState(false);
-  const [extraDayNote, setExtraDayNote] = useState("");
+  const [extraDayNote, setExtraDayNote] = useState('');
 
   const [showHolidaysList, setShowHolidaysList] = useState(false);
 
@@ -97,7 +99,7 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
   const totalMembers = team.members.length;
   const totalDailyPoints = team.members.reduce(
     (acc, m) => acc + (m.defaultPointsPerDay ?? team.settings.defaultPointsPerDay),
-    0
+    0,
   );
 
   const handleAddMember = (e: React.FormEvent) => {
@@ -105,23 +107,23 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
     if (!newMemberName.trim()) return;
 
     const pointsOverride =
-      newMemberPointsPerDay.trim() !== "" ? parseFloat(newMemberPointsPerDay) : undefined;
+      newMemberPointsPerDay.trim() !== '' ? parseFloat(newMemberPointsPerDay) : undefined;
 
     const newMember: TeamMember = {
-      id: nextId("member"),
+      id: nextId('member'),
       name: newMemberName.trim(),
       role: newMemberRole.trim() || undefined,
       avatarColor: newMemberColor,
       defaultPointsPerDay:
-        typeof pointsOverride === "number" && !isNaN(pointsOverride) ? pointsOverride : undefined,
+        typeof pointsOverride === 'number' && !isNaN(pointsOverride) ? pointsOverride : undefined,
       ptoSpans: [],
     };
 
     teamStore.addMember(newMember);
 
-    setNewMemberName("");
-    setNewMemberRole("");
-    setNewMemberPointsPerDay("");
+    setNewMemberName('');
+    setNewMemberRole('');
+    setNewMemberPointsPerDay('');
     setIsAddingMember(false);
   };
 
@@ -137,9 +139,9 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
     setPtoModalMemberId(memberId);
     setPtoStartDate(todayISO());
     setPtoEndDate(todayISO());
-    setPtoStartHalf("full");
-    setPtoEndHalf("full");
-    setPtoNote("");
+    setPtoStartHalf('full');
+    setPtoEndHalf('full');
+    setPtoNote('');
   };
 
   const handleAddPtoSpan = (e: React.FormEvent) => {
@@ -154,7 +156,7 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
     }
 
     const newPto: PtoSpan = {
-      id: nextId("pto"),
+      id: nextId('pto'),
       startDate: start,
       endDate: end,
       startHalfDay: ptoStartHalf,
@@ -176,7 +178,7 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
     if (!extraDayName.trim() || !extraDayDate) return;
 
     const newExtra: ExtraDayOff = {
-      id: nextId("dayoff"),
+      id: nextId('dayoff'),
       name: extraDayName.trim(),
       date: extraDayDate,
       isHalfDay: extraDayIsHalf,
@@ -185,10 +187,10 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
 
     teamStore.addExtraDayOff(newExtra);
 
-    setExtraDayName("");
+    setExtraDayName('');
     setExtraDayDate(todayISO());
     setExtraDayIsHalf(false);
-    setExtraDayNote("");
+    setExtraDayNote('');
     setIsAddingExtraDay(false);
   };
 
@@ -201,7 +203,7 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
       .trim()
       .split(/\s+/)
       .map((n) => n[0])
-      .join("")
+      .join('')
       .toUpperCase()
       .slice(0, 2);
   };
@@ -220,7 +222,7 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
           range,
           team,
           requirements.items.filter((i) => isItemWorkable(requirements, i)),
-          sprintReservations
+          sprintReservations,
         );
         list.push({ pi, summary });
       }
@@ -239,7 +241,8 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
           <div>
             <h1 className="team-view__title">Team & Capacity Management</h1>
             <p className="team-view__subtitle">
-              Configure team members, granular 1/2-day PTO spans, US holidays, and track sprint capacity.
+              Configure team members, granular 1/2-day PTO spans, US holidays, and track sprint
+              capacity.
             </p>
           </div>
         </div>
@@ -250,7 +253,7 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
             className="team-view__primary-btn"
             onClick={() => {
               setIsAddingMember(true);
-              setActiveTab("members");
+              setActiveTab('members');
             }}
           >
             <UserPlus size={14} />
@@ -279,7 +282,7 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
         <div className="team-metric-card">
           <div className="team-metric-card__label">US Holidays & Days Off</div>
           <div className="team-metric-card__value">
-            {team.settings.excludeUsHolidays ? "Excluded" : "Included"}
+            {team.settings.excludeUsHolidays ? 'Excluded' : 'Included'}
           </div>
           <div className="team-metric-card__hint">
             {team.settings.extraDaysOff.length} extra configured
@@ -291,24 +294,24 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
       <div className="team-view__tabs">
         <button
           type="button"
-          className={`team-view__tab${activeTab === "members" ? " is-active" : ""}`}
-          onClick={() => setActiveTab("members")}
+          className={`team-view__tab${activeTab === 'members' ? ' is-active' : ''}`}
+          onClick={() => setActiveTab('members')}
         >
           <Users size={14} />
           <span>Team Members & PTO ({team.members.length})</span>
         </button>
         <button
           type="button"
-          className={`team-view__tab${activeTab === "sprints" ? " is-active" : ""}`}
-          onClick={() => setActiveTab("sprints")}
+          className={`team-view__tab${activeTab === 'sprints' ? ' is-active' : ''}`}
+          onClick={() => setActiveTab('sprints')}
         >
           <CalendarRange size={14} />
           <span>Sprint Capacity Matrix ({allSprintSummaries.length} sprints)</span>
         </button>
         <button
           type="button"
-          className={`team-view__tab${activeTab === "settings" ? " is-active" : ""}`}
-          onClick={() => setActiveTab("settings")}
+          className={`team-view__tab${activeTab === 'settings' ? ' is-active' : ''}`}
+          onClick={() => setActiveTab('settings')}
         >
           <Settings size={14} />
           <span>Holidays & Point Settings</span>
@@ -318,7 +321,7 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
       {/* Tab Content */}
       <div className="team-view__content">
         {/* MEMBERS TAB */}
-        {activeTab === "members" && (
+        {activeTab === 'members' && (
           <div className="team-members-view">
             {isAddingMember && (
               <form className="member-form-card" onSubmit={handleAddMember}>
@@ -357,7 +360,10 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
                   </div>
 
                   <div className="member-form-field">
-                    <label>Points Per Business Day (leave empty for team default: {team.settings.defaultPointsPerDay})</label>
+                    <label>
+                      Points Per Business Day (leave empty for team default:{' '}
+                      {team.settings.defaultPointsPerDay})
+                    </label>
                     <input
                       type="number"
                       step="0.1"
@@ -376,7 +382,7 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
                         <button
                           key={c}
                           type="button"
-                          className={`color-palette-picker__swatch${newMemberColor === c ? " is-selected" : ""}`}
+                          className={`color-palette-picker__swatch${newMemberColor === c ? ' is-selected' : ''}`}
                           style={{ backgroundColor: c }}
                           onClick={() => setNewMemberColor(c)}
                         />
@@ -420,7 +426,7 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
                         <div className="team-member-card__identity">
                           <span
                             className="team-member-card__avatar"
-                            style={{ backgroundColor: member.avatarColor ?? "#5b7cfa" }}
+                            style={{ backgroundColor: member.avatarColor ?? '#5b7cfa' }}
                           >
                             {getInitials(member.name)}
                           </span>
@@ -428,12 +434,14 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
                             <input
                               className="team-member-card__name-input"
                               value={member.name}
-                              onChange={(e) => handleUpdateMember(member.id, { name: e.target.value })}
+                              onChange={(e) =>
+                                handleUpdateMember(member.id, { name: e.target.value })
+                              }
                             />
                             <input
                               className="team-member-card__role-input"
                               placeholder="Add role..."
-                              value={member.role ?? ""}
+                              value={member.role ?? ''}
                               onChange={(e) =>
                                 handleUpdateMember(member.id, { role: e.target.value || undefined })
                               }
@@ -461,18 +469,21 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
                             min="0"
                             max="50"
                             className="team-member-card__rate-input"
-                            value={member.defaultPointsPerDay ?? ""}
+                            value={member.defaultPointsPerDay ?? ''}
                             placeholder={`${team.settings.defaultPointsPerDay}`}
                             onChange={(e) => {
                               const val = e.target.value.trim();
                               handleUpdateMember(member.id, {
-                                defaultPointsPerDay: val !== "" ? parseFloat(val) : undefined,
+                                defaultPointsPerDay: val !== '' ? parseFloat(val) : undefined,
                               });
                             }}
                           />
                           <span className="team-member-card__rate-unit">pts/day</span>
                         </div>
-                        <span className="team-member-card__pto-total-badge" title="Total PTO days across all spans">
+                        <span
+                          className="team-member-card__pto-total-badge"
+                          title="Total PTO days across all spans"
+                        >
                           <Palmtree size={12} /> {totalPto}
                         </span>
                       </div>
@@ -500,7 +511,9 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
                             {member.ptoSpans.map((span) => {
                               const isSingle = span.startDate === span.endDate;
                               const isHalf =
-                                isSingle && (span.startHalfDay === "morning" || span.startHalfDay === "afternoon");
+                                isSingle &&
+                                (span.startHalfDay === 'morning' ||
+                                  span.startHalfDay === 'afternoon');
 
                               return (
                                 <div key={span.id} className="pto-span-chip">
@@ -515,20 +528,22 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
                                       )}
                                       <span
                                         className={`pto-span-chip__badge${
-                                          isHalf || span.startHalfDay !== "full" || span.endHalfDay !== "full"
-                                            ? " is-half"
-                                            : ""
+                                          isHalf ||
+                                          span.startHalfDay !== 'full' ||
+                                          span.endHalfDay !== 'full'
+                                            ? ' is-half'
+                                            : ''
                                         }`}
                                       >
                                         {isSingle
-                                          ? span.startHalfDay === "morning"
-                                            ? "AM (0.5d)"
-                                            : span.startHalfDay === "afternoon"
-                                            ? "PM (0.5d)"
-                                            : "Full Day (1d)"
+                                          ? span.startHalfDay === 'morning'
+                                            ? 'AM (0.5d)'
+                                            : span.startHalfDay === 'afternoon'
+                                              ? 'PM (0.5d)'
+                                              : 'Full Day (1d)'
                                           : `${
-                                              span.startHalfDay === "afternoon" ? "Start PM • " : ""
-                                            }${span.endHalfDay === "morning" ? "End AM" : "Full"}`}
+                                              span.startHalfDay === 'afternoon' ? 'Start PM • ' : ''
+                                            }${span.endHalfDay === 'morning' ? 'End AM' : 'Full'}`}
                                       </span>
                                     </div>
                                     {span.note && (
@@ -560,13 +575,16 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
         )}
 
         {/* SPRINT CAPACITY MATRIX TAB */}
-        {activeTab === "sprints" && (
+        {activeTab === 'sprints' && (
           <div className="sprint-matrix-view">
             {allSprintSummaries.length === 0 ? (
               <div className="team-view__empty-state">
                 <CalendarRange size={36} className="team-view__empty-icon" />
                 <h3>No Sprints Defined Yet</h3>
-                <p>Create Program Increments and Sprints in the Timeline view to see full capacity planning.</p>
+                <p>
+                  Create Program Increments and Sprints in the Timeline view to see full capacity
+                  planning.
+                </p>
               </div>
             ) : (
               <div className="sprint-matrix-table-wrap">
@@ -586,7 +604,7 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
                           <div className="sprint-matrix-table__member-header">
                             <span
                               className="sprint-matrix-table__avatar"
-                              style={{ backgroundColor: m.avatarColor ?? "#5b7cfa" }}
+                              style={{ backgroundColor: m.avatarColor ?? '#5b7cfa' }}
                             >
                               {getInitials(m.name)}
                             </span>
@@ -600,9 +618,13 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
                     {allSprintSummaries.map(({ pi, summary }) => {
                       const percent =
                         summary.totalCapacityPoints > 0
-                          ? Math.round((summary.totalAssignedPoints / summary.totalCapacityPoints) * 100)
+                          ? Math.round(
+                              (summary.totalAssignedPoints / summary.totalCapacityPoints) * 100,
+                            )
                           : 0;
-                      const isOver = summary.totalAssignedPoints > summary.totalCapacityPoints && summary.totalCapacityPoints > 0;
+                      const isOver =
+                        summary.totalAssignedPoints > summary.totalCapacityPoints &&
+                        summary.totalCapacityPoints > 0;
 
                       return (
                         <tr key={summary.sprintId}>
@@ -617,10 +639,16 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
                                   title={`Manage Capacity Reservations for ${pi.name}`}
                                 >
                                   <ShieldAlert size={10} />
-                                  <span>{pi.reservations?.length ? `${pi.reservations.length} res` : "Reserve"}</span>
+                                  <span>
+                                    {pi.reservations?.length
+                                      ? `${pi.reservations.length} res`
+                                      : 'Reserve'}
+                                  </span>
                                 </button>
                               </div>
-                              <strong className="sprint-matrix-cell__sprint-name">{summary.sprintName}</strong>
+                              <strong className="sprint-matrix-cell__sprint-name">
+                                {summary.sprintName}
+                              </strong>
                               <span className="sprint-matrix-cell__dates">
                                 {summary.startDate} → {summary.endDate}
                               </span>
@@ -637,8 +665,11 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
                               <div
                                 className="sprint-matrix-cell__reserved-box"
                                 title={summary.appliedReservations
-                                  .map((r) => `${r.name}: ${r.value}${r.unit === "percentage" ? "%" : " pts"}`)
-                                  .join(", ")}
+                                  .map(
+                                    (r) =>
+                                      `${r.name}: ${r.value}${r.unit === 'percentage' ? '%' : ' pts'}`,
+                                  )
+                                  .join(', ')}
                               >
                                 <span className="sprint-matrix-cell__reserved-pill">
                                   <ShieldAlert size={10} /> -{summary.totalReservedPoints} pts
@@ -666,10 +697,10 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
                             <span
                               className={`sprint-matrix-cell__available-badge${
                                 isOver
-                                  ? " is-over"
+                                  ? ' is-over'
                                   : summary.remainingCapacityPoints === 0
-                                  ? " is-zero"
-                                  : " is-available"
+                                    ? ' is-zero'
+                                    : ' is-available'
                               }`}
                             >
                               {isOver
@@ -682,7 +713,11 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
                               <div className="sprint-matrix-cell__progress-bar">
                                 <div
                                   className={`sprint-matrix-cell__progress-fill${
-                                    isOver ? " is-danger" : percent >= 90 ? " is-warning" : " is-normal"
+                                    isOver
+                                      ? ' is-danger'
+                                      : percent >= 90
+                                        ? ' is-warning'
+                                        : ' is-normal'
                                   }`}
                                   style={{ width: `${Math.min(100, percent)}%` }}
                                 />
@@ -697,7 +732,8 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
                             if (!mb) {
                               return <td key={m.id}>—</td>;
                             }
-                            const mbOver = mb.assignedPoints > mb.capacityPoints && mb.capacityPoints > 0;
+                            const mbOver =
+                              mb.assignedPoints > mb.capacityPoints && mb.capacityPoints > 0;
                             return (
                               <td key={m.id} className="sprint-matrix-table__member-cell">
                                 <div className="member-capacity-cell">
@@ -707,7 +743,7 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
                                     </span>
                                     <span
                                       className={`member-capacity-cell__status${
-                                        mbOver ? " is-over" : " is-available"
+                                        mbOver ? ' is-over' : ' is-available'
                                       }`}
                                     >
                                       {mbOver
@@ -746,7 +782,7 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
         )}
 
         {/* SETTINGS TAB */}
-        {activeTab === "settings" && (
+        {activeTab === 'settings' && (
           <div className="team-settings-view">
             {/* Team Baseline Points Settings */}
             <div className="settings-section-card">
@@ -785,7 +821,8 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
                 <div>
                   <h3>US Federal Holidays</h3>
                   <p>
-                    Automatically exclude recognized US federal holidays (e.g. Memorial Day, Labor Day, Thanksgiving) from business days.
+                    Automatically exclude recognized US federal holidays (e.g. Memorial Day, Labor
+                    Day, Thanksgiving) from business days.
                   </p>
                 </div>
                 <label className="toggle-switch">
@@ -809,7 +846,8 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
                 >
                   <ShieldCheck size={14} />
                   <span>
-                    {showHolidaysList ? "Hide" : "View"} {usHolidaysCurrentYear.length} Recognized US Federal Holidays ({currentYear})
+                    {showHolidaysList ? 'Hide' : 'View'} {usHolidaysCurrentYear.length} Recognized
+                    US Federal Holidays ({currentYear})
                   </span>
                   {showHolidaysList ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                 </button>
@@ -833,7 +871,8 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
                 <div>
                   <h3>Extra Days Off & Company Holidays</h3>
                   <p>
-                    Configure company-specific days off, winter shutdowns, floating holidays, or half-days not recognized as standard federal holidays.
+                    Configure company-specific days off, winter shutdowns, floating holidays, or
+                    half-days not recognized as standard federal holidays.
                   </p>
                 </div>
                 <button
@@ -882,8 +921,8 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
                       <div className="member-form-field">
                         <label>Duration</label>
                         <select
-                          value={extraDayIsHalf ? "half" : "full"}
-                          onChange={(e) => setExtraDayIsHalf(e.target.value === "half")}
+                          value={extraDayIsHalf ? 'half' : 'full'}
+                          onChange={(e) => setExtraDayIsHalf(e.target.value === 'half')}
                         >
                           <option value="full">Full Day (1.0 day off)</option>
                           <option value="half">Half Day (0.5 day off)</option>
@@ -923,9 +962,9 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
                             <span className="extra-day-chip__date">{extra.date}</span>
                             <strong className="extra-day-chip__name">{extra.name}</strong>
                             <span
-                              className={`extra-day-chip__badge${extra.isHalfDay ? " is-half" : ""}`}
+                              className={`extra-day-chip__badge${extra.isHalfDay ? ' is-half' : ''}`}
                             >
-                              {extra.isHalfDay ? "Half Day (0.5d)" : "Full Day"}
+                              {extra.isHalfDay ? 'Half Day (0.5d)' : 'Full Day'}
                             </span>
                           </div>
                           {extra.note && <div className="extra-day-chip__note">{extra.note}</div>}
@@ -961,8 +1000,8 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
               <div className="team-pto-modal__title-row">
                 <Palmtree size={18} className="team-pto-modal__icon" />
                 <h3>
-                  Add PTO Span for{" "}
-                  {team.members.find((m) => m.id === ptoModalMemberId)?.name ?? "Member"}
+                  Add PTO Span for{' '}
+                  {team.members.find((m) => m.id === ptoModalMemberId)?.name ?? 'Member'}
                 </h3>
               </div>
               <button

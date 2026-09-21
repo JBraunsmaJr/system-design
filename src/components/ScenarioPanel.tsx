@@ -1,7 +1,7 @@
-import { Film, MapPin, X, Plus, Play, Trash2, ChevronUp, ChevronDown } from "lucide-react";
-import type { Node } from "@xyflow/react";
-import { getBreadcrumbLabelsFlat } from "../collab/diagramStore";
-import type { ArchNodeData, Scenario, ScenarioStep } from "../domain/types";
+import { Film, MapPin, X, Plus, Play, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
+import type { Node } from '@xyflow/react';
+import { getBreadcrumbLabelsFlat } from '../collab/diagramStore';
+import type { ArchNodeData, Scenario, ScenarioStep } from '../domain/types';
 
 interface ScenarioPanelProps {
   scenarios: Scenario[];
@@ -15,7 +15,7 @@ interface ScenarioPanelProps {
   onRemoveSelectionFromStep: (scenarioId: string, stepId: string) => void;
   onUpdateStep: (scenarioId: string, stepId: string, patch: Partial<ScenarioStep>) => void;
   onDeleteStep: (scenarioId: string, stepId: string) => void;
-  onMoveStep: (scenarioId: string, stepId: string, direction: "up" | "down") => void;
+  onMoveStep: (scenarioId: string, stepId: string, direction: 'up' | 'down') => void;
   onPresent: (scenarioId: string) => void;
   canAddStep: boolean;
   /** The step currently selected in the list - shown in the editor pane
@@ -40,7 +40,7 @@ function pathsEqual(a: string[], b: string[]): boolean {
 
 function levelLabel(nodes: Node<ArchNodeData>[], path: string[]): string {
   const labels = getBreadcrumbLabelsFlat(nodes, path);
-  return labels.length === 0 ? "Root" : labels.join(" › ");
+  return labels.length === 0 ? 'Root' : labels.join(' › ');
 }
 
 export function ScenarioPanel({
@@ -106,13 +106,13 @@ export function ScenarioPanel({
           <div className="scenario-panel__scenario-select-row">
             <select
               className="scenario-panel__select"
-              value={active?.id ?? ""}
+              value={active?.id ?? ''}
               onChange={(e) => onSelectScenario(e.target.value)}
               aria-label="Select scenario"
             >
               {scenarios.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.title} ({s.steps.length} {s.steps.length === 1 ? "step" : "steps"})
+                  {s.title} ({s.steps.length} {s.steps.length === 1 ? 'step' : 'steps'})
                 </option>
               ))}
             </select>
@@ -150,7 +150,9 @@ export function ScenarioPanel({
                 className="scenario-panel__btn-present"
                 disabled={active.steps.length === 0}
                 onClick={() => onPresent(active.id)}
-                title={active.steps.length === 0 ? "Add at least one step first" : "Start presenting"}
+                title={
+                  active.steps.length === 0 ? 'Add at least one step first' : 'Start presenting'
+                }
               >
                 <Play size={11} /> Present
               </button>
@@ -172,8 +174,8 @@ export function ScenarioPanel({
         <div className="scenario-panel__empty">
           <p>No scenarios yet.</p>
           <p className="scenario-panel__hint">
-            Create a scenario, select nodes or edges on the diagram, and add them as steps. Steps can also span
-            subdiagrams for multi-level walkthroughs.
+            Create a scenario, select nodes or edges on the diagram, and add them as steps. Steps
+            can also span subdiagrams for multi-level walkthroughs.
           </p>
         </div>
       ) : (
@@ -181,9 +183,7 @@ export function ScenarioPanel({
           {/* Steps List */}
           <div className="scenario-panel__section">
             <div className="scenario-panel__section-header">
-              <span className="scenario-panel__section-title">
-                Steps ({active.steps.length})
-              </span>
+              <span className="scenario-panel__section-title">Steps ({active.steps.length})</span>
               <button
                 type="button"
                 className="scenario-panel__btn-add-step"
@@ -192,7 +192,7 @@ export function ScenarioPanel({
                 title={
                   canAddStep
                     ? `Add current canvas selection as a new step (${currentLevelLabel})`
-                    : "Select one or more nodes/edges on the canvas first"
+                    : 'Select one or more nodes/edges on the canvas first'
                 }
               >
                 <Plus size={12} /> Add Selection
@@ -203,7 +203,8 @@ export function ScenarioPanel({
               <div className="scenario-panel__empty-steps">
                 <p>No steps in this scenario yet.</p>
                 <p className="scenario-panel__hint">
-                  Select elements on the diagram, then click <strong>Add Selection</strong> above to create your first step.
+                  Select elements on the diagram, then click <strong>Add Selection</strong> above to
+                  create your first step.
                 </p>
               </div>
             ) : (
@@ -218,10 +219,10 @@ export function ScenarioPanel({
                       key={step.id}
                       role="button"
                       tabIndex={0}
-                      className={`scenario-step-row${isActive ? " is-active" : ""}`}
+                      className={`scenario-step-row${isActive ? ' is-active' : ''}`}
                       onClick={() => onSelectStep(step.id)}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
+                        if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault();
                           onSelectStep(step.id);
                         }
@@ -235,7 +236,7 @@ export function ScenarioPanel({
                         </span>
                         <div className="scenario-step-row__meta">
                           <span className="scenario-step-row__count">
-                            {count} {count === 1 ? "item" : "items"}
+                            {count} {count === 1 ? 'item' : 'items'}
                           </span>
                           {isSubDiagram && (
                             <span
@@ -251,7 +252,7 @@ export function ScenarioPanel({
                         <button
                           type="button"
                           disabled={index === 0}
-                          onClick={() => onMoveStep(active.id, step.id, "up")}
+                          onClick={() => onMoveStep(active.id, step.id, 'up')}
                           aria-label="Move step earlier"
                           title="Move step earlier"
                         >
@@ -260,7 +261,7 @@ export function ScenarioPanel({
                         <button
                           type="button"
                           disabled={index === active.steps.length - 1}
-                          onClick={() => onMoveStep(active.id, step.id, "down")}
+                          onClick={() => onMoveStep(active.id, step.id, 'down')}
                           aria-label="Move step later"
                           title="Move step later"
                         >
@@ -306,7 +307,9 @@ export function ScenarioPanel({
                   className="scenario-step-editor__input"
                   value={activeStep.title}
                   placeholder={`Step ${activeStepIndex + 1}`}
-                  onChange={(e) => onUpdateStep(active.id, activeStep.id, { title: e.target.value })}
+                  onChange={(e) =>
+                    onUpdateStep(active.id, activeStep.id, { title: e.target.value })
+                  }
                 />
               </label>
 
@@ -316,15 +319,21 @@ export function ScenarioPanel({
                   className="scenario-step-editor__textarea"
                   placeholder="What you'll say while this step is showing..."
                   rows={4}
-                  value={activeStep.narration ?? ""}
-                  onChange={(e) => onUpdateStep(active.id, activeStep.id, { narration: e.target.value })}
+                  value={activeStep.narration ?? ''}
+                  onChange={(e) =>
+                    onUpdateStep(active.id, activeStep.id, { narration: e.target.value })
+                  }
                 />
               </label>
 
               <div className="scenario-step-editor__selection">
                 <div className="scenario-step-editor__selection-summary">
-                  <strong>{activeStep.focusNodeIds.length + activeStep.focusEdgeIds.length}</strong> element
-                  {activeStep.focusNodeIds.length + activeStep.focusEdgeIds.length === 1 ? "" : "s"} highlighted
+                  <strong>{activeStep.focusNodeIds.length + activeStep.focusEdgeIds.length}</strong>{' '}
+                  element
+                  {activeStep.focusNodeIds.length + activeStep.focusEdgeIds.length === 1
+                    ? ''
+                    : 's'}{' '}
+                  highlighted
                 </div>
                 <div className="scenario-step-editor__selection-actions">
                   <button
@@ -335,8 +344,8 @@ export function ScenarioPanel({
                       !activeStepEditable
                         ? "Navigate to this step's diagram first"
                         : canAddStep
-                          ? "Add selected nodes/edges to this step"
-                          : "Select something on the canvas first"
+                          ? 'Add selected nodes/edges to this step'
+                          : 'Select something on the canvas first'
                     }
                   >
                     <Plus size={11} /> Add selection
@@ -349,8 +358,8 @@ export function ScenarioPanel({
                       !activeStepEditable
                         ? "Navigate to this step's diagram first"
                         : canAddStep
-                          ? "Remove selected nodes/edges from this step"
-                          : "Select something on the canvas first"
+                          ? 'Remove selected nodes/edges from this step'
+                          : 'Select something on the canvas first'
                     }
                   >
                     <X size={11} /> Remove selection
@@ -362,7 +371,8 @@ export function ScenarioPanel({
             active.steps.length > 0 && (
               <div className="scenario-step-editor scenario-step-editor--empty">
                 <p className="scenario-step-editor__empty-text">
-                  Click any step above to preview on the diagram and edit its notes and highlighted elements.
+                  Click any step above to preview on the diagram and edit its notes and highlighted
+                  elements.
                 </p>
               </div>
             )

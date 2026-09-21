@@ -11,7 +11,7 @@ import {
   defaultTransport,
   isTransportEnabled,
   buildPeerOpts,
-} from "./transport.ts";
+} from './transport.ts';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {
@@ -23,49 +23,43 @@ function assert(condition: boolean, message: string) {
   }
 }
 
-console.log("=== Defaults preserve current behaviour ===");
+console.log('=== Defaults preserve current behaviour ===');
 {
   assert(
-    JSON.stringify(enabledTransports()) === JSON.stringify(["webrtc"]),
-    "with nothing configured, peer-to-peer is enabled",
+    JSON.stringify(enabledTransports()) === JSON.stringify(['webrtc']),
+    'with nothing configured, peer-to-peer is enabled',
   );
-  assert(defaultTransport() === "webrtc", "and is the default");
-  assert(isTransportEnabled("webrtc"), "webrtc reports enabled");
-  assert(!isTransportEnabled("websocket"), "websocket does not");
+  assert(defaultTransport() === 'webrtc', 'and is the default');
+  assert(isTransportEnabled('webrtc'), 'webrtc reports enabled');
+  assert(!isTransportEnabled('websocket'), 'websocket does not');
 }
 
-console.log("=== Explicit configuration ===");
+console.log('=== Explicit configuration ===');
 {
-  const serverOnly = { VITE_SYNC_TRANSPORTS: "websocket" };
+  const serverOnly = { VITE_SYNC_TRANSPORTS: 'websocket' };
   assert(
-    !isTransportEnabled("webrtc", serverOnly),
-    "a server-only build excludes peer-to-peer, which is the government shape",
+    !isTransportEnabled('webrtc', serverOnly),
+    'a server-only build excludes peer-to-peer, which is the government shape',
   );
-  assert(
-    defaultTransport(serverOnly) === "websocket",
-    "and defaults to the server transport",
-  );
+  assert(defaultTransport(serverOnly) === 'websocket', 'and defaults to the server transport');
 
-  const both = { VITE_SYNC_TRANSPORTS: "webrtc,websocket" };
+  const both = { VITE_SYNC_TRANSPORTS: 'webrtc,websocket' };
+  assert(enabledTransports(both).length === 2, 'a build can ship both');
   assert(
-    enabledTransports(both).length === 2,
-    "a build can ship both",
-  );
-  assert(
-    defaultTransport(both) === "webrtc",
-    "the first entry is the default, so order expresses preference",
+    defaultTransport(both) === 'webrtc',
+    'the first entry is the default, so order expresses preference',
   );
 
   assert(
-    JSON.stringify(enabledTransports({ VITE_SYNC_TRANSPORTS: " websocket , webrtc " })) ===
-      JSON.stringify(["websocket", "webrtc"]),
-    "surrounding whitespace is tolerated",
+    JSON.stringify(enabledTransports({ VITE_SYNC_TRANSPORTS: ' websocket , webrtc ' })) ===
+      JSON.stringify(['websocket', 'webrtc']),
+    'surrounding whitespace is tolerated',
   );
 }
 
-console.log("=== Malformed configuration falls back rather than disabling sync ===");
+console.log('=== Malformed configuration falls back rather than disabling sync ===');
 {
-  for (const raw of ["", "   ", "nonsense", "webrtc;websocket"]) {
+  for (const raw of ['', '   ', 'nonsense', 'webrtc;websocket']) {
     const result = enabledTransports({ VITE_SYNC_TRANSPORTS: raw });
     assert(
       result.length > 0,
@@ -73,26 +67,26 @@ console.log("=== Malformed configuration falls back rather than disabling sync =
     );
   }
   assert(
-    JSON.stringify(enabledTransports({ VITE_SYNC_TRANSPORTS: "nonsense" })) ===
-      JSON.stringify(["webrtc"]),
-    "an unrecognised value falls back to the default rather than an empty list",
+    JSON.stringify(enabledTransports({ VITE_SYNC_TRANSPORTS: 'nonsense' })) ===
+      JSON.stringify(['webrtc']),
+    'an unrecognised value falls back to the default rather than an empty list',
   );
   assert(
-    JSON.stringify(enabledTransports({ VITE_SYNC_TRANSPORTS: "websocket,nonsense" })) ===
-      JSON.stringify(["websocket"]),
-    "a partly-valid list keeps what it recognises",
+    JSON.stringify(enabledTransports({ VITE_SYNC_TRANSPORTS: 'websocket,nonsense' })) ===
+      JSON.stringify(['websocket']),
+    'a partly-valid list keeps what it recognises',
   );
 }
 
-console.log("=== ICE servers ===");
+console.log('=== ICE servers ===');
 {
   assert(
     Object.keys(buildPeerOpts(undefined)).length === 0,
-    "no configured servers means the key is absent, NOT present and undefined - " +
-      "the latter would override the browser defaults with nothing",
+    'no configured servers means the key is absent, NOT present and undefined - ' +
+      'the latter would override the browser defaults with nothing',
   );
 
-  const servers = [{ urls: "stun:stun.example.gov:3478" }];
+  const servers = [{ urls: 'stun:stun.example.gov:3478' }];
   const opts = buildPeerOpts(servers) as {
     peerOpts?: { config?: { iceServers?: RTCIceServer[] } };
   };
@@ -112,4 +106,4 @@ if (failures > 0) {
   console.error(`\n${failures} failure(s)`);
   throw new Error(`${failures} transport check(s) failed`);
 }
-console.log("\nAll transport checks passed.");
+console.log('\nAll transport checks passed.');

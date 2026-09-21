@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { CalendarRange, X } from "lucide-react";
-import { computeSprintDateRanges, type ProgramIncrement } from "../../domain/programIncrements";
-import { computeFlippedPosition } from "../../domain/popoverPosition";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { CalendarRange, X } from 'lucide-react';
+import { computeSprintDateRanges, type ProgramIncrement } from '../../domain/programIncrements';
+import { computeFlippedPosition } from '../../domain/popoverPosition';
 
 interface SprintPickerProps {
   programIncrements: ProgramIncrement[];
@@ -39,9 +39,14 @@ function findSprint(pis: ProgramIncrement[], sprintId: string | undefined) {
  * (a requirement item sits in at most one sprint, matching how sprints
  * work in most agile tooling) and has no "create" option, since sprints
  * are only ever created from the Timeline view, not from here. */
-export function SprintPicker({ programIncrements, sprintId, onAssign, onClear }: SprintPickerProps) {
+export function SprintPicker({
+  programIncrements,
+  sprintId,
+  onAssign,
+  onClear,
+}: SprintPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState('');
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -57,7 +62,7 @@ export function SprintPicker({ programIncrements, sprintId, onAssign, onClear }:
   };
   const close = () => {
     setIsOpen(false);
-    setQuery("");
+    setQuery('');
   };
 
   useLayoutEffect(() => {
@@ -70,9 +75,11 @@ export function SprintPicker({ programIncrements, sprintId, onAssign, onClear }:
     const next = computeFlippedPosition(
       triggerRect,
       { width: dropdownRect.width, height: dropdownRect.height },
-      { width: window.innerWidth, height: window.innerHeight }
+      { width: window.innerWidth, height: window.innerHeight },
     );
-    setDropdownPos((prev) => (prev && prev.top === next.top && prev.left === next.left ? prev : next));
+    setDropdownPos((prev) =>
+      prev && prev.top === next.top && prev.left === next.left ? prev : next,
+    );
   }, [isOpen, query]);
 
   const reposition = useCallback(() => {
@@ -85,8 +92,8 @@ export function SprintPicker({ programIncrements, sprintId, onAssign, onClear }:
       computeFlippedPosition(
         triggerRect,
         { width: dropdownRect.width, height: dropdownRect.height },
-        { width: window.innerWidth, height: window.innerHeight }
-      )
+        { width: window.innerWidth, height: window.innerHeight },
+      ),
     );
   }, []);
 
@@ -98,17 +105,17 @@ export function SprintPicker({ programIncrements, sprintId, onAssign, onClear }:
       if (dropdownRef.current?.contains(target)) return;
       close();
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
   }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
-    window.addEventListener("scroll", reposition, true);
-    window.addEventListener("resize", reposition);
+    window.addEventListener('scroll', reposition, true);
+    window.addEventListener('resize', reposition);
     return () => {
-      window.removeEventListener("scroll", reposition, true);
-      window.removeEventListener("resize", reposition);
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
     };
   }, [isOpen, reposition]);
 
@@ -117,7 +124,9 @@ export function SprintPicker({ programIncrements, sprintId, onAssign, onClear }:
     .map((pi) => {
       const ranges = computeSprintDateRanges(pi);
       const sprints = pi.sprints
-        .filter((s) => q === "" || s.name.toLowerCase().includes(q) || pi.name.toLowerCase().includes(q))
+        .filter(
+          (s) => q === '' || s.name.toLowerCase().includes(q) || pi.name.toLowerCase().includes(q),
+        )
         .map((s) => ({ sprint: s, range: ranges.find((r) => r.sprintId === s.id) }));
       return { pi, sprints };
     })
@@ -128,12 +137,16 @@ export function SprintPicker({ programIncrements, sprintId, onAssign, onClear }:
       <button
         ref={triggerRef}
         type="button"
-        className={`sprint-picker__trigger${current ? "" : " is-empty"}`}
+        className={`sprint-picker__trigger${current ? '' : ' is-empty'}`}
         onClick={() => (isOpen ? close() : open())}
-        title={current ? `${current.pi.name} \u2022 ${current.range?.startDate} \u2013 ${current.range?.endDate}` : "Unassigned"}
+        title={
+          current
+            ? `${current.pi.name} \u2022 ${current.range?.startDate} \u2013 ${current.range?.endDate}`
+            : 'Unassigned'
+        }
       >
         <CalendarRange size={11} />
-        {current ? current.sprint.name : "Sprint"}
+        {current ? current.sprint.name : 'Sprint'}
       </button>
 
       {isOpen &&
@@ -142,7 +155,7 @@ export function SprintPicker({ programIncrements, sprintId, onAssign, onClear }:
           <div
             ref={dropdownRef}
             className="sprint-picker__dropdown"
-            style={{ position: "fixed", top: dropdownPos.top, left: dropdownPos.left }}
+            style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left }}
           >
             <input
               autoFocus
@@ -151,7 +164,7 @@ export function SprintPicker({ programIncrements, sprintId, onAssign, onClear }:
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Escape") close();
+                if (e.key === 'Escape') close();
               }}
             />
             <div className="sprint-picker__list">
@@ -193,12 +206,14 @@ export function SprintPicker({ programIncrements, sprintId, onAssign, onClear }:
               ))}
               {groups.length === 0 && (
                 <p className="sprint-picker__empty">
-                  {programIncrements.length === 0 ? "No program increments yet." : "No matching sprints."}
+                  {programIncrements.length === 0
+                    ? 'No program increments yet.'
+                    : 'No matching sprints.'}
                 </p>
               )}
             </div>
           </div>,
-          document.body
+          document.body,
         )}
     </>
   );

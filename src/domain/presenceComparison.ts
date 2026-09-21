@@ -37,13 +37,17 @@ export interface PeerBadge {
  * re-render rather than a missed one, which is the safe direction, and
  * it avoids sorting on every comparison.
  */
-export function peerBadgesAreEqual(prev: PeerBadge[] | undefined, next: PeerBadge[] | undefined): boolean {
+export function peerBadgesAreEqual(
+  prev: PeerBadge[] | undefined,
+  next: PeerBadge[] | undefined,
+): boolean {
   if (prev === next) return true;
   const a = prev ?? [];
   const b = next ?? [];
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
-    if (a[i].clientId !== b[i].clientId || a[i].name !== b[i].name || a[i].color !== b[i].color) return false;
+    if (a[i].clientId !== b[i].clientId || a[i].name !== b[i].name || a[i].color !== b[i].color)
+      return false;
   }
   return true;
 }

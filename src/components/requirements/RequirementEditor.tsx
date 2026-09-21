@@ -6,15 +6,19 @@ import {
   useState,
   type ChangeEvent,
   type KeyboardEvent as ReactKeyboardEvent,
-} from "react";
-import { createPortal } from "react-dom";
-import { getCaretPixelPosition } from "../../domain/caretPosition";
-import { computeFlippedPosition, type AnchorRect } from "../../domain/popoverPosition";
-import { getCurrentLineBounds, getListEnterBehavior, getListIndentBehavior } from "../../domain/markdownEditing";
-import { fitHeightToContent } from "../../domain/autoSizeTextarea";
-import type { RequirementItem, RequirementsDocument } from "../../domain/requirementsTypes";
-import { ReferencePopover } from "./ReferencePopover";
-import { MarkdownToolbar } from "./MarkdownToolbar";
+} from 'react';
+import { createPortal } from 'react-dom';
+import { getCaretPixelPosition } from '../../domain/caretPosition';
+import { computeFlippedPosition, type AnchorRect } from '../../domain/popoverPosition';
+import {
+  getCurrentLineBounds,
+  getListEnterBehavior,
+  getListIndentBehavior,
+} from '../../domain/markdownEditing';
+import { fitHeightToContent } from '../../domain/autoSizeTextarea';
+import type { RequirementItem, RequirementsDocument } from '../../domain/requirementsTypes';
+import { ReferencePopover } from './ReferencePopover';
+import { MarkdownToolbar } from './MarkdownToolbar';
 
 interface ActiveTrigger {
   triggerIndex: number;
@@ -28,7 +32,7 @@ function detectActiveTrigger(text: string, caretPos: number): ActiveTrigger | nu
   let i = caretPos - 1;
   while (i >= 0) {
     const ch = text[i];
-    if (ch === "#") return { triggerIndex: i, query: text.slice(i + 1, caretPos) };
+    if (ch === '#') return { triggerIndex: i, query: text.slice(i + 1, caretPos) };
     if (/\s/.test(ch)) return null;
     i--;
   }
@@ -37,13 +41,13 @@ function detectActiveTrigger(text: string, caretPos: number): ActiveTrigger | nu
 
 function filterCandidates(items: RequirementItem[], query: string, limit = 8): RequirementItem[] {
   const q = query.trim().toLowerCase();
-  if (q === "") return items.slice(0, limit);
+  if (q === '') return items.slice(0, limit);
   return items
     .filter((item) => item.id.toLowerCase().includes(q) || item.title.toLowerCase().includes(q))
     .slice(0, limit);
 }
 
-const NON_RETRIGGER_KEYS = new Set(["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"]);
+const NON_RETRIGGER_KEYS = new Set(['ArrowDown', 'ArrowUp', 'Enter', 'Tab', 'Escape']);
 // Used only for the naive initial position guess (left-clamping) before
 // the popover has actually rendered and can be measured - the real
 // rendered width (CSS min/max-width: 220-320px) is what the layout effect
@@ -59,7 +63,14 @@ interface RequirementEditorProps {
   placeholder?: string;
 }
 
-export function RequirementEditor({ value, onChange, onDone, doc, autoFocus, placeholder }: RequirementEditorProps) {
+export function RequirementEditor({
+  value,
+  onChange,
+  onDone,
+  doc,
+  autoFocus,
+  placeholder,
+}: RequirementEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   /**
    * Grows the textarea to fit its content, so a 15-line description
@@ -99,7 +110,7 @@ export function RequirementEditor({ value, onChange, onDone, doc, autoFocus, pla
    */
   useEffect(() => {
     const el = textareaRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
+    if (!el || typeof ResizeObserver === 'undefined') return;
     let lastWidth = el.clientWidth;
     const observer = new ResizeObserver(() => {
       const width = el.clientWidth;
@@ -149,9 +160,16 @@ export function RequirementEditor({ value, onChange, onDone, doc, autoFocus, pla
       const caret = getCaretPixelPosition(textarea, caretPos);
       const anchorTop = textareaRect.top + caret.top;
       const anchorRight = textareaRect.left + caret.left;
-      const anchor: AnchorRect = { top: anchorTop, bottom: anchorTop + caret.lineHeight, right: anchorRight };
+      const anchor: AnchorRect = {
+        top: anchorTop,
+        bottom: anchorTop + caret.lineHeight,
+        right: anchorRight,
+      };
       anchorRef.current = anchor;
-      setPopoverPos({ top: anchor.bottom + 4, left: Math.max(8, anchor.right - ESTIMATED_POPOVER_WIDTH) });
+      setPopoverPos({
+        top: anchor.bottom + 4,
+        left: Math.max(8, anchor.right - ESTIMATED_POPOVER_WIDTH),
+      });
     }
   }, []);
 
@@ -170,7 +188,7 @@ export function RequirementEditor({ value, onChange, onDone, doc, autoFocus, pla
     const next = computeFlippedPosition(
       anchor,
       { width: rect.width, height: rect.height },
-      { width: window.innerWidth, height: window.innerHeight }
+      { width: window.innerWidth, height: window.innerHeight },
     );
     setPopoverPos((prev) => (prev.top === next.top && prev.left === next.left ? prev : next));
   }, [trigger, candidates.length]);
@@ -182,11 +200,11 @@ export function RequirementEditor({ value, onChange, onDone, doc, autoFocus, pla
   // the nested scrollable content area, since scroll events don't bubble.
   useEffect(() => {
     if (!trigger) return;
-    window.addEventListener("scroll", updateTriggerState, true);
-    window.addEventListener("resize", updateTriggerState);
+    window.addEventListener('scroll', updateTriggerState, true);
+    window.addEventListener('resize', updateTriggerState);
     return () => {
-      window.removeEventListener("scroll", updateTriggerState, true);
-      window.removeEventListener("resize", updateTriggerState);
+      window.removeEventListener('scroll', updateTriggerState, true);
+      window.removeEventListener('resize', updateTriggerState);
     };
   }, [trigger, updateTriggerState]);
 
@@ -209,7 +227,7 @@ export function RequirementEditor({ value, onChange, onDone, doc, autoFocus, pla
         textarea.selectionStart = textarea.selectionEnd = newCaretPos;
       });
     },
-    [trigger, value, onChange]
+    [trigger, value, onChange],
   );
 
   // Continues a list on Enter (same marker, incremented number for ordered
@@ -226,7 +244,8 @@ export function RequirementEditor({ value, onChange, onDone, doc, autoFocus, pla
       let newValue: string;
       let newCaretPos: number;
       if (behavior.replaceCurrentLine) {
-        newValue = value.slice(0, behavior.lineStart) + behavior.insertText + value.slice(behavior.lineEnd);
+        newValue =
+          value.slice(0, behavior.lineStart) + behavior.insertText + value.slice(behavior.lineEnd);
         newCaretPos = behavior.lineStart + behavior.insertText.length;
       } else {
         newValue = value.slice(0, caretPos) + behavior.insertText + value.slice(caretPos);
@@ -239,7 +258,7 @@ export function RequirementEditor({ value, onChange, onDone, doc, autoFocus, pla
       });
       return true;
     },
-    [value, onChange]
+    [value, onChange],
   );
 
   // Tab/Shift+Tab indents or outdents the current list item line - a
@@ -260,11 +279,11 @@ export function RequirementEditor({ value, onChange, onDone, doc, autoFocus, pla
       });
       return true;
     },
-    [value, onChange]
+    [value, onChange],
   );
 
   const onKeyDown = (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === "Escape") {
+    if (event.key === 'Escape') {
       if (trigger) {
         event.preventDefault();
         setTrigger(null);
@@ -274,17 +293,17 @@ export function RequirementEditor({ value, onChange, onDone, doc, autoFocus, pla
       return;
     }
     if (trigger && candidates.length > 0) {
-      if (event.key === "ArrowDown") {
+      if (event.key === 'ArrowDown') {
         event.preventDefault();
         setSelectedIndex((i) => (i + 1) % candidates.length);
         return;
       }
-      if (event.key === "ArrowUp") {
+      if (event.key === 'ArrowUp') {
         event.preventDefault();
         setSelectedIndex((i) => (i - 1 + candidates.length) % candidates.length);
         return;
       }
-      if (event.key === "Enter" || event.key === "Tab") {
+      if (event.key === 'Enter' || event.key === 'Tab') {
         event.preventDefault();
         insertReference(candidates[selectedIndex]);
         return;
@@ -293,11 +312,11 @@ export function RequirementEditor({ value, onChange, onDone, doc, autoFocus, pla
     // The reference popover isn't consuming this key - check for
     // list-editing behaviors before falling back to the browser's normal
     // Enter (newline) / Tab (focus-shift) handling.
-    if (event.key === "Enter" && applyListEnter(event.currentTarget)) {
+    if (event.key === 'Enter' && applyListEnter(event.currentTarget)) {
       event.preventDefault();
       return;
     }
-    if (event.key === "Tab" && applyListIndent(event.currentTarget, !event.shiftKey)) {
+    if (event.key === 'Tab' && applyListIndent(event.currentTarget, !event.shiftKey)) {
       event.preventDefault();
       return;
     }
@@ -339,7 +358,7 @@ export function RequirementEditor({ value, onChange, onDone, doc, autoFocus, pla
             onHoverIndex={setSelectedIndex}
             searchQuery={trigger.query}
           />,
-          document.body
+          document.body,
         )}
     </div>
   );

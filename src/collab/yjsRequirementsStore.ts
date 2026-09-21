@@ -1,5 +1,5 @@
-import * as Y from "yjs";
-import { orderIdSet, pushIfAbsent } from "./seedGuards.ts";
+import * as Y from 'yjs';
+import { orderIdSet, pushIfAbsent } from './seedGuards.ts';
 import type {
   RequirementsDocument,
   RequirementItem,
@@ -7,7 +7,7 @@ import type {
   RequirementCategory,
   RelationshipType,
   RequirementRelationship,
-} from "../domain/requirementsTypes";
+} from '../domain/requirementsTypes';
 import {
   defaultStatusForType,
   isPrefixTaken,
@@ -15,8 +15,8 @@ import {
   updateItemReferencesInText,
   BUILT_IN_ITEM_TYPES,
   BUILT_IN_RELATIONSHIP_TYPES,
-} from "../domain/requirementsRegistry";
-import type { RequirementsStore } from "./requirementsStore";
+} from '../domain/requirementsRegistry';
+import type { RequirementsStore } from './requirementsStore';
 
 /** Item storage keys are purely internal - never displayed, never
  * referenced by anything outside this file (see this file's top doc
@@ -53,15 +53,15 @@ function collisionResistantId(prefix: string): string {
  * which is the only part anything else in the app actually references.
  */
 export function seedYjsRequirementsDoc(doc: Y.Doc, initial: RequirementsDocument): void {
-  const itemTypeOrder = doc.getArray<string>("itemTypeOrder");
-  const itemTypesMap = doc.getMap<Y.Map<unknown>>("itemTypes");
-  const categoryOrder = doc.getArray<string>("categoryOrder");
-  const categoriesMap = doc.getMap<RequirementCategory>("categories");
-  const itemOrder = doc.getArray<string>("itemOrder");
-  const itemsMap = doc.getMap<Y.Map<unknown>>("items");
-  const relationshipTypesMap = doc.getMap<RelationshipType>("relationshipTypes");
-  const relationshipsMap = doc.getMap<RequirementRelationship>("relationships");
-  const nextSequenceMap = doc.getMap<number>("nextSequence");
+  const itemTypeOrder = doc.getArray<string>('itemTypeOrder');
+  const itemTypesMap = doc.getMap<Y.Map<unknown>>('itemTypes');
+  const categoryOrder = doc.getArray<string>('categoryOrder');
+  const categoriesMap = doc.getMap<RequirementCategory>('categories');
+  const itemOrder = doc.getArray<string>('itemOrder');
+  const itemsMap = doc.getMap<Y.Map<unknown>>('items');
+  const relationshipTypesMap = doc.getMap<RelationshipType>('relationshipTypes');
+  const relationshipsMap = doc.getMap<RequirementRelationship>('relationships');
+  const nextSequenceMap = doc.getMap<number>('nextSequence');
   const seenItemTypes = orderIdSet(itemTypeOrder);
   const seenCategories = orderIdSet(categoryOrder);
   // Items are keyed by a generated storage key rather than by their own id,
@@ -71,19 +71,19 @@ export function seedYjsRequirementsDoc(doc: Y.Doc, initial: RequirementsDocument
   const seenItemIds = new Set<string>();
   for (const key of itemOrder.toArray()) {
     const existing = itemsMap.get(key);
-    const id = existing?.get("id");
-    if (typeof id === "string") seenItemIds.add(id);
+    const id = existing?.get('id');
+    if (typeof id === 'string') seenItemIds.add(id);
   }
 
   doc.transact(() => {
     for (const t of initial.itemTypes) {
       if (seenItemTypes.has(t.id) || itemTypesMap.has(t.id)) continue;
       const m = new Y.Map<unknown>();
-      m.set("label", t.label);
-      m.set("prefix", t.prefix);
-      m.set("color", t.color);
-      m.set("isBuiltIn", t.isBuiltIn);
-      m.set("isWorkable", t.isWorkable);
+      m.set('label', t.label);
+      m.set('prefix', t.prefix);
+      m.set('color', t.color);
+      m.set('isBuiltIn', t.isBuiltIn);
+      m.set('isWorkable', t.isWorkable);
       itemTypesMap.set(t.id, m);
       pushIfAbsent(itemTypeOrder, seenItemTypes, t.id);
     }
@@ -94,17 +94,17 @@ export function seedYjsRequirementsDoc(doc: Y.Doc, initial: RequirementsDocument
     }
     for (const item of initial.items) {
       if (seenItemIds.has(item.id)) continue;
-      const storageKey = collisionResistantId("item");
+      const storageKey = collisionResistantId('item');
       const m = new Y.Map<unknown>();
-      m.set("id", item.id);
-      m.set("typeId", item.typeId);
-      m.set("title", item.title);
-      m.set("body", item.body);
-      m.set("categoryId", item.categoryId);
-      m.set("sprintId", item.sprintId);
-      m.set("assigneeId", item.assigneeId);
-      m.set("points", item.points);
-      m.set("status", item.status);
+      m.set('id', item.id);
+      m.set('typeId', item.typeId);
+      m.set('title', item.title);
+      m.set('body', item.body);
+      m.set('categoryId', item.categoryId);
+      m.set('sprintId', item.sprintId);
+      m.set('assigneeId', item.assigneeId);
+      m.set('points', item.points);
+      m.set('status', item.status);
       itemsMap.set(storageKey, m);
       itemOrder.push([storageKey]);
       seenItemIds.add(item.id);
@@ -146,18 +146,18 @@ export function seedYjsRequirementsDoc(doc: Y.Doc, initial: RequirementsDocument
  * and joinSession must never seed anything locally in the first place.
  */
 export function seedBuiltInTypesIfEmpty(doc: Y.Doc): void {
-  const itemTypeOrder = doc.getArray<string>("itemTypeOrder");
-  const itemTypes = doc.getMap<Y.Map<unknown>>("itemTypes");
-  const relationshipTypes = doc.getMap<RelationshipType>("relationshipTypes");
+  const itemTypeOrder = doc.getArray<string>('itemTypeOrder');
+  const itemTypes = doc.getMap<Y.Map<unknown>>('itemTypes');
+  const relationshipTypes = doc.getMap<RelationshipType>('relationshipTypes');
   if (itemTypeOrder.length === 0 && itemTypes.size === 0) {
     doc.transact(() => {
       for (const t of BUILT_IN_ITEM_TYPES) {
         const m = new Y.Map<unknown>();
-        m.set("label", t.label);
-        m.set("prefix", t.prefix);
-        m.set("color", t.color);
-        m.set("isBuiltIn", t.isBuiltIn);
-        m.set("isWorkable", t.isWorkable);
+        m.set('label', t.label);
+        m.set('prefix', t.prefix);
+        m.set('color', t.color);
+        m.set('isBuiltIn', t.isBuiltIn);
+        m.set('isWorkable', t.isWorkable);
         itemTypes.set(t.id, m);
         itemTypeOrder.push([t.id]);
       }
@@ -167,7 +167,6 @@ export function seedBuiltInTypesIfEmpty(doc: Y.Doc): void {
     });
   }
 }
-
 
 /**
  * Yjs-backed RequirementsStore. See requirementsStore.ts for why the
@@ -202,15 +201,15 @@ export function seedBuiltInTypesIfEmpty(doc: Y.Doc): void {
  *  - "nextSequence": Y.Map<string, number> keyed by item-type id.
  */
 export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
-  const itemTypeOrder = doc.getArray<string>("itemTypeOrder");
-  const itemTypes = doc.getMap<Y.Map<unknown>>("itemTypes");
-  const categoryOrder = doc.getArray<string>("categoryOrder");
-  const categories = doc.getMap<RequirementCategory>("categories");
-  const itemOrder = doc.getArray<string>("itemOrder");
-  const items = doc.getMap<Y.Map<unknown>>("items");
-  const relationshipTypes = doc.getMap<RelationshipType>("relationshipTypes");
-  const relationships = doc.getMap<RequirementRelationship>("relationships");
-  const nextSequence = doc.getMap<number>("nextSequence");
+  const itemTypeOrder = doc.getArray<string>('itemTypeOrder');
+  const itemTypes = doc.getMap<Y.Map<unknown>>('itemTypes');
+  const categoryOrder = doc.getArray<string>('categoryOrder');
+  const categories = doc.getMap<RequirementCategory>('categories');
+  const itemOrder = doc.getArray<string>('itemOrder');
+  const items = doc.getMap<Y.Map<unknown>>('items');
+  const relationshipTypes = doc.getMap<RelationshipType>('relationshipTypes');
+  const relationships = doc.getMap<RequirementRelationship>('relationships');
+  const nextSequence = doc.getMap<number>('nextSequence');
   /**
    * Definitions of custom item types that have been deleted, kept so a
    * type can be restored faithfully if a concurrent edit turns out to
@@ -224,30 +223,30 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
    * items can go into a sprint at all. Reconstructing that from a
    * display-id prefix would be a guess.
    */
-  const deletedItemTypes = doc.getMap<Y.Map<unknown>>("deletedItemTypes");
+  const deletedItemTypes = doc.getMap<Y.Map<unknown>>('deletedItemTypes');
 
   function itemTypeMapToPlain(id: string, m: Y.Map<unknown>): RequirementItemType {
     return {
       id,
-      label: m.get("label") as string,
-      prefix: m.get("prefix") as string,
-      color: m.get("color") as string,
-      isBuiltIn: m.get("isBuiltIn") as boolean,
-      isWorkable: m.get("isWorkable") as boolean,
+      label: m.get('label') as string,
+      prefix: m.get('prefix') as string,
+      color: m.get('color') as string,
+      isBuiltIn: m.get('isBuiltIn') as boolean,
+      isWorkable: m.get('isWorkable') as boolean,
     };
   }
 
   function itemMapToPlain(m: Y.Map<unknown>): RequirementItem {
     return {
-      id: m.get("id") as string,
-      typeId: m.get("typeId") as string,
-      title: m.get("title") as string,
-      body: m.get("body") as string,
-      categoryId: m.get("categoryId") as string | undefined,
-      sprintId: m.get("sprintId") as string | undefined,
-      assigneeId: m.get("assigneeId") as string | undefined,
-      points: m.get("points") as number | undefined,
-      status: m.get("status") as RequirementItem["status"],
+      id: m.get('id') as string,
+      typeId: m.get('typeId') as string,
+      title: m.get('title') as string,
+      body: m.get('body') as string,
+      categoryId: m.get('categoryId') as string | undefined,
+      sprintId: m.get('sprintId') as string | undefined,
+      assigneeId: m.get('assigneeId') as string | undefined,
+      points: m.get('points') as number | undefined,
+      status: m.get('status') as RequirementItem['status'],
     };
   }
 
@@ -298,7 +297,7 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
     for (const storageKey of itemOrder.toArray()) {
       const m = items.get(storageKey);
       if (!m) continue;
-      const displayId = m.get("id") as string;
+      const displayId = m.get('id') as string;
       const list = byDisplayId.get(displayId);
       if (list) list.push(storageKey);
       else byDisplayId.set(displayId, [storageKey]);
@@ -323,7 +322,7 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
         for (const loserKey of losers) {
           const m = items.get(loserKey);
           if (!m) continue;
-          const typeId = m.get("typeId") as string;
+          const typeId = m.get('typeId') as string;
           const typeMap = itemTypes.get(typeId);
           const type = typeMap ? itemTypeMapToPlain(typeId, typeMap) : undefined;
           const prefix = type?.prefix ?? typeId;
@@ -339,7 +338,7 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
             seq += 1;
             candidate = `${prefix}-${seq}`;
           }
-          m.set("id", candidate);
+          m.set('id', candidate);
           usedDisplayIds.add(candidate);
           nextSequence.set(typeId, seq + 1);
         }
@@ -403,12 +402,13 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
       const m = items.get(storageKey);
       if (!m) continue;
 
-      const categoryId = m.get("categoryId") as string | undefined;
-      if (categoryId !== undefined && !categories.has(categoryId)) danglingCategoryKeys.push(storageKey);
+      const categoryId = m.get('categoryId') as string | undefined;
+      if (categoryId !== undefined && !categories.has(categoryId))
+        danglingCategoryKeys.push(storageKey);
 
-      const typeId = m.get("typeId") as string;
+      const typeId = m.get('typeId') as string;
       if (typeId !== undefined && !itemTypes.has(typeId) && !missingTypeIds.has(typeId)) {
-        missingTypeIds.set(typeId, m.get("id") as string);
+        missingTypeIds.set(typeId, m.get('id') as string);
       }
     }
 
@@ -416,7 +416,7 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
 
     doc.transact(() => {
       for (const storageKey of danglingCategoryKeys) {
-        items.get(storageKey)?.set("categoryId", undefined);
+        items.get(storageKey)?.set('categoryId', undefined);
       }
 
       for (const [typeId, sampleDisplayId] of missingTypeIds) {
@@ -436,13 +436,14 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
            * silently make these items sprint-eligible - the more
            * damaging direction to be wrong in.
            */
-          const prefix = /^([A-Za-z][A-Za-z0-9]*)-\d+$/.exec(sampleDisplayId)?.[1] ?? typeId.toUpperCase();
-          restored.set("label", `${prefix} (recovered)`);
-          restored.set("prefix", prefix);
-          restored.set("color", "#98a2b3");
-          restored.set("isWorkable", false);
+          const prefix =
+            /^([A-Za-z][A-Za-z0-9]*)-\d+$/.exec(sampleDisplayId)?.[1] ?? typeId.toUpperCase();
+          restored.set('label', `${prefix} (recovered)`);
+          restored.set('prefix', prefix);
+          restored.set('color', '#98a2b3');
+          restored.set('isWorkable', false);
         }
-        restored.set("isBuiltIn", false);
+        restored.set('isBuiltIn', false);
         itemTypes.set(typeId, restored);
         if (!itemTypeOrder.toArray().includes(typeId)) itemTypeOrder.push([typeId]);
         deletedItemTypes.delete(typeId);
@@ -505,7 +506,17 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
 
   /** Kept so destroy() can detach exactly what was attached - listing them
    * again by hand would drift the moment a collection is added. */
-  const observed = [itemTypeOrder, itemTypes, categoryOrder, categories, itemOrder, items, relationshipTypes, relationships, nextSequence];
+  const observed = [
+    itemTypeOrder,
+    itemTypes,
+    categoryOrder,
+    categories,
+    itemOrder,
+    items,
+    relationshipTypes,
+    relationships,
+    nextSequence,
+  ];
   for (const target of observed) target.observeDeep(recomputeAndNotify);
   let destroyed = false;
 
@@ -540,7 +551,7 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
       for (const storageKey of itemOrder.toArray()) {
         const itemMap = items.get(storageKey);
         if (itemMap) {
-          const itId = itemMap.get("id") as string;
+          const itId = itemMap.get('id') as string;
           if (itId) usedIds.add(itId);
         }
       }
@@ -549,14 +560,14 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
         sequence++;
       }
       const displayId = `${prefix}-${sequence}`;
-      const storageKey = collisionResistantId("item");
+      const storageKey = collisionResistantId('item');
       doc.transact(() => {
         const m = new Y.Map<unknown>();
-        m.set("id", displayId);
-        m.set("typeId", typeId);
-        m.set("title", "");
-        m.set("body", "");
-        m.set("status", defaultStatusForType(cached, typeId));
+        m.set('id', displayId);
+        m.set('typeId', typeId);
+        m.set('title', '');
+        m.set('body', '');
+        m.set('status', defaultStatusForType(cached, typeId));
         items.set(storageKey, m);
         itemOrder.push([storageKey]);
         nextSequence.set(typeId, sequence + 1);
@@ -579,19 +590,19 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
       const storageKey = displayIdToStorageKey.get(id);
       const m = storageKey ? items.get(storageKey) : undefined;
       if (!m) return undefined;
-      const currentTypeId = m.get("typeId") as string;
+      const currentTypeId = m.get('typeId') as string;
       if (currentTypeId === newTypeId) return id;
 
       const targetTypeMap = itemTypes.get(newTypeId);
       if (!targetTypeMap) return undefined;
-      const isWorkable = (targetTypeMap.get("isWorkable") as boolean) ?? false;
-      const targetPrefix = (targetTypeMap.get("prefix") as string) ?? newTypeId;
+      const isWorkable = (targetTypeMap.get('isWorkable') as boolean) ?? false;
+      const targetPrefix = (targetTypeMap.get('prefix') as string) ?? newTypeId;
 
       const usedIds = new Set<string>();
       for (const key of itemOrder.toArray()) {
         const itemMap = items.get(key);
         if (itemMap) {
-          const itId = itemMap.get("id") as string;
+          const itId = itemMap.get('id') as string;
           if (itId) usedIds.add(itId);
         }
       }
@@ -602,15 +613,15 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
       const newId = `${targetPrefix}-${sequence}`;
 
       doc.transact(() => {
-        m.set("id", newId);
-        m.set("typeId", newTypeId);
+        m.set('id', newId);
+        m.set('typeId', newTypeId);
         if (isWorkable) {
-          if (!m.get("status")) m.set("status", "todo");
+          if (!m.get('status')) m.set('status', 'todo');
         } else {
-          m.set("status", undefined);
-          m.set("points", undefined);
-          m.set("assigneeId", undefined);
-          m.set("sprintId", undefined);
+          m.set('status', undefined);
+          m.set('points', undefined);
+          m.set('assigneeId', undefined);
+          m.set('sprintId', undefined);
         }
 
         // Update relationships
@@ -628,9 +639,9 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
         for (const key of itemOrder.toArray()) {
           const itemMap = items.get(key);
           if (itemMap) {
-            const body = itemMap.get("body") as string | undefined;
+            const body = itemMap.get('body') as string | undefined;
             if (body && (body.includes(`#${id}`) || body.includes(`#ref:${id}`))) {
-              itemMap.set("body", updateItemReferencesInText(body, id, newId));
+              itemMap.set('body', updateItemReferencesInText(body, id, newId));
             }
           }
         }
@@ -644,14 +655,14 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
       if (fromTypeId === toTypeId) return 0;
       const targetTypeMap = itemTypes.get(toTypeId);
       if (!targetTypeMap) return 0;
-      const isWorkable = (targetTypeMap.get("isWorkable") as boolean) ?? false;
-      const targetPrefix = (targetTypeMap.get("prefix") as string) ?? toTypeId;
+      const isWorkable = (targetTypeMap.get('isWorkable') as boolean) ?? false;
+      const targetPrefix = (targetTypeMap.get('prefix') as string) ?? toTypeId;
 
       const usedIds = new Set<string>();
       for (const key of itemOrder.toArray()) {
         const itemMap = items.get(key);
         if (itemMap) {
-          const itId = itemMap.get("id") as string;
+          const itId = itemMap.get('id') as string;
           if (itId) usedIds.add(itId);
         }
       }
@@ -661,8 +672,8 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
 
       for (const storageKey of itemOrder.toArray()) {
         const m = items.get(storageKey);
-        if (m && m.get("typeId") === fromTypeId) {
-          const oldId = m.get("id") as string;
+        if (m && m.get('typeId') === fromTypeId) {
+          const oldId = m.get('id') as string;
           while (usedIds.has(`${targetPrefix}-${sequence}`)) {
             sequence++;
           }
@@ -679,15 +690,15 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
         for (const { newId, storageKey } of conversions) {
           const m = items.get(storageKey);
           if (m) {
-            m.set("id", newId);
-            m.set("typeId", toTypeId);
+            m.set('id', newId);
+            m.set('typeId', toTypeId);
             if (isWorkable) {
-              if (!m.get("status")) m.set("status", "todo");
+              if (!m.get('status')) m.set('status', 'todo');
             } else {
-              m.set("status", undefined);
-              m.set("points", undefined);
-              m.set("assigneeId", undefined);
-              m.set("sprintId", undefined);
+              m.set('status', undefined);
+              m.set('points', undefined);
+              m.set('assigneeId', undefined);
+              m.set('sprintId', undefined);
             }
           }
         }
@@ -709,7 +720,7 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
         for (const key of itemOrder.toArray()) {
           const itemMap = items.get(key);
           if (itemMap) {
-            const body = itemMap.get("body") as string | undefined;
+            const body = itemMap.get('body') as string | undefined;
             if (body) {
               let updated = body;
               for (const { oldId, newId } of conversions) {
@@ -718,7 +729,7 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
                 }
               }
               if (updated !== body) {
-                itemMap.set("body", updated);
+                itemMap.set('body', updated);
               }
             }
           }
@@ -753,7 +764,9 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
      */
     createAndAssignCategory: (itemId, label) => {
       const trimmed = label.trim();
-      const existing = Array.from(categories.values()).find((c) => c.label.toLowerCase() === trimmed.toLowerCase());
+      const existing = Array.from(categories.values()).find(
+        (c) => c.label.toLowerCase() === trimmed.toLowerCase(),
+      );
       const storageKey = displayIdToStorageKey.get(itemId);
       doc.transact(() => {
         let categoryId: string;
@@ -763,12 +776,16 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
           let n = 1;
           while (categories.has(`category-${n}`)) n++;
           categoryId = `category-${n}`;
-          const palette = ["#5b7cfa", "#9061f9", "#22B8CF", "#F2994A", "#eb5286", "#38bd7d"];
-          categories.set(categoryId, { id: categoryId, label: trimmed, color: palette[categoryOrder.length % palette.length] });
+          const palette = ['#5b7cfa', '#9061f9', '#22B8CF', '#F2994A', '#eb5286', '#38bd7d'];
+          categories.set(categoryId, {
+            id: categoryId,
+            label: trimmed,
+            color: palette[categoryOrder.length % palette.length],
+          });
           categoryOrder.push([categoryId]);
         }
         const m = storageKey ? items.get(storageKey) : undefined;
-        if (m) m.set("categoryId", categoryId);
+        if (m) m.set('categoryId', categoryId);
       });
     },
 
@@ -783,7 +800,7 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
         // render as a silently blank chip rather than as uncategorized.
         for (const storageKey of itemOrder.toArray()) {
           const m = items.get(storageKey);
-          if (m?.get("categoryId") === categoryId) m.set("categoryId", undefined);
+          if (m?.get('categoryId') === categoryId) m.set('categoryId', undefined);
         }
       });
     },
@@ -799,11 +816,11 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
       const id = `custom-${n}`;
       doc.transact(() => {
         const m = new Y.Map<unknown>();
-        m.set("label", label);
-        m.set("prefix", prefix.toUpperCase());
-        m.set("color", color);
-        m.set("isBuiltIn", false);
-        m.set("isWorkable", isWorkable);
+        m.set('label', label);
+        m.set('prefix', prefix.toUpperCase());
+        m.set('color', color);
+        m.set('isBuiltIn', false);
+        m.set('isWorkable', isWorkable);
         itemTypes.set(id, m);
         itemTypeOrder.push([id]);
         // custom-N ids are reused once freed (the scan above picks the
@@ -836,7 +853,7 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
       let deleted = false;
       doc.transact(() => {
         for (const storageKey of itemOrder.toArray()) {
-          if (items.get(storageKey)?.get("typeId") === typeId) return;
+          if (items.get(storageKey)?.get('typeId') === typeId) return;
         }
         const existing = itemTypes.get(typeId);
         if (!existing) return;
@@ -886,7 +903,7 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
       const result = addRelationshipPure(cached, typeId, fromItemId, toItemId);
       if (result.error) return result.error;
       const added = result.relationships.find(
-        (r) => !cached.relationships.some((existing) => existing.id === r.id)
+        (r) => !cached.relationships.some((existing) => existing.id === r.id),
       );
       if (added) relationships.set(added.id, added);
       return null;
@@ -901,9 +918,9 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
       doc.transact(() => {
         for (const storageKey of itemOrder.toArray()) {
           const m = items.get(storageKey);
-          const currentSprintId = m?.get("sprintId") as string | undefined;
+          const currentSprintId = m?.get('sprintId') as string | undefined;
           if (m && currentSprintId && sprintIdSet.has(currentSprintId)) {
-            m.set("sprintId", undefined);
+            m.set('sprintId', undefined);
           }
         }
       });

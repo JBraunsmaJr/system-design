@@ -12,16 +12,16 @@
  * home at all. A document already written to a file, already synced, or
  * already at rest in browser storage is not at risk from a tab closing.
  */
-import type { DurabilitySignals } from "./durability.ts";
+import type { DurabilitySignals } from './durability.ts';
 
 /** Just enough of EventTarget to install a listener, so tests need no DOM. */
 export interface UnloadTarget {
   addEventListener(
-    type: "beforeunload",
+    type: 'beforeunload',
     listener: (event: { preventDefault: () => void; returnValue?: unknown }) => void,
   ): void;
   removeEventListener(
-    type: "beforeunload",
+    type: 'beforeunload',
     listener: (event: { preventDefault: () => void; returnValue?: unknown }) => void,
   ): void;
 }
@@ -41,17 +41,18 @@ export function shouldBlockUnload(signals: DurabilitySignals): boolean {
 
   // The file the user chose as their copy has changed elsewhere and has not
   // been written since; closing leaves it behind without them deciding.
-  if (signals.fileAccess === "available" && signals.fileAttachment?.status === "conflict") return true;
+  if (signals.fileAccess === 'available' && signals.fileAttachment?.status === 'conflict')
+    return true;
 
   // Nothing is being written at all.
-  if (signals.localPersistence === "unavailable") return true;
+  if (signals.localPersistence === 'unavailable') return true;
 
   // Queued for a server that has not confirmed receipt. The local replica
   // survives, so this is only worth prompting about when there is no local
   // replica to fall back on.
   if (
     (signals.pendingUpdates ?? 0) > 0 &&
-    signals.localPersistence !== "active" &&
+    signals.localPersistence !== 'active' &&
     !signals.fileBacked
   ) {
     return true;
@@ -74,28 +75,25 @@ export function installUnloadGuard(
   getSignals: () => DurabilitySignals,
   target: UnloadTarget | undefined = globalThis as unknown as UnloadTarget,
 ): UnloadGuard {
-  if (!target || typeof target.addEventListener !== "function") {
+  if (!target || typeof target.addEventListener !== 'function') {
     return { release: () => {} };
   }
 
-  const listener = (event: {
-    preventDefault: () => void;
-    returnValue?: unknown;
-  }) => {
+  const listener = (event: { preventDefault: () => void; returnValue?: unknown }) => {
     if (!shouldBlockUnload(getSignals())) return;
     event.preventDefault();
     // Still required by some engines to actually trigger the prompt, even
     // though the string itself is ignored everywhere.
-    event.returnValue = "";
+    event.returnValue = '';
   };
 
-  target.addEventListener("beforeunload", listener);
+  target.addEventListener('beforeunload', listener);
   let released = false;
   return {
     release() {
       if (released) return;
       released = true;
-      target.removeEventListener("beforeunload", listener);
+      target.removeEventListener('beforeunload', listener);
     },
   };
 }

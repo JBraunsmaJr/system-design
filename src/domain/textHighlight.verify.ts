@@ -1,7 +1,7 @@
 /**
  * Run with: npx tsx --tsconfig tsconfig.app.json src/domain/textHighlight.verify.ts
  */
-import { splitByHighlight, computeTruncationWithHighlight } from "./textHighlight";
+import { splitByHighlight, computeTruncationWithHighlight } from './textHighlight';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {
@@ -14,93 +14,105 @@ function assert(condition: boolean, message: string) {
   }
 }
 
-console.log("=== splitByHighlight ===");
+console.log('=== splitByHighlight ===');
 {
-  const segs = splitByHighlight("Hello World, hello universe", "hello");
+  const segs = splitByHighlight('Hello World, hello universe', 'hello');
   assert(segs.length === 4, `splits into 4 segments: got ${segs.length}`);
-  assert(segs[0].text === "Hello" && segs[0].isMatch, "first match 'Hello'");
-  assert(segs[1].text === " World, " && !segs[1].isMatch, "middle text");
-  assert(segs[2].text === "hello" && segs[2].isMatch, "second match 'hello'");
-  assert(segs[3].text === " universe" && !segs[3].isMatch, "trailing text");
+  assert(segs[0].text === 'Hello' && segs[0].isMatch, "first match 'Hello'");
+  assert(segs[1].text === ' World, ' && !segs[1].isMatch, 'middle text');
+  assert(segs[2].text === 'hello' && segs[2].isMatch, "second match 'hello'");
+  assert(segs[3].text === ' universe' && !segs[3].isMatch, 'trailing text');
 }
 
 {
-  const empty = splitByHighlight("Just some text", "");
-  assert(empty.length === 1 && empty[0].text === "Just some text" && !empty[0].isMatch, "empty query gives single non-matching segment");
+  const empty = splitByHighlight('Just some text', '');
+  assert(
+    empty.length === 1 && empty[0].text === 'Just some text' && !empty[0].isMatch,
+    'empty query gives single non-matching segment',
+  );
 }
 
 {
-  const noMatch = splitByHighlight("Just some text", "xyz");
-  assert(noMatch.length === 1 && noMatch[0].text === "Just some text" && !noMatch[0].isMatch, "no match gives single non-matching segment");
+  const noMatch = splitByHighlight('Just some text', 'xyz');
+  assert(
+    noMatch.length === 1 && noMatch[0].text === 'Just some text' && !noMatch[0].isMatch,
+    'no match gives single non-matching segment',
+  );
 }
 
-console.log("\n=== computeTruncationWithHighlight ===");
+console.log('\n=== computeTruncationWithHighlight ===');
 // Measure by character count for pure unit tests
 const charMeasure = (s: string) => s.length;
 
 // Case 1: Fits entirely without truncation
 {
-  const res = computeTruncationWithHighlight("Short title", "title", 50, charMeasure);
-  assert(!res.isTruncated, "not truncated when it fits available width");
-  assert(res.visibleText === "Short title", "visibleText is full text");
-  assert(res.hasMatchInVisible, "has match in visible text");
-  assert(!res.hasMatchInTruncated, "no match in truncated");
+  const res = computeTruncationWithHighlight('Short title', 'title', 50, charMeasure);
+  assert(!res.isTruncated, 'not truncated when it fits available width');
+  assert(res.visibleText === 'Short title', 'visibleText is full text');
+  assert(res.hasMatchInVisible, 'has match in visible text');
+  assert(!res.hasMatchInTruncated, 'no match in truncated');
 }
 
 // Case 2: Truncated, match is near the beginning and fits in visible prefix
 {
   // availableWidth = 20, "..." takes 3 chars, so targetWidth = 17 chars fits "User authenticati"
-  const title = "User authentication with OAuth2 and SAML";
-  const res = computeTruncationWithHighlight(title, "User", 20, charMeasure);
-  assert(res.isTruncated, "is truncated");
-  assert(res.visibleText === "User authenticati", `visible text is truncated: ${res.visibleText}`);
-  assert(res.hasMatchInVisible, "has match in visible");
-  assert(!res.leadingEllipsis, "no leading ellipsis");
-  assert(res.trailingEllipsis, "has trailing ellipsis");
+  const title = 'User authentication with OAuth2 and SAML';
+  const res = computeTruncationWithHighlight(title, 'User', 20, charMeasure);
+  assert(res.isTruncated, 'is truncated');
+  assert(res.visibleText === 'User authenticati', `visible text is truncated: ${res.visibleText}`);
+  assert(res.hasMatchInVisible, 'has match in visible');
+  assert(!res.leadingEllipsis, 'no leading ellipsis');
+  assert(res.trailingEllipsis, 'has trailing ellipsis');
 }
 
 // Case 3: Truncated, match is in the cut-off portion at the end
 {
-  const title = "User authentication with OAuth2 and SAML";
-  const res = computeTruncationWithHighlight(title, "SAML", 20, charMeasure);
-  assert(res.isTruncated, "is truncated");
-  assert(res.hasMatchInVisible, "has match in visible text");
-  assert(res.visibleText.includes("SAML"), `visible text includes searched term: ${res.visibleText}`);
-  assert(res.leadingEllipsis, "has leading ellipsis before context");
-  assert(!res.trailingEllipsis, "no trailing ellipsis since it reaches end of text");
+  const title = 'User authentication with OAuth2 and SAML';
+  const res = computeTruncationWithHighlight(title, 'SAML', 20, charMeasure);
+  assert(res.isTruncated, 'is truncated');
+  assert(res.hasMatchInVisible, 'has match in visible text');
+  assert(
+    res.visibleText.includes('SAML'),
+    `visible text includes searched term: ${res.visibleText}`,
+  );
+  assert(res.leadingEllipsis, 'has leading ellipsis before context');
+  assert(!res.trailingEllipsis, 'no trailing ellipsis since it reaches end of text');
 }
 
 // Case 4: Truncated, match is in the middle of a long text
 {
-  const title = "User authentication system with OAuth2 and SAML 2.0 Single Sign-On";
-  const res = computeTruncationWithHighlight(title, "OAuth2", 25, charMeasure);
-  assert(res.isTruncated, "is truncated");
-  assert(res.hasMatchInVisible, "has match in visible");
-  assert(res.visibleText.includes("OAuth2"), `visible text includes searched term: ${res.visibleText}`);
-  assert(res.leadingEllipsis, "has leading ellipsis");
-  assert(res.trailingEllipsis, "has trailing ellipsis");
+  const title = 'User authentication system with OAuth2 and SAML 2.0 Single Sign-On';
+  const res = computeTruncationWithHighlight(title, 'OAuth2', 25, charMeasure);
+  assert(res.isTruncated, 'is truncated');
+  assert(res.hasMatchInVisible, 'has match in visible');
+  assert(
+    res.visibleText.includes('OAuth2'),
+    `visible text includes searched term: ${res.visibleText}`,
+  );
+  assert(res.leadingEllipsis, 'has leading ellipsis');
+  assert(res.trailingEllipsis, 'has trailing ellipsis');
 }
 
 // Case 5: Truncated, multiple matches with first match at the beginning
 {
-  const title = "Auth service with Auth token verification";
-  const res = computeTruncationWithHighlight(title, "Auth", 20, charMeasure);
-  assert(res.isTruncated, "is truncated");
-  assert(res.hasMatchInVisible, "has match in visible");
-  assert(res.visibleText === "Auth service with", `visibleText is: ${res.visibleText}`);
-  assert(!res.leadingEllipsis, "no leading ellipsis");
-  assert(res.trailingEllipsis, "has trailing ellipsis");
+  const title = 'Auth service with Auth token verification';
+  const res = computeTruncationWithHighlight(title, 'Auth', 20, charMeasure);
+  assert(res.isTruncated, 'is truncated');
+  assert(res.hasMatchInVisible, 'has match in visible');
+  assert(res.visibleText === 'Auth service with', `visibleText is: ${res.visibleText}`);
+  assert(!res.leadingEllipsis, 'no leading ellipsis');
+  assert(res.trailingEllipsis, 'has trailing ellipsis');
 }
 
 // Case 6: Truncated, query does not match title at all
 {
-  const title = "User authentication with OAuth2";
-  const res = computeTruncationWithHighlight(title, "Database", 20, charMeasure);
-  assert(res.isTruncated, "is truncated");
-  assert(!res.hasMatchInVisible, "no match in visible");
-  assert(res.visibleText === "User authenticati", `visibleText is: ${res.visibleText}`);
-  assert(!res.leadingEllipsis, "no leading ellipsis");
-  assert(res.trailingEllipsis, "has trailing ellipsis");
+  const title = 'User authentication with OAuth2';
+  const res = computeTruncationWithHighlight(title, 'Database', 20, charMeasure);
+  assert(res.isTruncated, 'is truncated');
+  assert(!res.hasMatchInVisible, 'no match in visible');
+  assert(res.visibleText === 'User authenticati', `visibleText is: ${res.visibleText}`);
+  assert(!res.leadingEllipsis, 'no leading ellipsis');
+  assert(res.trailingEllipsis, 'has trailing ellipsis');
 }
 
-console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);
+console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);

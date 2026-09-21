@@ -1,4 +1,4 @@
-import type { ScenarioDefinition } from "./types";
+import type { ScenarioDefinition } from './types';
 import {
   setupFixture,
   resetCounters,
@@ -11,7 +11,7 @@ import {
   pointOnTarget,
   assertGestureCommitted,
   findGrabbableUpdater,
-} from "./helpers";
+} from './helpers';
 
 const nodeSelector = (id: string) => `.react-flow__node[data-id="${id}"]`;
 
@@ -20,13 +20,13 @@ const nodeSelector = (id: string) => `.react-flow__node[data-id="${id}"]`;
  * its fixture waypoints, which sit near y 410-470 - so every edge scenario
  * frames the same region.
  */
-const EDGE_HUB_1_REGION = ["node-0", "node-1", "node-62"];
+const EDGE_HUB_1_REGION = ['node-0', 'node-1', 'node-62'];
 
 /** Reconnect target. Inside EDGE_HUB_1_REGION, so the whole gesture is on
  * screen at zoom 1; node-10 (the previous target) is 2200px away. */
-const RECONNECT_TARGET = "node-42";
+const RECONNECT_TARGET = 'node-42';
 
-async function selectEdgeHub1(page: Parameters<ScenarioDefinition["run"]>[0]) {
+async function selectEdgeHub1(page: Parameters<ScenarioDefinition['run']>[0]) {
   await page.evaluate(`
     (() => {
       const perfObj = window.__PERF__;
@@ -39,12 +39,13 @@ async function selectEdgeHub1(page: Parameters<ScenarioDefinition["run"]>[0]) {
 }
 
 export const idleScenario: ScenarioDefinition = {
-  id: "idle",
-  name: "Idle at Rest",
-  fixture: "large",
-  description: "Mount, settle, then do nothing for 2 seconds. Protects against runaway effects and render loops.",
+  id: 'idle',
+  name: 'Idle at Rest',
+  fixture: 'large',
+  description:
+    'Mount, settle, then do nothing for 2 seconds. Protects against runaway effects and render loops.',
   run: async (page) => {
-    await setupFixture(page, "large");
+    await setupFixture(page, 'large');
     await resetCounters(page);
 
     // Idle for 2000ms
@@ -54,63 +55,68 @@ export const idleScenario: ScenarioDefinition = {
 };
 
 export const dragNodeScenario: ScenarioDefinition = {
-  id: "drag-node",
-  name: "Drag Single Node",
-  fixture: "large",
-  description: "Drag one node 200px in 20 discrete 10px steps. Protects single-node render isolation.",
+  id: 'drag-node',
+  name: 'Drag Single Node',
+  fixture: 'large',
+  description:
+    'Drag one node 200px in 20 discrete 10px steps. Protects single-node render isolation.',
   run: async (page) => {
-    await setupFixture(page, "large");
-    await frameNodes(page, ["node-50"]);
-    const start = await pointOnTarget(page, nodeSelector("node-50"));
+    await setupFixture(page, 'large');
+    await frameNodes(page, ['node-50']);
+    const start = await pointOnTarget(page, nodeSelector('node-50'));
     await resetCounters(page);
 
     await dragCoordinates(page, start.x, start.y, 200, 0, 20);
-    await assertGestureCommitted(page, "Dragging node-50");
+    await assertGestureCommitted(page, 'Dragging node-50');
   },
 };
 
 export const dragHubNodeScenario: ScenarioDefinition = {
-  id: "drag-hub-node",
-  name: "Drag Hub Node (High Degree)",
-  fixture: "large",
-  description: "Drag hub node with >=25 attached edges 200px. Protects edge re-render fan-out.",
+  id: 'drag-hub-node',
+  name: 'Drag Hub Node (High Degree)',
+  fixture: 'large',
+  description: 'Drag hub node with >=25 attached edges 200px. Protects edge re-render fan-out.',
   run: async (page) => {
-    await setupFixture(page, "large");
-    await frameNodes(page, ["node-0"]);
-    const start = await pointOnTarget(page, nodeSelector("node-0"));
+    await setupFixture(page, 'large');
+    await frameNodes(page, ['node-0']);
+    const start = await pointOnTarget(page, nodeSelector('node-0'));
     await resetCounters(page);
 
     await dragCoordinates(page, start.x, start.y, 200, 0, 20);
-    await assertGestureCommitted(page, "Dragging hub node-0");
+    await assertGestureCommitted(page, 'Dragging hub node-0');
   },
 };
 
 export const dragGroupScenario: ScenarioDefinition = {
-  id: "drag-group",
-  name: "Drag Group Boundary",
-  fixture: "grouped",
-  description: "Drag a boundary containing >=10 child nodes 150px. Protects group child geometry caching.",
+  id: 'drag-group',
+  name: 'Drag Group Boundary',
+  fixture: 'grouped',
+  description:
+    'Drag a boundary containing >=10 child nodes 150px. Protects group child geometry caching.',
   run: async (page) => {
-    await setupFixture(page, "grouped");
-    await frameNodes(page, ["group-0"]);
+    await setupFixture(page, 'grouped');
+    await frameNodes(page, ['group-0']);
     // The top edge hit area is what drags a group boundary.
-    const start = await pointOnTarget(page, `${nodeSelector("group-0")} .group-node__edge-hit--top`);
+    const start = await pointOnTarget(
+      page,
+      `${nodeSelector('group-0')} .group-node__edge-hit--top`,
+    );
     await resetCounters(page);
 
     await dragCoordinates(page, start.x, start.y, 150, 0, 15);
-    await assertGestureCommitted(page, "Dragging group-0");
+    await assertGestureCommitted(page, 'Dragging group-0');
   },
 };
 
 export const marqueeSelectScenario: ScenarioDefinition = {
-  id: "marquee-select",
-  name: "Marquee Select Multiple Nodes",
-  fixture: "large",
-  description: "Marquee-select ~100 nodes across canvas. Protects selection change fan-out.",
+  id: 'marquee-select',
+  name: 'Marquee Select Multiple Nodes',
+  fixture: 'large',
+  description: 'Marquee-select ~100 nodes across canvas. Protects selection change fan-out.',
   run: async (page) => {
-    await setupFixture(page, "large");
+    await setupFixture(page, 'large');
     // Fit the whole fixture so a 600x400 marquee covers a large share of it.
-    await frameNodes(page, ["node-0", "node-399"]);
+    await frameNodes(page, ['node-0', 'node-399']);
 
     // The toggle is titled by its CURRENT mode. The old selector looked for an
     // aria-label that does not exist and skipped the click when it was not
@@ -124,20 +130,21 @@ export const marqueeSelectScenario: ScenarioDefinition = {
     // the marquee has room to extend right and down. Fixed offsets land on
     // floating UI (breadcrumb, panels) depending on layout.
     const region = await page.evaluate(() => {
-      const el = document.querySelector(".react-flow__pane");
+      const el = document.querySelector('.react-flow__pane');
       if (!el) return null;
       const r = el.getBoundingClientRect();
       for (let y = r.top + 20; y < r.top + 240; y += 10) {
         for (let x = r.left + 20; x < r.left + 240; x += 10) {
           const hit = document.elementFromPoint(x, y);
-          if (hit && hit.classList.contains("react-flow__pane")) {
+          if (hit && hit.classList.contains('react-flow__pane')) {
             return { x, y, right: r.right, bottom: r.bottom };
           }
         }
       }
       return null;
     });
-    if (!region) throw new Error("No empty canvas pane point near the top-left to start a marquee from");
+    if (!region)
+      throw new Error('No empty canvas pane point near the top-left to start a marquee from');
     const start = { x: region.x, y: region.y };
     const width = Math.min(600, region.right - start.x - 30);
     const height = Math.min(400, region.bottom - start.y - 30);
@@ -145,7 +152,7 @@ export const marqueeSelectScenario: ScenarioDefinition = {
     await resetCounters(page);
     await dragCoordinates(page, start.x, start.y, width, height, 20);
 
-    const selected = await page.$$eval(".react-flow__node.selected", (els) => els.length);
+    const selected = await page.$$eval('.react-flow__node.selected', (els) => els.length);
     if (selected < 20) {
       throw new Error(`Marquee selected ${selected} nodes; expected a large share of the fixture.`);
     }
@@ -153,12 +160,13 @@ export const marqueeSelectScenario: ScenarioDefinition = {
 };
 
 export const panScenario: ScenarioDefinition = {
-  id: "pan",
-  name: "Pan Viewport",
-  fixture: "large",
-  description: "Pan the viewport 500px in 50 discrete 10px steps. Viewport transforms must not re-render nodes.",
+  id: 'pan',
+  name: 'Pan Viewport',
+  fixture: 'large',
+  description:
+    'Pan the viewport 500px in 50 discrete 10px steps. Viewport transforms must not re-render nodes.',
   run: async (page) => {
-    await setupFixture(page, "large");
+    await setupFixture(page, 'large');
     await resetCounters(page);
 
     // Drag canvas background. Verified afterwards: a pan that silently
@@ -173,12 +181,12 @@ export const panScenario: ScenarioDefinition = {
 };
 
 export const zoomScenario: ScenarioDefinition = {
-  id: "zoom",
-  name: "Zoom Viewport In and Out",
-  fixture: "large",
-  description: "Zoom out two steps and back. Protects zoom-dependent rendering paths.",
+  id: 'zoom',
+  name: 'Zoom Viewport In and Out',
+  fixture: 'large',
+  description: 'Zoom out two steps and back. Protects zoom-dependent rendering paths.',
   run: async (page) => {
-    await setupFixture(page, "large");
+    await setupFixture(page, 'large');
     await resetCounters(page);
 
     await page.mouse.move(500, 400);
@@ -192,46 +200,47 @@ export const zoomScenario: ScenarioDefinition = {
 };
 
 export const dragWaypointScenario: ScenarioDefinition = {
-  id: "drag-waypoint",
-  name: "Drag Waypoint Bend",
-  fixture: "large",
-  description: "Drag existing edge waypoint 150px in 15 steps. Protects waypoint coalescing and routing.",
+  id: 'drag-waypoint',
+  name: 'Drag Waypoint Bend',
+  fixture: 'large',
+  description:
+    'Drag existing edge waypoint 150px in 15 steps. Protects waypoint coalescing and routing.',
   run: async (page) => {
-    await setupFixture(page, "large");
+    await setupFixture(page, 'large');
     await frameNodes(page, EDGE_HUB_1_REGION);
     await selectEdgeHub1(page);
-    const start = await pointOnTarget(page, ".typed-edge__waypoint");
+    const start = await pointOnTarget(page, '.typed-edge__waypoint');
     await resetCounters(page);
 
     await dragCoordinates(page, start.x, start.y, 150, 0, 15);
-    await assertGestureCommitted(page, "Dragging a waypoint of edge-hub-1");
+    await assertGestureCommitted(page, 'Dragging a waypoint of edge-hub-1');
   },
 };
 
 export const createWaypointScenario: ScenarioDefinition = {
-  id: "create-waypoint",
-  name: "Create Waypoint Bend",
-  fixture: "large",
-  description: "Drag an insertion handle 100px into a new bend. Protects insertion drag path.",
+  id: 'create-waypoint',
+  name: 'Create Waypoint Bend',
+  fixture: 'large',
+  description: 'Drag an insertion handle 100px into a new bend. Protects insertion drag path.',
   run: async (page) => {
-    await setupFixture(page, "large");
+    await setupFixture(page, 'large');
     await frameNodes(page, EDGE_HUB_1_REGION);
     await selectEdgeHub1(page);
-    const start = await pointOnTarget(page, ".typed-edge__insert-dot");
+    const start = await pointOnTarget(page, '.typed-edge__insert-dot');
     await resetCounters(page);
 
     await dragCoordinates(page, start.x, start.y, 100, 50, 10);
-    await assertGestureCommitted(page, "Creating a waypoint on edge-hub-1");
+    await assertGestureCommitted(page, 'Creating a waypoint on edge-hub-1');
   },
 };
 
 export const reconnectEdgeScenario: ScenarioDefinition = {
-  id: "reconnect-edge",
-  name: "Reconnect Edge Endpoint",
-  fixture: "large",
-  description: "Drag edge endpoint to another node. Protects reconnection validation path.",
+  id: 'reconnect-edge',
+  name: 'Reconnect Edge Endpoint',
+  fixture: 'large',
+  description: 'Drag edge endpoint to another node. Protects reconnection validation path.',
   run: async (page) => {
-    await setupFixture(page, "large");
+    await setupFixture(page, 'large');
     await frameNodes(page, EDGE_HUB_1_REGION);
     await selectEdgeHub1(page);
 
@@ -241,12 +250,15 @@ export const reconnectEdgeScenario: ScenarioDefinition = {
     // Released over a connection HANDLE, not the node body: React Flow only
     // completes a reconnect within connectionRadius of a handle, so a drop on
     // the middle of a node (what this scenario used to do) connects nothing.
-    const target = await page.evaluate((sel) => {
-      const handle = document.querySelector(sel);
-      if (!handle) return null;
-      const r = handle.getBoundingClientRect();
-      return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-    }, `${nodeSelector(RECONNECT_TARGET)} .react-flow__handle`);
+    const target = await page.evaluate(
+      (sel) => {
+        const handle = document.querySelector(sel);
+        if (!handle) return null;
+        const r = handle.getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      },
+      `${nodeSelector(RECONNECT_TARGET)} .react-flow__handle`,
+    );
     if (!target) throw new Error(`${RECONNECT_TARGET} has no connection handle to reconnect onto`);
     await resetCounters(page);
 
@@ -256,12 +268,13 @@ export const reconnectEdgeScenario: ScenarioDefinition = {
 };
 
 export const drillInOutScenario: ScenarioDefinition = {
-  id: "drill-in-out",
-  name: "Drill In and Out Sub-Diagram",
-  fixture: "nested",
-  description: "Drill into nested sub-diagram and back to root. Protects path filtering and camera fit.",
+  id: 'drill-in-out',
+  name: 'Drill In and Out Sub-Diagram',
+  fixture: 'nested',
+  description:
+    'Drill into nested sub-diagram and back to root. Protects path filtering and camera fit.',
   run: async (page) => {
-    await setupFixture(page, "nested");
+    await setupFixture(page, 'nested');
     await resetCounters(page);
 
     // Drill in
@@ -289,12 +302,13 @@ export const drillInOutScenario: ScenarioDefinition = {
 };
 
 export const remoteBurstScenario: ScenarioDefinition = {
-  id: "remote-burst",
-  name: "Remote Yjs Update Burst (Idle Local)",
-  fixture: "large",
-  description: "Apply 120 remote Yjs updates at ~60Hz while idle locally (PERF-S-2). Protects remote change ingestion.",
+  id: 'remote-burst',
+  name: 'Remote Yjs Update Burst (Idle Local)',
+  fixture: 'large',
+  description:
+    'Apply 120 remote Yjs updates at ~60Hz while idle locally (PERF-S-2). Protects remote change ingestion.',
   run: async (page) => {
-    await setupFixture(page, "large");
+    await setupFixture(page, 'large');
     await resetCounters(page);
 
     // Drive 120 real Yjs updates from a secondary doc inside browser context
@@ -344,12 +358,13 @@ export const remoteBurstScenario: ScenarioDefinition = {
 };
 
 export const remoteDuringDragScenario: ScenarioDefinition = {
-  id: "remote-during-drag",
-  name: "Remote Yjs Updates During Active Local Drag",
-  fixture: "large",
-  description: "Apply 120 remote Yjs updates while actively dragging a local node 200px. Protects worst-case collaborative throughput.",
+  id: 'remote-during-drag',
+  name: 'Remote Yjs Updates During Active Local Drag',
+  fixture: 'large',
+  description:
+    'Apply 120 remote Yjs updates while actively dragging a local node 200px. Protects worst-case collaborative throughput.',
   run: async (page) => {
-    await setupFixture(page, "large");
+    await setupFixture(page, 'large');
     await page.evaluate(`
       (() => {
         const perfObj = window.__PERF__;
@@ -412,7 +427,7 @@ export const remoteDuringDragScenario: ScenarioDefinition = {
     const nodeEl = page.locator('.react-flow__node[data-id="node-50"]');
     const box = await nodeEl.boundingBox();
     if (!box) {
-      throw new Error("Could not find bounding box for node-50");
+      throw new Error('Could not find bounding box for node-50');
     }
     const startX = box.x + box.width / 2;
     const startY = box.y + box.height / 2;

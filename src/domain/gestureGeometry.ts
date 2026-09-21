@@ -13,7 +13,7 @@
  *
  * Pure and dependency-free so the rules are testable without a browser.
  */
-import type { PendingNodeUpdate } from "./nodeChangeBatching.ts";
+import type { PendingNodeUpdate } from './nodeChangeBatching.ts';
 
 export interface InFlightGeometry {
   position?: { x: number; y: number };
@@ -32,31 +32,30 @@ export const NO_IN_FLIGHT: InFlightMap = new Map();
  */
 export function mergeInFlight(
   current: InFlightMap,
-  pending: ReadonlyMap<string, PendingNodeUpdate>
+  pending: ReadonlyMap<string, PendingNodeUpdate>,
 ): Map<string, InFlightGeometry> {
   const next = new Map(current);
   for (const [id, update] of pending) {
     const prev = next.get(id) ?? {};
     next.set(
       id,
-      update.type === "position"
+      update.type === 'position'
         ? { ...prev, position: update.position }
-        : { ...prev, width: update.width, height: update.height }
+        : { ...prev, width: update.width, height: update.height },
     );
   }
   return next;
 }
 
 /** A node with in-flight geometry laid over what the document holds. */
-export function applyInFlight<N extends { position: { x: number; y: number }; width?: number; height?: number }>(
-  node: N,
-  geometry: InFlightGeometry | undefined
-): N {
+export function applyInFlight<
+  N extends { position: { x: number; y: number }; width?: number; height?: number },
+>(node: N, geometry: InFlightGeometry | undefined): N {
   if (!geometry) return node;
   const next = { ...node };
   if (geometry.position) next.position = geometry.position;
-  if ("width" in geometry) next.width = geometry.width;
-  if ("height" in geometry) next.height = geometry.height;
+  if ('width' in geometry) next.width = geometry.width;
+  if ('height' in geometry) next.height = geometry.height;
   return next;
 }
 
@@ -79,7 +78,7 @@ export function toBroadcast(path: string, inFlight: InFlightMap): GestureBroadca
  * untrusted input, and the overlay is applied on every render. */
 export const MAX_BROADCAST_NODES = 500;
 
-const finite = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 
 /**
  * Validates a peer's broadcast. Anything malformed is dropped rather than
@@ -87,17 +86,23 @@ const finite = (v: unknown): v is number => typeof v === "number" && Number.isFi
  * a node off the canvas.
  */
 export function parseGestureBroadcast(raw: unknown): GestureBroadcast | null {
-  if (!raw || typeof raw !== "object") return null;
+  if (!raw || typeof raw !== 'object') return null;
   const candidate = raw as { path?: unknown; nodes?: unknown };
-  if (typeof candidate.path !== "string" || !candidate.nodes || typeof candidate.nodes !== "object") return null;
+  if (typeof candidate.path !== 'string' || !candidate.nodes || typeof candidate.nodes !== 'object')
+    return null;
   const nodes: Record<string, InFlightGeometry> = {};
   let count = 0;
   for (const [id, value] of Object.entries(candidate.nodes as Record<string, unknown>)) {
     if (count >= MAX_BROADCAST_NODES) break;
-    if (!value || typeof value !== "object") continue;
-    const g = value as { position?: { x?: unknown; y?: unknown }; width?: unknown; height?: unknown };
+    if (!value || typeof value !== 'object') continue;
+    const g = value as {
+      position?: { x?: unknown; y?: unknown };
+      width?: unknown;
+      height?: unknown;
+    };
     const out: InFlightGeometry = {};
-    if (g.position && finite(g.position.x) && finite(g.position.y)) out.position = { x: g.position.x, y: g.position.y };
+    if (g.position && finite(g.position.x) && finite(g.position.y))
+      out.position = { x: g.position.x, y: g.position.y };
     if (finite(g.width) && g.width > 0) out.width = g.width;
     if (finite(g.height) && g.height > 0) out.height = g.height;
     if (out.position || out.width !== undefined || out.height !== undefined) {
@@ -115,7 +120,7 @@ export function parseGestureBroadcast(raw: unknown): GestureBroadcast | null {
  */
 export function remoteInFlight(
   peers: ReadonlyArray<{ gesture?: GestureBroadcast | null }>,
-  path: string
+  path: string,
 ): InFlightMap {
   let result: Map<string, InFlightGeometry> | null = null;
   for (const peer of peers) {
@@ -158,7 +163,10 @@ export type EdgeGestureMap = ReadonlyMap<string, EdgeGesture>;
 export const NO_EDGE_GESTURES: EdgeGestureMap = new Map();
 
 /** The waypoints to draw for an edge mid-gesture. */
-export function applyEdgeGesture<W extends WaypointLike>(base: readonly W[] | undefined, gesture: EdgeGesture): W[] {
+export function applyEdgeGesture<W extends WaypointLike>(
+  base: readonly W[] | undefined,
+  gesture: EdgeGesture,
+): W[] {
   const list: W[] = [...(base ?? [])];
   const created = gesture.created;
   if (created && !list.some((w) => w.id === created.waypoint.id)) {
@@ -183,7 +191,10 @@ export function edgeGestureWrites(gesture: EdgeGesture): {
   const add = gesture.created
     ? {
         index: gesture.created.index,
-        waypoint: { ...gesture.created.waypoint, ...(gesture.moved.get(gesture.created.waypoint.id) ?? {}) },
+        waypoint: {
+          ...gesture.created.waypoint,
+          ...(gesture.moved.get(gesture.created.waypoint.id) ?? {}),
+        },
       }
     : undefined;
   const moves = [...gesture.moved]
@@ -209,18 +220,37 @@ const MAX_BROADCAST_EDGES = 100;
 const MAX_WAYPOINTS_PER_EDGE = 200;
 
 export function parseEdgeGestureBroadcast(raw: unknown): EdgeGestureBroadcast | null {
-  if (!raw || typeof raw !== "object") return null;
+  if (!raw || typeof raw !== 'object') return null;
   const candidate = raw as { path?: unknown; edges?: unknown };
-  if (typeof candidate.path !== "string" || !candidate.edges || typeof candidate.edges !== "object") return null;
+  if (typeof candidate.path !== 'string' || !candidate.edges || typeof candidate.edges !== 'object')
+    return null;
   const edges: Record<string, WaypointLike[]> = {};
   const labels: Record<string, LabelPlacement> = {};
   let count = 0;
-  if (candidate && typeof (candidate as { labels?: unknown }).labels === "object" && (candidate as { labels?: unknown }).labels) {
-    for (const [edgeId, value] of Object.entries((candidate as { labels: Record<string, unknown> }).labels)) {
+  if (
+    candidate &&
+    typeof (candidate as { labels?: unknown }).labels === 'object' &&
+    (candidate as { labels?: unknown }).labels
+  ) {
+    for (const [edgeId, value] of Object.entries(
+      (candidate as { labels: Record<string, unknown> }).labels,
+    )) {
       if (count >= MAX_BROADCAST_EDGES) break;
       const l = value as Partial<LabelPlacement> | null;
-      if (!l || !finite(l.labelAnchorT) || l.labelAnchorT < 0 || l.labelAnchorT > 1 || !finite(l.labelOffsetX) || !finite(l.labelOffsetY)) continue;
-      labels[edgeId] = { labelAnchorT: l.labelAnchorT, labelOffsetX: l.labelOffsetX, labelOffsetY: l.labelOffsetY };
+      if (
+        !l ||
+        !finite(l.labelAnchorT) ||
+        l.labelAnchorT < 0 ||
+        l.labelAnchorT > 1 ||
+        !finite(l.labelOffsetX) ||
+        !finite(l.labelOffsetY)
+      )
+        continue;
+      labels[edgeId] = {
+        labelAnchorT: l.labelAnchorT,
+        labelOffsetX: l.labelOffsetX,
+        labelOffsetY: l.labelOffsetY,
+      };
       count++;
     }
   }
@@ -231,7 +261,7 @@ export function parseEdgeGestureBroadcast(raw: unknown): EdgeGestureBroadcast | 
     let valid = true;
     for (const w of value) {
       const p = w as { id?: unknown; x?: unknown; y?: unknown };
-      if (typeof p?.id !== "string" || !finite(p.x) || !finite(p.y)) {
+      if (typeof p?.id !== 'string' || !finite(p.x) || !finite(p.y)) {
         valid = false;
         break;
       }
@@ -242,13 +272,15 @@ export function parseEdgeGestureBroadcast(raw: unknown): EdgeGestureBroadcast | 
     count++;
   }
   if (count === 0) return null;
-  return Object.keys(labels).length > 0 ? { path: candidate.path, edges, labels } : { path: candidate.path, edges };
+  return Object.keys(labels).length > 0
+    ? { path: candidate.path, edges, labels }
+    : { path: candidate.path, edges };
 }
 
 /** Peers' in-flight label placements at `path`, by edge id. */
 export function remoteEdgeLabels(
   peers: ReadonlyArray<{ edgeGesture?: EdgeGestureBroadcast | null }>,
-  path: string
+  path: string,
 ): ReadonlyMap<string, LabelPlacement> {
   let result: Map<string, LabelPlacement> | null = null;
   for (const peer of peers) {
@@ -264,7 +296,7 @@ const NO_REMOTE_LABELS: ReadonlyMap<string, LabelPlacement> = new Map();
 /** Peers' in-flight waypoint lists at `path`, by edge id. */
 export function remoteEdgeGestures(
   peers: ReadonlyArray<{ edgeGesture?: EdgeGestureBroadcast | null }>,
-  path: string
+  path: string,
 ): ReadonlyMap<string, WaypointLike[]> {
   let result: Map<string, WaypointLike[]> | null = null;
   for (const peer of peers) {

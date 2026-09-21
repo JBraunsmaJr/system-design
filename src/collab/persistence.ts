@@ -18,9 +18,9 @@
  * room; only a prior participant can rehost it (WS13-R12). The server-side
  * store is what closes that gap, and it is a separate decision.
  */
-import * as Y from "yjs";
-import { IndexeddbPersistence } from "y-indexeddb";
-import { isYjsDocEmpty } from "./seedGuards.ts";
+import * as Y from 'yjs';
+import { IndexeddbPersistence } from 'y-indexeddb';
+import { isYjsDocEmpty } from './seedGuards.ts';
 
 /** Namespaced so a room can never collide with the document-store keys, which
  * live in their own database. */
@@ -88,8 +88,7 @@ export function attachPersistence(
   options: AttachPersistenceOptions = {},
 ): DocPersistence {
   const create =
-    options.createProvider ??
-    ((k: string, d: Y.Doc) => new IndexeddbPersistence(k, d));
+    options.createProvider ?? ((k: string, d: Y.Doc) => new IndexeddbPersistence(k, d));
 
   const provider = create(key, doc);
   let emptyOnLoad = true;
@@ -105,7 +104,7 @@ export function attachPersistence(
       // document as non-empty here would suppress seeding and leave the user
       // staring at a blank canvas; treating it as empty is the safe direction
       // because the seeds are idempotent (WS1-R6).
-      console.warn("Local persistence unavailable for this document:", error);
+      console.warn('Local persistence unavailable for this document:', error);
       emptyOnLoad = isYjsDocEmpty(doc);
       settled = true;
     });
@@ -115,9 +114,9 @@ export function attachPersistence(
     wasEmptyOnLoad() {
       if (!settled) {
         throw new Error(
-          "wasEmptyOnLoad() read before whenSynced resolved - await it first, " +
-            "or the seed decision is made against a document that has not " +
-            "finished loading.",
+          'wasEmptyOnLoad() read before whenSynced resolved - await it first, ' +
+            'or the seed decision is made against a document that has not ' +
+            'finished loading.',
         );
       }
       return emptyOnLoad;
@@ -139,7 +138,7 @@ export function attachPersistence(
       // encoded INSIDE it, so every update about to be deleted is already in
       // that state - the provider applies an update to the doc before storing it.
       const updatesBefore = await new Promise<number>((resolve, reject) => {
-        const tx = db.transaction([UPDATES_STORE], "readwrite");
+        const tx = db.transaction([UPDATES_STORE], 'readwrite');
         const store = tx.objectStore(UPDATES_STORE);
         let count = 0;
         const keys = store.getAllKeys();
@@ -153,7 +152,7 @@ export function attachPersistence(
         };
         tx.oncomplete = () => resolve(count);
         tx.onerror = () => reject(tx.error);
-        tx.onabort = () => reject(tx.error ?? new Error("Compaction aborted."));
+        tx.onabort = () => reject(tx.error ?? new Error('Compaction aborted.'));
       });
       const updatesAfter = Math.min(updatesBefore, 1);
       // The provider trims on its own once this passes a threshold; keep its
@@ -165,4 +164,4 @@ export function attachPersistence(
 }
 
 /** y-indexeddb's object store for the update log. */
-const UPDATES_STORE = "updates";
+const UPDATES_STORE = 'updates';

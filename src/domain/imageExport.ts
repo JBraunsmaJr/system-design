@@ -1,19 +1,25 @@
-import { getNodesBounds, getViewportForBounds, type Node } from "@xyflow/react";
-import { toPng, toSvg } from "html-to-image";
+import { getNodesBounds, getViewportForBounds, type Node } from '@xyflow/react';
+import { toPng, toSvg } from 'html-to-image';
 
 const EXPORT_WIDTH = 1600;
 const EXPORT_HEIGHT = 1000;
 const EXPORT_PADDING = 0.15;
 const MIN_ZOOM = 0.3;
 const MAX_ZOOM = 2;
-const EXPORT_BACKGROUND = "#0f1117";
+const EXPORT_BACKGROUND = '#0f1117';
 
 function safeName(title: string): string {
-  return title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "diagram";
+  return (
+    title
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '') || 'diagram'
+  );
 }
 
 function downloadDataUrl(dataUrl: string, filename: string): void {
-  const anchor = document.createElement("a");
+  const anchor = document.createElement('a');
   anchor.href = dataUrl;
   anchor.download = filename;
   document.body.appendChild(anchor);
@@ -28,17 +34,24 @@ function downloadDataUrl(dataUrl: string, filename: string): void {
  * React Flow recipe. Background/MiniMap/Controls live outside that element,
  * so they're excluded from the export automatically.
  */
-async function captureViewport(format: "png" | "svg", nodes: Node[]): Promise<string> {
+async function captureViewport(format: 'png' | 'svg', nodes: Node[]): Promise<string> {
   if (nodes.length === 0) {
-    throw new Error("Nothing to export yet - add some nodes first.");
+    throw new Error('Nothing to export yet - add some nodes first.');
   }
-  const viewportEl = document.querySelector<HTMLElement>(".react-flow__viewport");
+  const viewportEl = document.querySelector<HTMLElement>('.react-flow__viewport');
   if (!viewportEl) {
     throw new Error("Couldn't find the canvas to export.");
   }
 
   const bounds = getNodesBounds(nodes);
-  const { x, y, zoom } = getViewportForBounds(bounds, EXPORT_WIDTH, EXPORT_HEIGHT, MIN_ZOOM, MAX_ZOOM, EXPORT_PADDING);
+  const { x, y, zoom } = getViewportForBounds(
+    bounds,
+    EXPORT_WIDTH,
+    EXPORT_HEIGHT,
+    MIN_ZOOM,
+    MAX_ZOOM,
+    EXPORT_PADDING,
+  );
 
   const options = {
     backgroundColor: EXPORT_BACKGROUND,
@@ -51,11 +64,11 @@ async function captureViewport(format: "png" | "svg", nodes: Node[]): Promise<st
     },
   };
 
-  return format === "png" ? toPng(viewportEl, options) : toSvg(viewportEl, options);
+  return format === 'png' ? toPng(viewportEl, options) : toSvg(viewportEl, options);
 }
 
 export async function exportDiagramAsPng(nodes: Node[], title: string): Promise<void> {
-  const dataUrl = await captureViewport("png", nodes);
+  const dataUrl = await captureViewport('png', nodes);
   downloadDataUrl(dataUrl, `${safeName(title)}.png`);
 }
 
@@ -67,6 +80,6 @@ export async function exportDiagramAsPng(nodes: Node[], title: string): Promise<
  * A true vector exporter is a bigger, separate undertaking if that's ever needed.
  */
 export async function exportDiagramAsSvg(nodes: Node[], title: string): Promise<void> {
-  const dataUrl = await captureViewport("svg", nodes);
+  const dataUrl = await captureViewport('svg', nodes);
   downloadDataUrl(dataUrl, `${safeName(title)}.svg`);
 }

@@ -1,6 +1,6 @@
-import type { Page } from "playwright";
-import type { FixtureName } from "../fixtures";
-import type { PerfMetrics } from "../instrumentation";
+import type { Page } from 'playwright';
+import type { FixtureName } from '../fixtures';
+import type { PerfMetrics } from '../instrumentation';
 
 /**
  * Waits for pending animation frames and React state to settle.
@@ -18,20 +18,20 @@ export async function assertViewportTranslated(
   page: Page,
   expectedDx: number,
   expectedDy: number,
-  tolerancePx: number = 8
+  tolerancePx: number = 8,
 ): Promise<void> {
   const moved = await page.evaluate(() => {
-    const viewport = document.querySelector(".react-flow__viewport");
-    const transform = viewport ? getComputedStyle(viewport).transform : "none";
-    if (!transform || transform === "none") return null;
+    const viewport = document.querySelector('.react-flow__viewport');
+    const transform = viewport ? getComputedStyle(viewport).transform : 'none';
+    if (!transform || transform === 'none') return null;
     const match = /matrix\(([^)]+)\)/.exec(transform);
     if (!match) return null;
-    const parts = match[1].split(",").map((n) => Number.parseFloat(n.trim()));
+    const parts = match[1].split(',').map((n) => Number.parseFloat(n.trim()));
     return parts.length >= 6 ? { x: parts[4], y: parts[5] } : null;
   });
 
   if (!moved) {
-    throw new Error("Could not read the viewport transform to verify the pan.");
+    throw new Error('Could not read the viewport transform to verify the pan.');
   }
 
   const actualDx = moved.x - viewportBeforeDrag.x;
@@ -49,7 +49,7 @@ export async function assertViewportTranslated(
             `canvas - it most likely landed on a node or on UI floating above ` +
             `the canvas. This is not an input-timing problem.`
           : `Input steps were dropped, so this run measured less work than the ` +
-            `scenario describes and its numbers are not comparable to the baseline.`)
+            `scenario describes and its numbers are not comparable to the baseline.`),
     );
   }
 }
@@ -69,11 +69,9 @@ export async function assertViewportTranslated(
  * Scans outward from the centre, since the middle of the canvas is the least
  * likely place for overlays.
  */
-export async function findEmptyCanvasPoint(
-  page: Page
-): Promise<{ x: number; y: number }> {
+export async function findEmptyCanvasPoint(page: Page): Promise<{ x: number; y: number }> {
   const point = await page.evaluate(() => {
-    const pane = document.querySelector(".react-flow__pane");
+    const pane = document.querySelector('.react-flow__pane');
     if (!pane) return null;
     const bounds = pane.getBoundingClientRect();
     const centreX = bounds.left + bounds.width / 2;
@@ -81,7 +79,7 @@ export async function findEmptyCanvasPoint(
 
     const hitsPane = (x: number, y: number) => {
       const el = document.elementFromPoint(x, y);
-      return el !== null && (el === pane || el.classList.contains("react-flow__pane"));
+      return el !== null && (el === pane || el.classList.contains('react-flow__pane'));
     };
 
     if (hitsPane(centreX, centreY)) {
@@ -91,14 +89,22 @@ export async function findEmptyCanvasPoint(
     // Square rings outward from the centre.
     for (let radius = 20; radius < Math.max(bounds.width, bounds.height) / 2; radius += 20) {
       for (const [dx, dy] of [
-        [radius, 0], [-radius, 0], [0, radius], [0, -radius],
-        [radius, radius], [-radius, radius], [radius, -radius], [-radius, -radius],
+        [radius, 0],
+        [-radius, 0],
+        [0, radius],
+        [0, -radius],
+        [radius, radius],
+        [-radius, radius],
+        [radius, -radius],
+        [-radius, -radius],
       ]) {
         const x = centreX + dx;
         const y = centreY + dy;
         if (
-          x > bounds.left + 4 && x < bounds.right - 4 &&
-          y > bounds.top + 4 && y < bounds.bottom - 4 &&
+          x > bounds.left + 4 &&
+          x < bounds.right - 4 &&
+          y > bounds.top + 4 &&
+          y < bounds.bottom - 4 &&
           hitsPane(x, y)
         ) {
           return { x: Math.round(x), y: Math.round(y) };
@@ -110,9 +116,9 @@ export async function findEmptyCanvasPoint(
 
   if (!point) {
     throw new Error(
-      "No point found where the canvas pane is the topmost element. Every " +
-        "sampled position is covered by a node or by floating UI, so a drag " +
-        "cannot reach the canvas to pan it."
+      'No point found where the canvas pane is the topmost element. Every ' +
+        'sampled position is covered by a node or by floating UI, so a drag ' +
+        'cannot reach the canvas to pan it.',
     );
   }
   return point;
@@ -124,11 +130,11 @@ let viewportBeforeDrag = { x: 0, y: 0 };
 
 export async function recordViewportBeforeDrag(page: Page): Promise<void> {
   viewportBeforeDrag = (await page.evaluate(() => {
-    const viewport = document.querySelector(".react-flow__viewport");
-    const transform = viewport ? getComputedStyle(viewport).transform : "none";
-    const match = /matrix\(([^)]+)\)/.exec(transform ?? "");
+    const viewport = document.querySelector('.react-flow__viewport');
+    const transform = viewport ? getComputedStyle(viewport).transform : 'none';
+    const match = /matrix\(([^)]+)\)/.exec(transform ?? '');
     if (!match) return { x: 0, y: 0 };
-    const parts = match[1].split(",").map((n) => Number.parseFloat(n.trim()));
+    const parts = match[1].split(',').map((n) => Number.parseFloat(n.trim()));
     return parts.length >= 6 ? { x: parts[4], y: parts[5] } : { x: 0, y: 0 };
   })) ?? { x: 0, y: 0 };
 }
@@ -181,11 +187,16 @@ export async function setupFixture(page: Page, fixtureName: FixtureName): Promis
  */
 export async function frameNodes(page: Page, nodeIds: string[]): Promise<void> {
   const framed = await page.evaluate(
-    (ids) => (window as unknown as { __PERF__?: { frameNodes?: (ids: string[]) => boolean } }).__PERF__?.frameNodes?.(ids) ?? false,
-    nodeIds
+    (ids) =>
+      (
+        window as unknown as { __PERF__?: { frameNodes?: (ids: string[]) => boolean } }
+      ).__PERF__?.frameNodes?.(ids) ?? false,
+    nodeIds,
   );
   if (!framed) {
-    throw new Error("window.__PERF__.frameNodes is unavailable - the canvas has not registered its viewport hook.");
+    throw new Error(
+      'window.__PERF__.frameNodes is unavailable - the canvas has not registered its viewport hook.',
+    );
   }
   await settleCanvas(page, 4);
 }
@@ -206,42 +217,53 @@ export async function pointOnTarget(
     /** Also accept a hit on any element matching this selector - for targets
      * that are interchangeable for what the scenario measures. */
     orAnyOf?: string;
-  } = {}
+  } = {},
 ): Promise<{ x: number; y: number }> {
-  const result = await page.evaluate(({ sel, orAnyOf }) => {
-    const target = document.querySelector(sel);
-    if (!target) return { error: `no element matches ${sel}` };
-    const r = target.getBoundingClientRect();
-    const x = r.left + r.width / 2;
-    const y = r.top + r.height / 2;
-    const hits = (px: number, py: number) => {
-      const el = document.elementFromPoint(px, py);
-      return el !== null && (el === target || target.contains(el) || (orAnyOf !== undefined && el.matches(orAnyOf)));
-    };
-    if (hits(x, y)) return { x, y };
-    // Something may cover the centre (a hub node's edge labels do). Try a grid
-    // of interior points, nearest the centre first, before giving up.
-    const candidates: { x: number; y: number }[] = [];
-    // Dense along x, since some targets are thin strips (a group's edge hit
-    // area) crossed by edge paths at arbitrary points.
-    const fxs = Array.from({ length: 19 }, (_, i) => 0.5 + (i % 2 === 0 ? 1 : -1) * Math.ceil(i / 2) * 0.05);
-    for (const fx of fxs) {
-      for (const fy of [0.5, 0.3, 0.7, 0.15, 0.85]) {
-        candidates.push({ x: r.left + r.width * fx, y: r.top + r.height * fy });
+  const result = await page.evaluate(
+    ({ sel, orAnyOf }) => {
+      const target = document.querySelector(sel);
+      if (!target) return { error: `no element matches ${sel}` };
+      const r = target.getBoundingClientRect();
+      const x = r.left + r.width / 2;
+      const y = r.top + r.height / 2;
+      const hits = (px: number, py: number) => {
+        const el = document.elementFromPoint(px, py);
+        return (
+          el !== null &&
+          (el === target || target.contains(el) || (orAnyOf !== undefined && el.matches(orAnyOf)))
+        );
+      };
+      if (hits(x, y)) return { x, y };
+      // Something may cover the centre (a hub node's edge labels do). Try a grid
+      // of interior points, nearest the centre first, before giving up.
+      const candidates: { x: number; y: number }[] = [];
+      // Dense along x, since some targets are thin strips (a group's edge hit
+      // area) crossed by edge paths at arbitrary points.
+      const fxs = Array.from(
+        { length: 19 },
+        (_, i) => 0.5 + (i % 2 === 0 ? 1 : -1) * Math.ceil(i / 2) * 0.05,
+      );
+      for (const fx of fxs) {
+        for (const fy of [0.5, 0.3, 0.7, 0.15, 0.85]) {
+          candidates.push({ x: r.left + r.width * fx, y: r.top + r.height * fy });
+        }
       }
-    }
-    const found = candidates.find((c) => hits(c.x, c.y));
-    if (found) return found;
-    const hit = document.elementFromPoint(x, y);
-    const describe = (el: Element | null) =>
-      el ? `${el.tagName.toLowerCase()}${el.className && typeof el.className === "string" ? "." + el.className.trim().split(/\s+/).join(".") : ""}` : "nothing (off-screen)";
-    return {
-      error:
-        `${sel} is not under the pointer at its centre (${Math.round(x)},${Math.round(y)}); ` +
-        `the browser would deliver the event to ${describe(hit)}. Frame it with frameNodes first.`,
-    };
-  }, { sel: selector, orAnyOf: options.orAnyOf });
-  if ("error" in result) throw new Error(result.error);
+      const found = candidates.find((c) => hits(c.x, c.y));
+      if (found) return found;
+      const hit = document.elementFromPoint(x, y);
+      const describe = (el: Element | null) =>
+        el
+          ? `${el.tagName.toLowerCase()}${el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).join('.') : ''}`
+          : 'nothing (off-screen)';
+      return {
+        error:
+          `${sel} is not under the pointer at its centre (${Math.round(x)},${Math.round(y)}); ` +
+          `the browser would deliver the event to ${describe(hit)}. Frame it with frameNodes first.`,
+      };
+    },
+    { sel: selector, orAnyOf: options.orAnyOf },
+  );
+  if ('error' in result) throw new Error(result.error);
   return result;
 }
 
@@ -254,10 +276,15 @@ export async function pointOnTarget(
  */
 export async function assertGestureCommitted(page: Page, what: string): Promise<void> {
   const writes = await page.evaluate(
-    () => (window as unknown as { __PERF__: { getCounters: () => { storeWrites: number } } }).__PERF__.getCounters().storeWrites
+    () =>
+      (
+        window as unknown as { __PERF__: { getCounters: () => { storeWrites: number } } }
+      ).__PERF__.getCounters().storeWrites,
   );
   if (writes === 0) {
-    throw new Error(`${what} wrote nothing to the document, so the gesture never took effect and this run measured nothing.`);
+    throw new Error(
+      `${what} wrote nothing to the document, so the gesture never took effect and this run measured nothing.`,
+    );
   }
 }
 
@@ -310,7 +337,7 @@ export async function dragCoordinates(
   startY: number,
   dx: number,
   dy: number,
-  steps: number = 20
+  steps: number = 20,
 ): Promise<void> {
   await page.mouse.move(startX, startY);
   await page.mouse.down();
@@ -334,7 +361,7 @@ export async function dragCoordinates(
      * painted before the next input is queued.
      */
     await page.evaluate(
-      `new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))`
+      `new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))`,
     );
   }
 
@@ -353,22 +380,30 @@ export async function dragCoordinates(
  */
 export async function findGrabbableUpdater(page: Page): Promise<{ x: number; y: number }> {
   const point = await page.evaluate(() => {
-    const pane = document.querySelector(".react-flow__pane")?.getBoundingClientRect();
+    const pane = document.querySelector('.react-flow__pane')?.getBoundingClientRect();
     if (!pane) return null;
-    for (const el of Array.from(document.querySelectorAll(".react-flow__edgeupdater"))) {
+    for (const el of Array.from(document.querySelectorAll('.react-flow__edgeupdater'))) {
       const r = el.getBoundingClientRect();
-      if (r.width === 0 || r.left < pane.left + 20 || r.right > pane.right - 20 || r.top < pane.top + 20 || r.bottom > pane.bottom - 20) continue;
+      if (
+        r.width === 0 ||
+        r.left < pane.left + 20 ||
+        r.right > pane.right - 20 ||
+        r.top < pane.top + 20 ||
+        r.bottom > pane.bottom - 20
+      )
+        continue;
       for (const fx of [0.5, 0.25, 0.75]) {
         for (const fy of [0.5, 0.25, 0.75]) {
           const x = r.left + r.width * fx;
           const y = r.top + r.height * fy;
           const hit = document.elementFromPoint(x, y);
-          if (hit && hit.classList.contains("react-flow__edgeupdater")) return { x, y };
+          if (hit && hit.classList.contains('react-flow__edgeupdater')) return { x, y };
         }
       }
     }
     return null;
   });
-  if (!point) throw new Error("No edge endpoint updater is grabbable anywhere in the framed viewport.");
+  if (!point)
+    throw new Error('No edge endpoint updater is grabbable anywhere in the framed viewport.');
   return point;
 }

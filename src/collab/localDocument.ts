@@ -17,41 +17,35 @@
  * (WS1-R6) so the damage is bounded, but relying on that is defence in depth,
  * not a design.
  */
-import * as Y from "yjs";
-import type { DiagramFile } from "../domain/serialization.ts";
+import * as Y from 'yjs';
+import type { DiagramFile } from '../domain/serialization.ts';
 import {
   attachPersistence,
   createNullPersistence,
   type DocPersistence,
   persistenceKeyForRoom,
-} from "./persistence.ts";
-import { isYjsDocEmpty } from "./seedGuards.ts";
-import { seedYjsDiagramDoc, createYjsDiagramStore } from "./yjsDiagramStore.ts";
-import {
-  seedYjsRequirementsDoc,
-  createYjsRequirementsStore,
-} from "./yjsRequirementsStore.ts";
+} from './persistence.ts';
+import { isYjsDocEmpty } from './seedGuards.ts';
+import { seedYjsDiagramDoc, createYjsDiagramStore } from './yjsDiagramStore.ts';
+import { seedYjsRequirementsDoc, createYjsRequirementsStore } from './yjsRequirementsStore.ts';
 import {
   seedYjsProgramIncrementsDoc,
   createYjsProgramIncrementsStore,
-} from "./yjsProgramIncrementsStore.ts";
-import {
-  seedYjsMilestonesDoc,
-  createYjsMilestonesStore,
-} from "./yjsMilestonesStore.ts";
-import { createYjsTeamStore } from "./yjsTeamStore.ts";
+} from './yjsProgramIncrementsStore.ts';
+import { seedYjsMilestonesDoc, createYjsMilestonesStore } from './yjsMilestonesStore.ts';
+import { createYjsTeamStore } from './yjsTeamStore.ts';
 import {
   createYjsDocumentMetaStore,
   seedYjsDocumentMeta,
   META_MAP,
   type DocumentMetaStore,
-} from "./yjsDocumentMetaStore.ts";
-import { seedTeamStore } from "./teamStore.ts";
-import type { DiagramStore } from "./diagramStore.ts";
-import type { RequirementsStore } from "./requirementsStore.ts";
-import type { ProgramIncrementsStore } from "./programIncrementsStore.ts";
-import type { TeamStore } from "./teamStore.ts";
-import type { MilestonesStore } from "./milestonesStore.ts";
+} from './yjsDocumentMetaStore.ts';
+import { seedTeamStore } from './teamStore.ts';
+import type { DiagramStore } from './diagramStore.ts';
+import type { RequirementsStore } from './requirementsStore.ts';
+import type { ProgramIncrementsStore } from './programIncrementsStore.ts';
+import type { TeamStore } from './teamStore.ts';
+import type { MilestonesStore } from './milestonesStore.ts';
 
 /** Namespaced apart from room keys so a document and a session can never
  * collide in IndexedDB, even if their identifiers happen to match. */
@@ -67,7 +61,7 @@ export function storageKeyForDocument(docId: string): string {
     : persistenceKeyForDocument(docId);
 }
 
-const SESSION_DOC_PREFIX = "session:";
+const SESSION_DOC_PREFIX = 'session:';
 
 export function persistenceKeyForDocument(docId: string): string {
   return `system-design:doc:${docId}`;
@@ -152,10 +146,7 @@ export function openDocumentNow(options: OpenDocumentOptions): OpenDocument & {
   const persistence =
     options.persist === false
       ? createNullPersistence(doc)
-      : (options.createPersistence ?? ((d, k) => attachPersistence(d, k)))(
-          doc,
-          key
-        );
+      : (options.createPersistence ?? ((d, k) => attachPersistence(d, k)))(doc, key);
 
   const stores = createDocumentStores(doc);
 
@@ -197,7 +188,9 @@ const liveHandles = new Map<string, OpenDocument & { ready: Promise<void> }>();
  * The handle is released by its own close(); opening the same id afterwards
  * opens it afresh.
  */
-export function acquireDocument(options: OpenDocumentOptions): OpenDocument & { ready: Promise<void> } {
+export function acquireDocument(
+  options: OpenDocumentOptions,
+): OpenDocument & { ready: Promise<void> } {
   const existing = liveHandles.get(options.docId);
   if (existing) return existing;
   const handle = openDocumentNow(options);
@@ -210,19 +203,14 @@ export function acquireDocument(options: OpenDocumentOptions): OpenDocument & { 
   return handle;
 }
 
-export async function openDocument(
-  options: OpenDocumentOptions
-): Promise<OpenDocument> {
+export async function openDocument(options: OpenDocumentOptions): Promise<OpenDocument> {
   const doc = new Y.Doc();
   const key = storageKeyForDocument(options.docId);
 
   const persistence =
     options.persist === false
       ? createNullPersistence(doc)
-      : (options.createPersistence ?? ((d, k) => attachPersistence(d, k)))(
-          doc,
-          key
-        );
+      : (options.createPersistence ?? ((d, k) => attachPersistence(d, k)))(doc, key);
 
   await persistence.whenSynced;
 
@@ -266,7 +254,7 @@ export async function openDocument(
 export function seedDocument(
   doc: Y.Doc,
   file: DiagramFile,
-  teamStore = createYjsTeamStore(doc)
+  teamStore = createYjsTeamStore(doc),
 ): void {
   seedYjsRequirementsDoc(doc, file.requirements);
   seedYjsProgramIncrementsDoc(doc, file.programIncrements ?? []);
@@ -318,13 +306,31 @@ export function replaceDocumentContents(doc: Y.Doc, file: DiagramFile): void {
     for (const edge of snapshot.edges) store.deleteEdge(edge.id);
     store.destroy();
 
-    for (const name of ["itemTypeOrder", "categoryOrder", "itemOrder", "piOrder", "milestoneOrder", "memberOrder"]) {
+    for (const name of [
+      'itemTypeOrder',
+      'categoryOrder',
+      'itemOrder',
+      'piOrder',
+      'milestoneOrder',
+      'memberOrder',
+    ]) {
       doc.getArray(name).delete(0, doc.getArray(name).length);
     }
-    for (const name of ["itemTypes", "categories", "items", "relationshipTypes", "relationships", "nextSequence", "pis", "milestones", "members", "extraDaysOff", META_MAP]) {
+    for (const name of [
+      'itemTypes',
+      'categories',
+      'items',
+      'relationshipTypes',
+      'relationships',
+      'nextSequence',
+      'pis',
+      'milestones',
+      'members',
+      'extraDaysOff',
+      META_MAP,
+    ]) {
       doc.getMap(name).clear();
     }
   });
   seedDocument(doc, file);
 }
-

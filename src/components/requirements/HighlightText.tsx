@@ -1,5 +1,5 @@
-import React, { useLayoutEffect, useRef, useState, useMemo } from "react";
-import { splitByHighlight, computeTruncationWithHighlight } from "../../domain/textHighlight";
+import React, { useLayoutEffect, useRef, useState, useMemo } from 'react';
+import { splitByHighlight, computeTruncationWithHighlight } from '../../domain/textHighlight';
 
 interface HighlightedTextProps {
   text: string;
@@ -27,7 +27,7 @@ export function HighlightedText({ text, search, className }: HighlightedTextProp
           </mark>
         ) : (
           <React.Fragment key={idx}>{seg.text}</React.Fragment>
-        )
+        ),
       )}
     </span>
   );
@@ -44,11 +44,11 @@ interface HighlightedTitleProps {
 
 let sharedCanvas: HTMLCanvasElement | null = null;
 function getTextWidth(text: string, font: string): number {
-  if (typeof document === "undefined") return text.length * 8;
+  if (typeof document === 'undefined') return text.length * 8;
   if (!sharedCanvas) {
-    sharedCanvas = document.createElement("canvas");
+    sharedCanvas = document.createElement('canvas');
   }
-  const ctx = sharedCanvas.getContext("2d");
+  const ctx = sharedCanvas.getContext('2d');
   if (!ctx) return text.length * 8;
   ctx.font = font;
   return ctx.measureText(text).width;
@@ -63,17 +63,17 @@ function getTextWidth(text: string, font: string): number {
 export function HighlightedTitle({
   text,
   search,
-  placeholder = "Untitled",
+  placeholder = 'Untitled',
   className,
   style,
   fallbackMaxChars,
 }: HighlightedTitleProps) {
   const containerRef = useRef<HTMLSpanElement>(null);
   const [containerWidth, setContainerWidth] = useState<number>(0);
-  const [computedFont, setComputedFont] = useState<string>("");
+  const [computedFont, setComputedFont] = useState<string>('');
 
-  const trimmedSearch = (search ?? "").trim();
-  const displayText = text || "";
+  const trimmedSearch = (search ?? '').trim();
+  const displayText = text || '';
 
   useLayoutEffect(() => {
     const el = containerRef.current;
@@ -89,14 +89,14 @@ export function HighlightedTitle({
         width = rect.width;
       }
       const computedStyle = window.getComputedStyle(el);
-      const font = `${computedStyle.fontWeight || "normal"} ${computedStyle.fontSize || "14px"} ${computedStyle.fontFamily || "sans-serif"}`;
+      const font = `${computedStyle.fontWeight || 'normal'} ${computedStyle.fontSize || '14px'} ${computedStyle.fontFamily || 'sans-serif'}`;
       setContainerWidth(width);
       setComputedFont(font);
     };
 
     updateMeasurements();
 
-    if (typeof ResizeObserver !== "undefined") {
+    if (typeof ResizeObserver !== 'undefined') {
       const observer = new ResizeObserver(() => {
         updateMeasurements();
       });
@@ -112,11 +112,8 @@ export function HighlightedTitle({
     if (!trimmedSearch) return null;
 
     if (containerWidth > 0 && computedFont) {
-      return computeTruncationWithHighlight(
-        displayText,
-        trimmedSearch,
-        containerWidth,
-        (s) => getTextWidth(s, computedFont)
+      return computeTruncationWithHighlight(displayText, trimmedSearch, containerWidth, (s) =>
+        getTextWidth(s, computedFont),
       );
     }
 
@@ -125,7 +122,7 @@ export function HighlightedTitle({
         displayText,
         trimmedSearch,
         fallbackMaxChars,
-        (s) => s.length
+        (s) => s.length,
       );
     }
 
@@ -138,9 +135,9 @@ export function HighlightedTitle({
         ref={containerRef}
         className={className}
         style={{
-          display: "block",
-          width: "100%",
-          maxWidth: "100%",
+          display: 'block',
+          width: '100%',
+          maxWidth: '100%',
           ...style,
         }}
         title={placeholder}
@@ -156,12 +153,12 @@ export function HighlightedTitle({
         ref={containerRef}
         className={className}
         style={{
-          display: "block",
-          width: "100%",
-          maxWidth: "100%",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
+          display: 'block',
+          width: '100%',
+          maxWidth: '100%',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
           ...style,
         }}
         title={displayText}
@@ -178,11 +175,11 @@ export function HighlightedTitle({
         ref={containerRef}
         className={className}
         style={{
-          display: "block",
-          width: "100%",
-          maxWidth: "100%",
-          overflow: "hidden",
-          whiteSpace: "nowrap",
+          display: 'block',
+          width: '100%',
+          maxWidth: '100%',
+          overflow: 'hidden',
+          whiteSpace: 'nowrap',
           ...style,
         }}
         title={displayText}
@@ -204,12 +201,12 @@ export function HighlightedTitle({
       ref={containerRef}
       className={className}
       style={{
-        display: "block",
-        width: "100%",
-        maxWidth: "100%",
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        whiteSpace: "nowrap",
+        display: 'block',
+        width: '100%',
+        maxWidth: '100%',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
         ...style,
       }}
       title={displayText}

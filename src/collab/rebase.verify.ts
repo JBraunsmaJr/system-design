@@ -5,14 +5,14 @@
  * while discarding everything they cannot, and that it refuses to run while
  * anyone might still hold the old document.
  */
-import * as Y from "yjs";
-import { rebaseDocument, readDocumentContents, canRebase } from "./rebase.ts";
-import { seedYjsDiagramDoc, createYjsDiagramStore } from "./yjsDiagramStore.ts";
-import { seedYjsRequirementsDoc } from "./yjsRequirementsStore.ts";
-import { seedYjsMilestonesDoc } from "./yjsMilestonesStore.ts";
-import { createYjsTeamStore } from "./yjsTeamStore.ts";
-import { seedTeamStore } from "./teamStore.ts";
-import type { SubDiagram } from "../domain/types";
+import * as Y from 'yjs';
+import { rebaseDocument, readDocumentContents, canRebase } from './rebase.ts';
+import { seedYjsDiagramDoc, createYjsDiagramStore } from './yjsDiagramStore.ts';
+import { seedYjsRequirementsDoc } from './yjsRequirementsStore.ts';
+import { seedYjsMilestonesDoc } from './yjsMilestonesStore.ts';
+import { createYjsTeamStore } from './yjsTeamStore.ts';
+import { seedTeamStore } from './teamStore.ts';
+import type { SubDiagram } from '../domain/types';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {
@@ -27,50 +27,46 @@ function assert(condition: boolean, message: string) {
 const root = {
   nodes: [
     {
-      id: "n1",
-      type: "typed",
+      id: 'n1',
+      type: 'typed',
       position: { x: 0, y: 0 },
-      data: { nodeType: "service", label: "Gateway" },
+      data: { nodeType: 'service', label: 'Gateway' },
     },
     {
-      id: "n2",
-      type: "typed",
+      id: 'n2',
+      type: 'typed',
       position: { x: 200, y: 0 },
-      data: { nodeType: "database", label: "Postgres" },
+      data: { nodeType: 'database', label: 'Postgres' },
     },
   ],
-  edges: [
-    { id: "e1", source: "n1", target: "n2", type: "typed", data: { label: "reads" } },
-  ],
+  edges: [{ id: 'e1', source: 'n1', target: 'n2', type: 'typed', data: { label: 'reads' } }],
 } as unknown as SubDiagram;
 
 function buildChurnedDoc(): Y.Doc {
   const doc = new Y.Doc();
   seedYjsDiagramDoc(doc, root);
   seedYjsMilestonesDoc(doc, [
-    { id: "ms1", type: "release", name: "GA", scheduledAt: "2026-03-31" },
+    { id: 'ms1', type: 'release', name: 'GA', scheduledAt: '2026-03-31' },
   ] as never);
   seedYjsRequirementsDoc(doc, {
     itemTypes: [
       {
-        id: "type-req",
-        label: "Requirement",
-        prefix: "REQ",
-        color: "#7c3aed",
+        id: 'type-req',
+        label: 'Requirement',
+        prefix: 'REQ',
+        color: '#7c3aed',
         isBuiltIn: true,
         isWorkable: false,
       },
     ],
     categories: [],
-    items: [
-      { id: "REQ-1", typeId: "type-req", title: "Auth", body: "" },
-    ],
+    items: [{ id: 'REQ-1', typeId: 'type-req', title: 'Auth', body: '' }],
     relationshipTypes: [],
     relationships: [],
-    nextSequence: { "type-req": 2 },
+    nextSequence: { 'type-req': 2 },
   } as never);
   seedTeamStore(createYjsTeamStore(doc), {
-    members: [{ id: "m1", name: "Engineer", ptoSpans: [] }],
+    members: [{ id: 'm1', name: 'Engineer', ptoSpans: [] }],
     settings: { defaultPointsPerDay: 1, excludeUsHolidays: true, extraDaysOff: [] },
   } as never);
 
@@ -86,7 +82,7 @@ function buildChurnedDoc(): Y.Doc {
   return doc;
 }
 
-console.log("=== A rebase reclaims history ===");
+console.log('=== A rebase reclaims history ===');
 {
   const source = buildChurnedDoc();
   const result = rebaseDocument(source);
@@ -97,11 +93,11 @@ console.log("=== A rebase reclaims history ===");
   );
   assert(
     Y.encodeStateAsUpdate(source).byteLength === result.bytesBefore,
-    "the source document is left untouched, so a failure mid-swap loses nothing",
+    'the source document is left untouched, so a failure mid-swap loses nothing',
   );
 }
 
-console.log("=== Everything the user can see survives ===");
+console.log('=== Everything the user can see survives ===');
 {
   const source = buildChurnedDoc();
   const before = readDocumentContents(source);
@@ -110,24 +106,21 @@ console.log("=== Everything the user can see survives ===");
 
   assert(
     JSON.stringify(after.root) === JSON.stringify(before.root),
-    "the diagram is identical, including the final dragged positions",
+    'the diagram is identical, including the final dragged positions',
   );
   assert(
     after.requirements.items.length === before.requirements.items.length,
-    "requirements survive",
+    'requirements survive',
   );
-  assert(
-    after.milestones.length === before.milestones.length,
-    "milestones survive",
-  );
-  assert(after.team.members.length === 1, "team members survive");
+  assert(after.milestones.length === before.milestones.length, 'milestones survive');
+  assert(after.team.members.length === 1, 'team members survive');
   assert(
     after.team.members.length === before.team.members.length,
-    "and are not duplicated by the reseed",
+    'and are not duplicated by the reseed',
   );
 }
 
-console.log("=== The rebased document has no shared history ===");
+console.log('=== The rebased document has no shared history ===');
 {
   const source = buildChurnedDoc();
   const { doc } = rebaseDocument(source);
@@ -140,21 +133,21 @@ console.log("=== The rebased document has no shared history ===");
   const mergedNodes = createYjsDiagramStore(merged).getSnapshot().nodes.length;
   assert(
     mergedNodes > createYjsDiagramStore(doc).getSnapshot().nodes.length,
-    "merging old and new duplicates content - documents must never be combined",
+    'merging old and new duplicates content - documents must never be combined',
   );
 }
 
-console.log("=== Eligibility: connected peers block it (WS4-R7) ===");
+console.log('=== Eligibility: connected peers block it (WS4-R7) ===');
 {
   const blocked = canRebase({
     connectedPeerCount: 2,
     lastSyncedAt: [],
     reconciliationWindowMs: 30 * 86_400_000,
   });
-  assert(!blocked.allowed, "peers in the session block a rebase");
+  assert(!blocked.allowed, 'peers in the session block a rebase');
   assert(
-    blocked.reason?.includes("2 other people") === true,
-    "and the reason names how many, not just that it failed",
+    blocked.reason?.includes('2 other people') === true,
+    'and the reason names how many, not just that it failed',
   );
 
   const singular = canRebase({
@@ -163,14 +156,14 @@ console.log("=== Eligibility: connected peers block it (WS4-R7) ===");
     reconciliationWindowMs: 30 * 86_400_000,
   });
   assert(
-    singular.reason?.includes("1 other person is") === true,
-    "one peer is described in the singular",
+    singular.reason?.includes('1 other person is') === true,
+    'one peer is described in the singular',
   );
 }
 
-console.log("=== Eligibility: the reconciliation window blocks it (WS4-R8) ===");
+console.log('=== Eligibility: the reconciliation window blocks it (WS4-R8) ===');
 {
-  const now = Date.parse("2026-06-01T00:00:00Z");
+  const now = Date.parse('2026-06-01T00:00:00Z');
   const window = 30 * 86_400_000;
 
   const recent = canRebase({
@@ -181,11 +174,11 @@ console.log("=== Eligibility: the reconciliation window blocks it (WS4-R8) ===")
   });
   assert(
     !recent.allowed,
-    "a device that synced five days ago blocks it - it may be offline, not gone",
+    'a device that synced five days ago blocks it - it may be offline, not gone',
   );
   assert(
-    recent.reason?.includes("30 days") === true,
-    "the reason names the window so the wait is predictable",
+    recent.reason?.includes('30 days') === true,
+    'the reason names the window so the wait is predictable',
   );
 
   const stale = canRebase({
@@ -194,7 +187,7 @@ console.log("=== Eligibility: the reconciliation window blocks it (WS4-R8) ===")
     reconciliationWindowMs: window,
     now,
   });
-  assert(stale.allowed, "a device last seen sixty days ago does not block it");
+  assert(stale.allowed, 'a device last seen sixty days ago does not block it');
 
   const boundary = canRebase({
     connectedPeerCount: 0,
@@ -204,7 +197,7 @@ console.log("=== Eligibility: the reconciliation window blocks it (WS4-R8) ===")
   });
   assert(
     boundary.allowed,
-    "exactly at the window boundary is outside it, so the window has a definite end",
+    'exactly at the window boundary is outside it, so the window has a definite end',
   );
 
   assert(
@@ -214,7 +207,7 @@ console.log("=== Eligibility: the reconciliation window blocks it (WS4-R8) ===")
       reconciliationWindowMs: window,
       now,
     }).allowed,
-    "a document nobody else has touched can be rebased",
+    'a document nobody else has touched can be rebased',
   );
 }
 
@@ -222,4 +215,4 @@ if (failures > 0) {
   console.error(`\n${failures} failure(s)`);
   throw new Error(`${failures} rebase check(s) failed`);
 }
-console.log("\nAll rebase checks passed.");
+console.log('\nAll rebase checks passed.');

@@ -79,7 +79,7 @@ export interface RequirementRelationship {
  * reordering). A simple three-state model is enough to drive "is this
  * done, in flight, or not started" without taking on the complexity of a
  * fully custom workflow engine, which this app doesn't need yet. */
-export type RequirementStatus = "todo" | "in-progress" | "done";
+export type RequirementStatus = 'todo' | 'in-progress' | 'done';
 
 export interface RequirementItem {
   /** The full generated reference id, e.g. "REQ-1" - stable for the life

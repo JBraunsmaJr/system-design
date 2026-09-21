@@ -1,7 +1,7 @@
-import * as Y from "yjs";
-import type { TeamDocument, TeamMember, PtoSpan, ExtraDayOff } from "../domain/teamTypes";
-import { DEFAULT_TEAM_SETTINGS } from "../domain/teamTypes";
-import type { TeamStore } from "./teamStore";
+import * as Y from 'yjs';
+import type { TeamDocument, TeamMember, PtoSpan, ExtraDayOff } from '../domain/teamTypes';
+import { DEFAULT_TEAM_SETTINGS } from '../domain/teamTypes';
+import type { TeamStore } from './teamStore';
 
 /**
  * Yjs-backed TeamStore. See teamStore.ts for why the operations are
@@ -44,30 +44,30 @@ import type { TeamStore } from "./teamStore";
  * an existing span's fields - only whole-span add/delete.
  */
 export function createYjsTeamStore(doc: Y.Doc): TeamStore {
-  const memberOrder = doc.getArray<string>("memberOrder");
-  const members = doc.getMap<Y.Map<unknown>>("members");
-  const extraDaysOff = doc.getMap<ExtraDayOff>("extraDaysOff");
-  const settings = doc.getMap<unknown>("settings");
+  const memberOrder = doc.getArray<string>('memberOrder');
+  const members = doc.getMap<Y.Map<unknown>>('members');
+  const extraDaysOff = doc.getMap<ExtraDayOff>('extraDaysOff');
+  const settings = doc.getMap<unknown>('settings');
 
   // One-time defaults, matching DEFAULT_TEAM_SETTINGS, if this is a
   // brand-new doc with nothing in it yet. Guarded by a key check so
   // joining an ALREADY-populated doc (the normal case - syncing to an
   // existing session) never stomps on real data with defaults.
-  if (!settings.has("defaultPointsPerDay")) {
+  if (!settings.has('defaultPointsPerDay')) {
     doc.transact(() => {
-      settings.set("defaultPointsPerDay", DEFAULT_TEAM_SETTINGS.defaultPointsPerDay);
-      settings.set("excludeUsHolidays", DEFAULT_TEAM_SETTINGS.excludeUsHolidays);
+      settings.set('defaultPointsPerDay', DEFAULT_TEAM_SETTINGS.defaultPointsPerDay);
+      settings.set('excludeUsHolidays', DEFAULT_TEAM_SETTINGS.excludeUsHolidays);
     });
   }
 
   function memberMapToPlain(id: string, m: Y.Map<unknown>): TeamMember {
     return {
       id,
-      name: m.get("name") as string,
-      role: m.get("role") as string | undefined,
-      avatarColor: m.get("avatarColor") as string | undefined,
-      defaultPointsPerDay: m.get("defaultPointsPerDay") as number | undefined,
-      ptoSpans: (m.get("ptoSpans") as Y.Array<PtoSpan>).toArray(),
+      name: m.get('name') as string,
+      role: m.get('role') as string | undefined,
+      avatarColor: m.get('avatarColor') as string | undefined,
+      defaultPointsPerDay: m.get('defaultPointsPerDay') as number | undefined,
+      ptoSpans: (m.get('ptoSpans') as Y.Array<PtoSpan>).toArray(),
     };
   }
 
@@ -81,8 +81,8 @@ export function createYjsTeamStore(doc: Y.Doc): TeamStore {
         })
         .filter((m): m is TeamMember => m !== null),
       settings: {
-        defaultPointsPerDay: settings.get("defaultPointsPerDay") as number,
-        excludeUsHolidays: settings.get("excludeUsHolidays") as boolean,
+        defaultPointsPerDay: settings.get('defaultPointsPerDay') as number,
+        excludeUsHolidays: settings.get('excludeUsHolidays') as boolean,
         extraDaysOff: Array.from(extraDaysOff.values()),
       },
     };
@@ -129,13 +129,13 @@ export function createYjsTeamStore(doc: Y.Doc): TeamStore {
     addMember: (member) => {
       doc.transact(() => {
         const m = new Y.Map<unknown>();
-        m.set("name", member.name);
-        m.set("role", member.role);
-        m.set("avatarColor", member.avatarColor);
-        m.set("defaultPointsPerDay", member.defaultPointsPerDay);
+        m.set('name', member.name);
+        m.set('role', member.role);
+        m.set('avatarColor', member.avatarColor);
+        m.set('defaultPointsPerDay', member.defaultPointsPerDay);
         const ptoArr = new Y.Array<PtoSpan>();
         ptoArr.push(member.ptoSpans);
-        m.set("ptoSpans", ptoArr);
+        m.set('ptoSpans', ptoArr);
         members.set(member.id, m);
         memberOrder.push([member.id]);
       });
@@ -162,13 +162,13 @@ export function createYjsTeamStore(doc: Y.Doc): TeamStore {
     addPtoSpan: (memberId, span) => {
       const m = members.get(memberId);
       if (!m) return;
-      (m.get("ptoSpans") as Y.Array<PtoSpan>).push([span]);
+      (m.get('ptoSpans') as Y.Array<PtoSpan>).push([span]);
     },
 
     deletePtoSpan: (memberId, ptoId) => {
       const m = members.get(memberId);
       if (!m) return;
-      const ptoArr = m.get("ptoSpans") as Y.Array<PtoSpan>;
+      const ptoArr = m.get('ptoSpans') as Y.Array<PtoSpan>;
       const idx = ptoArr.toArray().findIndex((p) => p.id === ptoId);
       if (idx !== -1) ptoArr.delete(idx, 1);
     },

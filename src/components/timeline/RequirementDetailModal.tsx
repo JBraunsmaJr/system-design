@@ -1,24 +1,41 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { X, ExternalLink, Calendar, Edit3, Check, Trash2, Diamond, Package, Flag, ClipboardCheck, Rocket, Snowflake } from "lucide-react";
-import { getItemType, isItemWorkable } from "../../domain/requirementsRegistry";
-import { findLinkedNodes, type DiagramPath } from "../../domain/subDiagramTree";
-import { computeSprintDateRanges, type ProgramIncrement } from "../../domain/programIncrements";
-import type { RequirementItem, RequirementsDocument } from "../../domain/requirementsTypes";
-import type { SubDiagram } from "../../domain/types";
-import type { Milestone } from "../../domain/milestones";
-import { findMilestonesForItem, getMilestoneColor, getMilestoneTypeLabel } from "../../domain/milestones";
-import { computeEpicInferredSchedule } from "../../domain/epicScheduling";
-import { RequirementBody } from "../requirements/RequirementBody";
-import { LinkedDiagramsSection } from "../requirements/LinkedDiagramsSection";
-import { RequirementEditor } from "../requirements/RequirementEditor";
-import { CategoryPicker } from "../requirements/CategoryPicker";
-import { StatusPicker } from "../requirements/StatusPicker";
-import { TypePicker } from "../requirements/TypePicker";
-import { SprintPicker } from "../requirements/SprintPicker";
-import { RelationshipManager } from "../requirements/RelationshipManager";
-import { MemberPicker } from "../team/MemberPicker";
-import { PointsPicker } from "../team/PointsPicker";
-import type { TeamDocument } from "../../domain/teamTypes";
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  X,
+  ExternalLink,
+  Calendar,
+  Edit3,
+  Check,
+  Trash2,
+  Diamond,
+  Package,
+  Flag,
+  ClipboardCheck,
+  Rocket,
+  Snowflake,
+} from 'lucide-react';
+import { getItemType, isItemWorkable } from '../../domain/requirementsRegistry';
+import { findLinkedNodes, type DiagramPath } from '../../domain/subDiagramTree';
+import { computeSprintDateRanges, type ProgramIncrement } from '../../domain/programIncrements';
+import type { RequirementItem, RequirementsDocument } from '../../domain/requirementsTypes';
+import type { SubDiagram } from '../../domain/types';
+import type { Milestone } from '../../domain/milestones';
+import {
+  findMilestonesForItem,
+  getMilestoneColor,
+  getMilestoneTypeLabel,
+} from '../../domain/milestones';
+import { computeEpicInferredSchedule } from '../../domain/epicScheduling';
+import { RequirementBody } from '../requirements/RequirementBody';
+import { LinkedDiagramsSection } from '../requirements/LinkedDiagramsSection';
+import { RequirementEditor } from '../requirements/RequirementEditor';
+import { CategoryPicker } from '../requirements/CategoryPicker';
+import { StatusPicker } from '../requirements/StatusPicker';
+import { TypePicker } from '../requirements/TypePicker';
+import { SprintPicker } from '../requirements/SprintPicker';
+import { RelationshipManager } from '../requirements/RelationshipManager';
+import { MemberPicker } from '../team/MemberPicker';
+import { PointsPicker } from '../team/PointsPicker';
+import type { TeamDocument } from '../../domain/teamTypes';
 
 interface RequirementDetailModalProps {
   item: RequirementItem;
@@ -68,7 +85,7 @@ export function RequirementDetailModal({
   // Close on Escape key press
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      if (e.key === 'Escape') {
         if (isEditing) {
           setIsEditing(false);
         } else {
@@ -76,18 +93,20 @@ export function RequirementDetailModal({
         }
       }
     };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose, isEditing]);
 
   const type = getItemType(doc, item.typeId);
   const linkedNodes = useMemo(
     () => (diagramRoot ? findLinkedNodes(diagramRoot, item.id) : []),
-    [diagramRoot, item.id]
+    [diagramRoot, item.id],
   );
-  const category = item.categoryId ? doc.categories.find((c) => c.id === item.categoryId) : undefined;
+  const category = item.categoryId
+    ? doc.categories.find((c) => c.id === item.categoryId)
+    : undefined;
 
-  const isEpic = item.typeId === "epic" || item.typeId.toLowerCase().includes("epic");
+  const isEpic = item.typeId === 'epic' || item.typeId.toLowerCase().includes('epic');
   const epicSchedule = useMemo(() => {
     return computeEpicInferredSchedule(item.id, doc, programIncrements, milestones);
   }, [item.id, doc, programIncrements, milestones]);
@@ -97,7 +116,8 @@ export function RequirementDetailModal({
   }, [milestones, item.id]);
 
   // Find the PI and sprint information for this item
-  let sprintInfo: { piName: string; sprintName: string; startDate?: string; endDate?: string } | undefined;
+  let sprintInfo:
+    { piName: string; sprintName: string; startDate?: string; endDate?: string } | undefined;
   if (item.sprintId) {
     for (const pi of programIncrements) {
       const sprint = pi.sprints.find((s) => s.id === item.sprintId);
@@ -117,15 +137,15 @@ export function RequirementDetailModal({
 
   const renderMilestoneIcon = (t: string) => {
     switch (t) {
-      case "release":
+      case 'release':
         return <Package size={13} />;
-      case "deadline":
+      case 'deadline':
         return <Flag size={13} />;
-      case "review":
+      case 'review':
         return <ClipboardCheck size={13} />;
-      case "launch":
+      case 'launch':
         return <Rocket size={13} />;
-      case "code-freeze":
+      case 'code-freeze':
         return <Snowflake size={13} />;
       default:
         return <Diamond size={13} />;
@@ -142,7 +162,7 @@ export function RequirementDetailModal({
         onNavigateToRequirement(targetId);
       }
     },
-    [doc.items, onSelectItem, onNavigateToRequirement, onClose]
+    [doc.items, onSelectItem, onNavigateToRequirement, onClose],
   );
 
   return (
@@ -159,9 +179,9 @@ export function RequirementDetailModal({
             <span
               className="requirement-detail-modal__id"
               style={{
-                color: type?.color ?? "var(--chrome-text)",
-                borderColor: `${type?.color ?? "var(--chrome-border)"}88`,
-                background: `${type?.color ?? "var(--chrome-border)"}15`,
+                color: type?.color ?? 'var(--chrome-text)',
+                borderColor: `${type?.color ?? 'var(--chrome-border)'}88`,
+                background: `${type?.color ?? 'var(--chrome-border)'}15`,
               }}
             >
               {item.id}
@@ -182,7 +202,10 @@ export function RequirementDetailModal({
               type && <span className="requirement-detail-modal__type-label">{type.label}</span>
             )}
             {onUpdateItem && isItemWorkable(doc, item) && (
-              <StatusPicker status={item.status} onChange={(status) => onUpdateItem(item.id, { status })} />
+              <StatusPicker
+                status={item.status}
+                onChange={(status) => onUpdateItem(item.id, { status })}
+              />
             )}
 
             {onUpdateItem ? (
@@ -283,7 +306,8 @@ export function RequirementDetailModal({
               <strong>{sprintInfo.piName}</strong> › {sprintInfo.sprintName}
               {sprintInfo.startDate && sprintInfo.endDate && (
                 <span className="requirement-detail-modal__dates">
-                  {" "}({sprintInfo.startDate} → {sprintInfo.endDate})
+                  {' '}
+                  ({sprintInfo.startDate} → {sprintInfo.endDate})
                 </span>
               )}
             </span>
@@ -291,22 +315,40 @@ export function RequirementDetailModal({
         )}
 
         {isEpic && (
-          <div className="requirement-detail-modal__sprint-info" style={{ backgroundColor: "rgba(139, 92, 246, 0.1)", borderColor: "rgba(139, 92, 246, 0.3)" }}>
-            <Calendar size={13} style={{ color: "#8b5cf6" }} />
+          <div
+            className="requirement-detail-modal__sprint-info"
+            style={{
+              backgroundColor: 'rgba(139, 92, 246, 0.1)',
+              borderColor: 'rgba(139, 92, 246, 0.3)',
+            }}
+          >
+            <Calendar size={13} style={{ color: '#8b5cf6' }} />
             <span>
-              <strong style={{ color: "#8b5cf6" }}>Inferred Schedule:</strong>{" "}
+              <strong style={{ color: '#8b5cf6' }}>Inferred Schedule:</strong>{' '}
               {epicSchedule.startDate ? (
                 <>
-                  {epicSchedule.startDate} → {epicSchedule.endDate ? epicSchedule.endDate : <span style={{ color: "#f59e0b" }}>Open-ended ({epicSchedule.unscheduledChildrenCount} unscheduled)</span>}
+                  {epicSchedule.startDate} →{' '}
+                  {epicSchedule.endDate ? (
+                    epicSchedule.endDate
+                  ) : (
+                    <span style={{ color: '#f59e0b' }}>
+                      Open-ended ({epicSchedule.unscheduledChildrenCount} unscheduled)
+                    </span>
+                  )}
                 </>
               ) : (
-                <span style={{ color: "var(--chrome-text-dim)" }}>Unscheduled (0 child items scheduled)</span>
+                <span style={{ color: 'var(--chrome-text-dim)' }}>
+                  Unscheduled (0 child items scheduled)
+                </span>
               )}
-              {" • "}
-              <strong>{epicSchedule.scheduledChildrenCount}/{epicSchedule.totalChildrenCount}</strong> scheduled
-              {" • "}
+              {' • '}
+              <strong>
+                {epicSchedule.scheduledChildrenCount}/{epicSchedule.totalChildrenCount}
+              </strong>{' '}
+              scheduled
+              {' • '}
               <strong>{epicSchedule.completedChildrenCount}</strong> done
-              {" • "}
+              {' • '}
               <strong>{epicSchedule.totalPoints}</strong> pts
             </span>
           </div>
@@ -323,7 +365,7 @@ export function RequirementDetailModal({
             />
           ) : (
             <h2 id="requirement-detail-title" className="requirement-detail-modal__title">
-              {item.title || "Untitled Requirement"}
+              {item.title || 'Untitled Requirement'}
             </h2>
           )}
 
@@ -365,11 +407,7 @@ export function RequirementDetailModal({
                 className="requirement-detail-modal__body-wrap"
                 onDoubleClick={() => onUpdateItem && setIsEditing(true)}
               >
-                <RequirementBody
-                  text={item.body}
-                  doc={doc}
-                  onNavigateToItem={handleNavigateRef}
-                />
+                <RequirementBody text={item.body} doc={doc} onNavigateToItem={handleNavigateRef} />
               </div>
             )}
           </div>
@@ -403,9 +441,9 @@ export function RequirementDetailModal({
           )}
 
           {linkedMilestones.length > 0 && (
-            <div className="requirement-detail-modal__section" style={{ marginTop: "16px" }}>
+            <div className="requirement-detail-modal__section" style={{ marginTop: '16px' }}>
               <span className="requirement-detail-modal__desc-label">Linked Markers</span>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "6px" }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
                 {linkedMilestones.map((m) => {
                   const mColor = getMilestoneColor(m);
                   const mLabel = getMilestoneTypeLabel(m.type);
@@ -426,7 +464,7 @@ export function RequirementDetailModal({
                       <span className="pi-board-column__milestone-shape">◆</span>
                       <span>{renderMilestoneIcon(m.type)}</span>
                       <span className="pi-board-column__milestone-name">{m.name}</span>
-                      <span style={{ opacity: 0.8, fontSize: "11px" }}>({m.scheduledAt})</span>
+                      <span style={{ opacity: 0.8, fontSize: '11px' }}>({m.scheduledAt})</span>
                     </button>
                   );
                 })}

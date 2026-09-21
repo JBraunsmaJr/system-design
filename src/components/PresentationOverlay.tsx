@@ -1,5 +1,5 @@
-import { Panel } from "@xyflow/react";
-import type { Scenario, ScenarioStep } from "../domain/types";
+import { Panel } from '@xyflow/react';
+import type { Scenario, ScenarioStep } from '../domain/types';
 
 interface PresentationOverlayProps {
   scenario: Scenario;

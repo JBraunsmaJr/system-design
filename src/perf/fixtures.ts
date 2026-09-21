@@ -1,5 +1,5 @@
-import type { Node, Edge } from "@xyflow/react";
-import type { ArchNodeData, ArchEdgeData, SubDiagram, EdgeWaypoint } from "../domain/types";
+import type { Node, Edge } from '@xyflow/react';
+import type { ArchNodeData, ArchEdgeData, SubDiagram, EdgeWaypoint } from '../domain/types';
 
 /**
  * Deterministic pseudo-random number generator (Mulberry32).
@@ -15,7 +15,7 @@ export function createPrng(seed: number): () => number {
   };
 }
 
-export type FixtureName = "small" | "medium" | "large" | "nested" | "grouped";
+export type FixtureName = 'small' | 'medium' | 'large' | 'nested' | 'grouped';
 
 export interface FixtureOptions {
   seed?: number;
@@ -28,17 +28,17 @@ export interface FixtureOptions {
 }
 
 const NODE_TYPES = [
-  "microservice",
-  "database",
-  "cache",
-  "queue",
-  "gateway",
-  "storage",
-  "serverless",
-  "pubsub",
+  'microservice',
+  'database',
+  'cache',
+  'queue',
+  'gateway',
+  'storage',
+  'serverless',
+  'pubsub',
 ];
 
-const EDGE_TYPES = ["sync", "async", "grpc", "event", "sql", "cache-read"];
+const EDGE_TYPES = ['sync', 'async', 'grpc', 'event', 'sql', 'cache-read'];
 
 /**
  * Generates a deterministic SubDiagram model with seeded PRNG.
@@ -61,7 +61,7 @@ function generateFlatDiagram(
   options: FixtureOptions,
   rand: () => number,
   groupCount: number,
-  waypointFraction: number
+  waypointFraction: number,
 ): SubDiagram {
   const nodes: Node<ArchNodeData>[] = [];
   const edges: Edge<ArchEdgeData>[] = [];
@@ -82,16 +82,16 @@ function generateFlatDiagram(
 
     groups.push({
       id: groupId,
-      type: "group",
+      type: 'group',
       position: { x, y },
       width,
       height,
       data: {
-        nodeType: "boundary",
+        nodeType: 'boundary',
         label: `Boundary ${g + 1}`,
         description: `Group container ${g + 1}`,
-        properties: { env: "prod", boundary: `tier-${g}` },
-        tags: ["boundary", `group-${g}`],
+        properties: { env: 'prod', boundary: `tier-${g}` },
+        tags: ['boundary', `group-${g}`],
       },
     });
   }
@@ -121,7 +121,7 @@ function generateFlatDiagram(
 
     nodes.push({
       id: nodeId,
-      type: "typed",
+      type: 'typed',
       position,
       parentId,
       data: {
@@ -129,11 +129,11 @@ function generateFlatDiagram(
         label: `Service ${i + 1}`,
         description: `Description for service node ${i + 1}`,
         properties: {
-          runtime: "node",
+          runtime: 'node',
           version: `1.${i % 9}.0`,
-          tier: parentId ? "grouped" : "standalone",
+          tier: parentId ? 'grouped' : 'standalone',
         },
-        tags: ["service", `type-${nodeType}`],
+        tags: ['service', `type-${nodeType}`],
       },
     });
   }
@@ -159,13 +159,13 @@ function generateFlatDiagram(
           id: `edge-hub-${h}`,
           source: hubId,
           target: targetId,
-          type: "typed",
+          type: 'typed',
           data: {
             edgeType: EDGE_TYPES[edgeIdx % EDGE_TYPES.length],
             label: `Hub Traffic ${h}`,
-            direction: "forward",
+            direction: 'forward',
             waypoints,
-            properties: { protocol: "tcp" },
+            properties: { protocol: 'tcp' },
           },
         });
         edgeIdx++;
@@ -185,13 +185,13 @@ function generateFlatDiagram(
         id: `edge-${edgeIdx}`,
         source: nodes[srcIdx].id,
         target: nodes[dstIdx].id,
-        type: "typed",
+        type: 'typed',
         data: {
           edgeType: EDGE_TYPES[edgeIdx % EDGE_TYPES.length],
           label: `Traffic ${edgeIdx + 1}`,
-          direction: "forward",
+          direction: 'forward',
           waypoints,
-          properties: { protocol: "https", timeoutMs: "5000" },
+          properties: { protocol: 'https', timeoutMs: '5000' },
         },
       });
       edgeIdx++;
@@ -226,12 +226,8 @@ function generateNestedDiagram(options: FixtureOptions, rand: () => number): Sub
 
   function buildLevel(currentDepth: number, prefix: string): SubDiagram {
     const isLeaf = currentDepth >= depth;
-    const levelNodeCount = isLeaf
-      ? totalNodes - nodesPerLevel * (depth - 1)
-      : nodesPerLevel;
-    const levelEdgeCount = isLeaf
-      ? totalEdges - edgesPerLevel * (depth - 1)
-      : edgesPerLevel;
+    const levelNodeCount = isLeaf ? totalNodes - nodesPerLevel * (depth - 1) : nodesPerLevel;
+    const levelEdgeCount = isLeaf ? totalEdges - edgesPerLevel * (depth - 1) : edgesPerLevel;
 
     const nodes: Node<ArchNodeData>[] = [];
     const edges: Edge<ArchEdgeData>[] = [];
@@ -249,7 +245,7 @@ function generateNestedDiagram(options: FixtureOptions, rand: () => number): Sub
 
       nodes.push({
         id: nodeId,
-        type: "typed",
+        type: 'typed',
         position: { x: (i % 10) * 220 + 50, y: Math.floor(i / 10) * 160 + 50 },
         data: {
           nodeType,
@@ -273,11 +269,11 @@ function generateNestedDiagram(options: FixtureOptions, rand: () => number): Sub
         id: `${prefix}edge-${e}`,
         source: nodes[srcIdx].id,
         target: nodes[dstIdx].id,
-        type: "typed",
+        type: 'typed',
         data: {
           edgeType: EDGE_TYPES[e % EDGE_TYPES.length],
           label: `Edge L${currentDepth}-${e}`,
-          direction: "forward",
+          direction: 'forward',
           waypoints,
           properties: { depth: String(currentDepth) },
         },
@@ -287,7 +283,7 @@ function generateNestedDiagram(options: FixtureOptions, rand: () => number): Sub
     return { nodes, edges };
   }
 
-  return buildLevel(1, "");
+  return buildLevel(1, '');
 }
 
 /**

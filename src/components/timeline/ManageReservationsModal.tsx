@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo } from 'react';
 import {
   ShieldAlert,
   Plus,
@@ -11,14 +11,18 @@ import {
   Hash,
   Sparkles,
   Info,
-} from "lucide-react";
-import type { ProgramIncrement, CapacityReservation, CapacityReservationUnit } from "../../domain/programIncrements";
-import type { TeamDocument } from "../../domain/teamTypes";
-import type { RequirementsDocument } from "../../domain/requirementsTypes";
-import { isItemWorkable } from "../../domain/requirementsRegistry";
-import { computeSprintDateRanges } from "../../domain/programIncrements";
-import { computeSprintCapacity } from "../../domain/teamCapacity";
-import type { ProgramIncrementsStore } from "../../collab/programIncrementsStore";
+} from 'lucide-react';
+import type {
+  ProgramIncrement,
+  CapacityReservation,
+  CapacityReservationUnit,
+} from '../../domain/programIncrements';
+import type { TeamDocument } from '../../domain/teamTypes';
+import type { RequirementsDocument } from '../../domain/requirementsTypes';
+import { isItemWorkable } from '../../domain/requirementsRegistry';
+import { computeSprintDateRanges } from '../../domain/programIncrements';
+import { computeSprintCapacity } from '../../domain/teamCapacity';
+import type { ProgramIncrementsStore } from '../../collab/programIncrementsStore';
 
 interface ManageReservationsModalProps {
   pi: ProgramIncrement;
@@ -29,20 +33,45 @@ interface ManageReservationsModalProps {
 }
 
 const CATEGORY_OPTIONS: { id: string; label: string; icon: string; color: string }[] = [
-  { id: "risk", label: "Risk Buffer", icon: "🛡️", color: "#f59e0b" },
-  { id: "bugs", label: "Bugs & Maintenance", icon: "🐛", color: "#f0578c" },
-  { id: "techdebt", label: "Technical Debt", icon: "🔧", color: "#8b5cf6" },
-  { id: "meetings", label: "Scrum & Meetings", icon: "📅", color: "#38bdf8" },
-  { id: "operations", label: "On-Call & Ops", icon: "⚙️", color: "#10b981" },
-  { id: "other", label: "Other / Custom", icon: "📌", color: "#94a3b8" },
+  { id: 'risk', label: 'Risk Buffer', icon: '🛡️', color: '#f59e0b' },
+  { id: 'bugs', label: 'Bugs & Maintenance', icon: '🐛', color: '#f0578c' },
+  { id: 'techdebt', label: 'Technical Debt', icon: '🔧', color: '#8b5cf6' },
+  { id: 'meetings', label: 'Scrum & Meetings', icon: '📅', color: '#38bdf8' },
+  { id: 'operations', label: 'On-Call & Ops', icon: '⚙️', color: '#10b981' },
+  { id: 'other', label: 'Other / Custom', icon: '📌', color: '#94a3b8' },
 ];
 
 const PRESET_RESERVATIONS = [
-  { name: "Scrum & Meetings (10%)", category: "meetings", unit: "percentage" as CapacityReservationUnit, value: 10 },
-  { name: "Tech Debt (10%)", category: "techdebt", unit: "percentage" as CapacityReservationUnit, value: 10 },
-  { name: "Risk Buffer (15%)", category: "risk", unit: "percentage" as CapacityReservationUnit, value: 15 },
-  { name: "General Reserve (20%)", category: "risk", unit: "percentage" as CapacityReservationUnit, value: 20 },
-  { name: "Bug Buffer (5 pts)", category: "bugs", unit: "points" as CapacityReservationUnit, value: 5 },
+  {
+    name: 'Scrum & Meetings (10%)',
+    category: 'meetings',
+    unit: 'percentage' as CapacityReservationUnit,
+    value: 10,
+  },
+  {
+    name: 'Tech Debt (10%)',
+    category: 'techdebt',
+    unit: 'percentage' as CapacityReservationUnit,
+    value: 10,
+  },
+  {
+    name: 'Risk Buffer (15%)',
+    category: 'risk',
+    unit: 'percentage' as CapacityReservationUnit,
+    value: 15,
+  },
+  {
+    name: 'General Reserve (20%)',
+    category: 'risk',
+    unit: 'percentage' as CapacityReservationUnit,
+    value: 20,
+  },
+  {
+    name: 'Bug Buffer (5 pts)',
+    category: 'bugs',
+    unit: 'points' as CapacityReservationUnit,
+    value: 5,
+  },
 ];
 
 export function ManageReservationsModal({
@@ -55,17 +84,20 @@ export function ManageReservationsModal({
   const [isAdding, setIsAdding] = useState(false);
   const [editingReservationId, setEditingReservationId] = useState<string | null>(null);
 
-  const [formName, setFormName] = useState("");
-  const [formCategory, setFormCategory] = useState("risk");
-  const [formUnit, setFormUnit] = useState<CapacityReservationUnit>("percentage");
-  const [formValue, setFormValue] = useState<string>("20");
-  const [formSprintId, setFormSprintId] = useState<string>(""); // "" = All Sprints
-  const [formNote, setFormNote] = useState("");
+  const [formName, setFormName] = useState('');
+  const [formCategory, setFormCategory] = useState('risk');
+  const [formUnit, setFormUnit] = useState<CapacityReservationUnit>('percentage');
+  const [formValue, setFormValue] = useState<string>('20');
+  const [formSprintId, setFormSprintId] = useState<string>(''); // "" = All Sprints
+  const [formNote, setFormNote] = useState('');
 
   const reservations = useMemo(() => pi.reservations ?? [], [pi.reservations]);
 
   const sprintDateRanges = useMemo(() => computeSprintDateRanges(pi), [pi]);
-  const rangeMap = useMemo(() => new Map(sprintDateRanges.map((r) => [r.sprintId, r])), [sprintDateRanges]);
+  const rangeMap = useMemo(
+    () => new Map(sprintDateRanges.map((r) => [r.sprintId, r])),
+    [sprintDateRanges],
+  );
 
   // Compute live sprint capacities for preview
   const sprintImpacts = useMemo(() => {
@@ -88,12 +120,12 @@ export function ManageReservationsModal({
   const sprintLevelCount = totalReservationsCount - piLevelCount;
 
   const resetForm = () => {
-    setFormName("");
-    setFormCategory("risk");
-    setFormUnit("percentage");
-    setFormValue("20");
-    setFormSprintId("");
-    setFormNote("");
+    setFormName('');
+    setFormCategory('risk');
+    setFormUnit('percentage');
+    setFormValue('20');
+    setFormSprintId('');
+    setFormNote('');
     setEditingReservationId(null);
     setIsAdding(false);
   };
@@ -104,7 +136,7 @@ export function ManageReservationsModal({
   };
 
   const handleApplyPreset = (preset: (typeof PRESET_RESERVATIONS)[number]) => {
-    setFormName(preset.name.replace(/\s*\([^)]*\)$/, ""));
+    setFormName(preset.name.replace(/\s*\([^)]*\)$/, ''));
     setFormCategory(preset.category);
     setFormUnit(preset.unit);
     setFormValue(preset.value.toString());
@@ -114,11 +146,11 @@ export function ManageReservationsModal({
 
   const handleStartEdit = (reservation: CapacityReservation) => {
     setFormName(reservation.name);
-    setFormCategory(reservation.category ?? "other");
+    setFormCategory(reservation.category ?? 'other');
     setFormUnit(reservation.unit);
     setFormValue(reservation.value.toString());
-    setFormSprintId(reservation.sprintId ?? "");
-    setFormNote(reservation.note ?? "");
+    setFormSprintId(reservation.sprintId ?? '');
+    setFormNote(reservation.note ?? '');
     setEditingReservationId(reservation.id);
     setIsAdding(true);
   };
@@ -134,7 +166,7 @@ export function ManageReservationsModal({
         category: formCategory,
         unit: formUnit,
         value: val,
-        sprintId: formSprintId.trim() !== "" ? formSprintId : undefined,
+        sprintId: formSprintId.trim() !== '' ? formSprintId : undefined,
         note: formNote.trim() || undefined,
       });
     } else {
@@ -143,7 +175,7 @@ export function ManageReservationsModal({
         category: formCategory,
         unit: formUnit,
         value: val,
-        sprintId: formSprintId.trim() !== "" ? formSprintId : undefined,
+        sprintId: formSprintId.trim() !== '' ? formSprintId : undefined,
         note: formNote.trim() || undefined,
       });
     }
@@ -159,7 +191,9 @@ export function ManageReservationsModal({
   };
 
   const getCategoryMeta = (catId?: string) => {
-    return CATEGORY_OPTIONS.find((c) => c.id === catId) ?? CATEGORY_OPTIONS[CATEGORY_OPTIONS.length - 1];
+    return (
+      CATEGORY_OPTIONS.find((c) => c.id === catId) ?? CATEGORY_OPTIONS[CATEGORY_OPTIONS.length - 1]
+    );
   };
 
   return (
@@ -218,7 +252,9 @@ export function ManageReservationsModal({
           {isAdding && (
             <form className="reservation-form" onSubmit={handleSaveReservation}>
               <div className="reservation-form__header">
-                <h4>{editingReservationId ? "Edit Capacity Reservation" : "Add Capacity Reservation"}</h4>
+                <h4>
+                  {editingReservationId ? 'Edit Capacity Reservation' : 'Add Capacity Reservation'}
+                </h4>
                 <button
                   type="button"
                   className="reservation-form__cancel-btn"
@@ -258,15 +294,15 @@ export function ManageReservationsModal({
                   <div className="reservation-form__unit-selector">
                     <button
                       type="button"
-                      className={`reservation-form__unit-btn${formUnit === "percentage" ? " is-active" : ""}`}
-                      onClick={() => setFormUnit("percentage")}
+                      className={`reservation-form__unit-btn${formUnit === 'percentage' ? ' is-active' : ''}`}
+                      onClick={() => setFormUnit('percentage')}
                     >
                       <Percent size={13} /> Percentage (%)
                     </button>
                     <button
                       type="button"
-                      className={`reservation-form__unit-btn${formUnit === "points" ? " is-active" : ""}`}
-                      onClick={() => setFormUnit("points")}
+                      className={`reservation-form__unit-btn${formUnit === 'points' ? ' is-active' : ''}`}
+                      onClick={() => setFormUnit('points')}
                     >
                       <Hash size={13} /> Points (pts)
                     </button>
@@ -275,20 +311,22 @@ export function ManageReservationsModal({
 
                 <div className="reservation-form__field">
                   <label>
-                    {formUnit === "percentage" ? "Percentage Value (%) *" : "Whole Points Value (pts) *"}
+                    {formUnit === 'percentage'
+                      ? 'Percentage Value (%) *'
+                      : 'Whole Points Value (pts) *'}
                   </label>
                   <div className="reservation-form__value-input-wrap">
                     <input
                       type="number"
                       step="any"
                       min="0"
-                      max={formUnit === "percentage" ? "100" : "500"}
+                      max={formUnit === 'percentage' ? '100' : '500'}
                       value={formValue}
                       onChange={(e) => setFormValue(e.target.value)}
                       required
                     />
                     <span className="reservation-form__value-suffix">
-                      {formUnit === "percentage" ? "%" : "pts"}
+                      {formUnit === 'percentage' ? '%' : 'pts'}
                     </span>
                   </div>
                 </div>
@@ -318,16 +356,20 @@ export function ManageReservationsModal({
 
               <div className="reservation-form__footer">
                 <span className="reservation-form__hint">
-                  {formUnit === "percentage"
+                  {formUnit === 'percentage'
                     ? `Deducts ${formValue || 0}% from each team member's gross capacity in target sprints.`
                     : `Deducts ${formValue || 0} pts total from sprint capacity (distributed proportionally across team members).`}
                 </span>
                 <div className="reservation-form__actions">
-                  <button type="button" className="reservation-form__cancel-btn-text" onClick={resetForm}>
+                  <button
+                    type="button"
+                    className="reservation-form__cancel-btn-text"
+                    onClick={resetForm}
+                  >
                     Cancel
                   </button>
                   <button type="submit" className="manage-reservations-modal__primary-btn">
-                    {editingReservationId ? "Update Reservation" : "Save Reservation"}
+                    {editingReservationId ? 'Update Reservation' : 'Save Reservation'}
                   </button>
                 </div>
               </div>
@@ -340,7 +382,9 @@ export function ManageReservationsModal({
               <div className="manage-reservations-section__title-group">
                 <Layers size={15} />
                 <span className="manage-reservations-section__title">Configured Allocations</span>
-                <span className="manage-reservations-section__count-badge">{totalReservationsCount}</span>
+                <span className="manage-reservations-section__count-badge">
+                  {totalReservationsCount}
+                </span>
               </div>
               {!isAdding && (
                 <button
@@ -356,10 +400,13 @@ export function ManageReservationsModal({
             {reservations.length === 0 ? (
               <div className="manage-reservations-empty">
                 <ShieldAlert size={28} className="manage-reservations-empty__icon" />
-                <p className="manage-reservations-empty__title">No Capacity Reservations Configured</p>
+                <p className="manage-reservations-empty__title">
+                  No Capacity Reservations Configured
+                </p>
                 <p className="manage-reservations-empty__desc">
-                  Reserve buffer capacity for risks, bug fixes, tech debt, or meetings. You can apply reservations at the
-                  PI level (impacting all sprints) or granularly per sprint.
+                  Reserve buffer capacity for risks, bug fixes, tech debt, or meetings. You can
+                  apply reservations at the PI level (impacting all sprints) or granularly per
+                  sprint.
                 </p>
                 {!isAdding && (
                   <button
@@ -396,14 +443,16 @@ export function ManageReservationsModal({
                             >
                               {cat.label}
                             </span>
-                            <span className={`reservation-card__scope-badge${isPiLevel ? " is-pi" : " is-sprint"}`}>
+                            <span
+                              className={`reservation-card__scope-badge${isPiLevel ? ' is-pi' : ' is-sprint'}`}
+                            >
                               {isPiLevel ? (
                                 <>
                                   <Layers size={10} /> All Sprints
                                 </>
                               ) : (
                                 <>
-                                  <Calendar size={10} /> {targetSprint?.name ?? "Sprint"}
+                                  <Calendar size={10} /> {targetSprint?.name ?? 'Sprint'}
                                 </>
                               )}
                             </span>
@@ -416,10 +465,10 @@ export function ManageReservationsModal({
                         <div className="reservation-card__value-badge">
                           <strong>
                             {r.value}
-                            {r.unit === "percentage" ? "%" : " pts"}
+                            {r.unit === 'percentage' ? '%' : ' pts'}
                           </strong>
                           <span className="reservation-card__value-label">
-                            {r.unit === "percentage" ? "Reserve Rate" : "Fixed Reserve"}
+                            {r.unit === 'percentage' ? 'Reserve Rate' : 'Fixed Reserve'}
                           </span>
                         </div>
 
@@ -454,7 +503,9 @@ export function ManageReservationsModal({
             <div className="manage-reservations-section__header">
               <div className="manage-reservations-section__title-group">
                 <Calendar size={15} />
-                <span className="manage-reservations-section__title">Sprint Capacity Impact Preview</span>
+                <span className="manage-reservations-section__title">
+                  Sprint Capacity Impact Preview
+                </span>
               </div>
               <div className="manage-reservations-section__hint">
                 <Info size={12} /> Net available capacity after reserve deductions
@@ -511,7 +562,7 @@ export function ManageReservationsModal({
                               {activeReservations.map((ar) => (
                                 <span key={ar.id} className="reservations-preview-table__chip">
                                   {ar.name}: {ar.value}
-                                  {ar.unit === "percentage" ? "%" : " pts"}
+                                  {ar.unit === 'percentage' ? '%' : ' pts'}
                                 </span>
                               ))}
                             </div>

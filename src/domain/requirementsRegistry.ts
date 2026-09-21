@@ -1,4 +1,12 @@
-import type { RequirementCategory, RequirementItemType, RequirementsDocument, RelationshipType, RequirementRelationship, RequirementItem, RequirementStatus } from "./requirementsTypes.ts";
+import type {
+  RequirementCategory,
+  RequirementItemType,
+  RequirementsDocument,
+  RelationshipType,
+  RequirementRelationship,
+  RequirementItem,
+  RequirementStatus,
+} from './requirementsTypes.ts';
 
 /** "Ticket" is the only built-in type that represents actual work -
  * everything else here documents intent (a client requirement, a goal, a
@@ -6,14 +14,70 @@ import type { RequirementCategory, RequirementItemType, RequirementsDocument, Re
  * can be marked workable too (see ManageTypesModal), this is just what
  * ships by default. */
 export const BUILT_IN_ITEM_TYPES: RequirementItemType[] = [
-  { id: "requirement", label: "Requirement", prefix: "REQ", color: "#5b7cfa", isBuiltIn: true, isWorkable: false },
-  { id: "goal", label: "Goal", prefix: "GOAL", color: "#0FA36B", isBuiltIn: true, isWorkable: false },
-  { id: "constraint", label: "Constraint", prefix: "CON", color: "#F2994A", isBuiltIn: true, isWorkable: false },
-  { id: "assumption", label: "Assumption", prefix: "ASM", color: "#9061F9", isBuiltIn: true, isWorkable: false },
-  { id: "risk", label: "Risk", prefix: "RISK", color: "#F0578C", isBuiltIn: true, isWorkable: false },
-  { id: "epic", label: "Epic", prefix: "EPIC", color: "#8b5cf6", isBuiltIn: true, isWorkable: false },
-  { id: "dependency", label: "Dependency", prefix: "DEP", color: "#f59e0b", isBuiltIn: true, isWorkable: false },
-  { id: "ticket", label: "Ticket", prefix: "TICKET", color: "#22B8CF", isBuiltIn: true, isWorkable: true },
+  {
+    id: 'requirement',
+    label: 'Requirement',
+    prefix: 'REQ',
+    color: '#5b7cfa',
+    isBuiltIn: true,
+    isWorkable: false,
+  },
+  {
+    id: 'goal',
+    label: 'Goal',
+    prefix: 'GOAL',
+    color: '#0FA36B',
+    isBuiltIn: true,
+    isWorkable: false,
+  },
+  {
+    id: 'constraint',
+    label: 'Constraint',
+    prefix: 'CON',
+    color: '#F2994A',
+    isBuiltIn: true,
+    isWorkable: false,
+  },
+  {
+    id: 'assumption',
+    label: 'Assumption',
+    prefix: 'ASM',
+    color: '#9061F9',
+    isBuiltIn: true,
+    isWorkable: false,
+  },
+  {
+    id: 'risk',
+    label: 'Risk',
+    prefix: 'RISK',
+    color: '#F0578C',
+    isBuiltIn: true,
+    isWorkable: false,
+  },
+  {
+    id: 'epic',
+    label: 'Epic',
+    prefix: 'EPIC',
+    color: '#8b5cf6',
+    isBuiltIn: true,
+    isWorkable: false,
+  },
+  {
+    id: 'dependency',
+    label: 'Dependency',
+    prefix: 'DEP',
+    color: '#f59e0b',
+    isBuiltIn: true,
+    isWorkable: false,
+  },
+  {
+    id: 'ticket',
+    label: 'Ticket',
+    prefix: 'TICKET',
+    color: '#22B8CF',
+    isBuiltIn: true,
+    isWorkable: true,
+  },
 ];
 
 /** Status is fixed and not user-extensible (see RequirementStatus's own
@@ -21,9 +85,9 @@ export const BUILT_IN_ITEM_TYPES: RequirementItemType[] = [
  * three values, not a registry of addable entries like item/relationship
  * types. */
 export const REQUIREMENT_STATUSES: { id: RequirementStatus; label: string; color: string }[] = [
-  { id: "todo", label: "To Do", color: "#8b90a0" },
-  { id: "in-progress", label: "In Progress", color: "#F2994A" },
-  { id: "done", label: "Done", color: "#0FA36B" },
+  { id: 'todo', label: 'To Do', color: '#8b90a0' },
+  { id: 'in-progress', label: 'In Progress', color: '#F2994A' },
+  { id: 'done', label: 'Done', color: '#0FA36B' },
 ];
 
 export function getStatusMeta(status: RequirementStatus | undefined) {
@@ -35,9 +99,12 @@ export function getStatusMeta(status: RequirementStatus | undefined) {
  * workable), or undefined for a non-workable type, since status isn't a
  * meaningful concept for a purely descriptive item like a Requirement or
  * Goal. */
-export function defaultStatusForType(doc: RequirementsDocument, typeId: string): RequirementStatus | undefined {
+export function defaultStatusForType(
+  doc: RequirementsDocument,
+  typeId: string,
+): RequirementStatus | undefined {
   const type = getItemType(doc, typeId);
-  return type?.isWorkable ? "todo" : undefined;
+  return type?.isWorkable ? 'todo' : undefined;
 }
 
 /** Whether `item` is currently displaying/eligible for a status at all -
@@ -55,14 +122,52 @@ export function isItemWorkable(doc: RequirementsDocument, item: RequirementItem)
  * "Blocks"/"Duplicates" are directional, each with a distinct inverse
  * shown when viewing the relationship from the other item. */
 export const BUILT_IN_RELATIONSHIP_TYPES: RelationshipType[] = [
-  { id: "relates-to", label: "Relates to", inverseLabel: "Relates to", color: "#8b90a0", isBuiltIn: true, isBlocking: false },
-  { id: "parent-of", label: "Parent of", inverseLabel: "Child of", color: "#8b5cf6", isBuiltIn: true, isBlocking: false },
-  { id: "blocks", label: "Blocks", inverseLabel: "Is blocked by", color: "#F0578C", isBuiltIn: true, isBlocking: true },
-  { id: "depends-on", label: "Depends on", inverseLabel: "Depended on by", color: "#f59e0b", isBuiltIn: true, isBlocking: true },
-  { id: "duplicates", label: "Duplicates", inverseLabel: "Is duplicated by", color: "#F2994A", isBuiltIn: true, isBlocking: false },
+  {
+    id: 'relates-to',
+    label: 'Relates to',
+    inverseLabel: 'Relates to',
+    color: '#8b90a0',
+    isBuiltIn: true,
+    isBlocking: false,
+  },
+  {
+    id: 'parent-of',
+    label: 'Parent of',
+    inverseLabel: 'Child of',
+    color: '#8b5cf6',
+    isBuiltIn: true,
+    isBlocking: false,
+  },
+  {
+    id: 'blocks',
+    label: 'Blocks',
+    inverseLabel: 'Is blocked by',
+    color: '#F0578C',
+    isBuiltIn: true,
+    isBlocking: true,
+  },
+  {
+    id: 'depends-on',
+    label: 'Depends on',
+    inverseLabel: 'Depended on by',
+    color: '#f59e0b',
+    isBuiltIn: true,
+    isBlocking: true,
+  },
+  {
+    id: 'duplicates',
+    label: 'Duplicates',
+    inverseLabel: 'Is duplicated by',
+    color: '#F2994A',
+    isBuiltIn: true,
+    isBlocking: false,
+  },
 ];
 
-export function getItemType(doc: RequirementsDocument, typeId: string): RequirementItemType | undefined {
+export function getItemType(
+  doc: RequirementsDocument,
+  typeId: string,
+): RequirementItemType | undefined {
   return doc.itemTypes.find((t) => t.id === typeId);
 }
 
@@ -85,7 +190,9 @@ export function withMissingBuiltInTypes(itemTypes: RequirementItemType[]): Requi
  * kept as a mirrored, separate function (rather than one generic helper)
  * since the two lists have different shapes and this stays simple to
  * read at each call site about which kind of type it's merging. */
-export function withMissingBuiltInRelationshipTypes(relationshipTypes: RelationshipType[]): RelationshipType[] {
+export function withMissingBuiltInRelationshipTypes(
+  relationshipTypes: RelationshipType[],
+): RelationshipType[] {
   const existingIds = new Set(relationshipTypes.map((t) => t.id));
   const missing = BUILT_IN_RELATIONSHIP_TYPES.filter((t) => !existingIds.has(t.id));
   return missing.length > 0 ? [...relationshipTypes, ...missing] : relationshipTypes;
@@ -96,7 +203,11 @@ export function withMissingBuiltInRelationshipTypes(relationshipTypes: Relations
  * ambiguous (which type does "REQ-3" belong to?), so this must be checked
  * before adding or renaming a custom type's prefix. `excludeTypeId` lets a
  * type be checked against everyone ELSE while editing itself. */
-export function isPrefixTaken(doc: RequirementsDocument, prefix: string, excludeTypeId?: string): boolean {
+export function isPrefixTaken(
+  doc: RequirementsDocument,
+  prefix: string,
+  excludeTypeId?: string,
+): boolean {
   const normalized = prefix.trim().toUpperCase();
   return doc.itemTypes.some((t) => t.id !== excludeTypeId && t.prefix.toUpperCase() === normalized);
 }
@@ -110,7 +221,7 @@ export function isPrefixTaken(doc: RequirementsDocument, prefix: string, exclude
 export function getNextAvailableIdForType(
   doc: RequirementsDocument,
   typeId: string,
-  extraOccupiedIds?: Set<string>
+  extraOccupiedIds?: Set<string>,
 ): string {
   const type = getItemType(doc, typeId);
   if (!type) throw new Error(`Unknown requirement item type: ${typeId}`);
@@ -128,7 +239,7 @@ export function getNextAvailableIdForType(
 
 export function generateItemId(
   doc: RequirementsDocument,
-  typeId: string
+  typeId: string,
 ): { id: string; nextSequence: Record<string, number> } {
   const type = getItemType(doc, typeId);
   if (!type) throw new Error(`Unknown requirement item type: ${typeId}`);
@@ -144,7 +255,10 @@ export function generateItemId(
   };
 }
 
-export function getCategory(doc: RequirementsDocument, categoryId: string | undefined): RequirementCategory | undefined {
+export function getCategory(
+  doc: RequirementsDocument,
+  categoryId: string | undefined,
+): RequirementCategory | undefined {
   if (!categoryId) return undefined;
   return doc.categories.find((c) => c.id === categoryId);
 }
@@ -185,7 +299,16 @@ export function countItemsUsingCategory(doc: RequirementsDocument, categoryId: s
  * asking for a color up front on every one would add friction that item
  * types (created far less often, and tied to id generation) can more
  * reasonably ask for. */
-const CATEGORY_COLOR_PALETTE = ["#5b7cfa", "#0FA36B", "#F2994A", "#9061F9", "#F0578C", "#22B8CF", "#EAB308", "#84CC16"];
+const CATEGORY_COLOR_PALETTE = [
+  '#5b7cfa',
+  '#0FA36B',
+  '#F2994A',
+  '#9061F9',
+  '#F0578C',
+  '#22B8CF',
+  '#EAB308',
+  '#84CC16',
+];
 
 export function nextCategoryColor(doc: RequirementsDocument): string {
   return CATEGORY_COLOR_PALETTE[doc.categories.length % CATEGORY_COLOR_PALETTE.length];
@@ -200,7 +323,10 @@ function nextCategoryId(doc: RequirementsDocument): string {
 /** Case-insensitive match against existing category labels, since "Auth"
  * and "auth" being treated as different categories would be a confusing
  * way to end up with near-duplicate groups. */
-export function findCategoryByLabel(doc: RequirementsDocument, label: string): RequirementCategory | undefined {
+export function findCategoryByLabel(
+  doc: RequirementsDocument,
+  label: string,
+): RequirementCategory | undefined {
   const normalized = label.trim().toLowerCase();
   return doc.categories.find((c) => c.label.toLowerCase() === normalized);
 }
@@ -211,12 +337,16 @@ export function findCategoryByLabel(doc: RequirementsDocument, label: string): R
  * updated categories array to store back onto the document. */
 export function createCategory(
   doc: RequirementsDocument,
-  label: string
+  label: string,
 ): { category: RequirementCategory; categories: RequirementCategory[] } {
   const trimmed = label.trim();
   const existing = findCategoryByLabel(doc, trimmed);
   if (existing) return { category: existing, categories: doc.categories };
-  const category: RequirementCategory = { id: nextCategoryId(doc), label: trimmed, color: nextCategoryColor(doc) };
+  const category: RequirementCategory = {
+    id: nextCategoryId(doc),
+    label: trimmed,
+    color: nextCategoryColor(doc),
+  };
   return { category, categories: [...doc.categories, category] };
 }
 
@@ -269,17 +399,17 @@ export function resolveReferencesToMarkdownLinks(text: string, doc: Requirements
 /** Updates all `#oldId` and `#ref:oldId` references in markdown text to `#newId` and `#ref:newId`. */
 export function updateItemReferencesInText(text: string, oldId: string, newId: string): string {
   if (!text || oldId === newId) return text;
-  const escapedOldId = oldId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const escapedOldId = oldId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return text
-    .replace(new RegExp(`#${escapedOldId}\\b`, "g"), `#${newId}`)
-    .replace(new RegExp(`#ref:${escapedOldId}\\b`, "g"), `#ref:${newId}`);
+    .replace(new RegExp(`#${escapedOldId}\\b`, 'g'), `#${newId}`)
+    .replace(new RegExp(`#ref:${escapedOldId}\\b`, 'g'), `#ref:${newId}`);
 }
 
 /** Updates all `fromItemId` and `toItemId` occurrences of `oldId` to `newId` across relationships. */
 export function updateItemReferencesInRelationships(
   relationships: RequirementRelationship[],
   oldId: string,
-  newId: string
+  newId: string,
 ): RequirementRelationship[] {
   if (oldId === newId) return relationships;
   return relationships.map((r) => {
@@ -296,7 +426,7 @@ export function updateItemReferencesInRelationships(
 export function updateItemReferencesInItems(
   items: RequirementItem[],
   oldId: string,
-  newId: string
+  newId: string,
 ): RequirementItem[] {
   if (oldId === newId) return items;
   return items.map((item) => {
@@ -306,7 +436,10 @@ export function updateItemReferencesInItems(
   });
 }
 
-export function getRelationshipType(doc: RequirementsDocument, typeId: string): RelationshipType | undefined {
+export function getRelationshipType(
+  doc: RequirementsDocument,
+  typeId: string,
+): RelationshipType | undefined {
   return doc.relationshipTypes.find((t) => t.id === typeId);
 }
 
@@ -314,7 +447,10 @@ export function getRelationshipType(doc: RequirementsDocument, typeId: string): 
  * "to" side - a relationship is only ever stored once regardless of
  * which item you're viewing it from, so callers looking at one item's
  * card need both directions included in a single list. */
-export function getRelationshipsForItem(doc: RequirementsDocument, itemId: string): RequirementRelationship[] {
+export function getRelationshipsForItem(
+  doc: RequirementsDocument,
+  itemId: string,
+): RequirementRelationship[] {
   return doc.relationships.filter((r) => r.fromItemId === itemId || r.toItemId === itemId);
 }
 
@@ -333,7 +469,7 @@ export function getOtherItemId(relationship: RequirementRelationship, itemId: st
 export function getRelationshipLabelForItem(
   relationship: RequirementRelationship,
   type: RelationshipType,
-  itemId: string
+  itemId: string,
 ): string {
   return relationship.fromItemId === itemId ? type.label : type.inverseLabel;
 }
@@ -357,9 +493,15 @@ function nextRelationshipId(): string {
  * types never contribute to the graph at all - before wiring this into
  * addRelationship.
  */
-export function wouldCreateCycle(doc: RequirementsDocument, fromItemId: string, toItemId: string): boolean {
+export function wouldCreateCycle(
+  doc: RequirementsDocument,
+  fromItemId: string,
+  toItemId: string,
+): boolean {
   if (fromItemId === toItemId) return true;
-  const blockingTypeIds = new Set(doc.relationshipTypes.filter((t) => t.isBlocking).map((t) => t.id));
+  const blockingTypeIds = new Set(
+    doc.relationshipTypes.filter((t) => t.isBlocking).map((t) => t.id),
+  );
   const adjacency = new Map<string, string[]>();
   for (const rel of doc.relationships) {
     if (!blockingTypeIds.has(rel.typeId)) continue;
@@ -402,13 +544,16 @@ export function addRelationship(
   doc: RequirementsDocument,
   typeId: string,
   fromItemId: string,
-  toItemId: string
+  toItemId: string,
 ): AddRelationshipResult {
   if (fromItemId === toItemId) {
-    return { relationships: doc.relationships, error: "An item can't have a relationship with itself." };
+    return {
+      relationships: doc.relationships,
+      error: "An item can't have a relationship with itself.",
+    };
   }
   const isDuplicate = doc.relationships.some(
-    (r) => r.typeId === typeId && r.fromItemId === fromItemId && r.toItemId === toItemId
+    (r) => r.typeId === typeId && r.fromItemId === fromItemId && r.toItemId === toItemId,
   );
   if (isDuplicate) {
     return { relationships: doc.relationships, error: null };
@@ -420,6 +565,11 @@ export function addRelationship(
       error: "That would create a circular dependency, so it wasn't added.",
     };
   }
-  const newRelationship: RequirementRelationship = { id: nextRelationshipId(), typeId, fromItemId, toItemId };
+  const newRelationship: RequirementRelationship = {
+    id: nextRelationshipId(),
+    typeId,
+    fromItemId,
+    toItemId,
+  };
   return { relationships: [...doc.relationships, newRelationship], error: null };
 }

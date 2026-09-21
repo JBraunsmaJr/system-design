@@ -18,7 +18,7 @@
  * rather than a static one.
  */
 
-export type TransportKind = "webrtc" | "websocket";
+export type TransportKind = 'webrtc' | 'websocket';
 
 export interface TransportOptions {
   /** Signaling servers for WebRTC, or sync servers for WebSocket. */
@@ -58,27 +58,23 @@ export interface TransportFactoryOptions extends TransportOptions {
  * without the peer-to-peer path compiled in, and so the choice is auditable
  * from the deployment rather than inferred from the source.
  */
-export function enabledTransports(
-  config: Record<string, unknown> = {}
-): TransportKind[] {
+export function enabledTransports(config: Record<string, unknown> = {}): TransportKind[] {
   const raw = config.VITE_SYNC_TRANSPORTS;
-  if (typeof raw !== "string" || raw.trim() === "") return ["webrtc"];
+  if (typeof raw !== 'string' || raw.trim() === '') return ['webrtc'];
   const parsed = raw
-    .split(",")
+    .split(',')
     .map((s) => s.trim())
-    .filter((s): s is TransportKind => s === "webrtc" || s === "websocket");
-  return parsed.length > 0 ? parsed : ["webrtc"];
+    .filter((s): s is TransportKind => s === 'webrtc' || s === 'websocket');
+  return parsed.length > 0 ? parsed : ['webrtc'];
 }
 
-export function defaultTransport(
-  config: Record<string, unknown> = {}
-): TransportKind {
+export function defaultTransport(config: Record<string, unknown> = {}): TransportKind {
   return enabledTransports(config)[0];
 }
 
 export function isTransportEnabled(
   kind: TransportKind,
-  config: Record<string, unknown> = {}
+  config: Record<string, unknown> = {},
 ): boolean {
   return enabledTransports(config).includes(kind);
 }
@@ -92,9 +88,7 @@ export function isTransportEnabled(
  * defaults with nothing, quietly turning "not configured" into "no ICE servers
  * at all", which breaks any connection needing STUN.
  */
-export function buildPeerOpts(
-  iceServers: RTCIceServer[] | undefined
-): Record<string, unknown> {
+export function buildPeerOpts(iceServers: RTCIceServer[] | undefined): Record<string, unknown> {
   if (iceServers === undefined) return {};
   return { peerOpts: { config: { iceServers } } };
 }

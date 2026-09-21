@@ -1,0 +1,122 @@
+# A complete deployment: the editor, the relay, the store, PostgreSQL, and
+# Keycloak as the identity provider (WS8-R9).
+#
+# As written this runs on localhost over plain HTTP, which browsers treat as
+# secure enough for development. For anything else, put all four behind TLS
+# and change every URL below to https:// - a cross-origin editor needs a
+# SameSite=None cookie, and browsers only accept those over HTTPS. The store
+# refuses to start in that combination rather than failing silently later.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: store
+      POSTGRES_PASSWORD: change-me
+      POSTGRES_DB: store
+    ports:
+      - '5432:5432'
+    volumes:
+      - store-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U store']
+      interval: 5s
+      retries: 10
+
+  # The identity provider. A deployment that already has one (Keycloak,
+  # Entra ID, Okta, Auth0) points the store at that instead and drops this
+  # service; see docs/store-deployment.md.
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    # The command matters: this image does nothing useful without it.
+    command: start-dev --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: change-me
+      # The address the BROWSER uses. Keycloak issues tokens and endpoint
+      # URLs under this name, so it must be the public one even though the
+      # store reaches Keycloak as http://keycloak:8080 inside the network.
+      KC_HOSTNAME: http://localhost:8081
+    volumes:
+      # A realm with the store registered as a client, so this example works
+      # from one command. Its client secret is a placeholder and it carries a
+      # demo account: read the file before using it for anything real.
+      - ./keycloak/system-design-realm.json:/opt/keycloak/data/import/system-design-realm.json:ro
+    ports:
+      - '8081:8080'
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /realms/system-design HTTP/1.1\r\nhost: localhost\r\nconnection: close\r\n\r\n' >&3 && grep -q '200 OK' <&3",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  store:
+    build:
+      context: ../..
+      dockerfile: docker/store/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    environment:
+      PORT: 8080
+      DATABASE_URL: postgresql://store:change-me@postgres:5432/store
+      # Where people reach the store, and where sign-in returns to.
+      PUBLIC_URL: http://localhost:8080
+      # Where the editor is served from. Exactly; no wildcards.
+      ALLOWED_ORIGINS: http://localhost:8088
+      # Where people land after signing in: the editor. Without this they
+      # would be left looking at the store's own root.
+      AFTER_LOGIN_URL: http://localhost:8088
+      AUTH_PROVIDERS: oidc
+      # Two addresses for one provider: the browser is sent to localhost,
+      # and this container reaches Keycloak by its service name. Inside a
+      # container, localhost is the container itself - which is why a
+      # single address cannot work here.
+      OIDC_ISSUER: http://localhost:8081/realms/system-design
+      OIDC_INTERNAL_URL: http://keycloak:8080
+      OIDC_CLIENT_ID: system-design-store
+      # Must match the client secret in keycloak/system-design-realm.json.
+      OIDC_CLIENT_SECRET: change-me
+      # issuer#subject for each administrator: who may place legal holds and
+      # purge. With none set, those actions are refused to everyone.
+      ADMIN_SUBJECTS: ''
+      # immediate | a duration (7d, 6m, 7y) | indefinite. Default 30d.
+      RETENTION_PERIOD: 30d
+      # The organization's recovery PUBLIC key. Generate the pair with
+      # `docker run --rm -v $(pwd):/keys ghcr.io/jbraunsmajr/system-design-store:latest generate-recovery-key --out /keys/recovery`
+      # (or scripts/generate-recovery-key.ts) and keep the private half offline;
+      # without this the store refuses every document (WS7-R4).
+      RECOVERY_PUBLIC_KEY_FILE: /run/secrets/recovery-public.pem
+    volumes:
+      - ./recovery-public.pem:/run/secrets/recovery-public.pem:ro
+    ports:
+      - '8080:8080'
+
+  relay:
+    build:
+      context: ../..
+      dockerfile: docker/signaling/Dockerfile
+    ports:
+      - '4444:4444'
+
+  editor:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    environment:
+      APP_URL: http://localhost:8088
+      RELAY: ws://localhost:4444
+      # Without this the editor has no workspace at all, and behaves exactly
+      # as it does with no store.
+      STORE_URL: http://localhost:8080
+    ports:
+      - '8088:80'
+
+volumes:
+  store-data:

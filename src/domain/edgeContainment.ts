@@ -1,4 +1,4 @@
-import { Position } from "@xyflow/react";
+import { Position } from '@xyflow/react';
 
 /**
  * Which end of an edge (if either) is a boundary that CONTAINS the other
@@ -8,7 +8,7 @@ import { Position } from "@xyflow/react";
  *   "target-inside" - the source is a boundary and the target sits inside it
  *   "source-inside" - the target is a boundary and the source sits inside it
  */
-export type ContainmentRelation = "none" | "target-inside" | "source-inside";
+export type ContainmentRelation = 'none' | 'target-inside' | 'source-inside';
 
 /**
  * Whether `nodeId` sits inside `ancestorId`, at any depth.
@@ -26,7 +26,7 @@ export type ContainmentRelation = "none" | "target-inside" | "source-inside";
 export function isInside(
   nodeId: string,
   ancestorId: string,
-  parentOf: (id: string) => string | undefined
+  parentOf: (id: string) => string | undefined,
 ): boolean {
   const visited = new Set<string>([nodeId]);
   let current = parentOf(nodeId);
@@ -43,12 +43,12 @@ export function isInside(
 export function getContainmentRelation(
   sourceId: string,
   targetId: string,
-  parentOf: (id: string) => string | undefined
+  parentOf: (id: string) => string | undefined,
 ): ContainmentRelation {
-  if (sourceId === targetId) return "none";
-  if (isInside(targetId, sourceId, parentOf)) return "target-inside";
-  if (isInside(sourceId, targetId, parentOf)) return "source-inside";
-  return "none";
+  if (sourceId === targetId) return 'none';
+  if (isInside(targetId, sourceId, parentOf)) return 'target-inside';
+  if (isInside(sourceId, targetId, parentOf)) return 'source-inside';
+  return 'none';
 }
 
 /** The opposite side of a node from the one given. */
@@ -88,12 +88,12 @@ export function flipPosition(position: Position): Position {
 export function getContainmentAwarePositions(
   relation: ContainmentRelation,
   sourcePosition: Position,
-  targetPosition: Position
+  targetPosition: Position,
 ): { sourcePosition: Position; targetPosition: Position } {
   switch (relation) {
-    case "target-inside":
+    case 'target-inside':
       return { sourcePosition: flipPosition(sourcePosition), targetPosition };
-    case "source-inside":
+    case 'source-inside':
       return { sourcePosition, targetPosition: flipPosition(targetPosition) };
     default:
       return { sourcePosition, targetPosition };
@@ -149,9 +149,9 @@ function positionDelta(position: Position): { dx: number; dy: number } {
 export function getClickBandEndpoints(
   relation: ContainmentRelation,
   points: { sourceX: number; sourceY: number; targetX: number; targetY: number },
-  inward: { sourcePosition: Position; targetPosition: Position }
+  inward: { sourcePosition: Position; targetPosition: Position },
 ): { sourceX: number; sourceY: number; targetX: number; targetY: number } {
-  if (relation === "target-inside") {
+  if (relation === 'target-inside') {
     const { dx, dy } = positionDelta(inward.sourcePosition);
     return {
       ...points,
@@ -159,7 +159,7 @@ export function getClickBandEndpoints(
       sourceY: points.sourceY + dy * HANDLE_CLEARANCE,
     };
   }
-  if (relation === "source-inside") {
+  if (relation === 'source-inside') {
     const { dx, dy } = positionDelta(inward.targetPosition);
     return {
       ...points,

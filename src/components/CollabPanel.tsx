@@ -1,9 +1,22 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { Users, Copy, Check, LogOut, X, Wifi, WifiOff, Settings, ChevronRight, ChevronDown, ExternalLink, Clipboard } from "lucide-react";
-import { computeFlippedPosition } from "../domain/popoverPosition";
-import { createSessionLink, parseSessionLink } from "../domain/sessionLink";
-import type { PresenceInfo } from "../collab/session";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import {
+  Users,
+  Copy,
+  Check,
+  LogOut,
+  X,
+  Wifi,
+  WifiOff,
+  Settings,
+  ChevronRight,
+  ChevronDown,
+  ExternalLink,
+  Clipboard,
+} from 'lucide-react';
+import { computeFlippedPosition } from '../domain/popoverPosition';
+import { createSessionLink, parseSessionLink } from '../domain/sessionLink';
+import type { PresenceInfo } from '../collab/session';
 
 const DROPDOWN_WIDTH = 300;
 
@@ -108,7 +121,7 @@ export function CollabPanel({
   onCopyLink,
 }: CollabPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [joinRoomName, setJoinRoomName] = useState("");
+  const [joinRoomName, setJoinRoomName] = useState('');
   // Starts open only when there's nothing configured yet, since the
   // panel can't do anything useful in that state and the fix is in
   // here. Otherwise collapsed: these are set once and rarely revisited.
@@ -141,9 +154,11 @@ export function CollabPanel({
     const next = computeFlippedPosition(
       triggerRect,
       { width: dropdownRect.width, height: dropdownRect.height },
-      { width: window.innerWidth, height: window.innerHeight }
+      { width: window.innerWidth, height: window.innerHeight },
     );
-    setDropdownPos((prev) => (prev && prev.top === next.top && prev.left === next.left ? prev : next));
+    setDropdownPos((prev) =>
+      prev && prev.top === next.top && prev.left === next.left ? prev : next,
+    );
   }, [isOpen]);
 
   const reposition = useCallback(() => {
@@ -156,8 +171,8 @@ export function CollabPanel({
       computeFlippedPosition(
         triggerRect,
         { width: dropdownRect.width, height: dropdownRect.height },
-        { width: window.innerWidth, height: window.innerHeight }
-      )
+        { width: window.innerWidth, height: window.innerHeight },
+      ),
     );
   }, []);
 
@@ -170,13 +185,13 @@ export function CollabPanel({
       close();
     };
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
+      if (e.key === 'Escape') close();
     };
-    document.addEventListener("mousedown", handleMouseDown);
-    document.addEventListener("keydown", handleEscape);
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('keydown', handleEscape);
     return () => {
-      document.removeEventListener("mousedown", handleMouseDown);
-      document.removeEventListener("keydown", handleEscape);
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('keydown', handleEscape);
     };
   }, [isOpen]);
 
@@ -185,11 +200,11 @@ export function CollabPanel({
   // window-level scrolling.
   useEffect(() => {
     if (!isOpen) return;
-    window.addEventListener("scroll", reposition, true);
-    window.addEventListener("resize", reposition);
+    window.addEventListener('scroll', reposition, true);
+    window.addEventListener('resize', reposition);
     return () => {
-      window.removeEventListener("scroll", reposition, true);
-      window.removeEventListener("resize", reposition);
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
     };
   }, [isOpen, reposition]);
 
@@ -204,14 +219,14 @@ export function CollabPanel({
 
     const fallbackCopy = (text: string) => {
       try {
-        const textArea = document.createElement("textarea");
+        const textArea = document.createElement('textarea');
         textArea.value = text;
-        textArea.style.position = "fixed";
-        textArea.style.opacity = "0";
+        textArea.style.position = 'fixed';
+        textArea.style.opacity = '0';
         document.body.appendChild(textArea);
         textArea.focus();
         textArea.select();
-        const successful = document.execCommand("copy");
+        const successful = document.execCommand('copy');
         document.body.removeChild(textArea);
         if (successful) {
           setCopied(true);
@@ -223,7 +238,7 @@ export function CollabPanel({
       }
     };
 
-    if (typeof navigator !== "undefined" && typeof navigator.clipboard?.writeText === "function") {
+    if (typeof navigator !== 'undefined' && typeof navigator.clipboard?.writeText === 'function') {
       navigator.clipboard
         .writeText(link)
         .then(() => {
@@ -241,7 +256,7 @@ export function CollabPanel({
 
   const handlePasteFromClipboard = async () => {
     try {
-      if (typeof navigator !== "undefined" && typeof navigator.clipboard?.readText === "function") {
+      if (typeof navigator !== 'undefined' && typeof navigator.clipboard?.readText === 'function') {
         const text = await navigator.clipboard.readText();
         if (text && text.trim()) {
           setJoinRoomName(text.trim());
@@ -269,7 +284,7 @@ export function CollabPanel({
       return;
     }
     onJoinSession(parsed.roomName, effectiveKey, parsed.relay);
-    setJoinRoomName("");
+    setJoinRoomName('');
     close();
   };
 
@@ -280,12 +295,12 @@ export function CollabPanel({
       <button
         ref={triggerRef}
         type="button"
-        className={`collab-panel__trigger${activeSession ? " is-active" : ""}`}
+        className={`collab-panel__trigger${activeSession ? ' is-active' : ''}`}
         onClick={() => (isOpen ? close() : open())}
-        title={activeSession ? `In session: ${activeSession.roomName}` : "Collaborate"}
+        title={activeSession ? `In session: ${activeSession.roomName}` : 'Collaborate'}
       >
         <Users size={14} />
-        <span className="toolbar__label">{activeSession ? "Session Active" : "Collaborate"}</span>
+        <span className="toolbar__label">{activeSession ? 'Session Active' : 'Collaborate'}</span>
       </button>
 
       {isOpen &&
@@ -296,7 +311,12 @@ export function CollabPanel({
             className="collab-panel__dropdown"
             role="dialog"
             aria-modal="false"
-            style={{ position: "fixed", top: dropdownPos.top, left: dropdownPos.left, width: DROPDOWN_WIDTH }}
+            style={{
+              position: 'fixed',
+              top: dropdownPos.top,
+              left: dropdownPos.left,
+              width: DROPDOWN_WIDTH,
+            }}
           >
             <div className="collab-panel__header">
               <span>Collaborative Session</span>
@@ -332,7 +352,8 @@ export function CollabPanel({
                       Resume session {resumableRoom}
                     </button>
                     <p className="collab-panel__hint">
-                      Hosts the session this document was shared in, so anyone with the original link can rejoin.
+                      Hosts the session this document was shared in, so anyone with the original
+                      link can rejoin.
                     </p>
                   </>
                 )}
@@ -364,62 +385,80 @@ export function CollabPanel({
                       placeholder="Paste a session link or code"
                       className="collab-panel__join-input"
                     />
-                    {typeof navigator !== "undefined" && typeof navigator.clipboard?.readText === "function" && (
-                      <button
-                        type="button"
-                        className="collab-panel__paste-button"
-                        onClick={handlePasteFromClipboard}
-                        title="Paste from clipboard"
-                      >
-                        <Clipboard size={13} />
-                      </button>
-                    )}
+                    {typeof navigator !== 'undefined' &&
+                      typeof navigator.clipboard?.readText === 'function' && (
+                        <button
+                          type="button"
+                          className="collab-panel__paste-button"
+                          onClick={handlePasteFromClipboard}
+                          title="Paste from clipboard"
+                        >
+                          <Clipboard size={13} />
+                        </button>
+                      )}
                   </div>
-                  <button type="submit" className="collab-panel__join-button" disabled={!joinRoomName.trim()}>
+                  <button
+                    type="submit"
+                    className="collab-panel__join-button"
+                    disabled={!joinRoomName.trim()}
+                  >
                     Join
                   </button>
                 </form>
 
-                {joinRoomName.trim() && parsedJoin.roomName && (parsedJoin.key || parsedJoin.password || parsedJoin.relay || parsedJoin.roomName !== joinRoomName.trim()) && (
-                  <div className="collab-panel__extracted-info">
-                    <span className="collab-panel__extracted-pill">
-                      Session: <strong>{parsedJoin.roomName}</strong>
-                    </span>
-                    {(parsedJoin.key || parsedJoin.password) && (
+                {joinRoomName.trim() &&
+                  parsedJoin.roomName &&
+                  (parsedJoin.key ||
+                    parsedJoin.password ||
+                    parsedJoin.relay ||
+                    parsedJoin.roomName !== joinRoomName.trim()) && (
+                    <div className="collab-panel__extracted-info">
                       <span className="collab-panel__extracted-pill">
-                        Encrypted: <strong>included</strong>
+                        Session: <strong>{parsedJoin.roomName}</strong>
                       </span>
-                    )}
-                    {parsedJoin.relay && (
-                      <span className="collab-panel__extracted-pill">
-                        Relay: <strong>{parsedJoin.relay}</strong>
-                      </span>
-                    )}
-                  </div>
-                )}
+                      {(parsedJoin.key || parsedJoin.password) && (
+                        <span className="collab-panel__extracted-pill">
+                          Encrypted: <strong>included</strong>
+                        </span>
+                      )}
+                      {parsedJoin.relay && (
+                        <span className="collab-panel__extracted-pill">
+                          Relay: <strong>{parsedJoin.relay}</strong>
+                        </span>
+                      )}
+                    </div>
+                  )}
               </>
             )}
 
             {activeSession && (
               <>
-                <div className={`collab-panel__relay-status${activeSession.relayConnected === false ? " is-disconnected" : ""}`}>
-                  {activeSession.relayConnected === false ? <WifiOff size={12} /> : <Wifi size={12} />}
+                <div
+                  className={`collab-panel__relay-status${activeSession.relayConnected === false ? ' is-disconnected' : ''}`}
+                >
+                  {activeSession.relayConnected === false ? (
+                    <WifiOff size={12} />
+                  ) : (
+                    <Wifi size={12} />
+                  )}
                   <span>
                     {activeSession.relayConnected === null
-                      ? "Contacting relay..."
+                      ? 'Contacting relay...'
                       : activeSession.relayConnected
-                        ? "Relay connected"
-                        : "Relay unreachable - check the URL in Settings, and that the server is running and reachable from this network"}
+                        ? 'Relay connected'
+                        : 'Relay unreachable - check the URL in Settings, and that the server is running and reachable from this network'}
                   </span>
                 </div>
-                <p className="collab-panel__hint">Share this link with anyone you want to collaborate with:</p>
+                <p className="collab-panel__hint">
+                  Share this link with anyone you want to collaborate with:
+                </p>
                 <div className="collab-panel__room-code">
                   <code>{activeSession.roomName}</code>
                   <button
                     type="button"
                     className="collab-panel__copy-button"
                     onClick={handleCopy}
-                    title={copied ? "Link copied!" : "Copy session link"}
+                    title={copied ? 'Link copied!' : 'Copy session link'}
                   >
                     {copied ? <Check size={13} /> : <Copy size={13} />}
                   </button>
@@ -429,7 +468,10 @@ export function CollabPanel({
                     <div className="collab-panel__peers-label">In this session</div>
                     {activeSession.peers.map((peer, i) => (
                       <div className="collab-panel__peer" key={`${peer.name}-${i}`}>
-                        <span className="collab-panel__peer-dot" style={{ background: peer.color }} />
+                        <span
+                          className="collab-panel__peer-dot"
+                          style={{ background: peer.color }}
+                        />
                         <span className="collab-panel__peer-name">{peer.name}</span>
                       </div>
                     ))}
@@ -477,18 +519,19 @@ export function CollabPanel({
                     type="text"
                     value={signalingUrlsInput}
                     onChange={(e) => onSignalingUrlsInputChange(e.target.value)}
-                    placeholder={buildTimeSignalingDefault || "ws://localhost:4444"}
+                    placeholder={buildTimeSignalingDefault || 'ws://localhost:4444'}
                     className="collab-panel__name-input"
                   />
-                  {buildTimeSignalingDefault && signalingUrlsInput !== buildTimeSignalingDefault && (
-                    <button
-                      type="button"
-                      className="collab-panel__reset-signaling"
-                      onClick={() => onSignalingUrlsInputChange(buildTimeSignalingDefault)}
-                    >
-                      Reset to deployment default
-                    </button>
-                  )}
+                  {buildTimeSignalingDefault &&
+                    signalingUrlsInput !== buildTimeSignalingDefault && (
+                      <button
+                        type="button"
+                        className="collab-panel__reset-signaling"
+                        onClick={() => onSignalingUrlsInputChange(buildTimeSignalingDefault)}
+                      >
+                        Reset to deployment default
+                      </button>
+                    )}
                   <p className="collab-panel__hint">
                     Where peers find each other. Not involved once they're connected. Comma-separate
                     several. Takes effect on your next session.
@@ -502,7 +545,7 @@ export function CollabPanel({
                     type="text"
                     value={iceServersInput}
                     onChange={(e) => onIceServersInputChange(e.target.value)}
-                    placeholder={buildTimeIceServersDefault || "Leave blank for defaults"}
+                    placeholder={buildTimeIceServersDefault || 'Leave blank for defaults'}
                     className="collab-panel__name-input"
                   />
                   {buildTimeIceServersDefault && iceServersInput !== buildTimeIceServersDefault && (
@@ -516,8 +559,8 @@ export function CollabPanel({
                   )}
                   <p className="collab-panel__hint">
                     How peers reach each other after the relay introduces them. Blank uses public
-                    STUN servers. On an isolated network where everyone shares a LAN, enter{" "}
-                    <code>none</code>. Otherwise list your own:{" "}
+                    STUN servers. On an isolated network where everyone shares a LAN, enter{' '}
+                    <code>none</code>. Otherwise list your own:{' '}
                     <code>turn:turn.internal:3478|user|pass</code>.
                   </p>
 
@@ -542,9 +585,8 @@ export function CollabPanel({
                 </div>
               )}
             </div>
-
           </div>,
-          document.body
+          document.body,
         )}
     </div>
   );

@@ -32,15 +32,7 @@ export type RawDiagramFile = Record<string, unknown>;
  * so that any file produced during that period still has a path forward.
  * 0.6 shipped in v0.9 through v0.91.3, 0.7 in v0.92 onward.
  */
-export const VERSION_ORDER = [
-  "0.1",
-  "0.2",
-  "0.3",
-  "0.4",
-  "0.5",
-  "0.6",
-  "0.7",
-] as const;
+export const VERSION_ORDER = ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7'] as const;
 
 export type SchemaVersion = (typeof VERSION_ORDER)[number];
 
@@ -61,8 +53,8 @@ export interface Migration {
  * "unrecognised".
  */
 export function compareVersions(a: string, b: string): number {
-  const pa = a.split(".").map((n) => Number.parseInt(n, 10));
-  const pb = b.split(".").map((n) => Number.parseInt(n, 10));
+  const pa = a.split('.').map((n) => Number.parseInt(n, 10));
+  const pb = b.split('.').map((n) => Number.parseInt(n, 10));
   const len = Math.max(pa.length, pb.length);
   for (let i = 0; i < len; i++) {
     const va = Number.isFinite(pa[i]) ? pa[i] : 0;
@@ -85,40 +77,39 @@ export function isKnownVersion(version: string): version is SchemaVersion {
  */
 export const MIGRATIONS: Migration[] = [
   {
-    from: "0.1",
-    to: "0.2",
-    description: "Added scenarios; absent means no scenarios.",
+    from: '0.1',
+    to: '0.2',
+    description: 'Added scenarios; absent means no scenarios.',
     migrate: (file) => file,
   },
   {
-    from: "0.2",
-    to: "0.3",
-    description: "Added nested sub-diagrams under node data; no file change.",
+    from: '0.2',
+    to: '0.3',
+    description: 'Added nested sub-diagrams under node data; no file change.',
     migrate: (file) => file,
   },
   {
-    from: "0.3",
-    to: "0.4",
-    description: "Added requirements; absent means an empty document.",
+    from: '0.3',
+    to: '0.4',
+    description: 'Added requirements; absent means an empty document.',
     migrate: (file) => file,
   },
   {
-    from: "0.4",
-    to: "0.5",
-    description: "Added programIncrements; absent means none.",
+    from: '0.4',
+    to: '0.5',
+    description: 'Added programIncrements; absent means none.',
     migrate: (file) => file,
   },
   {
-    from: "0.5",
-    to: "0.6",
-    description: "Added team; absent means an empty team document.",
+    from: '0.5',
+    to: '0.6',
+    description: 'Added team; absent means an empty team document.',
     migrate: (file) => file,
   },
   {
-    from: "0.6",
-    to: "0.7",
-    description:
-      "Added milestones and shape/icon fallback maps; all absent-safe.",
+    from: '0.6',
+    to: '0.7',
+    description: 'Added milestones and shape/icon fallback maps; all absent-safe.',
     migrate: (file) => file,
   },
 ];
@@ -130,7 +121,7 @@ export class SchemaVersionError extends Error {
 
   constructor(message: string, fileVersion: string, appVersion: string) {
     super(message);
-    this.name = "SchemaVersionError";
+    this.name = 'SchemaVersionError';
     this.fileVersion = fileVersion;
     this.appVersion = appVersion;
   }
@@ -154,9 +145,7 @@ export function migrateToCurrent(
 ): { file: RawDiagramFile; applied: Migration[] } {
   const declared = file.schemaVersion;
   const fileVersion =
-    typeof declared === "string" && declared.trim() !== ""
-      ? declared.trim()
-      : OLDEST_VERSION;
+    typeof declared === 'string' && declared.trim() !== '' ? declared.trim() : OLDEST_VERSION;
 
   if (fileVersion === targetVersion) {
     return { file, applied: [] };

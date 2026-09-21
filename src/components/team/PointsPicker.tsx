@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { Hash, X } from "lucide-react";
-import { computeFlippedPosition } from "../../domain/popoverPosition";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Hash, X } from 'lucide-react';
+import { computeFlippedPosition } from '../../domain/popoverPosition';
 
 interface PointsPickerProps {
   points?: number;
@@ -20,7 +20,7 @@ const POPOVER_WIDTH = 170;
  */
 export function PointsPicker({ points, onChange, compact = false }: PointsPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [customInput, setCustomInput] = useState<string>("");
+  const [customInput, setCustomInput] = useState<string>('');
   const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -33,7 +33,7 @@ export function PointsPicker({ points, onChange, compact = false }: PointsPicker
     // popover is opened, not something that needs to stay in sync with
     // `points` for as long as it's open, so there's no actual need for
     // effect-based state syncing here at all.
-    setCustomInput(points !== undefined ? String(points) : "");
+    setCustomInput(points !== undefined ? String(points) : '');
     const rect = trigger.getBoundingClientRect();
     setPopoverPos({ top: rect.bottom + 4, left: Math.max(8, rect.right - POPOVER_WIDTH) });
     setIsOpen(true);
@@ -50,9 +50,11 @@ export function PointsPicker({ points, onChange, compact = false }: PointsPicker
     const next = computeFlippedPosition(
       triggerRect,
       { width: popoverRect.width, height: popoverRect.height },
-      { width: window.innerWidth, height: window.innerHeight }
+      { width: window.innerWidth, height: window.innerHeight },
     );
-    setPopoverPos((prev) => (prev && prev.top === next.top && prev.left === next.left ? prev : next));
+    setPopoverPos((prev) =>
+      prev && prev.top === next.top && prev.left === next.left ? prev : next,
+    );
   }, [isOpen]);
 
   const reposition = useCallback(() => {
@@ -65,8 +67,8 @@ export function PointsPicker({ points, onChange, compact = false }: PointsPicker
       computeFlippedPosition(
         triggerRect,
         { width: popoverRect.width, height: popoverRect.height },
-        { width: window.innerWidth, height: window.innerHeight }
-      )
+        { width: window.innerWidth, height: window.innerHeight },
+      ),
     );
   }, []);
 
@@ -79,23 +81,23 @@ export function PointsPicker({ points, onChange, compact = false }: PointsPicker
       close();
     };
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
+      if (e.key === 'Escape') close();
     };
-    document.addEventListener("mousedown", handleMouseDown);
-    document.addEventListener("keydown", handleEscape);
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('keydown', handleEscape);
     return () => {
-      document.removeEventListener("mousedown", handleMouseDown);
-      document.removeEventListener("keydown", handleEscape);
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('keydown', handleEscape);
     };
   }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
-    window.addEventListener("scroll", reposition, true);
-    window.addEventListener("resize", reposition);
+    window.addEventListener('scroll', reposition, true);
+    window.addEventListener('resize', reposition);
     return () => {
-      window.removeEventListener("scroll", reposition, true);
-      window.removeEventListener("resize", reposition);
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
     };
   }, [isOpen, reposition]);
 
@@ -109,7 +111,7 @@ export function PointsPicker({ points, onChange, compact = false }: PointsPicker
     const parsed = parseFloat(customInput.trim());
     if (!isNaN(parsed) && parsed >= 0) {
       onChange(Math.round(parsed * 10) / 10);
-    } else if (customInput.trim() === "") {
+    } else if (customInput.trim() === '') {
       onChange(undefined);
     }
     close();
@@ -122,15 +124,17 @@ export function PointsPicker({ points, onChange, compact = false }: PointsPicker
       <button
         ref={triggerRef}
         type="button"
-        className={`points-picker__trigger${compact ? " points-picker__trigger--compact" : ""}${
-          hasPoints ? " has-points" : ""
+        className={`points-picker__trigger${compact ? ' points-picker__trigger--compact' : ''}${
+          hasPoints ? ' has-points' : ''
         }`}
         onClick={() => (isOpen ? close() : open())}
-        title={hasPoints ? `${points} point${points === 1 ? "" : "s"}` : "Assign points"}
-        aria-label={hasPoints ? `${points} points` : "Assign points"}
+        title={hasPoints ? `${points} point${points === 1 ? '' : 's'}` : 'Assign points'}
+        aria-label={hasPoints ? `${points} points` : 'Assign points'}
       >
         <Hash size={11} className="points-picker__icon" />
-        <span className="points-picker__value">{hasPoints ? `${points} pt${points === 1 ? "" : "s"}` : "--"}</span>
+        <span className="points-picker__value">
+          {hasPoints ? `${points} pt${points === 1 ? '' : 's'}` : '--'}
+        </span>
       </button>
 
       {isOpen &&
@@ -140,7 +144,12 @@ export function PointsPicker({ points, onChange, compact = false }: PointsPicker
             ref={popoverRef}
             className="points-picker__popover"
             role="dialog"
-            style={{ position: "fixed", top: popoverPos.top, left: popoverPos.left, width: POPOVER_WIDTH }}
+            style={{
+              position: 'fixed',
+              top: popoverPos.top,
+              left: popoverPos.left,
+              width: POPOVER_WIDTH,
+            }}
           >
             <div className="points-picker__header">
               <span>Story Points</span>
@@ -160,7 +169,7 @@ export function PointsPicker({ points, onChange, compact = false }: PointsPicker
                 <button
                   key={p}
                   type="button"
-                  className={`points-picker__preset-btn${points === p ? " is-active" : ""}`}
+                  className={`points-picker__preset-btn${points === p ? ' is-active' : ''}`}
                   onClick={() => handleSelect(p)}
                 >
                   {p}
@@ -181,7 +190,7 @@ export function PointsPicker({ points, onChange, compact = false }: PointsPicker
               <button type="submit">Set</button>
             </form>
           </div>,
-          document.body
+          document.body,
         )}
     </div>
   );

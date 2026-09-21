@@ -1,10 +1,10 @@
 {
   "name": "system-design-signaling-server",
   "private": true,
-  "version": "1.0.0",
-  "description": "Standalone y-webrtc signaling server for this project's collaborative editing feature. Deliberately a separate, minimal package from the main app - a signaling server has nothing to do with React/Vite, it only needs y-webrtc's own bundled server itself. See the main project README's 'Collaborative editing' section for how to point the app at wherever this ends up deployed.",
+  "version": "2.0.0",
+  "description": "The session relay for the editor's live collaboration: scripts/relay-server.ts, which speaks y-webrtc's signaling protocol and can additionally require a room token from the workspace store (WS10-R6). With RELAY_TOKEN_SECRET unset it behaves exactly as y-webrtc's own server did. Only its runtime dependency lives here; the image is built from the repository root so the relay's own source is copied in rather than duplicated.",
   "dependencies": {
-    "y-webrtc": "^10.3.0"
+    "ws": "^8.21.3"
   },
   "overrides": {
     "ip-address": "^10.3.1",

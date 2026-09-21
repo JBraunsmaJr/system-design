@@ -1,18 +1,27 @@
-import { useState, type KeyboardEvent } from "react";
-import { SendToBack, BringToFront, ChevronUp, ChevronDown } from "lucide-react";
-import type { Node, Edge } from "@xyflow/react";
-import { getNodeType } from "../domain/nodeRegistry";
-import { getGroupType } from "../domain/groupRegistry";
-import { getShapeType, globalShapeRegistry } from "../domain/shapeRegistry";
-import { CODE_LANGUAGES } from "../domain/codeRegistry";
-import { EDGE_TYPES, STYLE_GROUP_LABELS } from "../domain/edgeRegistry";
-import { IconPicker } from "./IconPicker";
-import { RequirementLinker } from "./requirements/RequirementLinker";
-import type { ArchNodeData, ArchEdgeData, ArchEdgeDataPatch } from "../domain/types";
-import type { ZOrderCommand } from "../domain/zOrder";
-import type { RequirementsDocument } from "../domain/requirementsTypes";
+import { useState, type KeyboardEvent } from 'react';
+import { SendToBack, BringToFront, ChevronUp, ChevronDown } from 'lucide-react';
+import type { Node, Edge } from '@xyflow/react';
+import { getNodeType } from '../domain/nodeRegistry';
+import { getGroupType } from '../domain/groupRegistry';
+import { getShapeType, globalShapeRegistry } from '../domain/shapeRegistry';
+import { CODE_LANGUAGES } from '../domain/codeRegistry';
+import { EDGE_TYPES, STYLE_GROUP_LABELS } from '../domain/edgeRegistry';
+import { IconPicker } from './IconPicker';
+import { RequirementLinker } from './requirements/RequirementLinker';
+import type { ArchNodeData, ArchEdgeData, ArchEdgeDataPatch } from '../domain/types';
+import type { ZOrderCommand } from '../domain/zOrder';
+import type { RequirementsDocument } from '../domain/requirementsTypes';
 
-const EDGE_STYLE_GROUP_ORDER = ["sync", "async", "control", "vcs", "blank", "data", "file", "generic"] as const;
+const EDGE_STYLE_GROUP_ORDER = [
+  'sync',
+  'async',
+  'control',
+  'vcs',
+  'blank',
+  'data',
+  'file',
+  'generic',
+] as const;
 
 /**
  * Front/back controls for the current selection.
@@ -28,16 +37,16 @@ function ZOrderControls({ onCommand }: { onCommand: (command: ZOrderCommand) => 
     <div className="inspector__z-order">
       <span className="inspector__z-order-label">Arrange</span>
       <div className="inspector__z-order-buttons">
-        <button type="button" onClick={() => onCommand("back")} title="Send to back">
+        <button type="button" onClick={() => onCommand('back')} title="Send to back">
           <SendToBack size={13} />
         </button>
-        <button type="button" onClick={() => onCommand("backward")} title="Send backward">
+        <button type="button" onClick={() => onCommand('backward')} title="Send backward">
           <ChevronDown size={13} />
         </button>
-        <button type="button" onClick={() => onCommand("forward")} title="Bring forward">
+        <button type="button" onClick={() => onCommand('forward')} title="Bring forward">
           <ChevronUp size={13} />
         </button>
-        <button type="button" onClick={() => onCommand("front")} title="Bring to front">
+        <button type="button" onClick={() => onCommand('front')} title="Bring to front">
           <BringToFront size={13} />
         </button>
       </div>
@@ -91,8 +100,8 @@ export function Inspector({
   if (selectedNode) {
     const data = selectedNode.data;
 
-    if (selectedNode.type === "text") {
-      const color = data.textColor ?? "#e7e9ee";
+    if (selectedNode.type === 'text') {
+      const color = data.textColor ?? '#e7e9ee';
       const fontSize = data.fontSize ?? 16;
       return (
         <aside className="inspector">
@@ -127,8 +136,8 @@ export function Inspector({
             </select>
           </Field>
           <p className="inspector__hint" style={{ marginTop: -8 }}>
-            Drag a corner handle on the selected annotation to resize its box - text wraps to
-            fit once resized, instead of auto-sizing to fit the text.
+            Drag a corner handle on the selected annotation to resize its box - text wraps to fit
+            once resized, instead of auto-sizing to fit the text.
           </p>
 
           <LinkedRequirementsField
@@ -141,20 +150,24 @@ export function Inspector({
 
           <ZOrderControls onCommand={onZOrderCommand} />
 
-          <button type="button" className="inspector__delete" onClick={() => onDeleteNode(selectedNode.id)}>
+          <button
+            type="button"
+            className="inspector__delete"
+            onClick={() => onDeleteNode(selectedNode.id)}
+          >
             Delete text
           </button>
         </aside>
       );
     }
 
-    if (selectedNode.type === "shape") {
+    if (selectedNode.type === 'shape') {
       const fullShapeDef = globalShapeRegistry.getShape(data.nodeType);
       const shapeDef = getShapeType(data.nodeType);
       const fontSize = data.fontSize ?? 16;
       return (
         <aside className="inspector">
-          <div className="panel-header">{fullShapeDef?.name ?? shapeDef?.label ?? "Shape"}</div>
+          <div className="panel-header">{fullShapeDef?.name ?? shapeDef?.label ?? 'Shape'}</div>
 
           <Field label="Text">
             <textarea
@@ -179,7 +192,7 @@ export function Inspector({
 
           <ColorField
             value={data.color}
-            defaultValue={fullShapeDef?.defaults.color ?? shapeDef?.color ?? "#5B7CFA"}
+            defaultValue={fullShapeDef?.defaults.color ?? shapeDef?.color ?? '#5B7CFA'}
             onChange={(color) => onUpdateNode(selectedNode.id, { color })}
           />
 
@@ -191,14 +204,17 @@ export function Inspector({
 
           {fullShapeDef?.properties && fullShapeDef.properties.length > 0 && (
             <div className="inspector__custom-properties" style={{ marginTop: 12 }}>
-              <span className="inspector__section-title" style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)" }}>
+              <span
+                className="inspector__section-title"
+                style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}
+              >
                 Shape Properties
               </span>
               {fullShapeDef.properties.map((prop) => {
-                const currentVal = data.properties?.[prop.id] ?? prop.defaultValue ?? "";
+                const currentVal = data.properties?.[prop.id] ?? prop.defaultValue ?? '';
                 return (
                   <Field key={prop.id} label={prop.label}>
-                    {prop.type === "select" && prop.options ? (
+                    {prop.type === 'select' && prop.options ? (
                       <select
                         value={String(currentVal)}
                         onChange={(e) =>
@@ -213,20 +229,23 @@ export function Inspector({
                           </option>
                         ))}
                       </select>
-                    ) : prop.type === "boolean" ? (
+                    ) : prop.type === 'boolean' ? (
                       <input
                         type="checkbox"
-                        checked={currentVal === "true" || currentVal === "1"}
+                        checked={currentVal === 'true' || currentVal === '1'}
                         onChange={(e) =>
                           onUpdateNode(selectedNode.id, {
-                            properties: { ...(data.properties || {}), [prop.id]: e.target.checked ? "true" : "false" },
+                            properties: {
+                              ...(data.properties || {}),
+                              [prop.id]: e.target.checked ? 'true' : 'false',
+                            },
                           })
                         }
                       />
-                    ) : prop.type === "color" ? (
+                    ) : prop.type === 'color' ? (
                       <input
                         type="color"
-                        value={String(currentVal || "#5B7CFA")}
+                        value={String(currentVal || '#5B7CFA')}
                         onChange={(e) =>
                           onUpdateNode(selectedNode.id, {
                             properties: { ...(data.properties || {}), [prop.id]: e.target.value },
@@ -235,7 +254,7 @@ export function Inspector({
                       />
                     ) : (
                       <input
-                        type={prop.type === "number" ? "number" : "text"}
+                        type={prop.type === 'number' ? 'number' : 'text'}
                         value={String(currentVal)}
                         placeholder={prop.description}
                         onChange={(e) =>
@@ -265,14 +284,18 @@ export function Inspector({
 
           <ZOrderControls onCommand={onZOrderCommand} />
 
-          <button type="button" className="inspector__delete" onClick={() => onDeleteNode(selectedNode.id)}>
+          <button
+            type="button"
+            className="inspector__delete"
+            onClick={() => onDeleteNode(selectedNode.id)}
+          >
             Delete shape
           </button>
         </aside>
       );
     }
 
-    if (selectedNode.type === "code") {
+    if (selectedNode.type === 'code') {
       return (
         <aside className="inspector">
           <div className="panel-header">Code Snippet</div>
@@ -287,7 +310,7 @@ export function Inspector({
 
           <Field label="Language">
             <select
-              value={data.codeLanguage ?? "json"}
+              value={data.codeLanguage ?? 'json'}
               onChange={(e) => onUpdateNode(selectedNode.id, { codeLanguage: e.target.value })}
             >
               {CODE_LANGUAGES.map((l) => (
@@ -305,8 +328,8 @@ export function Inspector({
           />
 
           <p className="inspector__hint" style={{ marginTop: -8 }}>
-            Double-click the code on the canvas to edit it directly. Tab inserts indentation
-            instead of moving focus.
+            Double-click the code on the canvas to edit it directly. Tab inserts indentation instead
+            of moving focus.
           </p>
 
           <LinkedRequirementsField
@@ -319,18 +342,22 @@ export function Inspector({
 
           <ZOrderControls onCommand={onZOrderCommand} />
 
-          <button type="button" className="inspector__delete" onClick={() => onDeleteNode(selectedNode.id)}>
+          <button
+            type="button"
+            className="inspector__delete"
+            onClick={() => onDeleteNode(selectedNode.id)}
+          >
             Delete code snippet
           </button>
         </aside>
       );
     }
 
-    const isGroup = selectedNode.type === "group";
+    const isGroup = selectedNode.type === 'group';
     const nodeDef = !isGroup ? getNodeType(data.nodeType) : undefined;
     const groupDef = isGroup ? getGroupType(data.nodeType) : undefined;
     const headerLabel = nodeDef?.label ?? groupDef?.label ?? data.nodeType;
-    const defaultColor = nodeDef?.color ?? groupDef?.color ?? "#98A2B3";
+    const defaultColor = nodeDef?.color ?? groupDef?.color ?? '#98A2B3';
     const subCount = data.subDiagram?.nodes.length ?? 0;
 
     return (
@@ -338,13 +365,16 @@ export function Inspector({
         <div className="panel-header">{headerLabel}</div>
 
         <Field label="Label">
-          <input value={data.label} onChange={(e) => onUpdateNode(selectedNode.id, { label: e.target.value })} />
+          <input
+            value={data.label}
+            onChange={(e) => onUpdateNode(selectedNode.id, { label: e.target.value })}
+          />
         </Field>
 
         <Field label="Description">
           <textarea
             rows={3}
-            value={data.description ?? ""}
+            value={data.description ?? ''}
             onChange={(e) => onUpdateNode(selectedNode.id, { description: e.target.value })}
           />
         </Field>
@@ -356,7 +386,9 @@ export function Inspector({
             renders rather than on a different default. */}
         <IconPicker
           value={data.icon}
-          defaultValue={(isGroup ? groupDef?.icon : nodeDef?.icon) ?? (isGroup ? "SquareDashed" : "Box")}
+          defaultValue={
+            (isGroup ? groupDef?.icon : nodeDef?.icon) ?? (isGroup ? 'SquareDashed' : 'Box')
+          }
           onChange={(icon) => onUpdateNode(selectedNode.id, { icon })}
         />
 
@@ -374,8 +406,13 @@ export function Inspector({
         <TagEditor tags={data.tags} onChange={(tags) => onUpdateNode(selectedNode.id, { tags })} />
 
         {!isGroup && (
-          <button type="button" style={{ marginBottom: "16px"}} className="inspector__drill" onClick={() => onDrillInto(selectedNode.id)}>
-            {subCount > 0 ? `Open sub-diagram (${subCount})` : "Create sub-diagram"} →
+          <button
+            type="button"
+            style={{ marginBottom: '16px' }}
+            className="inspector__drill"
+            onClick={() => onDrillInto(selectedNode.id)}
+          >
+            {subCount > 0 ? `Open sub-diagram (${subCount})` : 'Create sub-diagram'} →
           </button>
         )}
 
@@ -389,8 +426,12 @@ export function Inspector({
 
         <ZOrderControls onCommand={onZOrderCommand} />
 
-        <button type="button" className="inspector__delete" onClick={() => onDeleteNode(selectedNode.id)}>
-          {isGroup ? "Delete boundary" : "Delete node"}
+        <button
+          type="button"
+          className="inspector__delete"
+          onClick={() => onDeleteNode(selectedNode.id)}
+        >
+          {isGroup ? 'Delete boundary' : 'Delete node'}
         </button>
         {isGroup && (
           <p className="inspector__hint">
@@ -399,7 +440,8 @@ export function Inspector({
         )}
         {!isGroup && subCount > 0 && (
           <p className="inspector__hint">
-            Deleting this node also deletes its sub-diagram ({subCount} node{subCount === 1 ? "" : "s"} inside).
+            Deleting this node also deletes its sub-diagram ({subCount} node
+            {subCount === 1 ? '' : 's'} inside).
           </p>
         )}
       </aside>
@@ -436,14 +478,16 @@ export function Inspector({
 
       <ColorField
         value={data.color}
-        defaultValue={edgeTypeDef?.color ?? "#98A2B3"}
+        defaultValue={edgeTypeDef?.color ?? '#98A2B3'}
         onChange={(color) => onUpdateEdge(edge.id, { color })}
       />
 
       <Field label="Direction">
         <select
-          value={data.direction ?? "forward"}
-          onChange={(e) => onUpdateEdge(edge.id, { direction: e.target.value as ArchEdgeData["direction"] })}
+          value={data.direction ?? 'forward'}
+          onChange={(e) =>
+            onUpdateEdge(edge.id, { direction: e.target.value as ArchEdgeData['direction'] })
+          }
         >
           <option value="forward">Forward (source → target)</option>
           <option value="reverse">Reverse (target → source)</option>
@@ -458,7 +502,7 @@ export function Inspector({
 
       <Field label="Label override">
         <input
-          value={data.label ?? ""}
+          value={data.label ?? ''}
           placeholder={edgeTypeDef?.label}
           onChange={(e) => onUpdateEdge(edge.id, { label: e.target.value })}
         />
@@ -479,7 +523,11 @@ export function Inspector({
           className="color-field__reset"
           style={{ marginBottom: 16 }}
           onClick={() =>
-            onUpdateEdge(edge.id, { labelAnchorT: undefined, labelOffsetX: undefined, labelOffsetY: undefined })
+            onUpdateEdge(edge.id, {
+              labelAnchorT: undefined,
+              labelOffsetX: undefined,
+              labelOffsetY: undefined,
+            })
           }
         >
           Reset label position
@@ -521,7 +569,9 @@ export function Inspector({
             Straighten edge (remove all bends)
           </button>
           <p className="inspector__hint" style={{ marginTop: 0 }}>
-            Bends are pinned to the canvas rather than to either end. Double-click, right-click, or Alt-click any bend handle on the canvas, or click × above, to remove individual waypoints.
+            Bends are pinned to the canvas rather than to either end. Double-click, right-click, or
+            Alt-click any bend handle on the canvas, or click × above, to remove individual
+            waypoints.
           </p>
         </div>
       )}
@@ -596,7 +646,11 @@ function ColorField({
   return (
     <Field label="Color">
       <div className="color-field">
-        <input type="color" value={value ?? defaultValue} onChange={(e) => onChange(e.target.value)} />
+        <input
+          type="color"
+          value={value ?? defaultValue}
+          onChange={(e) => onChange(e.target.value)}
+        />
         {value && (
           <button type="button" className="color-field__reset" onClick={() => onChange(undefined)}>
             Reset
@@ -649,7 +703,7 @@ function PropertyEditor({
               delete next[key];
               onChange(next);
             }}
-            aria-label={`Remove ${key || "property"}`}
+            aria-label={`Remove ${key || 'property'}`}
           >
             ×
           </button>
@@ -658,7 +712,7 @@ function PropertyEditor({
       <button
         type="button"
         className="property-row__add"
-        onClick={() => onChange({ ...current, [""]: "" })}
+        onClick={() => onChange({ ...current, ['']: '' })}
       >
         + Add property
       </button>
@@ -673,21 +727,21 @@ function PropertyEditor({
 // you'd last typed no matter which node/edge you had selected. That's what
 // made tags look "global" - it was a stale-input bug, not a shared-data bug.
 function TagEditor({ tags, onChange }: { tags: string[]; onChange: (tags: string[]) => void }) {
-  const [draft, setDraft] = useState("");
+  const [draft, setDraft] = useState('');
 
   const commit = () => {
     const value = draft.trim();
     if (value && !tags.includes(value)) {
       onChange([...tags, value]);
     }
-    setDraft("");
+    setDraft('');
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Enter" || event.key === ",") {
+    if (event.key === 'Enter' || event.key === ',') {
       event.preventDefault();
       commit();
-    } else if (event.key === "Backspace" && draft === "" && tags.length > 0) {
+    } else if (event.key === 'Backspace' && draft === '' && tags.length > 0) {
       onChange(tags.slice(0, -1));
     }
   };
@@ -710,7 +764,7 @@ function TagEditor({ tags, onChange }: { tags: string[]; onChange: (tags: string
         <input
           className="tag-editor__input"
           value={draft}
-          placeholder={tags.length === 0 ? "env:prod, team:payments..." : "Add tag..."}
+          placeholder={tags.length === 0 ? 'env:prod, team:payments...' : 'Add tag...'}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={onKeyDown}
           onBlur={commit}

@@ -2,8 +2,8 @@ import type {
   RequirementsDocument,
   RequirementItem,
   RequirementItemType,
-} from "../domain/requirementsTypes";
-import { EMPTY_REQUIREMENTS_DOCUMENT } from "../domain/requirementsTypes";
+} from '../domain/requirementsTypes';
+import { EMPTY_REQUIREMENTS_DOCUMENT } from '../domain/requirementsTypes';
 import {
   generateItemId,
   getNextAvailableIdForType,
@@ -14,7 +14,7 @@ import {
   defaultStatusForType,
   isPrefixTaken,
   countItemsUsingType,
-} from "../domain/requirementsRegistry";
+} from '../domain/requirementsRegistry';
 
 /**
  * RequirementsStore is the same kind of seam TeamStore is (see
@@ -48,7 +48,7 @@ export interface RequirementsStore {
    * generated id (e.g. "REQ-6"), the same shape callers need today to
    * scroll to / focus the new item immediately after creating it. */
   addItem(typeId: string): string;
-  updateItem(id: string, patch: Partial<Omit<RequirementItem, "id" | "typeId">>): void;
+  updateItem(id: string, patch: Partial<Omit<RequirementItem, 'id' | 'typeId'>>): void;
   /** Converts an existing item to a different type, adjusting its ID and workable fields as needed, retroactively updating all references */
   convertItemType(id: string, newTypeId: string): string | undefined;
   /** Converts all items using fromTypeId to toTypeId, regenerating their IDs and updating references, and returns the count of converted items */
@@ -71,7 +71,10 @@ export interface RequirementsStore {
    * another type - matching onAddCustomType's existing validate-and-
    * reject behavior, rather than silently creating a colliding prefix. */
   addCustomType(label: string, prefix: string, color: string, isWorkable: boolean): boolean;
-  updateType(typeId: string, patch: Partial<Pick<RequirementItemType, "label" | "color" | "isWorkable">>): void;
+  updateType(
+    typeId: string,
+    patch: Partial<Pick<RequirementItemType, 'label' | 'color' | 'isWorkable'>>,
+  ): void;
   /** Returns false (and does nothing) if any item still uses this type.
    *
    * This used to cascade instead - deleting the type also deleted every
@@ -88,7 +91,12 @@ export interface RequirementsStore {
    * cleanup this used to do is gone rather than merely unreachable. */
   deleteCustomType(typeId: string): boolean;
 
-  addCustomRelationshipType(label: string, inverseLabel: string, color: string, isBlocking: boolean): void;
+  addCustomRelationshipType(
+    label: string,
+    inverseLabel: string,
+    color: string,
+    isBlocking: boolean,
+  ): void;
   /** Also removes every relationship of this type (items themselves are
    * untouched) - matching onDeleteCustomRelationshipType's existing
    * cascade. */
@@ -114,7 +122,7 @@ function nextCustomTypeId(doc: RequirementsDocument): string {
 }
 
 export function createLocalRequirementsStore(
-  initial: RequirementsDocument = EMPTY_REQUIREMENTS_DOCUMENT
+  initial: RequirementsDocument = EMPTY_REQUIREMENTS_DOCUMENT,
 ): RequirementsStore {
   let doc: RequirementsDocument = initial;
   const listeners = new Set<() => void>();
@@ -136,7 +144,13 @@ export function createLocalRequirementsStore(
 
     addItem: (typeId) => {
       const { id, nextSequence } = generateItemId(doc, typeId);
-      const newItem: RequirementItem = { id, typeId, title: "", body: "", status: defaultStatusForType(doc, typeId) };
+      const newItem: RequirementItem = {
+        id,
+        typeId,
+        title: '',
+        body: '',
+        status: defaultStatusForType(doc, typeId),
+      };
       doc = { ...doc, items: [...doc.items, newItem], nextSequence };
       notify();
       return id;
@@ -163,7 +177,7 @@ export function createLocalRequirementsStore(
           ...item,
           id: newId,
           typeId: newTypeId,
-          status: isWorkable ? (item.status ?? "todo") : undefined,
+          status: isWorkable ? (item.status ?? 'todo') : undefined,
           points: isWorkable ? item.points : undefined,
           assigneeId: isWorkable ? item.assigneeId : undefined,
           sprintId: isWorkable ? item.sprintId : undefined,
@@ -171,7 +185,11 @@ export function createLocalRequirementsStore(
       });
 
       updatedItems = updateItemReferencesInItems(updatedItems, id, newId);
-      const updatedRelationships = updateItemReferencesInRelationships(doc.relationships, id, newId);
+      const updatedRelationships = updateItemReferencesInRelationships(
+        doc.relationships,
+        id,
+        newId,
+      );
 
       doc = {
         ...doc,
@@ -203,7 +221,7 @@ export function createLocalRequirementsStore(
           ...item,
           id: newId,
           typeId: toTypeId,
-          status: isWorkable ? (item.status ?? "todo") : undefined,
+          status: isWorkable ? (item.status ?? 'todo') : undefined,
           points: isWorkable ? item.points : undefined,
           assigneeId: isWorkable ? item.assigneeId : undefined,
           sprintId: isWorkable ? item.sprintId : undefined,
@@ -213,7 +231,11 @@ export function createLocalRequirementsStore(
       let updatedRelationships = doc.relationships;
       for (const { oldId, newId } of conversions) {
         updatedItems = updateItemReferencesInItems(updatedItems, oldId, newId);
-        updatedRelationships = updateItemReferencesInRelationships(updatedRelationships, oldId, newId);
+        updatedRelationships = updateItemReferencesInRelationships(
+          updatedRelationships,
+          oldId,
+          newId,
+        );
       }
 
       doc = {
@@ -248,7 +270,9 @@ export function createLocalRequirementsStore(
       doc = {
         ...doc,
         categories: doc.categories.filter((c) => c.id !== categoryId),
-        items: doc.items.map((i) => (i.categoryId === categoryId ? { ...i, categoryId: undefined } : i)),
+        items: doc.items.map((i) =>
+          i.categoryId === categoryId ? { ...i, categoryId: undefined } : i,
+        ),
       };
       notify();
     },
@@ -269,7 +293,10 @@ export function createLocalRequirementsStore(
     },
 
     updateType: (typeId, patch) => {
-      doc = { ...doc, itemTypes: doc.itemTypes.map((t) => (t.id === typeId ? { ...t, ...patch } : t)) };
+      doc = {
+        ...doc,
+        itemTypes: doc.itemTypes.map((t) => (t.id === typeId ? { ...t, ...patch } : t)),
+      };
       notify();
     },
 
@@ -320,7 +347,7 @@ export function createLocalRequirementsStore(
       doc = {
         ...doc,
         items: doc.items.map((item) =>
-          item.sprintId && sprintIdSet.has(item.sprintId) ? { ...item, sprintId: undefined } : item
+          item.sprintId && sprintIdSet.has(item.sprintId) ? { ...item, sprintId: undefined } : item,
         ),
       };
       notify();
@@ -343,7 +370,7 @@ export function createLocalRequirementsStore(
  */
 export function createAdapterRequirementsStore(
   getSnapshot: () => RequirementsDocument,
-  setSnapshot: (updater: (prev: RequirementsDocument) => RequirementsDocument) => void
+  setSnapshot: (updater: (prev: RequirementsDocument) => RequirementsDocument) => void,
 ): RequirementsStore {
   return {
     getSnapshot,
@@ -358,8 +385,8 @@ export function createAdapterRequirementsStore(
       const newItem: RequirementItem = {
         id,
         typeId,
-        title: "",
-        body: "",
+        title: '',
+        body: '',
         status: defaultStatusForType(getSnapshot(), typeId),
       };
       setSnapshot((prev) => ({ ...prev, items: [...prev.items, newItem], nextSequence }));
@@ -395,7 +422,7 @@ export function createAdapterRequirementsStore(
             ...item,
             id: newId,
             typeId: newTypeId,
-            status: isWorkable ? (item.status ?? "todo") : undefined,
+            status: isWorkable ? (item.status ?? 'todo') : undefined,
             points: isWorkable ? item.points : undefined,
             assigneeId: isWorkable ? item.assigneeId : undefined,
             sprintId: isWorkable ? item.sprintId : undefined,
@@ -403,7 +430,11 @@ export function createAdapterRequirementsStore(
         });
 
         updatedItems = updateItemReferencesInItems(updatedItems, id, newId);
-        const updatedRelationships = updateItemReferencesInRelationships(prev.relationships, id, newId);
+        const updatedRelationships = updateItemReferencesInRelationships(
+          prev.relationships,
+          id,
+          newId,
+        );
 
         return {
           ...prev,
@@ -444,7 +475,7 @@ export function createAdapterRequirementsStore(
             ...item,
             id: newId,
             typeId: toTypeId,
-            status: isWorkable ? (item.status ?? "todo") : undefined,
+            status: isWorkable ? (item.status ?? 'todo') : undefined,
             points: isWorkable ? item.points : undefined,
             assigneeId: isWorkable ? item.assigneeId : undefined,
             sprintId: isWorkable ? item.sprintId : undefined,
@@ -454,7 +485,11 @@ export function createAdapterRequirementsStore(
         let updatedRelationships = prev.relationships;
         for (const { oldId, newId } of conversions) {
           updatedItems = updateItemReferencesInItems(updatedItems, oldId, newId);
-          updatedRelationships = updateItemReferencesInRelationships(updatedRelationships, oldId, newId);
+          updatedRelationships = updateItemReferencesInRelationships(
+            updatedRelationships,
+            oldId,
+            newId,
+          );
         }
 
         return {
@@ -489,7 +524,9 @@ export function createAdapterRequirementsStore(
       setSnapshot((prev) => ({
         ...prev,
         categories: prev.categories.filter((c) => c.id !== categoryId),
-        items: prev.items.map((i) => (i.categoryId === categoryId ? { ...i, categoryId: undefined } : i)),
+        items: prev.items.map((i) =>
+          i.categoryId === categoryId ? { ...i, categoryId: undefined } : i,
+        ),
       }));
     },
 
@@ -516,7 +553,10 @@ export function createAdapterRequirementsStore(
 
     deleteCustomType: (typeId) => {
       if (countItemsUsingType(getSnapshot(), typeId) > 0) return false;
-      setSnapshot((prev) => ({ ...prev, itemTypes: prev.itemTypes.filter((t) => t.id !== typeId) }));
+      setSnapshot((prev) => ({
+        ...prev,
+        itemTypes: prev.itemTypes.filter((t) => t.id !== typeId),
+      }));
       return true;
     },
 
@@ -548,7 +588,10 @@ export function createAdapterRequirementsStore(
     },
 
     deleteRelationship: (relationshipId) => {
-      setSnapshot((prev) => ({ ...prev, relationships: prev.relationships.filter((r) => r.id !== relationshipId) }));
+      setSnapshot((prev) => ({
+        ...prev,
+        relationships: prev.relationships.filter((r) => r.id !== relationshipId),
+      }));
     },
 
     unassignItemsFromSprints: (sprintIds) => {
@@ -556,7 +599,7 @@ export function createAdapterRequirementsStore(
       setSnapshot((prev) => ({
         ...prev,
         items: prev.items.map((item) =>
-          item.sprintId && sprintIdSet.has(item.sprintId) ? { ...item, sprintId: undefined } : item
+          item.sprintId && sprintIdSet.has(item.sprintId) ? { ...item, sprintId: undefined } : item,
         ),
       }));
     },

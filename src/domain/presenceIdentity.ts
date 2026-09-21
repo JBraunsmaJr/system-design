@@ -1,8 +1,8 @@
 // Namespaced to avoid colliding with anything else that might use this
 // browser's localStorage for this origin - same convention as
 // autosave.ts's own AUTOSAVE_KEY.
-const PRESENCE_NAME_KEY = "system-design-editor:presence-name";
-const SHOW_PEER_CURSORS_KEY = "system-design-editor:show-peer-cursors";
+const PRESENCE_NAME_KEY = 'system-design-editor:presence-name';
+const SHOW_PEER_CURSORS_KEY = 'system-design-editor:show-peer-cursors';
 
 /** Reads the person's own last-used display name for collaborative
  * sessions, if one was ever set. Returns null (rather than throwing)
@@ -40,7 +40,7 @@ export function savePresenceName(name: string): void {
 export function loadShowPeerCursors(): boolean {
   try {
     const raw = localStorage.getItem(SHOW_PEER_CURSORS_KEY);
-    return raw === null ? true : raw === "true";
+    return raw === null ? true : raw === 'true';
   } catch {
     return true;
   }

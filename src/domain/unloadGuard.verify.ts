@@ -5,14 +5,10 @@
  * count is what the leave guard reads; the unload guard is the backstop for
  * everything the leave guard cannot see, such as a tab being closed outright.
  */
-import {
-  installUnloadGuard,
-  shouldBlockUnload,
-  type UnloadTarget,
-} from "./unloadGuard.ts";
-import { countPersistedReplicas } from "../collab/session.ts";
-import type { PresenceInfo } from "../collab/session.ts";
-import type { DurabilitySignals } from "./durability.ts";
+import { installUnloadGuard, shouldBlockUnload, type UnloadTarget } from './unloadGuard.ts';
+import { countPersistedReplicas } from '../collab/session.ts';
+import type { PresenceInfo } from '../collab/session.ts';
+import type { DurabilitySignals } from './durability.ts';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {
@@ -24,65 +20,73 @@ function assert(condition: boolean, message: string) {
   }
 }
 
-const safe: DurabilitySignals = { localPersistence: "active" };
+const safe: DurabilitySignals = { localPersistence: 'active' };
 
-console.log("=== The guard stays quiet when nothing is at risk ===");
+console.log('=== The guard stays quiet when nothing is at risk ===');
 {
-  assert(!shouldBlockUnload(safe), "a document at rest in browser storage does not prompt");
+  assert(!shouldBlockUnload(safe), 'a document at rest in browser storage does not prompt');
   assert(
-    shouldBlockUnload({ ...safe, fileAccess: "available", fileAttachment: { fileName: "a.json", status: "conflict" } }),
-    "an unresolved file conflict prompts: the chosen file is behind (WS13-R4)",
+    shouldBlockUnload({
+      ...safe,
+      fileAccess: 'available',
+      fileAttachment: { fileName: 'a.json', status: 'conflict' },
+    }),
+    'an unresolved file conflict prompts: the chosen file is behind (WS13-R4)',
   );
   assert(
-    !shouldBlockUnload({ ...safe, fileAccess: "available", fileAttachment: { fileName: "a.json", status: "needs-permission" } }),
-    "a paused file does not prompt: every change is still saved in the browser",
+    !shouldBlockUnload({
+      ...safe,
+      fileAccess: 'available',
+      fileAttachment: { fileName: 'a.json', status: 'needs-permission' },
+    }),
+    'a paused file does not prompt: every change is still saved in the browser',
   );
   assert(
     !shouldBlockUnload({ ...safe, fileBacked: true }),
-    "a file-backed document does not prompt",
+    'a file-backed document does not prompt',
   );
   assert(
-    !shouldBlockUnload({ ...safe, serverSync: "synced" }),
-    "a synced document does not prompt",
+    !shouldBlockUnload({ ...safe, serverSync: 'synced' }),
+    'a synced document does not prompt',
   );
   assert(
-    !shouldBlockUnload({ localPersistence: "loading" }),
-    "loading does not prompt - the state is unknown, but nothing has been typed yet",
+    !shouldBlockUnload({ localPersistence: 'loading' }),
+    'loading does not prompt - the state is unknown, but nothing has been typed yet',
   );
   assert(
-    !shouldBlockUnload({ ...safe, serverSync: "offline", pendingUpdates: 12 }),
-    "a queued offline backlog does not prompt while the local replica holds it",
+    !shouldBlockUnload({ ...safe, serverSync: 'offline', pendingUpdates: 12 }),
+    'a queued offline backlog does not prompt while the local replica holds it',
   );
 }
 
-console.log("=== It prompts when closing would actually lose work ===");
+console.log('=== It prompts when closing would actually lose work ===');
 {
   assert(
     shouldBlockUnload({
       ...safe,
-      storageFailure: { reason: "quota", message: "full" },
+      storageFailure: { reason: 'quota', message: 'full' },
     }),
-    "a storage failure prompts",
+    'a storage failure prompts',
   );
   assert(
-    shouldBlockUnload({ ...safe, autosaveBlockedReason: "newer version" }),
-    "a paused autosave prompts",
+    shouldBlockUnload({ ...safe, autosaveBlockedReason: 'newer version' }),
+    'a paused autosave prompts',
   );
   assert(
-    shouldBlockUnload({ localPersistence: "unavailable" }),
-    "storage being unavailable prompts - nothing is being written at all",
+    shouldBlockUnload({ localPersistence: 'unavailable' }),
+    'storage being unavailable prompts - nothing is being written at all',
   );
   assert(
     shouldBlockUnload({
-      localPersistence: "unavailable",
-      serverSync: "offline",
+      localPersistence: 'unavailable',
+      serverSync: 'offline',
       pendingUpdates: 3,
     }),
-    "a queue with no local replica behind it prompts",
+    'a queue with no local replica behind it prompts',
   );
 }
 
-console.log("=== Installation and release ===");
+console.log('=== Installation and release ===');
 {
   const listeners = new Set<(e: { preventDefault: () => void; returnValue?: unknown }) => void>();
   const target: UnloadTarget = {
@@ -92,7 +96,7 @@ console.log("=== Installation and release ===");
 
   let signals: DurabilitySignals = safe;
   const guard = installUnloadGuard(() => signals, target);
-  assert(listeners.size === 1, "installing registers one listener");
+  assert(listeners.size === 1, 'installing registers one listener');
 
   const fire = () => {
     let prevented = false;
@@ -102,64 +106,55 @@ console.log("=== Installation and release ===");
     return prevented;
   };
 
-  assert(!fire(), "with nothing at risk, closing is not blocked");
+  assert(!fire(), 'with nothing at risk, closing is not blocked');
 
   // The decision must be read at unload time, not captured at install time.
-  signals = { ...safe, storageFailure: { reason: "quota", message: "full" } };
+  signals = { ...safe, storageFailure: { reason: 'quota', message: 'full' } };
   assert(
     fire(),
-    "a failure that appeared AFTER installation still blocks - the signals are read live",
+    'a failure that appeared AFTER installation still blocks - the signals are read live',
   );
 
   guard.release();
-  assert(listeners.size === 0, "releasing removes the listener");
+  assert(listeners.size === 0, 'releasing removes the listener');
   guard.release();
-  assert(listeners.size === 0, "releasing twice is harmless");
+  assert(listeners.size === 0, 'releasing twice is harmless');
 }
 
-console.log("=== A target without events degrades quietly ===");
+console.log('=== A target without events degrades quietly ===');
 {
   const guard = installUnloadGuard(() => safe, undefined as unknown as UnloadTarget);
   guard.release();
-  assert(true, "installing against no target neither throws nor leaks");
+  assert(true, 'installing against no target neither throws nor leaks');
 }
 
-console.log("=== Replica count (WS13-R10) ===");
+console.log('=== Replica count (WS13-R10) ===');
 {
-  const peer = (
-    clientId: number,
-    hasPersistedReplica: boolean,
-  ): PresenceInfo =>
+  const peer = (clientId: number, hasPersistedReplica: boolean): PresenceInfo =>
     ({
       clientId,
       name: `Peer ${clientId}`,
-      color: "#fff",
+      color: '#fff',
       cursor: null,
       selectedNodeIds: [],
       selectedEdgeIds: [],
       viewMode: null,
       focusedItemId: null,
-      diagramPath: "",
+      diagramPath: '',
       hasPersistedReplica,
     }) as PresenceInfo;
 
-  assert(
-    countPersistedReplicas([], true) === 1,
-    "alone with a replica counts one",
-  );
-  assert(
-    countPersistedReplicas([], false) === 0,
-    "alone without storage counts none",
-  );
+  assert(countPersistedReplicas([], true) === 1, 'alone with a replica counts one');
+  assert(countPersistedReplicas([], false) === 0, 'alone without storage counts none');
   assert(
     countPersistedReplicas([peer(1, true), peer(2, true)], true) === 3,
     "own replica is included alongside peers'",
   );
   assert(
     countPersistedReplicas([peer(1, false), peer(2, false)], true) === 1,
-    "connected peers whose storage was refused are NOT counted - this is the " +
-      "whole point, since counting connections would tell the last holder " +
-      "their work is duplicated when it is not",
+    'connected peers whose storage was refused are NOT counted - this is the ' +
+      'whole point, since counting connections would tell the last holder ' +
+      'their work is duplicated when it is not',
   );
   assert(
     countPersistedReplicas([peer(1, true)], false) === 1,
@@ -171,4 +166,4 @@ if (failures > 0) {
   console.error(`\n${failures} failure(s)`);
   throw new Error(`${failures} unload guard check(s) failed`);
 }
-console.log("\nAll unload guard and replica count checks passed.");
+console.log('\nAll unload guard and replica count checks passed.');

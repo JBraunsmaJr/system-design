@@ -1,15 +1,19 @@
-import { NodeResizer, useReactFlow, type NodeProps, type Node } from "@xyflow/react";
-import * as Icons from "lucide-react";
-import { getGroupType } from "../../domain/groupRegistry";
-import { BidirectionalHandles } from "./BidirectionalHandles";
-import type { ArchNodeData } from "../../domain/types";
-import { useCanvasContext } from "../CanvasContext";
-import { recordNodeRender } from "../../perf/instrumentation";
+import { NodeResizer, useReactFlow, type NodeProps, type Node } from '@xyflow/react';
+import * as Icons from 'lucide-react';
+import { getGroupType } from '../../domain/groupRegistry';
+import { BidirectionalHandles } from './BidirectionalHandles';
+import type { ArchNodeData } from '../../domain/types';
+import { useCanvasContext } from '../CanvasContext';
+import { recordNodeRender } from '../../perf/instrumentation';
 
-type GroupNodeType = Node<ArchNodeData, "group">;
+type GroupNodeType = Node<ArchNodeData, 'group'>;
 
 interface GroupNodeProps extends NodeProps<GroupNodeType> {
-  onAdoptIntoGroup?: (groupId: string, nodeIds: string[], groupPosition?: { x: number; y: number }) => void;
+  onAdoptIntoGroup?: (
+    groupId: string,
+    nodeIds: string[],
+    groupPosition?: { x: number; y: number },
+  ) => void;
 }
 
 /**
@@ -52,15 +56,15 @@ export function GroupNode({
   const { getIntersectingNodes } = useReactFlow<Node<ArchNodeData>>();
 
   const def = getGroupType(data.nodeType);
-  const accent = data.color ?? def?.color ?? "#7C8598";
+  const accent = data.color ?? def?.color ?? '#7C8598';
   // data.icon is a per-node override chosen in the Inspector; the group
   // type's own icon is the fallback. Same resolution order as TypedNode,
   // so a boundary behaves like every other node here.
   const iconName = data.icon ?? def?.icon;
   const IconComponent =
     (iconName && (Icons[iconName as keyof typeof Icons] as Icons.LucideIcon)) || Icons.SquareDashed;
-  const borderStyle = def?.borderStyle ?? "dashed";
-  const borderColor = selected ? "var(--accent)" : `${accent}99`;
+  const borderStyle = def?.borderStyle ?? 'dashed';
+  const borderColor = selected ? 'var(--accent)' : `${accent}99`;
 
   return (
     <>
@@ -83,25 +87,25 @@ export function GroupNode({
             height: params.height,
           };
           const contained = getIntersectingNodes(rect, false).filter(
-            (n) => n.id !== id && n.type !== "group" && n.parentId !== id
+            (n) => n.id !== id && n.type !== 'group' && n.parentId !== id,
           );
           if (contained.length > 0) {
             onAdoptIntoGroup?.(
               id,
               contained.map((n) => n.id),
-              { x: params.x, y: params.y }
+              { x: params.x, y: params.y },
             );
           }
         }}
       />
       <BidirectionalHandles />
       <div
-        className={`group-node${selected ? " is-selected" : ""}`}
+        className={`group-node${selected ? ' is-selected' : ''}`}
         style={{
           borderStyle,
-          borderWidth: borderStyle === "double" ? 4 : 1.5,
+          borderWidth: borderStyle === 'double' ? 4 : 1.5,
           borderColor,
-          background: selected ? "rgba(91, 124, 250, 0.09)" : `${accent}0d`,
+          background: selected ? 'rgba(91, 124, 250, 0.09)' : `${accent}0d`,
         }}
       >
         {/* Clickable border frame - 4 thin strips along each edge, each

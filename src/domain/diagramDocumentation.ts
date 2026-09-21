@@ -1,9 +1,9 @@
-import type { Node, Edge } from "@xyflow/react";
-import type { ArchNodeData, ArchEdgeData } from "./types";
-import { getNodeType, CATEGORY_LABELS } from "./nodeRegistry";
-import { getGroupType } from "./groupRegistry";
-import { globalShapeRegistry, getShapeType } from "./shapeRegistry";
-import { getEdgeType } from "./edgeRegistry";
+import type { Node, Edge } from '@xyflow/react';
+import type { ArchNodeData, ArchEdgeData } from './types';
+import { getNodeType, CATEGORY_LABELS } from './nodeRegistry';
+import { getGroupType } from './groupRegistry';
+import { globalShapeRegistry, getShapeType } from './shapeRegistry';
+import { getEdgeType } from './edgeRegistry';
 
 export interface DiagramDocumentation {
   description?: string;
@@ -24,16 +24,16 @@ export function isMeaningfulValue(val: unknown, seen = new WeakSet<object>()): b
   if (val === undefined || val === null) {
     return false;
   }
-  if (typeof val === "string") {
+  if (typeof val === 'string') {
     return val.trim().length > 0;
   }
-  if (typeof val === "number") {
+  if (typeof val === 'number') {
     return !Number.isNaN(val);
   }
-  if (typeof val === "boolean") {
+  if (typeof val === 'boolean') {
     return true;
   }
-  if (typeof val === "object") {
+  if (typeof val === 'object') {
     if (seen.has(val)) return false;
     seen.add(val);
     if (Array.isArray(val)) {
@@ -51,16 +51,14 @@ export function isMeaningfulValue(val: unknown, seen = new WeakSet<object>()): b
  * Treats whitespace-only strings, empty objects, empty arrays, and empty tags
  * as having no documentation.
  */
-export function hasDocumentation(
-  documentation: DiagramDocumentation | undefined
-): boolean {
+export function hasDocumentation(documentation: DiagramDocumentation | undefined): boolean {
   if (!documentation) {
     return false;
   }
 
   // 1. Description
   if (
-    typeof documentation.description === "string" &&
+    typeof documentation.description === 'string' &&
     documentation.description.trim().length > 0
   ) {
     return true;
@@ -69,9 +67,7 @@ export function hasDocumentation(
   // 2. Tags
   if (
     Array.isArray(documentation.tags) &&
-    documentation.tags.some(
-      (tag) => typeof tag === "string" && tag.trim().length > 0
-    )
+    documentation.tags.some((tag) => typeof tag === 'string' && tag.trim().length > 0)
   ) {
     return true;
   }
@@ -79,7 +75,7 @@ export function hasDocumentation(
   // 3. Properties
   if (
     documentation.properties &&
-    typeof documentation.properties === "object" &&
+    typeof documentation.properties === 'object' &&
     !Array.isArray(documentation.properties)
   ) {
     for (const [key, value] of Object.entries(documentation.properties)) {
@@ -97,20 +93,20 @@ export function hasDocumentation(
  * Handles primitives, arrays, objects, and circular references without crashing.
  */
 export function formatPropertyValue(value: unknown, seen = new WeakSet<object>()): string {
-  if (value === null) return "null";
-  if (value === undefined) return "undefined";
-  if (typeof value === "string") return value;
-  if (typeof value === "number") return Number.isNaN(value) ? "NaN" : String(value);
-  if (typeof value === "boolean") return value ? "true" : "false";
+  if (value === null) return 'null';
+  if (value === undefined) return 'undefined';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return Number.isNaN(value) ? 'NaN' : String(value);
+  if (typeof value === 'boolean') return value ? 'true' : 'false';
 
-  if (typeof value === "object") {
-    if (seen.has(value)) return "[Circular]";
+  if (typeof value === 'object') {
+    if (seen.has(value)) return '[Circular]';
     seen.add(value);
 
     if (Array.isArray(value)) {
-      if (value.length === 0) return "[]";
+      if (value.length === 0) return '[]';
       const formattedItems = value.map((item) => formatPropertyValue(item, seen));
-      return formattedItems.join(", ");
+      return formattedItems.join(', ');
     }
 
     try {
@@ -119,19 +115,19 @@ export function formatPropertyValue(value: unknown, seen = new WeakSet<object>()
       return JSON.stringify(
         value,
         (key, val) => {
-          if (typeof val === "object" && val !== null) {
-            if (key !== "" && (jsonSeen.has(val) || seen.has(val))) {
-              return "[Circular]";
+          if (typeof val === 'object' && val !== null) {
+            if (key !== '' && (jsonSeen.has(val) || seen.has(val))) {
+              return '[Circular]';
             }
             jsonSeen.add(val);
             seen.add(val);
           }
           return val;
         },
-        2
+        2,
       );
     } catch {
-      return "[Object]";
+      return '[Object]';
     }
   }
 
@@ -147,29 +143,27 @@ export interface ExtractedDocumentation {
 /**
  * Extracts and normalizes documentation from an ArchNode.
  */
-export function extractNodeDocumentation(
-  node: Node<ArchNodeData>
-): ExtractedDocumentation {
+export function extractNodeDocumentation(node: Node<ArchNodeData>): ExtractedDocumentation {
   const data = node.data;
-  const isGroup = node.type === "group";
-  const isShape = node.type === "shape";
-  const isCode = node.type === "code";
-  const isText = node.type === "text";
+  const isGroup = node.type === 'group';
+  const isShape = node.type === 'shape';
+  const isCode = node.type === 'code';
+  const isText = node.type === 'text';
 
   const title: string | undefined = data?.label?.trim() ? data.label.trim() : undefined;
   let subtitle: string | undefined;
 
   if (isGroup) {
     const groupDef = getGroupType(data.nodeType);
-    subtitle = groupDef?.label ?? "Boundary";
+    subtitle = groupDef?.label ?? 'Boundary';
   } else if (isShape) {
     const fullShapeDef = globalShapeRegistry.getShape(data.nodeType);
     const shapeDef = getShapeType(data.nodeType);
-    subtitle = fullShapeDef?.name ?? shapeDef?.label ?? "Shape";
+    subtitle = fullShapeDef?.name ?? shapeDef?.label ?? 'Shape';
   } else if (isCode) {
-    subtitle = data.codeLanguage ? `Code (${data.codeLanguage})` : "Code Snippet";
+    subtitle = data.codeLanguage ? `Code (${data.codeLanguage})` : 'Code Snippet';
   } else if (isText) {
-    subtitle = "Text Note";
+    subtitle = 'Text Note';
   } else {
     const nodeDef = getNodeType(data.nodeType);
     if (nodeDef) {
@@ -181,7 +175,7 @@ export function extractNodeDocumentation(
 
   const rawTags = data?.tags;
   const tags = Array.isArray(rawTags)
-    ? rawTags.filter((t): t is string => typeof t === "string" && t.trim().length > 0)
+    ? rawTags.filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
     : undefined;
 
   const documentation: DiagramDocumentation = {
@@ -200,23 +194,21 @@ export function extractNodeDocumentation(
 /**
  * Extracts and normalizes documentation from an ArchEdge.
  */
-export function extractEdgeDocumentation(
-  edge: Edge<ArchEdgeData>
-): ExtractedDocumentation {
+export function extractEdgeDocumentation(edge: Edge<ArchEdgeData>): ExtractedDocumentation {
   const data = edge.data;
-  const edgeTypeDef = getEdgeType(data?.edgeType ?? "generic");
+  const edgeTypeDef = getEdgeType(data?.edgeType ?? 'generic');
 
   const title: string | undefined = data?.label?.trim()
     ? data.label.trim()
     : edgeTypeDef?.label?.trim()
-    ? edgeTypeDef.label.trim()
-    : undefined;
+      ? edgeTypeDef.label.trim()
+      : undefined;
 
-  const subtitle = edgeTypeDef?.label || "Edge";
+  const subtitle = edgeTypeDef?.label || 'Edge';
 
   const rawTags = (data as Record<string, unknown> | undefined)?.tags;
   const tags = Array.isArray(rawTags)
-    ? rawTags.filter((t): t is string => typeof t === "string" && t.trim().length > 0)
+    ? rawTags.filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
     : undefined;
 
   const documentation: DiagramDocumentation = {
@@ -251,7 +243,7 @@ export function computeDocumentationPopupPosition(
   anchor: { x: number; y: number },
   popupSize: PopupSize,
   viewport: ViewportSize,
-  gap = 12
+  gap = 12,
 ): { top: number; left: number } {
   const margin = 10;
   let left = anchor.x + gap;

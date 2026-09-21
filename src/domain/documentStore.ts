@@ -16,36 +16,32 @@
  * testable in Node without a browser, and so the parts that can only be tested
  * against a real IndexedDB are as thin as possible.
  */
-import type { DiagramFile } from "./serialization.ts";
-import { parseDiagramFile, SCHEMA_VERSION } from "./serialization.ts";
-import { SchemaVersionError } from "./schemaMigrations.ts";
+import type { DiagramFile } from './serialization.ts';
+import { parseDiagramFile, SCHEMA_VERSION } from './serialization.ts';
+import { SchemaVersionError } from './schemaMigrations.ts';
 
 /** localStorage key written by every release up to and including v0.92.1. */
-export const LEGACY_AUTOSAVE_KEY = "system-design-editor:autosave";
+export const LEGACY_AUTOSAVE_KEY = 'system-design-editor:autosave';
 
-const INDEX_KEY = "index";
-const DOC_PREFIX = "doc:";
+const INDEX_KEY = 'index';
+const DOC_PREFIX = 'doc:';
 
 export type StorageFailureReason =
   /** No storage at all - private browsing, disabled, or an unsupported engine. */
-  | "unavailable"
+  | 'unavailable'
   /** Out of space. The single most important one to surface, not swallow. */
-  | "quota"
-  | "not-found"
+  | 'quota'
+  | 'not-found'
   /** Present but unparseable. Distinct from `version`: this one is worthless. */
-  | "corrupt"
+  | 'corrupt'
   /** Intact, but written by a newer build. Must never be overwritten. */
-  | "version"
-  | "unknown";
+  | 'version'
+  | 'unknown';
 
 export type StorageResult<T> =
-  | { ok: true; value: T }
-  | { ok: false; reason: StorageFailureReason; message: string };
+  { ok: true; value: T } | { ok: false; reason: StorageFailureReason; message: string };
 
-function fail<T>(
-  reason: StorageFailureReason,
-  message: string,
-): StorageResult<T> {
+function fail<T>(reason: StorageFailureReason, message: string): StorageResult<T> {
   return { ok: false, reason, message };
 }
 
@@ -58,30 +54,30 @@ function fail<T>(
  * looks like a generic failure and the user is told nothing useful.
  */
 export function classifyStorageError(error: unknown): StorageFailureReason {
-  if (error instanceof SchemaVersionError) return "version";
-  if (error instanceof SyntaxError) return "corrupt";
+  if (error instanceof SchemaVersionError) return 'version';
+  if (error instanceof SyntaxError) return 'corrupt';
 
   const name =
-    typeof error === "object" && error !== null && "name" in error
+    typeof error === 'object' && error !== null && 'name' in error
       ? String((error as { name: unknown }).name)
-      : "";
+      : '';
   const code =
-    typeof error === "object" && error !== null && "code" in error
+    typeof error === 'object' && error !== null && 'code' in error
       ? (error as { code: unknown }).code
       : undefined;
 
   if (
-    name === "QuotaExceededError" ||
-    name === "NS_ERROR_DOM_QUOTA_REACHED" ||
+    name === 'QuotaExceededError' ||
+    name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
     code === 22 ||
     code === 1014
   ) {
-    return "quota";
+    return 'quota';
   }
-  if (name === "SecurityError" || name === "InvalidStateError") {
-    return "unavailable";
+  if (name === 'SecurityError' || name === 'InvalidStateError') {
+    return 'unavailable';
   }
-  return "unknown";
+  return 'unknown';
 }
 
 export interface DocumentIndexEntry {
@@ -95,7 +91,7 @@ export interface DocumentIndexEntry {
   schemaVersion: string;
   /** Where the document came from. `session` documents retain their room so a
    * participant can rehost an empty room later (WS13-R12). */
-  origin: "local" | "session";
+  origin: 'local' | 'session';
   sessionRoom?: string;
   /** The session's encryption key, kept with the local copy so a former
    * participant can host the same room again and the original link still
@@ -193,18 +189,13 @@ export interface DocumentStore {
   writeDocument(
     docId: string,
     file: DiagramFile,
-    options?: { origin?: "local" | "session"; sessionRoom?: string; sessionKey?: string },
+    options?: { origin?: 'local' | 'session'; sessionRoom?: string; sessionKey?: string },
   ): Promise<StorageResult<DocumentIndexEntry>>;
-  renameDocument(
-    docId: string,
-    title: string,
-  ): Promise<StorageResult<DocumentIndexEntry>>;
+  renameDocument(docId: string, title: string): Promise<StorageResult<DocumentIndexEntry>>;
   /** WS2-R6: deletes content AND index entry. Distinct from disconnecting. */
   deleteDocument(docId: string): Promise<StorageResult<void>>;
   /** Reports index entries with no document, and documents with no entry. */
-  reconcile(): Promise<
-    StorageResult<{ danglingEntries: string[]; orphanedDocuments: string[] }>
-  >;
+  reconcile(): Promise<StorageResult<{ danglingEntries: string[]; orphanedDocuments: string[] }>>;
   importLegacyAutosave(
     readLegacy: () => string | null,
     clearLegacy: () => void,
@@ -222,7 +213,11 @@ export function createDocumentStore(backend: DocumentBackend): DocumentStore {
    * a storage transaction.
    */
   async function updateIndex(
-    build: (index: DocumentIndex) => { index: DocumentIndex; also?: BackendEntry[]; remove?: string[] },
+    build: (index: DocumentIndex) => {
+      index: DocumentIndex;
+      also?: BackendEntry[];
+      remove?: string[];
+    },
   ): Promise<void> {
     if (backend.modify) {
       await backend.modify(INDEX_KEY, (raw) => {
@@ -232,7 +227,10 @@ export function createDocumentStore(backend: DocumentBackend): DocumentStore {
       return;
     }
     const result = build(await readIndex());
-    await backend.writeAll([...(result.also ?? []), { key: INDEX_KEY, value: JSON.stringify(result.index) }]);
+    await backend.writeAll([
+      ...(result.also ?? []),
+      { key: INDEX_KEY, value: JSON.stringify(result.index) },
+    ]);
     if (result.remove?.length) await backend.deleteAll(result.remove);
   }
 
@@ -252,10 +250,7 @@ export function createDocumentStore(backend: DocumentBackend): DocumentStore {
     }
   }
 
-  function upsert(
-    index: DocumentIndex,
-    entry: DocumentIndexEntry,
-  ): DocumentIndex {
+  function upsert(index: DocumentIndex, entry: DocumentIndexEntry): DocumentIndex {
     const others = index.entries.filter((e) => e.docId !== entry.docId);
     return { version: 1, entries: [...others, entry] };
   }
@@ -269,10 +264,7 @@ export function createDocumentStore(backend: DocumentBackend): DocumentStore {
         );
         return { ok: true, value: sorted };
       } catch (error) {
-        return fail(
-          classifyStorageError(error),
-          "Could not read the document list.",
-        );
+        return fail(classifyStorageError(error), 'Could not read the document list.');
       }
     },
 
@@ -281,13 +273,10 @@ export function createDocumentStore(backend: DocumentBackend): DocumentStore {
       try {
         raw = await backend.read(DOC_PREFIX + docId);
       } catch (error) {
-        return fail(
-          classifyStorageError(error),
-          `Could not read document ${docId}.`,
-        );
+        return fail(classifyStorageError(error), `Could not read document ${docId}.`);
       }
       if (raw === null) {
-        return fail("not-found", `No stored document with id ${docId}.`);
+        return fail('not-found', `No stored document with id ${docId}.`);
       }
       try {
         return { ok: true, value: parseDiagramFile(raw) };
@@ -295,7 +284,7 @@ export function createDocumentStore(backend: DocumentBackend): DocumentStore {
         const reason = classifyStorageError(error);
         return fail(
           reason,
-          reason === "version"
+          reason === 'version'
             ? (error as SchemaVersionError).message
             : `Document ${docId} could not be read and may be damaged.`,
         );
@@ -314,18 +303,18 @@ export function createDocumentStore(backend: DocumentBackend): DocumentStore {
           const existing = index.entries.find((e) => e.docId === docId);
           const entry: DocumentIndexEntry = {
             docId,
-            title: file.title || "Untitled Diagram",
+            title: file.title || 'Untitled Diagram',
             createdAt: existing?.createdAt ?? now,
             updatedAt: now,
             schemaVersion: file.schemaVersion ?? SCHEMA_VERSION,
-            origin: options?.origin ?? existing?.origin ?? "local",
-            ...(options?.sessionRoom ?? existing?.sessionRoom
+            origin: options?.origin ?? existing?.origin ?? 'local',
+            ...((options?.sessionRoom ?? existing?.sessionRoom)
               ? { sessionRoom: options?.sessionRoom ?? existing?.sessionRoom }
               : {}),
-            ...(options?.sessionKey ?? existing?.sessionKey
+            ...((options?.sessionKey ?? existing?.sessionKey)
               ? { sessionKey: options?.sessionKey ?? existing?.sessionKey }
               : {}),
-            ...(options?.origin === "session"
+            ...(options?.origin === 'session'
               ? { lastSessionAt: now }
               : existing?.lastSessionAt
                 ? { lastSessionAt: existing.lastSessionAt }
@@ -333,15 +322,18 @@ export function createDocumentStore(backend: DocumentBackend): DocumentStore {
             sizeBytes: serialized.length,
           };
           written = entry;
-          return { index: upsert(index, entry), also: [{ key: DOC_PREFIX + docId, value: serialized }] };
+          return {
+            index: upsert(index, entry),
+            also: [{ key: DOC_PREFIX + docId, value: serialized }],
+          };
         });
         return { ok: true, value: written as unknown as DocumentIndexEntry };
       } catch (error) {
         const reason = classifyStorageError(error);
         return fail(
           reason,
-          reason === "quota"
-            ? "There is no space left to save this document. Export it to a file before making further changes."
+          reason === 'quota'
+            ? 'There is no space left to save this document. Export it to a file before making further changes.'
             : `Could not save document ${docId}.`,
         );
       }
@@ -356,7 +348,7 @@ export function createDocumentStore(backend: DocumentBackend): DocumentStore {
           renamed = { ...existing, title, updatedAt: new Date().toISOString() };
           return { index: upsert(index, renamed) };
         });
-        if (!renamed) return fail("not-found", `No stored document with id ${docId}.`);
+        if (!renamed) return fail('not-found', `No stored document with id ${docId}.`);
         return { ok: true, value: renamed };
       } catch (error) {
         return fail(classifyStorageError(error), `Could not rename ${docId}.`);
@@ -389,7 +381,7 @@ export function createDocumentStore(backend: DocumentBackend): DocumentStore {
           },
         };
       } catch (error) {
-        return fail(classifyStorageError(error), "Could not reconcile storage.");
+        return fail(classifyStorageError(error), 'Could not reconcile storage.');
       }
     },
 
@@ -404,12 +396,9 @@ export function createDocumentStore(backend: DocumentBackend): DocumentStore {
       try {
         raw = readLegacy();
       } catch (error) {
-        return fail(
-          classifyStorageError(error),
-          "Could not read the previous auto-saved draft.",
-        );
+        return fail(classifyStorageError(error), 'Could not read the previous auto-saved draft.');
       }
-      if (raw === null || raw.trim() === "") {
+      if (raw === null || raw.trim() === '') {
         return { ok: true, value: null };
       }
 
@@ -422,16 +411,16 @@ export function createDocumentStore(backend: DocumentBackend): DocumentStore {
         // draft this build gets to delete.
         return fail(
           reason,
-          reason === "version"
+          reason === 'version'
             ? (error as SchemaVersionError).message
-            : "The previous auto-saved draft could not be read and was left in place.",
+            : 'The previous auto-saved draft could not be read and was left in place.',
         );
       }
 
       const docId = newDocumentId();
       const written = await this.writeDocument(docId, {
         ...file,
-        title: file.title || "Recovered draft",
+        title: file.title || 'Recovered draft',
       });
       if (!written.ok) return written;
 
@@ -448,7 +437,7 @@ export function createDocumentStore(backend: DocumentBackend): DocumentStore {
 
 export function newDocumentId(): string {
   const c = globalThis.crypto;
-  if (c && typeof c.randomUUID === "function") return c.randomUUID();
+  if (c && typeof c.randomUUID === 'function') return c.randomUUID();
   // Only reached on engines without randomUUID; ids are local-only and never
   // security-bearing, so a timestamp plus randomness is sufficient here.
   return `doc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
@@ -468,10 +457,10 @@ export async function requestPersistentStorage(): Promise<StorageHealth> {
 
   let persisted = false;
   try {
-    if (typeof storage.persisted === "function") {
+    if (typeof storage.persisted === 'function') {
       persisted = await storage.persisted();
     }
-    if (!persisted && typeof storage.persist === "function") {
+    if (!persisted && typeof storage.persist === 'function') {
       persisted = await storage.persist();
     }
   } catch {
@@ -479,7 +468,7 @@ export async function requestPersistentStorage(): Promise<StorageHealth> {
   }
 
   try {
-    if (typeof storage.estimate === "function") {
+    if (typeof storage.estimate === 'function') {
       const estimate = await storage.estimate();
       return {
         persisted,

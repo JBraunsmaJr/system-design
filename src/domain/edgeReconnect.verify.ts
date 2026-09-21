@@ -18,7 +18,7 @@ import {
   isSameEndpoints,
   draggedEndFromReconnectStart,
   type EdgeEndpoints,
-} from "./edgeReconnect";
+} from './edgeReconnect';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {
@@ -31,30 +31,30 @@ function assert(condition: boolean, message: string) {
 }
 
 function describe(e: EdgeEndpoints): string {
-  return `${e.source}:${e.sourceHandle ?? "-"} -> ${e.target}:${e.targetHandle ?? "-"}`;
+  return `${e.source}:${e.sourceHandle ?? '-'} -> ${e.target}:${e.targetHandle ?? '-'}`;
 }
 
 const original: EdgeEndpoints = {
-  source: "api",
-  sourceHandle: "right",
-  target: "db",
-  targetHandle: "left",
+  source: 'api',
+  sourceHandle: 'right',
+  target: 'db',
+  targetHandle: 'left',
 };
 
 // === Part 1: the ordinary case, dragging the target end onto a new node ===
 {
   const next = normalizeReconnection(
     original,
-    { source: "api", sourceHandle: "right", target: "cache", targetHandle: "left" },
-    "target"
+    { source: 'api', sourceHandle: 'right', target: 'cache', targetHandle: 'left' },
+    'target',
   );
   assert(
-    next.source === "api" && next.sourceHandle === "right",
-    "dragging the target end leaves the source end exactly as it was"
+    next.source === 'api' && next.sourceHandle === 'right',
+    'dragging the target end leaves the source end exactly as it was',
   );
   assert(
-    next.target === "cache" && next.targetHandle === "left",
-    `and moves the target onto the new node and handle (${describe(next)})`
+    next.target === 'cache' && next.targetHandle === 'left',
+    `and moves the target onto the new node and handle (${describe(next)})`,
   );
 }
 
@@ -62,16 +62,16 @@ const original: EdgeEndpoints = {
 {
   const next = normalizeReconnection(
     original,
-    { source: "gateway", sourceHandle: "bottom", target: "db", targetHandle: "left" },
-    "source"
+    { source: 'gateway', sourceHandle: 'bottom', target: 'db', targetHandle: 'left' },
+    'source',
   );
   assert(
-    next.target === "db" && next.targetHandle === "left",
-    "dragging the source end leaves the target end exactly as it was"
+    next.target === 'db' && next.targetHandle === 'left',
+    'dragging the source end leaves the target end exactly as it was',
   );
   assert(
-    next.source === "gateway" && next.sourceHandle === "bottom",
-    `and moves the source onto the new node and handle (${describe(next)})`
+    next.source === 'gateway' && next.sourceHandle === 'bottom',
+    `and moves the source onto the new node and handle (${describe(next)})`,
   );
 }
 
@@ -85,16 +85,16 @@ const original: EdgeEndpoints = {
   const next = normalizeReconnection(
     original,
     // dragged (new) end reported first, anchored end second
-    { source: "cache", sourceHandle: "top", target: "api", targetHandle: "right" },
-    "target"
+    { source: 'cache', sourceHandle: 'top', target: 'api', targetHandle: 'right' },
+    'target',
   );
   assert(
-    next.source === "api" && next.sourceHandle === "right",
-    "with an inverted Connection, the anchored end is still recognised as the source"
+    next.source === 'api' && next.sourceHandle === 'right',
+    'with an inverted Connection, the anchored end is still recognised as the source',
   );
   assert(
-    next.target === "cache" && next.targetHandle === "top",
-    `and the dragged end becomes the target rather than the edge flipping round (${describe(next)})`
+    next.target === 'cache' && next.targetHandle === 'top',
+    `and the dragged end becomes the target rather than the edge flipping round (${describe(next)})`,
   );
 }
 
@@ -102,12 +102,12 @@ const original: EdgeEndpoints = {
 {
   const next = normalizeReconnection(
     original,
-    { source: "db", sourceHandle: "left", target: "gateway", targetHandle: "bottom" },
-    "source"
+    { source: 'db', sourceHandle: 'left', target: 'gateway', targetHandle: 'bottom' },
+    'source',
   );
   assert(
-    next.source === "gateway" && next.target === "db",
-    `an inverted Connection while dragging the source end also keeps the edge's direction (${describe(next)})`
+    next.source === 'gateway' && next.target === 'db',
+    `an inverted Connection while dragging the source end also keeps the edge's direction (${describe(next)})`,
   );
 }
 
@@ -116,15 +116,20 @@ const original: EdgeEndpoints = {
 // which end of the Connection is the anchored one - the handle is the
 // only thing that distinguishes them.
 {
-  const selfLoop: EdgeEndpoints = { source: "cache", sourceHandle: "top", target: "cache", targetHandle: "bottom" };
+  const selfLoop: EdgeEndpoints = {
+    source: 'cache',
+    sourceHandle: 'top',
+    target: 'cache',
+    targetHandle: 'bottom',
+  };
   const next = normalizeReconnection(
     selfLoop,
-    { source: "cache", sourceHandle: "top", target: "cache", targetHandle: "right" },
-    "target"
+    { source: 'cache', sourceHandle: 'top', target: 'cache', targetHandle: 'right' },
+    'target',
   );
   assert(
-    next.sourceHandle === "top" && next.targetHandle === "right",
-    `dragging one end of a self-loop onto a different handle of the same node moves only that end (${describe(next)})`
+    next.sourceHandle === 'top' && next.targetHandle === 'right',
+    `dragging one end of a self-loop onto a different handle of the same node moves only that end (${describe(next)})`,
   );
 }
 
@@ -133,15 +138,20 @@ const original: EdgeEndpoints = {
 // them, and null/undefined both mean "the default handle". Matching has
 // to treat them as equal or the anchored end stops being recognised.
 {
-  const edge: EdgeEndpoints = { source: "api", sourceHandle: null, target: "db", targetHandle: null };
+  const edge: EdgeEndpoints = {
+    source: 'api',
+    sourceHandle: null,
+    target: 'db',
+    targetHandle: null,
+  };
   const next = normalizeReconnection(
     edge,
-    { source: "api", sourceHandle: undefined, target: "cache", targetHandle: null },
-    "target"
+    { source: 'api', sourceHandle: undefined, target: 'cache', targetHandle: null },
+    'target',
   );
   assert(
-    next.source === "api" && next.target === "cache",
-    `null and undefined handles are treated as the same "default handle" rather than failing to match (${describe(next)})`
+    next.source === 'api' && next.target === 'cache',
+    `null and undefined handles are treated as the same "default handle" rather than failing to match (${describe(next)})`,
   );
 }
 
@@ -152,12 +162,12 @@ const original: EdgeEndpoints = {
 {
   const next = normalizeReconnection(
     original,
-    { source: "unrelated-a", sourceHandle: "x", target: "unrelated-b", targetHandle: "y" },
-    "target"
+    { source: 'unrelated-a', sourceHandle: 'x', target: 'unrelated-b', targetHandle: 'y' },
+    'target',
   );
   assert(
-    next.source === "api" && next.target === "unrelated-b",
-    `a Connection matching neither end falls back to React Flow's orientation instead of producing something arbitrary (${describe(next)})`
+    next.source === 'api' && next.target === 'unrelated-b',
+    `a Connection matching neither end falls back to React Flow's orientation instead of producing something arbitrary (${describe(next)})`,
   );
 }
 
@@ -167,26 +177,26 @@ const original: EdgeEndpoints = {
 // BOTH levels - visible from neither, but still there, and still caught
 // by the delete cascade later.
 {
-  const atLevel = new Set(["api", "db", "cache"]);
+  const atLevel = new Set(['api', 'db', 'cache']);
 
   assert(
-    validateReconnection({ source: "api", target: "cache" }, atLevel).ok,
-    "a reconnection between two nodes at this level is allowed"
+    validateReconnection({ source: 'api', target: 'cache' }, atLevel).ok,
+    'a reconnection between two nodes at this level is allowed',
   );
 
-  const offLevel = validateReconnection({ source: "api", target: "nested-worker" }, atLevel);
+  const offLevel = validateReconnection({ source: 'api', target: 'nested-worker' }, atLevel);
   assert(
     !offLevel.ok,
-    "a reconnection onto a node that isn't at this level is rejected rather than silently creating an edge nobody can see"
+    "a reconnection onto a node that isn't at this level is rejected rather than silently creating an edge nobody can see",
   );
   assert(
-    !offLevel.ok && offLevel.reason.includes("nested-worker"),
-    `and the rejection names the offending node (${!offLevel.ok ? offLevel.reason : ""})`
+    !offLevel.ok && offLevel.reason.includes('nested-worker'),
+    `and the rejection names the offending node (${!offLevel.ok ? offLevel.reason : ''})`,
   );
 
   assert(
-    validateReconnection({ source: "cache", target: "cache" }, atLevel).ok,
-    "self-loops are allowed - the app already lets you draw one, so moving an end shouldn't be stricter than drawing a new edge"
+    validateReconnection({ source: 'cache', target: 'cache' }, atLevel).ok,
+    "self-loops are allowed - the app already lets you draw one, so moving an end shouldn't be stricter than drawing a new edge",
   );
 }
 
@@ -196,40 +206,62 @@ const original: EdgeEndpoints = {
 // an entry in undo history, for a gesture that changed nothing.
 {
   assert(
-    isSameEndpoints(original, { source: "api", sourceHandle: "right", target: "db", targetHandle: "left" }),
-    "endpoints identical in every field compare equal"
+    isSameEndpoints(original, {
+      source: 'api',
+      sourceHandle: 'right',
+      target: 'db',
+      targetHandle: 'left',
+    }),
+    'endpoints identical in every field compare equal',
   );
   assert(
     isSameEndpoints(
-      { source: "api", target: "db", sourceHandle: null },
-      { source: "api", target: "db", sourceHandle: undefined }
+      { source: 'api', target: 'db', sourceHandle: null },
+      { source: 'api', target: 'db', sourceHandle: undefined },
     ),
-    "and null/undefined handles don't count as a difference here either"
+    "and null/undefined handles don't count as a difference here either",
   );
   assert(
-    !isSameEndpoints(original, { ...original, targetHandle: "top" }),
-    "while a genuinely different handle does"
+    !isSameEndpoints(original, { ...original, targetHandle: 'top' }),
+    'while a genuinely different handle does',
   );
 }
 
-console.log("\n=== onReconnectStart reports the ANCHORED end ===");
+console.log('\n=== onReconnectStart reports the ANCHORED end ===');
 {
   // Pinned to what @xyflow/react actually does (EdgeUpdateAnchors passes
   // oppositeHandle.type). If an upgrade changes that, this is where it shows.
-  assert(draggedEndFromReconnectStart("source") === "target", "dragging the target updater reports 'source' - the anchored end");
-  assert(draggedEndFromReconnectStart("target") === "source", "dragging the source updater reports 'target'");
+  assert(
+    draggedEndFromReconnectStart('source') === 'target',
+    "dragging the target updater reports 'source' - the anchored end",
+  );
+  assert(
+    draggedEndFromReconnectStart('target') === 'source',
+    "dragging the source updater reports 'target'",
+  );
 
   // End to end through the no-op guard, as Canvas.handleReconnect runs it:
   // the target end of api->db dragged onto cache.
-  const edge = { source: "api", sourceHandle: "right", target: "db", targetHandle: "left" };
-  const connection = { source: "api", sourceHandle: "right", target: "cache", targetHandle: "left" };
-  const next = normalizeReconnection(edge, connection, draggedEndFromReconnectStart("source"));
-  assert(!isSameEndpoints(edge, next) && next.target === "cache" && next.source === "api", "the dragged target end moves to cache");
-  const inverted = normalizeReconnection(edge, connection, "source");
-  assert(isSameEndpoints(edge, inverted), "(reading handleType as the dragged end rebuilds the original edge - the bug)");
+  const edge = { source: 'api', sourceHandle: 'right', target: 'db', targetHandle: 'left' };
+  const connection = {
+    source: 'api',
+    sourceHandle: 'right',
+    target: 'cache',
+    targetHandle: 'left',
+  };
+  const next = normalizeReconnection(edge, connection, draggedEndFromReconnectStart('source'));
+  assert(
+    !isSameEndpoints(edge, next) && next.target === 'cache' && next.source === 'api',
+    'the dragged target end moves to cache',
+  );
+  const inverted = normalizeReconnection(edge, connection, 'source');
+  assert(
+    isSameEndpoints(edge, inverted),
+    '(reading handleType as the dragged end rebuilds the original edge - the bug)',
+  );
 }
 
-console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);
+console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);
 // scripts/run-tests.ts decides pass/fail from the process exit status, so
 // a failed assertion has to actually set one - printing FAIL and exiting
 // 0 would report the suite as passing. Reached through globalThis

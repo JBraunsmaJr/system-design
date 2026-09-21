@@ -1,37 +1,57 @@
-import { useEffect, useMemo, useState, useRef, useSyncExternalStore } from "react";
-import { AlertTriangle, CalendarRange, ChevronDown, ChevronRight, ChevronUp, GanttChartSquare, Inbox, Plus, Trash2, ShieldAlert, Diamond } from "lucide-react";
+import { useEffect, useMemo, useState, useRef, useSyncExternalStore } from 'react';
+import {
+  AlertTriangle,
+  CalendarRange,
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
+  GanttChartSquare,
+  Inbox,
+  Plus,
+  Trash2,
+  ShieldAlert,
+  Diamond,
+} from 'lucide-react';
 import {
   computeSprintDateRanges,
   getSprintActiveReservations,
   type ProgramIncrement,
   type Sprint,
   type CapacityReservation,
-} from "../../domain/programIncrements";
-import { getItemType, isItemWorkable } from "../../domain/requirementsRegistry";
-import { findScheduleConflicts, checkScheduleConflict, findBlockingItemIds, type ScheduleConflictSeverity } from "../../domain/scheduleConflicts";
-import type { RequirementItem, RequirementsDocument } from "../../domain/requirementsTypes";
-import type { RequirementsStore } from "../../collab/requirementsStore";
-import type { ProgramIncrementsStore } from "../../collab/programIncrementsStore";
-import type { MilestonesStore } from "../../collab/milestonesStore";
-import { createLocalMilestonesStore } from "../../collab/milestonesStore";
-import type { Milestone } from "../../domain/milestones";
-import { getMilestoneColor, getMilestoneTypeLabel } from "../../domain/milestones";
-import { computeSprintMilestoneSummary } from "../../domain/sprintSummaries";
-import { getAllEpicsWithInferredSchedule, getChildItemsForParent } from "../../domain/epicScheduling";
-import type { TeamDocument } from "../../domain/teamTypes";
-import type { SubDiagram } from "../../domain/types";
-import type { DiagramPath } from "../../domain/subDiagramTree";
-import type { PresenceInfo } from "../../collab/session";
-import { computeSprintCapacity, computePICapacities } from "../../domain/teamCapacity";
-import { SprintCapacityBar } from "../team/SprintCapacityBar";
-import { MemberPicker } from "../team/MemberPicker";
-import { PointsPicker } from "../team/PointsPicker";
-import { RequirementDetailModal } from "./RequirementDetailModal";
-import { MilestoneDetailModal } from "./MilestoneDetailModal";
-import { AddMilestoneModal } from "./AddMilestoneModal";
-import { GanttChart } from "./GanttChart";
-import { SprintQuickAdd } from "./SprintQuickAdd";
-import { ManageReservationsModal } from "./ManageReservationsModal";
+} from '../../domain/programIncrements';
+import { getItemType, isItemWorkable } from '../../domain/requirementsRegistry';
+import {
+  findScheduleConflicts,
+  checkScheduleConflict,
+  findBlockingItemIds,
+  type ScheduleConflictSeverity,
+} from '../../domain/scheduleConflicts';
+import type { RequirementItem, RequirementsDocument } from '../../domain/requirementsTypes';
+import type { RequirementsStore } from '../../collab/requirementsStore';
+import type { ProgramIncrementsStore } from '../../collab/programIncrementsStore';
+import type { MilestonesStore } from '../../collab/milestonesStore';
+import { createLocalMilestonesStore } from '../../collab/milestonesStore';
+import type { Milestone } from '../../domain/milestones';
+import { getMilestoneColor, getMilestoneTypeLabel } from '../../domain/milestones';
+import { computeSprintMilestoneSummary } from '../../domain/sprintSummaries';
+import {
+  getAllEpicsWithInferredSchedule,
+  getChildItemsForParent,
+} from '../../domain/epicScheduling';
+import type { TeamDocument } from '../../domain/teamTypes';
+import type { SubDiagram } from '../../domain/types';
+import type { DiagramPath } from '../../domain/subDiagramTree';
+import type { PresenceInfo } from '../../collab/session';
+import { computeSprintCapacity, computePICapacities } from '../../domain/teamCapacity';
+import { SprintCapacityBar } from '../team/SprintCapacityBar';
+import { MemberPicker } from '../team/MemberPicker';
+import { PointsPicker } from '../team/PointsPicker';
+import { RequirementDetailModal } from './RequirementDetailModal';
+import { MilestoneDetailModal } from './MilestoneDetailModal';
+import { AddMilestoneModal } from './AddMilestoneModal';
+import { GanttChart } from './GanttChart';
+import { SprintQuickAdd } from './SprintQuickAdd';
+import { ManageReservationsModal } from './ManageReservationsModal';
 
 interface TimelineViewProps {
   programIncrementsStore: ProgramIncrementsStore;
@@ -70,37 +90,37 @@ export function TimelineView({
   const programIncrements = useSyncExternalStore(
     programIncrementsStore.subscribe,
     programIncrementsStore.getSnapshot,
-    programIncrementsStore.getSnapshot
+    programIncrementsStore.getSnapshot,
   );
   const requirements = useSyncExternalStore(
     requirementsStore.subscribe,
     requirementsStore.getSnapshot,
-    requirementsStore.getSnapshot
+    requirementsStore.getSnapshot,
   );
   const milestones = useSyncExternalStore(
     activeMilestonesStore.subscribe,
     activeMilestonesStore.getSnapshot,
-    activeMilestonesStore.getSnapshot
+    activeMilestonesStore.getSnapshot,
   );
 
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [selectedMilestoneId, setSelectedMilestoneId] = useState<string | null>(null);
   const [isAddingMilestone, setIsAddingMilestone] = useState(false);
   const [addMilestoneDate, setAddMilestoneDate] = useState<string | undefined>(undefined);
-  const [chartMode, setChartMode] = useState<"board" | "gantt">("board");
+  const [chartMode, setChartMode] = useState<'board' | 'gantt'>('board');
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
-  const [filterEpicId, setFilterEpicId] = useState<string>("all");
+  const [filterEpicId, setFilterEpicId] = useState<string>('all');
 
   useEffect(() => {
     if (!draggedItemId) return;
     const handleDragEnd = () => {
       setDraggedItemId(null);
     };
-    window.addEventListener("dragend", handleDragEnd);
-    window.addEventListener("drop", handleDragEnd);
+    window.addEventListener('dragend', handleDragEnd);
+    window.addEventListener('drop', handleDragEnd);
     return () => {
-      window.removeEventListener("dragend", handleDragEnd);
-      window.removeEventListener("drop", handleDragEnd);
+      window.removeEventListener('dragend', handleDragEnd);
+      window.removeEventListener('drop', handleDragEnd);
     };
   }, [draggedItemId]);
 
@@ -110,10 +130,12 @@ export function TimelineView({
 
   const parentEpicByItemId = useMemo(() => {
     const map = new Map<string, RequirementItem>();
-    const epics = requirements.items.filter((i) => i.typeId === "epic" || i.typeId.toLowerCase().includes("epic"));
+    const epics = requirements.items.filter(
+      (i) => i.typeId === 'epic' || i.typeId.toLowerCase().includes('epic'),
+    );
     const epicIds = new Set(epics.map((e) => e.id));
     for (const rel of requirements.relationships) {
-      if (epicIds.has(rel.fromItemId) && rel.typeId === "parent-of") {
+      if (epicIds.has(rel.fromItemId) && rel.typeId === 'parent-of') {
         const epic = epics.find((e) => e.id === rel.fromItemId);
         if (epic) map.set(rel.toItemId, epic);
       }
@@ -122,7 +144,7 @@ export function TimelineView({
   }, [requirements]);
 
   const filteredChildItemIds = useMemo(() => {
-    if (filterEpicId === "all") return null;
+    if (filterEpicId === 'all') return null;
     return new Set(getChildItemsForParent(filterEpicId, requirements).map((i) => i.id));
   }, [filterEpicId, requirements]);
 
@@ -176,7 +198,7 @@ export function TimelineView({
     requirementsStore.unassignItemsFromSprints([sprintId]);
   };
 
-  const onMoveSprint = (piId: string, sprintId: string, direction: "up" | "down") => {
+  const onMoveSprint = (piId: string, sprintId: string, direction: 'up' | 'down') => {
     programIncrementsStore.moveSprint(piId, sprintId, direction);
   };
 
@@ -195,11 +217,11 @@ export function TimelineView({
     requirementsStore.deleteItem(id);
   };
 
-  const onAddMilestone = (candidate: Omit<Milestone, "id" | "createdAt" | "updatedAt">) => {
+  const onAddMilestone = (candidate: Omit<Milestone, 'id' | 'createdAt' | 'updatedAt'>) => {
     return activeMilestonesStore.addMilestone(candidate);
   };
 
-  const onUpdateMilestone = (id: string, patch: Partial<Omit<Milestone, "id">>) => {
+  const onUpdateMilestone = (id: string, patch: Partial<Omit<Milestone, 'id'>>) => {
     activeMilestonesStore.updateMilestone(id, patch);
   };
 
@@ -228,9 +250,9 @@ export function TimelineView({
         requirements.relationships,
         requirements.relationshipTypes,
         requirements.itemTypes,
-        sprintRangesByItemId
+        sprintRangesByItemId,
       );
-      if (conflict && conflict.severity === "blocked") {
+      if (conflict && conflict.severity === 'blocked') {
         return conflict.blockerRange
           ? `Can't schedule here - blocked by ${conflict.blocker.id}, which isn't finished until ${conflict.blockerRange.endDate}.`
           : `Can't schedule here - blocked by ${conflict.blocker.id}, which isn't scheduled yet.`;
@@ -240,7 +262,11 @@ export function TimelineView({
     return null;
   };
 
-  const onAddRelationship = (typeId: string, fromItemId: string, toItemId: string): string | null => {
+  const onAddRelationship = (
+    typeId: string,
+    fromItemId: string,
+    toItemId: string,
+  ): string | null => {
     return requirementsStore.addRelationship(typeId, fromItemId, toItemId);
   };
 
@@ -263,13 +289,17 @@ export function TimelineView({
     }
   }
 
-  const selectedItem = selectedItemId ? requirements.items.find((it) => it.id === selectedItemId) : null;
+  const selectedItem = selectedItemId
+    ? requirements.items.find((it) => it.id === selectedItemId)
+    : null;
 
   // Items with no sprintId at all were previously invisible anywhere on
   // this board - there was no way to see them or drag them into a sprint
   // without leaving for the Requirements view first. Surfacing them here
   // as a dedicated, always-a-valid-drop-target section closes that gap.
-  const backlogItems = requirements.items.filter((item) => !item.sprintId && isItemWorkable(requirements, item));
+  const backlogItems = requirements.items.filter(
+    (item) => !item.sprintId && isItemWorkable(requirements, item),
+  );
 
   // Every sprint's date range, across ALL program increments - needed
   // here (unlike within a single PICard, which only knows its own PI's
@@ -302,7 +332,7 @@ export function TimelineView({
       requirements.relationships,
       requirements.relationshipTypes,
       requirements.itemTypes,
-      byItemId
+      byItemId,
     );
     // An item can have more than one conflict at once (e.g. one blocker
     // in the same sprint - a risk - and another entirely unscheduled - a
@@ -311,10 +341,13 @@ export function TimelineView({
     // appear later in the conflicts list. Keeps the specific blocker too
     // (not just the severity), so the card can name it directly rather
     // than just flagging "something's wrong".
-    const severityById = new Map<string, { severity: ScheduleConflictSeverity; blocker: RequirementItem }>();
+    const severityById = new Map<
+      string,
+      { severity: ScheduleConflictSeverity; blocker: RequirementItem }
+    >();
     for (const c of conflicts) {
       const existing = severityById.get(c.item.id);
-      if (!existing || existing.severity !== "blocked") {
+      if (!existing || existing.severity !== 'blocked') {
         severityById.set(c.item.id, { severity: c.severity, blocker: c.blocker });
       }
     }
@@ -333,11 +366,19 @@ export function TimelineView({
       requirements.relationships,
       requirements.relationshipTypes,
       requirements.itemTypes,
-      requirements.items
+      requirements.items,
     );
-  }, [draggedItemId, requirements.relationships, requirements.relationshipTypes, requirements.itemTypes, requirements.items]);
+  }, [
+    draggedItemId,
+    requirements.relationships,
+    requirements.relationshipTypes,
+    requirements.itemTypes,
+    requirements.items,
+  ]);
 
-  const selectedMilestone = selectedMilestoneId ? milestones.find((m) => m.id === selectedMilestoneId) : null;
+  const selectedMilestone = selectedMilestoneId
+    ? milestones.find((m) => m.id === selectedMilestoneId)
+    : null;
 
   return (
     <div className="timeline-view">
@@ -361,15 +402,15 @@ export function TimelineView({
         <div className="timeline-view__mode-toggle">
           <button
             type="button"
-            className={chartMode === "board" ? "active" : undefined}
-            onClick={() => setChartMode("board")}
+            className={chartMode === 'board' ? 'active' : undefined}
+            onClick={() => setChartMode('board')}
           >
             Board
           </button>
           <button
             type="button"
-            className={chartMode === "gantt" ? "active" : undefined}
-            onClick={() => setChartMode("gantt")}
+            className={chartMode === 'gantt' ? 'active' : undefined}
+            onClick={() => setChartMode('gantt')}
           >
             <GanttChartSquare size={12} />
             Gantt
@@ -378,7 +419,7 @@ export function TimelineView({
 
         {epicsWithSchedule.length > 0 && (
           <div className="timeline-view__epic-filter">
-            <span style={{ fontSize: "12px", color: "var(--chrome-text-dim)" }}>Epic:</span>
+            <span style={{ fontSize: '12px', color: 'var(--chrome-text-dim)' }}>Epic:</span>
             <select
               className="timeline-view__epic-select"
               value={filterEpicId}
@@ -388,7 +429,8 @@ export function TimelineView({
               <option value="all">All Epics</option>
               {epicsWithSchedule.map(({ epic, schedule }) => (
                 <option key={epic.id} value={epic.id}>
-                  {epic.id}: {epic.title || "Untitled"} ({schedule.scheduledChildrenCount}/{schedule.totalChildrenCount} scheduled)
+                  {epic.id}: {epic.title || 'Untitled'} ({schedule.scheduledChildrenCount}/
+                  {schedule.totalChildrenCount} scheduled)
                 </option>
               ))}
             </select>
@@ -398,7 +440,7 @@ export function TimelineView({
         <PresenceAvatarStack peers={peers} requirements={requirements} />
       </div>
 
-      {chartMode === "gantt" ? (
+      {chartMode === 'gantt' ? (
         <GanttChart
           programIncrements={programIncrements}
           requirements={requirements}
@@ -410,72 +452,74 @@ export function TimelineView({
           onNavigateToRequirement={onNavigateToRequirement}
         />
       ) : (
-      <div className="timeline-view__content">
-        {/* Scheduled Releases & Milestones Overview Section (FR-003, AC-002, AC-009) */}
-        <MilestonesSection
-          milestones={milestones}
-          onSelectMilestone={(id) => setSelectedMilestoneId(id)}
-          onAddMilestone={() => {
-            setAddMilestoneDate(undefined);
-            setIsAddingMilestone(true);
-          }}
-        />
-
-        {backlogItems.length > 0 && (
-          <BacklogSection
-            items={backlogItems}
-            requirements={requirements}
-            team={team}
-            draggedItemId={draggedItemId}
-            blockingItemIds={blockingItemIds}
-            parentEpicByItemId={parentEpicByItemId}
-            filteredChildItemIds={filteredChildItemIds}
-            onSelectItem={(id) => setSelectedItemId(id)}
-            onDragStartItem={(id) => setDraggedItemId(id)}
-            onDragEndItem={() => setDraggedItemId(null)}
-            onDropItem={onUnassignItem}
-            onUpdateItem={onUpdateItem}
+        <div className="timeline-view__content">
+          {/* Scheduled Releases & Milestones Overview Section (FR-003, AC-002, AC-009) */}
+          <MilestonesSection
+            milestones={milestones}
+            onSelectMilestone={(id) => setSelectedMilestoneId(id)}
+            onAddMilestone={() => {
+              setAddMilestoneDate(undefined);
+              setIsAddingMilestone(true);
+            }}
           />
-        )}
-        {programIncrements.length === 0 ? (
-          <p className="timeline-view__empty">
-            No program increments yet - add one above to start defining sprints.
-          </p>
-        ) : (
-          programIncrements.map((pi) => (
-            <ProgramIncrementCard
-              key={pi.id}
-              pi={pi}
+
+          {backlogItems.length > 0 && (
+            <BacklogSection
+              items={backlogItems}
               requirements={requirements}
-              milestones={milestones}
               team={team}
-              itemsBySprintId={itemsBySprintId}
-              backlogItems={backlogItems}
-              conflictSeverityByItemId={conflictSeverityByItemId}
               draggedItemId={draggedItemId}
               blockingItemIds={blockingItemIds}
-              sprintRangesByItemId={sprintRangesByItemId}
               parentEpicByItemId={parentEpicByItemId}
               filteredChildItemIds={filteredChildItemIds}
               onSelectItem={(id) => setSelectedItemId(id)}
-              onSelectMilestone={(id) => setSelectedMilestoneId(id)}
               onDragStartItem={(id) => setDraggedItemId(id)}
               onDragEndItem={() => setDraggedItemId(null)}
-              onDropItem={onMoveItemToSprint}
+              onDropItem={onUnassignItem}
               onUpdateItem={onUpdateItem}
-              onUpdateName={(name) => onUpdatePIName(pi.id, name)}
-              onUpdateStart={(startDate) => onUpdatePIStart(pi.id, startDate)}
-              onDelete={() => onDeletePI(pi.id)}
-              onAddSprint={() => onAddSprint(pi.id)}
-              onUpdateSprintName={(sprintId, name) => onUpdateSprintName(pi.id, sprintId, name)}
-              onUpdateSprintEnd={(sprintId, endDate) => onUpdateSprintEnd(pi.id, sprintId, endDate)}
-              onDeleteSprint={(sprintId) => onDeleteSprint(pi.id, sprintId)}
-              onMoveSprint={(sprintId, direction) => onMoveSprint(pi.id, sprintId, direction)}
-              programIncrementsStore={programIncrementsStore}
             />
-          ))
-        )}
-      </div>
+          )}
+          {programIncrements.length === 0 ? (
+            <p className="timeline-view__empty">
+              No program increments yet - add one above to start defining sprints.
+            </p>
+          ) : (
+            programIncrements.map((pi) => (
+              <ProgramIncrementCard
+                key={pi.id}
+                pi={pi}
+                requirements={requirements}
+                milestones={milestones}
+                team={team}
+                itemsBySprintId={itemsBySprintId}
+                backlogItems={backlogItems}
+                conflictSeverityByItemId={conflictSeverityByItemId}
+                draggedItemId={draggedItemId}
+                blockingItemIds={blockingItemIds}
+                sprintRangesByItemId={sprintRangesByItemId}
+                parentEpicByItemId={parentEpicByItemId}
+                filteredChildItemIds={filteredChildItemIds}
+                onSelectItem={(id) => setSelectedItemId(id)}
+                onSelectMilestone={(id) => setSelectedMilestoneId(id)}
+                onDragStartItem={(id) => setDraggedItemId(id)}
+                onDragEndItem={() => setDraggedItemId(null)}
+                onDropItem={onMoveItemToSprint}
+                onUpdateItem={onUpdateItem}
+                onUpdateName={(name) => onUpdatePIName(pi.id, name)}
+                onUpdateStart={(startDate) => onUpdatePIStart(pi.id, startDate)}
+                onDelete={() => onDeletePI(pi.id)}
+                onAddSprint={() => onAddSprint(pi.id)}
+                onUpdateSprintName={(sprintId, name) => onUpdateSprintName(pi.id, sprintId, name)}
+                onUpdateSprintEnd={(sprintId, endDate) =>
+                  onUpdateSprintEnd(pi.id, sprintId, endDate)
+                }
+                onDeleteSprint={(sprintId) => onDeleteSprint(pi.id, sprintId)}
+                onMoveSprint={(sprintId, direction) => onMoveSprint(pi.id, sprintId, direction)}
+                programIncrementsStore={programIncrementsStore}
+              />
+            ))
+          )}
+        </div>
       )}
 
       {selectedItem && (
@@ -538,7 +582,7 @@ interface PresenceAvatarStackProps {
 
 function getPresenceInitials(name: string): string {
   const trimmed = name.trim();
-  if (!trimmed) return "?";
+  if (!trimmed) return '?';
   const parts = trimmed.split(/[\s_-]+/);
   if (parts.length >= 2 && parts[0] && parts[1]) {
     return (parts[0][0] + parts[1][0]).toUpperCase();
@@ -554,12 +598,14 @@ function PresenceAvatarStack({ peers, requirements }: PresenceAvatarStackProps) 
   const overflowCount = peers.length - MAX_DISPLAY;
 
   const summaryLines = peers.map((p) => {
-    const focusedItem = p.focusedItemId ? requirements.items.find((it) => it.id === p.focusedItemId) : null;
-    const action = focusedItem ? `viewing ${focusedItem.id}: ${focusedItem.title}` : "browsing";
+    const focusedItem = p.focusedItemId
+      ? requirements.items.find((it) => it.id === p.focusedItemId)
+      : null;
+    const action = focusedItem ? `viewing ${focusedItem.id}: ${focusedItem.title}` : 'browsing';
     return `• ${p.name} (${action})`;
   });
 
-  const titleText = `Users on Timeline (${peers.length}):\n${summaryLines.join("\n")}`;
+  const titleText = `Users on Timeline (${peers.length}):\n${summaryLines.join('\n')}`;
 
   return (
     <div
@@ -569,8 +615,12 @@ function PresenceAvatarStack({ peers, requirements }: PresenceAvatarStackProps) 
     >
       <div className="timeline-view__presence-avatars">
         {displayPeers.map((p, idx) => {
-          const focusedItem = p.focusedItemId ? requirements.items.find((it) => it.id === p.focusedItemId) : null;
-          const statusText = focusedItem ? `viewing ${focusedItem.id}: ${focusedItem.title}` : "browsing";
+          const focusedItem = p.focusedItemId
+            ? requirements.items.find((it) => it.id === p.focusedItemId)
+            : null;
+          const statusText = focusedItem
+            ? `viewing ${focusedItem.id}: ${focusedItem.title}`
+            : 'browsing';
           return (
             <span
               key={p.clientId}
@@ -589,7 +639,7 @@ function PresenceAvatarStack({ peers, requirements }: PresenceAvatarStackProps) 
           <span
             className="timeline-view__presence-avatar timeline-view__presence-avatar--more"
             style={{ zIndex: 0 }}
-            title={`${overflowCount} more user${overflowCount === 1 ? "" : "s"}`}
+            title={`${overflowCount} more user${overflowCount === 1 ? '' : 's'}`}
           >
             +{overflowCount}
           </span>
@@ -602,8 +652,12 @@ function PresenceAvatarStack({ peers, requirements }: PresenceAvatarStackProps) 
         </div>
         <div className="timeline-view__presence-popover-list">
           {peers.map((p) => {
-            const focusedItem = p.focusedItemId ? requirements.items.find((it) => it.id === p.focusedItemId) : null;
-            const statusText = focusedItem ? `viewing ${focusedItem.id}: ${focusedItem.title}` : "browsing";
+            const focusedItem = p.focusedItemId
+              ? requirements.items.find((it) => it.id === p.focusedItemId)
+              : null;
+            const statusText = focusedItem
+              ? `viewing ${focusedItem.id}: ${focusedItem.title}`
+              : 'browsing';
             return (
               <div key={p.clientId} className="timeline-view__presence-popover-item">
                 <span
@@ -631,7 +685,11 @@ interface MilestonesSectionProps {
   onAddMilestone: () => void;
 }
 
-function MilestonesSection({ milestones, onSelectMilestone, onAddMilestone }: MilestonesSectionProps) {
+function MilestonesSection({
+  milestones,
+  onSelectMilestone,
+  onAddMilestone,
+}: MilestonesSectionProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   return (
@@ -641,13 +699,16 @@ function MilestonesSection({ milestones, onSelectMilestone, onAddMilestone }: Mi
           type="button"
           className="milestones-section__collapse-toggle"
           onClick={() => setIsCollapsed(!isCollapsed)}
-          aria-label={isCollapsed ? "Expand markers" : "Collapse markers"}
+          aria-label={isCollapsed ? 'Expand markers' : 'Collapse markers'}
         >
           {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
         </button>
         <Diamond size={14} className="milestones-section__icon" />
         <span className="milestones-section__title">Markers</span>
-        <span className="milestones-section__count" title={`${milestones.length} marker${milestones.length === 1 ? "" : "s"}`}>
+        <span
+          className="milestones-section__count"
+          title={`${milestones.length} marker${milestones.length === 1 ? '' : 's'}`}
+        >
           {milestones.length}
         </span>
         <button
@@ -665,7 +726,8 @@ function MilestonesSection({ milestones, onSelectMilestone, onAddMilestone }: Mi
         <div className="milestones-section__items">
           {milestones.length === 0 ? (
             <p className="milestones-section__empty">
-              No markers scheduled yet. Click <strong>Add Marker</strong> to place point-in-time outcomes on the timeline.
+              No markers scheduled yet. Click <strong>Add Marker</strong> to place point-in-time
+              outcomes on the timeline.
             </p>
           ) : (
             milestones.map((m) => {
@@ -679,7 +741,7 @@ function MilestonesSection({ milestones, onSelectMilestone, onAddMilestone }: Mi
                   className="milestones-section__card"
                   style={{ borderLeftColor: color }}
                   onClick={() => onSelectMilestone(m.id)}
-                  title={`${typeLabel}: ${m.name} \u2022 Scheduled: ${m.scheduledAt}${relatedCount > 0 ? ` \u2022 ${relatedCount} related work item${relatedCount === 1 ? "" : "s"}` : ""}`}
+                  title={`${typeLabel}: ${m.name} \u2022 Scheduled: ${m.scheduledAt}${relatedCount > 0 ? ` \u2022 ${relatedCount} related work item${relatedCount === 1 ? '' : 's'}` : ''}`}
                 >
                   <div className="milestones-section__card-header">
                     <span className="milestones-section__card-shape" style={{ color }}>
@@ -697,7 +759,7 @@ function MilestonesSection({ milestones, onSelectMilestone, onAddMilestone }: Mi
                     <span className="milestones-section__card-date">{m.scheduledAt}</span>
                     {relatedCount > 0 && (
                       <span className="milestones-section__card-work-badge">
-                        {relatedCount} {relatedCount === 1 ? "item" : "items"}
+                        {relatedCount} {relatedCount === 1 ? 'item' : 'items'}
                       </span>
                     )}
                   </div>
@@ -763,7 +825,7 @@ function BacklogSection({
 }: BacklogSectionProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState('');
   const dragCounter = useRef(0);
 
   useEffect(() => {
@@ -790,7 +852,7 @@ function BacklogSection({
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
+    e.dataTransfer.dropEffect = 'move';
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -798,7 +860,7 @@ function BacklogSection({
     dragCounter.current = 0;
     setIsDragOver(false);
     onDragEndItem();
-    const itemId = e.dataTransfer.getData("text/plain") || draggedItemId;
+    const itemId = e.dataTransfer.getData('text/plain') || draggedItemId;
     if (itemId) {
       onDropItem(itemId);
     }
@@ -807,7 +869,7 @@ function BacklogSection({
   const q = query.trim().toLowerCase();
   const filteredItems = items.filter((item) => {
     if (filteredChildItemIds && !filteredChildItemIds.has(item.id)) return false;
-    if (q === "") return true;
+    if (q === '') return true;
     return item.id.toLowerCase().includes(q) || item.title.toLowerCase().includes(q);
   });
 
@@ -818,13 +880,16 @@ function BacklogSection({
           type="button"
           className="backlog-section__collapse-toggle"
           onClick={() => setIsCollapsed(!isCollapsed)}
-          aria-label={isCollapsed ? "Expand backlog" : "Collapse backlog"}
+          aria-label={isCollapsed ? 'Expand backlog' : 'Collapse backlog'}
         >
           {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
         </button>
         <Inbox size={14} className="backlog-section__icon" />
         <span className="backlog-section__title">Backlog</span>
-        <span className="backlog-section__count" title={`${items.length} unassigned item${items.length === 1 ? "" : "s"}`}>
+        <span
+          className="backlog-section__count"
+          title={`${items.length} unassigned item${items.length === 1 ? '' : 's'}`}
+        >
           {items.length}
         </span>
         {!isCollapsed && (
@@ -841,7 +906,7 @@ function BacklogSection({
       </div>
       {!isCollapsed && (
         <div
-          className={`backlog-section__items${isDragOver ? " is-drag-over" : ""}`}
+          className={`backlog-section__items${isDragOver ? ' is-drag-over' : ''}`}
           onDragEnter={handleDragEnter}
           onDragLeave={handleDragLeave}
           onDragOver={handleDragOver}
@@ -852,18 +917,20 @@ function BacklogSection({
           ) : (
             filteredItems.map((item) => {
               const type = getItemType(requirements, item.typeId);
-              const category = item.categoryId ? requirements.categories.find((c) => c.id === item.categoryId) : undefined;
+              const category = item.categoryId
+                ? requirements.categories.find((c) => c.id === item.categoryId)
+                : undefined;
               const isDragging = draggedItemId === item.id;
               const isBlocker = blockingItemIds?.has(item.id);
               const parentEpic = parentEpicByItemId?.get(item.id);
               return (
                 <div
                   key={item.id}
-                  className={`pi-board-item backlog-section__item${isDragging ? " is-dragging" : ""}${isBlocker ? " is-blocker-highlight" : ""}`}
+                  className={`pi-board-item backlog-section__item${isDragging ? ' is-dragging' : ''}${isBlocker ? ' is-blocker-highlight' : ''}`}
                   draggable={true}
                   onDragStart={(e) => {
-                    e.dataTransfer.setData("text/plain", item.id);
-                    e.dataTransfer.effectAllowed = "move";
+                    e.dataTransfer.setData('text/plain', item.id);
+                    e.dataTransfer.effectAllowed = 'move';
                     requestAnimationFrame(() => onDragStartItem(item.id));
                   }}
                   onDragEnd={() => onDragEndItem()}
@@ -871,7 +938,7 @@ function BacklogSection({
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
+                    if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
                       onSelectItem(item.id);
                     }
@@ -882,8 +949,8 @@ function BacklogSection({
                     <span
                       className="pi-board-item__id"
                       style={{
-                        color: type?.color ?? "var(--chrome-text-dim)",
-                        borderColor: `${type?.color ?? "var(--chrome-border)"}66`,
+                        color: type?.color ?? 'var(--chrome-text-dim)',
+                        borderColor: `${type?.color ?? 'var(--chrome-border)'}66`,
                       }}
                     >
                       {item.id}
@@ -891,7 +958,7 @@ function BacklogSection({
                     {parentEpic && (
                       <span
                         className="pi-board-item__epic-badge"
-                        title={`Epic: ${parentEpic.id} ${parentEpic.title || ""}`}
+                        title={`Epic: ${parentEpic.id} ${parentEpic.title || ''}`}
                       >
                         {parentEpic.id}
                       </span>
@@ -907,13 +974,17 @@ function BacklogSection({
                     {category && (
                       <span
                         className="pi-board-item__category"
-                        style={{ color: category.color, borderColor: `${category.color}44`, background: `${category.color}18` }}
+                        style={{
+                          color: category.color,
+                          borderColor: `${category.color}44`,
+                          background: `${category.color}18`,
+                        }}
                       >
                         {category.label}
                       </span>
                     )}
                   </div>
-                  <div className="pi-board-item__title">{item.title || "Untitled"}</div>
+                  <div className="pi-board-item__title">{item.title || 'Untitled'}</div>
                   <div className="pi-board-item__footer">
                     {team && isItemWorkable(requirements, item) && (
                       <MemberPicker
@@ -949,7 +1020,10 @@ interface ProgramIncrementCardProps {
   team?: TeamDocument;
   itemsBySprintId: Map<string, RequirementItem[]>;
   backlogItems: RequirementItem[];
-  conflictSeverityByItemId: Map<string, { severity: ScheduleConflictSeverity; blocker: RequirementItem }>;
+  conflictSeverityByItemId: Map<
+    string,
+    { severity: ScheduleConflictSeverity; blocker: RequirementItem }
+  >;
   draggedItemId: string | null;
   blockingItemIds: Set<string>;
   sprintRangesByItemId: Map<string, { startDate: string; endDate: string }>;
@@ -968,7 +1042,7 @@ interface ProgramIncrementCardProps {
   onUpdateSprintName: (sprintId: string, name: string) => void;
   onUpdateSprintEnd: (sprintId: string, endDate: string) => void;
   onDeleteSprint: (sprintId: string) => void;
-  onMoveSprint: (sprintId: string, direction: "up" | "down") => void;
+  onMoveSprint: (sprintId: string, direction: 'up' | 'down') => void;
   programIncrementsStore: ProgramIncrementsStore;
 }
 
@@ -1057,7 +1131,11 @@ function ProgramIncrementCard({
     <section className="pi-card">
       <div className="pi-card__header">
         <CalendarRange size={16} className="pi-card__icon" />
-        <input className="pi-card__name" value={pi.name} onChange={(e) => onUpdateName(e.target.value)} />
+        <input
+          className="pi-card__name"
+          value={pi.name}
+          onChange={(e) => onUpdateName(e.target.value)}
+        />
         <label className="pi-card__start-label">
           Starts
           <input
@@ -1073,24 +1151,30 @@ function ProgramIncrementCard({
             className="pi-card__capacity-totals"
             title={`PI Capacity: ${piCapacityTotals.totalAssignedPoints} used / ${piCapacityTotals.totalCapacityPoints} total available (${piCapacityTotals.totalReservedPoints} reserved, ${piCapacityTotals.grossCapacityPoints} gross)`}
           >
-            <div className="pi-card__cap-pill pi-card__cap-pill--used" title={`Used Capacity: ${piCapacityTotals.totalAssignedPoints} points`}>
+            <div
+              className="pi-card__cap-pill pi-card__cap-pill--used"
+              title={`Used Capacity: ${piCapacityTotals.totalAssignedPoints} points`}
+            >
               <span className="pi-card__cap-label">Used:</span>
               <strong className="pi-card__cap-val">{piCapacityTotals.totalAssignedPoints}</strong>
               <span className="pi-card__cap-unit">pts</span>
             </div>
 
-            <div className="pi-card__cap-pill pi-card__cap-pill--total" title={`Total Available Capacity: ${piCapacityTotals.totalCapacityPoints} points (Gross: ${piCapacityTotals.grossCapacityPoints} pts)`}>
+            <div
+              className="pi-card__cap-pill pi-card__cap-pill--total"
+              title={`Total Available Capacity: ${piCapacityTotals.totalCapacityPoints} points (Gross: ${piCapacityTotals.grossCapacityPoints} pts)`}
+            >
               <span className="pi-card__cap-label">Total:</span>
               <strong className="pi-card__cap-val">{piCapacityTotals.totalCapacityPoints}</strong>
               <span className="pi-card__cap-unit">pts</span>
             </div>
 
             <div
-              className={`pi-card__cap-pill pi-card__cap-pill--reserved${piCapacityTotals.totalReservedPoints === 0 ? " is-zero" : ""}`}
+              className={`pi-card__cap-pill pi-card__cap-pill--reserved${piCapacityTotals.totalReservedPoints === 0 ? ' is-zero' : ''}`}
               title={
                 piCapacityTotals.totalReservedPoints > 0
                   ? `Reserved Capacity: ${piCapacityTotals.totalReservedPoints} points`
-                  : "No capacity reserved"
+                  : 'No capacity reserved'
               }
             >
               {piCapacityTotals.totalReservedPoints > 0 && <ShieldAlert size={12} />}
@@ -1108,15 +1192,17 @@ function ProgramIncrementCard({
                   <div
                     className={`pi-card__cap-progress-fill${
                       piCapacityTotals.isOverCapacity
-                        ? " is-danger"
+                        ? ' is-danger'
                         : piCapacityTotals.percent >= 90
-                        ? " is-warning"
-                        : " is-normal"
+                          ? ' is-warning'
+                          : ' is-normal'
                     }`}
                     style={{ width: `${Math.min(100, piCapacityTotals.percent)}%` }}
                   />
                 </div>
-                <span className={`pi-card__cap-progress-text${piCapacityTotals.isOverCapacity ? " is-danger" : ""}`}>
+                <span
+                  className={`pi-card__cap-progress-text${piCapacityTotals.isOverCapacity ? ' is-danger' : ''}`}
+                >
                   {piCapacityTotals.isOverCapacity
                     ? `+${Math.abs(piCapacityTotals.remainingCapacityPoints)} over`
                     : `${piCapacityTotals.remainingCapacityPoints} left`}
@@ -1129,12 +1215,12 @@ function ProgramIncrementCard({
         {team && (
           <button
             type="button"
-            className={`pi-card__reserve-btn${reservationsCount > 0 ? " has-reservations" : ""}`}
+            className={`pi-card__reserve-btn${reservationsCount > 0 ? ' has-reservations' : ''}`}
             onClick={() => setIsManagingReservations(true)}
             title="Manage Capacity Reservations for this PI"
           >
             <ShieldAlert size={13} />
-            <span>Reserve Capacity{reservationsCount > 0 ? ` (${reservationsCount})` : ""}</span>
+            <span>Reserve Capacity{reservationsCount > 0 ? ` (${reservationsCount})` : ''}</span>
           </button>
         )}
 
@@ -1144,7 +1230,11 @@ function ProgramIncrementCard({
             <button type="button" className="pi-card__confirm-yes" onClick={onDelete}>
               Yes
             </button>
-            <button type="button" className="pi-card__confirm-no" onClick={() => setIsConfirmingDelete(false)}>
+            <button
+              type="button"
+              className="pi-card__confirm-no"
+              onClick={() => setIsConfirmingDelete(false)}
+            >
               Cancel
             </button>
           </span>
@@ -1186,8 +1276,8 @@ function ProgramIncrementCard({
                 onUpdateName={(name) => onUpdateSprintName(sprint.id, name)}
                 onUpdateEnd={(endDate) => onUpdateSprintEnd(sprint.id, endDate)}
                 onDelete={() => onDeleteSprint(sprint.id)}
-                onMoveUp={() => onMoveSprint(sprint.id, "up")}
-                onMoveDown={() => onMoveSprint(sprint.id, "down")}
+                onMoveUp={() => onMoveSprint(sprint.id, 'up')}
+                onMoveDown={() => onMoveSprint(sprint.id, 'down')}
               />
             ))}
           </div>
@@ -1255,7 +1345,10 @@ interface SprintBoardColumnProps {
   milestones?: Milestone[];
   team?: TeamDocument;
   backlogItems: RequirementItem[];
-  conflictSeverityByItemId: Map<string, { severity: ScheduleConflictSeverity; blocker: RequirementItem }>;
+  conflictSeverityByItemId: Map<
+    string,
+    { severity: ScheduleConflictSeverity; blocker: RequirementItem }
+  >;
   draggedItemId: string | null;
   blockingItemIds: Set<string>;
   sprintRangesByItemId: Map<string, { startDate: string; endDate: string }>;
@@ -1316,7 +1409,7 @@ function SprintBoardColumn({
         range,
         team,
         requirements.items.filter((i) => isItemWorkable(requirements, i)),
-        activeSprintReservations
+        activeSprintReservations,
       )
     : null;
 
@@ -1330,17 +1423,26 @@ function SprintBoardColumn({
       requirements.relationships,
       requirements.relationshipTypes,
       requirements.itemTypes,
-      sprintRangesByItemId
+      sprintRangesByItemId,
     );
-  }, [draggedItemId, sprint.id, range, requirements.items, requirements.relationships, requirements.relationshipTypes, requirements.itemTypes, sprintRangesByItemId]);
+  }, [
+    draggedItemId,
+    sprint.id,
+    range,
+    requirements.items,
+    requirements.relationships,
+    requirements.relationshipTypes,
+    requirements.itemTypes,
+    sprintRangesByItemId,
+  ]);
 
   const visibleItems = useMemo(() => {
     if (!filteredChildItemIds) return items;
     return items.filter((item) => filteredChildItemIds.has(item.id));
   }, [items, filteredChildItemIds]);
 
-  const isBlocked = dropConflict?.severity === "blocked";
-  const isAtRisk = dropConflict?.severity === "risk";
+  const isBlocked = dropConflict?.severity === 'blocked';
+  const isAtRisk = dropConflict?.severity === 'risk';
 
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
@@ -1360,9 +1462,9 @@ function SprintBoardColumn({
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     if (isBlocked) {
-      e.dataTransfer.dropEffect = "none";
+      e.dataTransfer.dropEffect = 'none';
     } else {
-      e.dataTransfer.dropEffect = "move";
+      e.dataTransfer.dropEffect = 'move';
     }
   };
 
@@ -1371,7 +1473,7 @@ function SprintBoardColumn({
     dragCounter.current = 0;
     setIsDragOver(false);
     onDragEndItem();
-    const itemId = e.dataTransfer.getData("text/plain") || draggedItemId;
+    const itemId = e.dataTransfer.getData('text/plain') || draggedItemId;
     if (itemId) {
       const error = onDropItem(itemId, sprint.id);
       if (error) {
@@ -1384,7 +1486,7 @@ function SprintBoardColumn({
 
   return (
     <div
-      className={`pi-board-column${isBlocked ? " is-blocked" : ""}${isAtRisk ? " is-at-risk" : ""}${isDragOver ? (isBlocked ? " is-drag-over-blocked" : isAtRisk ? " is-drag-over-risk" : " is-drag-over") : ""}`}
+      className={`pi-board-column${isBlocked ? ' is-blocked' : ''}${isAtRisk ? ' is-at-risk' : ''}${isDragOver ? (isBlocked ? ' is-drag-over-blocked' : isAtRisk ? ' is-drag-over-risk' : ' is-drag-over') : ''}`}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
@@ -1395,7 +1497,7 @@ function SprintBoardColumn({
           <span className="pi-board-column__name">{sprint.name}</span>
           <span
             className="pi-board-column__count"
-            title={`${visibleItems.length} requirement item${visibleItems.length === 1 ? "" : "s"} assigned`}
+            title={`${visibleItems.length} requirement item${visibleItems.length === 1 ? '' : 's'} assigned`}
           >
             {visibleItems.length}
           </span>
@@ -1407,7 +1509,7 @@ function SprintBoardColumn({
         </div>
         <div className="pi-board-column__meta">
           <span className="pi-board-column__dates">
-            {range ? `${range.startDate} → ${range.endDate}` : "—"}
+            {range ? `${range.startDate} → ${range.endDate}` : '—'}
           </span>
           <span className="pi-board-column__duration">{sprint.durationDays}d</span>
         </div>
@@ -1437,7 +1539,9 @@ function SprintBoardColumn({
                   >
                     <span className="pi-board-column__milestone-shape">◆</span>
                     <span className="pi-board-column__milestone-name">{m.name}</span>
-                    {m.version && <span className="pi-board-column__milestone-ver">v{m.version}</span>}
+                    {m.version && (
+                      <span className="pi-board-column__milestone-ver">v{m.version}</span>
+                    )}
                   </button>
                 );
               })}
@@ -1455,7 +1559,8 @@ function SprintBoardColumn({
                     <span className="pi-board-column__release-shape">📦</span>
                     <span className="pi-board-column__release-name">{rel.milestone.name}</span>
                     <span className="pi-board-column__release-progress">
-                      {rel.completedRelatedItemsCount}/{rel.totalRelatedItemsCount} ({rel.completionPercentage}%)
+                      {rel.completedRelatedItemsCount}/{rel.totalRelatedItemsCount} (
+                      {rel.completionPercentage}%)
                     </span>
                   </button>
                 );
@@ -1466,7 +1571,7 @@ function SprintBoardColumn({
                   type="button"
                   className="pi-board-column__dep-pill"
                   onClick={() => onSelectItem(dep.id)}
-                  title={`External Dependency: ${dep.id} ${dep.title || ""}`}
+                  title={`External Dependency: ${dep.id} ${dep.title || ''}`}
                 >
                   <span className="pi-board-column__dep-icon">⚡</span>
                   <span className="pi-board-column__dep-name">{dep.id}</span>
@@ -1482,13 +1587,13 @@ function SprintBoardColumn({
                 return (
                   <div
                     key={epicInfo.epic.id}
-                    className={`pi-board-column__epic-progress-card${isComplete ? " is-complete" : ""}`}
+                    className={`pi-board-column__epic-progress-card${isComplete ? ' is-complete' : ''}`}
                     onClick={() => onSelectItem(epicInfo.epic.id)}
-                    title={`Epic: ${epicInfo.epic.id} - ${epicInfo.epic.title || "Untitled"}\n${epicInfo.completedChildrenCount}/${epicInfo.totalChildrenCount} completed (${epicInfo.completionPercentage}%)\n${epicInfo.itemsInSprint.length} item(s) in this sprint`}
+                    title={`Epic: ${epicInfo.epic.id} - ${epicInfo.epic.title || 'Untitled'}\n${epicInfo.completedChildrenCount}/${epicInfo.totalChildrenCount} completed (${epicInfo.completionPercentage}%)\n${epicInfo.itemsInSprint.length} item(s) in this sprint`}
                   >
                     <div className="pi-board-column__epic-progress-header">
                       <span className="pi-board-column__epic-progress-title">
-                        <span style={{ color: "#a78bfa" }}>⚡</span>
+                        <span style={{ color: '#a78bfa' }}>⚡</span>
                         <span>{epicInfo.epic.id}</span>
                         {epicInfo.epic.title && (
                           <span className="pi-board-column__epic-progress-name">
@@ -1497,7 +1602,8 @@ function SprintBoardColumn({
                         )}
                       </span>
                       <span className="pi-board-column__epic-progress-metrics">
-                        {epicInfo.completedChildrenCount}/{epicInfo.totalChildrenCount} ({epicInfo.completionPercentage}%)
+                        {epicInfo.completedChildrenCount}/{epicInfo.totalChildrenCount} (
+                        {epicInfo.completionPercentage}%)
                       </span>
                     </div>
                     <div className="pi-board-column__epic-progress-bar-bg">
@@ -1515,13 +1621,13 @@ function SprintBoardColumn({
       )}
       {dropConflict && (
         <div
-          className={`pi-board-column__blocked-banner${isAtRisk ? " is-risk" : ""}`}
+          className={`pi-board-column__blocked-banner${isAtRisk ? ' is-risk' : ''}`}
           title={
             isAtRisk
-              ? `Same sprint as its blocker ${dropConflict.blocker.id}${dropConflict.blocker.title ? ` (${dropConflict.blocker.title})` : ""} - allowed, but make sure ${dropConflict.blocker.id} is done first.`
+              ? `Same sprint as its blocker ${dropConflict.blocker.id}${dropConflict.blocker.title ? ` (${dropConflict.blocker.title})` : ''} - allowed, but make sure ${dropConflict.blocker.id} is done first.`
               : dropConflict.blockerRange
-                ? `Can't schedule here - blocked by ${dropConflict.blocker.id}${dropConflict.blocker.title ? ` (${dropConflict.blocker.title})` : ""}, which isn't finished until ${dropConflict.blockerRange.endDate}.`
-                : `Can't schedule here - blocked by ${dropConflict.blocker.id}${dropConflict.blocker.title ? ` (${dropConflict.blocker.title})` : ""}, which isn't scheduled yet.`
+                ? `Can't schedule here - blocked by ${dropConflict.blocker.id}${dropConflict.blocker.title ? ` (${dropConflict.blocker.title})` : ''}, which isn't finished until ${dropConflict.blockerRange.endDate}.`
+                : `Can't schedule here - blocked by ${dropConflict.blocker.id}${dropConflict.blocker.title ? ` (${dropConflict.blocker.title})` : ''}, which isn't scheduled yet.`
           }
         >
           <AlertTriangle size={12} className="pi-board-column__blocked-icon" />
@@ -1541,8 +1647,8 @@ function SprintBoardColumn({
             {isBlocked
               ? `Cannot add: blocked by ${dropConflict?.blocker.id}`
               : isDragOver
-                ? "Drop to assign to sprint"
-                : "No requirements assigned"}
+                ? 'Drop to assign to sprint'
+                : 'No requirements assigned'}
           </div>
         ) : (
           visibleItems.map((item) => {
@@ -1552,18 +1658,18 @@ function SprintBoardColumn({
               : undefined;
             const isDragging = draggedItemId === item.id;
             const conflictInfo = conflictSeverityByItemId.get(item.id);
-            const isConflicted = conflictInfo?.severity === "blocked";
-            const isAtRisk = conflictInfo?.severity === "risk";
+            const isConflicted = conflictInfo?.severity === 'blocked';
+            const isAtRisk = conflictInfo?.severity === 'risk';
             const isBlocker = blockingItemIds.has(item.id);
             const parentEpic = parentEpicByItemId?.get(item.id);
             return (
               <div
                 key={item.id}
-                className={`pi-board-item${isDragging ? " is-dragging" : ""}${isConflicted ? " is-conflicted" : ""}${isAtRisk ? " is-at-risk" : ""}${isBlocker ? " is-blocker-highlight" : ""}`}
+                className={`pi-board-item${isDragging ? ' is-dragging' : ''}${isConflicted ? ' is-conflicted' : ''}${isAtRisk ? ' is-at-risk' : ''}${isBlocker ? ' is-blocker-highlight' : ''}`}
                 draggable={true}
                 onDragStart={(e) => {
-                  e.dataTransfer.setData("text/plain", item.id);
-                  e.dataTransfer.effectAllowed = "move";
+                  e.dataTransfer.setData('text/plain', item.id);
+                  e.dataTransfer.effectAllowed = 'move';
                   requestAnimationFrame(() => {
                     onDragStartItem(item.id);
                   });
@@ -1575,7 +1681,7 @@ function SprintBoardColumn({
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
+                  if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
                     onSelectItem(item.id);
                   }
@@ -1586,8 +1692,8 @@ function SprintBoardColumn({
                   <span
                     className="pi-board-item__id"
                     style={{
-                      color: type?.color ?? "var(--chrome-text-dim)",
-                      borderColor: `${type?.color ?? "var(--chrome-border)"}66`,
+                      color: type?.color ?? 'var(--chrome-text-dim)',
+                      borderColor: `${type?.color ?? 'var(--chrome-border)'}66`,
                     }}
                   >
                     {item.id}
@@ -1595,7 +1701,7 @@ function SprintBoardColumn({
                   {parentEpic && (
                     <span
                       className="pi-board-item__epic-badge"
-                      title={`Epic: ${parentEpic.id} ${parentEpic.title || ""}`}
+                      title={`Epic: ${parentEpic.id} ${parentEpic.title || ''}`}
                     >
                       {parentEpic.id}
                     </span>
@@ -1612,14 +1718,14 @@ function SprintBoardColumn({
                     <AlertTriangle
                       size={12}
                       className="pi-board-item__conflict-warning"
-                      aria-label={`Blocked by ${conflictInfo?.blocker.id}${conflictInfo?.blocker.title ? ` (${conflictInfo.blocker.title})` : ""} - move this or its blocker to a different sprint to resolve`}
+                      aria-label={`Blocked by ${conflictInfo?.blocker.id}${conflictInfo?.blocker.title ? ` (${conflictInfo.blocker.title})` : ''} - move this or its blocker to a different sprint to resolve`}
                     />
                   )}
                   {isAtRisk && (
                     <AlertTriangle
                       size={12}
                       className="pi-board-item__risk-warning"
-                      aria-label={`Same sprint as its blocker ${conflictInfo?.blocker.id}${conflictInfo?.blocker.title ? ` (${conflictInfo.blocker.title})` : ""} - make sure that's done first`}
+                      aria-label={`Same sprint as its blocker ${conflictInfo?.blocker.id}${conflictInfo?.blocker.title ? ` (${conflictInfo.blocker.title})` : ''} - make sure that's done first`}
                     />
                   )}
                   {category && (
@@ -1635,7 +1741,7 @@ function SprintBoardColumn({
                     </span>
                   )}
                 </div>
-                <div className="pi-board-item__title">{item.title || "Untitled"}</div>
+                <div className="pi-board-item__title">{item.title || 'Untitled'}</div>
                 <div className="pi-board-item__footer">
                   {team && isItemWorkable(requirements, item) && (
                     <MemberPicker
@@ -1699,29 +1805,41 @@ function SprintRow({
   return (
     <div className="sprint-row">
       <div className="sprint-row__reorder">
-        <button type="button" disabled={isFirst} onClick={onMoveUp} aria-label="Move sprint earlier">
+        <button
+          type="button"
+          disabled={isFirst}
+          onClick={onMoveUp}
+          aria-label="Move sprint earlier"
+        >
           <ChevronUp size={12} />
         </button>
         <button type="button" disabled={isLast} onClick={onMoveDown} aria-label="Move sprint later">
           <ChevronDown size={12} />
         </button>
       </div>
-      <input className="sprint-row__name" value={sprint.name} onChange={(e) => onUpdateName(e.target.value)} />
-      <span className="sprint-row__start" title="Computed automatically from this PI's start date and every earlier sprint's length">
-        {range?.startDate ?? "—"}
+      <input
+        className="sprint-row__name"
+        value={sprint.name}
+        onChange={(e) => onUpdateName(e.target.value)}
+      />
+      <span
+        className="sprint-row__start"
+        title="Computed automatically from this PI's start date and every earlier sprint's length"
+      >
+        {range?.startDate ?? '—'}
       </span>
       <span className="sprint-row__arrow">→</span>
       <input
         type="date"
         className="sprint-row__end"
-        value={range?.endDate ?? ""}
+        value={range?.endDate ?? ''}
         onChange={(e) => onUpdateEnd(e.target.value)}
       />
       <span className="sprint-row__duration">{sprint.durationDays}d</span>
       {sprintSummary.directMilestones.length > 0 && (
         <span
           className="sprint-row__milestone-badge"
-          title={`${sprintSummary.directMilestones.length} milestone(s) in sprint: ${sprintSummary.directMilestones.map((m) => m.name).join(", ")}`}
+          title={`${sprintSummary.directMilestones.length} milestone(s) in sprint: ${sprintSummary.directMilestones.map((m) => m.name).join(', ')}`}
         >
           ◆ {sprintSummary.directMilestones.length}
         </span>
@@ -1729,7 +1847,7 @@ function SprintRow({
       {sprintSummary.impactedReleases.length > 0 && (
         <span
           className="sprint-row__release-badge"
-          title={`Impacts ${sprintSummary.impactedReleases.length} release(s): ${sprintSummary.impactedReleases.map((r) => r.milestone.name).join(", ")}`}
+          title={`Impacts ${sprintSummary.impactedReleases.length} release(s): ${sprintSummary.impactedReleases.map((r) => r.milestone.name).join(', ')}`}
         >
           📦 {sprintSummary.impactedReleases.length}
         </span>
@@ -1737,17 +1855,25 @@ function SprintRow({
       {sprintSummary.impactedEpics.length > 0 && (
         <span
           className="sprint-row__epic-badge"
-          title={`Contains work for ${sprintSummary.impactedEpics.length} epic(s): ${sprintSummary.impactedEpics.map((e) => `${e.epic.id} (${e.completedChildrenCount}/${e.totalChildrenCount})`).join(", ")}`}
+          title={`Contains work for ${sprintSummary.impactedEpics.length} epic(s): ${sprintSummary.impactedEpics.map((e) => `${e.epic.id} (${e.completedChildrenCount}/${e.totalChildrenCount})`).join(', ')}`}
         >
           ⚡ {sprintSummary.impactedEpics.length}
         </span>
       )}
       {itemCount > 0 && (
-        <span className="sprint-row__item-count" title={`${itemCount} requirement item${itemCount === 1 ? "" : "s"} assigned`}>
+        <span
+          className="sprint-row__item-count"
+          title={`${itemCount} requirement item${itemCount === 1 ? '' : 's'} assigned`}
+        >
           {itemCount}
         </span>
       )}
-      <button type="button" className="sprint-row__delete" onClick={onDelete} aria-label={`Delete ${sprint.name}`}>
+      <button
+        type="button"
+        className="sprint-row__delete"
+        onClick={onDelete}
+        aria-label={`Delete ${sprint.name}`}
+      >
         <Trash2 size={12} />
       </button>
     </div>

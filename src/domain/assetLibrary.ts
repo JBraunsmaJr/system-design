@@ -1,5 +1,9 @@
-import { globalIconRegistry, sanitizeSvg, type IconDefinition } from "./iconRegistry";
-import { globalShapeRegistry, type ShapeDefinition, DEFAULT_CONNECTION_POINTS } from "./shapeRegistry";
+import { globalIconRegistry, sanitizeSvg, type IconDefinition } from './iconRegistry';
+import {
+  globalShapeRegistry,
+  type ShapeDefinition,
+  DEFAULT_CONNECTION_POINTS,
+} from './shapeRegistry';
 
 export interface LibraryMetadata {
   id: string;
@@ -13,7 +17,7 @@ export interface LibraryMetadata {
 }
 
 export interface AssetLibrary {
-  format: "system-design-library";
+  format: 'system-design-library';
   version: number;
   library: LibraryMetadata;
   icons: IconDefinition[];
@@ -21,9 +25,9 @@ export interface AssetLibrary {
   enabled?: boolean;
 }
 
-const LIBRARIES_STORAGE_KEY = "system-design-editor:custom-libraries";
-const RECENT_ICONS_STORAGE_KEY = "system-design-editor:recent-icons";
-const FAVORITE_ICONS_STORAGE_KEY = "system-design-editor:favorite-icons";
+const LIBRARIES_STORAGE_KEY = 'system-design-editor:custom-libraries';
+const RECENT_ICONS_STORAGE_KEY = 'system-design-editor:recent-icons';
+const FAVORITE_ICONS_STORAGE_KEY = 'system-design-editor:favorite-icons';
 
 const MAX_ASSET_SIZE_BYTES = 512 * 1024; // 512 KB per asset definition
 const MAX_RECENT_ICONS = 30;
@@ -39,42 +43,62 @@ export interface LibraryValidationResult {
 export function validateAssetLibrary(raw: unknown): LibraryValidationResult {
   const errors: string[] = [];
 
-  if (!raw || typeof raw !== "object") {
-    return { valid: false, importedShapesCount: 0, importedIconsCount: 0, errors: ["Invalid JSON object format."] };
+  if (!raw || typeof raw !== 'object') {
+    return {
+      valid: false,
+      importedShapesCount: 0,
+      importedIconsCount: 0,
+      errors: ['Invalid JSON object format.'],
+    };
   }
 
   const data = raw as Partial<AssetLibrary>;
 
-  if (data.format !== "system-design-library") {
+  if (data.format !== 'system-design-library') {
     errors.push("Invalid library format identifier. Expected 'system-design-library'.");
   }
 
-  if (!data.library || typeof data.library !== "object") {
-    errors.push("Missing library metadata.");
+  if (!data.library || typeof data.library !== 'object') {
+    errors.push('Missing library metadata.');
     return { valid: false, importedShapesCount: 0, importedIconsCount: 0, errors };
   }
 
   const libMeta: LibraryMetadata = {
-    id: typeof data.library.id === "string" && data.library.id.trim() ? data.library.id.trim() : `lib-${Date.now()}`,
-    name: typeof data.library.name === "string" && data.library.name.trim() ? data.library.name.trim() : "Untitled Library",
-    description: typeof data.library.description === "string" ? data.library.description : undefined,
-    version: typeof data.library.version === "number" && !isNaN(data.library.version) ? data.library.version : 1,
-    author: typeof data.library.author === "string" ? data.library.author : undefined,
-    license: typeof data.library.license === "string" ? data.library.license : undefined,
-    attribution: typeof data.library.attribution === "string" ? data.library.attribution : undefined,
-    tags: Array.isArray(data.library.tags) ? data.library.tags.filter((t) => typeof t === "string") : [],
+    id:
+      typeof data.library.id === 'string' && data.library.id.trim()
+        ? data.library.id.trim()
+        : `lib-${Date.now()}`,
+    name:
+      typeof data.library.name === 'string' && data.library.name.trim()
+        ? data.library.name.trim()
+        : 'Untitled Library',
+    description:
+      typeof data.library.description === 'string' ? data.library.description : undefined,
+    version:
+      typeof data.library.version === 'number' && !isNaN(data.library.version)
+        ? data.library.version
+        : 1,
+    author: typeof data.library.author === 'string' ? data.library.author : undefined,
+    license: typeof data.library.license === 'string' ? data.library.license : undefined,
+    attribution:
+      typeof data.library.attribution === 'string' ? data.library.attribution : undefined,
+    tags: Array.isArray(data.library.tags)
+      ? data.library.tags.filter((t) => typeof t === 'string')
+      : [],
   };
 
   const validIcons: IconDefinition[] = [];
   if (Array.isArray(data.icons)) {
     for (const item of data.icons) {
-      if (!item || typeof item !== "object") {
-        errors.push("Skipped malformed icon entry.");
+      if (!item || typeof item !== 'object') {
+        errors.push('Skipped malformed icon entry.');
         continue;
       }
 
       if (!item.id || !item.name || !item.source) {
-        errors.push(`Icon entry missing required fields (id, name, or source): ${JSON.stringify(item.id || item.name || "unknown")}`);
+        errors.push(
+          `Icon entry missing required fields (id, name, or source): ${JSON.stringify(item.id || item.name || 'unknown')}`,
+        );
         continue;
       }
 
@@ -86,27 +110,35 @@ export function validateAssetLibrary(raw: unknown): LibraryValidationResult {
       }
 
       let source = item.source;
-      if (source.type === "svg") {
+      if (source.type === 'svg') {
         const sanitized = sanitizeSvg(source.data);
         if (!sanitized) {
           errors.push(`Icon "${item.name}" contains unsafe or invalid SVG content.`);
           continue;
         }
-        source = { type: "svg", data: sanitized };
+        source = { type: 'svg', data: sanitized };
       }
 
       validIcons.push({
         id: String(item.id).trim(),
         name: String(item.name).trim(),
-        category: typeof item.category === "string" ? item.category : libMeta.name,
-        tags: Array.isArray(item.tags) ? item.tags.filter((t) => typeof t === "string") : [],
-        version: typeof item.version === "number" ? item.version : 1,
+        category: typeof item.category === 'string' ? item.category : libMeta.name,
+        tags: Array.isArray(item.tags) ? item.tags.filter((t) => typeof t === 'string') : [],
+        version: typeof item.version === 'number' ? item.version : 1,
         source,
-        attribution: item.attribution && typeof item.attribution === "object" ? {
-          author: typeof item.attribution.author === "string" ? item.attribution.author : undefined,
-          license: typeof item.attribution.license === "string" ? item.attribution.license : undefined,
-          source: typeof item.attribution.source === "string" ? item.attribution.source : undefined,
-        } : undefined,
+        attribution:
+          item.attribution && typeof item.attribution === 'object'
+            ? {
+                author:
+                  typeof item.attribution.author === 'string' ? item.attribution.author : undefined,
+                license:
+                  typeof item.attribution.license === 'string'
+                    ? item.attribution.license
+                    : undefined,
+                source:
+                  typeof item.attribution.source === 'string' ? item.attribution.source : undefined,
+              }
+            : undefined,
         libraryId: libMeta.id,
       });
     }
@@ -115,13 +147,15 @@ export function validateAssetLibrary(raw: unknown): LibraryValidationResult {
   const validShapes: ShapeDefinition[] = [];
   if (Array.isArray(data.shapes)) {
     for (const item of data.shapes) {
-      if (!item || typeof item !== "object") {
-        errors.push("Skipped malformed shape entry.");
+      if (!item || typeof item !== 'object') {
+        errors.push('Skipped malformed shape entry.');
         continue;
       }
 
       if (!item.id || !item.name || !item.geometry) {
-        errors.push(`Shape entry missing required fields (id, name, or geometry): ${JSON.stringify(item.id || item.name || "unknown")}`);
+        errors.push(
+          `Shape entry missing required fields (id, name, or geometry): ${JSON.stringify(item.id || item.name || 'unknown')}`,
+        );
         continue;
       }
 
@@ -132,38 +166,45 @@ export function validateAssetLibrary(raw: unknown): LibraryValidationResult {
         continue;
       }
 
-      const width = typeof item.defaults?.width === "number" && item.defaults.width > 0 ? item.defaults.width : 120;
-      const height = typeof item.defaults?.height === "number" && item.defaults.height > 0 ? item.defaults.height : 100;
+      const width =
+        typeof item.defaults?.width === 'number' && item.defaults.width > 0
+          ? item.defaults.width
+          : 120;
+      const height =
+        typeof item.defaults?.height === 'number' && item.defaults.height > 0
+          ? item.defaults.height
+          : 100;
 
       validShapes.push({
         id: String(item.id).trim(),
         name: String(item.name).trim(),
-        description: typeof item.description === "string" ? item.description : undefined,
-        category: typeof item.category === "string" ? item.category : libMeta.name,
-        tags: Array.isArray(item.tags) ? item.tags.filter((t) => typeof t === "string") : [],
-        version: typeof item.version === "number" ? item.version : 1,
+        description: typeof item.description === 'string' ? item.description : undefined,
+        category: typeof item.category === 'string' ? item.category : libMeta.name,
+        tags: Array.isArray(item.tags) ? item.tags.filter((t) => typeof t === 'string') : [],
+        version: typeof item.version === 'number' ? item.version : 1,
         geometry: item.geometry,
         defaults: {
           width,
           height,
           style: item.defaults?.style,
-          label: typeof item.defaults?.label === "string" ? item.defaults.label : undefined,
-          color: typeof item.defaults?.color === "string" ? item.defaults.color : "#5B7CFA",
+          label: typeof item.defaults?.label === 'string' ? item.defaults.label : undefined,
+          color: typeof item.defaults?.color === 'string' ? item.defaults.color : '#5B7CFA',
         },
         constraints: item.constraints,
-        connectionPoints: Array.isArray(item.connectionPoints) && item.connectionPoints.length > 0
-          ? item.connectionPoints
-          : DEFAULT_CONNECTION_POINTS,
+        connectionPoints:
+          Array.isArray(item.connectionPoints) && item.connectionPoints.length > 0
+            ? item.connectionPoints
+            : DEFAULT_CONNECTION_POINTS,
         properties: Array.isArray(item.properties) ? item.properties : undefined,
-        iconId: typeof item.iconId === "string" ? item.iconId : undefined,
+        iconId: typeof item.iconId === 'string' ? item.iconId : undefined,
         libraryId: libMeta.id,
       });
     }
   }
 
   const library: AssetLibrary = {
-    format: "system-design-library",
-    version: typeof data.version === "number" ? data.version : 1,
+    format: 'system-design-library',
+    version: typeof data.version === 'number' ? data.version : 1,
     library: libMeta,
     icons: validIcons,
     shapes: validShapes,
@@ -288,7 +329,10 @@ export class AssetLibraryManager {
     try {
       const parsed = JSON.parse(jsonContent);
       const validation = validateAssetLibrary(parsed);
-      if (validation.library && (validation.importedIconsCount > 0 || validation.importedShapesCount > 0)) {
+      if (
+        validation.library &&
+        (validation.importedIconsCount > 0 || validation.importedShapesCount > 0)
+      ) {
         this.addOrUpdateLibrary(validation.library);
       }
       return validation;
@@ -297,7 +341,7 @@ export class AssetLibraryManager {
         valid: false,
         importedShapesCount: 0,
         importedIconsCount: 0,
-        errors: [(err as Error).message || "Invalid JSON syntax."],
+        errors: [(err as Error).message || 'Invalid JSON syntax.'],
       };
     }
   }
@@ -305,12 +349,16 @@ export class AssetLibraryManager {
   public exportLibrary(libraryId: string): void {
     const lib = this.libraries.get(libraryId);
     if (!lib) return;
-    const blob = new Blob([JSON.stringify(lib, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify(lib, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
+    const anchor = document.createElement('a');
     anchor.href = url;
-    const safeName = lib.library.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-    anchor.download = `${safeName || "custom-library"}.library.json`;
+    const safeName = lib.library.name
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+    anchor.download = `${safeName || 'custom-library'}.library.json`;
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
@@ -326,7 +374,7 @@ export function getRecentIcons(): string[] {
     const raw = localStorage.getItem(RECENT_ICONS_STORAGE_KEY);
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [];
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
   } catch {
     return [];
   }
@@ -349,7 +397,7 @@ export function getFavoriteIcons(): string[] {
     const raw = localStorage.getItem(FAVORITE_ICONS_STORAGE_KEY);
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [];
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
   } catch {
     return [];
   }

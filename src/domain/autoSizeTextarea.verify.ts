@@ -9,7 +9,7 @@
  * jsdom can't stand in for this: it performs no layout and reports
  * scrollHeight as 0 for everything.
  */
-import { fitHeightToContent, type AutoSizableElement } from "./autoSizeTextarea";
+import { fitHeightToContent, type AutoSizableElement } from './autoSizeTextarea';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {
@@ -31,9 +31,9 @@ function assert(condition: boolean, message: string) {
 function stubTextarea(contentHeight: number) {
   const el = {
     contentHeight,
-    style: { height: "" },
+    style: { height: '' },
     get scrollHeight(): number {
-      if (this.style.height === "auto" || this.style.height === "") return this.contentHeight;
+      if (this.style.height === 'auto' || this.style.height === '') return this.contentHeight;
       const pinned = Number.parseFloat(this.style.height);
       return Number.isNaN(pinned) ? this.contentHeight : Math.max(this.contentHeight, pinned);
     },
@@ -45,7 +45,10 @@ function stubTextarea(contentHeight: number) {
 {
   const el = stubTextarea(340);
   fitHeightToContent(el);
-  assert(el.style.height === "340px", "a 15-line description sizes the textarea to its full content height rather than a fixed window");
+  assert(
+    el.style.height === '340px',
+    'a 15-line description sizes the textarea to its full content height rather than a fixed window',
+  );
 }
 
 // === Part 2: shrinking back - the case the collapse step exists for ===
@@ -55,13 +58,13 @@ function stubTextarea(contentHeight: number) {
 {
   const el = stubTextarea(340);
   fitHeightToContent(el);
-  assert(el.style.height === "340px", "sized to the long content first");
+  assert(el.style.height === '340px', 'sized to the long content first');
 
   el.contentHeight = 60; // the user deletes most of the text
   fitHeightToContent(el);
   assert(
-    el.style.height === "60px",
-    "shrinks back when content is removed - measuring without collapsing to auto first would have left it stuck at 340px forever"
+    el.style.height === '60px',
+    'shrinks back when content is removed - measuring without collapsing to auto first would have left it stuck at 340px forever',
   );
 }
 
@@ -74,7 +77,10 @@ function stubTextarea(contentHeight: number) {
   const first = el.style.height;
   fitHeightToContent(el);
   fitHeightToContent(el);
-  assert(el.style.height === first && first === "200px", "fitting repeatedly with unchanged content converges on the same height instead of creeping");
+  assert(
+    el.style.height === first && first === '200px',
+    'fitting repeatedly with unchanged content converges on the same height instead of creeping',
+  );
 }
 
 // === Part 4: only height is written ===
@@ -84,7 +90,10 @@ function stubTextarea(contentHeight: number) {
   const el = stubTextarea(120);
   fitHeightToContent(el);
   const written = Object.keys(el.style);
-  assert(written.length === 1 && written[0] === "height", `only the height property is set, leaving min-height/max-height to CSS - wrote: ${written.join(", ")}`);
+  assert(
+    written.length === 1 && written[0] === 'height',
+    `only the height property is set, leaving min-height/max-height to CSS - wrote: ${written.join(', ')}`,
+  );
 }
 
-console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);
+console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);

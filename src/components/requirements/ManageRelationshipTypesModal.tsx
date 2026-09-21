@@ -1,15 +1,20 @@
-import { useState } from "react";
-import { GitBranch, Lock, Trash2, X } from "lucide-react";
-import type { RequirementsDocument } from "../../domain/requirementsTypes";
+import { useState } from 'react';
+import { GitBranch, Lock, Trash2, X } from 'lucide-react';
+import type { RequirementsDocument } from '../../domain/requirementsTypes';
 
 interface ManageRelationshipTypesModalProps {
   doc: RequirementsDocument;
-  onAddCustomType: (label: string, inverseLabel: string, color: string, isBlocking: boolean) => void;
+  onAddCustomType: (
+    label: string,
+    inverseLabel: string,
+    color: string,
+    isBlocking: boolean,
+  ) => void;
   onDeleteCustomType: (typeId: string) => void;
   onClose: () => void;
 }
 
-const DEFAULT_CUSTOM_COLOR = "#22B8CF";
+const DEFAULT_CUSTOM_COLOR = '#22B8CF';
 
 export function ManageRelationshipTypesModal({
   doc,
@@ -17,8 +22,8 @@ export function ManageRelationshipTypesModal({
   onDeleteCustomType,
   onClose,
 }: ManageRelationshipTypesModalProps) {
-  const [label, setLabel] = useState("");
-  const [inverseLabel, setInverseLabel] = useState("");
+  const [label, setLabel] = useState('');
+  const [inverseLabel, setInverseLabel] = useState('');
   const [color, setColor] = useState(DEFAULT_CUSTOM_COLOR);
   const [isBlocking, setIsBlocking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,12 +35,12 @@ export function ManageRelationshipTypesModal({
     // the user to retype the same word twice for the common case.
     const trimmedInverse = inverseLabel.trim() || trimmedLabel;
     if (!trimmedLabel) {
-      setError("A label is required.");
+      setError('A label is required.');
       return;
     }
     onAddCustomType(trimmedLabel, trimmedInverse, color, isBlocking);
-    setLabel("");
-    setInverseLabel("");
+    setLabel('');
+    setInverseLabel('');
     setIsBlocking(false);
     setError(null);
   };
@@ -56,7 +61,7 @@ export function ManageRelationshipTypesModal({
               <span className="manage-types-modal__swatch" style={{ background: type.color }} />
               <span className="manage-types-modal__label">{type.label}</span>
               <span className="manage-types-modal__prefix">
-                {type.inverseLabel !== type.label ? type.inverseLabel : "(symmetric)"}
+                {type.inverseLabel !== type.label ? type.inverseLabel : '(symmetric)'}
               </span>
               {type.isBlocking && (
                 <GitBranch
@@ -99,9 +104,21 @@ export function ManageRelationshipTypesModal({
               setError(null);
             }}
           />
-          <input type="color" value={color} onChange={(e) => setColor(e.target.value)} aria-label="Type color" />
-          <label className="manage-types-modal__workable-toggle" title="Treated as an ordering constraint - checked for circular dependencies">
-            <input type="checkbox" checked={isBlocking} onChange={(e) => setIsBlocking(e.target.checked)} />
+          <input
+            type="color"
+            value={color}
+            onChange={(e) => setColor(e.target.value)}
+            aria-label="Type color"
+          />
+          <label
+            className="manage-types-modal__workable-toggle"
+            title="Treated as an ordering constraint - checked for circular dependencies"
+          >
+            <input
+              type="checkbox"
+              checked={isBlocking}
+              onChange={(e) => setIsBlocking(e.target.checked)}
+            />
             Blocking
           </label>
           <button type="button" className="primary" onClick={onSubmit}>

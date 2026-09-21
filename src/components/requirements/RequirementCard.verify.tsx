@@ -1,10 +1,14 @@
 /**
  * Run with: npx tsx --tsconfig tsconfig.app.json src/components/requirements/RequirementCard.verify.tsx
  */
-import { renderToStaticMarkup } from "react-dom/server";
-import React from "react";
-import { RequirementCard } from "./RequirementCard";
-import { EMPTY_REQUIREMENTS_DOCUMENT, type RequirementsDocument, type RequirementItem } from "../../domain/requirementsTypes";
+import { renderToStaticMarkup } from 'react-dom/server';
+import React from 'react';
+import { RequirementCard } from './RequirementCard';
+import {
+  EMPTY_REQUIREMENTS_DOCUMENT,
+  type RequirementsDocument,
+  type RequirementItem,
+} from '../../domain/requirementsTypes';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {
@@ -18,17 +22,17 @@ function assert(condition: boolean, message: string) {
 }
 
 const item: RequirementItem = {
-  id: "REQ-101",
-  typeId: "requirement",
-  title: "Implement user authentication with OAuth2 and SAML",
-  body: "This requirement describes the auth flow and session token management.",
-  categoryId: "cat-sec",
+  id: 'REQ-101',
+  typeId: 'requirement',
+  title: 'Implement user authentication with OAuth2 and SAML',
+  body: 'This requirement describes the auth flow and session token management.',
+  categoryId: 'cat-sec',
 };
 
 const doc: RequirementsDocument = {
   ...EMPTY_REQUIREMENTS_DOCUMENT,
   items: [item],
-  categories: [{ id: "cat-sec", label: "Security", color: "#f0578c" }],
+  categories: [{ id: 'cat-sec', label: 'Security', color: '#f0578c' }],
 };
 
 const baseProps = {
@@ -44,16 +48,19 @@ const baseProps = {
   onDeleteRelationship: () => {},
 };
 
-console.log("=== RequirementCard search highlighting ===");
+console.log('=== RequirementCard search highlighting ===');
 // Test 1: Highlighting ID
 {
   const html = renderToStaticMarkup(
     React.createElement(RequirementCard, {
       ...baseProps,
-      searchQuery: "REQ-101",
-    })
+      searchQuery: 'REQ-101',
+    }),
   );
-  assert(html.includes('<mark class="search-highlight">REQ-101</mark>'), "ID is highlighted when matching search");
+  assert(
+    html.includes('<mark class="search-highlight">REQ-101</mark>'),
+    'ID is highlighted when matching search',
+  );
 }
 
 // Test 2: Highlighting Title
@@ -61,10 +68,13 @@ console.log("=== RequirementCard search highlighting ===");
   const html = renderToStaticMarkup(
     React.createElement(RequirementCard, {
       ...baseProps,
-      searchQuery: "authentication",
-    })
+      searchQuery: 'authentication',
+    }),
   );
-  assert(html.includes('<mark class="search-highlight">authentication</mark>'), "Title match is highlighted");
+  assert(
+    html.includes('<mark class="search-highlight">authentication</mark>'),
+    'Title match is highlighted',
+  );
 }
 
 // Test 3: Highlighting Body
@@ -72,10 +82,13 @@ console.log("=== RequirementCard search highlighting ===");
   const html = renderToStaticMarkup(
     React.createElement(RequirementCard, {
       ...baseProps,
-      searchQuery: "session token",
-    })
+      searchQuery: 'session token',
+    }),
   );
-  assert(html.includes('<mark class="search-highlight">session token</mark>'), "Body match is highlighted in rendered markdown");
+  assert(
+    html.includes('<mark class="search-highlight">session token</mark>'),
+    'Body match is highlighted in rendered markdown',
+  );
 }
 
 // Test 4: Highlighting Category
@@ -83,10 +96,13 @@ console.log("=== RequirementCard search highlighting ===");
   const html = renderToStaticMarkup(
     React.createElement(RequirementCard, {
       ...baseProps,
-      searchQuery: "Security",
-    })
+      searchQuery: 'Security',
+    }),
   );
-  assert(html.includes('<mark class="search-highlight">Security</mark>'), "Category badge is highlighted when matching search");
+  assert(
+    html.includes('<mark class="search-highlight">Security</mark>'),
+    'Category badge is highlighted when matching search',
+  );
 }
 
-console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);
+console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);

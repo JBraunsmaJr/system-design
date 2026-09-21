@@ -28,6 +28,6 @@ export interface AutoSizableElement {
  * content".
  */
 export function fitHeightToContent(el: AutoSizableElement): void {
-  el.style.height = "auto";
+  el.style.height = 'auto';
   el.style.height = `${el.scrollHeight}px`;
 }

@@ -1,10 +1,10 @@
-import { useEffect, useRef } from "react";
-import { NodeResizer, type NodeProps, type Node } from "@xyflow/react";
-import type { ArchNodeData } from "../../domain/types";
-import { useCanvasContext } from "../CanvasContext";
-import { recordNodeRender } from "../../perf/instrumentation";
+import { useEffect, useRef } from 'react';
+import { NodeResizer, type NodeProps, type Node } from '@xyflow/react';
+import type { ArchNodeData } from '../../domain/types';
+import { useCanvasContext } from '../CanvasContext';
+import { recordNodeRender } from '../../perf/instrumentation';
 
-type TextNodeType = Node<ArchNodeData, "text">;
+type TextNodeType = Node<ArchNodeData, 'text'>;
 
 interface TextNodeProps extends NodeProps<TextNodeType> {
   isEditing?: boolean;
@@ -28,12 +28,14 @@ export function TextNode({
 }: TextNodeProps) {
   recordNodeRender();
   const canvasContext = useCanvasContext();
-  const isEditing = propIsEditing ?? (canvasContext?.editingLabelNodeId === id);
-  const onStartEditing = propOnStartEditing ?? (canvasContext?.isPresenting ? undefined : canvasContext?.setEditingLabelNodeId);
+  const isEditing = propIsEditing ?? canvasContext?.editingLabelNodeId === id;
+  const onStartEditing =
+    propOnStartEditing ??
+    (canvasContext?.isPresenting ? undefined : canvasContext?.setEditingLabelNodeId);
   const onFinishEditing = propOnFinishEditing ?? (() => canvasContext?.setEditingLabelNodeId(null));
   const onChangeText = propOnChangeText ?? canvasContext?.onChangeTextNode;
 
-  const color = data.textColor ?? "#e7e9ee";
+  const color = data.textColor ?? '#e7e9ee';
   const fontSize = data.fontSize ?? 16;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const hasManualSize = width != null && height != null;
@@ -42,7 +44,7 @@ export function TextNode({
   // manually-set size yet - once resized, the box owns its own dimensions.
   useEffect(() => {
     if (isEditing && textareaRef.current && !hasManualSize) {
-      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = 'auto';
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }
   }, [isEditing, data.label, hasManualSize]);
@@ -60,13 +62,13 @@ export function TextNode({
         style={{
           color,
           fontSize,
-          width: hasManualSize ? "100%" : EDITING_DEFAULT_WIDTH,
-          height: hasManualSize ? "100%" : undefined,
+          width: hasManualSize ? '100%' : EDITING_DEFAULT_WIDTH,
+          height: hasManualSize ? '100%' : undefined,
         }}
         onChange={(e) => onChangeText?.(id, e.target.value)}
         onBlur={() => onFinishEditing?.()}
         onKeyDown={(e) => {
-          if (e.key === "Escape") {
+          if (e.key === 'Escape') {
             e.currentTarget.blur();
           }
         }}
@@ -84,12 +86,12 @@ export function TextNode({
         handleClassName="node-resize-handle"
       />
       <div
-        className={`text-node${selected ? " is-selected" : ""}`}
+        className={`text-node${selected ? ' is-selected' : ''}`}
         style={{
           color,
           fontSize,
-          width: hasManualSize ? "100%" : undefined,
-          height: hasManualSize ? "100%" : undefined,
+          width: hasManualSize ? '100%' : undefined,
+          height: hasManualSize ? '100%' : undefined,
         }}
         onDoubleClick={(e) => {
           e.stopPropagation();

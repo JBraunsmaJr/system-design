@@ -1,7 +1,7 @@
 // Namespaced to avoid colliding with anything else that might use this
 // browser's localStorage for this origin - same convention as
 // presenceIdentity.ts's own keys.
-const SIGNALING_URLS_KEY = "system-design-editor:signaling-urls";
+const SIGNALING_URLS_KEY = 'system-design-editor:signaling-urls';
 
 /**
  * Gets the deployment default signaling URL(s).
@@ -12,7 +12,7 @@ const SIGNALING_URLS_KEY = "system-design-editor:signaling-urls";
  * 3. Empty string if unset
  */
 export function getDefaultSignalingUrl(): string {
-  if (typeof window !== "undefined") {
+  if (typeof window !== 'undefined') {
     const runtimeConfig = (
       window as unknown as {
         __APP_CONFIG__?: {
@@ -35,25 +35,25 @@ export function getDefaultSignalingUrl(): string {
         runtimeConfig.relay,
       ];
       for (const candidate of candidates) {
-        if (typeof candidate === "string" && candidate.trim()) {
+        if (typeof candidate === 'string' && candidate.trim()) {
           return candidate.trim();
         }
       }
     }
   }
-  if (typeof import.meta !== "undefined" && typeof import.meta.env !== "undefined") {
+  if (typeof import.meta !== 'undefined' && typeof import.meta.env !== 'undefined') {
     const envCandidates = [
       import.meta.env.VITE_SIGNALING_URL as string | undefined,
       import.meta.env.VITE_RELAY_URL as string | undefined,
       import.meta.env.VITE_RELAY as string | undefined,
     ];
     for (const envVal of envCandidates) {
-      if (typeof envVal === "string" && envVal.trim()) {
+      if (typeof envVal === 'string' && envVal.trim()) {
         return envVal.trim();
       }
     }
   }
-  return "";
+  return '';
 }
 
 /**
@@ -113,7 +113,7 @@ export function saveSignalingUrls(raw: string): void {
  */
 export function parseSignalingUrls(raw: string): string[] {
   return raw
-    .split(",")
+    .split(',')
     .map((u) => u.trim())
     .filter(Boolean);
 }

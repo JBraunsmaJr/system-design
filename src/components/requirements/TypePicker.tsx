@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { Briefcase, Check, ChevronDown } from "lucide-react";
-import { getItemType } from "../../domain/requirementsRegistry";
-import { computeFlippedPosition } from "../../domain/popoverPosition";
-import type { RequirementsDocument } from "../../domain/requirementsTypes";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Briefcase, Check, ChevronDown } from 'lucide-react';
+import { getItemType } from '../../domain/requirementsRegistry';
+import { computeFlippedPosition } from '../../domain/popoverPosition';
+import type { RequirementsDocument } from '../../domain/requirementsTypes';
 
 interface TypePickerProps {
   doc: RequirementsDocument;
@@ -46,9 +46,11 @@ export function TypePicker({ doc, typeId, onChange, disabled, className }: TypeP
     const next = computeFlippedPosition(
       triggerRect,
       { width: dropdownRect.width, height: dropdownRect.height },
-      { width: window.innerWidth, height: window.innerHeight }
+      { width: window.innerWidth, height: window.innerHeight },
     );
-    setDropdownPos((prev) => (prev && prev.top === next.top && prev.left === next.left ? prev : next));
+    setDropdownPos((prev) =>
+      prev && prev.top === next.top && prev.left === next.left ? prev : next,
+    );
   }, [isOpen]);
 
   const reposition = useCallback(() => {
@@ -61,8 +63,8 @@ export function TypePicker({ doc, typeId, onChange, disabled, className }: TypeP
       computeFlippedPosition(
         triggerRect,
         { width: dropdownRect.width, height: dropdownRect.height },
-        { width: window.innerWidth, height: window.innerHeight }
-      )
+        { width: window.innerWidth, height: window.innerHeight },
+      ),
     );
   }, []);
 
@@ -74,13 +76,13 @@ export function TypePicker({ doc, typeId, onChange, disabled, className }: TypeP
       if (dropdownRef.current && path.includes(dropdownRef.current)) return;
       close();
     };
-    document.addEventListener("mousedown", handler);
-    window.addEventListener("scroll", reposition, true);
-    window.addEventListener("resize", reposition);
+    document.addEventListener('mousedown', handler);
+    window.addEventListener('scroll', reposition, true);
+    window.addEventListener('resize', reposition);
     return () => {
-      document.removeEventListener("mousedown", handler);
-      window.removeEventListener("scroll", reposition, true);
-      window.removeEventListener("resize", reposition);
+      document.removeEventListener('mousedown', handler);
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
     };
   }, [isOpen, reposition]);
 
@@ -90,15 +92,26 @@ export function TypePicker({ doc, typeId, onChange, disabled, className }: TypeP
         ref={triggerRef}
         type="button"
         disabled={disabled}
-        className={`type-picker__trigger${className ? ` ${className}` : ""}`}
-        style={currentType ? { borderColor: `${currentType.color}55`, color: currentType.color, backgroundColor: `${currentType.color}15` } : undefined}
+        className={`type-picker__trigger${className ? ` ${className}` : ''}`}
+        style={
+          currentType
+            ? {
+                borderColor: `${currentType.color}55`,
+                color: currentType.color,
+                backgroundColor: `${currentType.color}15`,
+              }
+            : undefined
+        }
         onClick={open}
         title={disabled ? undefined : `Type: ${currentType?.label ?? typeId} (Click to convert)`}
         aria-label={`Convert type from ${currentType?.label ?? typeId}`}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
       >
-        <span className="type-picker__swatch" style={{ background: currentType?.color ?? "var(--chrome-text-dim)" }} />
+        <span
+          className="type-picker__swatch"
+          style={{ background: currentType?.color ?? 'var(--chrome-text-dim)' }}
+        />
         <span className="type-picker__label">{currentType?.label ?? typeId}</span>
         {!disabled && <ChevronDown size={10} className="type-picker__chevron" />}
       </button>
@@ -110,7 +123,12 @@ export function TypePicker({ doc, typeId, onChange, disabled, className }: TypeP
             ref={dropdownRef}
             className="type-picker__dropdown"
             role="listbox"
-            style={{ position: "fixed", top: dropdownPos.top, left: dropdownPos.left, width: DROPDOWN_WIDTH }}
+            style={{
+              position: 'fixed',
+              top: dropdownPos.top,
+              left: dropdownPos.left,
+              width: DROPDOWN_WIDTH,
+            }}
           >
             <div className="type-picker__header">
               <span>Convert Type</span>
@@ -122,7 +140,7 @@ export function TypePicker({ doc, typeId, onChange, disabled, className }: TypeP
                   <button
                     key={type.id}
                     type="button"
-                    className={`type-picker__option${isSelected ? " is-selected" : ""}`}
+                    className={`type-picker__option${isSelected ? ' is-selected' : ''}`}
                     onClick={() => {
                       if (!isSelected) {
                         onChange(type.id);
@@ -134,7 +152,10 @@ export function TypePicker({ doc, typeId, onChange, disabled, className }: TypeP
                     <span className="type-picker__option-name">{type.label}</span>
                     <span className="type-picker__option-prefix">({type.prefix})</span>
                     {type.isWorkable && (
-                      <span title="Workable item" style={{ display: "inline-flex", alignItems: "center" }}>
+                      <span
+                        title="Workable item"
+                        style={{ display: 'inline-flex', alignItems: 'center' }}
+                      >
                         <Briefcase size={11} className="type-picker__workable-icon" />
                       </span>
                     )}
@@ -144,7 +165,7 @@ export function TypePicker({ doc, typeId, onChange, disabled, className }: TypeP
               })}
             </div>
           </div>,
-          document.body
+          document.body,
         )}
     </>
   );

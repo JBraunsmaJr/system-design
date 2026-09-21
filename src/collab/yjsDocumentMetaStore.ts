@@ -22,14 +22,14 @@
  * own. Every write replaces the value atomically, so a peer never observes a
  * half-applied list.
  */
-import * as Y from "yjs";
-import type { Scenario } from "../domain/types.ts";
+import * as Y from 'yjs';
+import type { Scenario } from '../domain/types.ts';
 
-export const META_MAP = "meta";
-const TITLE = "title";
-const SCENARIOS = "scenarios";
+export const META_MAP = 'meta';
+const TITLE = 'title';
+const SCENARIOS = 'scenarios';
 
-export const DEFAULT_DOCUMENT_TITLE = "Untitled Diagram";
+export const DEFAULT_DOCUMENT_TITLE = 'Untitled Diagram';
 
 export interface DocumentMeta {
   title: string;
@@ -64,7 +64,7 @@ export function createYjsDocumentMetaStore(doc: Y.Doc): DocumentMetaStore {
     const title = meta.get(TITLE);
     const scenarios = meta.get(SCENARIOS);
     return {
-      title: typeof title === "string" ? title : DEFAULT_DOCUMENT_TITLE,
+      title: typeof title === 'string' ? title : DEFAULT_DOCUMENT_TITLE,
       scenarios: Array.isArray(scenarios) ? (scenarios as Scenario[]) : EMPTY_SCENARIOS,
     };
   };
@@ -102,7 +102,13 @@ export function createYjsDocumentMetaStore(doc: Y.Doc): DocumentMetaStore {
  */
 export function seedYjsDocumentMeta(doc: Y.Doc, initial: Partial<DocumentMeta>): void {
   const meta = doc.getMap<unknown>(META_MAP);
-  const needsTitle = !meta.has(TITLE) && initial.title !== undefined;
+  // The placeholder title is never written. getSnapshot already reports it
+  // for a document that has none, so writing it gains nothing - and it
+  // costs something: a browser opening a shared document it has no copy of
+  // seeds a new one first, and a written placeholder then competes with
+  // the real title as an ordinary concurrent edit, at random (WS8-R4).
+  const seedsPlaceholder = initial.title === DEFAULT_DOCUMENT_TITLE;
+  const needsTitle = !meta.has(TITLE) && initial.title !== undefined && !seedsPlaceholder;
   const needsScenarios = !meta.has(SCENARIOS) && initial.scenarios !== undefined;
   if (!needsTitle && !needsScenarios) return;
   doc.transact(() => {

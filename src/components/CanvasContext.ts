@@ -1,5 +1,5 @@
-import { createContext, useContext } from "react";
-import type { ArchEdgeDataPatch, EdgeWaypoint } from "../domain/types";
+import { createContext, useContext } from 'react';
+import type { ArchEdgeDataPatch, EdgeWaypoint } from '../domain/types';
 
 export interface CanvasContextValue {
   isPresenting: boolean;
@@ -9,7 +9,11 @@ export interface CanvasContextValue {
   onChangeTextNode: (nodeId: string, text: string) => void;
   onChangeCodeNode: (nodeId: string, code: string) => void;
   onUpdateEdge?: (id: string, patch: ArchEdgeDataPatch) => void;
-  onAdoptIntoGroup?: (groupId: string, nodeIds: string[], groupPosition?: { x: number; y: number }) => void;
+  onAdoptIntoGroup?: (
+    groupId: string,
+    nodeIds: string[],
+    groupPosition?: { x: number; y: number },
+  ) => void;
   /** Bend manipulation, reaching TypedEdge the same way onUpdateEdge
    * already does. Three separate named callbacks rather than one
    * "set the waypoints" callback, because that's the shape the store
@@ -17,13 +21,17 @@ export interface CanvasContextValue {
    * why a wholesale array replace is the one thing that must not
    * happen here. */
   onAddEdgeWaypoint?: (edgeId: string, index: number, waypoint: EdgeWaypoint) => void;
-  onMoveEdgeWaypoint?: (edgeId: string, waypointId: string, position: { x: number; y: number }) => void;
+  onMoveEdgeWaypoint?: (
+    edgeId: string,
+    waypointId: string,
+    position: { x: number; y: number },
+  ) => void;
   /** Ends a bend drag: the edge's in-flight bends are written once (WS4-R2). */
   onEndEdgeGesture?: (edgeId: string) => void;
   /** Previews a label drag; onEndEdgeGesture writes it once. */
   onPreviewEdgeLabel?: (
     edgeId: string,
-    placement: { labelAnchorT: number; labelOffsetX: number; labelOffsetY: number }
+    placement: { labelAnchorT: number; labelOffsetX: number; labelOffsetY: number },
   ) => void;
   onRemoveEdgeWaypoint?: (edgeId: string, waypointId: string) => void;
 }

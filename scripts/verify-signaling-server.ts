@@ -31,16 +31,16 @@
  * is the content-blind relay its own source suggests, not just assumed
  * to be from reading the code.
  */
-import { spawn, spawnSync, type ChildProcess } from "child_process";
-import WebSocket from "ws";
+import { spawn, spawnSync, type ChildProcess } from 'child_process';
+import WebSocket from 'ws';
 
 let failures = 0;
 function assert(cond: boolean, msg: string) {
   if (!cond) {
-    console.error("FAIL:", msg);
+    console.error('FAIL:', msg);
     failures++;
   } else {
-    console.log("ok:", msg);
+    console.log('ok:', msg);
   }
 }
 
@@ -49,7 +49,7 @@ function waitFor(cond: () => boolean, timeoutMs = 3000): Promise<void> {
     const start = Date.now();
     const check = () => {
       if (cond()) return resolve();
-      if (Date.now() - start > timeoutMs) return reject(new Error("timeout waiting for condition"));
+      if (Date.now() - start > timeoutMs) return reject(new Error('timeout waiting for condition'));
       setTimeout(check, 20);
     };
     check();
@@ -58,14 +58,18 @@ function waitFor(cond: () => boolean, timeoutMs = 3000): Promise<void> {
 
 function killServer(proc: ChildProcess | null) {
   if (!proc || proc.pid === undefined) return;
-  if (process.platform === "win32") {
+  if (process.platform === 'win32') {
     try {
-      spawnSync("taskkill", ["/pid", String(proc.pid), "/T", "/F"], { stdio: "ignore" });
+      spawnSync('taskkill', ['/pid', String(proc.pid), '/T', '/F'], { stdio: 'ignore' });
     } catch {
-      proc.kill("SIGKILL");
+      proc.kill('SIGKILL');
     }
   } else {
-    proc.kill("SIGKILL");
+    try {
+      process.kill(-proc.pid, 'SIGKILL');
+    } catch {
+      proc.kill('SIGKILL');
+    }
   }
 }
 
@@ -76,40 +80,54 @@ let server: ChildProcess | null = null;
 // connection or an unresolved promise should never be able to leave a
 // process (or the spawned server) running indefinitely.
 const hardExit = setTimeout(() => {
-  console.error("HARD TIMEOUT - forcing exit");
+  console.error('HARD TIMEOUT - forcing exit');
   killServer(server);
   process.exit(1);
 }, 8000);
 
 try {
-  server = spawn(process.execPath, ["node_modules/y-webrtc/bin/server.js"], {
+  // Both relays are checked against the same protocol expectations:
+  // y-webrtc's own server, which this project has always used, and ours,
+  // which adds authentication (WS10-R6). "Speaks the same protocol" is
+  // then a tested claim rather than an intention. RELAY=ours runs only the
+  // second; the default runs y-webrtc's.
+  const useOurs = process.env.RELAY === 'ours';
+  const entry = useOurs ? 'scripts/relay-server.ts' : 'node_modules/y-webrtc/bin/server.js';
+  const readyWhen = useOurs ? 'Relay listening' : 'Signaling server running';
+  server = spawn(process.execPath, useOurs ? ['node_modules/tsx/dist/cli.mjs', entry] : [entry], {
     cwd: process.cwd(),
     env: { ...process.env, PORT: String(PORT) },
+    detached: process.platform !== 'win32',
   });
   let ready = false;
-  server.stdout?.on("data", (d) => {
-    if (d.toString().includes("Signaling server running")) ready = true;
+  server.stdout?.on('data', (d) => {
+    if (d.toString().includes(readyWhen)) ready = true;
   });
 
   await waitFor(() => ready);
-  assert(true, "the real, unmodified signaling server (y-webrtc's own bin/server.js) starts and reports ready");
+  assert(
+    true,
+    useOurs
+      ? 'our own relay (scripts/relay-server.ts) starts and reports ready'
+      : "the real, unmodified signaling server (y-webrtc's own bin/server.js) starts and reports ready",
+  );
 
   const clientA = new WebSocket(`ws://localhost:${PORT}`);
   const clientB = new WebSocket(`ws://localhost:${PORT}`);
   await Promise.all([
-    new Promise((res) => clientA.on("open", res)),
-    new Promise((res) => clientB.on("open", res)),
+    new Promise((res) => clientA.on('open', res)),
+    new Promise((res) => clientB.on('open', res)),
   ]);
-  assert(true, "two independent WebSocket clients connect to the signaling server");
+  assert(true, 'two independent WebSocket clients connect to the signaling server');
 
-  const ROOM = "verify-room-xyz";
-  clientA.send(JSON.stringify({ type: "subscribe", topics: [ROOM] }));
-  clientB.send(JSON.stringify({ type: "subscribe", topics: [ROOM] }));
+  const ROOM = 'verify-room-xyz';
+  clientA.send(JSON.stringify({ type: 'subscribe', topics: [ROOM] }));
+  clientB.send(JSON.stringify({ type: 'subscribe', topics: [ROOM] }));
 
   let receivedByB: { data: unknown } | null = null;
-  clientB.on("message", (raw: { toString: () => string }) => {
+  clientB.on('message', (raw: { toString: () => string }) => {
     const msg = JSON.parse(raw.toString());
-    if (msg.type === "publish") receivedByB = msg;
+    if (msg.type === 'publish') receivedByB = msg;
   });
 
   await new Promise((res) => setTimeout(res, 200)); // let subscriptions land
@@ -117,36 +135,43 @@ try {
   // Structurally similar to what y-webrtc itself actually sends (an SDP
   // offer/answer or ICE candidate) - the point is the server never
   // inspects or cares what this payload means, it just relays it.
-  const opaquePayload = { sdp: "v=0\r\no=- fake-session-id ...", type: "offer" };
-  clientA.send(JSON.stringify({ type: "publish", topic: ROOM, data: opaquePayload }));
+  const opaquePayload = { sdp: 'v=0\r\no=- fake-session-id ...', type: 'offer' };
+  clientA.send(JSON.stringify({ type: 'publish', topic: ROOM, data: opaquePayload }));
 
   await waitFor(() => receivedByB !== null);
-  assert(true, "a message published by client A to the shared room is received by client B, who's subscribed to the same room");
   assert(
-    JSON.stringify((receivedByB as { data: unknown } | null)?.data) === JSON.stringify(opaquePayload),
-    "the relayed payload arrives at client B completely unmodified - confirming the server is genuinely content-blind, just forwarding whatever bytes it's given by topic"
+    true,
+    "a message published by client A to the shared room is received by client B, who's subscribed to the same room",
+  );
+  assert(
+    JSON.stringify((receivedByB as { data: unknown } | null)?.data) ===
+      JSON.stringify(opaquePayload),
+    "the relayed payload arrives at client B completely unmodified - confirming the server is genuinely content-blind, just forwarding whatever bytes it's given by topic",
   );
 
   const clientC = new WebSocket(`ws://localhost:${PORT}`);
-  await new Promise((res) => clientC.on("open", res));
+  await new Promise((res) => clientC.on('open', res));
   let receivedByC = false;
-  clientC.on("message", () => {
+  clientC.on('message', () => {
     receivedByC = true;
   });
-  clientA.send(JSON.stringify({ type: "publish", topic: ROOM, data: { second: "message" } }));
+  clientA.send(JSON.stringify({ type: 'publish', topic: ROOM, data: { second: 'message' } }));
   await new Promise((res) => setTimeout(res, 200));
-  assert(!receivedByC, "a client NOT subscribed to the room receives nothing from it - topic-based isolation works, rooms don't leak into each other");
+  assert(
+    !receivedByC,
+    "a client NOT subscribed to the room receives nothing from it - topic-based isolation works, rooms don't leak into each other",
+  );
 
   clientA.close();
   clientB.close();
   clientC.close();
 } catch (err) {
-  console.error("FAIL:", (err as Error).message);
+  console.error('FAIL:', (err as Error).message);
   failures++;
 } finally {
   clearTimeout(hardExit);
   killServer(server);
 }
 
-console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);
-process.exitCode = failures === 0 ? 0 : 1;
+console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);
+process.exit(failures === 0 ? 0 : 1);

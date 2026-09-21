@@ -17,9 +17,7 @@
           "owner": "platform-team",
           "tier": "1"
         },
-        "tags": [
-          "fixture"
-        ],
+        "tags": ["fixture"],
         "color": "#4f46e5",
         "zIndex": 2
       }
@@ -39,9 +37,7 @@
           "owner": "platform-team",
           "tier": "1"
         },
-        "tags": [
-          "fixture"
-        ],
+        "tags": ["fixture"],
         "subDiagram": {
           "nodes": [
             {
@@ -59,9 +55,7 @@
                   "owner": "platform-team",
                   "tier": "1"
                 },
-                "tags": [
-                  "fixture"
-                ],
+                "tags": ["fixture"],
                 "subDiagram": {
                   "nodes": [
                     {
@@ -79,9 +73,7 @@
                           "owner": "platform-team",
                           "tier": "1"
                         },
-                        "tags": [
-                          "fixture"
-                        ]
+                        "tags": ["fixture"]
                       }
                     }
                   ],
@@ -104,9 +96,7 @@
                   "owner": "platform-team",
                   "tier": "1"
                 },
-                "tags": [
-                  "fixture"
-                ]
+                "tags": ["fixture"]
               }
             }
           ],
@@ -139,9 +129,7 @@
           "owner": "platform-team",
           "tier": "1"
         },
-        "tags": [
-          "fixture"
-        ]
+        "tags": ["fixture"]
       }
     },
     {
@@ -159,9 +147,7 @@
           "owner": "platform-team",
           "tier": "1"
         },
-        "tags": [
-          "fixture"
-        ],
+        "tags": ["fixture"],
         "textColor": "#111827",
         "fontSize": 14
       }
@@ -181,9 +167,7 @@
           "owner": "platform-team",
           "tier": "1"
         },
-        "tags": [
-          "fixture"
-        ]
+        "tags": ["fixture"]
       }
     }
   ],

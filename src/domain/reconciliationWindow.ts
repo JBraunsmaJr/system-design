@@ -11,12 +11,14 @@ export const DEFAULT_RECONCILIATION_WINDOW_DAYS = 30;
 export const MINIMUM_RECONCILIATION_WINDOW_DAYS = 7;
 
 export function resolveReconciliationWindowDays(configured: unknown): number {
-  const days = typeof configured === "string" && configured.trim() !== "" ? Number(configured) : Number.NaN;
+  const days =
+    typeof configured === 'string' && configured.trim() !== '' ? Number(configured) : Number.NaN;
   if (!Number.isFinite(days)) return DEFAULT_RECONCILIATION_WINDOW_DAYS;
   return Math.max(MINIMUM_RECONCILIATION_WINDOW_DAYS, Math.round(days));
 }
 
 export function reconciliationWindowMs(): number {
-  const configured = (import.meta as unknown as { env?: Record<string, unknown> }).env?.VITE_RECONCILIATION_WINDOW_DAYS;
+  const configured = (import.meta as unknown as { env?: Record<string, unknown> }).env
+    ?.VITE_RECONCILIATION_WINDOW_DAYS;
   return resolveReconciliationWindowDays(configured) * 86_400_000;
 }

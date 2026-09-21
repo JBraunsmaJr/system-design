@@ -1,5 +1,10 @@
-import type { ProgramIncrement, CapacityReservation } from "../domain/programIncrements";
-import { updateSprintEndDate, updatePIStartDate, getNextPIStartDate, DEFAULT_SPRINT_DURATION_DAYS } from "../domain/programIncrements";
+import type { ProgramIncrement, CapacityReservation } from '../domain/programIncrements';
+import {
+  updateSprintEndDate,
+  updatePIStartDate,
+  getNextPIStartDate,
+  DEFAULT_SPRINT_DURATION_DAYS,
+} from '../domain/programIncrements';
 
 /**
  * ProgramIncrementsStore is the same kind of seam TeamStore and
@@ -46,10 +51,14 @@ export interface ProgramIncrementsStore {
    * duration) result, same as today. */
   updateSprintEnd(piId: string, sprintId: string, newEndDate: string): void;
   deleteSprint(piId: string, sprintId: string): void;
-  moveSprint(piId: string, sprintId: string, direction: "up" | "down"): void;
+  moveSprint(piId: string, sprintId: string, direction: 'up' | 'down'): void;
 
-  addReservation(piId: string, reservation: Omit<CapacityReservation, "id">): void;
-  updateReservation(piId: string, reservationId: string, patch: Omit<CapacityReservation, "id">): void;
+  addReservation(piId: string, reservation: Omit<CapacityReservation, 'id'>): void;
+  updateReservation(
+    piId: string,
+    reservationId: string,
+    patch: Omit<CapacityReservation, 'id'>,
+  ): void;
   deleteReservation(piId: string, reservationId: string): void;
 }
 
@@ -59,7 +68,9 @@ function nextId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${idCounter}`;
 }
 
-export function createLocalProgramIncrementsStore(initial: ProgramIncrement[] = []): ProgramIncrementsStore {
+export function createLocalProgramIncrementsStore(
+  initial: ProgramIncrement[] = [],
+): ProgramIncrementsStore {
   let pis: ProgramIncrement[] = initial;
   const listeners = new Set<() => void>();
 
@@ -80,10 +91,12 @@ export function createLocalProgramIncrementsStore(initial: ProgramIncrement[] = 
 
     addPI: () => {
       const newPI: ProgramIncrement = {
-        id: nextId("pi"),
+        id: nextId('pi'),
         name: `PI ${pis.length + 1}`,
         startDate: getNextPIStartDate(pis),
-        sprints: [{ id: nextId("sprint"), name: "Sprint 1", durationDays: DEFAULT_SPRINT_DURATION_DAYS }],
+        sprints: [
+          { id: nextId('sprint'), name: 'Sprint 1', durationDays: DEFAULT_SPRINT_DURATION_DAYS },
+        ],
       };
       pis = [...pis, newPI];
       notify();
@@ -112,17 +125,23 @@ export function createLocalProgramIncrementsStore(initial: ProgramIncrement[] = 
               ...pi,
               sprints: [
                 ...pi.sprints,
-                { id: nextId("sprint"), name: `Sprint ${pi.sprints.length + 1}`, durationDays: DEFAULT_SPRINT_DURATION_DAYS },
+                {
+                  id: nextId('sprint'),
+                  name: `Sprint ${pi.sprints.length + 1}`,
+                  durationDays: DEFAULT_SPRINT_DURATION_DAYS,
+                },
               ],
             }
-          : pi
+          : pi,
       );
       notify();
     },
 
     updateSprintName: (piId, sprintId, name) => {
       pis = pis.map((pi) =>
-        pi.id === piId ? { ...pi, sprints: pi.sprints.map((s) => (s.id === sprintId ? { ...s, name } : s)) } : pi
+        pi.id === piId
+          ? { ...pi, sprints: pi.sprints.map((s) => (s.id === sprintId ? { ...s, name } : s)) }
+          : pi,
       );
       notify();
     },
@@ -133,7 +152,9 @@ export function createLocalProgramIncrementsStore(initial: ProgramIncrement[] = 
     },
 
     deleteSprint: (piId, sprintId) => {
-      pis = pis.map((pi) => (pi.id === piId ? { ...pi, sprints: pi.sprints.filter((s) => s.id !== sprintId) } : pi));
+      pis = pis.map((pi) =>
+        pi.id === piId ? { ...pi, sprints: pi.sprints.filter((s) => s.id !== sprintId) } : pi,
+      );
       notify();
     },
 
@@ -141,7 +162,7 @@ export function createLocalProgramIncrementsStore(initial: ProgramIncrement[] = 
       pis = pis.map((pi) => {
         if (pi.id !== piId) return pi;
         const index = pi.sprints.findIndex((s) => s.id === sprintId);
-        const swapWith = direction === "up" ? index - 1 : index + 1;
+        const swapWith = direction === 'up' ? index - 1 : index + 1;
         if (index === -1 || swapWith < 0 || swapWith >= pi.sprints.length) return pi;
         const sprints = [...pi.sprints];
         [sprints[index], sprints[swapWith]] = [sprints[swapWith], sprints[index]];
@@ -151,9 +172,9 @@ export function createLocalProgramIncrementsStore(initial: ProgramIncrement[] = 
     },
 
     addReservation: (piId, reservation) => {
-      const newReservation: CapacityReservation = { ...reservation, id: nextId("cres") };
+      const newReservation: CapacityReservation = { ...reservation, id: nextId('cres') };
       pis = pis.map((pi) =>
-        pi.id === piId ? { ...pi, reservations: [...(pi.reservations ?? []), newReservation] } : pi
+        pi.id === piId ? { ...pi, reservations: [...(pi.reservations ?? []), newReservation] } : pi,
       );
       notify();
     },
@@ -163,16 +184,20 @@ export function createLocalProgramIncrementsStore(initial: ProgramIncrement[] = 
         pi.id === piId
           ? {
               ...pi,
-              reservations: (pi.reservations ?? []).map((r) => (r.id === reservationId ? { ...patch, id: r.id } : r)),
+              reservations: (pi.reservations ?? []).map((r) =>
+                r.id === reservationId ? { ...patch, id: r.id } : r,
+              ),
             }
-          : pi
+          : pi,
       );
       notify();
     },
 
     deleteReservation: (piId, reservationId) => {
       pis = pis.map((pi) =>
-        pi.id === piId ? { ...pi, reservations: (pi.reservations ?? []).filter((r) => r.id !== reservationId) } : pi
+        pi.id === piId
+          ? { ...pi, reservations: (pi.reservations ?? []).filter((r) => r.id !== reservationId) }
+          : pi,
       );
       notify();
     },
@@ -189,7 +214,7 @@ export function createLocalProgramIncrementsStore(initial: ProgramIncrement[] = 
  */
 export function createAdapterProgramIncrementsStore(
   getSnapshot: () => ProgramIncrement[],
-  setSnapshot: (updater: (prev: ProgramIncrement[]) => ProgramIncrement[]) => void
+  setSnapshot: (updater: (prev: ProgramIncrement[]) => ProgramIncrement[]) => void,
 ): ProgramIncrementsStore {
   return {
     getSnapshot,
@@ -202,10 +227,12 @@ export function createAdapterProgramIncrementsStore(
     addPI: () => {
       const currentPis = getSnapshot();
       const newPI: ProgramIncrement = {
-        id: nextId("pi"),
+        id: nextId('pi'),
         name: `PI ${currentPis.length + 1}`,
         startDate: getNextPIStartDate(currentPis),
-        sprints: [{ id: nextId("sprint"), name: "Sprint 1", durationDays: DEFAULT_SPRINT_DURATION_DAYS }],
+        sprints: [
+          { id: nextId('sprint'), name: 'Sprint 1', durationDays: DEFAULT_SPRINT_DURATION_DAYS },
+        ],
       };
       setSnapshot((prev) => [...prev, newPI]);
       return newPI.id;
@@ -216,7 +243,9 @@ export function createAdapterProgramIncrementsStore(
     },
 
     updatePIStart: (piId, startDate) => {
-      setSnapshot((prev) => prev.map((pi) => (pi.id === piId ? updatePIStartDate(pi, startDate) : pi)));
+      setSnapshot((prev) =>
+        prev.map((pi) => (pi.id === piId ? updatePIStartDate(pi, startDate) : pi)),
+      );
     },
 
     deletePI: (piId) => {
@@ -231,29 +260,39 @@ export function createAdapterProgramIncrementsStore(
                 ...pi,
                 sprints: [
                   ...pi.sprints,
-                  { id: nextId("sprint"), name: `Sprint ${pi.sprints.length + 1}`, durationDays: DEFAULT_SPRINT_DURATION_DAYS },
+                  {
+                    id: nextId('sprint'),
+                    name: `Sprint ${pi.sprints.length + 1}`,
+                    durationDays: DEFAULT_SPRINT_DURATION_DAYS,
+                  },
                 ],
               }
-            : pi
-        )
+            : pi,
+        ),
       );
     },
 
     updateSprintName: (piId, sprintId, name) => {
       setSnapshot((prev) =>
         prev.map((pi) =>
-          pi.id === piId ? { ...pi, sprints: pi.sprints.map((s) => (s.id === sprintId ? { ...s, name } : s)) } : pi
-        )
+          pi.id === piId
+            ? { ...pi, sprints: pi.sprints.map((s) => (s.id === sprintId ? { ...s, name } : s)) }
+            : pi,
+        ),
       );
     },
 
     updateSprintEnd: (piId, sprintId, newEndDate) => {
-      setSnapshot((prev) => prev.map((pi) => (pi.id === piId ? updateSprintEndDate(pi, sprintId, newEndDate) : pi)));
+      setSnapshot((prev) =>
+        prev.map((pi) => (pi.id === piId ? updateSprintEndDate(pi, sprintId, newEndDate) : pi)),
+      );
     },
 
     deleteSprint: (piId, sprintId) => {
       setSnapshot((prev) =>
-        prev.map((pi) => (pi.id === piId ? { ...pi, sprints: pi.sprints.filter((s) => s.id !== sprintId) } : pi))
+        prev.map((pi) =>
+          pi.id === piId ? { ...pi, sprints: pi.sprints.filter((s) => s.id !== sprintId) } : pi,
+        ),
       );
     },
 
@@ -262,19 +301,23 @@ export function createAdapterProgramIncrementsStore(
         prev.map((pi) => {
           if (pi.id !== piId) return pi;
           const index = pi.sprints.findIndex((s) => s.id === sprintId);
-          const swapWith = direction === "up" ? index - 1 : index + 1;
+          const swapWith = direction === 'up' ? index - 1 : index + 1;
           if (index === -1 || swapWith < 0 || swapWith >= pi.sprints.length) return pi;
           const sprints = [...pi.sprints];
           [sprints[index], sprints[swapWith]] = [sprints[swapWith], sprints[index]];
           return { ...pi, sprints };
-        })
+        }),
       );
     },
 
     addReservation: (piId, reservation) => {
-      const newReservation: CapacityReservation = { ...reservation, id: nextId("cres") };
+      const newReservation: CapacityReservation = { ...reservation, id: nextId('cres') };
       setSnapshot((prev) =>
-        prev.map((pi) => (pi.id === piId ? { ...pi, reservations: [...(pi.reservations ?? []), newReservation] } : pi))
+        prev.map((pi) =>
+          pi.id === piId
+            ? { ...pi, reservations: [...(pi.reservations ?? []), newReservation] }
+            : pi,
+        ),
       );
     },
 
@@ -284,18 +327,22 @@ export function createAdapterProgramIncrementsStore(
           pi.id === piId
             ? {
                 ...pi,
-                reservations: (pi.reservations ?? []).map((r) => (r.id === reservationId ? { ...patch, id: r.id } : r)),
+                reservations: (pi.reservations ?? []).map((r) =>
+                  r.id === reservationId ? { ...patch, id: r.id } : r,
+                ),
               }
-            : pi
-        )
+            : pi,
+        ),
       );
     },
 
     deleteReservation: (piId, reservationId) => {
       setSnapshot((prev) =>
         prev.map((pi) =>
-          pi.id === piId ? { ...pi, reservations: (pi.reservations ?? []).filter((r) => r.id !== reservationId) } : pi
-        )
+          pi.id === piId
+            ? { ...pi, reservations: (pi.reservations ?? []).filter((r) => r.id !== reservationId) }
+            : pi,
+        ),
       );
     },
   };

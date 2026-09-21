@@ -3,9 +3,9 @@ name: Performance Testing
 on:
   workflow_dispatch:
   release:
-    types: [ published ]
+    types: [published]
   pull_request:
-    types: [ opened, synchronize, reopened, labeled ]
+    types: [opened, synchronize, reopened, labeled]
 
 permissions:
   contents: read

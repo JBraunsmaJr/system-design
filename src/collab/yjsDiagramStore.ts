@@ -1,10 +1,10 @@
-import * as Y from "yjs";
-import { orderIdSet, pushIfAbsent } from "./seedGuards.ts";
-import type { Node, Edge } from "@xyflow/react";
-import type { ArchNodeData, ArchEdgeData, EdgeWaypoint, SubDiagram } from "../domain/types";
-import type { DiagramStore } from "./diagramStore";
-import { flattenSubDiagramTree } from "./diagramStore";
-import { recordSnapshotBuild, recordStoreWrite } from "../perf/instrumentation";
+import * as Y from 'yjs';
+import { orderIdSet, pushIfAbsent } from './seedGuards.ts';
+import type { Node, Edge } from '@xyflow/react';
+import type { ArchNodeData, ArchEdgeData, EdgeWaypoint, SubDiagram } from '../domain/types';
+import type { DiagramStore } from './diagramStore';
+import { flattenSubDiagramTree } from './diagramStore';
+import { recordSnapshotBuild, recordStoreWrite } from '../perf/instrumentation';
 
 /** Node and edge ids are purely internal (never displayed - React Flow
  * uses them as keys and connection endpoints, nothing more), so - same
@@ -16,19 +16,19 @@ function collisionResistantId(prefix: string): string {
 }
 
 const NODE_DATA_FIELDS = [
-  "nodeType",
-  "label",
-  "description",
-  "properties",
-  "tags",
-  "textColor",
-  "fontSize",
-  "color",
-  "icon",
-  "codeContent",
-  "codeLanguage",
-  "linkedRequirementIds",
-  "zIndex",
+  'nodeType',
+  'label',
+  'description',
+  'properties',
+  'tags',
+  'textColor',
+  'fontSize',
+  'color',
+  'icon',
+  'codeContent',
+  'codeLanguage',
+  'linkedRequirementIds',
+  'zIndex',
 ] as const;
 
 /**
@@ -38,15 +38,15 @@ const NODE_DATA_FIELDS = [
  * different parts of at once - see WAYPOINTS_KEY below.
  */
 const EDGE_DATA_FIELDS = [
-  "edgeType",
-  "label",
-  "direction",
-  "hideLabel",
-  "color",
-  "labelAnchorT",
-  "labelOffsetX",
-  "labelOffsetY",
-  "properties",
+  'edgeType',
+  'label',
+  'direction',
+  'hideLabel',
+  'color',
+  'labelAnchorT',
+  'labelOffsetX',
+  'labelOffsetY',
+  'properties',
 ] as const;
 
 /**
@@ -84,13 +84,13 @@ const EDGE_DATA_FIELDS = [
  * the whole thing is replaced at once (properties, parentPath). Bends
  * have four dedicated patch operations, so they nest.
  */
-const WAYPOINTS_KEY = "waypoints";
+const WAYPOINTS_KEY = 'waypoints';
 
 function makeWaypointMap(waypoint: EdgeWaypoint): Y.Map<unknown> {
   const m = new Y.Map<unknown>();
-  m.set("id", waypoint.id);
-  m.set("x", waypoint.x);
-  m.set("y", waypoint.y);
+  m.set('id', waypoint.id);
+  m.set('x', waypoint.x);
+  m.set('y', waypoint.y);
   return m;
 }
 
@@ -127,7 +127,7 @@ function ensureWaypointArray(edgeMap: Y.Map<unknown>): Y.Array<Y.Map<unknown>> {
 function waypointIndexById(array: Y.Array<Y.Map<unknown>>, waypointId: string): number {
   const items = array.toArray();
   for (let i = 0; i < items.length; i++) {
-    if (items[i]?.get("id") === waypointId) return i;
+    if (items[i]?.get('id') === waypointId) return i;
   }
   return -1;
 }
@@ -169,10 +169,14 @@ function waypointIndexById(array: Y.Array<Y.Map<unknown>>, waypointId: string): 
  * already treats a missing level as the root.
  */
 function setLevel(m: Y.Map<unknown>, parentPath: string[] | undefined): void {
-  if (parentPath && parentPath.length > 0) m.set("parentPath", parentPath);
+  if (parentPath && parentPath.length > 0) m.set('parentPath', parentPath);
 }
 
-function setDefinedFields(m: Y.Map<unknown>, fields: readonly string[], source: Record<string, unknown>): void {
+function setDefinedFields(
+  m: Y.Map<unknown>,
+  fields: readonly string[],
+  source: Record<string, unknown>,
+): void {
   for (const field of fields) {
     const value = source[field];
     if (value !== undefined) m.set(field, value);
@@ -181,10 +185,10 @@ function setDefinedFields(m: Y.Map<unknown>, fields: readonly string[], source: 
 
 export function seedYjsDiagramDoc(doc: Y.Doc, root: SubDiagram): void {
   const { nodes, edges } = flattenSubDiagramTree(root);
-  const nodeOrder = doc.getArray<string>("nodeOrder");
-  const nodesMap = doc.getMap<Y.Map<unknown>>("nodes");
-  const edgeOrder = doc.getArray<string>("edgeOrder");
-  const edgesMap = doc.getMap<Y.Map<unknown>>("edges");
+  const nodeOrder = doc.getArray<string>('nodeOrder');
+  const nodesMap = doc.getMap<Y.Map<unknown>>('nodes');
+  const edgeOrder = doc.getArray<string>('edgeOrder');
+  const edgesMap = doc.getMap<Y.Map<unknown>>('edges');
   // Seeding must be safe to attempt against a document that persistence has
   // already restored - see seedGuards.ts.
   const seenNodes = orderIdSet(nodeOrder);
@@ -194,12 +198,12 @@ export function seedYjsDiagramDoc(doc: Y.Doc, root: SubDiagram): void {
     for (const node of nodes) {
       if (seenNodes.has(node.id) || nodesMap.has(node.id)) continue;
       const m = new Y.Map<unknown>();
-      m.set("type", node.type);
-      m.set("position", node.position);
+      m.set('type', node.type);
+      m.set('position', node.position);
       setLevel(m, (node.data as ArchNodeData & { parentPath?: string[] }).parentPath);
-      if (node.parentId !== undefined) m.set("parentId", node.parentId);
-      if (node.width !== undefined) m.set("width", node.width);
-      if (node.height !== undefined) m.set("height", node.height);
+      if (node.parentId !== undefined) m.set('parentId', node.parentId);
+      if (node.width !== undefined) m.set('width', node.width);
+      if (node.height !== undefined) m.set('height', node.height);
       setDefinedFields(m, NODE_DATA_FIELDS, node.data as Record<string, unknown>);
       nodesMap.set(node.id, m);
       pushIfAbsent(nodeOrder, seenNodes, node.id);
@@ -207,12 +211,12 @@ export function seedYjsDiagramDoc(doc: Y.Doc, root: SubDiagram): void {
     for (const edge of edges) {
       if (seenEdges.has(edge.id) || edgesMap.has(edge.id)) continue;
       const m = new Y.Map<unknown>();
-      m.set("source", edge.source);
-      m.set("target", edge.target);
-      m.set("type", edge.type ?? "typed");
+      m.set('source', edge.source);
+      m.set('target', edge.target);
+      m.set('type', edge.type ?? 'typed');
       setLevel(m, (edge.data as ArchEdgeData & { parentPath?: string[] }).parentPath);
-      if (edge.sourceHandle !== undefined) m.set("sourceHandle", edge.sourceHandle);
-      if (edge.targetHandle !== undefined) m.set("targetHandle", edge.targetHandle);
+      if (edge.sourceHandle !== undefined) m.set('sourceHandle', edge.sourceHandle);
+      if (edge.targetHandle !== undefined) m.set('targetHandle', edge.targetHandle);
       setDefinedFields(m, EDGE_DATA_FIELDS, (edge.data ?? {}) as Record<string, unknown>);
       // Bends carried in from local state have to be rebuilt as real
       // nested shared types, not set as the plain array they arrive as -
@@ -229,7 +233,6 @@ export function seedYjsDiagramDoc(doc: Y.Doc, root: SubDiagram): void {
     }
   });
 }
-
 
 /**
  * Yjs-backed DiagramStore. See diagramStore.ts for the full rationale
@@ -261,36 +264,40 @@ export function seedYjsDiagramDoc(doc: Y.Doc, root: SubDiagram): void {
  * to protect with nesting.
  */
 export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
-  const nodeOrder = doc.getArray<string>("nodeOrder");
-  const nodesMap = doc.getMap<Y.Map<unknown>>("nodes");
-  const edgeOrder = doc.getArray<string>("edgeOrder");
-  const edgesMap = doc.getMap<Y.Map<unknown>>("edges");
+  const nodeOrder = doc.getArray<string>('nodeOrder');
+  const nodesMap = doc.getMap<Y.Map<unknown>>('nodes');
+  const edgeOrder = doc.getArray<string>('edgeOrder');
+  const edgesMap = doc.getMap<Y.Map<unknown>>('edges');
 
   function nodeMapToPlain(id: string, m: Y.Map<unknown>): Node<ArchNodeData> {
     // Absent means the root level - see setLevel.
-    const data: Record<string, unknown> = { parentPath: (m.get("parentPath") as string[] | undefined) ?? [] };
+    const data: Record<string, unknown> = {
+      parentPath: (m.get('parentPath') as string[] | undefined) ?? [],
+    };
     for (const field of NODE_DATA_FIELDS) {
       const value = m.get(field);
       if (value !== undefined) data[field] = value;
     }
     const node: Node<ArchNodeData> = {
       id,
-      type: m.get("type") as string,
-      position: m.get("position") as { x: number; y: number },
+      type: m.get('type') as string,
+      position: m.get('position') as { x: number; y: number },
       data: data as ArchNodeData,
     };
-    const parentId = m.get("parentId") as string | undefined;
+    const parentId = m.get('parentId') as string | undefined;
     if (parentId !== undefined) node.parentId = parentId;
-    const width = m.get("width") as number | undefined;
+    const width = m.get('width') as number | undefined;
     if (width !== undefined) node.width = width;
-    const height = m.get("height") as number | undefined;
+    const height = m.get('height') as number | undefined;
     if (height !== undefined) node.height = height;
     return node;
   }
 
   function edgeMapToPlain(id: string, m: Y.Map<unknown>): Edge<ArchEdgeData> {
     // Absent means the root level - see setLevel.
-    const data: Record<string, unknown> = { parentPath: (m.get("parentPath") as string[] | undefined) ?? [] };
+    const data: Record<string, unknown> = {
+      parentPath: (m.get('parentPath') as string[] | undefined) ?? [],
+    };
     for (const field of EDGE_DATA_FIELDS) {
       const value = m.get(field);
       if (value !== undefined) data[field] = value;
@@ -303,24 +310,22 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
     // that the local and Yjs stores emit the same set of data keys.
     const waypointArray = readWaypointArray(m);
     if (waypointArray && waypointArray.length > 0) {
-      data.waypoints = waypointArray.toArray().map(
-        (w): EdgeWaypoint => ({
-          id: w.get("id") as string,
-          x: w.get("x") as number,
-          y: w.get("y") as number,
-        })
-      );
+      data.waypoints = waypointArray.toArray().map((w): EdgeWaypoint => ({
+        id: w.get('id') as string,
+        x: w.get('x') as number,
+        y: w.get('y') as number,
+      }));
     }
     const edge: Edge<ArchEdgeData> = {
       id,
-      source: m.get("source") as string,
-      target: m.get("target") as string,
-      type: m.get("type") as string,
+      source: m.get('source') as string,
+      target: m.get('target') as string,
+      type: m.get('type') as string,
       data: data as ArchEdgeData,
     };
-    const sourceHandle = m.get("sourceHandle") as string | null | undefined;
+    const sourceHandle = m.get('sourceHandle') as string | null | undefined;
     if (sourceHandle !== undefined) edge.sourceHandle = sourceHandle;
-    const targetHandle = m.get("targetHandle") as string | null | undefined;
+    const targetHandle = m.get('targetHandle') as string | null | undefined;
     if (targetHandle !== undefined) edge.targetHandle = targetHandle;
     return edge;
   }
@@ -346,7 +351,7 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
     dirty: Set<string>,
     id: string,
     source: Y.Map<unknown>,
-    build: (id: string, m: Y.Map<unknown>) => T
+    build: (id: string, m: Y.Map<unknown>) => T,
   ): T {
     const hit = cache.get(id);
     if (hit && hit.source === source && !dirty.has(id)) return hit.plain;
@@ -395,17 +400,18 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
    * A change to the root map itself names the ids in `changes.keys`. Order
    * arrays touch no entry's content, only the sequence.
    */
-  const trackChanges = (dirty: Set<string>) => (events: Array<Y.YEvent<Y.AbstractType<unknown>>>) => {
-    for (const event of events) {
-      const [first] = event.path;
-      if (typeof first === "string") {
-        dirty.add(first);
-      } else if (event.path.length === 0 && event.target instanceof Y.Map) {
-        for (const key of event.changes.keys.keys()) dirty.add(key);
+  const trackChanges =
+    (dirty: Set<string>) => (events: Array<Y.YEvent<Y.AbstractType<unknown>>>) => {
+      for (const event of events) {
+        const [first] = event.path;
+        if (typeof first === 'string') {
+          dirty.add(first);
+        } else if (event.path.length === 0 && event.target instanceof Y.Map) {
+          for (const key of event.changes.keys.keys()) dirty.add(key);
+        }
       }
-    }
-    changed = true;
-  };
+      changed = true;
+    };
   const onNodesChange = trackChanges(dirtyNodes);
   const onEdgesChange = trackChanges(dirtyEdges);
   const onOrderChange = () => {
@@ -428,7 +434,7 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
   edgesMap.observeDeep(onEdgesChange);
   nodeOrder.observe(onOrderChange);
   edgeOrder.observe(onOrderChange);
-  doc.on("afterTransaction", flush);
+  doc.on('afterTransaction', flush);
   let destroyed = false;
 
   function isPathAtOrBelow(path: string[], ancestorPrefix: string[]): boolean {
@@ -448,7 +454,7 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
       edgesMap.unobserveDeep(onEdgesChange);
       nodeOrder.unobserve(onOrderChange);
       edgeOrder.unobserve(onOrderChange);
-      doc.off("afterTransaction", flush);
+      doc.off('afterTransaction', flush);
     },
     replaceAll: (next) => {
       recordStoreWrite();
@@ -470,11 +476,11 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
 
     addNode: (parentPath, type, position, data) => {
       recordStoreWrite();
-      const id = collisionResistantId("node");
+      const id = collisionResistantId('node');
       doc.transact(() => {
         const m = new Y.Map<unknown>();
-        m.set("type", type);
-        m.set("position", position);
+        m.set('type', type);
+        m.set('position', position);
         setLevel(m, parentPath);
         setDefinedFields(m, NODE_DATA_FIELDS, data as Record<string, unknown>);
         nodesMap.set(id, m);
@@ -497,7 +503,7 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
     updatePosition: (id, position) => {
       recordStoreWrite();
       const m = nodesMap.get(id);
-      if (m) m.set("position", position);
+      if (m) m.set('position', position);
     },
 
     updateParentId: (id, parentId, position) => {
@@ -505,8 +511,8 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
       const m = nodesMap.get(id);
       if (!m) return;
       doc.transact(() => {
-        m.set("parentId", parentId);
-        m.set("position", position);
+        m.set('parentId', parentId);
+        m.set('position', position);
       });
     },
 
@@ -515,8 +521,8 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
       const m = nodesMap.get(id);
       if (!m) return;
       doc.transact(() => {
-        m.set("width", width);
-        m.set("height", height);
+        m.set('width', width);
+        m.set('height', height);
       });
     },
 
@@ -524,14 +530,14 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
       recordStoreWrite();
       const targetM = nodesMap.get(id);
       if (!targetM) return;
-      const targetParentPath = (targetM.get("parentPath") as string[]) ?? [];
+      const targetParentPath = (targetM.get('parentPath') as string[]) ?? [];
       const descendantPrefix = [...targetParentPath, id];
 
       const removedIds = new Set<string>([id]);
       for (const nid of nodeOrder.toArray()) {
         if (nid === id) continue;
         const m = nodesMap.get(nid);
-        const path = (m?.get("parentPath") as string[]) ?? [];
+        const path = (m?.get('parentPath') as string[]) ?? [];
         if (isPathAtOrBelow(path, descendantPrefix)) removedIds.add(nid);
       }
 
@@ -544,7 +550,10 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
         for (const eid of edgeOrder.toArray()) {
           const em = edgesMap.get(eid);
           if (!em) continue;
-          if (removedIds.has(em.get("source") as string) || removedIds.has(em.get("target") as string)) {
+          if (
+            removedIds.has(em.get('source') as string) ||
+            removedIds.has(em.get('target') as string)
+          ) {
             edgesMap.delete(eid);
             const idx = edgeOrder.toArray().indexOf(eid);
             if (idx !== -1) edgeOrder.delete(idx, 1);
@@ -555,15 +564,15 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
 
     addEdge: (parentPath, source, target, data, sourceHandle, targetHandle) => {
       recordStoreWrite();
-      const id = collisionResistantId("edge");
+      const id = collisionResistantId('edge');
       doc.transact(() => {
         const m = new Y.Map<unknown>();
-        m.set("source", source);
-        m.set("target", target);
-        m.set("type", "typed");
+        m.set('source', source);
+        m.set('target', target);
+        m.set('type', 'typed');
         setLevel(m, parentPath);
-        if (sourceHandle !== undefined) m.set("sourceHandle", sourceHandle);
-        if (targetHandle !== undefined) m.set("targetHandle", targetHandle);
+        if (sourceHandle !== undefined) m.set('sourceHandle', sourceHandle);
+        if (targetHandle !== undefined) m.set('targetHandle', targetHandle);
         setDefinedFields(m, EDGE_DATA_FIELDS, data as Record<string, unknown>);
         // Empty, but present from the start - so that two peers bending
         // this edge for the first time at the same moment insert into
@@ -611,10 +620,10 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
       // rather than splicing one person's source onto the other's
       // target.
       doc.transact(() => {
-        m.set("source", endpoints.source);
-        m.set("target", endpoints.target);
-        m.set("sourceHandle", endpoints.sourceHandle ?? null);
-        m.set("targetHandle", endpoints.targetHandle ?? null);
+        m.set('source', endpoints.source);
+        m.set('target', endpoints.target);
+        m.set('sourceHandle', endpoints.sourceHandle ?? null);
+        m.set('targetHandle', endpoints.targetHandle ?? null);
       });
     },
 
@@ -643,8 +652,8 @@ export function createYjsDiagramStore(doc: Y.Doc): DiagramStore {
       // array, so a peer inserting or removing a different bend during
       // this drag neither conflicts with it nor gets overwritten by it.
       doc.transact(() => {
-        waypointMap.set("x", position.x);
-        waypointMap.set("y", position.y);
+        waypointMap.set('x', position.x);
+        waypointMap.set('y', position.y);
       });
     },
 

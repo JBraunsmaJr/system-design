@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { Node, Edge } from "@xyflow/react";
-import type { ArchNodeData, ArchEdgeData } from "../../domain/types";
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { Node, Edge } from '@xyflow/react';
+import type { ArchNodeData, ArchEdgeData } from '../../domain/types';
 import {
   hasDocumentation,
   extractNodeDocumentation,
@@ -8,10 +8,10 @@ import {
   DEFAULT_HOVER_DELAY,
   DEFAULT_LEAVE_DELAY,
   type DiagramDocumentation,
-} from "../../domain/diagramDocumentation";
+} from '../../domain/diagramDocumentation';
 
 export interface ActiveTarget {
-  type: "node" | "edge";
+  type: 'node' | 'edge';
   id: string;
   anchor: { x: number; y: number };
 }
@@ -81,7 +81,7 @@ export function useDiagramHoverDocumentation({
   let currentSubtitle: string | undefined;
 
   if (activeTarget) {
-    if (activeTarget.type === "node") {
+    if (activeTarget.type === 'node') {
       const node = nodes.find((n) => n.id === activeTarget.id);
       if (node) {
         const extracted = extractNodeDocumentation(node);
@@ -91,7 +91,7 @@ export function useDiagramHoverDocumentation({
           currentSubtitle = extracted.subtitle;
         }
       }
-    } else if (activeTarget.type === "edge") {
+    } else if (activeTarget.type === 'edge') {
       const edge = edges.find((e) => e.id === activeTarget.id);
       if (edge) {
         const extracted = extractEdgeDocumentation(edge);
@@ -127,11 +127,11 @@ export function useDiagramHoverDocumentation({
 
       if (isOpen && activeTarget?.id !== node.id) {
         // If popup is already open from another element, switch smoothly
-        setActiveTarget({ type: "node", id: node.id, anchor });
+        setActiveTarget({ type: 'node', id: node.id, anchor });
         setIsOpen(true);
       } else {
         clearHoverTimer();
-        const pending: ActiveTarget = { type: "node", id: node.id, anchor };
+        const pending: ActiveTarget = { type: 'node', id: node.id, anchor };
         pendingTargetRef.current = pending;
         hoverTimerRef.current = setTimeout(() => {
           setActiveTarget(pendingTargetRef.current || pending);
@@ -139,7 +139,15 @@ export function useDiagramHoverDocumentation({
         }, hoverDelay);
       }
     },
-    [disabled, isOpen, activeTarget?.id, hoverDelay, clearLeaveTimer, clearHoverTimer, closeDocumentation]
+    [
+      disabled,
+      isOpen,
+      activeTarget?.id,
+      hoverDelay,
+      clearLeaveTimer,
+      clearHoverTimer,
+      closeDocumentation,
+    ],
   );
 
   const handleNodeMouseMove = useCallback(
@@ -153,7 +161,7 @@ export function useDiagramHoverDocumentation({
         setActiveTarget((prev) => (prev ? { ...prev, anchor } : null));
       }
     },
-    [disabled, isOpen, activeTarget?.id]
+    [disabled, isOpen, activeTarget?.id],
   );
 
   const handleNodeMouseLeave = useCallback(
@@ -167,7 +175,7 @@ export function useDiagramHoverDocumentation({
         }, leaveDelay);
       }
     },
-    [disabled, isOpen, leaveDelay, clearHoverTimer, clearLeaveTimer, closeDocumentation]
+    [disabled, isOpen, leaveDelay, clearHoverTimer, clearLeaveTimer, closeDocumentation],
   );
 
   // Mouse handlers for Edges
@@ -184,11 +192,11 @@ export function useDiagramHoverDocumentation({
       const anchor = { x: event.clientX, y: event.clientY };
 
       if (isOpen && activeTarget?.id !== edge.id) {
-        setActiveTarget({ type: "edge", id: edge.id, anchor });
+        setActiveTarget({ type: 'edge', id: edge.id, anchor });
         setIsOpen(true);
       } else {
         clearHoverTimer();
-        const pending: ActiveTarget = { type: "edge", id: edge.id, anchor };
+        const pending: ActiveTarget = { type: 'edge', id: edge.id, anchor };
         pendingTargetRef.current = pending;
         hoverTimerRef.current = setTimeout(() => {
           setActiveTarget(pendingTargetRef.current || pending);
@@ -196,7 +204,15 @@ export function useDiagramHoverDocumentation({
         }, hoverDelay);
       }
     },
-    [disabled, isOpen, activeTarget?.id, hoverDelay, clearLeaveTimer, clearHoverTimer, closeDocumentation]
+    [
+      disabled,
+      isOpen,
+      activeTarget?.id,
+      hoverDelay,
+      clearLeaveTimer,
+      clearHoverTimer,
+      closeDocumentation,
+    ],
   );
 
   const handleEdgeMouseMove = useCallback(
@@ -210,7 +226,7 @@ export function useDiagramHoverDocumentation({
         setActiveTarget((prev) => (prev ? { ...prev, anchor } : null));
       }
     },
-    [disabled, isOpen, activeTarget?.id]
+    [disabled, isOpen, activeTarget?.id],
   );
 
   const handleEdgeMouseLeave = useCallback(
@@ -224,7 +240,7 @@ export function useDiagramHoverDocumentation({
         }, leaveDelay);
       }
     },
-    [disabled, isOpen, leaveDelay, clearHoverTimer, clearLeaveTimer, closeDocumentation]
+    [disabled, isOpen, leaveDelay, clearHoverTimer, clearLeaveTimer, closeDocumentation],
   );
 
   // Touch handlers (FR-013, 6.3) & Click handlers
@@ -236,7 +252,7 @@ export function useDiagramHoverDocumentation({
         clearHoverTimer();
         clearLeaveTimer();
         setActiveTarget({
-          type: "node",
+          type: 'node',
           id: node.id,
           anchor: { x: event.clientX, y: event.clientY },
         });
@@ -245,7 +261,7 @@ export function useDiagramHoverDocumentation({
         closeDocumentation();
       }
     },
-    [disabled, isOpen, clearHoverTimer, clearLeaveTimer, closeDocumentation]
+    [disabled, isOpen, clearHoverTimer, clearLeaveTimer, closeDocumentation],
   );
 
   const handleEdgeClick = useCallback(
@@ -256,7 +272,7 @@ export function useDiagramHoverDocumentation({
         clearHoverTimer();
         clearLeaveTimer();
         setActiveTarget({
-          type: "edge",
+          type: 'edge',
           id: edge.id,
           anchor: { x: event.clientX, y: event.clientY },
         });
@@ -265,21 +281,19 @@ export function useDiagramHoverDocumentation({
         closeDocumentation();
       }
     },
-    [disabled, isOpen, clearHoverTimer, clearLeaveTimer, closeDocumentation]
+    [disabled, isOpen, clearHoverTimer, clearLeaveTimer, closeDocumentation],
   );
 
   // Keyboard accessibility helper (FR-012)
   const showDocumentationForElement = useCallback(
-    (type: "node" | "edge", id: string, anchor: { x: number; y: number }) => {
+    (type: 'node' | 'edge', id: string, anchor: { x: number; y: number }) => {
       if (disabled) return;
       const item =
-        type === "node"
-          ? nodes.find((n) => n.id === id)
-          : edges.find((e) => e.id === id);
+        type === 'node' ? nodes.find((n) => n.id === id) : edges.find((e) => e.id === id);
       if (!item) return;
 
       const extracted =
-        type === "node"
+        type === 'node'
           ? extractNodeDocumentation(item as Node<ArchNodeData>)
           : extractEdgeDocumentation(item as Edge<ArchEdgeData>);
 
@@ -290,7 +304,7 @@ export function useDiagramHoverDocumentation({
         setIsOpen(true);
       }
     },
-    [disabled, nodes, edges, clearHoverTimer, clearLeaveTimer]
+    [disabled, nodes, edges, clearHoverTimer, clearLeaveTimer],
   );
 
   // Popup hover persistence (FR-011)

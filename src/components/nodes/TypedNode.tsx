@@ -1,13 +1,13 @@
-import { type NodeProps, type Node } from "@xyflow/react";
-import { Maximize2 } from "lucide-react";
-import { getNodeType, CATEGORY_LABELS } from "../../domain/nodeRegistry";
-import { BidirectionalHandles } from "./BidirectionalHandles";
-import { IconRenderer } from "../IconRenderer";
-import type { ArchNodeData } from "../../domain/types";
-import { useCanvasContext } from "../CanvasContext";
-import { recordNodeRender } from "../../perf/instrumentation";
+import { type NodeProps, type Node } from '@xyflow/react';
+import { Maximize2 } from 'lucide-react';
+import { getNodeType, CATEGORY_LABELS } from '../../domain/nodeRegistry';
+import { BidirectionalHandles } from './BidirectionalHandles';
+import { IconRenderer } from '../IconRenderer';
+import type { ArchNodeData } from '../../domain/types';
+import { useCanvasContext } from '../CanvasContext';
+import { recordNodeRender } from '../../perf/instrumentation';
 
-type TypedNodeType = Node<ArchNodeData, "typed">;
+type TypedNodeType = Node<ArchNodeData, 'typed'>;
 
 interface TypedNodeProps extends NodeProps<TypedNodeType> {
   onDrillInto?: (nodeId: string) => void;
@@ -18,26 +18,28 @@ const VISIBLE_PROPERTY_CHIPS = 2;
 export function TypedNode({ id, data, selected, onDrillInto: propOnDrillInto }: TypedNodeProps) {
   recordNodeRender();
   const canvasContext = useCanvasContext();
-  const onDrillInto = canvasContext?.isPresenting ? undefined : (propOnDrillInto ?? canvasContext?.onDrillInto);
+  const onDrillInto = canvasContext?.isPresenting
+    ? undefined
+    : (propOnDrillInto ?? canvasContext?.onDrillInto);
   const def = getNodeType(data.nodeType);
-  const rawIcon = data.icon === "none" ? undefined : (data.icon ?? def?.icon);
-  const iconName = rawIcon && rawIcon.trim() !== "" ? rawIcon : undefined;
-  const accent = data.color ?? def?.color ?? "#98A2B3";
+  const rawIcon = data.icon === 'none' ? undefined : (data.icon ?? def?.icon);
+  const iconName = rawIcon && rawIcon.trim() !== '' ? rawIcon : undefined;
+  const accent = data.color ?? def?.color ?? '#98A2B3';
   const hasSubDiagram = data.hasSubDiagram ?? false;
   // The "Custom" type's category label and its own type label are both
   // literally "Custom", so the usual "Category · Type" subtitle would read
   // as "Custom · Custom" - show the description there instead, since that's
   // the more useful thing a fully generic node actually has to say about
   // itself.
-  const isCustom = data.nodeType === "custom";
+  const isCustom = data.nodeType === 'custom';
 
-  const properties = Object.entries(data.properties).filter(([key]) => key.trim() !== "");
+  const properties = Object.entries(data.properties).filter(([key]) => key.trim() !== '');
   const visibleProperties = properties.slice(0, VISIBLE_PROPERTY_CHIPS);
   const hiddenCount = properties.length - visibleProperties.length;
 
   return (
     <div
-      className={`typed-node${selected ? " is-selected" : ""}`}
+      className={`typed-node${selected ? ' is-selected' : ''}`}
       style={{ borderLeftColor: accent }}
     >
       <BidirectionalHandles />
@@ -85,18 +87,17 @@ export function TypedNode({ id, data, selected, onDrillInto: propOnDrillInto }: 
       {onDrillInto && (
         <button
           type="button"
-          className={`typed-node__drill${hasSubDiagram ? " has-content" : ""}`}
+          className={`typed-node__drill${hasSubDiagram ? ' has-content' : ''}`}
           onClick={(event) => {
             event.stopPropagation();
             onDrillInto(id);
           }}
-          title={hasSubDiagram ? "Open sub-diagram" : "Create a sub-diagram inside this node"}
+          title={hasSubDiagram ? 'Open sub-diagram' : 'Create a sub-diagram inside this node'}
           aria-label="Drill into sub-diagram"
         >
           <Maximize2 size={11} />
         </button>
       )}
-
     </div>
   );
 }

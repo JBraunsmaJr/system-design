@@ -1,0 +1,692 @@
+/**
+ * Talking to the store from the browser (WS6, WS7-R1, WS8-R15, WS9).
+ *
+ * Everything is sealed here, before it leaves: the store receives ciphertext
+ * and wrapped keys and can read none of it. The document key comes from the
+ * share link, the storage key is derived from it, and the workspace index is
+ * sealed under the workspace key.
+ *
+ * Two rules this client enforces on the store's behalf:
+ *
+ * - **Versions never go backwards** (WS8-R15). The client remembers the
+ *   highest version it has seen for each document, sends it with every read,
+ *   and refuses a response that claims to be older - a store replaying an
+ *   earlier state is a failure, not something to apply.
+ * - **Index writes are conditional** (WS9-R3). A collision means re-reading
+ *   and re-applying the change, not overwriting someone else's.
+ */
+import {
+  createStorageCrypto,
+  type CryptoMode,
+  type StorageCrypto,
+} from '../crypto/storageCrypto.ts';
+import { deriveStorageKey } from '../crypto/keys.ts';
+import type { BlobContext } from '../crypto/envelope.ts';
+import type { DiagramFile } from '../domain/serialization.ts';
+
+export interface StoreClientOptions {
+  /** Where the store is, e.g. https://store.example.com */
+  baseUrl: string;
+  /** Injected for tests; defaults to the platform fetch with cookies. */
+  fetch?: typeof fetch;
+  mode?: CryptoMode;
+}
+
+export type StoreClientErrorReason =
+  | 'unauthenticated'
+  | 'not-found'
+  | 'deleted'
+  | 'conflict'
+  | 'rolled-back'
+  | 'quota'
+  | 'too-large'
+  | 'offline'
+  | 'unreadable'
+  | 'store-error';
+
+export class StoreClientError extends Error {
+  reason: StoreClientErrorReason;
+  status?: number;
+
+  constructor(message: string, reason: StoreClientErrorReason, status?: number) {
+    super(message);
+    this.name = 'StoreClientError';
+    this.reason = reason;
+    this.status = status;
+  }
+}
+
+export interface IndexEntry {
+  docId: string;
+  /** The document key, wrapped under the workspace key (WS7-R3). */
+  wrappedDocKey: string;
+  title: string;
+  updatedAt: string;
+}
+
+export interface SessionInfo {
+  issuer: string;
+  subject: string;
+  displayName?: string;
+}
+
+const encoder = new TextEncoder();
+const decoder = new TextDecoder();
+const toBase64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes));
+const fromBase64 = (value: string) => Uint8Array.from(atob(value), (c) => c.charCodeAt(0));
+
+export function createStoreClient(options: StoreClientOptions) {
+  const call =
+    options.fetch ??
+    ((input: RequestInfo | URL, init?: RequestInit) =>
+      fetch(input, { ...init, credentials: 'include' }));
+  const crypto: StorageCrypto = createStorageCrypto(options.mode ?? 'webcrypto');
+  const base = options.baseUrl.replace(/\/+$/, '');
+  /** The highest version seen per document (WS8-R15). */
+  const seen = new Map<string, number>();
+  let recoveryKeyPem: string | null | undefined;
+
+  async function request(
+    path: string,
+    init: RequestInit & { docId?: string } = {},
+  ): Promise<{ status: number; body: Record<string, unknown>; version: number | null }> {
+    const docId = init.docId;
+    const known = docId ? seen.get(docId) : undefined;
+    let response: Response;
+    try {
+      response = await call(`${base}${path}`, {
+        ...init,
+        headers: {
+          ...(init.body ? { 'content-type': 'application/json' } : {}),
+          ...(known !== undefined ? { 'if-document-version': String(known) } : {}),
+          ...(init.headers ?? {}),
+        },
+      });
+    } catch (error) {
+      // The store being unreachable is ordinary - the editor works without
+      // it - so it is its own reason rather than an error to surface raw.
+      throw new StoreClientError(`The store could not be reached: ${String(error)}`, 'offline');
+    }
+    const text = await response.text();
+    let body: Record<string, unknown>;
+    try {
+      body = text ? (JSON.parse(text) as Record<string, unknown>) : {};
+    } catch {
+      throw new StoreClientError(
+        'The store returned something that is not JSON.',
+        'store-error',
+        response.status,
+      );
+    }
+    const header = response.headers.get('x-document-version');
+    const version = header === null ? null : Number(header);
+    if (docId && version !== null) {
+      const highest = seen.get(docId);
+      if (highest !== undefined && version < highest) {
+        throw new StoreClientError(
+          `The store returned version ${version} of ${docId}, older than version ${highest} already seen. Not applying it.`,
+          'rolled-back',
+        );
+      }
+      seen.set(docId, version);
+    }
+    if (!response.ok) {
+      const error = (body.error ?? {}) as { reason?: string; message?: string };
+      const reason: StoreClientErrorReason =
+        error.reason === 'stale-version'
+          ? 'rolled-back'
+          : (
+                [
+                  'unauthenticated',
+                  'not-found',
+                  'deleted',
+                  'conflict',
+                  'quota',
+                  'too-large',
+                ] as const
+              ).includes(error.reason as never)
+            ? (error.reason as StoreClientErrorReason)
+            : 'store-error';
+      throw new StoreClientError(
+        error.message ?? `The store refused the request (${response.status}).`,
+        reason,
+        response.status,
+      );
+    }
+    return { status: response.status, body, version };
+  }
+
+  const contextFor = (docId: string, kind: BlobContext['kind'], version: number): BlobContext => ({
+    docId,
+    kind,
+    version,
+  });
+
+  return {
+    /** What the store is: its mode, and whether it requires sign-in. A
+     * client shows the WS6-R3 warning from `cryptoMode: "passthrough"`. */
+    async health(): Promise<{
+      cryptoMode: 'webcrypto' | 'passthrough';
+      authentication: 'none' | 'required';
+      /** WS10-R6: whether joining a session needs a token from here. */
+      relayAuthentication: 'none' | 'required';
+    }> {
+      const { body } = await request('/v1/health');
+      return {
+        cryptoMode: (body.cryptoMode as 'webcrypto' | 'passthrough') ?? 'webcrypto',
+        authentication: (body.authentication as 'none' | 'required') ?? 'required',
+        relayAuthentication: (body.relayAuthentication as 'none' | 'required') ?? 'none',
+      };
+    },
+
+    /**
+     * The organization's recovery public key (WS7-R4), PEM, or null where a
+     * store does not use escrow. Fetched once and remembered: it changes
+     * only when an organization rotates it, which means re-wrapping anyway.
+     */
+    async recoveryPublicKey(): Promise<string | null> {
+      if (recoveryKeyPem === undefined) {
+        const { body } = await request('/v1/recovery-key');
+        recoveryKeyPem = (body.publicKey as string | null) ?? null;
+      }
+      return recoveryKeyPem;
+    },
+
+    /** A short-lived token admitting this person to one session room
+     * (WS10-R7). Refused where they are not signed in. */
+    async roomToken(room: string): Promise<{ token: string; expiresAt: string }> {
+      const { body } = await request(`/v1/rooms/${encodeURIComponent(room)}/token`, {
+        method: 'POST',
+      });
+      return body as { token: string; expiresAt: string };
+    },
+
+    /** Who the store thinks we are, or null when not signed in. */
+    async session(): Promise<SessionInfo | null> {
+      try {
+        const { body } = await request('/v1/auth/session');
+        return (body.session as SessionInfo) ?? null;
+      } catch (error) {
+        if (error instanceof StoreClientError && error.reason === 'unauthenticated') return null;
+        throw error;
+      }
+    },
+
+    /** Ends the session at the store, so the cookie stops working. */
+    async logout(): Promise<void> {
+      await request('/v1/auth/logout', { method: 'POST' });
+    },
+
+    async providers(): Promise<string[]> {
+      const { body } = await request('/v1/auth/providers');
+      return (body.providers as string[]) ?? [];
+    },
+
+    /** The highest version this client has seen, for the durability UI. */
+    versionOf(docId: string): number | null {
+      return seen.get(docId) ?? null;
+    },
+
+    /**
+     * Uploads a document as one sealed snapshot, creating it if needed.
+     * The blob is sealed with the storage key derived from the document key
+     * (WS7-R1), bound to this document and version (WS6-R4).
+     */
+    async putDocument(
+      docId: string,
+      documentKey: string,
+      file: DiagramFile,
+      wraps: { wrappedForWorkspace: string; wrappedForRecovery?: string },
+    ): Promise<number> {
+      const key = await deriveStorageKey(documentKey);
+      let version = seen.get(docId) ?? null;
+      if (version === null) {
+        try {
+          const head = await request(`/v1/docs/${encodeURIComponent(docId)}`, { docId });
+          version = (head.body.document as { version: number }).version;
+        } catch (error) {
+          if (!(error instanceof StoreClientError) || error.reason !== 'not-found') throw error;
+          const created = await request('/v1/docs', {
+            method: 'POST',
+            docId,
+            body: JSON.stringify({ docId, keys: wraps }),
+          });
+          version = (created.body.document as { version: number }).version;
+        }
+      }
+      // Sealed against the version it will carry: the store increments on
+      // accepting it, so a blob written at version n is opened at n.
+      const next = version + 1;
+      const sealed = await crypto.seal(
+        contextFor(docId, 'snapshot', next),
+        encoder.encode(JSON.stringify(file)),
+        key,
+      );
+      const appended = await request(`/v1/docs/${encodeURIComponent(docId)}/compact`, {
+        method: 'POST',
+        docId,
+        body: JSON.stringify({ kind: 'snapshot', bytes: toBase64(sealed) }),
+      });
+      return (appended.body.document as { version: number }).version;
+    },
+
+    /** Registers a document, with its wrapped keys and nothing in it. */
+    async createDocument(
+      docId: string,
+      wraps: { wrappedForWorkspace: string; wrappedForRecovery?: string },
+    ): Promise<number> {
+      const { body } = await request('/v1/docs', {
+        method: 'POST',
+        docId,
+        body: JSON.stringify({ docId, keys: wraps }),
+      });
+      return (body.document as { version: number }).version;
+    },
+
+    /**
+     * Appends one sealed CRDT update (WS8-R2). The blob is sealed against
+     * the version the store will give it, so it is bound to its place in
+     * the document's history (WS6-R4); `expectedVersion` makes the append
+     * conditional, so two clients appending at once cannot both believe
+     * they were first (WS8-R15). A conflict is reported, not retried here:
+     * the caller re-reads what it missed and appends again.
+     */
+    async appendUpdate(
+      docId: string,
+      documentKey: string,
+      update: Uint8Array,
+      atVersion: number,
+      /** For a page that is going away: the request is allowed to outlive
+       * it, which an ordinary fetch is not. */
+      options: { keepalive?: boolean } = {},
+    ): Promise<number> {
+      const key = await deriveStorageKey(documentKey);
+      const sealed = await crypto.seal(contextFor(docId, 'update', atVersion + 1), update, key);
+      const { body } = await request(`/v1/docs/${encodeURIComponent(docId)}/updates`, {
+        method: 'POST',
+        keepalive: options.keepalive,
+        docId,
+        body: JSON.stringify({
+          kind: 'update',
+          bytes: toBase64(sealed),
+          expectedVersion: atVersion,
+        }),
+      });
+      return (body.document as { version: number }).version;
+    },
+
+    /** Updates written after `since`, opened (WS8-R2). */
+    async updatesSince(
+      docId: string,
+      documentKey: string,
+      since: number,
+    ): Promise<{ version: number; updates: Uint8Array[] }> {
+      const key = await deriveStorageKey(documentKey);
+      const { body } = await request(
+        `/v1/docs/${encodeURIComponent(docId)}/updates?since=${since}`,
+        { docId },
+      );
+      const record = body.document as { version: number };
+      const blobs = (body.blobs as { kind: string; version: number; bytes: string }[]) ?? [];
+      const updates: Uint8Array[] = [];
+      for (const blob of blobs) {
+        updates.push(
+          await crypto.open(
+            contextFor(docId, blob.kind as BlobContext['kind'], blob.version),
+            fromBase64(blob.bytes),
+            key,
+          ),
+        );
+      }
+      return { version: record.version, updates };
+    },
+
+    /** Every blob of a document, opened, in order (WS8-R4: order does not
+     * matter to a CRDT, but the store returns them as written). */
+    async allUpdates(
+      docId: string,
+      documentKey: string,
+    ): Promise<{ version: number; blobs: { kind: string; bytes: Uint8Array }[] }> {
+      const key = await deriveStorageKey(documentKey);
+      const { body } = await request(`/v1/docs/${encodeURIComponent(docId)}`, { docId });
+      const record = body.document as { version: number };
+      const blobs = (body.blobs as { kind: string; version: number; bytes: string }[]) ?? [];
+      const opened: { kind: string; bytes: Uint8Array }[] = [];
+      for (const blob of blobs) {
+        opened.push({
+          kind: blob.kind,
+          bytes: await crypto.open(
+            contextFor(docId, blob.kind as BlobContext['kind'], blob.version),
+            fromBase64(blob.bytes),
+            key,
+          ),
+        });
+      }
+      return { version: record.version, blobs: opened };
+    },
+
+    /** Replaces the log with one sealed state (WS8-R5). */
+    async compactDocument(
+      docId: string,
+      documentKey: string,
+      state: Uint8Array,
+      atVersion: number,
+    ): Promise<number> {
+      const key = await deriveStorageKey(documentKey);
+      const sealed = await crypto.seal(contextFor(docId, 'snapshot', atVersion + 1), state, key);
+      const { body } = await request(`/v1/docs/${encodeURIComponent(docId)}/compact`, {
+        method: 'POST',
+        docId,
+        body: JSON.stringify({ kind: 'snapshot', bytes: toBase64(sealed) }),
+      });
+      return (body.document as { version: number }).version;
+    },
+
+    /** Fetches and opens a document. */
+    async getDocument(
+      docId: string,
+      documentKey: string,
+    ): Promise<{ file: DiagramFile; version: number }> {
+      const key = await deriveStorageKey(documentKey);
+      const { body } = await request(`/v1/docs/${encodeURIComponent(docId)}`, { docId });
+      const record = body.document as { version: number };
+      const blobs = (body.blobs as { kind: string; version: number; bytes: string }[]) ?? [];
+      const snapshot =
+        [...blobs].reverse().find((blob) => blob.kind === 'snapshot') ?? blobs[blobs.length - 1];
+      if (!snapshot)
+        throw new StoreClientError(`Document ${docId} holds nothing yet.`, 'not-found');
+      let plaintext: Uint8Array;
+      try {
+        plaintext = await crypto.open(
+          contextFor(docId, snapshot.kind as BlobContext['kind'], snapshot.version),
+          fromBase64(snapshot.bytes),
+          key,
+        );
+      } catch (error) {
+        // The link's key does not match what sealed this, or the blob was
+        // altered. Either way it is not something to open.
+        throw new StoreClientError(
+          `Could not open ${docId}: the key does not match, or the stored data was altered. (${String(error)})`,
+          'unreadable',
+        );
+      }
+      try {
+        return {
+          file: JSON.parse(decoder.decode(plaintext)) as DiagramFile,
+          version: record.version,
+        };
+      } catch {
+        throw new StoreClientError(
+          `Document ${docId} opened, but does not contain a diagram.`,
+          'unreadable',
+        );
+      }
+    },
+
+    /** WS7-R7: the document key re-wrapped under a new workspace key. */
+    async rewrapDocument(docId: string, wrappedForWorkspace: string): Promise<void> {
+      await request(`/v1/docs/${encodeURIComponent(docId)}/keys`, {
+        method: 'PUT',
+        body: JSON.stringify({ wrappedForWorkspace }),
+      });
+    },
+
+    /** Members and their public user keys, for wrapping a new workspace key
+     * to each of them (WS7-R7, R8). Administrators only. */
+    async listMembers(): Promise<
+      {
+        userId: string;
+        displayName?: string;
+        publicKey?: string;
+        /** Which workspace key generations this member holds (WS7-R8). */
+        workspaceKeyGenerations?: number[];
+      }[]
+    > {
+      const { body } = await request('/v1/workspace/members');
+      return body.members as {
+        userId: string;
+        displayName?: string;
+        publicKey?: string;
+        workspaceKeyGenerations?: number[];
+      }[];
+    },
+
+    /** Hands the workspace key to another member, wrapped to their public
+     * key (WS7-R8). Any member may: they could share it out of band
+     * anyway, and the store records who did it. */
+    async grantWorkspaceKey(userId: string, generation: number, wrappedKey: string): Promise<void> {
+      await request(`/v1/workspace/members/${encodeURIComponent(userId)}/key`, {
+        method: 'PUT',
+        body: JSON.stringify({ generation, wrappedKey }),
+      });
+    },
+
+    async deleteDocument(docId: string): Promise<void> {
+      await request(`/v1/docs/${encodeURIComponent(docId)}`, { method: 'DELETE', docId });
+    },
+
+    // -- devices and keys (WS7-R8, R11) ------------------------------------
+
+    async registerDevice(publicKey: string, label?: string) {
+      const { body } = await request('/v1/users/me/devices', {
+        method: 'POST',
+        body: JSON.stringify({ publicKey, label }),
+      });
+      return body.device as {
+        deviceId: string;
+        verificationCode: string;
+        approvedAt: string | null;
+      };
+    },
+
+    /** This person, as the directory holds them, including their public
+     * user key. */
+    async me(): Promise<{ userId: string; displayName?: string; publicKey?: string }> {
+      const { body } = await request('/v1/users/me');
+      return body.user as { userId: string; displayName?: string; publicKey?: string };
+    },
+
+    async listDevices() {
+      const { body } = await request('/v1/users/me/devices');
+      return body.devices as {
+        deviceId: string;
+        publicKey: string;
+        verificationCode: string;
+        approvedAt: string | null;
+        revokedAt: string | null;
+        label?: string;
+      }[];
+    },
+
+    /** What this device is given: nothing until another approves it. */
+    async keysForDevice(deviceId: string) {
+      const { body } = await request('/v1/users/me/keys', { headers: { 'x-device-id': deviceId } });
+      return body as
+        | { status: 'awaiting-approval'; verificationCode: string }
+        | { status: 'needs-setup'; verificationCode: string }
+        | {
+            status: 'approved';
+            wrappedUserKey: { keyWrap: string; body: string };
+            workspaceKeys: { generation: number; wrappedKey: string }[];
+          };
+    },
+
+    async approveDevice(
+      deviceId: string,
+      verificationCode: string,
+      wrappedUserKey: { keyWrap: string; body: string },
+      fromDeviceId: string,
+    ) {
+      await request(`/v1/users/me/devices/${encodeURIComponent(deviceId)}/approve`, {
+        method: 'POST',
+        headers: { 'x-device-id': fromDeviceId },
+        body: JSON.stringify({ verificationCode, wrappedUserKey }),
+      });
+    },
+
+    /** The first device storing the user key it generated, wrapped to
+     * itself, so its next visit can recover it. */
+    async setOwnUserKey(deviceId: string, wrappedUserKey: { keyWrap: string; body: string }) {
+      await request(`/v1/users/me/devices/${encodeURIComponent(deviceId)}/user-key`, {
+        method: 'PUT',
+        headers: { 'x-device-id': deviceId },
+        body: JSON.stringify({ wrappedUserKey }),
+      });
+    },
+
+    async revokeDevice(deviceId: string) {
+      await request(`/v1/users/me/devices/${encodeURIComponent(deviceId)}`, { method: 'DELETE' });
+    },
+
+    async publishUserPublicKey(publicKey: string) {
+      await request('/v1/users/me/public-key', {
+        method: 'PUT',
+        body: JSON.stringify({ publicKey }),
+      });
+    },
+
+    async putWorkspaceKey(generation: number, wrappedKey: string) {
+      await request('/v1/users/me/keys', {
+        method: 'PUT',
+        body: JSON.stringify({ generation, wrappedKey }),
+      });
+    },
+
+    /** WS7-R12: the sealed user key and its salt, for unlocking with a
+     * recovery code on a browser with no approved device. */
+    async putRecovery(salt: string, sealedUserKey: string) {
+      await request('/v1/users/me/recovery', {
+        method: 'PUT',
+        body: JSON.stringify({ salt, sealedUserKey }),
+      });
+    },
+
+    /** A secret encrypted to this person's public key, which only their
+     * private key can recover (WS7-R12). */
+    async recoveryChallenge(deviceId: string): Promise<{ challengeId: string; wrapped: string }> {
+      const { body } = await request(
+        `/v1/users/me/devices/${encodeURIComponent(deviceId)}/recovery-challenge`,
+        {
+          method: 'POST',
+        },
+      );
+      return body as { challengeId: string; wrapped: string };
+    },
+
+    async recoverDevice(
+      deviceId: string,
+      challengeId: string,
+      answer: string,
+      wrappedUserKey: { keyWrap: string; body: string },
+    ): Promise<void> {
+      await request(`/v1/users/me/devices/${encodeURIComponent(deviceId)}/recover`, {
+        method: 'POST',
+        body: JSON.stringify({ challengeId, answer, wrappedUserKey }),
+      });
+    },
+
+    async getRecovery() {
+      const { body } = await request('/v1/users/me/recovery');
+      return (body.recovery as { salt: string; sealedUserKey: string } | null) ?? null;
+    },
+
+    // -- the workspace index (WS9) -----------------------------------------
+
+    /** Whether this workspace holds an index yet - asked without a key,
+     * because someone who has not been given the workspace key still
+     * needs to know a workspace exists (WS7-R8). */
+    async workspaceExists(workspaceId: string): Promise<boolean> {
+      const { body } = await request(`/v1/workspaces/${encodeURIComponent(workspaceId)}/index`);
+      return (body.index as string | null) !== null;
+    },
+
+    async readIndex(
+      workspaceId: string,
+      indexKey: CryptoKey,
+    ): Promise<{ entries: IndexEntry[]; version: number | null; generation: number | null }> {
+      const { body } = await request(`/v1/workspaces/${encodeURIComponent(workspaceId)}/index`);
+      const sealed = body.index as string | null;
+      const version = (body.version as number | null) ?? null;
+      const generation = (body.generation as number | null) ?? null;
+      if (!sealed) return { entries: [], version, generation };
+      const opened = await crypto.open(
+        { docId: workspaceId, kind: 'index', version: 1 },
+        fromBase64(sealed),
+        indexKey,
+      );
+      return { entries: JSON.parse(decoder.decode(opened)) as IndexEntry[], version, generation };
+    },
+
+    /**
+     * Writes the index under a key that is not the one it is currently
+     * sealed with: rotation (WS7-R7), where re-reading first would need the
+     * key being replaced. Everything else uses updateIndex.
+     */
+    async writeIndex(
+      workspaceId: string,
+      indexKey: CryptoKey,
+      entries: IndexEntry[],
+      expectedVersion: number | null,
+      generation?: number,
+    ): Promise<void> {
+      const sealed = await crypto.seal(
+        { docId: workspaceId, kind: 'index', version: 1 },
+        encoder.encode(JSON.stringify(entries)),
+        indexKey,
+      );
+      await request(`/v1/workspaces/${encodeURIComponent(workspaceId)}/index`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          index: toBase64(sealed),
+          expectedVersion,
+          ...(generation ? { generation } : {}),
+        }),
+      });
+    },
+
+    /**
+     * Applies a change to the index, re-reading and re-applying if someone
+     * else wrote first (WS9-R3). `change` runs again on the fresh entries,
+     * so it must be a function of what is there, not a precomputed list.
+     */
+    async updateIndex(
+      workspaceId: string,
+      indexKey: CryptoKey,
+      change: (entries: IndexEntry[]) => IndexEntry[],
+      attempts = 5,
+      generation?: number,
+    ): Promise<IndexEntry[]> {
+      for (let attempt = 1; attempt <= attempts; attempt++) {
+        const { entries, version } = await this.readIndex(workspaceId, indexKey);
+        const next = change(entries);
+        const sealed = await crypto.seal(
+          { docId: workspaceId, kind: 'index', version: 1 },
+          encoder.encode(JSON.stringify(next)),
+          indexKey,
+        );
+        try {
+          await request(`/v1/workspaces/${encodeURIComponent(workspaceId)}/index`, {
+            method: 'PUT',
+            body: JSON.stringify({
+              index: toBase64(sealed),
+              expectedVersion: version,
+              ...(generation ? { generation } : {}),
+            }),
+          });
+          return next;
+        } catch (error) {
+          const isCollision = error instanceof StoreClientError && error.reason === 'conflict';
+          if (!isCollision || attempt === attempts) throw error;
+          // Someone else wrote between the read and the write: read again
+          // and apply the change to what is now there.
+        }
+      }
+      throw new StoreClientError(
+        'The workspace index is being changed faster than this client can keep up.',
+        'conflict',
+      );
+    },
+  };
+}
+
+export type StoreClient = ReturnType<typeof createStoreClient>;

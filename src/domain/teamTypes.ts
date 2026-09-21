@@ -1,6 +1,6 @@
-import type { CapacityReservation } from "./programIncrements";
+import type { CapacityReservation } from './programIncrements';
 
-export type HalfDayType = "full" | "morning" | "afternoon";
+export type HalfDayType = 'full' | 'morning' | 'afternoon';
 
 export interface PtoSpan {
   id: string;

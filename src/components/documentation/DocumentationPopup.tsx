@@ -1,16 +1,11 @@
-import {
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   hasDocumentation,
   computeDocumentationPopupPosition,
   type DiagramDocumentation,
-} from "../../domain/diagramDocumentation";
-import { DocumentationRenderer } from "./DocumentationRenderer";
+} from '../../domain/diagramDocumentation';
+import { DocumentationRenderer } from './DocumentationRenderer';
 
 export interface DocumentationPopupProps {
   documentation: DiagramDocumentation;
@@ -33,7 +28,7 @@ export function DocumentationPopup({
   onClose,
   onMouseEnter,
   onMouseLeave,
-  className = "",
+  className = '',
 }: DocumentationPopupProps) {
   const popupRef = useRef<HTMLDivElement | null>(null);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
@@ -47,14 +42,14 @@ export function DocumentationPopup({
     if (!shouldShow) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      if (e.key === 'Escape') {
         onClose?.();
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);
     return () => {
-      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener('keydown', handleKeyDown);
     };
   }, [shouldShow, onClose]);
 
@@ -80,12 +75,10 @@ export function DocumentationPopup({
       anchor,
       { width: rect.width || 280, height: rect.height || 180 },
       viewport,
-      12
+      12,
     );
 
-    setPos((prev) =>
-      prev?.top === nextPos.top && prev.left === nextPos.left ? prev : nextPos
-    );
+    setPos((prev) => (prev?.top === nextPos.top && prev.left === nextPos.left ? prev : nextPos));
   }, [
     shouldShow,
     anchor?.x,
@@ -110,7 +103,7 @@ export function DocumentationPopup({
       role="tooltip"
       className={`doc-popup nodrag ${className}`.trim()}
       style={{
-        position: "fixed",
+        position: 'fixed',
         top: pos ? pos.top : defaultTop,
         left: pos ? pos.left : defaultLeft,
       }}
@@ -121,16 +114,12 @@ export function DocumentationPopup({
         e.stopPropagation();
       }}
     >
-      <DocumentationRenderer
-        documentation={documentation}
-        title={title}
-        subtitle={subtitle}
-      />
+      <DocumentationRenderer documentation={documentation} title={title} subtitle={subtitle} />
     </div>
   );
 
   // In test / SSR environments where document.body might not be used with portals, render directly
-  if (typeof document === "undefined" || !document.body) {
+  if (typeof document === 'undefined' || !document.body) {
     return content;
   }
 

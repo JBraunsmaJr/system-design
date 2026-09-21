@@ -1,11 +1,11 @@
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import remarkBreaks from "remark-breaks";
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 import {
   formatPropertyValue,
   isMeaningfulValue,
   type DiagramDocumentation,
-} from "../../domain/diagramDocumentation";
+} from '../../domain/diagramDocumentation';
 
 export interface DocumentationRendererProps {
   documentation: DiagramDocumentation;
@@ -18,23 +18,22 @@ export function DocumentationRenderer({
   documentation,
   title,
   subtitle,
-  className = "",
+  className = '',
 }: DocumentationRendererProps) {
   const hasDescription =
-    typeof documentation.description === "string" &&
-    documentation.description.trim().length > 0;
+    typeof documentation.description === 'string' && documentation.description.trim().length > 0;
 
   const validProperties = Object.entries(documentation.properties ?? {}).filter(
-    ([key, value]) => key.trim().length > 0 && isMeaningfulValue(value)
+    ([key, value]) => key.trim().length > 0 && isMeaningfulValue(value),
   );
   const hasProperties = validProperties.length > 0;
 
   const validTags = (documentation.tags ?? []).filter(
-    (tag) => typeof tag === "string" && tag.trim().length > 0
+    (tag) => typeof tag === 'string' && tag.trim().length > 0,
   );
   const hasTags = validTags.length > 0;
 
-  const hasTitle = typeof title === "string" && title.trim().length > 0;
+  const hasTitle = typeof title === 'string' && title.trim().length > 0;
 
   // If there is no title and no documentation content at all, don't render empty markup
   if (!hasTitle && !hasDescription && !hasProperties && !hasTags) {

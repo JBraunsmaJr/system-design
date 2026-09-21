@@ -21,15 +21,17 @@ COPY . .
 # reverse proxy at some arbitrary subpath, without knowing which in
 # advance and without a rebuild per deployment. A relative base makes
 # every asset reference resolve against wherever index.html actually was
-# loaded from, whatever that turns out to be. Verified this concretely,
-# not just by inspecting the built HTML: served the same build through
-# nginx at both a root path and a simulated subpath and confirmed assets
-# loaded correctly (200) in both cases, and specifically confirmed they
-# do NOT resolve at the wrong (root) location when served from a subpath
-# (404 there) - proving genuine relative resolution rather than a
-# coincidence. See docker/nginx.conf's comment on why the SPA fallback
-# was removed as a direct consequence of this choice.
-RUN npm run build -- --base=./
+# loaded from, whatever that turns out to be.
+RUN npm run build:app -- --base=./
+
+# The documentation site, served alongside the app. VitePress writes the
+# base into every asset URL and into its own client router, so unlike the
+# app it cannot simply be relative. It is built with a placeholder that
+# docker-entrypoint.d/45-docs-base.sh replaces at container start, so one
+# image serves the docs wherever it happens to be mounted - at /docs/ by
+# default, or under APP_URL's prefix, or wherever DOCS_BASE says.
+RUN npm --prefix docs-site ci && \
+    DOCS_BASE=/__DOCS_BASE__/ DOCS_APP_URL=https://__APP_URL__/ npm run build:docs
 
 # ---- Runtime stage: serves the built static files via nginx ----
 FROM nginx:stable-alpine AS runtime

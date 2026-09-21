@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState } from 'react';
 import {
   AlertTriangle,
   ChevronDown,
@@ -11,14 +11,17 @@ import {
   Snowflake,
   Diamond,
   Layers,
-} from "lucide-react";
-import { computeSprintDateRanges, type ProgramIncrement } from "../../domain/programIncrements";
-import { getItemType, isItemWorkable } from "../../domain/requirementsRegistry";
-import { findScheduleConflicts } from "../../domain/scheduleConflicts";
-import type { RequirementsDocument, RequirementItem } from "../../domain/requirementsTypes";
-import type { Milestone } from "../../domain/milestones";
-import { getMilestoneColor, getMilestoneTypeLabel } from "../../domain/milestones";
-import { getAllEpicsWithInferredSchedule, getChildItemsForParent } from "../../domain/epicScheduling";
+} from 'lucide-react';
+import { computeSprintDateRanges, type ProgramIncrement } from '../../domain/programIncrements';
+import { getItemType, isItemWorkable } from '../../domain/requirementsRegistry';
+import { findScheduleConflicts } from '../../domain/scheduleConflicts';
+import type { RequirementsDocument, RequirementItem } from '../../domain/requirementsTypes';
+import type { Milestone } from '../../domain/milestones';
+import { getMilestoneColor, getMilestoneTypeLabel } from '../../domain/milestones';
+import {
+  getAllEpicsWithInferredSchedule,
+  getChildItemsForParent,
+} from '../../domain/epicScheduling';
 
 interface GanttChartProps {
   programIncrements: ProgramIncrement[];
@@ -31,7 +34,7 @@ interface GanttChartProps {
   onNavigateToRequirement?: (itemId: string) => void;
 }
 
-export type GanttGroupingMode = "none" | "epic" | "parent" | "sprint" | "type";
+export type GanttGroupingMode = 'none' | 'epic' | 'parent' | 'sprint' | 'type';
 
 interface GanttGroup {
   id: string;
@@ -45,7 +48,7 @@ const DAY_WIDTH = 14;
 const DEFAULT_LABEL_COLUMN_WIDTH = 220;
 
 function parseISODate(iso: string): number {
-  const [y, m, d] = iso.split("-").map(Number);
+  const [y, m, d] = iso.split('-').map(Number);
   return Date.UTC(y, m - 1, d) / 86400000;
 }
 
@@ -58,7 +61,7 @@ function useGanttLayout(
   milestones: Milestone[] = [],
   requirements?: RequirementsDocument,
   filterEpicId?: string,
-  filteredChildItemIds?: Set<string> | null
+  filteredChildItemIds?: Set<string> | null,
 ) {
   return useMemo(() => {
     const bands: {
@@ -86,7 +89,10 @@ function useGanttLayout(
     if (bands.length === 0 && milestones.length === 0 && epicsWithSchedule.length === 0) {
       return {
         bands: [],
-        rangesBySprintId: new Map<string, { startDate: string; endDate: string; left: number; width: number }>(),
+        rangesBySprintId: new Map<
+          string,
+          { startDate: string; endDate: string; left: number; width: number }
+        >(),
         milestoneLayouts: [],
         epicLayouts: [],
         depLayouts: [],
@@ -118,7 +124,10 @@ function useGanttLayout(
     }
 
     const originDays = startCandidates.length > 0 ? Math.min(...startCandidates) : 0;
-    const rangesBySprintId = new Map<string, { startDate: string; endDate: string; left: number; width: number }>();
+    const rangesBySprintId = new Map<
+      string,
+      { startDate: string; endDate: string; left: number; width: number }
+    >();
     let maxRight = 0;
 
     for (const band of bands) {
@@ -126,7 +135,12 @@ function useGanttLayout(
       const endDays = parseISODate(band.endDate);
       const left = (startDays - originDays) * DAY_WIDTH;
       const width = Math.max(DAY_WIDTH, (endDays - startDays + 1) * DAY_WIDTH);
-      rangesBySprintId.set(band.sprintId, { startDate: band.startDate, endDate: band.endDate, left, width });
+      rangesBySprintId.set(band.sprintId, {
+        startDate: band.startDate,
+        endDate: band.endDate,
+        left,
+        width,
+      });
       maxRight = Math.max(maxRight, left + width);
     }
 
@@ -164,7 +178,7 @@ function useGanttLayout(
     const epicLayouts = epicsWithSchedule
       .filter(({ epic, schedule }) => {
         if (!schedule.startDate) return false;
-        if (filterEpicId && filterEpicId !== "all") {
+        if (filterEpicId && filterEpicId !== 'all') {
           return epic.id === filterEpicId;
         }
         return true;
@@ -191,20 +205,28 @@ function useGanttLayout(
     // External dependencies layout
     const depLayouts = requirements
       ? requirements.items
-          .filter((i) => (i.typeId === "dependency" || i.typeId.toLowerCase().includes("dep")) && !isItemWorkable(requirements, i))
+          .filter(
+            (i) =>
+              (i.typeId === 'dependency' || i.typeId.toLowerCase().includes('dep')) &&
+              !isItemWorkable(requirements, i),
+          )
           .filter((dep) => {
-            if (!filterEpicId || filterEpicId === "all") return true;
+            if (!filterEpicId || filterEpicId === 'all') return true;
             if (filteredChildItemIds && filteredChildItemIds.has(dep.id)) return true;
             return requirements.relationships.some(
               (r) =>
-                (r.fromItemId === dep.id && (r.toItemId === filterEpicId || filteredChildItemIds?.has(r.toItemId))) ||
-                (r.toItemId === dep.id && (r.fromItemId === filterEpicId || filteredChildItemIds?.has(r.fromItemId)))
+                (r.fromItemId === dep.id &&
+                  (r.toItemId === filterEpicId || filteredChildItemIds?.has(r.toItemId))) ||
+                (r.toItemId === dep.id &&
+                  (r.fromItemId === filterEpicId || filteredChildItemIds?.has(r.fromItemId))),
             );
           })
           .map((dep) => {
             const linkedMs = milestones.filter((m) => {
               const ids = m.relatedItemIds ?? m.relatedWorkableItemIds ?? [];
-              return ids.includes(dep.id) && m.scheduledAt && /^\d{4}-\d{2}-\d{2}$/.test(m.scheduledAt);
+              return (
+                ids.includes(dep.id) && m.scheduledAt && /^\d{4}-\d{2}-\d{2}$/.test(m.scheduledAt)
+              );
             });
             if (linkedMs.length > 0) {
               const day = parseISODate(linkedMs[0].scheduledAt);
@@ -239,7 +261,7 @@ export function GanttChart({
   programIncrements,
   requirements,
   milestones = [],
-  filterEpicId = "all",
+  filterEpicId = 'all',
   filteredChildItemIds,
   onSelectItem,
   onSelectMilestone,
@@ -247,14 +269,14 @@ export function GanttChart({
 }: GanttChartProps) {
   const [isConflictsCollapsed, setIsConflictsCollapsed] = useState(false);
   const [isEpicsCollapsed, setIsEpicsCollapsed] = useState(false);
-  const [groupingMode, setGroupingMode] = useState<GanttGroupingMode>("none");
+  const [groupingMode, setGroupingMode] = useState<GanttGroupingMode>('none');
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(new Set());
   const [labelColumnWidth, setLabelColumnWidth] = useState(DEFAULT_LABEL_COLUMN_WIDTH);
   const [isDraggingResizer, setIsDraggingResizer] = useState(false);
 
   const effectiveFilteredChildItemIds = useMemo(() => {
     if (filteredChildItemIds !== undefined) return filteredChildItemIds;
-    if (!filterEpicId || filterEpicId === "all") return null;
+    if (!filterEpicId || filterEpicId === 'all') return null;
     return new Set(getChildItemsForParent(filterEpicId, requirements).map((i) => i.id));
   }, [filteredChildItemIds, filterEpicId, requirements]);
 
@@ -273,12 +295,12 @@ export function GanttChart({
 
     const handleMouseUp = () => {
       setIsDraggingResizer(false);
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
     };
 
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
   };
 
   const toggleGroupCollapse = (groupId: string) => {
@@ -290,19 +312,35 @@ export function GanttChart({
     });
   };
 
-  const { bands, rangesBySprintId, milestoneLayouts, epicLayouts, depLayouts, totalWidth, maxStack } = useGanttLayout(
+  const {
+    bands,
+    rangesBySprintId,
+    milestoneLayouts,
+    epicLayouts,
+    depLayouts,
+    totalWidth,
+    maxStack,
+  } = useGanttLayout(
     programIncrements,
     milestones,
     requirements,
     filterEpicId,
-    effectiveFilteredChildItemIds
+    effectiveFilteredChildItemIds,
   );
 
   const scheduledItems = requirements.items.filter((item) => {
-    if (!item.sprintId || !rangesBySprintId.has(item.sprintId) || !isItemWorkable(requirements, item)) {
+    if (
+      !item.sprintId ||
+      !rangesBySprintId.has(item.sprintId) ||
+      !isItemWorkable(requirements, item)
+    ) {
       return false;
     }
-    if (effectiveFilteredChildItemIds && !effectiveFilteredChildItemIds.has(item.id) && item.id !== filterEpicId) {
+    if (
+      effectiveFilteredChildItemIds &&
+      !effectiveFilteredChildItemIds.has(item.id) &&
+      item.id !== filterEpicId
+    ) {
       return false;
     }
     return true;
@@ -323,7 +361,7 @@ export function GanttChart({
       requirements.relationships,
       requirements.relationshipTypes,
       requirements.itemTypes,
-      sprintRangesByItemId
+      sprintRangesByItemId,
     );
     if (!effectiveFilteredChildItemIds) return allConflicts;
     return allConflicts.filter(
@@ -331,18 +369,26 @@ export function GanttChart({
         effectiveFilteredChildItemIds.has(c.item.id) ||
         effectiveFilteredChildItemIds.has(c.blocker.id) ||
         c.item.id === filterEpicId ||
-        c.blocker.id === filterEpicId
+        c.blocker.id === filterEpicId,
     );
-  }, [requirements.items, requirements.relationships, requirements.relationshipTypes, requirements.itemTypes, sprintRangesByItemId, effectiveFilteredChildItemIds, filterEpicId]);
+  }, [
+    requirements.items,
+    requirements.relationships,
+    requirements.relationshipTypes,
+    requirements.itemTypes,
+    sprintRangesByItemId,
+    effectiveFilteredChildItemIds,
+    filterEpicId,
+  ]);
 
   const conflictByItemId = new Map<string, (typeof conflicts)[number]>();
   for (const c of conflicts) {
     const existing = conflictByItemId.get(c.item.id);
-    if (!existing || existing.severity !== "blocked") {
+    if (!existing || existing.severity !== 'blocked') {
       conflictByItemId.set(c.item.id, c);
     }
   }
-  const blockedCount = conflicts.filter((c) => c.severity === "blocked").length;
+  const blockedCount = conflicts.filter((c) => c.severity === 'blocked').length;
   const riskCount = conflicts.length - blockedCount;
 
   const rows = useMemo(() => {
@@ -356,10 +402,12 @@ export function GanttChart({
 
   const parentEpicByItemId = useMemo(() => {
     const map = new Map<string, RequirementItem>();
-    const epics = requirements.items.filter((i) => i.typeId === "epic" || i.typeId.toLowerCase().includes("epic"));
+    const epics = requirements.items.filter(
+      (i) => i.typeId === 'epic' || i.typeId.toLowerCase().includes('epic'),
+    );
     const epicIds = new Set(epics.map((e) => e.id));
     for (const rel of requirements.relationships) {
-      if (epicIds.has(rel.fromItemId) && rel.typeId === "parent-of") {
+      if (epicIds.has(rel.fromItemId) && rel.typeId === 'parent-of') {
         const epic = epics.find((e) => e.id === rel.fromItemId);
         if (epic) map.set(rel.toItemId, epic);
       }
@@ -371,7 +419,7 @@ export function GanttChart({
     const map = new Map<string, RequirementItem>();
     const itemById = new Map(requirements.items.map((i) => [i.id, i]));
     for (const rel of requirements.relationships) {
-      if (rel.typeId === "parent-of") {
+      if (rel.typeId === 'parent-of') {
         const parent = itemById.get(rel.fromItemId);
         if (parent) map.set(rel.toItemId, parent);
       }
@@ -380,12 +428,14 @@ export function GanttChart({
   }, [requirements]);
 
   const groups = useMemo((): GanttGroup[] => {
-    if (groupingMode === "none") {
-      return [{ id: "default", title: "", items: rows }];
+    if (groupingMode === 'none') {
+      return [{ id: 'default', title: '', items: rows }];
     }
 
-    if (groupingMode === "epic") {
-      const epics = requirements.items.filter((i) => i.typeId === "epic" || i.typeId.toLowerCase().includes("epic"));
+    if (groupingMode === 'epic') {
+      const epics = requirements.items.filter(
+        (i) => i.typeId === 'epic' || i.typeId.toLowerCase().includes('epic'),
+      );
       const map = new Map<string, RequirementItem[]>();
       const standalone: RequirementItem[] = [];
 
@@ -406,26 +456,26 @@ export function GanttChart({
         if (items && items.length > 0) {
           result.push({
             id: `epic-${epic.id}`,
-            title: `Epic: ${epic.id} - ${epic.title || "Untitled"}`,
-            color: "#8b5cf6",
-            badge: `${items.length} item${items.length === 1 ? "" : "s"}`,
+            title: `Epic: ${epic.id} - ${epic.title || 'Untitled'}`,
+            color: '#8b5cf6',
+            badge: `${items.length} item${items.length === 1 ? '' : 's'}`,
             items,
           });
         }
       }
       if (standalone.length > 0) {
         result.push({
-          id: "epic-standalone",
-          title: "Standalone Workable Items",
-          color: "var(--chrome-text-dim)",
-          badge: `${standalone.length} item${standalone.length === 1 ? "" : "s"}`,
+          id: 'epic-standalone',
+          title: 'Standalone Workable Items',
+          color: 'var(--chrome-text-dim)',
+          badge: `${standalone.length} item${standalone.length === 1 ? '' : 's'}`,
           items: standalone,
         });
       }
       return result;
     }
 
-    if (groupingMode === "parent") {
+    if (groupingMode === 'parent') {
       const map = new Map<string, RequirementItem[]>();
       const standalone: RequirementItem[] = [];
 
@@ -447,25 +497,25 @@ export function GanttChart({
         const pType = parent ? getItemType(requirements, parent.typeId) : undefined;
         result.push({
           id: `parent-${parentId}`,
-          title: `Parent: ${parentId} - ${parent?.title || "Untitled"}`,
-          color: pType?.color ?? "var(--accent)",
-          badge: `${items.length} item${items.length === 1 ? "" : "s"}`,
+          title: `Parent: ${parentId} - ${parent?.title || 'Untitled'}`,
+          color: pType?.color ?? 'var(--accent)',
+          badge: `${items.length} item${items.length === 1 ? '' : 's'}`,
           items,
         });
       }
       if (standalone.length > 0) {
         result.push({
-          id: "parent-independent",
-          title: "Independent Workable Items",
-          color: "var(--chrome-text-dim)",
-          badge: `${standalone.length} item${standalone.length === 1 ? "" : "s"}`,
+          id: 'parent-independent',
+          title: 'Independent Workable Items',
+          color: 'var(--chrome-text-dim)',
+          badge: `${standalone.length} item${standalone.length === 1 ? '' : 's'}`,
           items: standalone,
         });
       }
       return result;
     }
 
-    if (groupingMode === "sprint") {
+    if (groupingMode === 'sprint') {
       const result: GanttGroup[] = [];
       for (const pi of programIncrements) {
         const ranges = computeSprintDateRanges(pi);
@@ -475,9 +525,9 @@ export function GanttChart({
           if (items.length > 0) {
             result.push({
               id: `sprint-${sprint.id}`,
-              title: `${pi.name} • ${sprint.name}${range ? ` (${range.startDate} → ${range.endDate})` : ""}`,
-              color: "var(--accent)",
-              badge: `${items.length} item${items.length === 1 ? "" : "s"}`,
+              title: `${pi.name} • ${sprint.name}${range ? ` (${range.startDate} → ${range.endDate})` : ''}`,
+              color: 'var(--accent)',
+              badge: `${items.length} item${items.length === 1 ? '' : 's'}`,
               items,
             });
           }
@@ -486,7 +536,7 @@ export function GanttChart({
       return result;
     }
 
-    if (groupingMode === "type") {
+    if (groupingMode === 'type') {
       const result: GanttGroup[] = [];
       for (const t of requirements.itemTypes) {
         const items = rows.filter((item) => item.typeId === t.id);
@@ -495,7 +545,7 @@ export function GanttChart({
             id: `type-${t.id}`,
             title: `${t.label}s`,
             color: t.color,
-            badge: `${items.length} item${items.length === 1 ? "" : "s"}`,
+            badge: `${items.length} item${items.length === 1 ? '' : 's'}`,
             items,
           });
         }
@@ -503,20 +553,20 @@ export function GanttChart({
       return result;
     }
 
-    return [{ id: "default", title: "", items: rows }];
+    return [{ id: 'default', title: '', items: rows }];
   }, [groupingMode, rows, requirements, programIncrements, parentEpicByItemId, parentItemByItemId]);
 
   const renderMilestoneIcon = (t: string) => {
     switch (t) {
-      case "release":
+      case 'release':
         return <Package size={12} />;
-      case "deadline":
+      case 'deadline':
         return <Flag size={12} />;
-      case "review":
+      case 'review':
         return <ClipboardCheck size={12} />;
-      case "launch":
+      case 'launch':
         return <Rocket size={12} />;
-      case "code-freeze":
+      case 'code-freeze':
         return <Snowflake size={12} />;
       default:
         return <Diamond size={12} />;
@@ -526,7 +576,10 @@ export function GanttChart({
   if (bands.length === 0 && milestoneLayouts.length === 0) {
     return (
       <div className="gantt-chart__empty">
-        <p>No sprints or milestones defined yet - add a Program Increment or Release to plot your timeline.</p>
+        <p>
+          No sprints or milestones defined yet - add a Program Increment or Release to plot your
+          timeline.
+        </p>
       </div>
     );
   }
@@ -545,36 +598,36 @@ export function GanttChart({
           <div className="gantt-chart__group-btn-group">
             <button
               type="button"
-              className={`gantt-chart__group-btn${groupingMode === "none" ? " is-active" : ""}`}
-              onClick={() => setGroupingMode("none")}
+              className={`gantt-chart__group-btn${groupingMode === 'none' ? ' is-active' : ''}`}
+              onClick={() => setGroupingMode('none')}
             >
               None
             </button>
             <button
               type="button"
-              className={`gantt-chart__group-btn${groupingMode === "epic" ? " is-active" : ""}`}
-              onClick={() => setGroupingMode("epic")}
+              className={`gantt-chart__group-btn${groupingMode === 'epic' ? ' is-active' : ''}`}
+              onClick={() => setGroupingMode('epic')}
             >
               Epic
             </button>
             <button
               type="button"
-              className={`gantt-chart__group-btn${groupingMode === "parent" ? " is-active" : ""}`}
-              onClick={() => setGroupingMode("parent")}
+              className={`gantt-chart__group-btn${groupingMode === 'parent' ? ' is-active' : ''}`}
+              onClick={() => setGroupingMode('parent')}
             >
               Parent
             </button>
             <button
               type="button"
-              className={`gantt-chart__group-btn${groupingMode === "sprint" ? " is-active" : ""}`}
-              onClick={() => setGroupingMode("sprint")}
+              className={`gantt-chart__group-btn${groupingMode === 'sprint' ? ' is-active' : ''}`}
+              onClick={() => setGroupingMode('sprint')}
             >
               Sprint
             </button>
             <button
               type="button"
-              className={`gantt-chart__group-btn${groupingMode === "type" ? " is-active" : ""}`}
-              onClick={() => setGroupingMode("type")}
+              className={`gantt-chart__group-btn${groupingMode === 'type' ? ' is-active' : ''}`}
+              onClick={() => setGroupingMode('type')}
             >
               Type
             </button>
@@ -583,7 +636,7 @@ export function GanttChart({
       </div>
 
       {conflicts.length > 0 && (
-        <div className={`gantt-conflicts${blockedCount === 0 ? " is-risk-only" : ""}`}>
+        <div className={`gantt-conflicts${blockedCount === 0 ? ' is-risk-only' : ''}`}>
           <button
             type="button"
             className="gantt-conflicts__header"
@@ -592,7 +645,7 @@ export function GanttChart({
             <AlertTriangle size={14} />
             <span>
               {blockedCount > 0 && `${blockedCount} blocked`}
-              {blockedCount > 0 && riskCount > 0 && ", "}
+              {blockedCount > 0 && riskCount > 0 && ', '}
               {riskCount > 0 && `${riskCount} at risk`}
             </span>
             {isConflictsCollapsed ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
@@ -600,22 +653,25 @@ export function GanttChart({
           {!isConflictsCollapsed && (
             <ul className="gantt-conflicts__list">
               {conflicts.map((c) => (
-                <li key={c.id} className={`gantt-conflicts__item${c.severity === "risk" ? " is-risk" : ""}`}>
+                <li
+                  key={c.id}
+                  className={`gantt-conflicts__item${c.severity === 'risk' ? ' is-risk' : ''}`}
+                >
                   <span className="gantt-conflicts__text">
-                    {c.severity === "risk" ? (
+                    {c.severity === 'risk' ? (
                       <>
                         <strong>{c.item.id}</strong>
-                        {c.item.title ? `: ${c.item.title}` : ""} is scheduled in the same sprint as its blocker{" "}
-                        <strong>{c.blocker.id}</strong>
-                        {c.blocker.title ? `: ${c.blocker.title}` : ""}. Both can likely be completed in the sprint,
-                        but make sure {c.blocker.id} is done first.
+                        {c.item.title ? `: ${c.item.title}` : ''} is scheduled in the same sprint as
+                        its blocker <strong>{c.blocker.id}</strong>
+                        {c.blocker.title ? `: ${c.blocker.title}` : ''}. Both can likely be
+                        completed in the sprint, but make sure {c.blocker.id} is done first.
                       </>
                     ) : (
                       <>
                         <strong>{c.item.id}</strong>
-                        {c.item.title ? `: ${c.item.title}` : ""} is scheduled starting {c.itemRange.startDate}, but
-                        it's blocked by <strong>{c.blocker.id}</strong>
-                        {c.blocker.title ? `: ${c.blocker.title}` : ""}
+                        {c.item.title ? `: ${c.item.title}` : ''} is scheduled starting{' '}
+                        {c.itemRange.startDate}, but it's blocked by <strong>{c.blocker.id}</strong>
+                        {c.blocker.title ? `: ${c.blocker.title}` : ''}
                         {c.blockerRange
                           ? `, which isn't finished until ${c.blockerRange.endDate}`
                           : ", which isn't scheduled yet"}
@@ -642,7 +698,10 @@ export function GanttChart({
       <div className="gantt-chart__scroll">
         <div className="gantt-chart__inner" style={{ width: labelColumnWidth + totalWidth }}>
           {/* Vertical milestone lines running down the chart behind work items */}
-          <div className="gantt-chart__milestone-lines-layer" style={{ left: labelColumnWidth, width: totalWidth }}>
+          <div
+            className="gantt-chart__milestone-lines-layer"
+            style={{ left: labelColumnWidth, width: totalWidth }}
+          >
             {milestoneLayouts.map(({ milestone, left }) => {
               const color = getMilestoneColor(milestone);
               return (
@@ -665,7 +724,7 @@ export function GanttChart({
               <div className="gantt-chart__label-header" style={{ width: labelColumnWidth }}>
                 <span>Item</span>
                 <div
-                  className={`gantt-chart__resizer${isDraggingResizer ? " is-dragging" : ""}`}
+                  className={`gantt-chart__resizer${isDraggingResizer ? ' is-dragging' : ''}`}
                   onMouseDown={handleResizerMouseDown}
                   title="Drag to resize Item column"
                 />
@@ -690,13 +749,19 @@ export function GanttChart({
             </div>
 
             {/* Dedicated Markers track (FR-003, AC-002, AC-009) */}
-            <div className="gantt-chart__milestones-row" style={{ minHeight: milestoneTrackHeight }}>
+            <div
+              className="gantt-chart__milestones-row"
+              style={{ minHeight: milestoneTrackHeight }}
+            >
               <div className="gantt-chart__milestones-label" style={{ width: labelColumnWidth }}>
                 <Diamond size={13} className="gantt-chart__milestone-header-icon" />
                 <span>Markers</span>
               </div>
 
-              <div className="gantt-chart__milestones-track" style={{ width: totalWidth, minHeight: milestoneTrackHeight }}>
+              <div
+                className="gantt-chart__milestones-track"
+                style={{ width: totalWidth, minHeight: milestoneTrackHeight }}
+              >
                 {milestoneLayouts.map(({ milestone, left }) => {
                   const color = getMilestoneColor(milestone);
                   return (
@@ -713,7 +778,8 @@ export function GanttChart({
                 {milestoneLayouts.map(({ milestone, left, stackIndex }) => {
                   const color = getMilestoneColor(milestone);
                   const typeLabel = getMilestoneTypeLabel(milestone.type);
-                  const relatedCount = (milestone.relatedItemIds ?? milestone.relatedWorkableItemIds)?.length ?? 0;
+                  const relatedCount =
+                    (milestone.relatedItemIds ?? milestone.relatedWorkableItemIds)?.length ?? 0;
                   const topOffset = stackIndex * 26 + 4;
 
                   return (
@@ -727,19 +793,29 @@ export function GanttChart({
                         className="gantt-chart__milestone-marker"
                         style={{ borderColor: color, color }}
                         onClick={() => onSelectMilestone?.(milestone.id)}
-                        title={`${typeLabel}: ${milestone.name}${milestone.version ? ` (v${milestone.version})` : ""} \u2022 Scheduled: ${milestone.scheduledAt}${relatedCount > 0 ? ` \u2022 ${relatedCount} related item${relatedCount === 1 ? "" : "s"}` : ""}`}
+                        title={`${typeLabel}: ${milestone.name}${milestone.version ? ` (v${milestone.version})` : ''} \u2022 Scheduled: ${milestone.scheduledAt}${relatedCount > 0 ? ` \u2022 ${relatedCount} related item${relatedCount === 1 ? '' : 's'}` : ''}`}
                         aria-label={`${typeLabel} ${milestone.name}, scheduled ${milestone.scheduledAt}`}
                       >
-                        <span className="gantt-chart__milestone-shape" style={{ backgroundColor: color }}>
+                        <span
+                          className="gantt-chart__milestone-shape"
+                          style={{ backgroundColor: color }}
+                        >
                           ◆
                         </span>
-                        <span className="gantt-chart__milestone-icon">{renderMilestoneIcon(milestone.type)}</span>
+                        <span className="gantt-chart__milestone-icon">
+                          {renderMilestoneIcon(milestone.type)}
+                        </span>
                         <span className="gantt-chart__milestone-name">{milestone.name}</span>
                         {milestone.version && (
-                          <span className="gantt-chart__milestone-version">v{milestone.version}</span>
+                          <span className="gantt-chart__milestone-version">
+                            v{milestone.version}
+                          </span>
                         )}
                         {relatedCount > 0 && (
-                          <span className="gantt-chart__milestone-badge" title={`${relatedCount} linked items`}>
+                          <span
+                            className="gantt-chart__milestone-badge"
+                            title={`${relatedCount} linked items`}
+                          >
                             {relatedCount}
                           </span>
                         )}
@@ -777,31 +853,42 @@ export function GanttChart({
                         <div
                           className="gantt-chart__epic-label"
                           style={{ width: labelColumnWidth }}
-                          title={`${epic.id}: ${epic.title || "Untitled"}`}
+                          title={`${epic.id}: ${epic.title || 'Untitled'}`}
                         >
-                          <span
-                            className="gantt-chart__label-id"
-                            style={{ color: "#8b5cf6" }}
-                          >
+                          <span className="gantt-chart__label-id" style={{ color: '#8b5cf6' }}>
                             {epic.id}
                           </span>
-                          <span className="gantt-chart__label-title" title={epic.title || "Untitled"}>
-                            {epic.title || "Untitled"}
+                          <span
+                            className="gantt-chart__label-title"
+                            title={epic.title || 'Untitled'}
+                          >
+                            {epic.title || 'Untitled'}
                           </span>
                         </div>
-                        <div className="gantt-chart__track" style={{ width: totalWidth, position: "relative" }}>
+                        <div
+                          className="gantt-chart__track"
+                          style={{ width: totalWidth, position: 'relative' }}
+                        >
                           <button
                             type="button"
-                            className={`gantt-chart__epic-bar ${isSolid ? "gantt-chart__epic-bar--solid" : "gantt-chart__epic-bar--open-ended"}`}
+                            className={`gantt-chart__epic-bar ${isSolid ? 'gantt-chart__epic-bar--solid' : 'gantt-chart__epic-bar--open-ended'}`}
                             style={{ left, width }}
                             onClick={() => onSelectItem(epic.id)}
-                            title={`${epic.id}: ${epic.title || "Untitled"} (${schedule.startDate ?? "—"} \u2192 ${schedule.endDate ?? "Open-ended"}) \u2022 ${schedule.scheduledChildrenCount}/${schedule.totalChildrenCount} scheduled \u2022 ${schedule.totalPoints} pts`}
+                            title={`${epic.id}: ${epic.title || 'Untitled'} (${schedule.startDate ?? '—'} \u2192 ${schedule.endDate ?? 'Open-ended'}) \u2022 ${schedule.scheduledChildrenCount}/${schedule.totalChildrenCount} scheduled \u2022 ${schedule.totalPoints} pts`}
                           >
-                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            <span
+                              style={{
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
                               {epic.title || epic.id}
                             </span>
                             <span className="gantt-chart__epic-status-badge">
-                              {isSolid ? `${schedule.totalPoints} pts` : `${schedule.unscheduledChildrenCount} unscheduled`}
+                              {isSolid
+                                ? `${schedule.totalPoints} pts`
+                                : `${schedule.unscheduledChildrenCount} unscheduled`}
                             </span>
                           </button>
                         </div>
@@ -814,28 +901,30 @@ export function GanttChart({
                       <div
                         className="gantt-chart__epic-label"
                         style={{ width: labelColumnWidth }}
-                        title={`${dep.id}: ${dep.title || "Untitled"}`}
+                        title={`${dep.id}: ${dep.title || 'Untitled'}`}
                       >
-                        <span
-                          className="gantt-chart__label-id"
-                          style={{ color: "#f59e0b" }}
-                        >
+                        <span className="gantt-chart__label-id" style={{ color: '#f59e0b' }}>
                           {dep.id}
                         </span>
-                        <span className="gantt-chart__label-title" title={dep.title || "Untitled"}>
-                          {dep.title || "Untitled"}
+                        <span className="gantt-chart__label-title" title={dep.title || 'Untitled'}>
+                          {dep.title || 'Untitled'}
                         </span>
                       </div>
-                      <div className="gantt-chart__track" style={{ width: totalWidth, position: "relative" }}>
+                      <div
+                        className="gantt-chart__track"
+                        style={{ width: totalWidth, position: 'relative' }}
+                      >
                         <button
                           type="button"
                           className="pi-board-column__dep-pill"
-                          style={{ position: "absolute", left, top: "6px", zIndex: 3 }}
+                          style={{ position: 'absolute', left, top: '6px', zIndex: 3 }}
                           onClick={() => onSelectItem(dep.id)}
-                          title={`External Dependency: ${dep.id} ${dep.title || ""} (Linked to ${milestone.name} on ${date})`}
+                          title={`External Dependency: ${dep.id} ${dep.title || ''} (Linked to ${milestone.name} on ${date})`}
                         >
                           <span className="pi-board-column__dep-icon">⚡</span>
-                          <span>{dep.id} ({date})</span>
+                          <span>
+                            {dep.id} ({date})
+                          </span>
                         </button>
                       </div>
                     </div>
@@ -849,16 +938,16 @@ export function GanttChart({
           <div className="gantt-chart__rows">
             {groups.length === 0 || rows.length === 0 ? (
               <p className="gantt-chart__no-items">
-                {filterEpicId && filterEpicId !== "all"
-                  ? "No workable items matching the selected Epic are scheduled into a sprint yet."
-                  : "No workable items scheduled into a sprint yet."}
+                {filterEpicId && filterEpicId !== 'all'
+                  ? 'No workable items matching the selected Epic are scheduled into a sprint yet.'
+                  : 'No workable items scheduled into a sprint yet.'}
               </p>
             ) : (
               groups.map((group) => {
                 const isGroupCollapsed = collapsedGroupIds.has(group.id);
                 return (
                   <div key={group.id} className="gantt-chart__group-section">
-                    {groupingMode !== "none" && group.title && (
+                    {groupingMode !== 'none' && group.title && (
                       <div className="gantt-chart__group-header-row">
                         <button
                           type="button"
@@ -867,17 +956,26 @@ export function GanttChart({
                           onClick={() => toggleGroupCollapse(group.id)}
                           title={`Toggle group ${group.title}`}
                         >
-                          {isGroupCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+                          {isGroupCollapsed ? (
+                            <ChevronRight size={13} />
+                          ) : (
+                            <ChevronDown size={13} />
+                          )}
                           <span
                             className="gantt-chart__group-color-dot"
-                            style={{ backgroundColor: group.color ?? "var(--accent)" }}
+                            style={{ backgroundColor: group.color ?? 'var(--accent)' }}
                           />
                           <span className="gantt-chart__group-title">{group.title}</span>
-                          {group.badge && <span className="gantt-chart__group-badge">{group.badge}</span>}
+                          {group.badge && (
+                            <span className="gantt-chart__group-badge">{group.badge}</span>
+                          )}
                         </button>
                         <div
                           className="gantt-chart__track gantt-chart__group-track"
-                          style={{ width: totalWidth, borderColor: group.color ? `${group.color}33` : undefined }}
+                          style={{
+                            width: totalWidth,
+                            borderColor: group.color ? `${group.color}33` : undefined,
+                          }}
                         />
                       </div>
                     )}
@@ -888,8 +986,8 @@ export function GanttChart({
                         if (!pos) return null;
                         const type = getItemType(requirements, item.typeId);
                         const rowConflict = conflictByItemId.get(item.id);
-                        const isConflicted = rowConflict?.severity === "blocked";
-                        const isAtRisk = rowConflict?.severity === "risk";
+                        const isConflicted = rowConflict?.severity === 'blocked';
+                        const isAtRisk = rowConflict?.severity === 'risk';
                         const itemFullTitle = item.title ? `${item.id}: ${item.title}` : item.id;
                         return (
                           <div key={item.id} className="gantt-chart__row">
@@ -900,23 +998,34 @@ export function GanttChart({
                             >
                               <span
                                 className="gantt-chart__label-id"
-                                style={{ color: type?.color ?? "var(--chrome-text-dim)" }}
+                                style={{ color: type?.color ?? 'var(--chrome-text-dim)' }}
                               >
                                 {item.id}
                               </span>
-                              <span className="gantt-chart__label-title" title={item.title || "Untitled"}>
-                                {item.title || "Untitled"}
+                              <span
+                                className="gantt-chart__label-title"
+                                title={item.title || 'Untitled'}
+                              >
+                                {item.title || 'Untitled'}
                               </span>
-                              {isConflicted && <AlertTriangle size={11} className="gantt-chart__label-warning" />}
-                              {isAtRisk && <AlertTriangle size={11} className="gantt-chart__label-risk" />}
+                              {isConflicted && (
+                                <AlertTriangle size={11} className="gantt-chart__label-warning" />
+                              )}
+                              {isAtRisk && (
+                                <AlertTriangle size={11} className="gantt-chart__label-risk" />
+                              )}
                             </div>
                             <div className="gantt-chart__track" style={{ width: totalWidth }}>
                               <button
                                 type="button"
-                                className={`gantt-chart__bar${isConflicted ? " is-conflicted" : ""}${isAtRisk ? " is-at-risk" : ""}`}
-                                style={{ left: pos.left, width: pos.width, borderColor: type?.color }}
+                                className={`gantt-chart__bar${isConflicted ? ' is-conflicted' : ''}${isAtRisk ? ' is-at-risk' : ''}`}
+                                style={{
+                                  left: pos.left,
+                                  width: pos.width,
+                                  borderColor: type?.color,
+                                }}
                                 onClick={() => onSelectItem(item.id)}
-                                title={`${item.id}: ${item.title || "Untitled"} (${pos.startDate} \u2192 ${pos.endDate})`}
+                                title={`${item.id}: ${item.title || 'Untitled'} (${pos.startDate} \u2192 ${pos.endDate})`}
                               >
                                 {item.title || item.id}
                               </button>

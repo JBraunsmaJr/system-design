@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { CheckCircle2, Circle, CircleDot, ChevronDown } from "lucide-react";
-import { REQUIREMENT_STATUSES, getStatusMeta } from "../../domain/requirementsRegistry";
-import { computeFlippedPosition } from "../../domain/popoverPosition";
-import type { RequirementStatus } from "../../domain/requirementsTypes";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { CheckCircle2, Circle, CircleDot, ChevronDown } from 'lucide-react';
+import { REQUIREMENT_STATUSES, getStatusMeta } from '../../domain/requirementsRegistry';
+import { computeFlippedPosition } from '../../domain/popoverPosition';
+import type { RequirementStatus } from '../../domain/requirementsTypes';
 
 interface StatusPickerProps {
   status: RequirementStatus | undefined;
@@ -13,8 +13,8 @@ interface StatusPickerProps {
 const DROPDOWN_WIDTH = 150;
 
 function StatusIcon({ status, size }: { status: RequirementStatus; size: number }) {
-  if (status === "done") return <CheckCircle2 size={size} />;
-  if (status === "in-progress") return <CircleDot size={size} />;
+  if (status === 'done') return <CheckCircle2 size={size} />;
+  if (status === 'in-progress') return <CircleDot size={size} />;
   return <Circle size={size} />;
 }
 
@@ -56,9 +56,11 @@ export function StatusPicker({ status, onChange }: StatusPickerProps) {
     const next = computeFlippedPosition(
       triggerRect,
       { width: dropdownRect.width, height: dropdownRect.height },
-      { width: window.innerWidth, height: window.innerHeight }
+      { width: window.innerWidth, height: window.innerHeight },
     );
-    setDropdownPos((prev) => (prev && prev.top === next.top && prev.left === next.left ? prev : next));
+    setDropdownPos((prev) =>
+      prev && prev.top === next.top && prev.left === next.left ? prev : next,
+    );
   }, [isOpen]);
 
   const reposition = useCallback(() => {
@@ -71,8 +73,8 @@ export function StatusPicker({ status, onChange }: StatusPickerProps) {
       computeFlippedPosition(
         triggerRect,
         { width: dropdownRect.width, height: dropdownRect.height },
-        { width: window.innerWidth, height: window.innerHeight }
-      )
+        { width: window.innerWidth, height: window.innerHeight },
+      ),
     );
   }, []);
 
@@ -85,23 +87,23 @@ export function StatusPicker({ status, onChange }: StatusPickerProps) {
       close();
     };
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
+      if (e.key === 'Escape') close();
     };
-    document.addEventListener("mousedown", handleMouseDown);
-    document.addEventListener("keydown", handleEscape);
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('keydown', handleEscape);
     return () => {
-      document.removeEventListener("mousedown", handleMouseDown);
-      document.removeEventListener("keydown", handleEscape);
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('keydown', handleEscape);
     };
   }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
-    window.addEventListener("scroll", reposition, true);
-    window.addEventListener("resize", reposition);
+    window.addEventListener('scroll', reposition, true);
+    window.addEventListener('resize', reposition);
     return () => {
-      window.removeEventListener("scroll", reposition, true);
-      window.removeEventListener("resize", reposition);
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
     };
   }, [isOpen, reposition]);
 
@@ -126,13 +128,18 @@ export function StatusPicker({ status, onChange }: StatusPickerProps) {
           <div
             ref={dropdownRef}
             className="status-picker__dropdown"
-            style={{ position: "fixed", top: dropdownPos.top, left: dropdownPos.left, width: DROPDOWN_WIDTH }}
+            style={{
+              position: 'fixed',
+              top: dropdownPos.top,
+              left: dropdownPos.left,
+              width: DROPDOWN_WIDTH,
+            }}
           >
             {REQUIREMENT_STATUSES.map((s) => (
               <button
                 key={s.id}
                 type="button"
-                className={`status-picker__option${s.id === meta.id ? " is-selected" : ""}`}
+                className={`status-picker__option${s.id === meta.id ? ' is-selected' : ''}`}
                 style={{ color: s.color }}
                 onClick={() => {
                   onChange(s.id);
@@ -144,7 +151,7 @@ export function StatusPicker({ status, onChange }: StatusPickerProps) {
               </button>
             ))}
           </div>,
-          document.body
+          document.body,
         )}
     </div>
   );

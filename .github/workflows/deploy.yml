@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   release:
-    types: [ published ]
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -24,6 +24,7 @@ jobs:
           node-version: 26
           cache: npm
       - run: npm ci
+      - run: npm --prefix docs-site ci
       - run: npm run build
         env:
           VITE_SIGNALING_URL: ${{ vars.VITE_SIGNALING_URL }}

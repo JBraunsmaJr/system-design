@@ -19,7 +19,7 @@ The System Design Editor container image is a lightweight Nginx web server packa
 To minimize deployment complexity, standard environment variables are provided with clear primary names.
 
 | Variable      | Primary / Purpose           | Example                        | Description                                                      |
-|:--------------|:----------------------------|:-------------------------------|:-----------------------------------------------------------------|
+| :------------ | :-------------------------- | :----------------------------- | :--------------------------------------------------------------- |
 | `RELAY`       | **Primary (Signaling URL)** | `wss://relay.example.com`      | Default WebSocket URL for the WebRTC signaling relay.            |
 | `APP_URL`     | **Primary (Base URL)**      | `https://design.example.com`   | Public base URL used when generating shareable session links.    |
 | `ICE_SERVERS` | **Primary (STUN/TURN)**     | `stun:stun.l.google.com:19302` | Comma-separated list of STUN/TURN server URLs for NAT traversal. |
@@ -65,7 +65,7 @@ services:
     image: ghcr.io/jbraunsmajr/system-design:latest
     container_name: system-design-editor
     ports:
-      - "8080:80"
+      - '8080:80'
     environment:
       # If accessed directly by the browser:
       - RELAY=ws://localhost:4444
@@ -78,11 +78,12 @@ services:
     image: ghcr.io/jbraunsmajr/system-design-relay:latest
     container_name: system-design-relay
     ports:
-      - "4444:4444"
+      - '4444:4444'
     restart: unless-stopped
 ```
 
 Start the stack:
+
 ```bash
 docker compose up -d
 ```

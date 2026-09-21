@@ -11,13 +11,13 @@
  * inspecting Yjs internals: a destroyed store that still rebuilds is leaking,
  * whatever its observer list says.
  */
-import * as Y from "yjs";
-import { seedYjsDiagramDoc, createYjsDiagramStore } from "./yjsDiagramStore.ts";
-import { createYjsRequirementsStore } from "./yjsRequirementsStore.ts";
-import { createYjsProgramIncrementsStore } from "./yjsProgramIncrementsStore.ts";
-import { createYjsTeamStore } from "./yjsTeamStore.ts";
-import { createYjsMilestonesStore } from "./yjsMilestonesStore.ts";
-import type { SubDiagram } from "../domain/types";
+import * as Y from 'yjs';
+import { seedYjsDiagramDoc, createYjsDiagramStore } from './yjsDiagramStore.ts';
+import { createYjsRequirementsStore } from './yjsRequirementsStore.ts';
+import { createYjsProgramIncrementsStore } from './yjsProgramIncrementsStore.ts';
+import { createYjsTeamStore } from './yjsTeamStore.ts';
+import { createYjsMilestonesStore } from './yjsMilestonesStore.ts';
+import type { SubDiagram } from '../domain/types';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {
@@ -32,16 +32,16 @@ function assert(condition: boolean, message: string) {
 const root = {
   nodes: [
     {
-      id: "n1",
-      type: "typed",
+      id: 'n1',
+      type: 'typed',
       position: { x: 0, y: 0 },
-      data: { nodeType: "service", label: "Gateway" },
+      data: { nodeType: 'service', label: 'Gateway' },
     },
   ],
   edges: [],
 } as unknown as SubDiagram;
 
-console.log("=== A destroyed store stops reacting ===");
+console.log('=== A destroyed store stops reacting ===');
 {
   const doc = new Y.Doc();
   seedYjsDiagramDoc(doc, root);
@@ -50,8 +50,8 @@ console.log("=== A destroyed store stops reacting ===");
   let notifications = 0;
   store.subscribe(() => notifications++);
 
-  store.updatePosition("n1", { x: 10, y: 10 });
-  assert(notifications > 0, "a live store notifies on change");
+  store.updatePosition('n1', { x: 10, y: 10 });
+  assert(notifications > 0, 'a live store notifies on change');
 
   const afterLive = notifications;
   store.destroy();
@@ -59,16 +59,13 @@ console.log("=== A destroyed store stops reacting ===");
   // Mutate through a SECOND store so the change genuinely originates
   // elsewhere, as a remote update would.
   const other = createYjsDiagramStore(doc);
-  other.updatePosition("n1", { x: 20, y: 20 });
+  other.updatePosition('n1', { x: 20, y: 20 });
 
-  assert(
-    notifications === afterLive,
-    "a destroyed store does not react to later changes",
-  );
+  assert(notifications === afterLive, 'a destroyed store does not react to later changes');
   other.destroy();
 }
 
-console.log("=== Destroy is idempotent ===");
+console.log('=== Destroy is idempotent ===');
 {
   const doc = new Y.Doc();
   seedYjsDiagramDoc(doc, root);
@@ -80,10 +77,10 @@ console.log("=== Destroy is idempotent ===");
   } catch {
     threw = true;
   }
-  assert(!threw, "calling destroy twice is safe, so teardown can be defensive");
+  assert(!threw, 'calling destroy twice is safe, so teardown can be defensive');
 }
 
-console.log("=== Churn does not accumulate observers ===");
+console.log('=== Churn does not accumulate observers ===');
 {
   const doc = new Y.Doc();
   seedYjsDiagramDoc(doc, root);
@@ -95,7 +92,7 @@ console.log("=== Churn does not accumulate observers ===");
   for (let i = 0; i < 50; i++) {
     const store = createYjsDiagramStore(doc);
     store.subscribe(() => notificationsFromClosedStores++);
-    store.updatePosition("n1", { x: i, y: i });
+    store.updatePosition('n1', { x: i, y: i });
     store.destroy();
   }
   const duringLifetimes = notificationsFromClosedStores;
@@ -103,7 +100,7 @@ console.log("=== Churn does not accumulate observers ===");
   const survivor = createYjsDiagramStore(doc);
   let survivorNotifications = 0;
   survivor.subscribe(() => survivorNotifications++);
-  survivor.updatePosition("n1", { x: 999, y: 999 });
+  survivor.updatePosition('n1', { x: 999, y: 999 });
 
   assert(
     notificationsFromClosedStores === duringLifetimes,
@@ -116,34 +113,34 @@ console.log("=== Churn does not accumulate observers ===");
   survivor.destroy();
 }
 
-console.log("=== Every store implements the seam ===");
+console.log('=== Every store implements the seam ===');
 {
   const doc = new Y.Doc();
   const stores = [
-    ["diagram", createYjsDiagramStore(doc)],
-    ["requirements", createYjsRequirementsStore(doc)],
-    ["programIncrements", createYjsProgramIncrementsStore(doc)],
-    ["team", createYjsTeamStore(doc)],
-    ["milestones", createYjsMilestonesStore(doc)],
+    ['diagram', createYjsDiagramStore(doc)],
+    ['requirements', createYjsRequirementsStore(doc)],
+    ['programIncrements', createYjsProgramIncrementsStore(doc)],
+    ['team', createYjsTeamStore(doc)],
+    ['milestones', createYjsMilestonesStore(doc)],
   ] as const;
 
   for (const [name, store] of stores) {
     assert(
-      typeof (store as { destroy?: unknown }).destroy === "function",
+      typeof (store as { destroy?: unknown }).destroy === 'function',
       `${name} store exposes destroy`,
     );
   }
   for (const [, store] of stores) store.destroy();
-  assert(true, "and all of them tear down without throwing");
+  assert(true, 'and all of them tear down without throwing');
 }
 
 if (failures > 0) {
   console.error(`\n${failures} failure(s)`);
   throw new Error(`${failures} store lifecycle check(s) failed`);
 }
-console.log("\nAll store lifecycle checks passed.");
+console.log('\nAll store lifecycle checks passed.');
 
-console.log("=== replaceAll swaps the whole diagram (WS1 Step 3) ===");
+console.log('=== replaceAll swaps the whole diagram (WS1 Step 3) ===');
 {
   const doc = new Y.Doc();
   seedYjsDiagramDoc(doc, root);
@@ -159,10 +156,10 @@ console.log("=== replaceAll swaps the whole diagram (WS1 Step 3) ===");
   const replacement = {
     nodes: [
       {
-        id: "replacement",
-        type: "typed",
+        id: 'replacement',
+        type: 'typed',
         position: { x: 5, y: 5 },
-        data: { nodeType: "database", label: "Replacement" },
+        data: { nodeType: 'database', label: 'Replacement' },
       },
     ],
     edges: [],
@@ -172,8 +169,8 @@ console.log("=== replaceAll swaps the whole diagram (WS1 Step 3) ===");
 
   const snapshot = store.getSnapshot();
   assert(
-    snapshot.nodes.length === 1 && snapshot.nodes[0].id === "replacement",
-    "the previous contents are gone, not merged with the new ones",
+    snapshot.nodes.length === 1 && snapshot.nodes[0].id === 'replacement',
+    'the previous contents are gone, not merged with the new ones',
   );
   assert(
     observedCounts.length > 0 && observedCounts.every((n) => n > 0),

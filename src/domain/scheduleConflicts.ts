@@ -3,7 +3,7 @@ import type {
   RequirementRelationship,
   RelationshipType,
   RequirementItemType,
-} from "./requirementsTypes";
+} from './requirementsTypes';
 
 /**
  * The ids of item types that represent actual work.
@@ -42,7 +42,7 @@ function workableTypeIds(itemTypes: RequirementItemType[]): Set<string> {
  * it's surfaced rather than hidden, but it doesn't prevent the
  * assignment the way "blocked" does.
  */
-export type ScheduleConflictSeverity = "blocked" | "risk";
+export type ScheduleConflictSeverity = 'blocked' | 'risk';
 
 export interface ScheduleConflict {
   id: string;
@@ -89,7 +89,7 @@ export function findScheduleConflicts(
   relationships: RequirementRelationship[],
   relationshipTypes: RelationshipType[],
   itemTypes: RequirementItemType[],
-  sprintRangesByItemId: Map<string, { startDate: string; endDate: string }>
+  sprintRangesByItemId: Map<string, { startDate: string; endDate: string }>,
 ): ScheduleConflict[] {
   const blockingTypeIds = new Set(relationshipTypes.filter((t) => t.isBlocking).map((t) => t.id));
   const workableIds = workableTypeIds(itemTypes);
@@ -115,11 +115,11 @@ export function findScheduleConflicts(
 
     let severity: ScheduleConflictSeverity;
     if (!blockerRange) {
-      severity = "blocked";
+      severity = 'blocked';
     } else if (item.sprintId && item.sprintId === blocker.sprintId) {
-      severity = "risk";
+      severity = 'risk';
     } else if (blockerRange.endDate >= itemRange.startDate) {
-      severity = "blocked";
+      severity = 'blocked';
     } else {
       continue;
     }
@@ -181,7 +181,7 @@ export function checkScheduleConflict(
   relationships: RequirementRelationship[],
   relationshipTypes: RelationshipType[],
   itemTypes: RequirementItemType[],
-  sprintRangesByItemId: Map<string, { startDate: string; endDate: string }>
+  sprintRangesByItemId: Map<string, { startDate: string; endDate: string }>,
 ): HypotheticalScheduleConflict | null {
   const blockingTypeIds = new Set(relationshipTypes.filter((t) => t.isBlocking).map((t) => t.id));
   const workableIds = workableTypeIds(itemTypes);
@@ -205,16 +205,16 @@ export function checkScheduleConflict(
 
     let severity: ScheduleConflictSeverity;
     if (!blockerRange) {
-      severity = "blocked";
+      severity = 'blocked';
     } else if (blocker.sprintId === targetSprintId) {
-      severity = "risk";
+      severity = 'risk';
     } else if (blockerRange.endDate >= targetRange.startDate) {
-      severity = "blocked";
+      severity = 'blocked';
     } else {
       continue;
     }
 
-    if (severity === "blocked") {
+    if (severity === 'blocked') {
       return { blocker, blockerRange, severity };
     }
     if (!bestRiskSoFar) {
@@ -241,7 +241,7 @@ export function findBlockingItemIds(
   relationships: RequirementRelationship[],
   relationshipTypes: RelationshipType[],
   itemTypes: RequirementItemType[],
-  items: RequirementItem[]
+  items: RequirementItem[],
 ): Set<string> {
   const blockingTypeIds = new Set(relationshipTypes.filter((t) => t.isBlocking).map((t) => t.id));
   const workableIds = workableTypeIds(itemTypes);

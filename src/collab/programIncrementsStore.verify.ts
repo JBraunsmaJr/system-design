@@ -5,29 +5,32 @@
  *
  *   npx tsx src/collab/programIncrementsStore.verify.ts
  */
-import * as Y from "yjs";
-import { createLocalProgramIncrementsStore } from "./programIncrementsStore";
-import { createYjsProgramIncrementsStore, seedYjsProgramIncrementsDoc } from "./yjsProgramIncrementsStore";
-import type { ProgramIncrementsStore } from "./programIncrementsStore";
+import * as Y from 'yjs';
+import { createLocalProgramIncrementsStore } from './programIncrementsStore';
+import {
+  createYjsProgramIncrementsStore,
+  seedYjsProgramIncrementsDoc,
+} from './yjsProgramIncrementsStore';
+import type { ProgramIncrementsStore } from './programIncrementsStore';
 
 let failures = 0;
 function assert(cond: boolean, msg: string) {
   if (!cond) {
     (globalThis as unknown as { process: { exitCode: number } }).process.exitCode = 1; // run-tests.ts reads the exit status
-    console.error("FAIL:", msg);
+    console.error('FAIL:', msg);
     failures++;
   } else {
-    console.log("ok:", msg);
+    console.log('ok:', msg);
   }
 }
 
 function canonicalJSON(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonicalJSON).join(",")}]`;
-  if (value !== null && typeof value === "object") {
+  if (Array.isArray(value)) return `[${value.map(canonicalJSON).join(',')}]`;
+  if (value !== null && typeof value === 'object') {
     const keys = Object.keys(value as object)
       .filter((k) => (value as Record<string, unknown>)[k] !== undefined)
       .sort();
-    return `{${keys.map((k) => `${JSON.stringify(k)}:${canonicalJSON((value as Record<string, unknown>)[k])}`).join(",")}}`;
+    return `{${keys.map((k) => `${JSON.stringify(k)}:${canonicalJSON((value as Record<string, unknown>)[k])}`).join(',')}}`;
   }
   return JSON.stringify(value);
 }
@@ -47,12 +50,15 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: ProgramIncrementsStore
 {
   function runSequence(store: ProgramIncrementsStore) {
     const piId = store.addPI();
-    store.updatePIName(piId, "Q1 2027");
+    store.updatePIName(piId, 'Q1 2027');
     store.addSprint(piId);
-    const sprintIds = store.getSnapshot().find((pi) => pi.id === piId)!.sprints.map((s) => s.id);
-    store.updateSprintName(piId, sprintIds[0], "Sprint One");
-    store.addReservation(piId, { name: "Risk Buffer", unit: "percentage", value: 15 });
-    store.moveSprint(piId, sprintIds[1], "up");
+    const sprintIds = store
+      .getSnapshot()
+      .find((pi) => pi.id === piId)!
+      .sprints.map((s) => s.id);
+    store.updateSprintName(piId, sprintIds[0], 'Sprint One');
+    store.addReservation(piId, { name: 'Risk Buffer', unit: 'percentage', value: 15 });
+    store.moveSprint(piId, sprintIds[1], 'up');
     return store.getSnapshot();
   }
 
@@ -61,22 +67,26 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: ProgramIncrementsStore
 
   // Ids themselves are collision-resistant/random and will differ between
   // implementations by design - strip them before comparing structure.
-  function stripIds(pis: ReturnType<ProgramIncrementsStore["getSnapshot"]>) {
+  function stripIds(pis: ReturnType<ProgramIncrementsStore['getSnapshot']>) {
     return pis.map((pi) => ({
       name: pi.name,
       startDate: pi.startDate,
       sprints: pi.sprints.map((s) => ({ name: s.name, durationDays: s.durationDays })),
-      reservations: (pi.reservations ?? []).map((r) => ({ name: r.name, unit: r.unit, value: r.value })),
+      reservations: (pi.reservations ?? []).map((r) => ({
+        name: r.name,
+        unit: r.unit,
+        value: r.value,
+      })),
     }));
   }
 
   assert(
     canonicalJSON(stripIds(localSnap)) === canonicalJSON(stripIds(yjsSnap)),
-    "local and Yjs stores produce structurally identical results (PI name, sprint names/order after the move, reservation) after the same sequence of operations - the Yjs implementation is a faithful drop-in for single-user use"
+    'local and Yjs stores produce structurally identical results (PI name, sprint names/order after the move, reservation) after the same sequence of operations - the Yjs implementation is a faithful drop-in for single-user use',
   );
   assert(
     canonicalJSON(stripIds(localSnap)) === canonicalJSON(stripIds(yjsSnap)),
-    "the adapter store (delegating to an externally-owned setSnapshot, matching how App.tsx's undoable state works) produces a structurally identical result too"
+    "the adapter store (delegating to an externally-owned setSnapshot, matching how App.tsx's undoable state works) produces a structurally identical result too",
   );
 }
 
@@ -89,15 +99,21 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: ProgramIncrementsStore
   const piId = peerA.store.addPI();
   const peerB = forkPeer(peerA.doc);
 
-  peerA.store.updatePIName(piId, "Renamed by A");
-  peerB.store.updatePIStart(piId, "2027-06-01");
+  peerA.store.updatePIName(piId, 'Renamed by A');
+  peerB.store.updatePIStart(piId, '2027-06-01');
 
   sync(peerA.doc, peerB.doc);
 
   const piA = peerA.store.getSnapshot().find((pi) => pi.id === piId)!;
   const piB = peerB.store.getSnapshot().find((pi) => pi.id === piId)!;
-  assert(piA.name === "Renamed by A" && piA.startDate === "2027-06-01", "peer A's merged view has BOTH concurrent field edits on the same PI - A's name change and B's startDate change both survived");
-  assert(piB.name === "Renamed by A" && piB.startDate === "2027-06-01", "peer B's merged view matches peer A's exactly");
+  assert(
+    piA.name === 'Renamed by A' && piA.startDate === '2027-06-01',
+    "peer A's merged view has BOTH concurrent field edits on the same PI - A's name change and B's startDate change both survived",
+  );
+  assert(
+    piB.name === 'Renamed by A' && piB.startDate === '2027-06-01',
+    "peer B's merged view matches peer A's exactly",
+  );
 }
 
 // 2b. Concurrent field edits on the SAME sprint - name vs duration (via updateSprintEnd).
@@ -108,12 +124,12 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: ProgramIncrementsStore
   const sprintId = storeA.getSnapshot()[0].sprints[0].id;
   const peerB = forkPeer(docA);
 
-  storeA.updateSprintName(piId, sprintId, "Renamed Sprint");
+  storeA.updateSprintName(piId, sprintId, 'Renamed Sprint');
   const startDate = peerB.store.getSnapshot()[0].startDate;
   // Extend the sprint's end date - the default duration is 14 days
   // starting at startDate, so pushing the end out further increases
   // durationDays.
-  const [y, m, d] = startDate.split("-").map(Number);
+  const [y, m, d] = startDate.split('-').map(Number);
   const laterDate = new Date(Date.UTC(y, m - 1, d + 20)).toISOString().slice(0, 10);
   peerB.store.updateSprintEnd(piId, sprintId, laterDate);
 
@@ -121,8 +137,14 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: ProgramIncrementsStore
 
   const sprintA = storeA.getSnapshot()[0].sprints[0];
   const sprintB = peerB.store.getSnapshot()[0].sprints[0];
-  assert(sprintA.name === "Renamed Sprint" && sprintA.durationDays > 14, "peer A's merged view has BOTH concurrent field edits on the same sprint - the name change and the extended duration both survived");
-  assert(sprintB.name === "Renamed Sprint" && sprintB.durationDays === sprintA.durationDays, "peer B's merged view matches peer A's exactly");
+  assert(
+    sprintA.name === 'Renamed Sprint' && sprintA.durationDays > 14,
+    "peer A's merged view has BOTH concurrent field edits on the same sprint - the name change and the extended duration both survived",
+  );
+  assert(
+    sprintB.name === 'Renamed Sprint' && sprintB.durationDays === sprintA.durationDays,
+    "peer B's merged view matches peer A's exactly",
+  );
 }
 
 // 2c. Concurrent addition of different sprints to the same PI converges.
@@ -139,8 +161,15 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: ProgramIncrementsStore
 
   const sprintsA = storeA.getSnapshot()[0].sprints;
   const sprintsB = peerB.store.getSnapshot()[0].sprints;
-  assert(sprintsA.length === 3, "all three sprints (the original plus both concurrently-added ones) survive on peer A");
-  assert(JSON.stringify(sprintsA.map((s) => s.id).sort()) === JSON.stringify(sprintsB.map((s) => s.id).sort()), "both peers converge to the identical set of sprints");
+  assert(
+    sprintsA.length === 3,
+    'all three sprints (the original plus both concurrently-added ones) survive on peer A',
+  );
+  assert(
+    JSON.stringify(sprintsA.map((s) => s.id).sort()) ===
+      JSON.stringify(sprintsB.map((s) => s.id).sort()),
+    'both peers converge to the identical set of sprints',
+  );
 }
 
 // 2d. Delete-vs-edit race on a PI.
@@ -155,8 +184,14 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: ProgramIncrementsStore
 
   sync(docA, peerB.doc);
 
-  assert(storeA.getSnapshot().find((pi) => pi.id === piId) === undefined, "the delete wins on peer A - not resurrected by B's concurrent edit");
-  assert(peerB.store.getSnapshot().find((pi) => pi.id === piId) === undefined, "the delete wins on peer B too - both converge to the same outcome");
+  assert(
+    storeA.getSnapshot().find((pi) => pi.id === piId) === undefined,
+    "the delete wins on peer A - not resurrected by B's concurrent edit",
+  );
+  assert(
+    peerB.store.getSnapshot().find((pi) => pi.id === piId) === undefined,
+    'the delete wins on peer B too - both converge to the same outcome',
+  );
 }
 
 // 2e. Concurrent reservation add + delete on the same PI converge without conflict.
@@ -164,19 +199,26 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: ProgramIncrementsStore
   const docA = new Y.Doc();
   const storeA = createYjsProgramIncrementsStore(docA);
   const piId = storeA.addPI();
-  storeA.addReservation(piId, { name: "Existing Reservation", unit: "percentage", value: 10 });
+  storeA.addReservation(piId, { name: 'Existing Reservation', unit: 'percentage', value: 10 });
   const existingId = storeA.getSnapshot()[0].reservations![0].id;
   const peerB = forkPeer(docA);
 
-  storeA.addReservation(piId, { name: "Added by A", unit: "points", value: 5 });
+  storeA.addReservation(piId, { name: 'Added by A', unit: 'points', value: 5 });
   peerB.store.deleteReservation(piId, existingId);
 
   sync(docA, peerB.doc);
 
   const reservationsA = storeA.getSnapshot()[0].reservations ?? [];
   const reservationsB = peerB.store.getSnapshot()[0].reservations ?? [];
-  assert(reservationsA.length === 1 && reservationsA[0].name === "Added by A", "peer A's merged view has the deletion AND the addition both applied - the pre-existing reservation is gone, the new one from A survived");
-  assert(JSON.stringify(reservationsA.map((r) => r.id).sort()) === JSON.stringify(reservationsB.map((r) => r.id).sort()), "both peers converge to the identical set of reservations");
+  assert(
+    reservationsA.length === 1 && reservationsA[0].name === 'Added by A',
+    "peer A's merged view has the deletion AND the addition both applied - the pre-existing reservation is gone, the new one from A survived",
+  );
+  assert(
+    JSON.stringify(reservationsA.map((r) => r.id).sort()) ===
+      JSON.stringify(reservationsB.map((r) => r.id).sort()),
+    'both peers converge to the identical set of reservations',
+  );
 }
 
 // === Part 3: moveSprint's Y.Array swap logic, standalone ===
@@ -188,33 +230,49 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: ProgramIncrementsStore
   store.addSprint(piId); // 3 sprints total: [S1, S2, S3] (ids[0], ids[1], ids[2])
   const ids = store.getSnapshot()[0].sprints.map((s) => s.id);
 
-  store.moveSprint(piId, ids[1], "up"); // S2 (index 1) swaps with S1 (index 0) -> [S2, S1, S3]
+  store.moveSprint(piId, ids[1], 'up'); // S2 (index 1) swaps with S1 (index 0) -> [S2, S1, S3]
   let order = store.getSnapshot()[0].sprints.map((s) => s.id);
-  assert(JSON.stringify(order) === JSON.stringify([ids[1], ids[0], ids[2]]), "moving the middle sprint up swaps it with the first, matching manual trace before implementation");
+  assert(
+    JSON.stringify(order) === JSON.stringify([ids[1], ids[0], ids[2]]),
+    'moving the middle sprint up swaps it with the first, matching manual trace before implementation',
+  );
 
   // S2 is now at index 0 (per the result just above) - moving it "down"
   // swaps it with whatever's now at index 1, which is S1.
-  store.moveSprint(piId, ids[1], "down");
+  store.moveSprint(piId, ids[1], 'down');
   order = store.getSnapshot()[0].sprints.map((s) => s.id);
-  assert(JSON.stringify(order) === JSON.stringify([ids[0], ids[1], ids[2]]), "moving that same sprint back down swaps it with S1 again (its CURRENT neighbor at index 1, not wherever it started) - correctly restoring the original order");
+  assert(
+    JSON.stringify(order) === JSON.stringify([ids[0], ids[1], ids[2]]),
+    'moving that same sprint back down swaps it with S1 again (its CURRENT neighbor at index 1, not wherever it started) - correctly restoring the original order',
+  );
 
   // Order is now back to [S1, S2, S3] - S1 is genuinely at index 0, so
   // moving IT up is the actual no-op case.
   const beforeInvalid = store.getSnapshot()[0].sprints.map((s) => s.id);
-  store.moveSprint(piId, ids[0], "up");
+  store.moveSprint(piId, ids[0], 'up');
   const afterInvalid = store.getSnapshot()[0].sprints.map((s) => s.id);
-  assert(JSON.stringify(beforeInvalid) === JSON.stringify(afterInvalid), "moving the sprint actually at the first position further up is a safe no-op, not an error or corruption");
+  assert(
+    JSON.stringify(beforeInvalid) === JSON.stringify(afterInvalid),
+    'moving the sprint actually at the first position further up is a safe no-op, not an error or corruption',
+  );
 }
 
 // === Part 4: seedYjsProgramIncrementsDoc - starting a session must preserve existing work exactly ===
 {
   const existingStore = createLocalProgramIncrementsStore();
   const piId = existingStore.addPI();
-  existingStore.updatePIName(piId, "Existing PI");
+  existingStore.updatePIName(piId, 'Existing PI');
   existingStore.addSprint(piId);
-  const sprintIds = existingStore.getSnapshot().find((pi) => pi.id === piId)!.sprints.map((s) => s.id);
-  existingStore.updateSprintName(piId, sprintIds[1], "Existing Sprint Two");
-  existingStore.addReservation(piId, { name: "Existing Reservation", unit: "percentage", value: 15 });
+  const sprintIds = existingStore
+    .getSnapshot()
+    .find((pi) => pi.id === piId)!
+    .sprints.map((s) => s.id);
+  existingStore.updateSprintName(piId, sprintIds[1], 'Existing Sprint Two');
+  existingStore.addReservation(piId, {
+    name: 'Existing Reservation',
+    unit: 'percentage',
+    value: 15,
+  });
   const existingSnapshot = existingStore.getSnapshot();
 
   const doc = new Y.Doc();
@@ -224,40 +282,72 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: ProgramIncrementsStore
 
   assert(
     canonicalJSON(existingSnapshot) === canonicalJSON(seededSnapshot),
-    "seeding a fresh Y.Doc from an existing PI (with two sprints and a reservation) and reading it back produces an EXACT match, including every original PI/sprint/reservation id - nothing lost, nothing regenerated"
+    'seeding a fresh Y.Doc from an existing PI (with two sprints and a reservation) and reading it back produces an EXACT match, including every original PI/sprint/reservation id - nothing lost, nothing regenerated',
   );
 
   const seededPI = seededSnapshot.find((pi) => pi.id === piId)!;
-  assert(seededPI.sprints.map((s) => s.id).join(",") === sprintIds.join(","), "sprint order is preserved exactly, not just the same set in a different order");
-  assert(seededPI.reservations?.[0].name === "Existing Reservation", "the reservation's own id and content are both preserved");
+  assert(
+    seededPI.sprints.map((s) => s.id).join(',') === sprintIds.join(','),
+    'sprint order is preserved exactly, not just the same set in a different order',
+  );
+  assert(
+    seededPI.reservations?.[0].name === 'Existing Reservation',
+    "the reservation's own id and content are both preserved",
+  );
 }
 
 // === Part 5: contiguous PI start dates ===
 {
   const local = createLocalProgramIncrementsStore();
   const pi1Id = local.addPI();
-  local.updatePIStart(pi1Id, "2026-11-24"); // Sprint 1 (14 days) runs 2026-11-24 -> 2026-12-07
+  local.updatePIStart(pi1Id, '2026-11-24'); // Sprint 1 (14 days) runs 2026-11-24 -> 2026-12-07
   const pi2Id = local.addPI();
   const snap = local.getSnapshot();
   const pi2 = snap.find((pi) => pi.id === pi2Id)!;
-  assert(pi2.startDate === "2026-12-08", "local store: PI 2 automatically starts on Dec 8 when PI 1 ends on Dec 7");
+  assert(
+    pi2.startDate === '2026-12-08',
+    'local store: PI 2 automatically starts on Dec 8 when PI 1 ends on Dec 7',
+  );
 
   const ydoc = new Y.Doc();
   const ystore = createYjsProgramIncrementsStore(ydoc);
   const yPi1Id = ystore.addPI();
-  ystore.updatePIStart(yPi1Id, "2026-11-24");
+  ystore.updatePIStart(yPi1Id, '2026-11-24');
   const yPi2Id = ystore.addPI();
   const ySnap = ystore.getSnapshot();
   const yPi2 = ySnap.find((pi) => pi.id === yPi2Id)!;
-  assert(yPi2.startDate === "2026-12-08", "Yjs store: PI 2 automatically starts on Dec 8 when PI 1 ends on Dec 7");
+  assert(
+    yPi2.startDate === '2026-12-08',
+    'Yjs store: PI 2 automatically starts on Dec 8 when PI 1 ends on Dec 7',
+  );
 
   // Invalid or empty start date fallbacks
-  const { getNextPIStartDate, todayISO } = await import("../domain/programIncrements");
-  const fallbackEmpty = getNextPIStartDate([{ id: "pi-x", name: "Empty start", startDate: "", sprints: [{ id: "s1", name: "S1", durationDays: 14 }] }]);
-  assert(fallbackEmpty === todayISO(), "getNextPIStartDate falls back to todayISO() when startDate is empty");
+  const { getNextPIStartDate, todayISO } = await import('../domain/programIncrements');
+  const fallbackEmpty = getNextPIStartDate([
+    {
+      id: 'pi-x',
+      name: 'Empty start',
+      startDate: '',
+      sprints: [{ id: 's1', name: 'S1', durationDays: 14 }],
+    },
+  ]);
+  assert(
+    fallbackEmpty === todayISO(),
+    'getNextPIStartDate falls back to todayISO() when startDate is empty',
+  );
 
-  const fallbackInvalid = getNextPIStartDate([{ id: "pi-x", name: "Invalid date", startDate: "2026-02-31", sprints: [{ id: "s1", name: "S1", durationDays: 14 }] }]);
-  assert(fallbackInvalid === todayISO(), "getNextPIStartDate falls back to todayISO() when startDate is calendar-invalid (Feb 31)");
+  const fallbackInvalid = getNextPIStartDate([
+    {
+      id: 'pi-x',
+      name: 'Invalid date',
+      startDate: '2026-02-31',
+      sprints: [{ id: 's1', name: 'S1', durationDays: 14 }],
+    },
+  ]);
+  assert(
+    fallbackInvalid === todayISO(),
+    'getNextPIStartDate falls back to todayISO() when startDate is calendar-invalid (Feb 31)',
+  );
 }
 
-console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILURE(S)`);
+console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);

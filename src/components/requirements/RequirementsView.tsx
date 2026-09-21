@@ -1,20 +1,38 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { ChevronDown, ChevronUp, LayoutList, Search, Settings2, Tags, Waypoints, X } from "lucide-react";
-import { RequirementCard } from "./RequirementCard";
-import { ManageTypesModal } from "./ManageTypesModal";
-import { ManageRelationshipTypesModal } from "./ManageRelationshipTypesModal";
-import { AddItemDropdown } from "./AddItemDropdown";
-import type {
-  RequirementItem,
-  RequirementItemType,
-} from "../../domain/requirementsTypes";
-import type { ProgramIncrement } from "../../domain/programIncrements";
-import type { TeamDocument } from "../../domain/teamTypes";
-import type { SubDiagram } from "../../domain/types";
-import { findAllLinkedNodes, type DiagramPath, type LinkedNodeRef } from "../../domain/subDiagramTree";
-import type { RequirementsStore } from "../../collab/requirementsStore";
-import type { PresenceInfo } from "../../collab/session";
-import plur from "plur";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
+import {
+  ChevronDown,
+  ChevronUp,
+  LayoutList,
+  Search,
+  Settings2,
+  Tags,
+  Waypoints,
+  X,
+} from 'lucide-react';
+import { RequirementCard } from './RequirementCard';
+import { ManageTypesModal } from './ManageTypesModal';
+import { ManageRelationshipTypesModal } from './ManageRelationshipTypesModal';
+import { AddItemDropdown } from './AddItemDropdown';
+import type { RequirementItem, RequirementItemType } from '../../domain/requirementsTypes';
+import type { ProgramIncrement } from '../../domain/programIncrements';
+import type { TeamDocument } from '../../domain/teamTypes';
+import type { SubDiagram } from '../../domain/types';
+import {
+  findAllLinkedNodes,
+  type DiagramPath,
+  type LinkedNodeRef,
+} from '../../domain/subDiagramTree';
+import type { RequirementsStore } from '../../collab/requirementsStore';
+import type { PresenceInfo } from '../../collab/session';
+import plur from 'plur';
 
 interface RequirementsViewProps {
   requirementsStore: RequirementsStore;
@@ -61,9 +79,9 @@ const EMPTY_LINKED_NODES: LinkedNodeRef[] = [];
  * RequirementCard's own React.memo comparison just as surely.
  */
 const EMPTY_PEERS: PresenceInfo[] = [];
-const UNCATEGORIZED_KEY = "__uncategorized__";
+const UNCATEGORIZED_KEY = '__uncategorized__';
 
-type GroupBy = "type" | "category";
+type GroupBy = 'type' | 'category';
 
 interface ItemGroup {
   key: string;
@@ -83,16 +101,16 @@ export function RequirementsView({
   onFocusHandled,
   peers = [],
   onFocusedItemChange,
-  initialSearch = "",
+  initialSearch = '',
 }: RequirementsViewProps) {
   const doc = useSyncExternalStore(
     requirementsStore.subscribe,
     requirementsStore.getSnapshot,
-    requirementsStore.getSnapshot
+    requirementsStore.getSnapshot,
   );
   const [search, setSearch] = useState(initialSearch);
   const [activeMatchItemId, setActiveMatchItemId] = useState<string | null>(null);
-  const [groupBy, setGroupBy] = useState<GroupBy>("type");
+  const [groupBy, setGroupBy] = useState<GroupBy>('type');
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [isManagingTypes, setIsManagingTypes] = useState(false);
   const [isManagingRelationshipTypes, setIsManagingRelationshipTypes] = useState(false);
@@ -124,7 +142,7 @@ export function RequirementsView({
    */
   const linkedNodesByItemId = useMemo(
     () => (diagramRoot ? findAllLinkedNodes(diagramRoot) : new Map()),
-    [diagramRoot]
+    [diagramRoot],
   );
 
   const filteredItems = useMemo(() => {
@@ -146,7 +164,7 @@ export function RequirementsView({
    * {key, label, color, items} structure "group by type" already produces.
    */
   const groups = useMemo<ItemGroup[]>(() => {
-    if (groupBy === "type") {
+    if (groupBy === 'type') {
       return doc.itemTypes
         .map((type) => ({
           key: type.id,
@@ -165,13 +183,13 @@ export function RequirementsView({
       }))
       .filter((g) => g.items.length > 0);
     const uncategorized = filteredItems.filter(
-      (i) => !i.categoryId || !doc.categories.some((c) => c.id === i.categoryId)
+      (i) => !i.categoryId || !doc.categories.some((c) => c.id === i.categoryId),
     );
     if (uncategorized.length > 0) {
       categoryGroups.push({
         key: UNCATEGORIZED_KEY,
-        label: "Uncategorized",
-        color: "var(--chrome-text-dim)",
+        label: 'Uncategorized',
+        color: 'var(--chrome-text-dim)',
         items: uncategorized,
       });
     }
@@ -185,10 +203,10 @@ export function RequirementsView({
      * narrowing the list, and land at the bottom of their group - scroll
      * to it the same way a reference-click navigation would.
      */
-    setSearch("");
+    setSearch('');
     requestAnimationFrame(() => {
       const el = document.getElementById(`requirement-${id}`);
-      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
   };
 
@@ -235,12 +253,15 @@ export function RequirementsView({
   // and this callback is too.
   const onEditingChange = useCallback(
     (itemId: string, isEditing: boolean) => onFocusedItemChange?.(isEditing ? itemId : null),
-    [onFocusedItemChange]
+    [onFocusedItemChange],
   );
 
-  const onAddRelationship = useCallback((typeId: string, fromItemId: string, toItemId: string): string | null => {
-    return requirementsStoreRef.current.addRelationship(typeId, fromItemId, toItemId);
-  }, []);
+  const onAddRelationship = useCallback(
+    (typeId: string, fromItemId: string, toItemId: string): string | null => {
+      return requirementsStoreRef.current.addRelationship(typeId, fromItemId, toItemId);
+    },
+    [],
+  );
 
   const onDeleteRelationship = useCallback((relationshipId: string) => {
     requirementsStoreRef.current.deleteRelationship(relationshipId);
@@ -249,7 +270,7 @@ export function RequirementsView({
   const onNavigateToItem = useCallback((itemId: string) => {
     const el = document.getElementById(`requirement-${itemId}`);
     if (!el) return;
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     setHighlightedId(itemId);
     if (highlightTimer.current) clearTimeout(highlightTimer.current);
     highlightTimer.current = setTimeout(() => setHighlightedId(null), HIGHLIGHT_DURATION_MS);
@@ -272,13 +293,14 @@ export function RequirementsView({
   const navigateToMatch = useCallback(
     (index: number) => {
       if (visibleItems.length === 0) return;
-      const normalizedIndex = ((index % visibleItems.length) + visibleItems.length) % visibleItems.length;
+      const normalizedIndex =
+        ((index % visibleItems.length) + visibleItems.length) % visibleItems.length;
       const targetItem = visibleItems[normalizedIndex];
       if (!targetItem) return;
       setActiveMatchItemId(targetItem.id);
       onNavigateToItem(targetItem.id);
     },
-    [visibleItems, onNavigateToItem]
+    [visibleItems, onNavigateToItem],
   );
 
   const goToNextMatch = useCallback(() => {
@@ -300,16 +322,16 @@ export function RequirementsView({
   }, [visibleItems.length, activeMatchItemId, activeIndex, navigateToMatch]);
 
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
+    if (e.key === 'Enter') {
       e.preventDefault();
       if (e.shiftKey) {
         goToPrevMatch();
       } else {
         goToNextMatch();
       }
-    } else if (e.key === "Escape") {
+    } else if (e.key === 'Escape') {
       e.preventDefault();
-      setSearch("");
+      setSearch('');
       setActiveMatchItemId(null);
       searchInputRef.current?.blur();
     }
@@ -317,13 +339,13 @@ export function RequirementsView({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
         e.preventDefault();
         searchInputRef.current?.focus();
         searchInputRef.current?.select();
         return;
       }
-      if (e.key === "F3" || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "g")) {
+      if (e.key === 'F3' || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'g')) {
         if (search.trim().length > 0) {
           e.preventDefault();
           if (e.shiftKey) {
@@ -335,8 +357,8 @@ export function RequirementsView({
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [search, goToNextMatch, goToPrevMatch]);
 
   /*
@@ -358,7 +380,12 @@ export function RequirementsView({
     return () => cancelAnimationFrame(frame);
   }, [focusItemId, onNavigateToItem]);
 
-  const onAddCustomType = (label: string, prefix: string, color: string, isWorkable: boolean): boolean => {
+  const onAddCustomType = (
+    label: string,
+    prefix: string,
+    color: string,
+    isWorkable: boolean,
+  ): boolean => {
     return requirementsStoreRef.current.addCustomType(label, prefix, color, isWorkable);
   };
 
@@ -375,7 +402,7 @@ export function RequirementsView({
    */
   const onUpdateType = (
     typeId: string,
-    patch: Partial<Pick<RequirementItemType, "label" | "color" | "isWorkable">>
+    patch: Partial<Pick<RequirementItemType, 'label' | 'color' | 'isWorkable'>>,
   ) => {
     requirementsStoreRef.current.updateType(typeId, patch);
   };
@@ -392,7 +419,12 @@ export function RequirementsView({
     return counts;
   }, [doc.items]);
 
-  const onAddCustomRelationshipType = (label: string, inverseLabel: string, color: string, isBlocking: boolean) => {
+  const onAddCustomRelationshipType = (
+    label: string,
+    inverseLabel: string,
+    color: string,
+    isBlocking: boolean,
+  ) => {
     requirementsStoreRef.current.addCustomRelationshipType(label, inverseLabel, color, isBlocking);
   };
 
@@ -410,7 +442,7 @@ export function RequirementsView({
             onOpenManageTypes={() => setIsManagingTypes(true)}
             itemCountsByType={itemCountsByType}
           />
-          <div className={`requirements-view__search-wrap${search.trim() ? " has-query" : ""}`}>
+          <div className={`requirements-view__search-wrap${search.trim() ? ' has-query' : ''}`}>
             <Search size={13} className="requirements-view__search-icon" />
             <input
               ref={searchInputRef}
@@ -430,7 +462,7 @@ export function RequirementsView({
                 <span className="requirements-view__search-counter">
                   {visibleItems.length > 0
                     ? `${activeIndex + 1} of ${visibleItems.length}`
-                    : "0 of 0"}
+                    : '0 of 0'}
                 </span>
                 <button
                   type="button"
@@ -458,7 +490,7 @@ export function RequirementsView({
                   type="button"
                   className="requirements-view__search-clear"
                   onClick={() => {
-                    setSearch("");
+                    setSearch('');
                     setActiveMatchItemId(null);
                     searchInputRef.current?.focus();
                   }}
@@ -474,7 +506,7 @@ export function RequirementsView({
                 type="button"
                 className="requirements-view__search-clear"
                 onClick={() => {
-                  setSearch("");
+                  setSearch('');
                   setActiveMatchItemId(null);
                 }}
                 title="Clear search"
@@ -486,7 +518,7 @@ export function RequirementsView({
           </div>
           {!search.trim() && doc.items.length > 0 && (
             <span className="requirements-view__count-badge">
-              {doc.items.length} {doc.items.length === 1 ? "item" : "items"}
+              {doc.items.length} {doc.items.length === 1 ? 'item' : 'items'}
             </span>
           )}
         </div>
@@ -497,8 +529,8 @@ export function RequirementsView({
             <div className="requirements-view__group-toggle">
               <button
                 type="button"
-                className={groupBy === "type" ? "active" : undefined}
-                onClick={() => setGroupBy("type")}
+                className={groupBy === 'type' ? 'active' : undefined}
+                onClick={() => setGroupBy('type')}
                 title="Group by item type"
               >
                 <LayoutList size={12} />
@@ -506,8 +538,8 @@ export function RequirementsView({
               </button>
               <button
                 type="button"
-                className={groupBy === "category" ? "active" : undefined}
-                onClick={() => setGroupBy("category")}
+                className={groupBy === 'category' ? 'active' : undefined}
+                onClick={() => setGroupBy('category')}
                 title="Group by category"
               >
                 <Tags size={12} />
@@ -543,7 +575,9 @@ export function RequirementsView({
 
       <div className="requirements-view__content">
         {doc.items.length === 0 ? (
-          <p className="requirements-view__empty">No requirements yet - add one above to get started.</p>
+          <p className="requirements-view__empty">
+            No requirements yet - add one above to get started.
+          </p>
         ) : groups.length === 0 ? (
           <p className="requirements-view__empty">No requirements match your search.</p>
         ) : (
@@ -571,8 +605,15 @@ export function RequirementsView({
                   onDeleteCategory={onDeleteCategory}
                   onAddRelationship={onAddRelationship}
                   onDeleteRelationship={onDeleteRelationship}
-                  highlighted={highlightedId === item.id || (Boolean(search.trim()) && activeItem?.id === item.id)}
-                  peersHere={peers.length === 0 ? EMPTY_PEERS : peers.filter((p) => p.focusedItemId === item.id)}
+                  highlighted={
+                    highlightedId === item.id ||
+                    (Boolean(search.trim()) && activeItem?.id === item.id)
+                  }
+                  peersHere={
+                    peers.length === 0
+                      ? EMPTY_PEERS
+                      : peers.filter((p) => p.focusedItemId === item.id)
+                  }
                   onEditingChange={onEditingChange}
                   searchQuery={search.trim()}
                 />

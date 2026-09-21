@@ -1,5 +1,5 @@
-import type { Node, Edge } from "@xyflow/react";
-import type { ArchNodeData, ArchEdgeData, SubDiagram } from "./types";
+import type { Node, Edge } from '@xyflow/react';
+import type { ArchNodeData, ArchEdgeData, SubDiagram } from './types';
 
 export interface CloneIdGenerator {
   nextNodeId: (prefix: string) => string;
@@ -7,10 +7,10 @@ export interface CloneIdGenerator {
 }
 
 function prefixForType(type: string | undefined): string {
-  if (type === "group") return "group";
-  if (type === "text") return "text";
-  if (type === "shape") return "shape";
-  return "node";
+  if (type === 'group') return 'group';
+  if (type === 'text') return 'text';
+  if (type === 'shape') return 'shape';
+  return 'node';
 }
 
 /**
@@ -28,7 +28,7 @@ function prefixForType(type: string | undefined): string {
 export function cloneNodesAndEdges(
   nodes: Node<ArchNodeData>[],
   edges: Edge<ArchEdgeData>[],
-  ids: CloneIdGenerator
+  ids: CloneIdGenerator,
 ): { nodes: Node<ArchNodeData>[]; edges: Edge<ArchEdgeData>[] } {
   const idMap = new Map<string, string>();
 

@@ -1,6 +1,6 @@
-import type { Page } from "playwright";
-import type { FixtureName } from "../fixtures";
-import type { PerfMetrics } from "../instrumentation";
+import type { Page } from 'playwright';
+import type { FixtureName } from '../fixtures';
+import type { PerfMetrics } from '../instrumentation';
 
 export interface ScenarioDefinition {
   id: string;
