@@ -7,6 +7,9 @@ services:
       # The DNS entry that points to the host this editor is running on.
       APP_URL: ${EDITOR_URL:-https://editor.example.com}
 
+      # Optional: URL of the workspace store if deploying persistent shared team workspaces.
+      # STORE_URL: ${STORE_URL:-https://store.example.com}
+
       # Example from air-gapped network
       # ICE_SERVERS: ${ICE_SERVERS:-}
     container_name: system-design-editor

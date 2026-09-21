@@ -66,8 +66,16 @@ jobs:
       - name: Compute image name and date tag
         id: vars
         run: |
-          echo "image=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')-relay" >> "$GITHUB_OUTPUT"
-          echo "date_tag=$(date -u +'%Y-%m-%d')" >> "$GITHUB_OUTPUT"
+          IMAGE="ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')-relay"
+          DATE_TAG="$(date -u +'%Y-%m-%d')"
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+          echo "date_tag=$DATE_TAG" >> "$GITHUB_OUTPUT"
+          echo "tags<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$IMAGE:$DATE_TAG" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event.release.prerelease }}" != "true" ]; then
+            echo "$IMAGE:latest" >> "$GITHUB_OUTPUT"
+          fi
+          echo "EOF" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -118,8 +126,6 @@ jobs:
           context: .
           file: docker/signaling/Dockerfile
           push: true
-          tags: |
-            ${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.date_tag }}
-            ${{ steps.vars.outputs.image }}:latest
+          tags: ${{ steps.vars.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
