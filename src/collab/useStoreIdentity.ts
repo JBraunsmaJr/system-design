@@ -1,6 +1,6 @@
 /**
  * Who the store says this person is (WS10-R1), for naming them to others
- * in a session.
+ * in a session, and what identity providers are available when signed out.
  *
  * Separate from the workspace sync on purpose. Identity does not depend
  * on which document is open, or on whether it is in the workspace at all
@@ -16,26 +16,42 @@ export interface StoreIdentity {
   subject: string;
 }
 
-export function useStoreIdentity(storeUrl: string | null): StoreIdentity | null {
-  const [identity, setIdentity] = useState<StoreIdentity | null>(null);
+export interface StoreAuthInfo {
+  identity: StoreIdentity | null;
+  providers: string[];
+}
+
+export function useStoreAuth(storeUrl: string | null): StoreAuthInfo {
+  const [auth, setAuth] = useState<StoreAuthInfo>({ identity: null, providers: [] });
 
   useEffect(() => {
-    if (!storeUrl) return;
+    if (!storeUrl) {
+      setAuth({ identity: null, providers: [] });
+      return;
+    }
     let cancelled = false;
     const client = createStoreClient({ baseUrl: storeUrl });
-    const ask = () =>
-      client.session().then(
-        (session) => {
-          if (!cancelled)
-            setIdentity(
-              session ? { displayName: session.displayName, subject: session.subject } : null,
-            );
-        },
-        () => {
-          // Unreachable: the name falls back to whatever the person chose,
-          // or the generated one. Nothing here is worth an error.
-        },
-      );
+    const ask = async () => {
+      try {
+        const session = await client.session();
+        if (cancelled) return;
+        if (session) {
+          setAuth({
+            identity: { displayName: session.displayName, subject: session.subject },
+            providers: [],
+          });
+        } else {
+          const provs = await client.providers().catch(() => []);
+          if (!cancelled) {
+            setAuth({ identity: null, providers: provs });
+          }
+        }
+      } catch {
+        if (!cancelled) {
+          setAuth({ identity: null, providers: [] });
+        }
+      }
+    };
     void ask();
     // Signing in happens in another tab of the provider and returns here,
     // so looking again when the window regains focus picks it up without
@@ -48,5 +64,10 @@ export function useStoreIdentity(storeUrl: string | null): StoreIdentity | null 
     };
   }, [storeUrl]);
 
+  return auth;
+}
+
+export function useStoreIdentity(storeUrl: string | null): StoreIdentity | null {
+  const { identity } = useStoreAuth(storeUrl);
   return identity;
 }

@@ -209,6 +209,37 @@ assessment requires tamper resistance, grant the store's database role
 `INSERT` and `SELECT` on `audit_log` only, and ship the table to your log
 platform.
 
+## Offline document recovery
+
+When all workspace member devices and recovery codes are lost, or in an
+emergency disaster recovery scenario, administrators can decrypt an escrowed
+document package directly using the organization's offline recovery private key.
+
+Using the container image:
+
+```bash
+docker run --rm \
+  -u $(id -u):$(id -g) \
+  -v ./keys:/keys \
+  -v ./backups:/backups \
+  ghcr.io/jbraunsmajr/system-design-store:latest \
+  recover-document \
+    --key /keys/recovery-private.pem \
+    --package /backups/doc-123.json \
+    --out /backups/recovered-123.json
+```
+
+Or from source:
+
+```bash
+npx tsx scripts/recover-document.ts \
+  --key recovery-private.pem \
+  --package doc-123.json \
+  --out doc-123-recovered.json
+```
+
+The output JSON file can be opened directly in the editor via **File > Open**.
+
 ## Responses
 
 | Status                | Meaning                                                                                 |

@@ -44,16 +44,28 @@ store:
 ## Before the first document
 
 Generate the organization's recovery pair once, on a machine that is not the
-server:
+server.
+
+### Using the published store image (recommended for container deployments)
+
+```bash
+docker run --rm \
+  -u $(id -u):$(id -g) \
+  -v ./keys:/keys \
+  ghcr.io/jbraunsmajr/system-design-store:latest \
+  generate-recovery-key --out /keys/recovery
+```
+
+### From source
 
 ```bash
 npx tsx scripts/generate-recovery-key.ts --out ./recovery
 ```
 
-Give the store the **public** half. Keep the private half offline, and
-somewhere other than your database backups — it is the last route into a
-document when workspace keys are gone, and it is useless to an attacker who
-has only the database.
+Give the store the **public** half (`recovery-public.pem`). Keep the private
+half (`recovery-private.pem`) offline, and somewhere other than your database
+backups — it is the last route into a document when workspace keys are gone, and
+it is useless to an attacker who has only the database.
 
 ::: warning A store with encryption on and no recovery key refuses documents.
 That is deliberate. The alternative is a workspace quietly accumulating
@@ -158,9 +170,32 @@ stored; changing it later affects only documents deleted afterwards.
 Sessions live in PostgreSQL, so a restart does not sign everyone out and two
 instances behind a load balancer share them — no sticky sessions needed.
 
-## Backups
+## Backups and disaster recovery
 
 Back up PostgreSQL as usual. Its contents are encrypted, so a backup is
 useless to an attacker — and equally useless to you without the offline
 recovery key. **Store that key separately from the backups it would be used
 to recover.**
+
+To restore an escrowed document package offline using the recovery private key:
+
+```bash
+docker run --rm \
+  -u $(id -u):$(id -g) \
+  -v ./keys:/keys \
+  -v ./backups:/backups \
+  ghcr.io/jbraunsmajr/system-design-store:latest \
+  recover-document \
+    --key /keys/recovery-private.pem \
+    --package /backups/document.json \
+    --out /backups/recovered.json
+```
+
+Or from source:
+
+```bash
+npx tsx scripts/recover-document.ts \
+  --key recovery-private.pem \
+  --package document.json \
+  --out recovered.json
+```

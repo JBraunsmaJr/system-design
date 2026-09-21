@@ -76,6 +76,30 @@ check(
   'the image runs the entry point this was checked against',
 );
 
+console.log('\n=== Recovery CLI tools packaged in the store image ===');
+for (const cliScript of ['scripts/generate-recovery-key.ts', 'scripts/recover-document.ts']) {
+  const cliReachable = importGraph(cliScript);
+  const cliMissing = cliReachable.filter(
+    (file) => !copied.some((source) => file === source || file.startsWith(`${source}/`)),
+  );
+  check(
+    cliMissing.length === 0,
+    `${cliScript} and its dependencies (${cliReachable.join(', ')}) are copied into the image`,
+  );
+}
+
+check(
+  /ENTRYPOINT\s+\[.*docker-entrypoint\.sh.*\]/.test(dockerfile),
+  'the image configures docker-entrypoint.sh as its ENTRYPOINT',
+);
+
+const entrypointContent = readFileSync('docker/store/docker-entrypoint.sh', 'utf8');
+check(
+  entrypointContent.includes('generate-recovery-key') &&
+    entrypointContent.includes('recover-document'),
+  'docker-entrypoint.sh dispatches generate-recovery-key and recover-document',
+);
+
 if (failures > 0) {
   console.error(`\n${failures} check(s) failed`);
   process.exit(1);

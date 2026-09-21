@@ -83,7 +83,9 @@ import { LeaveGuardDialog } from './components/LeaveGuardDialog';
 import { WorkspacePanel } from './components/WorkspacePanel';
 import { getStoreUrl } from './domain/storeConfig';
 import { useWorkspaceSync } from './collab/useWorkspaceSync';
-import { useStoreIdentity } from './collab/useStoreIdentity';
+import { useStoreAuth } from './collab/useStoreIdentity';
+import { saveDocumentToWorkspace } from './collab/workspacePersistence';
+import { createStoreClient } from './collab/storeClient';
 import { useAccessRequests } from './collab/useAccessRequests';
 import { AccessRequestNotice } from './components/AccessRequestNotice';
 import { authorizeRelayUrls } from './collab/relayAccess';
@@ -444,7 +446,19 @@ function App() {
    * "chosen" name, and the next person to sign in on this browser would
    * appear as the last one.
    */
-  const storeIdentity = useStoreIdentity(storeUrl);
+  const { identity: storeIdentity, providers: storeProviders } = useStoreAuth(storeUrl);
+  const [isSavingToWorkspace, setIsSavingToWorkspace] = useState(false);
+
+  const isOidcAvailable = Boolean(
+    storeUrl && (storeProviders.includes('oidc') || storeProviders.length > 0),
+  );
+
+  const handleLoginOidc = useCallback(() => {
+    if (!storeUrl) return;
+    const provider = storeProviders.includes('oidc') ? 'oidc' : (storeProviders[0] ?? 'oidc');
+    globalThis.location.assign(`${storeUrl}/v1/auth/${encodeURIComponent(provider)}/start`);
+  }, [storeUrl, storeProviders]);
+
   /** People waiting to be let into the workspace, noticed from here rather
    * than only from inside File > Documents (WS7-R8). */
   const accessRequests = useAccessRequests({ storeUrl });
@@ -1015,6 +1029,27 @@ function App() {
    * local document, or a browser that has not been enrolled.
    */
   const workspaceSync = useWorkspaceSync({ storeUrl, docId: openDocId, doc: openDoc.doc, title });
+
+  const handleSaveToWorkspace = useCallback(async () => {
+    if (!storeUrl) return;
+    setIsSavingToWorkspace(true);
+    try {
+      const client = createStoreClient({ baseUrl: storeUrl });
+      const docState = Y.encodeStateAsUpdate(openDoc.doc);
+      await saveDocumentToWorkspace({
+        client,
+        docId: openDocId,
+        title,
+        documentState: docState,
+      });
+      showToast('Saved to workspace');
+    } catch (error) {
+      console.error('Failed to save to workspace:', error);
+      showToast('Could not save to workspace', 'error');
+    } finally {
+      setIsSavingToWorkspace(false);
+    }
+  }, [storeUrl, openDoc.doc, openDocId, title, showToast]);
 
   /**
    * Opening a workspace document joins its room. Everyone holding the
@@ -3107,6 +3142,13 @@ function App() {
                   : undefined
               }
               fileName={activeSession?.ownsDocument ? null : fileSaving.fileName}
+              isOidcAvailable={isOidcAvailable}
+              onLoginOidc={!storeIdentity && isOidcAvailable ? handleLoginOidc : undefined}
+              isLoggedIn={storeIdentity !== null}
+              onSaveToWorkspace={
+                storeUrl && storeIdentity !== null ? handleSaveToWorkspace : undefined
+              }
+              isSavingToWorkspace={isSavingToWorkspace}
             />
           }
           // A workspace session does not lock the document: see

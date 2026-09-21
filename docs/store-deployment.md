@@ -17,7 +17,8 @@ A complete example — editor, relay, store, PostgreSQL and Keycloak — is in
 
 ```bash
 cd docker/store
-npx tsx ../../scripts/generate-recovery-key.ts --out ./recovery
+# Generate the recovery key pair using the store container image (or npx tsx ../../scripts/generate-recovery-key.ts):
+docker run --rm -v $(pwd):/keys ghcr.io/jbraunsmajr/system-design-store:latest generate-recovery-key --out /keys/recovery
 docker compose -f compose.yaml up --build
 ```
 
@@ -142,7 +143,19 @@ address. Without it the editor shows no workspace.
 ## Before the first document: the recovery key
 
 Generate the organization's recovery pair once, on a machine that is not the
-server:
+server.
+
+Using the store container image:
+
+```bash
+docker run --rm \
+  -u $(id -u):$(id -g) \
+  -v ./keys:/keys \
+  ghcr.io/jbraunsmajr/system-design-store:latest \
+  generate-recovery-key --out /keys/recovery
+```
+
+Or from source:
 
 ```bash
 npx tsx scripts/generate-recovery-key.ts --out ./recovery
@@ -252,8 +265,24 @@ any document.
 The organization's **recovery key** is generated during first-run setup and
 kept offline. It is the last route into a document when workspace keys are
 gone, and it is the reason documents can be recovered at all; the store
-never holds its private half. Recover a document with
-`npx tsx scripts/recover-document.ts --key recovery-private.pem --package doc.json`.
+never holds its private half.
+
+Recover an escrowed document package using the container image:
+
+```bash
+docker run --rm \
+  -u $(id -u):$(id -g) \
+  -v ./keys:/keys \
+  -v ./backups:/backups \
+  ghcr.io/jbraunsmajr/system-design-store:latest \
+  recover-document \
+    --key /keys/recovery-private.pem \
+    --package /backups/doc.json \
+    --out /backups/doc-recovered.json
+```
+
+Or from source:
+`npx tsx scripts/recover-document.ts --key recovery-private.pem --package doc.json --out doc-recovered.json`.
 
 ## Running more than one instance
 
