@@ -17,8 +17,11 @@ relay is no longer in the path.
 
 ### The relay is:
 
-- A single-purpose WebSocket server, about 100 lines, from the
-  [`y-webrtc`](https://github.com/yjs/y-webrtc) project.
+- A single-purpose WebSocket server speaking the
+  [`y-webrtc`](https://github.com/yjs/y-webrtc) signaling protocol. The
+  published image runs this project's own implementation, which CI checks
+  against y-webrtc's own server so that "the same protocol" is tested
+  rather than assumed.
 - Stateless. It stores nothing on disk, keeps no database, and forgets
   everything when it restarts.
 - Unaware of your content. It routes messages between clients subscribed
@@ -280,3 +283,42 @@ Common causes:
 - **A TLS alert during handshake**: Certificate issuance issue on your proxy.
 - **Internal DNS name, external users**: Unreachable across network boundaries.
 - **Connects, but peers never see each other**: Verify relay URL and session code match.
+
+## Requiring membership
+
+By default the relay admits anyone who can reach it: knowing a room name is
+the whole of the access control. That is reasonable where the relay is only
+reachable inside a network, and not where it is public.
+
+Where the deployment also runs the [workspace store](/deployment/workspace-store),
+set the same secret on both:
+
+```yaml
+relay:
+  image: ghcr.io/jbraunsmajr/system-design-relay:latest
+  environment:
+    RELAY_TOKEN_SECRET: ${RELAY_TOKEN_SECRET}   # at least 32 random characters
+store:
+  environment:
+    RELAY_TOKEN_SECRET: ${RELAY_TOKEN_SECRET}   # the same value
+```
+
+The store then issues a short-lived token for one room to someone it has
+signed in, and the relay refuses anyone without one. A token governs who may
+*join* a session, not who may read it: session content is encrypted with the
+document's key, which neither service ever holds.
+
+**Check it took effect** rather than assuming so:
+
+```bash
+curl https://relay.example.gov/health
+# {"status":"ok","authentication":"required","rooms":0}
+```
+
+`"authentication":"none"` means the secret did not reach the relay.
+
+::: warning Images published before this release
+Relay images published before this change ran y-webrtc's own server, which
+has no such check: setting `RELAY_TOKEN_SECRET` on one of those did nothing.
+Update the image, then confirm with `/health`.
+:::

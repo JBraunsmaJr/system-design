@@ -11,14 +11,14 @@ It is optional: an editor with no store configured behaves exactly as it
 always has, and nothing leaves the browser.
 
 A complete example — editor, relay, store, PostgreSQL and Keycloak — is in
-[`docker/store/compose.example.yaml`](../docker/store/compose.example.yaml).
+[`docker/store/compose.yaml`](../docker/store/compose.yaml).
 
 ## Trying it
 
 ```bash
 cd docker/store
 npx tsx ../../scripts/generate-recovery-key.ts --out ./recovery
-docker compose -f compose.example.yaml up --build
+docker compose -f compose.yaml up --build
 ```
 
 Then open <http://localhost:8088> and sign in as `demo` / `demo`.

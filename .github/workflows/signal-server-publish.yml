@@ -82,7 +82,10 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v7
         with:
-          context: docker/signaling
+          # The repository root: the relay's source lives in scripts/ and
+          # store/, and is copied in rather than duplicated here.
+          context: .
+          file: docker/signaling/Dockerfile
           push: true
           tags: |
             ${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.date_tag }}

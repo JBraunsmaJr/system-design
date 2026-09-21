@@ -1,7 +1,7 @@
 /**
  * The session relay, with optional authentication (WS10-R6, R7).
  *
- *   npx tsx scripts/relay-server.ts            # open, as before
+ *   npx tsx scripts/relay-server.ts # open, as before
  *   RELAY_TOKEN_SECRET=... npx tsx scripts/relay-server.ts
  *
  * y-webrtc's own server is what this project has used until now, and it

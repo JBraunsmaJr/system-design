@@ -18,7 +18,7 @@ in the browser, sessions start from a link, and nothing leaves the machine.
 - **A recovery keypair**, generated before the first document is stored.
 
 A complete example — editor, relay, store, PostgreSQL and Keycloak — lives in
-`docker/store/compose.example.yaml` in the repository.
+`docker/store/compose.yaml` in the repository.
 
 ## Before the first document
 
