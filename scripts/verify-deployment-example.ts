@@ -8,7 +8,7 @@
  * provider, before the store is involved, and a client secret that does
  * not match fails at the token exchange with an error that says little.
  */
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { loadStoreConfig, ConfigError } from '../store/src/config.ts';
 
 /**
@@ -78,7 +78,10 @@ function check(condition: boolean, message: string) {
   }
 }
 
-const compose = readComposeExample(readFileSync('docker/store/compose.example.yaml', 'utf8'));
+const composePath = existsSync('docker/store/compose.yaml')
+  ? 'docker/store/compose.yaml'
+  : 'docker/store/compose.example.yaml';
+const compose = readComposeExample(readFileSync(composePath, 'utf8'));
 const realm = JSON.parse(
   readFileSync('docker/store/keycloak/system-design-realm.json', 'utf8'),
 ) as {
