@@ -1,5 +1,8 @@
 # System Design Editor
 
+- [Documentation](https://jbraunsmajr.github.io/system-design/docs)
+- [Editor](https://jbraunsmajr.github.io/system-design)
+
 ## Background
 
 This project originally started off as a way to create diagrams, but has since evolved into a tool to collaborate on
