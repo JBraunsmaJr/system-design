@@ -17,8 +17,29 @@ in the browser, sessions start from a link, and nothing leaves the machine.
 - **HTTPS**, unless everything is on localhost. See *Origins and HTTPS*.
 - **A recovery keypair**, generated before the first document is stored.
 
-A complete example — editor, relay, store, PostgreSQL and Keycloak — lives in
-`docker/store/compose.yaml` in the repository.
+## The image
+
+The store is published alongside the editor and the relay, on each release:
+
+```
+ghcr.io/jbraunsmajr/system-design-store:latest
+ghcr.io/jbraunsmajr/system-design-store:<yyyy-mm-dd>
+```
+
+Each release is tested against PostgreSQL and started once before it is
+published. A complete example — editor, relay, store, PostgreSQL and
+Keycloak — lives in `docker/store/compose.yaml` in the repository; it builds
+the images from source, and swapping each `build:` for the matching
+`image:` above runs the published ones instead.
+
+```yaml
+store:
+  image: ghcr.io/jbraunsmajr/system-design-store:latest
+  environment:
+    PUBLIC_URL: https://store.example.gov
+    DATABASE_URL: postgresql://store:${POSTGRES_PASSWORD}@postgres:5432/store
+    # …the settings below
+```
 
 ## Before the first document
 
