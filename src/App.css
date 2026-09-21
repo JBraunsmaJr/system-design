@@ -11816,7 +11816,7 @@ mark.search-highlight--ellipsis {
    Durability indicator (WS13-R8/R9)
 
    Quiet by default, insistent on failure. The alert state is the only thing in
-   the toolbar allowed to hold colour, because it is the only thing there that
+   the toolbar allowed to hold color, because it is the only thing there that
    means the user is about to lose work.
    --------------------------------------------------------------------------- */
 .durability {
