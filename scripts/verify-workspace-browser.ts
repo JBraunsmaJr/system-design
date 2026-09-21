@@ -428,6 +428,42 @@ async function run() {
       check(named, `and names the other person as their sign-in does (${peerName})`);
     }
 
+    console.log('\n=== Leaving straight after an edit ===');
+    {
+      // An edit, then the page goes away before the batching delay is up.
+      // Leaving must not lose it: it goes to the workspace on the way out.
+      await closeManager(second);
+      const before = await first.evaluate(
+        () => document.querySelectorAll('.react-flow__node').length,
+      );
+      await second.evaluate(`window.__PERF__.addNode("Added as the tab closed")`);
+      await second.goto('about:blank');
+      const arrived = await first
+        .waitForFunction(
+          () =>
+            [...document.querySelectorAll('.react-flow__node')].some((node) =>
+              (node.textContent ?? '').includes('Added as the tab closed'),
+            ),
+          null,
+          { timeout: 20000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        );
+      check(arrived, 'an edit made just before leaving reaches everyone else');
+      check(
+        (await first.evaluate(() => document.querySelectorAll('.react-flow__node').length)) ===
+          before + 1,
+        'exactly once',
+      );
+      // Back to the document, for the checks that follow.
+      await second.goto(first.url());
+      await second.waitForFunction("typeof window.__PERF__?.loadFixture === 'function'", null, {
+        timeout: 20000,
+      });
+    }
+
     console.log('\n=== Someone else asks, and is let in from the editor (WS7-R8) ===');
     {
       // A different person, not another browser of the first one.

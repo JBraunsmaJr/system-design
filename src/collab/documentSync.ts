@@ -48,6 +48,16 @@ export interface DocumentSync {
   start(): Promise<void>;
   /** Sends anything outstanding now. */
   flush(): Promise<void>;
+  /**
+   * For a page that is going away. Sends what the store has not seen in
+   * one request that may outlive the page, without the fetch-first that
+   * an ordinary send does - there is not time for two round trips while a
+   * page unloads. If it is refused because someone else wrote first,
+   * nothing is lost: the change is still in this browser, and the next
+   * visit sends it, since what is sent is always measured against the
+   * store rather than against when it was last tried.
+   */
+  flushOnExit(): void;
   stop(): void;
   version(): number;
 }
@@ -188,6 +198,26 @@ export function createDocumentSync(options: DocumentSyncOptions): DocumentSync {
     async flush() {
       if (timer) clearTimeout(timer);
       await send();
+    },
+
+    flushOnExit() {
+      if (stopped || !dirty) return;
+      if (timer) clearTimeout(timer);
+      const update = Y.encodeStateAsUpdate(doc, Y.encodeStateVector(mirror));
+      if (update.length === 0) return;
+      // Sealing is asynchronous, but short; the request it leads to is
+      // marked keepalive so the browser finishes it after the page has
+      // gone. Nothing is awaited here - an unloading page cannot wait.
+      void client
+        .appendUpdate(docId, documentKey, update, version, { keepalive: true })
+        .then((next) => {
+          version = next;
+          Y.applyUpdate(mirror, update, WORKSPACE_ORIGIN);
+          dirty = false;
+        })
+        .catch(() => {
+          // Kept in this browser; the next visit sends it.
+        });
     },
 
     stop() {

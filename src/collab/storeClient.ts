@@ -296,11 +296,15 @@ export function createStoreClient(options: StoreClientOptions) {
       documentKey: string,
       update: Uint8Array,
       atVersion: number,
+      /** For a page that is going away: the request is allowed to outlive
+       * it, which an ordinary fetch is not. */
+      options: { keepalive?: boolean } = {},
     ): Promise<number> {
       const key = await deriveStorageKey(documentKey);
       const sealed = await crypto.seal(contextFor(docId, 'update', atVersion + 1), update, key);
       const { body } = await request(`/v1/docs/${encodeURIComponent(docId)}/updates`, {
         method: 'POST',
+        keepalive: options.keepalive,
         docId,
         body: JSON.stringify({
           kind: 'update',

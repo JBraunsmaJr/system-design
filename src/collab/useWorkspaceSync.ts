@@ -175,6 +175,30 @@ export function useWorkspaceSync(options: WorkspaceSyncOptions) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client, docId, storage, stop, options.doc]);
 
+  /**
+   * Leaving a document - switching to another, closing the tab, reloading
+   * - is always a page going away here, since switching documents is a
+   * navigation. Changes made in the last moment would otherwise sit out
+   * the batching delay and never be sent, so they go now.
+   *
+   * visibilitychange fires earlier than pagehide on most navigations,
+   * which leaves more time for the request to start; pagehide covers the
+   * cases where it does not fire at all. Sending twice is harmless: the
+   * second finds nothing new.
+   */
+  useEffect(() => {
+    const leaving = () => sync.current?.flushOnExit();
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') leaving();
+    };
+    globalThis.addEventListener?.('pagehide', leaving);
+    document.addEventListener?.('visibilitychange', onVisibility);
+    return () => {
+      globalThis.removeEventListener?.('pagehide', leaving);
+      document.removeEventListener?.('visibilitychange', onVisibility);
+    };
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     void Promise.resolve().then(() => {
