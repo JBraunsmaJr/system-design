@@ -64,20 +64,27 @@ Nginx inside the container automatically configures:
 ## Documentation in the container
 
 This documentation is built into the image and served at **`/docs/`**
-alongside the editor, so a deployment carries its own copy with no internet
-access required.
+alongside the editor, so a deployment carries its own copy and needs no
+internet access to read it.
 
-Unlike the editor — which uses a relative base so one image works at a
-domain's root or behind any reverse proxy path — VitePress bakes absolute
-asset URLs at build time. The path is therefore a build argument:
+The path is applied when the container starts, not when the image is built,
+so one image works anywhere:
 
-```bash
-# Editor at https://example.gov/ , docs at https://example.gov/docs/
-docker build -t system-design .
+| Setting | Result |
+| :--- | :--- |
+| Nothing set | Docs at `/docs/` |
+| `APP_URL=https://example.gov/system-design/` | Docs at `/system-design/docs/` |
+| `DOCS_BASE=/help/` | Docs at `/help/` |
 
-# Editor at https://example.gov/system-design/ , docs one level in
-docker build --build-arg DOCS_BASE=/system-design/docs/ -t system-design .
-```
+`DOCS_BASE` wins where both are set. A value without a leading or trailing
+slash is corrected rather than rejected.
 
-If the docs load but every stylesheet and link 404s, `DOCS_BASE` does not
-match the path the container is actually served from.
+::: details Why this is not a relative path like the editor's
+The editor is built with a relative base, so a single build resolves its
+assets against wherever `index.html` was loaded from. VitePress cannot do
+that: it writes absolute asset URLs and hands its own client router a base
+to compare against the address bar. Getting it wrong is confusing rather
+than obviously broken — the page loads, then the router rewrites the URL to
+the path the build assumed. So the image is built with a placeholder, and
+the entrypoint replaces it with the path you are actually serving from.
+:::
