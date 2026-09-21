@@ -9,7 +9,7 @@
  * themselves, what the relay refuses, and that an open relay still behaves
  * exactly as it did.
  */
-import { spawn, type ChildProcess } from 'child_process';
+import { spawn, spawnSync, type ChildProcess } from 'child_process';
 import WebSocket from 'ws';
 import { mintRoomToken, verifyRoomToken, RoomTokenError } from '../store/src/auth/roomTokens.ts';
 
@@ -23,6 +23,23 @@ function check(condition: boolean, message: string) {
 }
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const SECRET = 'a'.repeat(48);
+
+function stopRelay(proc: ChildProcess | null) {
+  if (!proc || proc.pid === undefined) return;
+  if (process.platform === 'win32') {
+    try {
+      spawnSync('taskkill', ['/pid', String(proc.pid), '/T', '/F'], { stdio: 'ignore' });
+    } catch {
+      proc.kill('SIGTERM');
+    }
+  } else {
+    try {
+      process.kill(-proc.pid, 'SIGTERM');
+    } catch {
+      proc.kill('SIGTERM');
+    }
+  }
+}
 
 console.log('=== The tokens ===');
 {
@@ -96,6 +113,7 @@ async function startRelay(port: number, secret: string | null): Promise<ChildPro
         ...(secret ? { RELAY_TOKEN_SECRET: secret } : {}),
       },
       stdio: ['ignore', 'pipe', 'pipe'],
+      detached: process.platform !== 'win32',
     },
   );
   const deadline = Date.now() + 15_000;
@@ -216,7 +234,7 @@ console.log('\n=== A relay that requires them ===');
 
     for (const peer of [alice, bob, eve]) peer.socket.close();
   } finally {
-    relay.kill('SIGTERM');
+    stopRelay(relay);
   }
 }
 
@@ -246,7 +264,7 @@ console.log('\n=== A relay that does not ===');
     first.socket.close();
     second.socket.close();
   } finally {
-    relay.kill('SIGTERM');
+    stopRelay(relay);
   }
 }
 

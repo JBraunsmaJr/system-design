@@ -44,7 +44,7 @@ function importGraph(entry: string): string[] {
       queue.push(resolve(dirname(file), match[1]));
     }
   }
-  return [...seen].map((file) => relative(root, file));
+  return [...seen].map((file) => relative(root, file).replace(/\\/g, '/'));
 }
 
 const reachable = importGraph('store/src/main.ts');

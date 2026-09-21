@@ -203,7 +203,11 @@ function killServer(proc: ChildProcess | null) {
       proc.kill('SIGKILL');
     }
   } else {
-    proc.kill('SIGKILL');
+    try {
+      process.kill(-proc.pid, 'SIGKILL');
+    } catch {
+      proc.kill('SIGKILL');
+    }
   }
 }
 
@@ -219,6 +223,7 @@ try {
   server = spawn(process.execPath, ['node_modules/y-webrtc/bin/server.js'], {
     cwd: process.cwd(),
     env: { ...process.env, PORT: String(PORT) },
+    detached: process.platform !== 'win32',
   });
   let ready = false;
   server.stdout?.on('data', (d) => {

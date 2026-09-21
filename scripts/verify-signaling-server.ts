@@ -65,7 +65,11 @@ function killServer(proc: ChildProcess | null) {
       proc.kill('SIGKILL');
     }
   } else {
-    proc.kill('SIGKILL');
+    try {
+      process.kill(-proc.pid, 'SIGKILL');
+    } catch {
+      proc.kill('SIGKILL');
+    }
   }
 }
 
@@ -93,6 +97,7 @@ try {
   server = spawn(process.execPath, useOurs ? ['node_modules/tsx/dist/cli.mjs', entry] : [entry], {
     cwd: process.cwd(),
     env: { ...process.env, PORT: String(PORT) },
+    detached: process.platform !== 'win32',
   });
   let ready = false;
   server.stdout?.on('data', (d) => {
@@ -169,4 +174,4 @@ try {
 }
 
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);
-process.exitCode = failures === 0 ? 0 : 1;
+process.exit(failures === 0 ? 0 : 1);
