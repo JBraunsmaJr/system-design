@@ -60,7 +60,7 @@ const packages = new Set<string>();
     const file = queue.pop()!;
     if (seen.has(file)) continue;
     seen.add(file);
-    localFiles.push(relative(root, file));
+    localFiles.push(relative(root, file).replace(/\\/g, '/'));
     const text = readFileSync(file, 'utf8');
     for (const match of text.matchAll(/(?:from|import)\s+['"]([^'"]+)['"]/g)) {
       const specifier = match[1];
@@ -103,7 +103,20 @@ console.log('\n=== Assembled as the image assembles it ===');
     mkdirSync(dirname(join(image, file)), { recursive: true });
     cpSync(file, join(image, file));
   }
-  symlinkSync(join(root, 'node_modules'), join(image, 'node_modules'));
+  try {
+    symlinkSync(
+      join(root, 'node_modules'),
+      join(image, 'node_modules'),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+  } catch {
+    for (const pkg of packages) {
+      const src = join(root, 'node_modules', pkg);
+      if (existsSync(src)) {
+        cpSync(src, join(image, 'node_modules', pkg), { recursive: true });
+      }
+    }
+  }
 
   const start = async (port: number, secret: string | null) => {
     const child = spawn(
@@ -158,7 +171,19 @@ console.log('\n=== Assembled as the image assembles it ===');
   );
   locked.child.kill();
 
-  rmSync(image, { recursive: true, force: true });
+  try {
+    if (existsSync(join(image, 'node_modules'))) {
+      rmSync(join(image, 'node_modules'), {
+        recursive: true,
+        force: true,
+        maxRetries: 5,
+        retryDelay: 100,
+      });
+    }
+    rmSync(image, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  } catch {
+    // Ignore cleanup failure in temp directory on Windows if file locks take time to release
+  }
 }
 
 check(existsSync('docker/signaling/package.json'), 'the image keeps its own small manifest');

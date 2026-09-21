@@ -14,7 +14,7 @@ COPY . .
 
 # Build application with perf instrumentation enabled
 ENV VITE_PERF_INSTRUMENTATION=1
-RUN npm run build -- --base=./
+RUN npm run build:app -- --base=./
 
 # Expose Vite preview default port
 EXPOSE 4173
