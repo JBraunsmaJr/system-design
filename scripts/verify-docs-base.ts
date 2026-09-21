@@ -13,7 +13,7 @@
  * Runs the real script against a directory shaped like the built site.
  */
 import { execFileSync } from 'child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
@@ -28,6 +28,9 @@ function check(condition: boolean, message: string) {
 
 const PLACEHOLDER = '/__DOCS_BASE__/';
 const SCRIPT = 'docker/docker-entrypoint.d/45-docs-base.sh';
+
+const gitSh = 'C:\\Program Files\\Git\\bin\\sh.exe';
+const shellCmd = process.platform === 'win32' && existsSync(gitSh) ? gitSh : 'sh';
 
 /** A directory shaped like the built site, with the placeholder in each
  * kind of file the rewrite has to reach. */
@@ -47,7 +50,10 @@ function builtSite(): string {
 }
 
 const run = (docs: string, env: Record<string, string>) =>
-  execFileSync('sh', [SCRIPT], { env: { ...process.env, DOCS_ROOT: docs, ...env }, encoding: 'utf8' });
+  execFileSync(shellCmd, [SCRIPT], {
+    env: { ...process.env, DOCS_ROOT: docs.replace(/\\/g, '/'), ...env },
+    encoding: 'utf8',
+  });
 
 const readAll = (docs: string) =>
   ['index.html', 'guide/security.html', 'assets/app.js', 'assets/style.css']

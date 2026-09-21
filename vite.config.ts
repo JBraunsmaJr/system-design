@@ -22,13 +22,17 @@ export default defineConfig({
       name: 'docs-redirect',
       configureServer(server) {
         server.middlewares.use((req, res, next) => {
+          const url = req.url || '';
           if (
-            req.url === '/system-design/docs' ||
-            req.url === '/system-design/docs/' ||
-            req.url === '/docs' ||
-            req.url === '/docs/'
+            url === '/system-design/docs' ||
+            url === '/system-design/docs/' ||
+            url === '/docs' ||
+            url === '/docs/' ||
+            url.endsWith('/docs') ||
+            url.endsWith('/docs/')
           ) {
-            res.writeHead(302, { Location: '/system-design/docs/index.html' });
+            const target = url.replace(/\/docs\/?(\?.*)?$/, '/docs/index.html$1');
+            res.writeHead(302, { Location: target });
             res.end();
             return;
           }
@@ -37,13 +41,17 @@ export default defineConfig({
       },
       configurePreviewServer(server) {
         server.middlewares.use((req, res, next) => {
+          const url = req.url || '';
           if (
-            req.url === '/system-design/docs' ||
-            req.url === '/system-design/docs/' ||
-            req.url === '/docs' ||
-            req.url === '/docs/'
+            url === '/system-design/docs' ||
+            url === '/system-design/docs/' ||
+            url === '/docs' ||
+            url === '/docs/' ||
+            url.endsWith('/docs') ||
+            url.endsWith('/docs/')
           ) {
-            res.writeHead(302, { Location: '/system-design/docs/index.html' });
+            const target = url.replace(/\/docs\/?(\?.*)?$/, '/docs/index.html$1');
+            res.writeHead(302, { Location: target });
             res.end();
             return;
           }
@@ -86,7 +94,7 @@ export default defineConfig({
       },
 
       workbox: {
-        navigateFallbackDenylist: [/^\/system-design\/docs/],
+        navigateFallbackDenylist: [/\/docs(\/|$)/],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         globPatterns: ['**/*.{js,css,html,png,jpg,jpeg,gif,svg,ico}'],
       },

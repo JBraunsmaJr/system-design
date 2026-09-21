@@ -14,9 +14,6 @@
           path.endsWith('/docs/')
         ) {
           var target = path.replace(/\/docs\/?$/, '/docs/index.html');
-          if (!target.startsWith('/system-design')) {
-            target = '/system-design' + target;
-          }
           window.location.replace(target + window.location.search + window.location.hash);
         }
       })();

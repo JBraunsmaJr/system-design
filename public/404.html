@@ -15,17 +15,15 @@
           path.endsWith('/docs/')
         ) {
           var target = path.replace(/\/docs\/?$/, '/docs/index.html');
-          if (!target.startsWith('/system-design')) {
-            target = '/system-design' + target;
-          }
           window.location.replace(target + window.location.search + window.location.hash);
         } else {
-          window.location.replace('/system-design/');
+          var fallback = path.startsWith('/system-design') ? '/system-design/' : '/';
+          window.location.replace(fallback);
         }
       })();
     </script>
   </head>
   <body>
-    <p>Redirecting to <a href="/system-design/docs/index.html">documentation</a>...</p>
+    <p>Redirecting to <a href="./docs/index.html">documentation</a>...</p>
   </body>
 </html>
