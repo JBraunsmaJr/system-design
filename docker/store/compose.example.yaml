@@ -114,7 +114,6 @@ services:
       # Without this the editor has no workspace at all, and behaves exactly
       # as it does with no store.
       STORE_URL: http://localhost:8080
-      DOCS_BASE: /docs
     ports:
       - '8088:80'
 
