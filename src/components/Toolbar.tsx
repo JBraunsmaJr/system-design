@@ -112,7 +112,6 @@ export function Toolbar({
             title="Your work is automatically saved in this browser"
           >
             <Check size={14} />
-            <span className="toolbar__label">Autosaved</span>
           </span>
         )}
         <div className="toolbar__actions">
