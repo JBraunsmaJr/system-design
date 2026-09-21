@@ -167,7 +167,8 @@
   flex-shrink: 0;
 }
 
-.toolbar__actions button {
+.toolbar__actions button,
+.toolbar__actions a {
   height: 32px;
   display: inline-flex;
   align-items: center;
@@ -184,19 +185,22 @@
   white-space: nowrap;
   box-sizing: border-box;
   cursor: pointer;
+  text-decoration: none;
   transition:
     background 0.15s ease,
     border-color 0.15s ease,
     color 0.15s ease;
 }
 
-.toolbar__actions button:hover {
+.toolbar__actions button:hover,
+.toolbar__actions a:hover {
   background: var(--chrome-bg);
   border-color: var(--chrome-border);
   color: var(--chrome-text);
 }
 
-.toolbar__actions button:focus-visible {
+.toolbar__actions button:focus-visible,
+.toolbar__actions a:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
@@ -210,7 +214,8 @@
   background: transparent;
 }
 
-.toolbar__actions button.toolbar__icon-button {
+.toolbar__actions button.toolbar__icon-button,
+.toolbar__actions a.toolbar__icon-button {
   width: 32px;
   height: 32px;
   padding: 0;
@@ -5430,12 +5435,14 @@ mark.search-highlight--ellipsis {
   }
 
   .toolbar__actions button,
+  .toolbar__actions a,
   .collab-panel__trigger,
   .durability__chip {
     padding: 0 8px;
   }
 
-  .toolbar__actions button.toolbar__icon-button {
+  .toolbar__actions button.toolbar__icon-button,
+  .toolbar__actions a.toolbar__icon-button {
     padding: 0;
   }
 
@@ -5476,12 +5483,14 @@ mark.search-highlight--ellipsis {
   }
 
   .toolbar__actions button,
+  .toolbar__actions a,
   .collab-panel__trigger,
   .durability__chip {
     padding: 0 6px;
   }
 
-  .toolbar__actions button.toolbar__icon-button {
+  .toolbar__actions button.toolbar__icon-button,
+  .toolbar__actions a.toolbar__icon-button {
     padding: 0;
   }
 
