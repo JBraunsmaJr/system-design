@@ -24,6 +24,15 @@ COPY . .
 # loaded from, whatever that turns out to be.
 RUN npm run build:app -- --base=./
 
+# The documentation site, served from /docs/ alongside the app. Unlike the
+# app it cannot use a relative base - VitePress bakes absolute asset URLs
+# at build time - so the path is a build argument. The default suits the
+# common case of the app at a domain's root; a deployment behind a reverse
+# proxy at some prefix builds with, say,
+# --build-arg DOCS_BASE=/system-design/docs/.
+ARG DOCS_BASE=/docs/
+RUN npm --prefix docs-site ci && DOCS_BASE="$DOCS_BASE" npm run build:docs
+
 # ---- Runtime stage: serves the built static files via nginx ----
 FROM nginx:stable-alpine AS runtime
 

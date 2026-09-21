@@ -1,7 +1,14 @@
 import { defineConfig } from 'vitepress';
 
 export default defineConfig({
-  base: '/system-design/docs/',
+  // GitHub Pages serves this repository at <user>.github.io/system-design/,
+  // which is why that is the default. Any other host needs its own path:
+  // the container image builds with DOCS_BASE=/docs/, and a deployment
+  // behind a reverse proxy at some prefix passes the full path through
+  // the image's DOCS_BASE build argument. VitePress bakes the base into
+  // every asset URL at build time, so this cannot be decided at runtime
+  // the way the app's relative base can.
+  base: process.env.DOCS_BASE ?? '/system-design/docs/',
   outDir: '../../dist/docs',
   title: 'System Design Editor',
   description:

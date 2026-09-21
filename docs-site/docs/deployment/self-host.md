@@ -60,3 +60,24 @@ Nginx inside the container automatically configures:
 `assets/*` - Long-term immutable caching (`Cache-Control: public, immutable`).
 `index.html` & `env-config.js` - Revalidated on every request (`Cache-Control: no-cache`).
 :::
+
+## Documentation in the container
+
+This documentation is built into the image and served at **`/docs/`**
+alongside the editor, so a deployment carries its own copy with no internet
+access required.
+
+Unlike the editor — which uses a relative base so one image works at a
+domain's root or behind any reverse proxy path — VitePress bakes absolute
+asset URLs at build time. The path is therefore a build argument:
+
+```bash
+# Editor at https://example.gov/ , docs at https://example.gov/docs/
+docker build -t system-design .
+
+# Editor at https://example.gov/system-design/ , docs one level in
+docker build --build-arg DOCS_BASE=/system-design/docs/ -t system-design .
+```
+
+If the docs load but every stylesheet and link 404s, `DOCS_BASE` does not
+match the path the container is actually served from.
