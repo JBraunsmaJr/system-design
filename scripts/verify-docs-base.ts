@@ -41,11 +41,18 @@ function builtSite(): string {
   mkdirSync(join(docs, 'guide'), { recursive: true });
   writeFileSync(
     join(docs, 'index.html'),
-    `<link rel="stylesheet" href="${PLACEHOLDER}assets/style.css"><script>{"base":"${PLACEHOLDER}"}</script>`,
+    `<link rel="stylesheet" href="${PLACEHOLDER}assets/style.css"><script>{"base":"${PLACEHOLDER}"}</script>` +
+      `<a class="back" href="https://__APP_URL__/">Open the editor</a>`,
   );
-  writeFileSync(join(docs, 'guide', 'security.html'), `<a href="${PLACEHOLDER}guide/workspaces">Workspaces</a>`);
+  writeFileSync(
+    join(docs, 'guide', 'security.html'),
+    `<a href="${PLACEHOLDER}guide/workspaces">Workspaces</a>`,
+  );
   writeFileSync(join(docs, 'assets', 'app.js'), `const base = "${PLACEHOLDER}";`);
-  writeFileSync(join(docs, 'assets', 'style.css'), `@font-face{src:url(${PLACEHOLDER}assets/inter.woff2)}`);
+  writeFileSync(
+    join(docs, 'assets', 'style.css'),
+    `@font-face{src:url(${PLACEHOLDER}assets/inter.woff2)}`,
+  );
   return docs;
 }
 
@@ -65,7 +72,10 @@ console.log('=== Where the docs are served ===');
   const docs = builtSite();
   const output = run(docs, {});
   const content = readAll(docs);
-  check(/Serving documentation at \/docs\//.test(output), 'with nothing configured, /docs/ - and it says so');
+  check(
+    /Serving documentation at \/docs\//.test(output),
+    'with nothing configured, /docs/ - and it says so',
+  );
   check(!content.includes(PLACEHOLDER), 'no placeholder survives, in markup, script or stylesheet');
   check(content.includes('"/docs/assets/style.css"'), 'asset URLs point at the served path');
   rmSync(docs, { recursive: true, force: true });
@@ -80,13 +90,45 @@ console.log('=== Where the docs are served ===');
   // An app behind a prefix should not have to say so twice.
   const docs = builtSite();
   run(docs, { APP_URL: 'https://example.gov/system-design/' });
-  check(readAll(docs).includes('/system-design/docs/assets/style.css'), "APP_URL's prefix carries the docs with it");
+  check(
+    readAll(docs).includes('/system-design/docs/assets/style.css'),
+    "APP_URL's prefix carries the docs with it",
+  );
   rmSync(docs, { recursive: true, force: true });
 }
 {
   const docs = builtSite();
   run(docs, { APP_URL: 'https://example.gov' });
-  check(readAll(docs).includes('"/docs/assets/style.css"'), 'an app at a domain root leaves docs at /docs/');
+  check(
+    readAll(docs).includes('"/docs/assets/style.css"'),
+    'an app at a domain root leaves docs at /docs/',
+  );
+  rmSync(docs, { recursive: true, force: true });
+}
+
+console.log('\n=== The link back to the editor ===');
+for (const [env, expected, why] of [
+  [{}, 'href="/"', 'docs at /docs/ link back to the domain root'],
+  [
+    { APP_URL: 'https://example.gov/system-design' },
+    'href="https://example.gov/system-design/"',
+    'APP_URL is used as given, with its trailing slash supplied',
+  ],
+  [
+    { DOCS_BASE: '/system-design/docs/' },
+    'href="/system-design/"',
+    'docs one level in link back to the level above',
+  ],
+  [
+    { DOCS_BASE: '/help/' },
+    'href="/"',
+    'docs somewhere unusual link back to the root rather than guessing',
+  ],
+] as const) {
+  const docs = builtSite();
+  run(docs, env as Record<string, string>);
+  const index = readFileSync(join(docs, 'index.html'), 'utf8');
+  check(index.includes(`${expected}>Open the editor`) && !index.includes('__APP_URL__'), why);
   rmSync(docs, { recursive: true, force: true });
 }
 

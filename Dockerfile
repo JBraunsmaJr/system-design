@@ -30,7 +30,8 @@ RUN npm run build:app -- --base=./
 # docker-entrypoint.d/45-docs-base.sh replaces at container start, so one
 # image serves the docs wherever it happens to be mounted - at /docs/ by
 # default, or under APP_URL's prefix, or wherever DOCS_BASE says.
-RUN npm --prefix docs-site ci && DOCS_BASE=/__DOCS_BASE__/ npm run build:docs
+RUN npm --prefix docs-site ci && \
+    DOCS_BASE=/__DOCS_BASE__/ DOCS_APP_URL=https://__APP_URL__/ npm run build:docs
 
 # ---- Runtime stage: serves the built static files via nginx ----
 FROM nginx:stable-alpine AS runtime

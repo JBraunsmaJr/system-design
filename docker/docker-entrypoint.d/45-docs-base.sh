@@ -50,9 +50,26 @@ case "$DOCS_BASE" in
   *) DOCS_BASE="$DOCS_BASE/" ;;
 esac
 
-echo "Serving documentation at $DOCS_BASE"
+# Where the documentation links back to: the editor. APP_URL if the
+# deployment named it; otherwise the docs' own parent when they sit at the
+# usual docs/ beside the editor; otherwise the domain root.
+APP_PLACEHOLDER="https://__APP_URL__/"
+if [ -n "${APP_URL:-${BASE_URL:-}}" ]; then
+  EDITOR_URL="${APP_URL:-${BASE_URL:-}}"
+  case "$EDITOR_URL" in
+    */) : ;;
+    *) EDITOR_URL="$EDITOR_URL/" ;;
+  esac
+else
+  case "$DOCS_BASE" in
+    */docs/) EDITOR_URL="${DOCS_BASE%docs/}" ;;
+    *) EDITOR_URL="/" ;;
+  esac
+fi
+
+echo "Serving documentation at $DOCS_BASE, linking back to the editor at $EDITOR_URL"
 
 # Every file the placeholder can appear in: markup, the client bundle,
 # and stylesheets that reference fonts.
 find "$DOCS_ROOT" -type f \( -name '*.html' -o -name '*.js' -o -name '*.css' -o -name '*.json' \) \
-  -exec sed -i "s|$PLACEHOLDER|$DOCS_BASE|g" {} +
+  -exec sed -i -e "s|$PLACEHOLDER|$DOCS_BASE|g" -e "s|$APP_PLACEHOLDER|$EDITOR_URL|g" {} +

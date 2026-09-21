@@ -1,5 +1,20 @@
 import { defineConfig } from 'vitepress';
 
+/**
+ * Where the editor is, for the link back to it.
+ *
+ * In the container image this is a placeholder: the editor and the docs
+ * are mounted wherever the deployment puts them, so the entrypoint
+ * (docker-entrypoint.d/45-docs-base.sh) writes the real address in at
+ * start-up, exactly as it does the docs' own base path. On GitHub Pages
+ * the editor is the repository's own site. Anywhere else, the domain root.
+ */
+const editorUrl =
+  process.env.DOCS_APP_URL ??
+  (process.env.GITHUB_REPOSITORY
+    ? `https://${process.env.GITHUB_REPOSITORY.split('/')[0].toLowerCase()}.github.io/${process.env.GITHUB_REPOSITORY.split('/')[1]}/`
+    : '/');
+
 export default defineConfig({
   // GitHub Pages serves this repository at <user>.github.io/system-design/,
   // which is why that is the default. Any other host needs its own path:
@@ -19,6 +34,9 @@ export default defineConfig({
       { text: 'Home', link: '/' },
       { text: 'Guide', link: '/guide/diagram' },
       { text: 'Deployment', link: '/deployment/self-host' },
+      // Back to the editor these docs belong to. Same tab: this is the way
+      // home, not an outside link.
+      { text: 'Open the editor', link: editorUrl, target: '_self', rel: '' },
     ],
 
     sidebar: [

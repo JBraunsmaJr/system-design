@@ -12,8 +12,10 @@ import {
   Route,
   FileDown,
   Package,
+  BookOpen,
 } from 'lucide-react';
 import { ExportMenu } from './ExportMenu';
+import { getDocsUrl } from '../domain/docsLocation';
 import { FileMenu } from './FileMenu';
 import { faGithub } from '@fortawesome/free-brands-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -187,6 +189,19 @@ export function Toolbar({
           >
             <FontAwesomeIcon icon={faGithub} style={{ width: 14, height: 14 }} />
           </button>
+          {/* This deployment's own copy of the documentation, which the
+              image serves beside the editor. A new tab, so reading it never
+              takes anyone away from what they were doing. */}
+          <a
+            className="toolbar__icon-button"
+            href={getDocsUrl()}
+            target="_blank"
+            rel="noopener"
+            title="Documentation"
+            aria-label="Documentation"
+          >
+            <BookOpen size={14} />
+          </a>
         </div>
       </div>
       <div className="toolbar__row toolbar__row--tabs">
