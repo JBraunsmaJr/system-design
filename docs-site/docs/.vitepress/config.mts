@@ -40,6 +40,7 @@ export default defineConfig({
           { text: 'Self Hosting', link: '/deployment/self-host' },
           { text: 'Relay Server (Signaling)', link: '/deployment/relay-server' },
           { text: 'Workspace Store', link: '/deployment/workspace-store' },
+          { text: 'Administering a Workspace', link: '/deployment/administration' },
         ],
       },
     ],
