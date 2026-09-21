@@ -88,6 +88,7 @@ export function useWorkspaceSync(options: WorkspaceSyncOptions) {
   });
   /** Running while this document is in the workspace. */
   const sync = useRef<DocumentSync | null>(null);
+
   const tracked = useRef<{
     workspaceKey: CryptoKey;
     documentKey: string;

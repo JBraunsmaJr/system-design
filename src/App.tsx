@@ -83,6 +83,7 @@ import { LeaveGuardDialog } from './components/LeaveGuardDialog';
 import { WorkspacePanel } from './components/WorkspacePanel';
 import { getStoreUrl } from './domain/storeConfig';
 import { useWorkspaceSync } from './collab/useWorkspaceSync';
+import { useStoreIdentity } from './collab/useStoreIdentity';
 import { authorizeRelayUrls } from './collab/relayAccess';
 import {
   acquireDocument,
@@ -423,10 +424,27 @@ function App() {
     setShowPeerCursorsState(show);
     saveShowPeerCursors(show);
   }, []);
+  /** Whether the person typed their name, rather than it being generated.
+   * A typed name outranks the one their sign-in provides. */
+  const [nameChosen, setNameChosen] = useState(() => loadPresenceName() !== null);
   const onDisplayNameChange = useCallback((name: string) => {
     setDisplayName(name);
+    setNameChosen(true);
     savePresenceName(name);
   }, []);
+
+  /**
+   * The name others see on this person's cursor. Three sources, in order:
+   * a name they typed (saved, so it survives a reload), then the name
+   * their sign-in provides, then a generated "Guest-…".
+   *
+   * The signed-in name is used but never saved: saving it would make it a
+   * "chosen" name, and the next person to sign in on this browser would
+   * appear as the last one.
+   */
+  const storeIdentity = useStoreIdentity(storeUrl);
+  const signedInName = storeIdentity?.displayName?.trim() || null;
+  const presenceName = nameChosen ? displayName : (signedInName ?? displayName);
 
   // Deliberately no reset to [] when activeSession becomes null - the
   // stale peer list from a just-ended session is harmless, since
@@ -590,6 +608,12 @@ function App() {
     localPresenceRef.current = { ...localPresenceRef.current, ...patch };
     session.setLocalPresence(localPresenceRef.current);
   }, []);
+
+  // A name that changes mid-session - typed, or a sign-in that finished
+  // after the session began - reaches the others now, not next session.
+  useEffect(() => {
+    broadcastPresence({ name: presenceName.trim() || 'Guest' });
+  }, [presenceName, broadcastPresence]);
 
   /**
    * WS13-R10: tell the others this participant holds a saved copy, once its
@@ -762,7 +786,7 @@ function App() {
       });
 
       const initialPresence: LocalPresenceInfo = {
-        name: displayName.trim() || 'Guest',
+        name: presenceName.trim() || 'Guest',
         color: PRESENCE_COLORS[Math.floor(Math.random() * PRESENCE_COLORS.length)],
         cursor: null,
         selectedNodeIds: [],
@@ -811,7 +835,7 @@ function App() {
       signalingUrlsInput,
       buildTimeSignalingDefault,
       iceServers,
-      displayName,
+      presenceName,
       showToast,
       storeUrl,
     ],
@@ -860,7 +884,7 @@ function App() {
         iceServers,
       });
       const initialPresence: LocalPresenceInfo = {
-        name: displayName.trim() || 'Guest',
+        name: presenceName.trim() || 'Guest',
         color: PRESENCE_COLORS[Math.floor(Math.random() * PRESENCE_COLORS.length)],
         cursor: null,
         selectedNodeIds: [],
@@ -880,7 +904,7 @@ function App() {
         ownsDocument: true,
       });
     },
-    [endSession, signalingUrls, setSignalingUrlsInput, iceServers, displayName, showToast],
+    [endSession, signalingUrls, setSignalingUrlsInput, iceServers, presenceName, showToast],
   );
 
   // Auto-join if a session link is present in the URL on initial mount or hash change
@@ -3103,7 +3127,7 @@ function App() {
                     }
                   : null
               }
-              displayName={displayName}
+              displayName={presenceName}
               onDisplayNameChange={onDisplayNameChange}
               showPeerCursors={showPeerCursors}
               onShowPeerCursorsChange={setShowPeerCursors}

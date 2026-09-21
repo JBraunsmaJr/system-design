@@ -408,8 +408,22 @@ async function run() {
       const firstSees = await sawEachOther(first);
       const secondSees = await sawEachOther(second);
       check(firstSees && secondSees, 'each browser is in the session, with the other one in it');
-      const peerName = (await first.textContent('.collab-panel__peer-name')) ?? '';
-      check(peerName.trim().length > 0, `and can say who it is (${peerName.trim()})`);
+      // Named as their sign-in names them, not "Guest-..." - a cursor
+      // labelled with a random string tells nobody who is editing.
+      const named = await first
+        .waitForFunction(
+          () =>
+            (document.querySelector('.collab-panel__peer-name')?.textContent ?? '').trim() ===
+            'Test User',
+          null,
+          { timeout: 15000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        );
+      const peerName = ((await first.textContent('.collab-panel__peer-name')) ?? '').trim();
+      check(named, `and names the other person as their sign-in does (${peerName})`);
     }
 
     console.log('\n=== Losing a browser: revoke, then rotate (WS7-R7, R14) ===');
