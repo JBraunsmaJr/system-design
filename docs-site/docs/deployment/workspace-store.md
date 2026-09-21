@@ -22,7 +22,7 @@ A complete example — editor, relay, store, PostgreSQL and Keycloak — lives i
 
 ## Before the first document
 
-Generate the organisation's recovery pair once, on a machine that is not the
+Generate the organization's recovery pair once, on a machine that is not the
 server:
 
 ```bash

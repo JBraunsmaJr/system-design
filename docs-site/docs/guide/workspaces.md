@@ -17,7 +17,7 @@ now. Opening a workspace document puts you in its session automatically.
 
 Open **File → Documents**. If your deployment has a workspace, a Workspace
 section appears at the top with the sign-in providers it accepts — usually
-your organisation's single sign-on.
+your organization's single sign-on.
 
 Signing in identifies you. It does not, on its own, let you read anything:
 documents are encrypted with keys the server never holds, so access is
@@ -87,7 +87,7 @@ Revoking alone is not enough, and the editor says so at the point you do it.
 | New browser, one you already use still works | Approve it from the working browser |
 | Every browser gone, you have your recovery code | The recovery code unseals your keys |
 | Every browser gone and no recovery code | An administrator re-grants access |
-| The workspace itself has lost its keys | The organisation's offline recovery key |
+| The workspace itself has lost its keys | The organization's offline recovery key |
 
 Keep your recovery code somewhere other than the machines it recovers. It is
 128 bits, written in groups for reading aloud, and the workspace never stores
