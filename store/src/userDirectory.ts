@@ -90,6 +90,17 @@ export interface UserDirectory {
    * it one, and it needs the wrap to recover the key on its next visit.
    */
   setOwnUserKey(userId: string, deviceId: string, wrapped: WrappedUserKey): Promise<DeviceRecord>;
+  /**
+   * WS7-R12: a device approved by its holder's recovery code rather than
+   * by another device. Only called once the device has proved it holds
+   * the user's private key (see the recovery challenge in httpService):
+   * the store never sees the code, so it cannot check the code itself.
+   */
+  approveByRecovery(
+    userId: string,
+    deviceId: string,
+    wrapped: WrappedUserKey,
+  ): Promise<DeviceRecord>;
   /** WS7-R14. */
   revokeDevice(userId: string, deviceId: string): Promise<DeviceRecord>;
   putRecovery(userId: string, recovery: RecoveryRecord): Promise<void>;
@@ -200,6 +211,14 @@ export function createMemoryUserDirectory(now: () => Date = () => new Date()): U
       if (device.revokedAt) throw new DirectoryError('That device has been revoked.', 'revoked');
       if (device.approvedAt)
         throw new DirectoryError('That device is already approved.', 'conflict');
+      device.approvedAt = now().toISOString();
+      device.wrappedUserKey = wrapped;
+      return { ...device };
+    },
+
+    async approveByRecovery(userId, deviceId, wrapped) {
+      const device = requireDevice(userId, deviceId);
+      if (device.revokedAt) throw new DirectoryError('That device has been revoked.', 'revoked');
       device.approvedAt = now().toISOString();
       device.wrappedUserKey = wrapped;
       return { ...device };

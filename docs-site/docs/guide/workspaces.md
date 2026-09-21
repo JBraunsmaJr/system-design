@@ -89,9 +89,21 @@ Revoking alone is not enough, and the editor says so at the point you do it.
 | Every browser gone and no recovery code | An administrator re-grants access |
 | The workspace itself has lost its keys | The organization's offline recovery key |
 
-Keep your recovery code somewhere other than the machines it recovers. It is
-128 bits, written in groups for reading aloud, and the workspace never stores
-it in any form — which is also why nobody can look it up for you.
+### Your recovery code
+
+Once you have access, File → Documents offers to **create a recovery code**.
+It is shown once — 28 characters in groups of five — and you are asked to
+confirm you have kept it. Keep it somewhere other than the machines it
+recovers: written down, or in a password manager.
+
+The workspace never stores the code in any form, which is also why nobody —
+including an administrator — can look it up for you. You can make a new one
+at any time; the old one stops working.
+
+To use it, open File → Documents on the new browser. It will be waiting for
+approval; choose **No other browser? Use your recovery code** and type it.
+Case, spaces and dashes do not matter, and a mistyped character is caught
+before anything is sent, because the code checks itself.
 
 ## What the server can see
 

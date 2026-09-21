@@ -561,6 +561,30 @@ export function createStoreClient(options: StoreClientOptions) {
       });
     },
 
+    /** A secret encrypted to this person's public key, which only their
+     * private key can recover (WS7-R12). */
+    async recoveryChallenge(deviceId: string): Promise<{ challengeId: string; wrapped: string }> {
+      const { body } = await request(
+        `/v1/users/me/devices/${encodeURIComponent(deviceId)}/recovery-challenge`,
+        {
+          method: 'POST',
+        },
+      );
+      return body as { challengeId: string; wrapped: string };
+    },
+
+    async recoverDevice(
+      deviceId: string,
+      challengeId: string,
+      answer: string,
+      wrappedUserKey: { keyWrap: string; body: string },
+    ): Promise<void> {
+      await request(`/v1/users/me/devices/${encodeURIComponent(deviceId)}/recover`, {
+        method: 'POST',
+        body: JSON.stringify({ challengeId, answer, wrappedUserKey }),
+      });
+    },
+
     async getRecovery() {
       const { body } = await request('/v1/users/me/recovery');
       return (body.recovery as { salt: string; sealedUserKey: string } | null) ?? null;

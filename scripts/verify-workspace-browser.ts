@@ -250,6 +250,29 @@ async function run() {
       await sleep(2500);
     }
 
+    console.log('\n=== A recovery code, from the interface (WS7-R12) ===');
+    {
+      await openManager(first);
+      await first.waitForSelector('.workspace-panel__recovery-create', { timeout: 20000 });
+      check(true, 'someone with no recovery code is told so, and offered one');
+      await first.click('.workspace-panel__recovery-create');
+      await first.waitForSelector('.workspace-panel__recovery-code', { timeout: 30000 });
+      const shown = (
+        (await first.textContent('.workspace-panel__recovery-code code')) ?? ''
+      ).trim();
+      check(
+        /^[0-9A-Z]{5}(-[0-9A-Z]{5}){4}-[0-9A-Z]{3}$/.test(shown),
+        `the code is shown once (${shown})`,
+      );
+      await first.click('.workspace-panel__recovery-saved');
+      await first.waitForSelector('.workspace-panel__recovery-replace', { timeout: 10000 });
+      check(
+        (await first.locator('.workspace-panel__recovery-code').count()) === 0,
+        'and gone once they say they have saved it, with a way to replace it',
+      );
+      await closeManager(first);
+    }
+
     console.log('\n=== What the store holds ===');
     {
       // Read from the store's own data, as an operator with database access

@@ -55,6 +55,7 @@ import {
   upsertEntry,
 } from '../collab/workspaceDocuments';
 import { rotateWorkspaceKey } from '../collab/workspaceRotation';
+import { createRecoveryCode, recoverWithCode } from '../collab/recoveryCode';
 import { importPublicKey, wrapKeyForPublicKey } from '../crypto/keys';
 import { announceWorkspaceChange } from '../collab/useWorkspaceSync';
 import { unwrapPrivateKeyWithPrivateKey } from '../crypto/keys';
@@ -117,6 +118,11 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
   const [device, setDevice] = useState<DeviceState | null>(null);
   const [pending, setPending] = useState<PendingDevice[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
+  /** Whether this person has a recovery code set, once known. */
+  const [hasRecoveryCode, setHasRecoveryCode] = useState<boolean | null>(null);
+  /** A code just made, shown once until they confirm they have kept it. */
+  const [newCode, setNewCode] = useState<string | null>(null);
+  const [typedCode, setTypedCode] = useState('');
   /** Whether this person may grant access: discovered by asking, since
    * only an administrator may list members (WS10-R2). */
   const [canGrant, setCanGrant] = useState(false);
@@ -191,6 +197,10 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
             approvedAt: d.approvedAt,
             revokedAt: d.revokedAt,
           })),
+        );
+        client.getRecovery().then(
+          (recovery) => setHasRecoveryCode(recovery !== null),
+          () => setHasRecoveryCode(null),
         );
         // Who else is in this workspace, and whether they can read it.
         // Only an administrator may ask, so a refusal is not an error -
@@ -434,6 +444,39 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
       );
     });
 
+  /** This person's user key, opened with this browser's device key. */
+  const openUserKey = async (): Promise<CryptoKey> => {
+    const held = await storage.load();
+    if (!held) throw new Error('This browser holds no keys yet.');
+    const keys = await client.keysForDevice(held.deviceId);
+    if (keys.status !== 'approved') throw new Error('This browser is not approved.');
+    return unwrapPrivateKeyWithPrivateKey(
+      {
+        keyWrap: Uint8Array.from(atob(keys.wrappedUserKey.keyWrap), (c) => c.charCodeAt(0)),
+        body: Uint8Array.from(atob(keys.wrappedUserKey.body), (c) => c.charCodeAt(0)),
+      },
+      held.keyPair.privateKey,
+      { docId: 'user-key', kind: 'key-wrap', version: 1 },
+    );
+  };
+
+  const makeRecoveryCode = () =>
+    run(async () => {
+      setNewCode(await createRecoveryCode(client, await openUserKey()));
+      setHasRecoveryCode(true);
+    });
+
+  const redeemRecoveryCode = () =>
+    run(
+      async () => {
+        const outcome = await recoverWithCode(client, storage, typedCode);
+        if (!outcome.ok) throw new Error(outcome.message);
+        setTypedCode('');
+        await refresh();
+      },
+      { keepMessage: false },
+    );
+
   const approve = (target: PendingDevice) =>
     run(async () => {
       const held = await storage.load();
@@ -589,6 +632,31 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
           >
             Check again
           </button>
+          <details className="workspace-panel__recover" style={{ marginTop: 4 }}>
+            <summary style={{ cursor: 'pointer' }}>
+              No other browser? Use your recovery code
+            </summary>
+            <div style={{ display: 'grid', gap: 6, marginTop: 6 }}>
+              <input
+                className="workspace-panel__recover-input"
+                aria-label="Recovery code"
+                placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX-XXX"
+                value={typedCode}
+                onChange={(event) => setTypedCode(event.target.value)}
+                autoComplete="off"
+                spellCheck={false}
+                style={{ fontFamily: 'monospace', letterSpacing: 1 }}
+              />
+              <button
+                type="button"
+                className="workspace-panel__recover-submit"
+                onClick={() => void redeemRecoveryCode()}
+                disabled={busy || typedCode.trim().length === 0}
+              >
+                Recover this browser
+              </button>
+            </div>
+          </details>
         </div>
       )}
 
@@ -617,6 +685,67 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
                 </div>
               ))}
             </div>
+          )}
+
+          {newCode && (
+            <div
+              className="workspace-panel__recovery-code"
+              role="alert"
+              style={{
+                display: 'grid',
+                gap: 6,
+                padding: 10,
+                borderRadius: 8,
+                border: '1px solid var(--warning, #e0a84a)',
+              }}
+            >
+              <strong>Your recovery code</strong>
+              <code style={{ fontSize: 15, letterSpacing: 1, userSelect: 'all' }}>{newCode}</code>
+              <span>
+                This is shown once. Keep it somewhere other than the machines it recovers - written
+                down, or in a password manager. Nobody can look it up for you, including an
+                administrator.
+              </span>
+              <button
+                type="button"
+                className="workspace-panel__recovery-saved"
+                onClick={() => setNewCode(null)}
+              >
+                I have saved it
+              </button>
+            </div>
+          )}
+
+          {!newCode && hasRecoveryCode === false && (
+            <div className="workspace-panel__recovery-missing" style={{ display: 'grid', gap: 6 }}>
+              <span>
+                You have no recovery code. If you lose every browser, it is the only way back in
+                without an administrator.
+              </span>
+              <button
+                type="button"
+                className="workspace-panel__recovery-create"
+                onClick={() => void makeRecoveryCode()}
+                disabled={busy}
+              >
+                Create a recovery code
+              </button>
+            </div>
+          )}
+
+          {!newCode && hasRecoveryCode === true && (
+            <button
+              type="button"
+              className="workspace-panel__recovery-replace"
+              onClick={() => {
+                if (window.confirm('Make a new recovery code? The old one will stop working.'))
+                  void makeRecoveryCode();
+              }}
+              disabled={busy}
+              style={{ justifySelf: 'start' }}
+            >
+              Make a new recovery code
+            </button>
           )}
 
           {canGrant && members.length > 0 && (

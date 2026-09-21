@@ -21,6 +21,13 @@
  * caller, so a deployment cannot start one unauthenticated by accident.
  */
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'http';
+import {
+  constants as cryptoConstants,
+  createPublicKey,
+  publicEncrypt,
+  randomBytes,
+  randomUUID,
+} from 'crypto';
 import { StoreError } from './documentService.ts';
 import { ProviderUnreachable, type Provider } from './auth/providers.ts';
 import { DirectoryError, verificationCodeFor, type UserDirectory } from './userDirectory.ts';
@@ -256,6 +263,12 @@ export function createHttpService(options: HttpServiceOptions): Server {
   // never runs, and a const used by a handler would be in its dead zone.
   /** Escrow applies only where the store cannot read content anyway. */
   const escrowRequired = () => (options.cryptoMode ?? 'webcrypto') !== 'passthrough';
+  /** Outstanding recovery challenges. Short-lived and single-use, so
+   * process memory is enough: a restart only means asking again. */
+  const recoveryChallenges = new Map<
+    string,
+    { userId: string; deviceId: string; answer: string; expiresAt: number }
+  >();
   const publicUrl = () =>
     typeof options.publicUrl === 'function'
       ? options.publicUrl()
@@ -1020,6 +1033,87 @@ export function createHttpService(options: HttpServiceOptions): Server {
           subject,
           docId: null,
           detail: { deviceId, approvedBy: callingDeviceId },
+        });
+        return send(response, 200, { device });
+      }
+      // WS7-R12: approving a device with a recovery code. The store never
+      // sees the code, so it cannot check it - instead the device proves it
+      // holds the private user key the code unsealed. The store encrypts a
+      // random secret to the person's PUBLIC key; only the private key
+      // turns it back. A session alone, stolen or not, cannot answer.
+      if (deviceId && parts[5] === 'recovery-challenge' && method === 'POST') {
+        const user = await directory.getUser(userId);
+        if (!user.publicKey) {
+          throw new HttpError(
+            409,
+            'conflict',
+            'There is no published key to recover against. Recovery needs a key set up on an earlier device.',
+          );
+        }
+        const secret = randomBytes(32);
+        const challengeId = randomUUID();
+        const wrapped = publicEncrypt(
+          {
+            key: createPublicKey({
+              key: Buffer.from(user.publicKey, 'base64'),
+              format: 'der',
+              type: 'spki',
+            }),
+            padding: cryptoConstants.RSA_PKCS1_OAEP_PADDING,
+            oaepHash: 'sha256',
+          },
+          secret,
+        );
+        recoveryChallenges.set(challengeId, {
+          userId,
+          deviceId,
+          answer: secret.toString('hex'),
+          expiresAt: Date.now() + 5 * 60_000,
+        });
+        return send(response, 200, { challengeId, wrapped: wrapped.toString('base64') });
+      }
+      if (deviceId && parts[5] === 'recover' && method === 'POST') {
+        const body = await readJson(request);
+        const challengeId = requireString(body.challengeId, 'challengeId');
+        const challenge = recoveryChallenges.get(challengeId);
+        // Single use, whatever the outcome: a wrong answer does not get
+        // another try at the same secret.
+        recoveryChallenges.delete(challengeId);
+        const answer = typeof body.answer === 'string' ? body.answer : '';
+        if (
+          !challenge ||
+          challenge.userId !== userId ||
+          challenge.deviceId !== deviceId ||
+          challenge.expiresAt < Date.now() ||
+          challenge.answer !== answer
+        ) {
+          await record({
+            operation: 'device-recover',
+            outcome: 'denied',
+            subject,
+            docId: null,
+            detail: { deviceId },
+          });
+          throw new HttpError(
+            403,
+            'forbidden',
+            'That recovery attempt did not prove the key. Check the recovery code and try again.',
+          );
+        }
+        const wrapped = body.wrappedUserKey as { keyWrap?: unknown; body?: unknown } | undefined;
+        if (typeof wrapped?.keyWrap !== 'string' || typeof wrapped?.body !== 'string') {
+          throw new HttpError(400, 'bad-request', 'wrappedUserKey must carry keyWrap and body.');
+        }
+        const device = await directory.approveByRecovery(userId, deviceId, {
+          keyWrap: wrapped.keyWrap,
+          body: wrapped.body,
+        });
+        await record({
+          operation: 'device-recover',
+          outcome: 'ok',
+          subject,
+          docId: null,
+          detail: { deviceId },
         });
         return send(response, 200, { device });
       }

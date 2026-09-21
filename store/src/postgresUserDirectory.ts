@@ -191,6 +191,23 @@ export function createPostgresUserDirectory(
       return toDevice(result.rows[0]);
     },
 
+    async approveByRecovery(userId, deviceId, wrapped) {
+      const device = await requireRow(userId, deviceId);
+      if (device.revoked_at) throw new DirectoryError('That device has been revoked.', 'revoked');
+      const result = await pool.query<DeviceRow>(
+        `UPDATE devices SET approved_at = $3, wrapped_user_key_body = $4, wrapped_user_key_wrap = $5
+          WHERE device_id = $1 AND user_id = $2 RETURNING *`,
+        [
+          deviceId,
+          userId,
+          now(),
+          Buffer.from(wrapped.body, 'base64'),
+          Buffer.from(wrapped.keyWrap, 'base64'),
+        ],
+      );
+      return toDevice(result.rows[0]);
+    },
+
     async setOwnUserKey(userId, deviceId, wrapped) {
       const device = await requireRow(userId, deviceId);
       if (device.revoked_at) throw new DirectoryError('That device has been revoked.', 'revoked');

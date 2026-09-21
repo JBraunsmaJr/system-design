@@ -24,6 +24,7 @@ import {
   enrollDevice,
   type EnrollmentApi,
 } from '../src/collab/deviceIdentity.ts';
+import { createRecoveryCode, recoverWithCode } from '../src/collab/recoveryCode.ts';
 import {
   documentKeyFor,
   fromBase64,
@@ -273,6 +274,73 @@ try {
     JSON.stringify(opened.file) === JSON.stringify(DOCUMENT),
     'and opens the document the first browser saved',
   );
+
+  console.log('\n=== A recovery code, when every browser is gone (WS7-R12) ===');
+  {
+    // The first person makes a code while they still have a working browser.
+    const code = await createRecoveryCode(first.client, userKey);
+    check(
+      /^[0-9A-Z]{5}(-[0-9A-Z]{5}){4}-[0-9A-Z]{3}$/.test(code),
+      `a code is 28 characters in groups of five, for reading aloud (${code})`,
+    );
+
+    // Then loses everything: a new browser, the same person.
+    const replacement = await newBrowserAs('person-1');
+    const waiting = await enrollDevice({ api: replacement.api, storage: replacement.storage });
+    check(
+      waiting.status === 'awaiting-approval',
+      'a new browser waits, as it would for another device to approve it',
+    );
+
+    const typo = code.slice(0, -1) + (code.endsWith('A') ? 'B' : 'A');
+    const mistyped = await recoverWithCode(replacement.client, replacement.storage, typo);
+    check(
+      !mistyped.ok && mistyped.reason === 'malformed',
+      `a mistyped code is caught by its own checksum (${!mistyped.ok ? mistyped.message : ''})`,
+    );
+
+    // A stolen session with no code: asks for the challenge and guesses.
+    const held = await replacement.storage.load();
+    const challenge = await replacement.client.recoveryChallenge(held!.deviceId);
+    const forged = await replacement.client
+      .recoverDevice(held!.deviceId, challenge.challengeId, 'f'.repeat(64), {
+        keyWrap: 'AA==',
+        body: 'AA==',
+      })
+      .then(
+        () => 'accepted',
+        () => 'refused',
+      );
+    check(forged === 'refused', 'a session without the code cannot answer the challenge');
+
+    const recovered = await recoverWithCode(
+      replacement.client,
+      replacement.storage,
+      code.toLowerCase().replace(/-/g, ' '),
+    );
+    check(recovered.ok, 'the right code recovers the browser, typed however the person types it');
+    const after = await enrollDevice({ api: replacement.api, storage: replacement.storage });
+    check(after.status === 'ready', `and it reaches the workspace (${after.status})`);
+    check(
+      (await exportSymmetricKeyHex(after.workspaceKey!)) ===
+        (await exportSymmetricKeyHex(workspaceKey)),
+      'with the same workspace key as before',
+    );
+
+    // A new code replaces the old one.
+    const newer = await createRecoveryCode(first.client, userKey);
+    const another = await newBrowserAs('person-1');
+    await enrollDevice({ api: another.api, storage: another.storage });
+    const stale = await recoverWithCode(another.client, another.storage, code);
+    check(
+      !stale.ok && stale.reason === 'wrong-code',
+      'after making a new code, the old one no longer works',
+    );
+    check(
+      (await recoverWithCode(another.client, another.storage, newer)).ok,
+      'and the new one does',
+    );
+  }
 
   console.log('\n=== A second person joins the workspace (WS7-R8) ===');
   {
