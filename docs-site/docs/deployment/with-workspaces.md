@@ -24,8 +24,8 @@ Plan for about thirty minutes.
 ## 1. Before you start
 
 Everything the [core deployment](/deployment/core#_1-before-you-start) needs -
-Docker with Compose v2, a DNS name, a TLS certificate, ports 80 and 443 - plus
-**somewhere for people to sign in**. Either:
+Docker with Compose v2, a DNS name, a TLS certificate, ports 80 and 443 - plus **somewhere for people to sign in**.
+Either:
 
 - **Your organization's identity provider** - Keycloak, Entra ID, Okta,
   Auth0, GitLab or Google; anything that speaks OpenID Connect. Recommended
@@ -136,9 +136,11 @@ serves `/.well-known/openid-configuration`. For Keycloak that is
 `https://<keycloak>/realms/<realm>`. Leave `OIDC_INTERNAL_URL` empty.
 
 ::: tip Check the issuer before going further
+
 ```bash
 curl https://login.example.gov/realms/yourrealm/.well-known/openid-configuration
 ```
+
 If that doesn't return JSON from this server, the store won't reach it either.
 :::
 
@@ -181,8 +183,13 @@ curl https://design.example.gov/store/v1/health
 You should see:
 
 ```json
-{"status":"ok","cryptoMode":"webcrypto","authentication":"required",
- "escrow":"configured","relayAuthentication":"required"}
+{
+  "status": "ok",
+  "cryptoMode": "webcrypto",
+  "authentication": "required",
+  "escrow": "configured",
+  "relayAuthentication": "required"
+}
 ```
 
 | If you see                     | It means                                                                                                  |
@@ -191,9 +198,10 @@ You should see:
 | `"relayAuthentication":"none"` | `RELAY_TOKEN_SECRET` is empty in `.env`.                                                                  |
 | No response                    | `docker compose logs store` - the store says what is wrong and stops, rather than starting misconfigured. |
 
-**Option B only - add people.** Open `https://design.example.gov/auth/admin`,
-sign in as `admin` with `KEYCLOAK_ADMIN_PASSWORD`, switch to the
-**system-design** realm, and add a user under **Users**. Give each person an
+**Option B only - add people.** Open `https://design.example.gov/auth/admin` (Depends on your proxy configuration.
+Assuming everything is hosted at `design.example.com` and your proxy is set to forward `/auth` traffic to your keycloak
+instance), sign in as `admin` with `KEYCLOAK_ADMIN_PASSWORD`, switch to the **system-design** realm, and add a user under
+**Users**. Give each person an
 email address, marked verified: Keycloak will otherwise interrupt their first
 sign-in to ask for one.
 
@@ -242,8 +250,8 @@ docker compose exec postgres pg_dump -U store store > store-$(date +%F).sql
 ```
 
 The store's database holds only ciphertext, so a backup is useless to anyone
-who steals it - and useless to you without the recovery key from step 4.
-**Keep that key somewhere other than the backups.**
+who steals it - and useless to you without the recovery key from step 4. **Keep that key somewhere other than the
+backups.**
 
 ### Next
 
