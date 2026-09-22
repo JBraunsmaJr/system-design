@@ -47,9 +47,13 @@ services:
       RELAY_TOKEN_SECRET: ${RELAY_TOKEN_SECRET}
       ADMIN_SUBJECTS: ${ADMIN_SUBJECTS:-}
       RETENTION_PERIOD: ${RETENTION_PERIOD:-30d}
+      # If you are using self-signed certs, mount your certificates and specify the CA here
+      # NODE_EXTRA_CA_CERTS: /certs/your-ca.crt
     volumes:
       # The PUBLIC half only. The private half never belongs on this host.
       - ./keys/recovery-public.pem:/run/keys/recovery-public.pem:ro
+      # If you are using self-signed certs, mount the certs
+      # - ./certs:/certs:ro
 
   postgres:
     image: postgres:16-alpine

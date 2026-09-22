@@ -34,8 +34,12 @@ services:
       # Read by keycloak-realm.json when it is imported.
       DOMAIN: ${DOMAIN}
       OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
+      # If you are using self-signed certificates, you can use the following to trust them.
+      # KC_TRUSTSTORE_PATHS: /certs
     volumes:
       - ./keycloak-realm.json:/opt/keycloak/data/import/system-design-realm.json:ro
+      # Mount self-signed certificates
+      # - ./certs:/certs:ro
 
   keycloak-db:
     image: postgres:16-alpine
