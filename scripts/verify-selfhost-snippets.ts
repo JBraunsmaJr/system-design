@@ -31,14 +31,14 @@ function check(condition: boolean, message: string) {
 }
 
 const FILES = 'docs-site/docs/files';
-const read = (path: string) => readFileSync(join(FILES, path), 'utf8');
+const read = (path: string) => readFileSync(join(FILES, path), 'utf8').replace(/\r\n/g, '\n');
 
 /** KEY=value lines, ignoring comments - commented lines are returned
  * separately, for the Option B values. */
 function readEnv(text: string) {
   const active: Record<string, string> = {};
   const commented: Record<string, string> = {};
-  for (const line of text.split('\n')) {
+  for (const line of text.replace(/\r\n/g, '\n').split('\n')) {
     const match = /^(#\s*)?([A-Z][A-Z0-9_]*)=(.*)$/.exec(line.trim());
     if (!match) continue;
     (match[1] ? commented : active)[match[2]] = match[3].trim();
@@ -49,7 +49,7 @@ function readEnv(text: string) {
 /** One service's environment block, as written in our compose files:
  * `  name:` then `    environment:` then `      KEY: value` lines. */
 function serviceEnvironment(compose: string, service: string): Record<string, string> {
-  const lines = compose.split('\n');
+  const lines = compose.replace(/\r\n/g, '\n').split('\n');
   const start = lines.findIndex((line) => line === `  ${service}:`);
   if (start === -1) return {};
   const out: Record<string, string> = {};
@@ -228,8 +228,8 @@ console.log('\n=== Keycloak, if run here ===');
 {
   const optionB = { ...filled, OIDC_ISSUER: commented.OIDC_ISSUER };
   check(
-    `${interpolate(keycloak.KC_HOSTNAME, optionB)}/realms/${realm.realm}` === optionB.OIDC_ISSUER,
-    `Keycloak's public address and the realm make exactly the issuer the store expects (${optionB.OIDC_ISSUER})`,
+      `https://${interpolate(keycloak.KC_HOSTNAME, optionB)}${keycloak.KC_HTTP_RELATIVE_PATH}/realms/${realm.realm}` === optionB.OIDC_ISSUER,
+      `Keycloak's public address and the realm make exactly the issuer the store expects (${optionB.OIDC_ISSUER})`,
   );
   check(
     keycloak.KC_HTTP_RELATIVE_PATH === '/auth',
