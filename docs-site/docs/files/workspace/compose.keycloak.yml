@@ -20,7 +20,7 @@ services:
       KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?Set KEYCLOAK_DB_PASSWORD in .env}
       # Served behind the proxy at /auth/, and told so, so the addresses it
       # hands out are the ones browsers can reach.
-      KC_HOSTNAME: https://${DOMAIN}/auth
+      KC_HOSTNAME: ${DOMAIN}
       KC_HTTP_RELATIVE_PATH: /auth
       KC_HTTP_ENABLED: 'true'
       KC_PROXY_HEADERS: xforwarded
