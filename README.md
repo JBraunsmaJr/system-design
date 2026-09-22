@@ -1,5 +1,7 @@
 # System Design Editor
 
+[Hosting Guide](https://jbraunsmajr.github.io/system-design/docs/deployment/self-host)
+
 - [Documentation](https://jbraunsmajr.github.io/system-design/docs)
 - [Editor](https://jbraunsmajr.github.io/system-design)
 
