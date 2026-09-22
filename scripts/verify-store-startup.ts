@@ -99,6 +99,34 @@ console.log('=== It starts, serves, and stops ===');
   check(/shutting down/.test(running.output()), 'saying so');
 }
 
+console.log('\n=== Settings reach the running process ===');
+{
+  // The service's own tests construct it with every option directly, so
+  // they cannot notice a setting that is read nowhere. RELAY_TOKEN_SECRET
+  // was exactly that: documented, tested, and never read from the
+  // environment - so a relay requiring tokens sat beside a store that could
+  // not issue them, and nobody could join a session.
+  const running = start({
+    PORT: String(PORT + 2),
+    PUBLIC_URL: `http://localhost:${PORT + 2}`,
+    ALLOW_UNAUTHENTICATED: 'true',
+    RELAY_TOKEN_SECRET: 'r'.repeat(64),
+  });
+  const health = await waitForHealth(PORT + 2);
+  const body = health ? ((await health.json()) as { relayAuthentication?: string }) : {};
+  check(
+    body.relayAuthentication === 'required',
+    `RELAY_TOKEN_SECRET in the environment makes the store issue relay tokens (${body.relayAuthentication})`,
+  );
+  const token = await fetch(`http://127.0.0.1:${PORT + 2}/v1/rooms/some-room/token`, {
+    method: 'POST',
+  });
+  check(token.status === 200, `and it does issue one (${token.status})`);
+  check(/Relay: sessions require a token/.test(running.output()), 'and says so at startup');
+  running.child.kill('SIGTERM');
+  await running.exit;
+}
+
 console.log('\n=== It refuses to start badly configured ===');
 {
   const cases: [string, Record<string, string>, RegExp][] = [
@@ -121,6 +149,16 @@ console.log('\n=== It refuses to start badly configured ===');
         ALLOW_UNAUTHENTICATED: 'true',
       },
       /HTTPS/,
+    ],
+    [
+      'with a relay secret too short to be one',
+      {
+        PORT: String(PORT + 1),
+        PUBLIC_URL: `http://localhost:${PORT + 1}`,
+        ALLOW_UNAUTHENTICATED: 'true',
+        RELAY_TOKEN_SECRET: 'short',
+      },
+      /RELAY_TOKEN_SECRET is 5 characters/,
     ],
     [
       'with an unparseable retention period',

@@ -16,7 +16,7 @@ now. Opening a workspace document puts you in its session automatically.
 ## Signing in
 
 Open **File → Documents**. If your deployment has a workspace, a Workspace
-section appears at the top with the sign-in providers it accepts — usually
+section appears at the top with the sign-in providers it accepts - usually
 your organization's single sign-on.
 
 Signing in identifies you. It does not, on its own, let you read anything:
@@ -31,7 +31,7 @@ anyone they let in afterwards.
 
 ## Every browser after that
 
-A **second browser of your own** — a laptop as well as a desktop — shows a
+A **second browser of your own** - a laptop as well as a desktop - shows a
 short verification code and waits. On a browser you already use, open
 **File → Documents** and approve it, checking the code matches on both
 screens. Comparing the code is what stops someone substituting their own
@@ -43,7 +43,7 @@ workspace* with a **Give access** button. Pressing it hands them the
 workspace key, wrapped so that only they can open it. Their browser picks it
 up within a few seconds.
 
-Nothing you do while waiting can read the workspace — and neither can the
+Nothing you do while waiting can read the workspace - and neither can the
 server.
 
 ## Saving
@@ -59,7 +59,7 @@ changes stay in your browser and go up when it returns.
 
 Opening a workspace document puts you in a live session with everyone else
 who has it open. You see their cursors, their selections and their names, and
-their edits arrive as they type. Nobody shares a link — everyone holding the
+their edits arrive as they type. Nobody shares a link - everyone holding the
 document's key arrives in the same place.
 
 Concurrent edits **merge**. Two people editing the same diagram both keep
@@ -76,7 +76,7 @@ Two steps, and both matter:
 2. **Rotate the key.** A revoked browser still holds the workspace key it
    already had. **Rotate key** replaces it so that key opens nothing saved
    afterwards. Every document is re-wrapped; no content is re-encrypted and
-   nothing is lost — a workspace of 500 documents rotates in under a second.
+   nothing is lost - a workspace of 500 documents rotates in under a second.
 
 Revoking alone is not enough, and the editor says so at the point you do it.
 
@@ -92,12 +92,12 @@ Revoking alone is not enough, and the editor says so at the point you do it.
 ### Your recovery code
 
 Once you have access, File → Documents offers to **create a recovery code**.
-It is shown once — 28 characters in groups of five — and you are asked to
+It is shown once - 28 characters in groups of five - and you are asked to
 confirm you have kept it. Keep it somewhere other than the machines it
 recovers: written down, or in a password manager.
 
-The workspace never stores the code in any form, which is also why nobody —
-including an administrator — can look it up for you. You can make a new one
+The workspace never stores the code in any form, which is also why nobody -
+including an administrator - can look it up for you. You can make a new one
 at any time; the old one stops working.
 
 To use it, open File → Documents on the new browser. It will be waiting for

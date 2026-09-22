@@ -1,0 +1,23 @@
+{
+  "realm": "system-design",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "clients": [
+    {
+      "clientId": "system-design-store",
+      "name": "System Design workspace",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "${OIDC_CLIENT_SECRET}",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": ["https://${DOMAIN}/store/v1/auth/callback"],
+      "webOrigins": ["https://${DOMAIN}"],
+      "attributes": { "pkce.code.challenge.method": "S256" }
+    }
+  ]
+}

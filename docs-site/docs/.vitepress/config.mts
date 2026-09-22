@@ -55,10 +55,12 @@ export default defineConfig({
       {
         text: 'Deployment & Infrastructure',
         items: [
-          { text: 'Self Hosting', link: '/deployment/self-host' },
-          { text: 'Relay Server (Signaling)', link: '/deployment/relay-server' },
-          { text: 'Workspace Store', link: '/deployment/workspace-store' },
+          { text: 'Self-Hosting: choose a path', link: '/deployment/self-host' },
+          { text: 'Core Deployment', link: '/deployment/core' },
+          { text: 'Deployment with Workspaces', link: '/deployment/with-workspaces' },
           { text: 'Administering a Workspace', link: '/deployment/administration' },
+          { text: 'Workspace Store Reference', link: '/deployment/workspace-store' },
+          { text: 'Relay Server Reference', link: '/deployment/relay-server' },
         ],
       },
     ],

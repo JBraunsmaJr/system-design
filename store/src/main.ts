@@ -96,6 +96,7 @@ async function main() {
     allowUnauthenticated: config.allowUnauthenticated,
     cryptoMode: config.cryptoMode,
     recoveryPublicKeyPem: config.recoveryPublicKeyPem,
+    relayTokenSecret: config.relayTokenSecret,
     isAdmin: (subject) => admins.has(subject),
   });
 

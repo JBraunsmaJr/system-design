@@ -2,8 +2,8 @@
 
 Most of what happens in a workspace needs no administrator: people sign in,
 approve their own browsers, let each other in, and rotate keys themselves. A
-few actions are deliberately reserved — legal holds, purging, and restoring
-access for someone who has lost everything — because they override retention
+few actions are deliberately reserved - legal holds, purging, and restoring
+access for someone who has lost everything - because they override retention
 or someone's keys.
 
 These are **API actions** in this release. There is no administration screen
@@ -25,8 +25,8 @@ Administrators are listed in the store's `ADMIN_SUBJECTS`, as
 ADMIN_SUBJECTS: https://keycloak.example.gov/realms/design#9b1f3c52-6a1e-4c3a-9d2e-1f0a7b5c4e21
 ```
 
-The subject is your identity provider's identifier for you — for Keycloak, a
-UUID — not your username. To find yours, sign in to the editor, then open:
+The subject is your identity provider's identifier for you - for Keycloak, a
+UUID - not your username. To find yours, sign in to the editor, then open:
 
 ```
 https://store.example.gov/v1/auth/session
@@ -81,7 +81,7 @@ Sessions last eight hours. A `401` means sign in again.
 
 ## Finding a document
 
-The store identifies documents by id and never knows their titles — that is
+The store identifies documents by id and never knows their titles - that is
 the point of encrypting them. To act on a particular document you need its
 id, which is in the editor's address bar while it is open:
 
@@ -112,8 +112,8 @@ will remove it.
 
 ## Legal hold
 
-A hold stops a document being purged — by retention, by the sweep, or by an
-explicit purge — until it is released. It applies whether or not the
+A hold stops a document being purged - by retention, by the sweep, or by an
+explicit purge - until it is released. It applies whether or not the
 document is deleted, and in every retention mode, including `immediate`.
 
 ```js
@@ -130,7 +130,7 @@ cheap and reversible; a purge is neither.
 ## Purging
 
 Purging removes a document and its history permanently. It cannot be undone,
-and nobody — including the organization's offline recovery key — can bring a
+and nobody - including the organization's offline recovery key - can bring a
 purged document back.
 
 ```js
@@ -149,7 +149,7 @@ For someone who has lost every browser **and** their recovery code. If they
 still have either, they do not need an administrator: another browser can
 approve a new one, or the recovery code can.
 
-It takes two people, and that is deliberate — no single step lets anyone read
+It takes two people, and that is deliberate - no single step lets anyone read
 the workspace.
 
 **1. The administrator resets their keys.**
@@ -170,15 +170,15 @@ to their lost keys goes with them.
 **2. A member lets them back in.** They sign in on a new browser, which
 publishes a fresh key and tells them they are waiting for access. Anyone
 already in the workspace sees a notice over their document and presses
-**Give access** — exactly as for a new colleague.
+**Give access** - exactly as for a new colleague.
 
 Consider [rotating the workspace key](/guide/workspaces#losing-a-laptop)
 afterwards if the lost browsers might be in someone else's hands.
 
 ## Reading the audit trail
 
-The store records every request — who, what, which document, and whether it
-was allowed — in PostgreSQL's `audit_log` table. There is no API for it in
+The store records every request - who, what, which document, and whether it
+was allowed - in PostgreSQL's `audit_log` table. There is no API for it in
 this release; read it with SQL:
 
 ```sql
@@ -203,8 +203,8 @@ ORDER BY at DESC
 LIMIT 100;
 ```
 
-Worth knowing: the log is append-only **by convention** in this release — the
-store never updates or deletes a row — not by database permissions. If your
+Worth knowing: the log is append-only **by convention** in this release - the
+store never updates or deletes a row - not by database permissions. If your
 assessment requires tamper resistance, grant the store's database role
 `INSERT` and `SELECT` on `audit_log` only, and ship the table to your log
 platform.
@@ -248,5 +248,5 @@ The output JSON file can be opened directly in the editor via **File > Open**.
 | `401 unauthenticated` | Your session has expired. Sign in again.                                                |
 | `403 forbidden`       | You are not in `ADMIN_SUBJECTS`, or none are configured.                                |
 | `404 not-found`       | No such document or person. Check the id.                                               |
-| `409 conflict`        | Refused for a reason in the message — most often, a purge of a document under hold.     |
+| `409 conflict`        | Refused for a reason in the message - most often, a purge of a document under hold.     |
 | `410 deleted`         | The document is deleted. Restore it first, or include deleted documents in the request. |

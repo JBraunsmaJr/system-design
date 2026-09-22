@@ -33,7 +33,7 @@ relay is no longer in the path.
 - A place your documents live. Nothing is persisted anywhere except each
   participant's own browser.
 - Authenticated. Anyone who can reach the relay can connect to it. See
-  [Access control](#access-control) — this matters.
+  [Access control](#access-control) - this matters.
 
 ### What this means practically
 
@@ -49,7 +49,7 @@ but nobody new can join, and a peer who reloads can't get back in.
 
 ::: warning HTTPS Requirement
 **If the app is served over HTTPS, the relay must be reachable over `wss://`.**
-A browser on an HTTPS page will refuse to open a plain `ws://` WebSocket as mixed content, and it does so quietly — you'll see a console error and nothing else. This is the single most common reason a correctly-running relay appears not to work.
+A browser on an HTTPS page will refuse to open a plain `ws://` WebSocket as mixed content, and it does so quietly - you'll see a console error and nothing else. This is the single most common reason a correctly-running relay appears not to work.
 :::
 
 The relay itself speaks plain WebSocket and has no TLS support. Put a
@@ -63,7 +63,7 @@ relay.example.com {
 ```
 
 That's genuinely all that's required. Caddy v2 detects and proxies
-WebSocket upgrades automatically — no `Upgrade`/`Connection` header
+WebSocket upgrades automatically - no `Upgrade`/`Connection` header
 plumbing, no `flush_interval`, no `Host` rewriting. The relay ignores
 `X-Forwarded-*` headers entirely, so adding them buys nothing.
 
@@ -82,7 +82,7 @@ location / {
 
 The relay sends a WebSocket ping every 30 seconds and drops connections
 that don't pong, so idle timeouts on intermediaries are usually not a
-problem — but a proxy with a short read timeout can still sever
+problem - but a proxy with a short read timeout can still sever
 connections mid-session.
 
 ---
@@ -113,7 +113,7 @@ wss://relay-a.example.com, wss://relay-b.example.com
 
 Clients connect to all of them. Peers find each other as long as they
 share **at least one** reachable relay, so this gives you redundancy
-without any coordination between the relays themselves — they never talk
+without any coordination between the relays themselves - they never talk
 to each other.
 
 ### A caveat on changing the default
@@ -160,7 +160,7 @@ certificate, assume it will be found.
 ## Restricted and air-gapped environments
 
 The app is a fully static site with no runtime backend, so it can be
-served from anywhere — including a plain nginx container inside an
+served from anywhere - including a plain nginx container inside an
 isolated network. The bundle makes **no outbound HTTP requests**: fonts
 are bundled, icons are bundled, and there are no CDN references.
 
@@ -169,7 +169,7 @@ WebRTC, however, has a dependency that isn't obvious.
 ### ICE servers (STUN and TURN)
 
 To establish a direct peer connection, WebRTC gathers **ICE candidates**
-— possible network paths between two browsers. The underlying library
+- possible network paths between two browsers. The underlying library
 ships with two public STUN servers configured by default:
 
 ```
@@ -182,7 +182,7 @@ What that costs you depends on your network:
 
 | Situation                                       | Works without STUN?                                                                                                   |
 | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| All users on the same flat LAN / subnet         | **Yes.** Host candidates are sufficient — the browsers can see each other's local addresses directly.                 |
+| All users on the same flat LAN / subnet         | **Yes.** Host candidates are sufficient - the browsers can see each other's local addresses directly.                 |
 | Users across subnets, with routing between them | **Usually.** Depends on whether the routed addresses appear as host candidates. Test it.                              |
 | Users behind NAT from each other                | **No.** Requires STUN to discover external addresses, and often TURN to relay when a direct connection can't be made. |
 | Users on different sites / VPN split tunnels    | **No.** Requires TURN.                                                                                                |
@@ -193,7 +193,7 @@ falling back to the host candidates that were sufficient all along.
 
 #### Configuring them
 
-ICE servers are configured exactly like the relay URL — a build-time
+ICE servers are configured exactly like the relay URL - a build-time
 default, overridable per browser at runtime:
 
 ```bash
@@ -215,7 +215,7 @@ stun:stun.internal:3478, turn:turn.internal:3478|username|password
 Pipe is the delimiter because RFC 7064/7065 don't permit it in a
 STUN/TURN URI, so it can never appear inside the URL and never needs
 escaping. A username given without a credential is discarded rather than
-passed through — `RTCPeerConnection` rejects a half-specified server, and
+passed through - `RTCPeerConnection` rejects a half-specified server, and
 failing at parse time is easier to trace back to a typo than failing at
 connection time.
 
@@ -263,13 +263,13 @@ For topologies that genuinely need TURN, run something like
 Work down the layers; the first failure tells you where the problem is.
 
 ```bash
-# 1. DNS — does the name resolve from a client machine?
+# 1. DNS - does the name resolve from a client machine?
 dig +short relay.example.com
 
-# 2. TLS and reachability — should print: okay
+# 2. TLS and reachability - should print: okay
 curl -v https://relay.example.com/
 
-# 3. WebSocket upgrade — should print: Connected
+# 3. WebSocket upgrade - should print: Connected
 npx wscat -c wss://relay.example.com
 
 # 4. From the relay host, is the container actually up?

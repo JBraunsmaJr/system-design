@@ -1,0 +1,36 @@
+# System Design Editor - core deployment: the editor and its relay.
+#
+# One domain, one TLS proxy:
+#   https://<DOMAIN>/        the editor (and its documentation at /docs/)
+#   wss://<DOMAIN>/relay/    the relay, for live sessions
+#
+# Nothing here stores documents: they live in each person's browser.
+
+name: system-design
+
+services:
+  editor:
+    image: ghcr.io/jbraunsmajr/system-design:${VERSION:-latest}
+    restart: unless-stopped
+    environment:
+      APP_URL: https://${DOMAIN:?Set DOMAIN in .env}/
+      # The trailing slash matters: nginx serves the relay at /relay/.
+      RELAY: wss://${DOMAIN}/relay/
+      ICE_SERVERS: ${ICE_SERVERS:-}
+
+  relay:
+    image: ghcr.io/jbraunsmajr/system-design-relay:${VERSION:-latest}
+    restart: unless-stopped
+
+  proxy:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      - editor
+      - relay

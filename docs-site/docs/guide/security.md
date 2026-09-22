@@ -97,7 +97,7 @@ not data moving.
 Three things this arrangement buys:
 
 - **The device key never leaves the browser.** It is generated as
-  non-extractable, so even the application's own code cannot read it out —
+  non-extractable, so even the application's own code cannot read it out -
   only ask the browser to use it.
 - **Each sealed change is bound to its place.** A document's id, the kind of
   change, and its version are authenticated alongside the ciphertext, so a
@@ -119,7 +119,7 @@ It **does** see, by design, and records in its audit log:
 - who signed in, from which provider, and when
 - which documents each person read or changed, and who granted access to whom
 
-A deployment can be configured to store documents unencrypted — for local
+A deployment can be configured to store documents unencrypted - for local
 development, or where an organization has decided the server should read
 content. When it is, **the editor shows a warning that cannot be dismissed**,
 because you should never have to check a configuration file to know whether
@@ -135,7 +135,7 @@ document, workspace, or even which deployment a session belongs to.
 Losing a device must not mean losing documents, and must not mean anyone
 else can read them either.
 
-<svg class="kd" viewBox="0 0 680 270" role="img" aria-label="Three recovery routes: another approved browser, your recovery code, or the organization's offline key — each leading back to readable documents.">
+<svg class="kd" viewBox="0 0 680 270" role="img" aria-label="Three recovery routes: another approved browser, your recovery code, or the organization's offline key - each leading back to readable documents.">
   <rect class="box" x="30" y="24" width="190" height="56" rx="8"/>
   <text class="t" x="125" y="46" text-anchor="middle" dominant-baseline="central">Another browser</text>
   <text class="ts" x="125" y="64" text-anchor="middle" dominant-baseline="central">Codes compared, then approved</text>
@@ -167,7 +167,7 @@ They differ in who they need:
 
 The offline key is why **every document must carry a recovery wrap**. A
 workspace that accepted documents without one would accumulate content that
-nobody — including the organization that owns it — could ever recover. The
+nobody - including the organization that owns it - could ever recover. The
 store refuses them rather than let that happen.
 
 ## Replacing a key
@@ -179,8 +179,8 @@ re-sealed. No content is re-encrypted, nothing is lost, and documents that
 are deleted but still within their retention period are re-wrapped too, so
 they stay restorable.
 
-Anyone holding the old key can still read what they could read before —
-copies already made cannot be recalled — but nothing saved afterwards.
+Anyone holding the old key can still read what they could read before -
+copies already made cannot be recalled - but nothing saved afterwards.
 
 ## What this does not protect against
 

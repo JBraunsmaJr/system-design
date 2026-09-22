@@ -12,8 +12,8 @@ in the browser, sessions start from a link, and nothing leaves the machine.
 
 - **PostgreSQL 16 or later.** The store applies its own schema at startup;
   there is no separate migration step.
-- **An identity provider.** Any OIDC provider works — Keycloak, Entra ID,
-  Okta, Auth0, GitLab, Google — and GitHub is supported through an adapter.
+- **An identity provider.** Any OIDC provider works - Keycloak, Entra ID,
+  Okta, Auth0, GitLab, Google - and GitHub is supported through an adapter.
 - **HTTPS**, unless everything is on localhost. See *Origins and HTTPS*.
 - **A recovery keypair**, generated before the first document is stored.
 
@@ -27,8 +27,8 @@ ghcr.io/jbraunsmajr/system-design-store:<yyyy-mm-dd>
 ```
 
 Each release is tested against PostgreSQL and started once before it is
-published. A complete example — editor, relay, store, PostgreSQL and
-Keycloak — lives in `docker/store/compose.yaml` in the repository; it builds
+published. A complete example - editor, relay, store, PostgreSQL and
+Keycloak - lives in `docker/store/compose.yaml` in the repository; it builds
 the images from source, and swapping each `build:` for the matching
 `image:` above runs the published ones instead.
 
@@ -64,7 +64,7 @@ npx tsx scripts/generate-recovery-key.ts --out ./recovery
 
 Give the store the **public** half (`recovery-public.pem`). Keep the private
 half (`recovery-private.pem`) offline, and somewhere other than your database
-backups — it is the last route into a document when workspace keys are gone, and
+backups - it is the last route into a document when workspace keys are gone, and
 it is useless to an attacker who has only the database.
 
 ::: warning A store with encryption on and no recovery key refuses documents.
@@ -81,7 +81,7 @@ to a quiet default.
 | Variable | Required | Purpose |
 | :--- | :--- | :--- |
 | `PUBLIC_URL` | yes | Where people reach the store. Sign-in returns here. |
-| `DATABASE_URL` | no | PostgreSQL. Without it everything is kept in memory — demonstrations only. |
+| `DATABASE_URL` | no | PostgreSQL. Without it everything is kept in memory - demonstrations only. |
 | `PORT` | no | Default 8080. |
 | `ALLOWED_ORIGINS` | where the editor is elsewhere | Exact origins the editor is served from. No wildcards. |
 | `AFTER_LOGIN_URL` | no | Where people land after signing in. Defaults to the first allowed origin. |
@@ -107,9 +107,9 @@ Register the store as a **confidential client**:
 | Setting | Value |
 | :--- | :--- |
 | Redirect URI | **Exactly** `<PUBLIC_URL>/v1/auth/callback` |
-| Client type | Confidential — the secret stays on the server |
+| Client type | Confidential - the secret stays on the server |
 | Flow | Authorization Code with PKCE |
-| Scopes | `openid profile` — only the subject and a display name are read |
+| Scopes | `openid profile` - only the subject and a display name are read |
 
 Two things catch people out:
 
@@ -139,11 +139,11 @@ Keycloak) or it will advertise the internal one and the two stop matching.
 A browser only sends a session cookie across origins when it is marked
 `SameSite=None`, and only accepts that over HTTPS.
 
-- **Different origins** — serve both over HTTPS. The store refuses to start
+- **Different origins** - serve both over HTTPS. The store refuses to start
   with a cross-origin editor over plain HTTP rather than appearing to work
   and then having every request look unauthenticated.
-- **Same origin**, behind one reverse proxy — nothing special is needed.
-- **Localhost** — plain HTTP works, because browsers treat it as secure.
+- **Same origin**, behind one reverse proxy - nothing special is needed.
+- **Localhost** - plain HTTP works, because browsers treat it as secure.
 
 ## Sessions and the relay
 
@@ -168,12 +168,12 @@ stored; changing it later affects only documents deleted afterwards.
 ## Running more than one instance
 
 Sessions live in PostgreSQL, so a restart does not sign everyone out and two
-instances behind a load balancer share them — no sticky sessions needed.
+instances behind a load balancer share them - no sticky sessions needed.
 
 ## Backups and disaster recovery
 
 Back up PostgreSQL as usual. Its contents are encrypted, so a backup is
-useless to an attacker — and equally useless to you without the offline
+useless to an attacker - and equally useless to you without the offline
 recovery key. **Store that key separately from the backups it would be used
 to recover.**
 

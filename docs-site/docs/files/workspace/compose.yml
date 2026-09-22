@@ -1,0 +1,84 @@
+# System Design Editor - with workspaces: shared, encrypted team storage.
+#
+# One domain, one TLS proxy:
+#   https://<DOMAIN>/         the editor (and its documentation at /docs/)
+#   wss://<DOMAIN>/relay/     the relay, for live sessions
+#   https://<DOMAIN>/store/   the workspace store
+#
+# The store holds documents it cannot read: they are encrypted in the
+# browser. Sign-in uses your identity provider; to run one here instead,
+# add compose.keycloak.yml (see the setup guide).
+
+name: system-design
+
+services:
+  editor:
+    image: ghcr.io/jbraunsmajr/system-design:${VERSION:-latest}
+    restart: unless-stopped
+    environment:
+      APP_URL: https://${DOMAIN:?Set DOMAIN in .env}/
+      RELAY: wss://${DOMAIN}/relay/
+      STORE_URL: https://${DOMAIN}/store
+      ICE_SERVERS: ${ICE_SERVERS:-}
+
+  relay:
+    image: ghcr.io/jbraunsmajr/system-design-relay:${VERSION:-latest}
+    restart: unless-stopped
+    environment:
+      # The same value as the store's: sessions then require signing in.
+      RELAY_TOKEN_SECRET: ${RELAY_TOKEN_SECRET:?Set RELAY_TOKEN_SECRET in .env}
+
+  store:
+    image: ghcr.io/jbraunsmajr/system-design-store:${VERSION:-latest}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PUBLIC_URL: https://${DOMAIN}/store
+      AFTER_LOGIN_URL: https://${DOMAIN}/
+      DATABASE_URL: postgresql://store:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/store
+      AUTH_PROVIDERS: oidc
+      OIDC_ISSUER: ${OIDC_ISSUER:?Set OIDC_ISSUER in .env}
+      OIDC_INTERNAL_URL: ${OIDC_INTERNAL_URL:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:?Set OIDC_CLIENT_ID in .env}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:?Set OIDC_CLIENT_SECRET in .env}
+      RECOVERY_PUBLIC_KEY_FILE: /run/keys/recovery-public.pem
+      RELAY_TOKEN_SECRET: ${RELAY_TOKEN_SECRET}
+      ADMIN_SUBJECTS: ${ADMIN_SUBJECTS:-}
+      RETENTION_PERIOD: ${RETENTION_PERIOD:-30d}
+    volumes:
+      # The PUBLIC half only. The private half never belongs on this host.
+      - ./keys/recovery-public.pem:/run/keys/recovery-public.pem:ro
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: store
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: store
+    volumes:
+      - store-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U store']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  proxy:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      - editor
+      - relay
+      - store
+
+volumes:
+  store-data:

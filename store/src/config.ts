@@ -36,6 +36,13 @@ export interface StoreConfig {
    * setup and kept offline; the store never holds it.
    */
   recoveryPublicKeyPem: string | null;
+  /**
+   * WS10-R6, R7: shared with the relay, which admits only peers carrying a
+   * room token signed with it. Absent means an open relay. It has to reach
+   * the store as well as the relay: a relay that requires tokens beside a
+   * store that cannot issue them admits nobody at all.
+   */
+  relayTokenSecret: string | null;
   maxBlobBytes: number;
   maxBlobsPerDocument: number;
   maxTotalBytes: number;
@@ -190,6 +197,13 @@ export function loadStoreConfig(env: Env = process.env): StoreConfig {
     }
   }
 
+  const relayTokenSecret = env.RELAY_TOKEN_SECRET?.trim() || null;
+  if (relayTokenSecret && relayTokenSecret.length < 32) {
+    throw new ConfigError(
+      `RELAY_TOKEN_SECRET is ${relayTokenSecret.length} characters; use at least 32 random ones (openssl rand -hex 32). It is the only thing between someone who can reach the relay and every session.`,
+    );
+  }
+
   const cryptoMode = (env.CRYPTO_MODE ?? 'webcrypto').trim();
   if (cryptoMode !== 'webcrypto' && cryptoMode !== 'passthrough') {
     throw new ConfigError(`CRYPTO_MODE must be "webcrypto" or "passthrough", not "${cryptoMode}".`);
@@ -206,6 +220,7 @@ export function loadStoreConfig(env: Env = process.env): StoreConfig {
     retention: parseRetentionPeriod(env.RETENTION_PERIOD),
     cryptoMode,
     recoveryPublicKeyPem,
+    relayTokenSecret,
     maxBlobBytes: positive(env, 'MAX_BLOB_BYTES', 8 * 1024 * 1024),
     maxBlobsPerDocument: positive(env, 'MAX_BLOBS_PER_DOCUMENT', 100_000),
     maxTotalBytes: positive(env, 'MAX_TOTAL_BYTES', Number.POSITIVE_INFINITY),
@@ -240,6 +255,9 @@ export function describeConfig(config: StoreConfig): string[] {
     config.cryptoMode === 'passthrough'
       ? 'Crypto mode: PASSTHROUGH - documents are stored unencrypted and this server can read them'
       : 'Crypto mode: webcrypto - documents arrive sealed and this server cannot read them',
+    config.relayTokenSecret
+      ? 'Relay: sessions require a token from this store (set the same RELAY_TOKEN_SECRET on the relay)'
+      : 'Relay: OPEN - anyone who can reach it and knows a room name can join a session',
     config.cryptoMode === 'passthrough'
       ? 'Recovery escrow: not applicable in passthrough mode'
       : config.recoveryPublicKeyPem

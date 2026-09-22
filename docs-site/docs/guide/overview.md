@@ -24,7 +24,7 @@ browser engine and can be hosted from any static web server, object storage buck
 ### Peer-to-Peer State Synchronization
 
 Document changes are tracked using CRDTs (Conflict-free Replicated Data Types) via Yjs. Document data never traverses a
-central server—it flows directly over encrypted WebRTC data channels between participants.
+central server-it flows directly over encrypted WebRTC data channels between participants.
 
 ### Air-Gap & Private Network Friendly
 
