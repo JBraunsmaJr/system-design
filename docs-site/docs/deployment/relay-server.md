@@ -5,8 +5,8 @@ signaling server). This page covers what it does, how to run it, how the
 editor finds it, who can use it, and what changes on networks without
 internet access.
 
-Both deployment guides already include it — [Core](/deployment/core) and
-[with Workspaces](/deployment/with-workspaces) — behind the same proxy as the
+Both deployment guides already include it - [Core](/deployment/core) and
+[with Workspaces](/deployment/with-workspaces) - behind the same proxy as the
 editor, at `wss://<your domain>/relay/`. This page is the reference behind
 them.
 
@@ -72,7 +72,7 @@ curl http://localhost:4444/health
 ```
 
 `authentication` is `required` when `RELAY_TOKEN_SECRET` is set; `rooms` is
-how many sessions are currently open. Every other HTTP path answers 404 —
+how many sessions are currently open. Every other HTTP path answers 404 -
 the relay's real work is WebSocket connections.
 
 The image runs as an unprivileged user, writes nothing to its own
@@ -85,7 +85,7 @@ filesystem, and has a built-in health check on `/health`.
 ::: warning HTTPS requirement
 **If the editor is served over HTTPS, the relay must be reachable over
 `wss://`.** A browser on an HTTPS page refuses to open a plain `ws://`
-WebSocket as mixed content, and does so quietly — a console error and
+WebSocket as mixed content, and does so quietly - a console error and
 nothing else. This is the single most common reason a correctly running
 relay appears not to work.
 :::
@@ -93,7 +93,7 @@ relay appears not to work.
 The relay speaks plain WebSocket and has no TLS of its own. Put a reverse
 proxy in front of it.
 
-**Behind the editor's own proxy, at a path** — what both deployment guides
+**Behind the editor's own proxy, at a path** - what both deployment guides
 do, with one certificate for everything:
 
 ```nginx
@@ -119,7 +119,7 @@ so `https://<domain>/relay/health` is the relay's `/health`. Point the editor
 at `wss://<domain>/relay/` **with** the trailing slash: without it, nginx
 answers with a redirect, which WebSocket clients do not follow.
 
-**On a host of its own** — Caddy handles both the certificate and the
+**On a host of its own** - Caddy handles both the certificate and the
 upgrade with no further configuration:
 
 ```caddyfile
@@ -131,7 +131,7 @@ relay.example.gov {
 The relay ignores `X-Forwarded-*` headers, so adding them buys nothing.
 
 The relay pings every connection every 30 seconds, so idle timeouts on
-intermediaries are rarely a problem — but a proxy with a short read timeout
+intermediaries are rarely a problem - but a proxy with a short read timeout
 can still cut a session off mid-edit. Give it an hour.
 
 ---
@@ -169,7 +169,7 @@ wss://relay-a.example.gov, wss://relay-b.example.gov
 
 Browsers connect to all of them, and find each other as long as they share
 **at least one** reachable relay. That gives you redundancy with no
-coordination between relays — they never talk to each other. (With
+coordination between relays - they never talk to each other. (With
 `RELAY_TOKEN_SECRET`, give every relay the same secret.)
 
 ### A caveat on changing the default
@@ -186,8 +186,8 @@ or you tell them the new URL.
 Two separate questions, with separate answers.
 
 **Who can read a session?** Only people with its link. A session's link
-carries a key; everything the session sends — through the relay and
-directly between browsers — is encrypted with it, and neither the relay nor
+carries a key; everything the session sends - through the relay and
+directly between browsers - is encrypted with it, and neither the relay nor
 the workspace store ever has it. This is always on. Someone who learns only a
 session's room name can connect to the relay and see that the room exists,
 and nothing more.
@@ -202,7 +202,7 @@ restricting where it isn't. Three ways, roughly in order of strength:
 2. **Membership, with a workspace.** Set the same `RELAY_TOKEN_SECRET` on the
    relay and the [workspace store](/deployment/workspace-store). The store
    then issues a short-lived token for one room to someone it has signed in,
-   and the relay refuses anyone without a valid one — including someone
+   and the relay refuses anyone without a valid one - including someone
    holding a token for a different room, or one that has expired.
    [Deployment with Workspaces](/deployment/with-workspaces) sets this up.
 3. **Treat links as secrets.** Share them over a channel you trust. Anyone
@@ -235,8 +235,8 @@ certificate, assume it will be found.
 
 ## Restricted and air-gapped environments
 
-The editor is a static site: it makes **no outbound requests** — fonts and
-icons are bundled, and there are no CDN references — so it can be served
+The editor is a static site: it makes **no outbound requests** - fonts and
+icons are bundled, and there are no CDN references - so it can be served
 from anywhere inside an isolated network. (With workspaces, the store and
 its database are on your network too.)
 
@@ -245,7 +245,7 @@ WebRTC, however, has a dependency that isn't obvious.
 ### ICE servers (STUN and TURN)
 
 To establish a direct peer connection, WebRTC gathers **ICE candidates**
-— possible network paths between two browsers. The underlying library
+- possible network paths between two browsers. The underlying library
 ships with two public STUN servers configured by default:
 
 ```
@@ -258,7 +258,7 @@ What that costs you depends on your network:
 
 | Situation                                       | Works without STUN?                                                                                                   |
 | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| All users on the same flat LAN / subnet         | **Yes.** Host candidates are sufficient — the browsers can see each other's local addresses directly.                 |
+| All users on the same flat LAN / subnet         | **Yes.** Host candidates are sufficient - the browsers can see each other's local addresses directly.                 |
 | Users across subnets, with routing between them | **Usually.** Depends on whether the routed addresses appear as host candidates. Test it.                              |
 | Users behind NAT from each other                | **No.** Requires STUN to discover external addresses, and often TURN to relay when a direct connection can't be made. |
 | Users on different sites / VPN split tunnels    | **No.** Requires TURN.                                                                                                |
@@ -292,7 +292,7 @@ stun:stun.internal:3478, turn:turn.internal:3478|username|password
 Pipe is the delimiter because RFC 7064/7065 don't permit it in a
 STUN/TURN URI, so it can never appear inside the URL and never needs
 escaping. A username given without a credential is discarded rather than
-passed through — `RTCPeerConnection` rejects a half-specified server, and
+passed through - `RTCPeerConnection` rejects a half-specified server, and
 failing at parse time is easier to trace back to a typo than failing at
 connection time.
 
@@ -353,5 +353,5 @@ Common causes:
 | `curl` works, the editor never connects | `ws://` on an HTTPS page, blocked silently. Use `wss://`. |
 | The editor connects, then drops within a minute | A proxy read timeout shorter than the session. |
 | Signed-in people cannot join a session | The relay requires tokens and the store cannot issue them. Check both `/health` responses (above). |
-| Connected, but people never see each other | They are using different relays, or a network that blocks direct paths — see [ICE servers](#ice-servers-stun-and-turn). |
+| Connected, but people never see each other | They are using different relays, or a network that blocks direct paths - see [ICE servers](#ice-servers-stun-and-turn). |
 | `relay.example.gov` rejected as a URL | No scheme. Relay URLs start with `wss://` or `ws://`. |
