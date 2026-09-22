@@ -51,6 +51,28 @@ function measureMedianDuration(
   return durations[mid];
 }
 
+/**
+ * How much longer the large case takes than the small one, as the best of
+ * several paired measurements.
+ *
+ * A single ratio of two short timings is at the mercy of whatever else is
+ * running: a pause that lands on one side and not the other inflates it,
+ * which is how these checks failed under the full suite's parallel load
+ * while passing alone every time. Interference can only make a ratio worse,
+ * never better, so the best of several attempts is the honest figure.
+ * (Taking the fastest single run instead was tried and rejected: for the
+ * smallest operations it skews the small side fast and inflates the ratio.)
+ */
+function bestRatio(small: () => void, large: () => void, attempts = 5): number {
+  let best = Number.POSITIVE_INFINITY;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const tSmall = measureMedianDuration(small);
+    const tLarge = measureMedianDuration(large);
+    best = Math.min(best, tLarge / Math.max(0.0001, tSmall));
+  }
+  return best;
+}
+
 console.log('\n=== Layer 1 Algorithmic Complexity Guards (PERF-L1) ===\n');
 
 // 1. flattenSubDiagramTree scaling (O(N))
@@ -112,25 +134,29 @@ console.log('\n=== Layer 1 Algorithmic Complexity Guards (PERF-L1) ===\n');
   );
 
   const REPS = 200;
-  const tSmallNodes = measureMedianDuration(() => {
-    for (let r = 0; r < REPS; r++) getNodesAtPath(smallFlat.nodes, []);
-  });
-  const tLargeNodes = measureMedianDuration(() => {
-    for (let r = 0; r < REPS; r++) getNodesAtPath(largeFlat.nodes, []);
-  });
-  const nodeRatio = tLargeNodes / Math.max(0.0001, tSmallNodes);
+  // Paired and best-of-five: this check failed once at 25.08x under the
+  // full suite's load while measuring 3-6x on its own.
+  const nodeRatio = bestRatio(
+    () => {
+      for (let r = 0; r < REPS; r++) getNodesAtPath(smallFlat.nodes, []);
+    },
+    () => {
+      for (let r = 0; r < REPS; r++) getNodesAtPath(largeFlat.nodes, []);
+    },
+  );
   assert(
     nodeRatio < 25,
     `getNodesAtPath scales linearly (8x size -> ${nodeRatio.toFixed(2)}x time)`,
   );
 
-  const tSmallEdges = measureMedianDuration(() => {
-    for (let r = 0; r < REPS; r++) getEdgesAtPath(smallFlat.edges, []);
-  });
-  const tLargeEdges = measureMedianDuration(() => {
-    for (let r = 0; r < REPS; r++) getEdgesAtPath(largeFlat.edges, []);
-  });
-  const edgeRatio = tLargeEdges / Math.max(0.0001, tSmallEdges);
+  const edgeRatio = bestRatio(
+    () => {
+      for (let r = 0; r < REPS; r++) getEdgesAtPath(smallFlat.edges, []);
+    },
+    () => {
+      for (let r = 0; r < REPS; r++) getEdgesAtPath(largeFlat.edges, []);
+    },
+  );
   assert(
     edgeRatio < 25,
     `getEdgesAtPath scales linearly (8x size -> ${edgeRatio.toFixed(2)}x time)`,
