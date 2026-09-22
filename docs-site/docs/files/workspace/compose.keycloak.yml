@@ -21,6 +21,12 @@ services:
       # Served behind the proxy at /auth/, and told so, so the addresses it
       # hands out are the ones browsers can reach.
       KC_HOSTNAME: ${DOMAIN}
+
+      # These notes are assuming keycloak is hosted on the same machine as everything else.
+      # This value will depend on the reverse proxy configuration.
+      # For instance, if this is hosted on `example.com` your proxy might take `/auth` url and forward it to keycloak.
+      # example.com/auth.
+      # It is NOT recommended to strip the path from the URL at the proxy
       KC_HTTP_RELATIVE_PATH: /auth
       KC_HTTP_ENABLED: 'true'
       KC_PROXY_HEADERS: xforwarded

@@ -105,9 +105,9 @@ docker run --rm \
 
 This creates two files in `keys/`:
 
-| File | What to do with it |
-| :--- | :--- |
-| `recovery-public.pem` | Leave it where it is. The store reads it. |
+| File                   | What to do with it                                                                                                                                  |
+|:-----------------------|:----------------------------------------------------------------------------------------------------------------------------------------------------|
+| `recovery-public.pem`  | Leave it where it is. The store reads it.                                                                                                           |
 | `recovery-private.pem` | **Move it off this server now**, to somewhere offline - a password manager, an encrypted drive in a safe. Keep it apart from your database backups. |
 
 ::: danger Nobody can recreate the private half
@@ -122,14 +122,14 @@ route back for anyone who loses everything.
 
 Register the workspace with your provider as a **confidential client**:
 
-| Setting | Value |
-| :--- | :--- |
-| Client ID | `system-design-store` (or anything; match `OIDC_CLIENT_ID`) |
-| Client type | Confidential, with a client secret |
-| Client secret | The `OIDC_CLIENT_SECRET` from your `.env` |
-| Redirect URI | `https://design.example.gov/store/v1/auth/callback` |
-| Flow | Authorization Code, with PKCE |
-| Scopes | `openid profile` |
+| Setting       | Value                                                                                                              |
+|:--------------|:-------------------------------------------------------------------------------------------------------------------|
+| Client ID     | `system-design-store` (or anything; match `OIDC_CLIENT_ID`. This example value comes from the keycloak-realm.json) |
+| Client type   | Confidential, with a client secret                                                                                 |
+| Client secret | The `OIDC_CLIENT_SECRET` from your `.env`                                                                          |
+| Redirect URI  | `https://design.example.gov/store/v1/auth/callback`                                                                |
+| Flow          | Authorization Code, with PKCE                                                                                      |
+| Scopes        | `openid profile`                                                                                                   |
 
 Then set `OIDC_ISSUER` in `.env` to your provider's issuer - the URL that
 serves `/.well-known/openid-configuration`. For Keycloak that is
@@ -185,11 +185,11 @@ You should see:
  "escrow":"configured","relayAuthentication":"required"}
 ```
 
-| If you see | It means |
-| :--- | :--- |
-| `"escrow":"missing"` | `keys/recovery-public.pem` isn't there. Redo step 4. |
-| `"relayAuthentication":"none"` | `RELAY_TOKEN_SECRET` is empty in `.env`. |
-| No response | `docker compose logs store` - the store says what is wrong and stops, rather than starting misconfigured. |
+| If you see                     | It means                                                                                                  |
+|:-------------------------------|:----------------------------------------------------------------------------------------------------------|
+| `"escrow":"missing"`           | `keys/recovery-public.pem` isn't there. Redo step 4.                                                      |
+| `"relayAuthentication":"none"` | `RELAY_TOKEN_SECRET` is empty in `.env`.                                                                  |
+| No response                    | `docker compose logs store` - the store says what is wrong and stops, rather than starting misconfigured. |
 
 **Option B only - add people.** Open `https://design.example.gov/auth/admin`,
 sign in as `admin` with `KEYCLOAK_ADMIN_PASSWORD`, switch to the
@@ -224,10 +224,10 @@ press lets them in. [Workspaces](/guide/workspaces) is the guide to give them.
 
 ## Keeping it running
 
-| Task | Command |
-| :--- | :--- |
-| See what is running | `docker compose ps` |
-| Read the logs | `docker compose logs -f store` |
+| Task                         | Command                                       |
+|:-----------------------------|:----------------------------------------------|
+| See what is running          | `docker compose ps`                           |
+| Read the logs                | `docker compose logs -f store`                |
 | Update to the newest release | `docker compose pull && docker compose up -d` |
 
 With Keycloak, add `-f compose.yml -f compose.keycloak.yml` to each.
