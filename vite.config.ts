@@ -94,12 +94,7 @@ export default defineConfig({
       },
 
       workbox: {
-        navigateFallbackDenylist: [
-          /\/docs(\/|$)/,
-          /\/store(\/|$)/,
-          /\/relay(\/|$)/,
-          /\/auth(\/|$)/,
-        ],
+        navigateFallbackDenylist: [/\/docs(\/|$)/],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         globPatterns: ['**/*.{js,css,html,png,jpg,jpeg,gif,svg,ico}'],
       },
