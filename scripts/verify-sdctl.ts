@@ -24,7 +24,7 @@ import {
   MIN_RETAINED_REVISIONS,
 } from '../sdctl/src/state.js';
 import { buildDeploymentSpec, loadAnswersFile } from '../sdctl/src/wizard.js';
-import { validateCertificates } from '../sdctl/src/cert.js';
+import { validateCertificates, generateSelfSignedCertificate } from '../sdctl/src/cert.js';
 import { runPreflightChecks } from '../sdctl/src/preflight.js';
 import { runDeploymentVerification } from '../sdctl/src/verify.js';
 import { calculatePlan, formatPlanText } from '../sdctl/src/plan.js';
@@ -32,6 +32,7 @@ import { applyDeployment } from '../sdctl/src/apply.js';
 import { upgradeDeployment, rollbackDeployment } from '../sdctl/src/lifecycle.js';
 import { runCli } from '../sdctl/src/cli.js';
 import { generateTestCertificate } from './certHelper.js';
+import { ui, colors } from '../sdctl/src/ui.js';
 import type { DeploymentSpec, ReleaseManifest } from '../sdctl/src/types.js';
 
 let failures = 0;
@@ -1132,6 +1133,156 @@ console.log('\n18. Cloudflare DNS-01 ACME & Wildcard Support');
     'CLI `sdctl init` populates CLOUDFLARE_API_TOKEN in secrets.env',
   );
   rmSync(cfInitDir, { recursive: true, force: true });
+
+  // ==========================================
+  // Section 11: Self-Signed Certificate Generation & Verification
+  // ==========================================
+  console.log('\n--- Testing Self-Signed Certificate Generation & Verification ---');
+  const selfSignedDir = mkdtempSync(join(tmpdir(), 'sdctl-self-signed-'));
+  const selfSignedCertPath = join(selfSignedDir, 'certs', 'cert.pem');
+  const selfSignedKeyPath = join(selfSignedDir, 'certs', 'key.pem');
+
+  const generated = generateSelfSignedCertificate({
+    commonName: 'editor.home.jbraunsma.dev',
+    sans: ['127.0.0.1', 'localhost', 'relay.home.jbraunsma.dev'],
+    validityDays: 365,
+    certPath: selfSignedCertPath,
+    keyPath: selfSignedKeyPath,
+  });
+
+  check(
+    existsSync(selfSignedCertPath) && existsSync(selfSignedKeyPath),
+    'generateSelfSignedCertificate writes cert.pem and key.pem',
+  );
+  check(
+    generated.certPem.startsWith('-----BEGIN CERTIFICATE-----'),
+    'generateSelfSignedCertificate generates PEM certificate',
+  );
+  check(
+    generated.keyPem.startsWith('-----BEGIN PRIVATE KEY-----'),
+    'generateSelfSignedCertificate generates PEM private key',
+  );
+
+  const selfSignedValidation = validateCertificates({
+    certPath: selfSignedCertPath,
+    keyPath: selfSignedKeyPath,
+    expectedHostnames: ['editor.home.jbraunsma.dev', 'relay.home.jbraunsma.dev'],
+  });
+  check(selfSignedValidation.valid, 'Self-signed certificate is recognized as valid X.509');
+  check(
+    Boolean(
+      selfSignedValidation.details.subject &&
+      selfSignedValidation.details.subject.includes('editor.home.jbraunsma.dev'),
+    ),
+    'Self-signed certificate subject contains expected Common Name',
+  );
+  check(
+    Boolean(
+      selfSignedValidation.details.sans &&
+      selfSignedValidation.details.sans.includes('relay.home.jbraunsma.dev'),
+    ),
+    'Self-signed certificate SANs contain expected alternate hostnames',
+  );
+
+  // Self-signed Deployment Spec Validation & Generation
+  const selfSignedSpec: DeploymentSpec = {
+    version: '1',
+    mode: 'public',
+    topology: 'routed',
+    tls: {
+      mode: 'self-signed',
+      domain: 'editor.home.jbraunsma.dev',
+      editorHost: 'editor.home.jbraunsma.dev',
+      relayHost: 'editor.home.jbraunsma.dev',
+      certificatePath: 'certs/cert.pem',
+      privateKeyPath: 'certs/key.pem',
+    },
+    paths: {
+      editor: '/editor',
+      relay: '/relay',
+    },
+    relay: { allowedCidrs: [] },
+  };
+
+  const selfSignedSpecValidation = validateDeploymentSpec(selfSignedSpec);
+  check(selfSignedSpecValidation.valid, 'Schema accepts valid self-signed TLS mode specification');
+
+  const selfSignedCaddy = generateCaddyfile(selfSignedSpec);
+  check(
+    selfSignedCaddy.includes('tls /etc/caddy/certs/cert.pem /etc/caddy/certs/key.pem'),
+    'Caddyfile mounts and references self-signed certificate path',
+  );
+
+  const selfSignedCompose = generateComposeYaml(selfSignedSpec);
+  check(
+    selfSignedCompose.includes('./certs:/etc/caddy/certs:ro'),
+    'Compose mounts certs volume into proxy for self-signed mode',
+  );
+
+  // Preflight check with self-signed spec when certs do not yet exist
+  const emptySelfSignedDir = mkdtempSync(join(tmpdir(), 'sdctl-empty-self-signed-'));
+  const preflightEmptySelfSigned = runPreflightChecks({
+    workingDir: emptySelfSignedDir,
+    spec: selfSignedSpec,
+    force: ['PRE-HOST-SOCK', 'PRE-HOST-MOUNT', 'PRE-CFG-SPEC', 'PRE-REG-DIGESTS'],
+  });
+  const certPreflightCheck = preflightEmptySelfSigned.checks.find((c) => c.id === 'PRE-TLS-CERTS');
+  check(
+    certPreflightCheck?.status === 'pass',
+    'Preflight passes for self-signed mode and notes auto-generation upon apply',
+  );
+  rmSync(emptySelfSignedDir, { recursive: true, force: true });
+
+  // Apply on temp directory with self-signed mode (should automatically generate certs on disk)
+  const applySelfSignedDir = mkdtempSync(join(tmpdir(), 'sdctl-apply-self-signed-'));
+  const applyResult = await applyDeployment({
+    workingDir: applySelfSignedDir,
+    spec: selfSignedSpec,
+    force: ['PRE-HOST-SOCK', 'PRE-HOST-MOUNT', 'PRE-CFG-SPEC', 'PRE-REG-DIGESTS', 'PRE-TLS-CERTS'],
+    skipVerify: true,
+  });
+  check(applyResult.success, 'applyDeployment succeeds for self-signed spec');
+  check(
+    existsSync(join(applySelfSignedDir, 'certs', 'cert.pem')) &&
+      existsSync(join(applySelfSignedDir, 'certs', 'key.pem')),
+    'applyDeployment automatically generates cert.pem and key.pem on disk for self-signed mode',
+  );
+  check(
+    existsSync(join(applySelfSignedDir, 'Caddyfile')),
+    'applyDeployment generates Caddyfile for self-signed mode',
+  );
+  rmSync(applySelfSignedDir, { recursive: true, force: true });
+
+  const selfSignedEndpoints = deriveEndpoints(selfSignedSpec);
+  check(
+    selfSignedEndpoints.appUrl === 'https://editor.home.jbraunsma.dev/editor',
+    'deriveEndpoints builds https:// appUrl for self-signed TLS mode',
+  );
+  check(
+    selfSignedEndpoints.relayUrl === 'wss://editor.home.jbraunsma.dev/relay',
+    'deriveEndpoints builds wss:// relayUrl for self-signed TLS mode',
+  );
+
+  // Test UI and ANSI styling functions
+  check(typeof ui.banner('Test Title') === 'string', 'UI banner renders banner string');
+  check(
+    typeof ui.sectionHeader('1/5', 'Section Title', 'Description') === 'string',
+    'UI sectionHeader renders header string',
+  );
+  check(
+    typeof ui.menuOption('1', 'Option 1', 'Detail', true) === 'string',
+    'UI menuOption renders menu option string',
+  );
+  check(
+    typeof ui.badge('pass') === 'string' && typeof ui.statusSymbol('pass') === 'string',
+    'UI badge and statusSymbol render formatted status badges',
+  );
+  check(
+    typeof colors.cyan('text') === 'string' && typeof colors.bold('text') === 'string',
+    'Colors utility formats colored text',
+  );
+
+  rmSync(selfSignedDir, { recursive: true, force: true });
 
   rmSync(testDir, { recursive: true, force: true });
 }

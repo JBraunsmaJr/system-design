@@ -1,6 +1,6 @@
 export type DeploymentMode = 'public' | 'isolated';
 export type Topology = 'lan' | 'routed' | 'nat' | 'multisite';
-export type TlsMode = 'acme' | 'acme-dns' | 'provided' | 'external' | 'none';
+export type TlsMode = 'acme' | 'acme-dns' | 'self-signed' | 'provided' | 'external' | 'none';
 
 export interface DnsProviderConfig {
   name: 'cloudflare' | string;
@@ -178,6 +178,7 @@ export interface VerifyOptions {
   clientTimeoutSec?: number;
   editorUrl?: string;
   relayUrl?: string;
+  insecure?: boolean;
 }
 
 export interface ClientDiagReport {
@@ -229,6 +230,7 @@ export interface ApplyOptions {
   editorUrl?: string;
   relayUrl?: string;
   executeDocker?: boolean;
+  insecure?: boolean;
 }
 
 export interface ApplyResult {
@@ -250,6 +252,7 @@ export interface UpgradeOptions {
   editorUrl?: string;
   relayUrl?: string;
   executeDocker?: boolean;
+  insecure?: boolean;
 }
 
 export interface UpgradeResult {

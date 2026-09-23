@@ -2,7 +2,7 @@ import type { ValidationResult, ValidationError } from './types.js';
 
 const VALID_MODES = ['public', 'isolated'];
 const VALID_TOPOLOGIES = ['lan', 'routed', 'nat', 'multisite'];
-const VALID_TLS_MODES = ['acme', 'acme-dns', 'provided', 'external', 'none'];
+const VALID_TLS_MODES = ['acme', 'acme-dns', 'self-signed', 'provided', 'external', 'none'];
 
 const CIDR_REGEX =
   /^(([0-9]{1,3}\.){3}[0-9]{1,3}\/([0-9]|[1-2][0-9]|3[0-2])|([a-fA-F0-9:]+)\/([0-9]|[1-9][0-9]|1[0-2][0-8]))$/;
@@ -79,7 +79,7 @@ export function validateDeploymentSpec(spec: unknown): ValidationResult {
       path: 'tls',
       message: '`tls` configuration object is required',
       suggestedFix:
-        'Add a `tls` section with `mode: "acme"`, "acme-dns", "provided", "external", or "none".',
+        'Add a `tls` section with `mode: "acme"`, "acme-dns", "self-signed", "provided", "external", or "none".',
     });
   } else {
     const tls = s.tls as Record<string, unknown>;
@@ -87,7 +87,8 @@ export function validateDeploymentSpec(spec: unknown): ValidationResult {
       errors.push({
         path: 'tls.mode',
         message: `Invalid TLS mode: "${tls.mode}". Must be one of: ${VALID_TLS_MODES.join(', ')}`,
-        suggestedFix: 'Set `tls.mode` to "acme", "acme-dns", "provided", "external", or "none".',
+        suggestedFix:
+          'Set `tls.mode` to "acme", "acme-dns", "self-signed", "provided", "external", or "none".',
       });
     }
 
@@ -98,7 +99,7 @@ export function validateDeploymentSpec(spec: unknown): ValidationResult {
         message:
           'ACME automatic certificates cannot be used in isolated mode without public internet access',
         suggestedFix:
-          'Change `tls.mode` to "provided" (operator-supplied certs), "external", or "none".',
+          'Change `tls.mode` to "self-signed", "provided" (operator-supplied certs), "external", or "none".',
       });
     }
 

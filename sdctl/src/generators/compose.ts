@@ -8,8 +8,7 @@ export function deriveEndpoints(spec: DeploymentSpec): {
   relayUrl: string;
   iceServers: string;
 } {
-  const isTls =
-    spec.tls.mode === 'acme' || spec.tls.mode === 'acme-dns' || spec.tls.mode === 'provided';
+  const isTls = spec.tls.mode !== 'none';
   const httpScheme = isTls ? 'https' : 'http';
   const wsScheme = isTls ? 'wss' : 'ws';
 
@@ -76,7 +75,10 @@ export function generateComposeYaml(
   const images = getResolvedImages(manifest, spec.registry?.prefix);
   const { appUrl, relayUrl, iceServers } = deriveEndpoints(spec);
   const hasProxy =
-    spec.tls.mode === 'acme' || spec.tls.mode === 'acme-dns' || spec.tls.mode === 'provided';
+    spec.tls.mode === 'acme' ||
+    spec.tls.mode === 'acme-dns' ||
+    spec.tls.mode === 'provided' ||
+    spec.tls.mode === 'self-signed';
   const proxyImage = spec.proxy?.image || images.proxy;
 
   const header = generateHeader('#');
@@ -154,7 +156,7 @@ export function generateComposeYaml(
     lines.push('      - ./Caddyfile:/etc/caddy/Caddyfile:ro');
     lines.push('      - caddy_data:/data');
     lines.push('      - caddy_config:/config');
-    if (spec.tls.mode === 'provided') {
+    if (spec.tls.mode === 'provided' || spec.tls.mode === 'self-signed') {
       const certDir = spec.tls.certificatePath ? './certs' : './certs';
       lines.push(`      - ${certDir}:/etc/caddy/certs:ro`);
     }

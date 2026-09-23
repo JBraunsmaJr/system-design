@@ -2,7 +2,7 @@ import type { DeploymentSpec } from '../types.js';
 import { generateHeader } from './header.js';
 
 export function buildTlsDirectives(spec: DeploymentSpec): string[] {
-  if (spec.tls.mode === 'provided') {
+  if (spec.tls.mode === 'provided' || spec.tls.mode === 'self-signed') {
     return ['    tls /etc/caddy/certs/cert.pem /etc/caddy/certs/key.pem'];
   }
 

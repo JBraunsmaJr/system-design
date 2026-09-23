@@ -60,7 +60,8 @@ export async function rollbackDeployment(options: RollbackOptions = {}): Promise
   if (
     restoredSpec.tls.mode === 'acme' ||
     restoredSpec.tls.mode === 'acme-dns' ||
-    restoredSpec.tls.mode === 'provided'
+    restoredSpec.tls.mode === 'provided' ||
+    restoredSpec.tls.mode === 'self-signed'
   ) {
     const caddyContent = generateCaddyfile(restoredSpec);
     writeFileSync(join(workingDir, 'Caddyfile'), caddyContent, 'utf8');

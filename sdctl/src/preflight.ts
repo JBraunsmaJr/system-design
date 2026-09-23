@@ -224,7 +224,7 @@ export function runPreflightChecks(options: PreflightOptions = {}): PreflightRep
   }
 
   // 5. TLS Certificate Validation (PRE-TLS-CERTS)
-  if (spec && spec.tls && spec.tls.mode === 'provided') {
+  if (spec && spec.tls && (spec.tls.mode === 'provided' || spec.tls.mode === 'self-signed')) {
     const certId = 'PRE-TLS-CERTS';
     const certPath = spec.tls.certificatePath || join(workingDir, 'certs', 'cert.pem');
     const keyPath = spec.tls.privateKeyPath || join(workingDir, 'certs', 'key.pem');
@@ -235,55 +235,67 @@ export function runPreflightChecks(options: PreflightOptions = {}): PreflightRep
     if (spec.tls.editorHost) expectedHosts.push(spec.tls.editorHost);
     if (spec.tls.relayHost) expectedHosts.push(spec.tls.relayHost);
 
-    const certResult = validateCertificates({
-      certPath,
-      keyPath,
-      caPath,
-      expectedHostnames: expectedHosts,
-    });
+    const certsExist = existsSync(certPath) && existsSync(keyPath);
 
-    if (certResult.valid) {
-      if (certResult.warnings.length > 0) {
+    if (!certsExist && spec.tls.mode === 'self-signed') {
+      checks.push({
+        id: certId,
+        name: 'TLS Certificate and Key Validation',
+        status: 'pass',
+        expected: 'Valid certificate and matching private key',
+        observed: `Self-signed certificate will be automatically generated upon 'sdctl apply' for host '${expectedHosts[0] || 'localhost'}'`,
+      });
+    } else {
+      const certResult = validateCertificates({
+        certPath,
+        keyPath,
+        caPath,
+        expectedHostnames: expectedHosts,
+      });
+
+      if (certResult.valid) {
+        if (certResult.warnings.length > 0) {
+          checks.push({
+            id: certId,
+            name: 'TLS Certificate and Key Validation',
+            status: 'warn',
+            expected: 'Valid, unexpired certificate matching hostnames and key',
+            observed: `Certificate is valid. Warnings: ${certResult.warnings.join('; ')}`,
+            cause: 'Certificate close to expiration',
+            remediation: 'Consider renewing the certificate before expiration',
+          });
+        } else {
+          checks.push({
+            id: certId,
+            name: 'TLS Certificate and Key Validation',
+            status: 'pass',
+            expected: 'Valid, unexpired certificate matching hostnames and key',
+            observed: `Certificate valid for ${certResult.details.daysRemaining ?? 'unknown'} days, SANs: [${(certResult.details.sans || []).join(', ')}]`,
+          });
+        }
+      } else if (forceList.has(certId)) {
+        forcedCheckIds.push(certId);
         checks.push({
           id: certId,
           name: 'TLS Certificate and Key Validation',
-          status: 'warn',
-          expected: 'Valid, unexpired certificate matching hostnames and key',
-          observed: `Certificate is valid. Warnings: ${certResult.warnings.join('; ')}`,
-          cause: 'Certificate close to expiration',
-          remediation: 'Consider renewing the certificate before expiration',
+          status: 'skip',
+          expected: 'Valid certificate and matching private key',
+          observed: `Bypassed by --force (${certResult.errors.join('; ')})`,
+          cause: certResult.errors.join('; '),
+          remediation: 'Provide valid PEM encoded certificate and private key files',
         });
       } else {
         checks.push({
           id: certId,
           name: 'TLS Certificate and Key Validation',
-          status: 'pass',
-          expected: 'Valid, unexpired certificate matching hostnames and key',
-          observed: `Certificate valid for ${certResult.details.daysRemaining ?? 'unknown'} days, SANs: [${(certResult.details.sans || []).join(', ')}]`,
+          status: 'fail',
+          expected: 'Valid certificate and matching private key',
+          observed: certResult.errors.join('; '),
+          cause: 'Certificate parsing failed, key mismatch, hostname mismatch, or cert expired',
+          remediation:
+            'Check certificate path, ensure private key matches public key, or provide a valid CA bundle',
         });
       }
-    } else if (forceList.has(certId)) {
-      forcedCheckIds.push(certId);
-      checks.push({
-        id: certId,
-        name: 'TLS Certificate and Key Validation',
-        status: 'skip',
-        expected: 'Valid certificate and matching private key',
-        observed: `Bypassed by --force (${certResult.errors.join('; ')})`,
-        cause: certResult.errors.join('; '),
-        remediation: 'Provide valid PEM encoded certificate and private key files',
-      });
-    } else {
-      checks.push({
-        id: certId,
-        name: 'TLS Certificate and Key Validation',
-        status: 'fail',
-        expected: 'Valid certificate and matching private key',
-        observed: certResult.errors.join('; '),
-        cause: 'Certificate parsing failed, key mismatch, hostname mismatch, or cert expired',
-        remediation:
-          'Verify certificate/key files exist, match each other, and cover configured hostnames',
-      });
     }
   }
 

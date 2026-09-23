@@ -4,6 +4,7 @@ import type { DeploymentSpec, PlanDifference, ReleaseManifest, StateRevision } f
 import { DEFAULT_MANIFEST, getResolvedImages } from './manifest.js';
 import { loadState } from './state.js';
 import { parseSimpleYaml } from './yaml.js';
+import { colors } from './ui.js';
 
 export function calculatePlan(options: {
   desiredSpec?: DeploymentSpec;
@@ -47,7 +48,8 @@ export function calculatePlan(options: {
   if (
     desiredSpec.tls.mode === 'acme' ||
     desiredSpec.tls.mode === 'acme-dns' ||
-    desiredSpec.tls.mode === 'provided'
+    desiredSpec.tls.mode === 'provided' ||
+    desiredSpec.tls.mode === 'self-signed'
   ) {
     desiredComponents.add('proxy');
   }
@@ -236,43 +238,57 @@ function getPortsSummary(spec: DeploymentSpec): string {
 
 export function formatPlanText(plan: PlanDifference): string {
   if (!plan.hasChanges) {
-    return 'No changes detected. The running deployment matches the desired specification and release manifest.';
+    return colors.dim(
+      'No changes detected. The running deployment matches the desired specification and release manifest.',
+    );
   }
 
-  const lines: string[] = ['Deployment Plan:'];
+  const lines: string[] = [colors.bold(colors.brightCyan('Deployment Plan:'))];
 
   if (plan.componentsAdded.length > 0) {
-    lines.push(`  + Components Added: ${plan.componentsAdded.join(', ')}`);
+    lines.push(
+      `  ${colors.brightGreen('+')} ${colors.bold('Components Added:')} ${colors.green(plan.componentsAdded.join(', '))}`,
+    );
   }
   if (plan.componentsRemoved.length > 0) {
-    lines.push(`  - Components Removed: ${plan.componentsRemoved.join(', ')}`);
+    lines.push(
+      `  ${colors.brightRed('-')} ${colors.bold('Components Removed:')} ${colors.red(plan.componentsRemoved.join(', '))}`,
+    );
   }
 
   if (plan.imageChanges.length > 0) {
-    lines.push('  ~ Image Changes:');
+    lines.push(`  ${colors.brightYellow('~')} ${colors.bold('Image Changes:')}`);
     for (const img of plan.imageChanges) {
-      lines.push(`      * ${img.component}: ${img.current} -> ${img.desired}`);
+      lines.push(
+        `      * ${colors.cyan(img.component)}: ${colors.dim(img.current)} -> ${colors.brightGreen(img.desired)}`,
+      );
     }
   }
 
   if (plan.envChanges.length > 0) {
-    lines.push('  ~ Environment Variables:');
+    lines.push(`  ${colors.brightYellow('~')} ${colors.bold('Environment Variables:')}`);
     for (const env of plan.envChanges) {
-      lines.push(`      * ${env.key}: ${env.current} -> ${env.desired}`);
+      lines.push(
+        `      * ${colors.cyan(env.key)}: ${colors.dim(env.current)} -> ${colors.brightGreen(env.desired)}`,
+      );
     }
   }
 
   if (plan.portChanges.length > 0) {
-    lines.push('  ~ Port Mappings:');
+    lines.push(`  ${colors.brightYellow('~')} ${colors.bold('Port Mappings:')}`);
     for (const p of plan.portChanges) {
-      lines.push(`      * ${p.port}: ${p.current} -> ${p.desired}`);
+      lines.push(
+        `      * ${colors.cyan(p.port)}: ${colors.dim(p.current)} -> ${colors.brightGreen(p.desired)}`,
+      );
     }
   }
 
   if (plan.proxyChanges.length > 0) {
-    lines.push('  ~ Proxy Configuration:');
+    lines.push(`  ${colors.brightYellow('~')} ${colors.bold('Proxy Configuration:')}`);
     for (const px of plan.proxyChanges) {
-      lines.push(`      * ${px.property}: ${px.current} -> ${px.desired}`);
+      lines.push(
+        `      * ${colors.cyan(px.property)}: ${colors.dim(px.current)} -> ${colors.brightGreen(px.desired)}`,
+      );
     }
   }
 

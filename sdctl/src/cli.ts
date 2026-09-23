@@ -15,6 +15,7 @@ import { calculatePlan, formatPlanText } from './plan.js';
 import { applyDeployment } from './apply.js';
 import { upgradeDeployment, rollbackDeployment } from './lifecycle.js';
 import { loadState } from './state.js';
+import { ui, colors } from './ui.js';
 import type { DeploymentSpec, CheckResult } from './types.js';
 
 export interface CliOptions {
@@ -36,6 +37,7 @@ export interface CliOptions {
     relayUrl?: string;
     autoRollback?: boolean;
     skipVerify?: boolean;
+    insecure?: boolean;
     to?: number;
   };
 }
@@ -58,6 +60,8 @@ export function parseArgs(argv: string[]): CliOptions {
       flags.autoRollback = true;
     } else if (arg === '--skip-verify') {
       flags.skipVerify = true;
+    } else if (arg === '--insecure') {
+      flags.insecure = true;
     } else if (arg === '--to' && i + 1 < argv.length) {
       flags.to = parseInt(argv[++i], 10);
     } else if (arg.startsWith('--to=')) {
@@ -118,15 +122,16 @@ export function parseArgs(argv: string[]): CliOptions {
 
 function printCheckTable(checks: CheckResult[]) {
   for (const c of checks) {
-    const symbol =
-      c.status === 'pass' ? '✓' : c.status === 'fail' ? '✗' : c.status === 'warn' ? '!' : '-';
-    const tag = `[${c.status.toUpperCase()}]`.padEnd(8);
-    const layerStr = c.layer ? `L${c.layer} ` : '';
-    console.log(` ${symbol} ${tag} ${layerStr}${c.id}: ${c.name}`);
-    console.log(`     Observed: ${c.observed}`);
+    const symbol = ui.statusSymbol(c.status);
+    const badge = ui.badge(c.status);
+    const layerStr = c.layer ? colors.dim(`L${c.layer} `) : '';
+    console.log(
+      ` ${symbol} ${badge} ${layerStr}${colors.bold(c.id)}: ${colors.brightWhite(c.name)}`,
+    );
+    console.log(`     ${colors.dim('Observed:')} ${c.observed}`);
     if (c.status === 'fail' || c.status === 'warn') {
-      if (c.cause) console.log(`     Cause:    ${c.cause}`);
-      if (c.remediation) console.log(`     Fix:      ${c.remediation}`);
+      if (c.cause) console.log(`     ${colors.brightYellow('Cause:')}    ${c.cause}`);
+      if (c.remediation) console.log(`     ${colors.brightCyan('Fix:')}      ${c.remediation}`);
     }
   }
 }
@@ -372,7 +377,12 @@ Flags:
     writeFileSync(composePath, composeContent, 'utf8');
 
     // Caddyfile if proxy needed
-    if (spec.tls.mode === 'acme' || spec.tls.mode === 'acme-dns' || spec.tls.mode === 'provided') {
+    if (
+      spec.tls.mode === 'acme' ||
+      spec.tls.mode === 'acme-dns' ||
+      spec.tls.mode === 'provided' ||
+      spec.tls.mode === 'self-signed'
+    ) {
       const caddyContent = generateCaddyfile(spec);
       const caddyPath = join(workingDir, 'Caddyfile');
       if (existsSync(caddyPath)) {
@@ -405,7 +415,8 @@ Flags:
       if (
         spec.tls.mode === 'acme' ||
         spec.tls.mode === 'acme-dns' ||
-        spec.tls.mode === 'provided'
+        spec.tls.mode === 'provided' ||
+        spec.tls.mode === 'self-signed'
       ) {
         console.log('  - Caddyfile');
       }
@@ -444,6 +455,7 @@ Flags:
         skipVerify: flags.skipVerify,
         editorUrl: flags.editorUrl,
         relayUrl: flags.relayUrl,
+        insecure: flags.insecure,
       });
 
       if (flags.output === 'json') {
@@ -624,6 +636,7 @@ Flags:
       clientTimeoutSec: flags.timeoutSec,
       editorUrl: flags.editorUrl,
       relayUrl: flags.relayUrl,
+      insecure: flags.insecure,
     });
 
     if (flags.output === 'json') {

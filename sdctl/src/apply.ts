@@ -15,6 +15,7 @@ import { runDeploymentVerification } from './verify.js';
 import { calculatePlan } from './plan.js';
 import { recordAppliedRevision, getPreviousRevision } from './state.js';
 import { checkDockerSocket } from './host.js';
+import { generateSelfSignedCertificate } from './cert.js';
 import { rollbackDeployment } from './lifecycle.js';
 
 export async function applyDeployment(options: ApplyOptions = {}): Promise<ApplyResult> {
@@ -76,6 +77,31 @@ export async function applyDeployment(options: ApplyOptions = {}): Promise<Apply
   }
   loadOrCreateSecrets(secretsPath, Boolean(spec.turn?.enabled), extraSecrets);
 
+  // Self-signed certificate generation
+  if (spec.tls.mode === 'self-signed') {
+    const certPath = spec.tls.certificatePath
+      ? join(workingDir, spec.tls.certificatePath)
+      : join(workingDir, 'certs', 'cert.pem');
+    const keyPath = spec.tls.privateKeyPath
+      ? join(workingDir, spec.tls.privateKeyPath)
+      : join(workingDir, 'certs', 'key.pem');
+
+    if (!existsSync(certPath) || !existsSync(keyPath)) {
+      const primaryCn = spec.tls.editorHost || spec.tls.domain || 'localhost';
+      const sans: string[] = ['localhost', '127.0.0.1'];
+      if (spec.tls.domain) sans.push(spec.tls.domain);
+      if (spec.tls.editorHost) sans.push(spec.tls.editorHost);
+      if (spec.tls.relayHost) sans.push(spec.tls.relayHost);
+
+      generateSelfSignedCertificate({
+        commonName: primaryCn,
+        sans,
+        certPath,
+        keyPath,
+      });
+    }
+  }
+
   const composeContent = generateComposeYaml(spec, manifest);
   const composePath = join(workingDir, 'compose.yaml');
   if (existsSync(composePath)) {
@@ -86,7 +112,12 @@ export async function applyDeployment(options: ApplyOptions = {}): Promise<Apply
   }
   writeFileSync(composePath, composeContent, 'utf8');
 
-  if (spec.tls.mode === 'acme' || spec.tls.mode === 'acme-dns' || spec.tls.mode === 'provided') {
+  if (
+    spec.tls.mode === 'acme' ||
+    spec.tls.mode === 'acme-dns' ||
+    spec.tls.mode === 'provided' ||
+    spec.tls.mode === 'self-signed'
+  ) {
     const caddyContent = generateCaddyfile(spec);
     const caddyPath = join(workingDir, 'Caddyfile');
     if (existsSync(caddyPath)) {

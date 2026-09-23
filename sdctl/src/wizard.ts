@@ -2,6 +2,7 @@ import * as readline from 'readline';
 import { existsSync, readFileSync } from 'fs';
 import type { DeploymentSpec, WizardAnswers, DeploymentMode, Topology, TlsMode } from './types.js';
 import { parseSimpleYaml } from './yaml.js';
+import { ui } from './ui.js';
 
 export function buildDeploymentSpec(answers: WizardAnswers): DeploymentSpec {
   const mode: DeploymentMode = answers.mode || 'public';
@@ -65,6 +66,13 @@ export function buildDeploymentSpec(answers: WizardAnswers): DeploymentSpec {
     }
   }
 
+  let certificatePath = answers.certificatePath;
+  let privateKeyPath = answers.privateKeyPath;
+  if (tlsMode === 'self-signed') {
+    certificatePath = certificatePath || './certs/cert.pem';
+    privateKeyPath = privateKeyPath || './certs/key.pem';
+  }
+
   const spec: DeploymentSpec = {
     version: '1',
     mode,
@@ -72,11 +80,11 @@ export function buildDeploymentSpec(answers: WizardAnswers): DeploymentSpec {
     proxy: answers.proxyImage ? { image: answers.proxyImage } : undefined,
     tls: {
       mode: tlsMode,
-      domain: answers.domain || (editorHost.startsWith('*.') ? editorHost : undefined),
-      editorHost: tlsMode !== 'none' ? editorHost : undefined,
-      relayHost: tlsMode !== 'none' ? relayHost : undefined,
-      certificatePath: answers.certificatePath,
-      privateKeyPath: answers.privateKeyPath,
+      domain: answers.domain,
+      editorHost: editorHost || undefined,
+      relayHost: relayHost || undefined,
+      certificatePath,
+      privateKeyPath,
       caPath: answers.caPath,
       dnsProvider,
     },
@@ -89,44 +97,44 @@ export function buildDeploymentSpec(answers: WizardAnswers): DeploymentSpec {
       ? {
           enabled: true,
           externalIp: answers.turnExternalIp,
-          realm: editorHost,
+          realm: answers.turnRealm || editorHost || 'system-design.local',
         }
       : undefined,
-    iceServers: answers.customIceServers,
   };
 
   return spec;
 }
 
-export function loadAnswersFile(filePath: string): WizardAnswers {
-  if (!existsSync(filePath)) {
-    throw new Error(`Answers file not found at: ${filePath}`);
+export function loadAnswersFile(path: string): WizardAnswers {
+  if (!existsSync(path)) {
+    throw new Error(`Answers file not found at ${path}`);
   }
-  const content = readFileSync(filePath, 'utf8');
-  if (filePath.endsWith('.json')) {
+  const content = readFileSync(path, 'utf8');
+  if (path.endsWith('.json')) {
     return JSON.parse(content) as WizardAnswers;
   }
-  return parseSimpleYaml(content) as WizardAnswers;
+  return parseSimpleYaml(content) as unknown as WizardAnswers;
 }
 
-export async function promptQuestion(
+function promptQuestion(
   rl: readline.Interface,
-  query: string,
-  defaultValue?: string,
+  question: string,
+  defaultVal?: string,
 ): Promise<string> {
-  const prompt = defaultValue ? `${query} [${defaultValue}]: ` : `${query}: `;
+  const promptText = ui.prompt(question, defaultVal);
   return new Promise((resolve) => {
-    rl.question(prompt, (answer) => {
-      resolve(answer.trim() || defaultValue || '');
+    rl.question(promptText, (ans) => {
+      resolve(ans.trim() || defaultVal || '');
     });
   });
 }
 
-export async function runInteractiveWizard(answers: WizardAnswers = {}): Promise<DeploymentSpec> {
-  if (!process.stdin.isTTY) {
-    throw new Error(
-      'Interactive input requested but no TTY is attached. Use `--yes` or `--answers <file>` in non-interactive environments.',
-    );
+export async function runInteractiveWizard(
+  answers: WizardAnswers = {},
+  defaultsOnly = false,
+): Promise<DeploymentSpec> {
+  if (defaultsOnly) {
+    return buildDeploymentSpec(answers);
   }
 
   const rl = readline.createInterface({
@@ -134,17 +142,37 @@ export async function runInteractiveWizard(answers: WizardAnswers = {}): Promise
     output: process.stdout,
   });
 
-  console.log('\n=== System Design Editor Setup Wizard (`sdctl init`) ===\n');
+  console.log(
+    '\n' +
+      ui.banner('System Design Stack Control (sdctl)', 'Interactive Setup & Deployment Wizard') +
+      '\n',
+  );
 
   try {
     // 1. Mode
-    console.log('1. Deployment Environment Mode:');
     console.log(
-      '  [1] Public (Internet-connected registry, ACME certificates, public STUN permitted)',
+      ui.sectionHeader(
+        '1/6',
+        'Deployment Environment Mode',
+        'Choose how this instance connects to networks and registries.',
+      ),
     );
     console.log(
-      '  [2] Isolated (Air-gapped / private network, internal registry, no outbound connections)',
+      ui.menuOption(
+        '1',
+        'Public Mode',
+        'Internet-connected registry, public ACME certificates, public STUN',
+        true,
+      ),
     );
+    console.log(
+      ui.menuOption(
+        '2',
+        'Isolated Mode',
+        'Air-gapped / private network, internal registry, no outbound connections',
+      ),
+    );
+
     const modeChoice = await promptQuestion(
       rl,
       'Select mode (1 or 2)',
@@ -154,15 +182,43 @@ export async function runInteractiveWizard(answers: WizardAnswers = {}): Promise
       modeChoice === '2' || answers.mode === 'isolated' ? 'isolated' : 'public';
 
     // 2. Topology
-    console.log('\n2. Network Topology between collaborating users:');
-    console.log('  [1] LAN: All clients on the same flat local subnet (no ICE / STUN required)');
-    console.log('  [2] Routed: Clients across corporate subnets with direct IP routing');
     console.log(
-      '  [3] NAT: Clients behind NAT routers relative to each other (STUN + TURN required)',
+      ui.sectionHeader(
+        '2/6',
+        'Network Topology',
+        'Select the network layout between collaborating browser clients.',
+      ),
     );
     console.log(
-      '  [4] Multi-site: Clients across different physical branches or VPN tunnels (TURN required)',
+      ui.menuOption(
+        '1',
+        'LAN (Flat Subnet)',
+        'All clients on same subnet (no STUN / TURN required)',
+        true,
+      ),
     );
+    console.log(
+      ui.menuOption(
+        '2',
+        'Routed Subnets',
+        'Clients across corporate subnets with direct IP routing',
+      ),
+    );
+    console.log(
+      ui.menuOption(
+        '3',
+        'NAT Routers',
+        'Clients behind NAT routers relative to each other (STUN + TURN required)',
+      ),
+    );
+    console.log(
+      ui.menuOption(
+        '4',
+        'Multi-site / VPN',
+        'Clients across branches or WAN/VPN connections (TURN required)',
+      ),
+    );
+
     const topoChoice = await promptQuestion(rl, 'Select topology (1-4)', '1');
     let topology: Topology = 'lan';
     if (topoChoice === '2') topology = 'routed';
@@ -170,7 +226,13 @@ export async function runInteractiveWizard(answers: WizardAnswers = {}): Promise
     else if (topoChoice === '4') topology = 'multisite';
 
     // 3. TLS Mode
-    console.log('\n3. TLS / HTTPS Configuration:');
+    console.log(
+      ui.sectionHeader(
+        '3/6',
+        'TLS / HTTPS Configuration',
+        'Configure HTTPS encryption and certificate management for edge proxy.',
+      ),
+    );
     let tlsMode: TlsMode = 'none';
     let domain: string | undefined;
     let editorPath: string | undefined;
@@ -181,40 +243,116 @@ export async function runInteractiveWizard(answers: WizardAnswers = {}): Promise
     let proxyImage: string | undefined;
 
     if (mode === 'public') {
-      console.log("  [1] Automatic HTTPS with Caddy HTTP-01 (ACME / Let's Encrypt)");
-      console.log('  [2] Automatic HTTPS via Cloudflare DNS-01 (ACME / Wildcard domain)');
-      console.log('  [3] Operator-supplied Custom Certificates (PEM cert + key)');
-      console.log('  [4] External Reverse Proxy (Operator manages own TLS termination)');
-      console.log('  [5] None (Plain HTTP/WS - local evaluation only)');
-      const tlsChoice = await promptQuestion(rl, 'Select TLS mode (1-5)', '1');
+      console.log(
+        ui.menuOption(
+          '1',
+          'Automatic HTTPS with Caddy HTTP-01',
+          "Public Let's Encrypt / ZeroSSL ACME",
+          true,
+        ),
+      );
+      console.log(
+        ui.menuOption(
+          '2',
+          'Automatic HTTPS via Cloudflare DNS-01',
+          'ACME DNS challenge for wildcard domains & private IPs',
+        ),
+      );
+      console.log(
+        ui.menuOption(
+          '3',
+          'Self-Signed Certificate (Auto-generated)',
+          'Generates local X.509 cert with hostname as Common Name & SANs',
+        ),
+      );
+      console.log(
+        ui.menuOption(
+          '4',
+          'Operator-supplied Custom Certificates',
+          'Existing PEM cert and private key files',
+        ),
+      );
+      console.log(
+        ui.menuOption(
+          '5',
+          'External Reverse Proxy',
+          'Operator manages TLS termination (NGINX, Traefik, etc.)',
+        ),
+      );
+      console.log(
+        ui.menuOption(
+          '6',
+          'None (Plain HTTP / WS)',
+          'Local evaluation / unencrypted development only',
+        ),
+      );
+
+      const tlsChoice = await promptQuestion(rl, 'Select TLS mode (1-6)', '1');
       tlsMode = 'acme';
       if (tlsChoice === '2') {
         tlsMode = 'acme-dns';
         dnsProviderName = 'cloudflare';
       } else if (tlsChoice === '3') {
-        tlsMode = 'provided';
+        tlsMode = 'self-signed';
       } else if (tlsChoice === '4') {
-        tlsMode = 'external';
+        tlsMode = 'provided';
       } else if (tlsChoice === '5') {
+        tlsMode = 'external';
+      } else if (tlsChoice === '6') {
         tlsMode = 'none';
       }
     } else {
-      console.log('  [1] Operator-supplied Custom Certificates (Internal CA / PEM cert + key)');
-      console.log('  [2] External Reverse Proxy (Operator manages own TLS termination)');
-      console.log('  [3] None (Plain HTTP/WS - local evaluation only)');
-      const tlsChoice = await promptQuestion(rl, 'Select TLS mode (1-3)', '1');
-      tlsMode = 'provided';
-      if (tlsChoice === '2') tlsMode = 'external';
-      else if (tlsChoice === '3') tlsMode = 'none';
+      console.log(
+        ui.menuOption(
+          '1',
+          'Self-Signed Certificate (Auto-generated)',
+          'Generates local X.509 cert with hostname as Common Name & SANs',
+          true,
+        ),
+      );
+      console.log(
+        ui.menuOption(
+          '2',
+          'Operator-supplied Custom Certificates',
+          'Internal CA / existing PEM cert + key files',
+        ),
+      );
+      console.log(
+        ui.menuOption(
+          '3',
+          'External Reverse Proxy',
+          'Operator manages TLS termination (NGINX, Traefik, etc.)',
+        ),
+      );
+      console.log(
+        ui.menuOption(
+          '4',
+          'None (Plain HTTP / WS)',
+          'Local evaluation / unencrypted development only',
+        ),
+      );
+
+      const tlsChoice = await promptQuestion(rl, 'Select TLS mode (1-4)', '1');
+      tlsMode = 'self-signed';
+      if (tlsChoice === '2') tlsMode = 'provided';
+      else if (tlsChoice === '3') tlsMode = 'external';
+      else if (tlsChoice === '4') tlsMode = 'none';
     }
 
     // 4. Hostnames
+    console.log(
+      ui.sectionHeader(
+        '4/6',
+        'Hostnames & URL Routing',
+        'Specify domains, hostnames, and optional subpaths for services.',
+      ),
+    );
     let editorHost = 'localhost';
     let relayHost = 'localhost';
     if (tlsMode === 'acme-dns') {
       domain = await promptQuestion(
         rl,
-        '\nPrimary or Wildcard Domain (e.g. *.home.example.com or editor.home.example.com)',
+        'Primary or Wildcard Domain (e.g. *.home.example.com or editor.home.example.com)',
         '*.example.com',
       );
       const isWildcard = domain.startsWith('*.');
@@ -268,7 +406,7 @@ export async function runInteractiveWizard(answers: WizardAnswers = {}): Promise
 
       const resolversInput = await promptQuestion(
         rl,
-        'Custom DNS Resolvers for Cloudflare ACME (optional, comma-separated e.g. 1.1.1.1, 1.0.0.1)',
+        'Custom Cloudflare DNS Resolvers (optional, comma-separated IPs or NS)',
         '',
       );
       if (resolversInput) {
@@ -284,10 +422,11 @@ export async function runInteractiveWizard(answers: WizardAnswers = {}): Promise
         'slothcroissant/caddy-cloudflaredns:latest',
       );
     } else if (tlsMode !== 'none') {
+      const defaultHost = tlsMode === 'self-signed' ? 'editor.local' : 'design.example.com';
       editorHost = await promptQuestion(
         rl,
-        '\nPublic domain / hostname for Editor (e.g. design.example.com)',
-        'design.example.com',
+        `Hostname / Domain for Editor (${tlsMode === 'self-signed' ? 'Used as Certificate Common Name' : 'e.g. design.example.com'})`,
+        defaultHost,
       );
       const singleHostAns = await promptQuestion(
         rl,
@@ -296,6 +435,18 @@ export async function runInteractiveWizard(answers: WizardAnswers = {}): Promise
       );
       if (singleHostAns.toLowerCase().startsWith('y')) {
         relayHost = editorHost;
+        const editorPathAns = await promptQuestion(
+          rl,
+          'Subpath for Editor (leave blank or "/" for root, or e.g. /editor)',
+          '/',
+        );
+        if (editorPathAns && editorPathAns !== '/') {
+          editorPath = editorPathAns;
+        }
+        const relayPathAns = await promptQuestion(rl, 'Subpath for Signaling Relay', '/relay');
+        if (relayPathAns) {
+          relayPath = relayPathAns;
+        }
       } else {
         relayHost = await promptQuestion(
           rl,
@@ -314,12 +465,27 @@ export async function runInteractiveWizard(answers: WizardAnswers = {}): Promise
         './certs/cert.pem',
       );
       privateKeyPath = await promptQuestion(rl, 'Path to private key PEM file', './certs/key.pem');
+    } else if (tlsMode === 'self-signed') {
+      certificatePath = './certs/cert.pem';
+      privateKeyPath = './certs/key.pem';
+      console.log(
+        ui.info(
+          `Self-signed certificates will be generated automatically at '${certificatePath}' and '${privateKeyPath}'.`,
+        ),
+      );
     }
 
     // 5. Access restriction (public mode)
     let allowedCidrs: string[] = [];
     if (mode === 'public') {
-      console.log('\nNotice: The WebRTC signaling relay is unauthenticated by default.');
+      console.log(
+        ui.sectionHeader(
+          '5/6',
+          'Access Restriction',
+          'Optionally restrict WebSocket signaling relay access to trusted CIDRs.',
+        ),
+      );
+      console.log(ui.info('Notice: The WebRTC signaling relay is unauthenticated by default.'));
       const restrictAns = await promptQuestion(
         rl,
         'Would you like to restrict relay access to specific IP CIDRs? (y/n)',
@@ -339,15 +505,24 @@ export async function runInteractiveWizard(answers: WizardAnswers = {}): Promise
     }
 
     // 6. TURN
+    console.log(
+      ui.sectionHeader(
+        '6/6',
+        'NAT Traversal & TURN',
+        'Configure media relay for clients behind symmetric NATs or firewalls.',
+      ),
+    );
     const enableTurn = topology === 'nat' || topology === 'multisite';
     let turnExternalIp: string | undefined;
     if (enableTurn) {
-      console.log('\nTopology requires TURN server for reliable media relay.');
+      console.log(ui.warning('Topology requires TURN server for reliable media relay.'));
       turnExternalIp = await promptQuestion(
         rl,
         'Public / reachable IP address for TURN server (optional)',
         '',
       );
+    } else {
+      console.log(ui.info('Topology does not require dedicated TURN server.'));
     }
 
     const compiledAnswers: WizardAnswers = {
@@ -372,6 +547,7 @@ export async function runInteractiveWizard(answers: WizardAnswers = {}): Promise
     };
 
     const spec = buildDeploymentSpec(compiledAnswers);
+    console.log('\n' + ui.success('Configuration compiled successfully.') + '\n');
     return spec;
   } finally {
     rl.close();
