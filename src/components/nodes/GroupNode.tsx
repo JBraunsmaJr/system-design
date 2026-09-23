@@ -19,8 +19,8 @@ interface GroupNodeProps extends NodeProps<GroupNodeType> {
 /**
  * A labeled boundary that other nodes can be dropped/dragged into (see
  * Canvas.tsx's onNodeDragStop + App.tsx's onReparentNode/onAdoptIntoGroup).
- * Resizing the boundary automatically adopts any non-group nodes that now
- * fall fully within its new bounds.
+ * Resizing the boundary automatically adopts any nodes - including other
+ * boundaries, which nest - that now fall fully within its new bounds.
  * Editing the label/description/tags goes through the same Inspector as
  * regular nodes - this component owns layout plus the per-kind visual
  * identity (icon/color/border style) looked up from groupRegistry.ts.
@@ -48,12 +48,13 @@ export function GroupNode({
   id,
   data,
   selected,
+  parentId,
   onAdoptIntoGroup: propOnAdoptIntoGroup,
 }: GroupNodeProps) {
   recordNodeRender();
   const canvasContext = useCanvasContext();
   const onAdoptIntoGroup = propOnAdoptIntoGroup ?? canvasContext?.onAdoptIntoGroup;
-  const { getIntersectingNodes } = useReactFlow<Node<ArchNodeData>>();
+  const { getIntersectingNodes, getInternalNode } = useReactFlow<Node<ArchNodeData>>();
 
   const def = getGroupType(data.nodeType);
   const accent = data.color ?? def?.color ?? '#7C8598';
@@ -80,14 +81,28 @@ export function GroupNode({
         lineClassName="node-resize-line"
         handleClassName="node-resize-handle"
         onResizeEnd={(_event, params) => {
+          // params.x/y are relative to this boundary's parent when it is
+          // nested; getIntersectingNodes works in canvas coordinates.
+          const parentAbsolute = parentId
+            ? getInternalNode(parentId)?.internals.positionAbsolute
+            : undefined;
           const rect = {
-            x: params.x,
-            y: params.y,
+            x: params.x + (parentAbsolute?.x ?? 0),
+            y: params.y + (parentAbsolute?.y ?? 0),
             width: params.width,
             height: params.height,
           };
+          // With partially=false this also returns anything that fully
+          // encloses the rect (this boundary's own ancestors) - only what is
+          // no larger than the rect sits inside it. onAdoptIntoGroup narrows
+          // the rest down to what should become direct children.
+          const rectArea = rect.width * rect.height;
           const contained = getIntersectingNodes(rect, false).filter(
-            (n) => n.id !== id && n.type !== 'group' && n.parentId !== id,
+            (n) =>
+              n.id !== id &&
+              n.parentId !== id &&
+              (n.measured?.width ?? n.width ?? 0) * (n.measured?.height ?? n.height ?? 0) <=
+                rectArea,
           );
           if (contained.length > 0) {
             onAdoptIntoGroup?.(

@@ -52,7 +52,12 @@ import { GROUP_TYPES } from '../domain/groupRegistry';
 import { SHAPE_TYPES, globalShapeRegistry } from '../domain/shapeRegistry';
 import { computeAlignment, type AlignBox, type AlignmentGuide } from '../domain/alignmentGuides';
 import type { ZOrderCommand } from '../domain/zOrder';
-import { toAbsolutePosition } from '../domain/graphUtils';
+import {
+  getDescendantIds,
+  nodeArea,
+  pickInnermostGroup,
+  toAbsolutePosition,
+} from '../domain/graphUtils';
 import {
   DRAG_MIME_TYPE,
   GROUP_DRAG_MIME_TYPE,
@@ -523,14 +528,13 @@ export function Canvas({
     [isPresenting, screenToFlowPosition, onAddText],
   );
 
-  const getAlignmentCandidates = useCallback(
-    (draggedNode: Node<ArchNodeData>) =>
-      nodesRef.current.filter((n) => {
-        if (n.id === draggedNode.id) return false;
-        return !(draggedNode.type === 'group' && n.parentId === draggedNode.id);
-      }),
-    [],
-  );
+  const getAlignmentCandidates = useCallback((draggedNode: Node<ArchNodeData>) => {
+    // A dragged boundary carries everything inside it at any depth, so
+    // none of that is a fixed reference to align against.
+    const carried =
+      draggedNode.type === 'group' ? getDescendantIds(draggedNode.id, nodesRef.current) : undefined;
+    return nodesRef.current.filter((n) => n.id !== draggedNode.id && !carried?.has(n.id));
+  }, []);
 
   const onNodeDrag = useCallback<OnNodeDrag<Node<ArchNodeData>>>(
     (_event, draggedNode) => {
@@ -546,23 +550,30 @@ export function Canvas({
   );
 
   // Two symmetric cases here:
-  //  - dragging a regular node so it overlaps a boundary makes it a child of
-  //    that boundary (moves with it from then on)
+  //  - dragging a node so it overlaps a boundary makes it a child of that
+  //    boundary (moves with it from then on). Boundaries nest, so when it
+  //    overlaps several, the innermost one wins.
   //  - dragging a *boundary* over existing nodes adopts whichever nodes now
   //    fall fully inside it, rather than requiring each one to be dragged in
   //    individually. Full containment (not just a corner clipping) is
   //    required for the boundary-drag case, since you're enclosing them.
+  //    Enclosed boundaries are adopted too, but their own children are left
+  //    with them (see graphUtils.ts's selectNodesToAdopt).
+  // A dragged boundary is itself reparented as well: into the innermost
+  // boundary that now fully encloses it, or back to the canvas if none does.
   // See App.tsx's onReparentNode/onAdoptIntoGroup for the position math.
   const onNodeDragStop = useCallback<OnNodeDrag<Node<ArchNodeData>>>(
     (_event, draggedNode) => {
       setAlignmentGuides([]);
 
+      let snapDx = 0;
+      let snapDy = 0;
       const boxes = [draggedNode, ...getAlignmentCandidates(draggedNode)].map((n) =>
         nodeToAlignBox(n, nodesRef.current),
       );
       const movingBox = boxes.find((b) => b.id === draggedNode.id);
       if (movingBox) {
-        const { snapDx, snapDy } = computeAlignment(movingBox, boxes);
+        ({ snapDx, snapDy } = computeAlignment(movingBox, boxes));
         if (snapDx !== 0 || snapDy !== 0) {
           onNodesChange([
             {
@@ -574,19 +585,37 @@ export function Canvas({
         }
       }
 
+      const allNodes = nodesRef.current;
       if (draggedNode.type === 'group') {
-        const contained = getIntersectingNodes(draggedNode, false).filter(
-          (n) => n.type !== 'group' && n.parentId !== draggedNode.id,
+        // With partially=false React Flow returns every node that either
+        // sits fully inside the dragged boundary or fully encloses it - the
+        // smaller of the two in each pair is the one inside.
+        const draggedArea = nodeArea(draggedNode);
+        const carried = getDescendantIds(draggedNode.id, allNodes);
+        const fullyOverlapping = getIntersectingNodes(draggedNode, false).filter(
+          (n) => !carried.has(n.id),
         );
-        if (contained.length > 0) {
+        const enclosing = fullyOverlapping.filter(
+          (n) => n.type === 'group' && nodeArea(n) > draggedArea,
+        );
+        const enclosed = fullyOverlapping.filter((n) => nodeArea(n) <= draggedArea);
+
+        const container = pickInnermostGroup(draggedNode.id, enclosing, allNodes);
+        if (enclosed.length > 0) {
           onAdoptIntoGroup(
             draggedNode.id,
-            contained.map((n) => n.id),
+            enclosed.map((n) => n.id),
+            { x: draggedNode.position.x + snapDx, y: draggedNode.position.y + snapDy },
           );
         }
+        onReparentNode(draggedNode.id, container ? container.id : null);
         return;
       }
-      const intersectingGroup = getIntersectingNodes(draggedNode).find((n) => n.type === 'group');
+      const intersectingGroup = pickInnermostGroup(
+        draggedNode.id,
+        getIntersectingNodes(draggedNode),
+        allNodes,
+      );
       onReparentNode(draggedNode.id, intersectingGroup ? intersectingGroup.id : null);
     },
     [getAlignmentCandidates, onNodesChange, getIntersectingNodes, onReparentNode, onAdoptIntoGroup],

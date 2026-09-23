@@ -1,7 +1,16 @@
 /**
  * Run with: npx tsx --tsconfig tsconfig.app.json src/domain/groupAdoption.verify.ts
  */
-import { findNodesContainedInRect, isNodeContainedInRect, toAbsolutePosition } from './graphUtils';
+import {
+  findNodesContainedInRect,
+  getDescendantIds,
+  isNodeContainedInRect,
+  pickInnermostGroup,
+  reorderWithGroupsFirst,
+  selectNodesToAdopt,
+  toAbsolutePosition,
+  toRelativePosition,
+} from './graphUtils';
 import { createLocalDiagramStore } from '../collab/diagramStore';
 import type { Node } from '@xyflow/react';
 import type { ArchNodeData } from './types';
@@ -97,9 +106,12 @@ function mkNodeData(label: string, nodeType = 'service'): ArchNodeData {
 
   const containedBeforeResize = findNodesContainedInRect(initialRect, nodes, 'group-1');
 
+  const containedBeforeIds = containedBeforeResize.map((n) => n.id).sort();
   assert(
-    containedBeforeResize.length === 1 && containedBeforeResize[0]?.id === 'node-inside',
-    'initially only node-inside is unparented and fully contained',
+    containedBeforeIds.length === 2 &&
+      containedBeforeIds[0] === 'group-2' &&
+      containedBeforeIds[1] === 'node-inside',
+    'initially node-inside and the nested boundary are the unparented, fully contained nodes',
   );
 
   // Resize group: expand to x: 100..400, y: 100..300
@@ -114,7 +126,10 @@ function mkNodeData(label: string, nodeType = 'service'): ArchNodeData {
     'node-partial is now fully contained within resized boundary',
   );
   assert(!containedIds.includes('node-outside'), 'node-outside remains outside boundary');
-  assert(!containedIds.includes('group-2'), 'other group nodes are excluded from adoption');
+  assert(
+    containedIds.includes('group-2'),
+    'a boundary fully inside another is adopted too - boundaries nest',
+  );
   assert(
     !containedIds.includes('node-already-child'),
     'existing children of this group are excluded from re-adoption list',
@@ -156,12 +171,24 @@ function mkNodeData(label: string, nodeType = 'service'): ArchNodeData {
   const adopted = findNodesContainedInRect(groupBNewRect, nodes, 'group-b');
 
   assert(
-    adopted.length === 1 && adopted[0]?.id === 'child-a',
-    'child-a from group-a is detected as contained in resized group-b',
+    adopted.length === 1 && adopted[0]?.id === 'group-a',
+    'group-a (fully inside resized group-b) is adopted as a whole',
+  );
+  assert(
+    !adopted.some((n) => n.id === 'child-a'),
+    'child-a is not pulled out of group-a - it comes along with its own boundary',
+  );
+
+  // A node whose boundary is NOT enclosed is still moved over.
+  const partialRect = { x: 55, y: 55, width: 60, height: 60 };
+  const stolen = findNodesContainedInRect(partialRect, nodes, 'group-b');
+  assert(
+    stolen.length === 1 && stolen[0]?.id === 'child-a',
+    'child-a is adopted when only it (not group-a) is enclosed',
   );
 
   // Derive relative position to group-b's new position (0, 0)
-  const childA = adopted[0]!;
+  const childA = nodes.find((n) => n.id === 'child-a')!;
   const abs = toAbsolutePosition(childA, nodes, childA.parentId);
   assert(
     abs.x === 60 && abs.y === 60,
@@ -241,6 +268,161 @@ function mkNodeData(label: string, nodeType = 'service'): ArchNodeData {
   assert(
     item2After.position.x === 250 && item2After.position.y === 80,
     'item 2 relative position is correctly set (350-100=250, 180-100=80)',
+  );
+}
+
+// --- Test 4: Nested boundaries (A contains B contains three nodes) ---
+{
+  const nodes: Node<ArchNodeData>[] = [
+    {
+      id: 'n1',
+      type: 'typed',
+      parentId: 'group-b',
+      position: { x: 10, y: 10 },
+      width: 40,
+      height: 30,
+      data: mkNodeData('N1'),
+    },
+    {
+      id: 'group-b',
+      type: 'group',
+      parentId: 'group-a',
+      position: { x: 50, y: 60 },
+      width: 300,
+      height: 200,
+      data: mkNodeData('B', 'vpc'),
+    },
+    {
+      id: 'n2',
+      type: 'typed',
+      parentId: 'group-b',
+      position: { x: 100, y: 10 },
+      width: 40,
+      height: 30,
+      data: mkNodeData('N2'),
+    },
+    {
+      id: 'group-a',
+      type: 'group',
+      position: { x: 100, y: 100 },
+      width: 600,
+      height: 400,
+      data: mkNodeData('A', 'region'),
+    },
+    {
+      id: 'n3',
+      type: 'typed',
+      parentId: 'group-b',
+      position: { x: 200, y: 10 },
+      width: 40,
+      height: 30,
+      data: mkNodeData('N3'),
+    },
+  ];
+
+  const ordered = reorderWithGroupsFirst(nodes).map((n) => n.id);
+  assert(
+    ordered[0] === 'group-a' && ordered[1] === 'group-b',
+    'outer boundary is ordered before the nested one (React Flow needs parents first)',
+  );
+
+  const n1Abs = toAbsolutePosition(nodes[0]!, nodes, 'group-b');
+  assert(
+    n1Abs.x === 160 && n1Abs.y === 170,
+    'absolute position walks the whole parent chain (100+50+10, 100+60+10)',
+  );
+  const n1Rel = toRelativePosition(n1Abs, nodes, 'group-b');
+  assert(n1Rel.x === 10 && n1Rel.y === 10, 'toRelativePosition inverts toAbsolutePosition');
+
+  const descendants = getDescendantIds('group-a', nodes);
+  assert(
+    ['group-b', 'n1', 'n2', 'n3'].every((id) => descendants.has(id)) && descendants.size === 4,
+    'descendants of A include B and everything inside B',
+  );
+
+  // Moving A moves B and B's contents: nothing below A needs to change,
+  // every absolute position just shifts by the same delta.
+  const moved = nodes.map((n) => (n.id === 'group-a' ? { ...n, position: { x: 400, y: 300 } } : n));
+  const shifts = ['group-b', 'n1', 'n2', 'n3'].map((id) => {
+    const before = nodes.find((n) => n.id === id)!;
+    const after = moved.find((n) => n.id === id)!;
+    const a = toAbsolutePosition(before, nodes, before.parentId);
+    const b = toAbsolutePosition(after, moved, after.parentId);
+    return { dx: b.x - a.x, dy: b.y - a.y };
+  });
+  assert(
+    shifts.every((s) => s.dx === 300 && s.dy === 200),
+    'moving A shifts B and all three of its nodes by the same amount',
+  );
+
+  // A dragged/resized over B and its nodes adopts only B.
+  const adopt = selectNodesToAdopt('group-a', ['group-b', 'n1', 'n2', 'n3'], nodes);
+  assert(adopt.length === 0, 'A re-adopts nothing it already contains at any depth');
+  const flat = nodes.map((n) => (n.id === 'group-b' ? { ...n, parentId: undefined } : n));
+  const adoptFlat = selectNodesToAdopt('group-a', ['group-b', 'n1', 'n2', 'n3'], flat);
+  assert(
+    adoptFlat.length === 1 && adoptFlat[0] === 'group-b',
+    "A adopts B but leaves B's nodes as B's children",
+  );
+  assert(
+    selectNodesToAdopt('group-b', ['group-a'], nodes).length === 0,
+    'a boundary never adopts one of its own ancestors (no cycles)',
+  );
+
+  // Dropping a node that overlaps both A and B lands it in B.
+  const innermost = pickInnermostGroup(
+    'n-new',
+    nodes.filter((n) => n.type === 'group'),
+    nodes,
+  );
+  assert(innermost?.id === 'group-b', 'a node dropped over A and B joins the innermost (B)');
+  assert(
+    pickInnermostGroup('group-a', [nodes[1]!], nodes) === undefined,
+    'a boundary is never parented into one of its own descendants',
+  );
+}
+
+// --- Test 5: End-to-end DiagramStore, nesting B into A ---
+{
+  const store = createLocalDiagramStore();
+  const a = store.addNode([], 'group', { x: 100, y: 100 }, mkNodeData('A', 'region'));
+  store.updateDimensions(a, 600, 400);
+  const b = store.addNode([], 'group', { x: 150, y: 160 }, mkNodeData('B', 'vpc'));
+  store.updateDimensions(b, 300, 200);
+  const kids = [0, 1, 2].map((i) =>
+    store.addNode([], 'typed', { x: 10 + i * 90, y: 10 }, mkNodeData(`N${i}`)),
+  );
+  for (const k of kids) {
+    const n = store.getSnapshot().nodes.find((nn) => nn.id === k)!;
+    store.updateParentId(k, b, n.position);
+  }
+
+  // Same math as App.tsx's onReparentNode: B dropped inside A.
+  const before = store.getSnapshot().nodes;
+  const bNode = before.find((n) => n.id === b)!;
+  const bAbs = toAbsolutePosition(bNode, before, bNode.parentId);
+  store.updateParentId(b, a, toRelativePosition(bAbs, before, a));
+
+  const absOf = (id: string) => {
+    const all = store.getSnapshot().nodes;
+    const n = all.find((nn) => nn.id === id)!;
+    return toAbsolutePosition(n, all, n.parentId);
+  };
+  const kidsBefore = kids.map(absOf);
+  const bAfterReparent = absOf(b);
+  assert(
+    bAfterReparent.x === 150 && bAfterReparent.y === 160,
+    'B stays where it was dropped when it becomes a child of A',
+  );
+
+  store.updatePosition(a, { x: 300, y: 250 });
+  const bMoved = absOf(b);
+  assert(bMoved.x === 350 && bMoved.y === 310, 'moving A moves B');
+  assert(
+    kids
+      .map(absOf)
+      .every((p, i) => p.x === kidsBefore[i]!.x + 200 && p.y === kidsBefore[i]!.y + 150),
+    'moving A moves every node inside B',
   );
 }
 
