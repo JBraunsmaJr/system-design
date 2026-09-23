@@ -15,18 +15,28 @@ services:
   editor:
     image: ghcr.io/jbraunsmajr/system-design:${VERSION:-latest}
     restart: unless-stopped
+    # If you are using self-signed certs
+    #volumes:
+    #  - ./certs:/certs:ro
     environment:
       APP_URL: https://${DOMAIN:?Set DOMAIN in .env}/
       RELAY: wss://${DOMAIN}/relay/
       STORE_URL: https://${DOMAIN}/store
       ICE_SERVERS: ${ICE_SERVERS:-}
+      # If you are using self-signed certs
+      # NODE_EXTRA_CA_CERTS: /certs/your-ca.crt
 
   relay:
     image: ghcr.io/jbraunsmajr/system-design-relay:${VERSION:-latest}
     restart: unless-stopped
+    # If you are using self-signed certs, mount the certs
+    #volumes:
+    #  - ./certs:/certs:ro
     environment:
       # The same value as the store's: sessions then require signing in.
       RELAY_TOKEN_SECRET: ${RELAY_TOKEN_SECRET:?Set RELAY_TOKEN_SECRET in .env}
+      # If you are using self-signed certs
+      # NODE_EXTRA_CA_CERTS: /certs/your-ca.crt
 
   store:
     image: ghcr.io/jbraunsmajr/system-design-store:${VERSION:-latest}

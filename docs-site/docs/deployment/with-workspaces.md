@@ -94,8 +94,7 @@ The organization's recovery key is the last way back into a document if every
 person's own keys are lost. The store refuses documents until it has one.
 
 ```bash
-docker run --rm \
-  -u $(id -u):$(id -g) \
+sudo docker run --rm \
   -v ./keys:/keys \
   ghcr.io/jbraunsmajr/system-design-store:latest \
   generate-recovery-key --out /keys/recovery
