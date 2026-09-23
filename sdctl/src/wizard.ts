@@ -27,17 +27,44 @@ export function buildDeploymentSpec(answers: WizardAnswers): DeploymentSpec {
   const isNatOrMultisite = topology === 'nat' || topology === 'multisite';
   const turnEnabled = answers.enableTurn ?? isNatOrMultisite;
 
+  let resolvers: string[] | undefined;
+  if (answers.cloudflareResolvers) {
+    if (Array.isArray(answers.cloudflareResolvers)) {
+      resolvers = answers.cloudflareResolvers;
+    } else if (typeof answers.cloudflareResolvers === 'string') {
+      resolvers = answers.cloudflareResolvers
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+    }
+  }
+
+  const dnsProvider =
+    tlsMode === 'acme-dns' || answers.dnsProviderName
+      ? {
+          name: answers.dnsProviderName || 'cloudflare',
+          apiTokenEnvVar: answers.cloudflareApiTokenEnvVar,
+          apiToken: answers.cloudflareApiToken,
+          resolvers,
+          propagationDelay: answers.cloudflarePropagationDelay,
+          propagationTimeout: answers.cloudflarePropagationTimeout,
+        }
+      : undefined;
+
   const spec: DeploymentSpec = {
     version: '1',
     mode,
     topology,
+    proxy: answers.proxyImage ? { image: answers.proxyImage } : undefined,
     tls: {
       mode: tlsMode,
+      domain: answers.domain || (editorHost.startsWith('*.') ? editorHost : undefined),
       editorHost: tlsMode !== 'none' ? editorHost : undefined,
       relayHost: tlsMode !== 'none' ? relayHost : undefined,
       certificatePath: answers.certificatePath,
       privateKeyPath: answers.privateKeyPath,
       caPath: answers.caPath,
+      dnsProvider,
     },
     registry: answers.registryPrefix ? { prefix: answers.registryPrefix } : undefined,
     relay: {
@@ -130,16 +157,30 @@ export async function runInteractiveWizard(answers: WizardAnswers = {}): Promise
     // 3. TLS Mode
     console.log('\n3. TLS / HTTPS Configuration:');
     let tlsMode: TlsMode = 'none';
+    let domain: string | undefined;
+    let dnsProviderName: string | undefined;
+    let cloudflareApiToken: string | undefined;
+    let cloudflareResolvers: string[] | undefined;
+    let proxyImage: string | undefined;
+
     if (mode === 'public') {
-      console.log("  [1] Automatic HTTPS with Caddy (ACME / Let's Encrypt)");
-      console.log('  [2] Operator-supplied Custom Certificates (PEM cert + key)');
-      console.log('  [3] External Reverse Proxy (Operator manages own TLS termination)');
-      console.log('  [4] None (Plain HTTP/WS - local evaluation only)');
-      const tlsChoice = await promptQuestion(rl, 'Select TLS mode (1-4)', '1');
+      console.log("  [1] Automatic HTTPS with Caddy HTTP-01 (ACME / Let's Encrypt)");
+      console.log('  [2] Automatic HTTPS via Cloudflare DNS-01 (ACME / Wildcard domain)');
+      console.log('  [3] Operator-supplied Custom Certificates (PEM cert + key)');
+      console.log('  [4] External Reverse Proxy (Operator manages own TLS termination)');
+      console.log('  [5] None (Plain HTTP/WS - local evaluation only)');
+      const tlsChoice = await promptQuestion(rl, 'Select TLS mode (1-5)', '1');
       tlsMode = 'acme';
-      if (tlsChoice === '2') tlsMode = 'provided';
-      else if (tlsChoice === '3') tlsMode = 'external';
-      else if (tlsChoice === '4') tlsMode = 'none';
+      if (tlsChoice === '2') {
+        tlsMode = 'acme-dns';
+        dnsProviderName = 'cloudflare';
+      } else if (tlsChoice === '3') {
+        tlsMode = 'provided';
+      } else if (tlsChoice === '4') {
+        tlsMode = 'external';
+      } else if (tlsChoice === '5') {
+        tlsMode = 'none';
+      }
     } else {
       console.log('  [1] Operator-supplied Custom Certificates (Internal CA / PEM cert + key)');
       console.log('  [2] External Reverse Proxy (Operator manages own TLS termination)');
@@ -153,7 +194,49 @@ export async function runInteractiveWizard(answers: WizardAnswers = {}): Promise
     // 4. Hostnames
     let editorHost = 'localhost';
     let relayHost = 'localhost';
-    if (tlsMode !== 'none') {
+    if (tlsMode === 'acme-dns') {
+      domain = await promptQuestion(
+        rl,
+        '\nPrimary or Wildcard Domain (e.g. *.home.example.com)',
+        '*.example.com',
+      );
+      const isWildcard = domain.startsWith('*.');
+      const baseDomain = isWildcard ? domain.slice(2) : domain;
+      editorHost = await promptQuestion(
+        rl,
+        'Public domain / hostname for Editor',
+        isWildcard ? `design.${baseDomain}` : baseDomain,
+      );
+      relayHost = await promptQuestion(
+        rl,
+        'Public domain / hostname for Relay',
+        isWildcard ? `relay.${baseDomain}` : `relay.${baseDomain}`,
+      );
+
+      cloudflareApiToken = await promptQuestion(
+        rl,
+        'Cloudflare API Token (optional, or set via CLOUDFLARE_API_TOKEN env)',
+        '',
+      );
+
+      const resolversInput = await promptQuestion(
+        rl,
+        'Custom DNS Resolvers for Cloudflare ACME (optional, comma-separated e.g. 1.1.1.1, 1.0.0.1)',
+        '',
+      );
+      if (resolversInput) {
+        cloudflareResolvers = resolversInput
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
+      }
+
+      proxyImage = await promptQuestion(
+        rl,
+        'Custom Proxy Image (optional)',
+        'slothcroissant/caddy-cloudflaredns:latest',
+      );
+    } else if (tlsMode !== 'none') {
       editorHost = await promptQuestion(
         rl,
         '\nPublic domain / hostname for Editor (e.g. design.example.com)',
@@ -224,6 +307,11 @@ export async function runInteractiveWizard(answers: WizardAnswers = {}): Promise
       mode,
       topology,
       tlsMode,
+      domain,
+      dnsProviderName,
+      cloudflareApiToken: cloudflareApiToken || undefined,
+      cloudflareResolvers,
+      proxyImage: proxyImage || undefined,
       editorHost,
       relayHost,
       singleHost: editorHost === relayHost,

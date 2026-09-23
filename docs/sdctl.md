@@ -119,6 +119,7 @@ sdctl preflight --output json
 | `PRE-CFG-SPEC`    | Validates `deployment.yaml` schema                               | Correct reported YAML fields according to `sdctl validate`                             |
 | `PRE-REG-DIGESTS` | Validates release manifest image SHA-256 digests                 | Ensure release manifest contains valid immutable digests                               |
 | `PRE-TLS-CERTS`   | Validates custom TLS certificate, key matching, SANs, and expiry | Check certificate paths, match private key, and renew if <30 days to expiry            |
+| `PRE-TLS-DNS`     | Validates DNS-01 ACME credentials (e.g. Cloudflare API token)    | Set `CLOUDFLARE_API_TOKEN` in environment or `secrets.env`                             |
 
 ---
 
@@ -133,7 +134,7 @@ sdctl generate
 **Generated Artifacts:**
 
 - `compose.yaml`: Docker Compose stack definition pinned by digest.
-- `Caddyfile`: Reverse proxy TLS, WSS routing, and CIDR allowlist rules (when TLS mode is `acme` or `provided`).
+- `Caddyfile`: Reverse proxy TLS, WSS routing, and CIDR allowlist rules (when TLS mode is `acme`, `acme-dns`, or `provided`).
 - `turnserver.conf`: Coturn STUN/TURN server configuration (when TURN is enabled).
 - `secrets.env`: Isolated credentials with restricted permissions.
 

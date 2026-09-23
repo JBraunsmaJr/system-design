@@ -46,6 +46,7 @@ export function formatSecretsEnv(secrets: Record<string, string>): string {
 export function loadOrCreateSecrets(
   filePath: string,
   needsTurn: boolean = false,
+  extraSecrets?: Record<string, string>,
 ): Record<string, string> {
   let existing: Record<string, string> = {};
   if (existsSync(filePath)) {
@@ -65,6 +66,15 @@ export function loadOrCreateSecrets(
     if (!existing.TURN_SECRET) {
       existing.TURN_SECRET = generateRandomSecret(32);
       updated = true;
+    }
+  }
+
+  if (extraSecrets) {
+    for (const [k, v] of Object.entries(extraSecrets)) {
+      if (v && !existing[k]) {
+        existing[k] = v;
+        updated = true;
+      }
     }
   }
 

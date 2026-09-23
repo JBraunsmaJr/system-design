@@ -44,7 +44,11 @@ export function calculatePlan(options: {
   const desiredImages = getResolvedImages(manifest, desiredSpec.registry?.prefix);
 
   const desiredComponents = new Set<string>(['editor', 'relay']);
-  if (desiredSpec.tls.mode === 'acme' || desiredSpec.tls.mode === 'provided') {
+  if (
+    desiredSpec.tls.mode === 'acme' ||
+    desiredSpec.tls.mode === 'acme-dns' ||
+    desiredSpec.tls.mode === 'provided'
+  ) {
     desiredComponents.add('proxy');
   }
   if (desiredSpec.turn?.enabled) {
@@ -93,7 +97,7 @@ export function calculatePlan(options: {
         : comp === 'relay'
           ? desiredImages.relay
           : comp === 'proxy'
-            ? desiredImages.proxy
+            ? desiredSpec.proxy?.image || desiredImages.proxy
             : comp === 'turn'
               ? desiredImages.turn
               : undefined;
@@ -204,7 +208,7 @@ function getEffectiveRelayUrl(spec: DeploymentSpec): string {
 
 function getPortsSummary(spec: DeploymentSpec): string {
   const ports: string[] = [];
-  if (spec.tls.mode === 'acme' || spec.tls.mode === 'provided') {
+  if (spec.tls.mode === 'acme' || spec.tls.mode === 'acme-dns' || spec.tls.mode === 'provided') {
     ports.push('80/tcp', '443/tcp');
   } else {
     ports.push('8080/tcp (editor)', `${spec.relay?.port || 4444}/tcp (relay)`);

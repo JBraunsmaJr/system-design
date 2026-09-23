@@ -342,7 +342,12 @@ Flags:
 
     // Check secrets
     const secretsPath = join(workingDir, 'secrets.env');
-    loadOrCreateSecrets(secretsPath, Boolean(spec.turn?.enabled));
+    const extraSecrets: Record<string, string> = {};
+    if (spec.tls.dnsProvider?.apiToken) {
+      const tokenVar = spec.tls.dnsProvider.apiTokenEnvVar || 'CLOUDFLARE_API_TOKEN';
+      extraSecrets[tokenVar] = spec.tls.dnsProvider.apiToken;
+    }
+    loadOrCreateSecrets(secretsPath, Boolean(spec.turn?.enabled), extraSecrets);
 
     // Compose yaml
     const composeContent = generateComposeYaml(spec, DEFAULT_MANIFEST);
@@ -356,7 +361,7 @@ Flags:
     writeFileSync(composePath, composeContent, 'utf8');
 
     // Caddyfile if proxy needed
-    if (spec.tls.mode === 'acme' || spec.tls.mode === 'provided') {
+    if (spec.tls.mode === 'acme' || spec.tls.mode === 'acme-dns' || spec.tls.mode === 'provided') {
       const caddyContent = generateCaddyfile(spec);
       const caddyPath = join(workingDir, 'Caddyfile');
       if (existsSync(caddyPath)) {
@@ -386,7 +391,13 @@ Flags:
     } else {
       console.log(`\n✓ Generated deployment artifacts in ${workingDir}`);
       console.log('  - compose.yaml');
-      if (spec.tls.mode === 'acme' || spec.tls.mode === 'provided') console.log('  - Caddyfile');
+      if (
+        spec.tls.mode === 'acme' ||
+        spec.tls.mode === 'acme-dns' ||
+        spec.tls.mode === 'provided'
+      ) {
+        console.log('  - Caddyfile');
+      }
       if (spec.turn?.enabled) console.log('  - turnserver.conf');
       console.log('  - secrets.env');
     }

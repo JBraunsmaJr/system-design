@@ -69,7 +69,12 @@ export async function applyDeployment(options: ApplyOptions = {}): Promise<Apply
 
   // 4. Generate artifacts (FR-APPLY-02, FR-CFG-03, FR-CFG-05)
   const secretsPath = join(workingDir, 'secrets.env');
-  loadOrCreateSecrets(secretsPath, Boolean(spec.turn?.enabled));
+  const extraSecrets: Record<string, string> = {};
+  if (spec.tls.dnsProvider?.apiToken) {
+    const tokenVar = spec.tls.dnsProvider.apiTokenEnvVar || 'CLOUDFLARE_API_TOKEN';
+    extraSecrets[tokenVar] = spec.tls.dnsProvider.apiToken;
+  }
+  loadOrCreateSecrets(secretsPath, Boolean(spec.turn?.enabled), extraSecrets);
 
   const composeContent = generateComposeYaml(spec, manifest);
   const composePath = join(workingDir, 'compose.yaml');
@@ -81,7 +86,7 @@ export async function applyDeployment(options: ApplyOptions = {}): Promise<Apply
   }
   writeFileSync(composePath, composeContent, 'utf8');
 
-  if (spec.tls.mode === 'acme' || spec.tls.mode === 'provided') {
+  if (spec.tls.mode === 'acme' || spec.tls.mode === 'acme-dns' || spec.tls.mode === 'provided') {
     const caddyContent = generateCaddyfile(spec);
     const caddyPath = join(workingDir, 'Caddyfile');
     if (existsSync(caddyPath)) {

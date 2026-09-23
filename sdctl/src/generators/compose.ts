@@ -8,7 +8,8 @@ export function deriveEndpoints(spec: DeploymentSpec): {
   relayUrl: string;
   iceServers: string;
 } {
-  const isTls = spec.tls.mode === 'acme' || spec.tls.mode === 'provided';
+  const isTls =
+    spec.tls.mode === 'acme' || spec.tls.mode === 'acme-dns' || spec.tls.mode === 'provided';
   const httpScheme = isTls ? 'https' : 'http';
   const wsScheme = isTls ? 'wss' : 'ws';
 
@@ -57,7 +58,9 @@ export function generateComposeYaml(
     specHash || createHash('sha256').update(JSON.stringify(spec)).digest('hex').slice(0, 16);
   const images = getResolvedImages(manifest, spec.registry?.prefix);
   const { appUrl, relayUrl, iceServers } = deriveEndpoints(spec);
-  const hasProxy = spec.tls.mode === 'acme' || spec.tls.mode === 'provided';
+  const hasProxy =
+    spec.tls.mode === 'acme' || spec.tls.mode === 'acme-dns' || spec.tls.mode === 'provided';
+  const proxyImage = spec.proxy?.image || images.proxy;
 
   const header = generateHeader('#');
   const lines: string[] = [header];
@@ -111,13 +114,22 @@ export function generateComposeYaml(
   // Proxy service (Caddy)
   if (hasProxy) {
     lines.push('  proxy:');
-    lines.push(`    image: ${images.proxy}`);
+    lines.push(`    image: ${proxyImage}`);
     lines.push('    container_name: sdctl-proxy');
     lines.push('    restart: unless-stopped');
     lines.push('    ports:');
     lines.push('      - "80:80"');
     lines.push('      - "443:443"');
     lines.push('      - "443:443/udp"');
+    if (spec.tls.mode === 'acme-dns' || spec.tls.dnsProvider) {
+      const dns = spec.tls.dnsProvider;
+      const tokenVar = dns?.apiTokenEnvVar || 'CLOUDFLARE_API_TOKEN';
+      lines.push('    environment:');
+      lines.push(`      - ${tokenVar}=\${${tokenVar}}`);
+      lines.push('      - ACME_AGREE=true');
+      lines.push('    env_file:');
+      lines.push('      - secrets.env');
+    }
     lines.push('    volumes:');
     lines.push('      - ./Caddyfile:/etc/caddy/Caddyfile:ro');
     lines.push('      - caddy_data:/data');

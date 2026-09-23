@@ -2,7 +2,7 @@ import type { ValidationResult, ValidationError } from './types.js';
 
 const VALID_MODES = ['public', 'isolated'];
 const VALID_TOPOLOGIES = ['lan', 'routed', 'nat', 'multisite'];
-const VALID_TLS_MODES = ['acme', 'provided', 'external', 'none'];
+const VALID_TLS_MODES = ['acme', 'acme-dns', 'provided', 'external', 'none'];
 
 const CIDR_REGEX =
   /^(([0-9]{1,3}\.){3}[0-9]{1,3}\/([0-9]|[1-2][0-9]|3[0-2])|([a-fA-F0-9:]+)\/([0-9]|[1-9][0-9]|1[0-2][0-8]))$/;
@@ -52,12 +52,34 @@ export function validateDeploymentSpec(spec: unknown): ValidationResult {
     });
   }
 
+  // Proxy override validation (optional)
+  if (s.proxy !== undefined) {
+    if (!s.proxy || typeof s.proxy !== 'object') {
+      errors.push({
+        path: 'proxy',
+        message: '`proxy` configuration must be an object',
+        suggestedFix: 'Provide a valid `proxy` object with an optional `image` field.',
+      });
+    } else {
+      const proxy = s.proxy as Record<string, unknown>;
+      if (proxy.image !== undefined && (typeof proxy.image !== 'string' || !proxy.image.trim())) {
+        errors.push({
+          path: 'proxy.image',
+          message: '`proxy.image` must be a non-empty string',
+          suggestedFix:
+            'Specify a valid Docker image reference (e.g., "slothcroissant/caddy-cloudflaredns:latest").',
+        });
+      }
+    }
+  }
+
   // TLS
   if (!s.tls || typeof s.tls !== 'object') {
     errors.push({
       path: 'tls',
       message: '`tls` configuration object is required',
-      suggestedFix: 'Add a `tls` section with `mode: "acme"`, "provided", "external", or "none".',
+      suggestedFix:
+        'Add a `tls` section with `mode: "acme"`, "acme-dns", "provided", "external", or "none".',
     });
   } else {
     const tls = s.tls as Record<string, unknown>;
@@ -65,12 +87,12 @@ export function validateDeploymentSpec(spec: unknown): ValidationResult {
       errors.push({
         path: 'tls.mode',
         message: `Invalid TLS mode: "${tls.mode}". Must be one of: ${VALID_TLS_MODES.join(', ')}`,
-        suggestedFix: 'Set `tls.mode` to "acme", "provided", "external", or "none".',
+        suggestedFix: 'Set `tls.mode` to "acme", "acme-dns", "provided", "external", or "none".',
       });
     }
 
     // Cross-validation: Isolated mode cannot use ACME
-    if (s.mode === 'isolated' && tls.mode === 'acme') {
+    if (s.mode === 'isolated' && (tls.mode === 'acme' || tls.mode === 'acme-dns')) {
       errors.push({
         path: 'tls.mode',
         message:
@@ -78,6 +100,53 @@ export function validateDeploymentSpec(spec: unknown): ValidationResult {
         suggestedFix:
           'Change `tls.mode` to "provided" (operator-supplied certs), "external", or "none".',
       });
+    }
+
+    // DNS-01 ACME validation
+    if (tls.mode === 'acme-dns') {
+      if (!tls.dnsProvider || typeof tls.dnsProvider !== 'object') {
+        errors.push({
+          path: 'tls.dnsProvider',
+          message:
+            '`tls.dnsProvider` configuration object is required when `tls.mode` is "acme-dns"',
+          suggestedFix: 'Add `tls.dnsProvider` with `name: "cloudflare"` and provider settings.',
+        });
+      } else {
+        const dns = tls.dnsProvider as Record<string, unknown>;
+        if (!dns.name || typeof dns.name !== 'string') {
+          errors.push({
+            path: 'tls.dnsProvider.name',
+            message: '`tls.dnsProvider.name` is required (e.g., "cloudflare")',
+            suggestedFix: 'Set `tls.dnsProvider.name` to "cloudflare".',
+          });
+        }
+        if (dns.resolvers !== undefined) {
+          if (!Array.isArray(dns.resolvers) || !dns.resolvers.every((r) => typeof r === 'string')) {
+            errors.push({
+              path: 'tls.dnsProvider.resolvers',
+              message:
+                '`tls.dnsProvider.resolvers` must be an array of string resolver addresses or nameservers',
+              suggestedFix: 'Provide an array of DNS resolvers (e.g., ["1.1.1.1", "1.0.0.1"]).',
+            });
+          }
+        }
+        if (dns.propagationDelay !== undefined && typeof dns.propagationDelay !== 'string') {
+          errors.push({
+            path: 'tls.dnsProvider.propagationDelay',
+            message: '`tls.dnsProvider.propagationDelay` must be a duration string (e.g., "30s")',
+            suggestedFix:
+              'Set `tls.dnsProvider.propagationDelay` to a string such as "30s" or "1m".',
+          });
+        }
+        if (dns.propagationTimeout !== undefined && typeof dns.propagationTimeout !== 'string') {
+          errors.push({
+            path: 'tls.dnsProvider.propagationTimeout',
+            message: '`tls.dnsProvider.propagationTimeout` must be a duration string (e.g., "10m")',
+            suggestedFix:
+              'Set `tls.dnsProvider.propagationTimeout` to a string such as "10m" or "5m".',
+          });
+        }
+      }
     }
 
     // Provided TLS requires certificate and key paths

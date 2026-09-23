@@ -57,7 +57,11 @@ export async function rollbackDeployment(options: RollbackOptions = {}): Promise
   const composeContent = generateComposeYaml(restoredSpec, manifest);
   writeFileSync(join(workingDir, 'compose.yaml'), composeContent, 'utf8');
 
-  if (restoredSpec.tls.mode === 'acme' || restoredSpec.tls.mode === 'provided') {
+  if (
+    restoredSpec.tls.mode === 'acme' ||
+    restoredSpec.tls.mode === 'acme-dns' ||
+    restoredSpec.tls.mode === 'provided'
+  ) {
     const caddyContent = generateCaddyfile(restoredSpec);
     writeFileSync(join(workingDir, 'Caddyfile'), caddyContent, 'utf8');
   }

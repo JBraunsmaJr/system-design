@@ -287,6 +287,54 @@ export function runPreflightChecks(options: PreflightOptions = {}): PreflightRep
     }
   }
 
+  // 6. DNS-01 ACME Provider Validation (PRE-TLS-DNS)
+  if (spec && spec.tls && spec.tls.mode === 'acme-dns') {
+    const dnsId = 'PRE-TLS-DNS';
+    const dns = spec.tls.dnsProvider;
+    const tokenVar = dns?.apiTokenEnvVar || 'CLOUDFLARE_API_TOKEN';
+    const envToken = process.env[tokenVar];
+    const secretsPath = join(workingDir, 'secrets.env');
+    let fileToken: string | undefined;
+    if (existsSync(secretsPath)) {
+      try {
+        const parsed = readFileSync(secretsPath, 'utf8');
+        const tokenMatch = parsed.match(new RegExp(`^${tokenVar}=(.*)$`, 'm'));
+        if (tokenMatch) fileToken = tokenMatch[1].trim();
+      } catch {
+        // ignore
+      }
+    }
+    const hasToken = Boolean(dns?.apiToken || envToken || fileToken);
+    if (hasToken) {
+      checks.push({
+        id: dnsId,
+        name: 'DNS-01 ACME Provider Configuration',
+        status: 'pass',
+        expected: `Valid DNS-01 provider configuration with ${tokenVar}`,
+        observed: `DNS provider '${dns?.name || 'cloudflare'}' configured with API token`,
+      });
+    } else if (forceList.has(dnsId)) {
+      forcedCheckIds.push(dnsId);
+      checks.push({
+        id: dnsId,
+        name: 'DNS-01 ACME Provider Configuration',
+        status: 'skip',
+        expected: `Valid DNS-01 provider configuration with ${tokenVar}`,
+        observed: `Bypassed by --force (Token ${tokenVar} not detected in environment or secrets.env)`,
+      });
+    } else {
+      checks.push({
+        id: dnsId,
+        name: 'DNS-01 ACME Provider Configuration',
+        status: 'warn',
+        expected: `API token in environment variable ${tokenVar} or secrets.env`,
+        observed: `No ${tokenVar} found in environment or secrets.env`,
+        cause: `Caddy ACME DNS-01 challenge for Cloudflare requires ${tokenVar}`,
+        remediation: `Set ${tokenVar} in environment or secrets.env`,
+      });
+    }
+  }
+
   const passed = checks.filter((c) => c.status === 'pass').length;
   const failed = checks.filter((c) => c.status === 'fail').length;
   const warned = checks.filter((c) => c.status === 'warn').length;

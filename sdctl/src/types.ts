@@ -1,6 +1,15 @@
 export type DeploymentMode = 'public' | 'isolated';
 export type Topology = 'lan' | 'routed' | 'nat' | 'multisite';
-export type TlsMode = 'acme' | 'provided' | 'external' | 'none';
+export type TlsMode = 'acme' | 'acme-dns' | 'provided' | 'external' | 'none';
+
+export interface DnsProviderConfig {
+  name: 'cloudflare' | string;
+  apiTokenEnvVar?: string;
+  apiToken?: string;
+  resolvers?: string[];
+  propagationDelay?: string;
+  propagationTimeout?: string;
+}
 
 export interface ComponentImages {
   editor: string;
@@ -27,6 +36,9 @@ export interface DeploymentSpec {
   version: string;
   mode: DeploymentMode;
   topology: Topology;
+  proxy?: {
+    image?: string;
+  };
   tls: {
     mode: TlsMode;
     domain?: string;
@@ -35,6 +47,7 @@ export interface DeploymentSpec {
     certificatePath?: string;
     privateKeyPath?: string;
     caPath?: string;
+    dnsProvider?: DnsProviderConfig;
   };
   registry?: {
     prefix?: string;
@@ -97,9 +110,17 @@ export interface WizardAnswers {
   editorHost?: string;
   relayHost?: string;
   singleHost?: boolean;
+  domain?: string;
   certificatePath?: string;
   privateKeyPath?: string;
   caPath?: string;
+  dnsProviderName?: string;
+  cloudflareApiToken?: string;
+  cloudflareApiTokenEnvVar?: string;
+  cloudflareResolvers?: string[] | string;
+  cloudflarePropagationDelay?: string;
+  cloudflarePropagationTimeout?: string;
+  proxyImage?: string;
   allowedCidrs?: string[] | string;
   enableTurn?: boolean;
   turnExternalIp?: string;

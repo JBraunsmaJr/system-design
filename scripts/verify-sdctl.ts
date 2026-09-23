@@ -10,7 +10,7 @@ import * as http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { DEFAULT_MANIFEST, getResolvedImages } from '../sdctl/src/manifest.js';
 import { validateDeploymentSpec } from '../sdctl/src/schema.js';
-import { dumpDeploymentSpecYaml } from '../sdctl/src/yaml.js';
+import { dumpDeploymentSpecYaml, parseSimpleYaml } from '../sdctl/src/yaml.js';
 import { generateComposeYaml } from '../sdctl/src/generators/compose.js';
 import { generateCaddyfile } from '../sdctl/src/generators/caddy.js';
 import { generateCoturnConfig } from '../sdctl/src/generators/coturn.js';
@@ -784,6 +784,155 @@ console.log('\n17. Full CLI Command Lifecycle Execution');
 
   code = await runCli(['status', '--output', 'json'], testDir);
   check(code === 0, 'CLI `sdctl status` exits 0');
+
+  rmSync(testDir, { recursive: true, force: true });
+}
+
+// 18. Cloudflare DNS-01 ACME & Wildcard Support with Configurable Resolvers & Custom Proxy Image
+console.log('\n18. Cloudflare DNS-01 ACME & Wildcard Support');
+{
+  // A. Schema validation
+  const cloudflareSpec: DeploymentSpec = {
+    version: '1',
+    mode: 'public',
+    topology: 'routed',
+    proxy: {
+      image: 'slothcroissant/caddy-cloudflaredns:latest',
+    },
+    tls: {
+      mode: 'acme-dns',
+      domain: '*.home.jbraunsma.dev',
+      editorHost: 'design.home.jbraunsma.dev',
+      relayHost: 'relay.home.jbraunsma.dev',
+      dnsProvider: {
+        name: 'cloudflare',
+        apiTokenEnvVar: 'CLOUDFLARE_API_TOKEN',
+        resolvers: ['1.1.1.1', '1.0.0.1'],
+        propagationDelay: '30s',
+        propagationTimeout: '10m',
+      },
+    },
+    relay: {
+      allowedCidrs: ['192.168.1.0/24'],
+    },
+  };
+
+  const schemaRes = validateDeploymentSpec(cloudflareSpec);
+  check(
+    schemaRes.valid && schemaRes.errors.length === 0,
+    'Cloudflare DNS-01 spec passes schema validation',
+  );
+
+  const invalidSpec = {
+    ...cloudflareSpec,
+    tls: {
+      mode: 'acme-dns',
+      dnsProvider: {
+        name: 'cloudflare',
+        resolvers: [123], // invalid resolver type
+      },
+    },
+  };
+  const invalidRes = validateDeploymentSpec(invalidSpec);
+  check(!invalidRes.valid, 'Schema catches invalid resolvers array elements');
+
+  // B. YAML serialization & recursive parsing
+  const dumpedYaml = dumpDeploymentSpecYaml(cloudflareSpec);
+  check(dumpedYaml.includes('mode: "acme-dns"'), 'YAML includes mode: "acme-dns"');
+  check(
+    dumpedYaml.includes('slothcroissant/caddy-cloudflaredns:latest'),
+    'YAML includes custom proxy image',
+  );
+  check(dumpedYaml.includes('- "1.1.1.1"'), 'YAML dumps resolver list correctly');
+
+  const parsedSpec = parseSimpleYaml(dumpedYaml) as unknown as DeploymentSpec;
+  check(parsedSpec.tls.mode === 'acme-dns', 'Parsed spec preserves acme-dns mode');
+  check(
+    Array.isArray(parsedSpec.tls.dnsProvider?.resolvers) &&
+      parsedSpec.tls.dnsProvider?.resolvers?.[0] === '1.1.1.1',
+    'Parsed spec preserves configurable resolvers array',
+  );
+
+  // C. Caddyfile Generation with Configurable Resolvers
+  const caddyfile = generateCaddyfile(cloudflareSpec);
+  check(caddyfile.includes('*.home.jbraunsma.dev {'), 'Caddyfile contains wildcard block');
+  check(
+    caddyfile.includes('dns cloudflare {env.CLOUDFLARE_API_TOKEN}'),
+    'Caddyfile contains cloudflare dns directive with env token',
+  );
+  check(
+    caddyfile.includes('resolvers 1.1.1.1 1.0.0.1'),
+    'Caddyfile contains configurable resolvers directive',
+  );
+  check(caddyfile.includes('propagation_delay 30s'), 'Caddyfile contains propagation_delay');
+  check(caddyfile.includes('propagation_timeout 10m'), 'Caddyfile contains propagation_timeout');
+  check(
+    caddyfile.includes('@relay host relay.home.jbraunsma.dev'),
+    'Caddyfile routes relay host in wildcard block',
+  );
+  check(caddyfile.includes('reverse_proxy editor:80'), 'Caddyfile falls back to editor');
+
+  // Test custom operator nameservers / resolvers
+  const customNsSpec: DeploymentSpec = {
+    ...cloudflareSpec,
+    tls: {
+      ...cloudflareSpec.tls,
+      dnsProvider: {
+        name: 'cloudflare',
+        resolvers: ['clyde.ns.cloudflare.com', 'mckenzie.ns.cloudflare.com'],
+      },
+    },
+  };
+  const caddyCustomNs = generateCaddyfile(customNsSpec);
+  check(
+    caddyCustomNs.includes('resolvers clyde.ns.cloudflare.com mckenzie.ns.cloudflare.com'),
+    'Caddyfile generates custom operator nameservers when configured',
+  );
+
+  // D. Compose YAML Generation with Custom Image & Proxy Environment
+  const composeYaml = generateComposeYaml(cloudflareSpec);
+  check(
+    composeYaml.includes('image: slothcroissant/caddy-cloudflaredns:latest'),
+    'Compose YAML uses custom proxy image override',
+  );
+  check(
+    composeYaml.includes('CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}'),
+    'Compose YAML passes CLOUDFLARE_API_TOKEN to proxy',
+  );
+  check(composeYaml.includes('ACME_AGREE=true'), 'Compose YAML passes ACME_AGREE=true to proxy');
+
+  // E. Secrets Management with Cloudflare Token
+  const testDir = mkdtempSync(join(tmpdir(), 'sdctl-cf-'));
+  const secretsPath = join(testDir, 'secrets.env');
+  loadOrCreateSecrets(secretsPath, false, { CLOUDFLARE_API_TOKEN: 'secret-token-12345' });
+  const writtenSecrets = readFileSync(secretsPath, 'utf8');
+  check(
+    writtenSecrets.includes('CLOUDFLARE_API_TOKEN=secret-token-12345'),
+    'secrets.env stores CLOUDFLARE_API_TOKEN',
+  );
+
+  // F. Wizard Answers Spec Generation
+  const wizardSpec = buildDeploymentSpec({
+    mode: 'public',
+    topology: 'routed',
+    tlsMode: 'acme-dns',
+    domain: '*.home.jbraunsma.dev',
+    editorHost: 'design.home.jbraunsma.dev',
+    relayHost: 'relay.home.jbraunsma.dev',
+    cloudflareResolvers: '8.8.8.8, 8.8.4.4',
+    cloudflareApiToken: 'token-abc',
+    proxyImage: 'slothcroissant/caddy-cloudflaredns:latest',
+  });
+  check(wizardSpec.tls.mode === 'acme-dns', 'Wizard generates acme-dns spec');
+  check(
+    wizardSpec.tls.dnsProvider?.resolvers?.[0] === '8.8.8.8' &&
+      wizardSpec.tls.dnsProvider?.resolvers?.[1] === '8.8.4.4',
+    'Wizard parses comma-separated configurable resolvers',
+  );
+  check(
+    wizardSpec.proxy?.image === 'slothcroissant/caddy-cloudflaredns:latest',
+    'Wizard records proxy image',
+  );
 
   rmSync(testDir, { recursive: true, force: true });
 }
