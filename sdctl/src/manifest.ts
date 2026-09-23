@@ -7,19 +7,19 @@ export const DEFAULT_MANIFEST: ReleaseManifest = {
   images: {
     editor: {
       image: 'ghcr.io/jbraunsmajr/system-design',
-      digest: 'sha256:7f4a1c518b0c8e23f95b35a712f10b0e51dc20d206f40b2a6f53a47ff6ec0b8e',
+      digest: 'sha256:80fe0b9bbbf29aacfc9a702ca1a751c457bf95395bb1212bc2d747c9c7f224e0',
     },
     relay: {
       image: 'ghcr.io/jbraunsmajr/system-design-relay',
-      digest: 'sha256:4d8a1c9e821fa91b5c3e6605a9c9f2b1897d9e4a3c10b7a421ef88012fcd99a0',
+      digest: 'sha256:c06ba13e6e1393ca46ef17f5a324b333d2443e006ad0dee05f8974bc29ca9c49',
     },
     proxy: {
       image: 'caddy',
-      digest: 'sha256:2b2cf691ad5c2f0f4a86b1d62c938f4d9241b7145b59740b284d7a8d8e63a8a3',
+      digest: 'sha256:af32e97399febea808609119bb21544d0265c58a02836576e32a2d082c262c17',
     },
     turn: {
       image: 'coturn/coturn',
-      digest: 'sha256:1e6c382103f6bbda28f6f0ea99616d2b512ab424d9f6ea9b5f5832a84ba7a35c',
+      digest: 'sha256:bbefd3e1fdfdc0d58770fe01b581fd8b00d9f3a5580d00acb77cf719a6bc78e3',
     },
     installer: {
       image: 'ghcr.io/jbraunsmajr/system-design-installer',
