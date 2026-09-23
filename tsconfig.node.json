@@ -20,7 +20,7 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["vite.config.ts", "scripts/**/*", "store/**/*"],
+  "include": ["vite.config.ts", "scripts/**/*", "store/**/*", "sdctl/**/*"],
   /* gen-fixture.mts runs inside worktrees of historical commits, where the
      surrounding types differ by design. Typechecking it against HEAD would
      be meaningless and would break whenever an old shape diverges. */
