@@ -9,6 +9,8 @@ import React from 'react';
 import { RequirementsView } from './RequirementsView';
 import { RequirementCard } from './RequirementCard';
 import { RelationshipManager } from './RelationshipManager';
+import { RequirementsOutline } from './RequirementsOutline';
+import { buildEpicTree } from '../../domain/requirementsHierarchy';
 import {
   BUILT_IN_ITEM_TYPES,
   BUILT_IN_RELATIONSHIP_TYPES,
@@ -171,7 +173,7 @@ console.log('=== Split view ===');
     'outline rows are indented by depth (TICKET-2 is two levels down)',
   );
   assert(
-    html.includes('aria-selected="true" aria-expanded="true" data-outline-id="EPIC-1"'),
+    /aria-selected="true"[^>]*data-outline-id="EPIC-1"/.test(html),
     'with nothing chosen, the first item is open',
   );
   assert(
@@ -179,7 +181,8 @@ console.log('=== Split view ===');
     'the open item is shown in full in the detail pane',
   );
   assert(
-    html.includes('>Children <span class="requirements-split__children-count">2</span>') &&
+    html.includes('Children <span class="requirements-split__children-count">2</span>') &&
+      html.includes('class="requirements-split__children-toggle"') &&
       html.includes('aria-label="Open EPIC-2"') &&
       html.includes('aria-label="Open TICKET-1"'),
     "the open item's children are listed beneath it, each with an Open button",
@@ -196,6 +199,88 @@ console.log('=== Split view ===');
     html.includes('aria-label="Collapse all cards"') &&
       html.includes('aria-label="Expand all cards"'),
     'the toolbar offers Collapse all and Expand all',
+  );
+}
+
+console.log('=== Outline folding ===');
+{
+  const base = {
+    doc,
+    groups: [
+      { key: 'epic', label: 'Epics', color: '#a0f', items: doc.items.slice(0, 2) },
+      { key: 'ticket', label: 'Tickets', color: '#0af', items: doc.items.slice(2) },
+    ],
+    sectionKeyPrefix: 'type',
+    noEpicSectionKey: '__no-epic__',
+    selectedId: null,
+    onSelect: () => {},
+    foldedIds: new Set<string>(),
+    onToggleFolded: () => {},
+    collapsedSectionKeys: new Set<string>(),
+    onToggleSection: () => {},
+    onCollapseAll: () => {},
+    onExpandAll: () => {},
+  };
+  const open = renderToStaticMarkup(React.createElement(RequirementsOutline, base));
+  assert(
+    open.includes('aria-expanded="true"') && open.includes('>Tickets</span>'),
+    'each group has a foldable header',
+  );
+  assert(open.includes('4 of 4 shown'), 'the outline header counts visible rows');
+
+  const sectionFolded = renderToStaticMarkup(
+    React.createElement(RequirementsOutline, {
+      ...base,
+      collapsedSectionKeys: new Set(['type:ticket']),
+    }),
+  );
+  assert(
+    !sectionFolded.includes('data-outline-id="TICKET-1"') &&
+      sectionFolded.includes('data-outline-id="EPIC-1"') &&
+      sectionFolded.includes('2 of 4 shown'),
+    'folding a group hides only its rows',
+  );
+
+  const tree = buildEpicTree(doc);
+  const treeOpen = renderToStaticMarkup(
+    React.createElement(RequirementsOutline, { ...base, groups: [], epicTree: tree }),
+  );
+  assert(
+    treeOpen.includes('requirements-outline__row is-pinned') &&
+      treeOpen.includes('top:34px') &&
+      treeOpen.includes('top:62px'),
+    'unfolded parents are pinned, nested ones one row lower',
+  );
+  const treeFolded = renderToStaticMarkup(
+    React.createElement(RequirementsOutline, {
+      ...base,
+      groups: [],
+      epicTree: tree,
+      foldedIds: new Set(['EPIC-2']),
+    }),
+  );
+  assert(
+    !treeFolded.includes('data-outline-id="TICKET-2"') &&
+      treeFolded.includes('data-outline-id="EPIC-2"'),
+    'folding a parent hides the items under it',
+  );
+  const searching = renderToStaticMarkup(
+    React.createElement(RequirementsOutline, {
+      ...base,
+      groups: [],
+      epicTree: tree,
+      foldedIds: new Set(['EPIC-1', 'EPIC-2']),
+      searchQuery: 'refund',
+    }),
+  );
+  assert(
+    searching.includes('data-outline-id="TICKET-2"'),
+    'a search shows matches inside folded parents',
+  );
+  assert(
+    /<button[^>]*disabled=""[^>]*title="Fold every group/.test(searching) ||
+      /title="Fold every group[^"]*"[^>]*disabled=""/.test(searching),
+    'Collapse all is disabled while searching',
   );
 }
 

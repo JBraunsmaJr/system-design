@@ -217,6 +217,9 @@ export function RequirementsView({
   const [foldedIds, setFoldedIds] = useState<ReadonlySet<string>>(
     () => new Set(initialPrefs.foldedIds),
   );
+  const [collapsedSectionKeys, setCollapsedSectionKeys] = useState<ReadonlySet<string>>(
+    () => new Set(initialPrefs.collapsedSectionKeys),
+  );
   const [lastVerbByTypeId, setLastVerbByTypeId] = useState<Record<string, string>>(
     () => initialPrefs.lastVerbByTypeId ?? {},
   );
@@ -266,15 +269,36 @@ export function RequirementsView({
       layout,
       collapsedIds: [...collapsedIds],
       foldedIds: [...foldedIds],
+      collapsedSectionKeys: [...collapsedSectionKeys],
       lastVerbByTypeId,
     });
-  }, [documentId, groupBy, layout, collapsedIds, foldedIds, lastVerbByTypeId]);
+  }, [
+    documentId,
+    groupBy,
+    layout,
+    collapsedIds,
+    foldedIds,
+    collapsedSectionKeys,
+    lastVerbByTypeId,
+  ]);
 
   const onToggleCollapsed = useCallback((itemId: string) => {
     setCollapsedIds((prev) => toggled(prev, itemId));
   }, []);
   const onToggleFolded = useCallback((itemId: string) => {
     setFoldedIds((prev) => toggled(prev, itemId));
+  }, []);
+  const onToggleSection = useCallback((fullSectionKey: string) => {
+    setCollapsedSectionKeys((prev) => toggled(prev, fullSectionKey));
+  }, []);
+  const onCollapseOutline = useCallback((fullSectionKeys: string[], parentIds: string[]) => {
+    setCollapsedSectionKeys((prev) => new Set([...prev, ...fullSectionKeys]));
+    setFoldedIds((prev) => new Set([...prev, ...parentIds]));
+  }, []);
+  const onExpandOutline = useCallback((fullSectionKeys: string[]) => {
+    const keys = new Set(fullSectionKeys);
+    setCollapsedSectionKeys((prev) => new Set([...prev].filter((k) => !keys.has(k))));
+    setFoldedIds(new Set());
   }, []);
   const onVerbUsed = useCallback((itemTypeId: string, verbKey: string) => {
     setLastVerbByTypeId((prev) =>
@@ -479,6 +503,7 @@ export function RequirementsView({
     groupBy,
     selectedId: null as string | null,
     hierarchyIndex,
+    outlineSectionOf: new Map<string, string>(),
   });
 
   const flash = useCallback((itemId: string) => {
@@ -505,9 +530,41 @@ export function RequirementsView({
   const onNavigateToItem = useCallback(
     (itemId: string, fromSectionKey?: string, fromItemId?: string) => {
       const nav = navStateRef.current;
+      const ancestorsOf = (id: string) => {
+        const ancestors = new Set<string>();
+        const stack = [...(nav.hierarchyIndex.parentsByChildId.get(id) ?? [])];
+        while (stack.length > 0) {
+          const next = stack.pop()!;
+          if (ancestors.has(next)) continue;
+          ancestors.add(next);
+          stack.push(...(nav.hierarchyIndex.parentsByChildId.get(next) ?? []));
+        }
+        return ancestors;
+      };
       if (nav.layout === 'split') {
         if (fromItemId && nav.selectedId && nav.selectedId !== itemId) {
           pushHistory({ kind: 'select', itemId: nav.selectedId, label: nav.selectedId });
+        }
+        // Reveal the target in the outline: unfold its section and every
+        // parent above it (only what's needed - other folds stay).
+        const section = nav.outlineSectionOf.get(itemId);
+        if (section) {
+          setCollapsedSectionKeys((prev) => {
+            if (!prev.has(section)) return prev;
+            const next = new Set(prev);
+            next.delete(section);
+            return next;
+          });
+        }
+        if (nav.groupBy === 'epic') {
+          const ancestors = ancestorsOf(itemId);
+          if (ancestors.size > 0) {
+            setFoldedIds((prev) =>
+              [...prev].some((id) => ancestors.has(id))
+                ? new Set([...prev].filter((id) => !ancestors.has(id)))
+                : prev,
+            );
+          }
         }
         setSplitSelectedId(itemId);
         flash(itemId);
@@ -530,14 +587,7 @@ export function RequirementsView({
         return;
       }
       if (nav.groupBy !== 'epic') return;
-      const ancestors = new Set<string>();
-      const stack = [...(nav.hierarchyIndex.parentsByChildId.get(itemId) ?? [])];
-      while (stack.length > 0) {
-        const id = stack.pop()!;
-        if (ancestors.has(id)) continue;
-        ancestors.add(id);
-        stack.push(...(nav.hierarchyIndex.parentsByChildId.get(id) ?? []));
-      }
+      const ancestors = ancestorsOf(itemId);
       if (ancestors.size === 0) return;
       setFoldedIds((prev) => new Set([...prev].filter((id) => !ancestors.has(id))));
       requestAnimationFrame(() => {
@@ -580,9 +630,30 @@ export function RequirementsView({
     return visibleItems[0]?.id ?? null;
   }, [splitSelectedId, doc.items, visibleItems]);
 
+  /** Which outline section each item sits in (e.g. "type:ticket"), so
+   * navigation can unfold the right one. Top-level epics and everything
+   * nested under them have no section header, so they aren't listed. */
+  const outlineSectionOf = useMemo(() => {
+    const map = new Map<string, string>();
+    if (groupBy === 'epic') {
+      for (const item of epicTree.unparented) map.set(item.id, `epic:${NO_EPIC_KEY}`);
+    } else {
+      for (const group of groups) {
+        for (const item of group.items) map.set(item.id, `${groupBy}:${group.key}`);
+      }
+    }
+    return map;
+  }, [groupBy, epicTree, groups]);
+
   useLayoutEffect(() => {
-    navStateRef.current = { layout, groupBy, selectedId: selectedItemId, hierarchyIndex };
-  }, [layout, groupBy, selectedItemId, hierarchyIndex]);
+    navStateRef.current = {
+      layout,
+      groupBy,
+      selectedId: selectedItemId,
+      hierarchyIndex,
+      outlineSectionOf,
+    };
+  }, [layout, groupBy, selectedItemId, hierarchyIndex, outlineSectionOf]);
 
   const activeIndex = useMemo(() => {
     if (!search.trim() || visibleItems.length === 0) return 0;
@@ -905,6 +976,7 @@ export function RequirementsView({
     const children = (hierarchyIndex.childrenByParentId.get(item.id) ?? [])
       .map((id) => itemById.get(id))
       .filter((c): c is RequirementItem => Boolean(c));
+    const anyChildExpanded = children.some((c) => !collapsedIds.has(c.id));
     const crumb = (p: RequirementItem) => (
       <button
         key={p.id}
@@ -940,8 +1012,25 @@ export function RequirementsView({
         })}
         {children.length > 0 && (
           <section className="requirements-split__children">
-            <h3 className="requirements-view__group-title">
+            <h3 className="requirements-view__group-title requirements-split__children-title">
               Children <span className="requirements-split__children-count">{children.length}</span>
+              <button
+                type="button"
+                className="requirements-split__children-toggle"
+                onClick={() =>
+                  setCollapsedIds((prev) => {
+                    const next = new Set(prev);
+                    for (const child of children) {
+                      if (anyChildExpanded) next.add(child.id);
+                      else next.delete(child.id);
+                    }
+                    return next;
+                  })
+                }
+              >
+                {anyChildExpanded ? <ChevronsDownUp size={12} /> : <ChevronsUpDown size={12} />}
+                {anyChildExpanded ? 'Collapse all' : 'Expand all'}
+              </button>
             </h3>
             {children.map((child) =>
               renderCard(child, {
@@ -1171,10 +1260,16 @@ export function RequirementsView({
                 doc={doc}
                 groups={groups}
                 epicTree={groupBy === 'epic' ? epicTree : undefined}
+                sectionKeyPrefix={groupBy}
+                noEpicSectionKey={NO_EPIC_KEY}
                 selectedId={selectedItemId}
                 onSelect={setSplitSelectedId}
                 foldedIds={foldedIds}
                 onToggleFolded={onToggleFolded}
+                collapsedSectionKeys={collapsedSectionKeys}
+                onToggleSection={onToggleSection}
+                onCollapseAll={onCollapseOutline}
+                onExpandAll={onExpandOutline}
                 searchQuery={trimmedSearch}
               />
             )}

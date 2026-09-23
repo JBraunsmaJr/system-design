@@ -3239,6 +3239,32 @@ option {
   color: var(--chrome-text-dim);
 }
 
+.requirements-split__children-title {
+  display: flex;
+  align-items: center;
+}
+
+.requirements-split__children-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 3px 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--chrome-text-dim);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.requirements-split__children-toggle:hover {
+  color: var(--chrome-text);
+  border-color: var(--chrome-border);
+}
+
 @media (max-width: 900px) {
   .requirements-split {
     grid-template-columns: minmax(0, 1fr);
@@ -3254,22 +3280,96 @@ option {
 /* ---------- Outline (split view's left pane) ---------- */
 
 .requirements-outline {
-  padding: 8px 0 24px;
+  padding-bottom: 24px;
   font-size: 13px;
 }
 
-.requirements-outline__section + .requirements-outline__section {
-  margin-top: 10px;
+/* Sticky bar at the top of the pane: counts plus Collapse/Expand all.
+   Its height is mirrored in RequirementsOutline (TOOLBAR_HEIGHT). */
+.requirements-outline__toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px 0 12px;
+  background: var(--chrome-bg);
+  border-bottom: 1px solid var(--chrome-border);
 }
 
+.requirements-outline__toolbar-label {
+  flex: 1;
+  min-width: 0;
+  color: var(--chrome-text-dim);
+  font-size: 11.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.requirements-outline__toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--chrome-text-dim);
+  font-size: 11.5px;
+}
+
+.requirements-outline__toolbar-btn:hover:not(:disabled) {
+  color: var(--chrome-text);
+  border-color: var(--chrome-border);
+}
+
+.requirements-outline__toolbar-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.requirements-outline__section + .requirements-outline__section {
+  margin-top: 4px;
+}
+
+/* A group's header (Tickets, a category, "No epic"): folds the group, and
+   stays pinned under the toolbar while you scroll through the group.
+   Height mirrored in RequirementsOutline (SECTION_HEADER_HEIGHT). */
 .requirements-outline__section-title {
+  position: sticky;
+  z-index: 4;
   display: flex;
-  justify-content: space-between;
-  padding: 6px 12px 4px;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 28px;
+  padding: 0 12px 0 8px;
+  background: var(--chrome-bg);
+  border: none;
+  border-radius: 0;
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  text-align: left;
+}
+
+.requirements-outline__section-title:hover:not(:disabled) {
+  background: var(--node-bg);
+}
+
+.requirements-outline__section-title:disabled {
+  cursor: default;
+}
+
+.requirements-outline__section-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .requirements-outline__section-count {
@@ -3280,7 +3380,15 @@ option {
 .requirements-outline__row {
   display: flex;
   align-items: center;
+  height: 28px;
   padding-right: 6px;
+}
+
+/* An unfolded parent stays pinned (at an offset set inline) while you
+   scroll through its children; it needs a background to cover them. */
+.requirements-outline__row.is-pinned {
+  position: sticky;
+  background: var(--chrome-bg);
 }
 
 .requirements-outline__row.is-context {
@@ -3316,7 +3424,7 @@ option {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 28px;
+  height: 26px;
   padding: 0 8px;
   background: transparent;
   border: 1px solid transparent;

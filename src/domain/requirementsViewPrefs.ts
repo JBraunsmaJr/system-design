@@ -16,6 +16,10 @@ export interface RequirementsViewPrefs {
   /** Epics (or other parents) whose children are folded away in the epic
    * grouping and the outline. */
   foldedIds?: string[];
+  /** Outline sections folded in the split view, as "<groupBy>:<sectionKey>"
+   * (e.g. "type:ticket", "epic:__no-epic__"), so each grouping keeps its
+   * own folds. */
+  collapsedSectionKeys?: string[];
   /** The relationship verb ("<typeId>::forward|backward") last used from a
    * card of each item type, so the Add relationship picker opens on it. */
   lastVerbByTypeId?: Record<string, string>;
@@ -52,6 +56,8 @@ export function loadRequirementsViewPrefs(documentId?: string): RequirementsView
     if (collapsedIds) prefs.collapsedIds = collapsedIds;
     const foldedIds = stringArray(parsed.foldedIds);
     if (foldedIds) prefs.foldedIds = foldedIds;
+    const collapsedSectionKeys = stringArray(parsed.collapsedSectionKeys);
+    if (collapsedSectionKeys) prefs.collapsedSectionKeys = collapsedSectionKeys;
     const verbs = parsed.lastVerbByTypeId;
     if (verbs && typeof verbs === 'object' && !Array.isArray(verbs)) {
       prefs.lastVerbByTypeId = Object.fromEntries(
