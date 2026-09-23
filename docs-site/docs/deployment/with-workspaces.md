@@ -158,6 +158,15 @@ As in the core deployment: `certs/fullchain.pem` and `certs/privkey.pem`.
 
 ## 7. Start it
 
+::: warning TURN Server
+
+In an air-gapped network it has been observed that the relay token secret is possibly bugged. 
+In the event that two users are unable to join a session and see content, try commenting out the `RELAY_TOKEN_SECRET` 
+env-vars from both the `store` and `relay` services.
+
+:::
+
+
 ::: code-group
 
 ```bash [Option A]
