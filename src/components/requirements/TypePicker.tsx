@@ -105,8 +105,8 @@ export function TypePicker({
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        close();
         triggerRef.current?.focus();
+        close();
       }
     };
     document.addEventListener('mousedown', handler);
