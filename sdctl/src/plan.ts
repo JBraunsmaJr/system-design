@@ -169,6 +169,16 @@ export function calculatePlan(options: {
     });
   }
 
+  const currentPaths = `editor: ${currentSpec?.paths?.editor || '/'}, relay: ${currentSpec?.paths?.relay || (currentSpec?.tls.editorHost === currentSpec?.tls.relayHost ? '/relay' : '/')}`;
+  const desiredPaths = `editor: ${desiredSpec.paths?.editor || '/'}, relay: ${desiredSpec.paths?.relay || (desiredSpec.tls.editorHost === desiredSpec.tls.relayHost ? '/relay' : '/')}`;
+  if (currentPaths !== desiredPaths) {
+    proxyChanges.push({
+      property: 'Routing Subpaths',
+      current: currentPaths,
+      desired: desiredPaths,
+    });
+  }
+
   const hasChanges =
     !currentRevision ||
     componentsAdded.length > 0 ||

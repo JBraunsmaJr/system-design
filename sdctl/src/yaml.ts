@@ -48,6 +48,13 @@ export function dumpDeploymentSpecYaml(spec: DeploymentSpec): string {
     lines.push(`  prefix: "${spec.registry.prefix}"`);
   }
 
+  if (spec.paths && (spec.paths.editor || spec.paths.relay)) {
+    lines.push('');
+    lines.push('paths:');
+    if (spec.paths.editor) lines.push(`  editor: "${spec.paths.editor}"`);
+    if (spec.paths.relay) lines.push(`  relay: "${spec.paths.relay}"`);
+  }
+
   lines.push('');
   lines.push('relay:');
   if (spec.relay.allowedCidrs && spec.relay.allowedCidrs.length > 0) {

@@ -37,6 +37,23 @@ export function generateCaddyfile(spec: DeploymentSpec): string {
   const isSingleHost = editorHost === relayHost;
   const isWildcard = Boolean(spec.tls.domain && spec.tls.domain.startsWith('*.'));
 
+  const rawEditorPath = spec.paths?.editor?.trim();
+  const rawRelayPath = spec.paths?.relay?.trim();
+
+  let editorPath = '';
+  if (rawEditorPath && rawEditorPath !== '/') {
+    editorPath = rawEditorPath.startsWith('/') ? rawEditorPath : `/${rawEditorPath}`;
+    if (editorPath.endsWith('/')) editorPath = editorPath.slice(0, -1);
+  }
+
+  let relayPath = '';
+  if (rawRelayPath && rawRelayPath !== '/') {
+    relayPath = rawRelayPath.startsWith('/') ? rawRelayPath : `/${rawRelayPath}`;
+    if (relayPath.endsWith('/')) relayPath = relayPath.slice(0, -1);
+  } else if (isSingleHost && !rawRelayPath) {
+    relayPath = '/relay';
+  }
+
   const tlsDirectives = buildTlsDirectives(spec);
 
   const cidrList =
@@ -63,53 +80,82 @@ export function generateCaddyfile(spec: DeploymentSpec): string {
         );
       }
       lines.push('    handle @relay {');
+      if (relayPath) {
+        lines.push(`        uri strip_prefix ${relayPath}`);
+      }
       lines.push('        reverse_proxy relay:4444');
       lines.push('    }');
     } else {
-      lines.push('    @relay_path path /relay*');
+      const matchRelay = relayPath || '/relay';
+      lines.push(`    @relay_path path ${matchRelay}*`);
       if (cidrList) {
         lines.push(
-          `    @relay_blocked {\n        path /relay*\n        not client_ip ${cidrList}\n    }`,
+          `    @relay_blocked {\n        path ${matchRelay}*\n        not client_ip ${cidrList}\n    }`,
         );
         lines.push(
           '    respond @relay_blocked "Access Denied: Relay restricted by source CIDR" 403',
         );
       }
       lines.push('    handle @relay_path {');
-      lines.push('        uri strip_prefix /relay');
+      lines.push(`        uri strip_prefix ${matchRelay}`);
       lines.push('        reverse_proxy relay:4444');
       lines.push('    }');
     }
 
     lines.push('');
-    lines.push('    handle {');
-    lines.push('        reverse_proxy editor:80');
-    lines.push('    }');
+    if (editorPath) {
+      lines.push(`    @editor_path path ${editorPath}*`);
+      lines.push('    handle @editor_path {');
+      lines.push(`        uri strip_prefix ${editorPath}`);
+      lines.push('        reverse_proxy editor:80');
+      lines.push('    }');
+      lines.push('');
+      lines.push('    handle {');
+      lines.push(`        redir / ${editorPath}/ 308`);
+      lines.push('    }');
+    } else {
+      lines.push('    handle {');
+      lines.push('        reverse_proxy editor:80');
+      lines.push('    }');
+    }
     lines.push('}');
   } else if (isSingleHost) {
-    // Single host deployment: editor at root, relay at /relay or direct port
+    // Single host deployment: editor at root or subpath, relay at subpath
     lines.push(`${editorHost} {`);
     if (tlsDirectives.length > 0) {
       lines.push(...tlsDirectives);
     }
 
     lines.push('');
-    lines.push('    @relay_path path /relay*');
+    const matchRelay = relayPath || '/relay';
+    lines.push(`    @relay_path path ${matchRelay}*`);
     if (cidrList) {
       lines.push(
-        `    @relay_blocked {\n        path /relay*\n        not client_ip ${cidrList}\n    }`,
+        `    @relay_blocked {\n        path ${matchRelay}*\n        not client_ip ${cidrList}\n    }`,
       );
       lines.push('    respond @relay_blocked "Access Denied: Relay restricted by source CIDR" 403');
     }
     lines.push('    handle @relay_path {');
-    lines.push('        uri strip_prefix /relay');
+    lines.push(`        uri strip_prefix ${matchRelay}`);
     lines.push('        reverse_proxy relay:4444');
     lines.push('    }');
 
     lines.push('');
-    lines.push('    handle {');
-    lines.push('        reverse_proxy editor:80');
-    lines.push('    }');
+    if (editorPath) {
+      lines.push(`    @editor_path path ${editorPath}*`);
+      lines.push('    handle @editor_path {');
+      lines.push(`        uri strip_prefix ${editorPath}`);
+      lines.push('        reverse_proxy editor:80');
+      lines.push('    }');
+      lines.push('');
+      lines.push('    handle {');
+      lines.push(`        redir / ${editorPath}/ 308`);
+      lines.push('    }');
+    } else {
+      lines.push('    handle {');
+      lines.push('        reverse_proxy editor:80');
+      lines.push('    }');
+    }
     lines.push('}');
   } else {
     // Separate editor and relay hostnames
@@ -118,7 +164,19 @@ export function generateCaddyfile(spec: DeploymentSpec): string {
     if (tlsDirectives.length > 0) {
       lines.push(...tlsDirectives);
     }
-    lines.push('    reverse_proxy editor:80');
+    if (editorPath) {
+      lines.push(`    @editor_path path ${editorPath}*`);
+      lines.push('    handle @editor_path {');
+      lines.push(`        uri strip_prefix ${editorPath}`);
+      lines.push('        reverse_proxy editor:80');
+      lines.push('    }');
+      lines.push('');
+      lines.push('    handle {');
+      lines.push(`        redir / ${editorPath}/ 308`);
+      lines.push('    }');
+    } else {
+      lines.push('    reverse_proxy editor:80');
+    }
     lines.push('}');
     lines.push('');
 
@@ -133,7 +191,15 @@ export function generateCaddyfile(spec: DeploymentSpec): string {
       lines.push('    respond @relay_blocked "Access Denied: Relay restricted by source CIDR" 403');
     }
 
-    lines.push('    reverse_proxy relay:4444');
+    if (relayPath) {
+      lines.push(`    @relay_path path ${relayPath}*`);
+      lines.push('    handle @relay_path {');
+      lines.push(`        uri strip_prefix ${relayPath}`);
+      lines.push('        reverse_proxy relay:4444');
+      lines.push('    }');
+    } else {
+      lines.push('    reverse_proxy relay:4444');
+    }
     lines.push('}');
   }
 

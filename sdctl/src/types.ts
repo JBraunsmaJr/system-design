@@ -11,6 +11,11 @@ export interface DnsProviderConfig {
   propagationTimeout?: string;
 }
 
+export interface SubpathConfig {
+  editor?: string;
+  relay?: string;
+}
+
 export interface ComponentImages {
   editor: string;
   relay: string;
@@ -52,6 +57,7 @@ export interface DeploymentSpec {
   registry?: {
     prefix?: string;
   };
+  paths?: SubpathConfig;
   relay: {
     allowedCidrs?: string[];
     port?: number;
@@ -110,6 +116,9 @@ export interface WizardAnswers {
   editorHost?: string;
   relayHost?: string;
   singleHost?: boolean;
+  editorPath?: string;
+  relayPath?: string;
+  paths?: SubpathConfig;
   domain?: string;
   certificatePath?: string;
   privateKeyPath?: string;

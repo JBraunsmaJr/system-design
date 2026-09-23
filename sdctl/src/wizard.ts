@@ -8,7 +8,9 @@ export function buildDeploymentSpec(answers: WizardAnswers): DeploymentSpec {
   const topology: Topology = answers.topology || 'lan';
   const tlsMode: TlsMode = answers.tlsMode || (mode === 'isolated' ? 'provided' : 'acme');
 
-  const editorHost = answers.editorHost || 'localhost';
+  const editorHost =
+    answers.editorHost ||
+    (answers.domain && !answers.domain.startsWith('*.') ? answers.domain : 'localhost');
   const relayHost =
     answers.relayHost || (answers.singleHost !== false ? editorHost : `relay.${editorHost}`);
 
@@ -51,6 +53,18 @@ export function buildDeploymentSpec(answers: WizardAnswers): DeploymentSpec {
         }
       : undefined;
 
+  let paths: { editor?: string; relay?: string } | undefined;
+  if (answers.editorPath || answers.relayPath || answers.paths) {
+    const editor = answers.editorPath || answers.paths?.editor;
+    const relay = answers.relayPath || answers.paths?.relay;
+    if (editor || relay) {
+      paths = {
+        editor: editor || undefined,
+        relay: relay || undefined,
+      };
+    }
+  }
+
   const spec: DeploymentSpec = {
     version: '1',
     mode,
@@ -66,6 +80,7 @@ export function buildDeploymentSpec(answers: WizardAnswers): DeploymentSpec {
       caPath: answers.caPath,
       dnsProvider,
     },
+    paths,
     registry: answers.registryPrefix ? { prefix: answers.registryPrefix } : undefined,
     relay: {
       allowedCidrs: allowedCidrs || [],
@@ -158,6 +173,8 @@ export async function runInteractiveWizard(answers: WizardAnswers = {}): Promise
     console.log('\n3. TLS / HTTPS Configuration:');
     let tlsMode: TlsMode = 'none';
     let domain: string | undefined;
+    let editorPath: string | undefined;
+    let relayPath: string | undefined;
     let dnsProviderName: string | undefined;
     let cloudflareApiToken: string | undefined;
     let cloudflareResolvers: string[] | undefined;
@@ -197,21 +214,51 @@ export async function runInteractiveWizard(answers: WizardAnswers = {}): Promise
     if (tlsMode === 'acme-dns') {
       domain = await promptQuestion(
         rl,
-        '\nPrimary or Wildcard Domain (e.g. *.home.example.com)',
+        '\nPrimary or Wildcard Domain (e.g. *.home.example.com or editor.home.example.com)',
         '*.example.com',
       );
       const isWildcard = domain.startsWith('*.');
       const baseDomain = isWildcard ? domain.slice(2) : domain;
-      editorHost = await promptQuestion(
-        rl,
-        'Public domain / hostname for Editor',
-        isWildcard ? `design.${baseDomain}` : baseDomain,
-      );
-      relayHost = await promptQuestion(
-        rl,
-        'Public domain / hostname for Relay',
-        isWildcard ? `relay.${baseDomain}` : `relay.${baseDomain}`,
-      );
+      if (isWildcard) {
+        editorHost = await promptQuestion(
+          rl,
+          'Public domain / hostname for Editor',
+          `design.${baseDomain}`,
+        );
+        relayHost = await promptQuestion(
+          rl,
+          'Public domain / hostname for Relay',
+          `relay.${baseDomain}`,
+        );
+      } else {
+        editorHost = domain;
+        const singleHostAns = await promptQuestion(
+          rl,
+          `Serve Signaling Relay on same domain under subpath (${editorHost}/relay)? (y/n)`,
+          'y',
+        );
+        if (singleHostAns.toLowerCase().startsWith('y')) {
+          relayHost = editorHost;
+          const editorPathAns = await promptQuestion(
+            rl,
+            'Subpath for Editor (leave blank or "/" for root, or e.g. /editor)',
+            '/',
+          );
+          if (editorPathAns && editorPathAns !== '/') {
+            editorPath = editorPathAns;
+          }
+          const relayPathAns = await promptQuestion(rl, 'Subpath for Signaling Relay', '/relay');
+          if (relayPathAns) {
+            relayPath = relayPathAns;
+          }
+        } else {
+          relayHost = await promptQuestion(
+            rl,
+            'Public domain / hostname for Relay',
+            `relay.${baseDomain}`,
+          );
+        }
+      }
 
       cloudflareApiToken = await promptQuestion(
         rl,
@@ -315,6 +362,8 @@ export async function runInteractiveWizard(answers: WizardAnswers = {}): Promise
       editorHost,
       relayHost,
       singleHost: editorHost === relayHost,
+      editorPath: editorPath || undefined,
+      relayPath: relayPath || undefined,
       certificatePath,
       privateKeyPath,
       allowedCidrs,

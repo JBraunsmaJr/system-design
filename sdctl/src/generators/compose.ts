@@ -17,18 +17,35 @@ export function deriveEndpoints(spec: DeploymentSpec): {
   const relayHost = spec.tls.relayHost || editorHost;
   const isSingleHost = editorHost === relayHost;
 
+  const rawEditorPath = spec.paths?.editor?.trim();
+  const rawRelayPath = spec.paths?.relay?.trim();
+
+  let editorPath = '';
+  if (rawEditorPath && rawEditorPath !== '/') {
+    editorPath = rawEditorPath.startsWith('/') ? rawEditorPath : `/${rawEditorPath}`;
+    if (editorPath.endsWith('/')) editorPath = editorPath.slice(0, -1);
+  }
+
+  let relayPath = '';
+  if (rawRelayPath && rawRelayPath !== '/') {
+    relayPath = rawRelayPath.startsWith('/') ? rawRelayPath : `/${rawRelayPath}`;
+    if (relayPath.endsWith('/')) relayPath = relayPath.slice(0, -1);
+  } else if (isSingleHost && !rawRelayPath) {
+    relayPath = '/relay';
+  }
+
   let appUrl: string;
   let relayUrl: string;
 
   if (spec.tls.mode === 'none') {
-    appUrl = `http://${editorHost === 'localhost' ? 'localhost:8080' : editorHost}`;
-    relayUrl = `ws://${relayHost === 'localhost' ? 'localhost:4444' : `${relayHost}:4444`}`;
+    appUrl = `http://${editorHost === 'localhost' ? 'localhost:8080' : editorHost}${editorPath}`;
+    relayUrl = `ws://${relayHost === 'localhost' ? 'localhost:4444' : `${relayHost}:4444`}${relayPath}`;
   } else if (isSingleHost) {
-    appUrl = `${httpScheme}://${editorHost}`;
-    relayUrl = `${wsScheme}://${editorHost}/relay`;
+    appUrl = `${httpScheme}://${editorHost}${editorPath}`;
+    relayUrl = `${wsScheme}://${editorHost}${relayPath}`;
   } else {
-    appUrl = `${httpScheme}://${editorHost}`;
-    relayUrl = `${wsScheme}://${relayHost}`;
+    appUrl = `${httpScheme}://${editorHost}${editorPath}`;
+    relayUrl = `${wsScheme}://${relayHost}${relayPath}`;
   }
 
   // Derived ICE servers

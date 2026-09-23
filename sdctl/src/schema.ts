@@ -214,6 +214,33 @@ export function validateDeploymentSpec(spec: unknown): ValidationResult {
     }
   }
 
+  // Subpaths configuration
+  if (s.paths !== undefined) {
+    if (typeof s.paths !== 'object' || s.paths === null || Array.isArray(s.paths)) {
+      errors.push({
+        path: 'paths',
+        message: '`paths` must be an object with optional `editor` and `relay` subpath strings',
+        suggestedFix: 'Set `paths: { editor: "/editor", relay: "/relay" }`.',
+      });
+    } else {
+      const paths = s.paths as Record<string, unknown>;
+      if (paths.editor !== undefined && typeof paths.editor !== 'string') {
+        errors.push({
+          path: 'paths.editor',
+          message: '`paths.editor` must be a string (e.g., "/editor" or "/")',
+          suggestedFix: 'Use a path string like "/editor" or "/".',
+        });
+      }
+      if (paths.relay !== undefined && typeof paths.relay !== 'string') {
+        errors.push({
+          path: 'paths.relay',
+          message: '`paths.relay` must be a string (e.g., "/relay")',
+          suggestedFix: 'Use a path string like "/relay".',
+        });
+      }
+    }
+  }
+
   // Relay access CIDRs
   if (s.relay && typeof s.relay === 'object') {
     const relay = s.relay as Record<string, unknown>;

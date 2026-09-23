@@ -11,7 +11,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { DEFAULT_MANIFEST, getResolvedImages } from '../sdctl/src/manifest.js';
 import { validateDeploymentSpec } from '../sdctl/src/schema.js';
 import { dumpDeploymentSpecYaml, parseSimpleYaml } from '../sdctl/src/yaml.js';
-import { generateComposeYaml } from '../sdctl/src/generators/compose.js';
+import { generateComposeYaml, deriveEndpoints } from '../sdctl/src/generators/compose.js';
 import { generateCaddyfile } from '../sdctl/src/generators/caddy.js';
 import { generateCoturnConfig } from '../sdctl/src/generators/coturn.js';
 import { loadOrCreateSecrets } from '../sdctl/src/generators/secrets.js';
@@ -918,6 +918,142 @@ console.log('\n18. Cloudflare DNS-01 ACME & Wildcard Support');
   check(
     caddyCustomNs.includes('resolvers clyde.ns.cloudflare.com mckenzie.ns.cloudflare.com'),
     'Caddyfile generates custom operator nameservers when configured',
+  );
+
+  // Test single primary domain with subpath /relay (e.g. editor.home.jbraunsma.dev)
+  const singleDomainSpec: DeploymentSpec = {
+    version: '1',
+    mode: 'public',
+    topology: 'routed',
+    tls: {
+      mode: 'acme-dns',
+      domain: 'editor.home.jbraunsma.dev',
+      editorHost: 'editor.home.jbraunsma.dev',
+      relayHost: 'editor.home.jbraunsma.dev',
+      dnsProvider: {
+        name: 'cloudflare',
+      },
+    },
+    relay: { allowedCidrs: [] },
+  };
+  const singleDomainCaddy = generateCaddyfile(singleDomainSpec);
+  check(
+    singleDomainCaddy.includes('editor.home.jbraunsma.dev {'),
+    'Single domain Caddyfile generates primary host block',
+  );
+  check(
+    singleDomainCaddy.includes('@relay_path path /relay*'),
+    'Single domain Caddyfile matches /relay* path',
+  );
+  check(
+    singleDomainCaddy.includes('uri strip_prefix /relay'),
+    'Single domain Caddyfile strips /relay prefix before proxying',
+  );
+  check(
+    singleDomainCaddy.includes('reverse_proxy relay:4444'),
+    'Single domain Caddyfile proxies /relay to relay:4444',
+  );
+  check(
+    singleDomainCaddy.includes('reverse_proxy editor:80'),
+    'Single domain Caddyfile proxies root to editor:80',
+  );
+
+  const singleDomainEndpoints = deriveEndpoints(singleDomainSpec);
+  check(
+    singleDomainEndpoints.appUrl === 'https://editor.home.jbraunsma.dev',
+    'Single domain appUrl is https://editor.home.jbraunsma.dev',
+  );
+  check(
+    singleDomainEndpoints.relayUrl === 'wss://editor.home.jbraunsma.dev/relay',
+    'Single domain relayUrl is wss://editor.home.jbraunsma.dev/relay',
+  );
+
+  // Test Wizard answers builder with single domain
+  const singleDomainWizardSpec = buildDeploymentSpec({
+    mode: 'public',
+    topology: 'routed',
+    tlsMode: 'acme-dns',
+    domain: 'editor.home.jbraunsma.dev',
+    editorPath: '/editor',
+    relayPath: '/relay',
+    cloudflareApiToken: 'cf-tok-123',
+  });
+  check(
+    singleDomainWizardSpec.tls.editorHost === 'editor.home.jbraunsma.dev' &&
+      singleDomainWizardSpec.tls.relayHost === 'editor.home.jbraunsma.dev',
+    'Wizard builds single-domain spec with matching editorHost and relayHost',
+  );
+  check(
+    singleDomainWizardSpec.paths?.editor === '/editor' &&
+      singleDomainWizardSpec.paths?.relay === '/relay',
+    'Wizard records custom editor and relay subpaths',
+  );
+
+  // Test single domain with custom subpaths (/editor and /relay) Caddyfile and endpoints
+  const subpathSpec: DeploymentSpec = {
+    version: '1',
+    mode: 'public',
+    topology: 'routed',
+    tls: {
+      mode: 'acme-dns',
+      domain: 'editor.home.jbraunsma.dev',
+      editorHost: 'editor.home.jbraunsma.dev',
+      relayHost: 'editor.home.jbraunsma.dev',
+      dnsProvider: {
+        name: 'cloudflare',
+      },
+    },
+    paths: {
+      editor: '/editor',
+      relay: '/relay',
+    },
+    relay: { allowedCidrs: [] },
+  };
+
+  const subpathValidation = validateDeploymentSpec(subpathSpec);
+  check(subpathValidation.valid, 'Schema accepts valid subpath spec');
+
+  const subpathYaml = dumpDeploymentSpecYaml(subpathSpec);
+  check(
+    subpathYaml.includes('paths:\n  editor: "/editor"\n  relay: "/relay"'),
+    'YAML serializer dumps paths block',
+  );
+  const parsedSubpathYaml = parseSimpleYaml(subpathYaml) as unknown as DeploymentSpec;
+  check(
+    parsedSubpathYaml.paths?.editor === '/editor' && parsedSubpathYaml.paths?.relay === '/relay',
+    'YAML parser recovers subpath configuration',
+  );
+
+  const subpathCaddy = generateCaddyfile(subpathSpec);
+  check(
+    subpathCaddy.includes('@editor_path path /editor*'),
+    'Caddyfile generates @editor_path matcher',
+  );
+  check(
+    subpathCaddy.includes('uri strip_prefix /editor'),
+    'Caddyfile strips /editor prefix before proxying to editor:80',
+  );
+  check(
+    subpathCaddy.includes('redir / /editor/ 308'),
+    'Caddyfile redirects root / to /editor/ 308',
+  );
+  check(
+    subpathCaddy.includes('@relay_path path /relay*'),
+    'Caddyfile generates @relay_path matcher',
+  );
+  check(
+    subpathCaddy.includes('uri strip_prefix /relay'),
+    'Caddyfile strips /relay prefix before proxying to relay:4444',
+  );
+
+  const subpathEndpoints = deriveEndpoints(subpathSpec);
+  check(
+    subpathEndpoints.appUrl === 'https://editor.home.jbraunsma.dev/editor',
+    'deriveEndpoints builds appUrl with /editor subpath',
+  );
+  check(
+    subpathEndpoints.relayUrl === 'wss://editor.home.jbraunsma.dev/relay',
+    'deriveEndpoints builds relayUrl with /relay subpath',
   );
 
   // D. Compose YAML Generation with Custom Image & Proxy Environment
