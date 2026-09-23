@@ -9,14 +9,18 @@ export function buildDeploymentSpec(answers: WizardAnswers): DeploymentSpec {
   const tlsMode: TlsMode = answers.tlsMode || (mode === 'isolated' ? 'provided' : 'acme');
 
   const editorHost = answers.editorHost || 'localhost';
-  const relayHost = answers.relayHost || (answers.singleHost !== false ? editorHost : `relay.${editorHost}`);
+  const relayHost =
+    answers.relayHost || (answers.singleHost !== false ? editorHost : `relay.${editorHost}`);
 
   let allowedCidrs: string[] | undefined;
   if (answers.allowedCidrs) {
     if (Array.isArray(answers.allowedCidrs)) {
       allowedCidrs = answers.allowedCidrs;
     } else if (typeof answers.allowedCidrs === 'string') {
-      allowedCidrs = answers.allowedCidrs.split(',').map((s) => s.trim()).filter(Boolean);
+      allowedCidrs = answers.allowedCidrs
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
     }
   }
 
@@ -93,17 +97,30 @@ export async function runInteractiveWizard(answers: WizardAnswers = {}): Promise
   try {
     // 1. Mode
     console.log('1. Deployment Environment Mode:');
-    console.log('  [1] Public (Internet-connected registry, ACME certificates, public STUN permitted)');
-    console.log('  [2] Isolated (Air-gapped / private network, internal registry, no outbound connections)');
-    const modeChoice = await promptQuestion(rl, 'Select mode (1 or 2)', answers.mode === 'isolated' ? '2' : '1');
-    const mode: DeploymentMode = modeChoice === '2' || answers.mode === 'isolated' ? 'isolated' : 'public';
+    console.log(
+      '  [1] Public (Internet-connected registry, ACME certificates, public STUN permitted)',
+    );
+    console.log(
+      '  [2] Isolated (Air-gapped / private network, internal registry, no outbound connections)',
+    );
+    const modeChoice = await promptQuestion(
+      rl,
+      'Select mode (1 or 2)',
+      answers.mode === 'isolated' ? '2' : '1',
+    );
+    const mode: DeploymentMode =
+      modeChoice === '2' || answers.mode === 'isolated' ? 'isolated' : 'public';
 
     // 2. Topology
     console.log('\n2. Network Topology between collaborating users:');
     console.log('  [1] LAN: All clients on the same flat local subnet (no ICE / STUN required)');
     console.log('  [2] Routed: Clients across corporate subnets with direct IP routing');
-    console.log('  [3] NAT: Clients behind NAT routers relative to each other (STUN + TURN required)');
-    console.log('  [4] Multi-site: Clients across different physical branches or VPN tunnels (TURN required)');
+    console.log(
+      '  [3] NAT: Clients behind NAT routers relative to each other (STUN + TURN required)',
+    );
+    console.log(
+      '  [4] Multi-site: Clients across different physical branches or VPN tunnels (TURN required)',
+    );
     const topoChoice = await promptQuestion(rl, 'Select topology (1-4)', '1');
     let topology: Topology = 'lan';
     if (topoChoice === '2') topology = 'routed';
@@ -114,7 +131,7 @@ export async function runInteractiveWizard(answers: WizardAnswers = {}): Promise
     console.log('\n3. TLS / HTTPS Configuration:');
     let tlsMode: TlsMode = 'none';
     if (mode === 'public') {
-      console.log('  [1] Automatic HTTPS with Caddy (ACME / Let\'s Encrypt)');
+      console.log("  [1] Automatic HTTPS with Caddy (ACME / Let's Encrypt)");
       console.log('  [2] Operator-supplied Custom Certificates (PEM cert + key)');
       console.log('  [3] External Reverse Proxy (Operator manages own TLS termination)');
       console.log('  [4] None (Plain HTTP/WS - local evaluation only)');
@@ -137,19 +154,35 @@ export async function runInteractiveWizard(answers: WizardAnswers = {}): Promise
     let editorHost = 'localhost';
     let relayHost = 'localhost';
     if (tlsMode !== 'none') {
-      editorHost = await promptQuestion(rl, '\nPublic domain / hostname for Editor (e.g. design.example.com)', 'design.example.com');
-      const singleHostAns = await promptQuestion(rl, 'Serve Signaling Relay under subpath on same domain (/relay)? (y/n)', 'y');
+      editorHost = await promptQuestion(
+        rl,
+        '\nPublic domain / hostname for Editor (e.g. design.example.com)',
+        'design.example.com',
+      );
+      const singleHostAns = await promptQuestion(
+        rl,
+        'Serve Signaling Relay under subpath on same domain (/relay)? (y/n)',
+        'y',
+      );
       if (singleHostAns.toLowerCase().startsWith('y')) {
         relayHost = editorHost;
       } else {
-        relayHost = await promptQuestion(rl, 'Public domain / hostname for Relay (e.g. relay.example.com)', `relay.${editorHost}`);
+        relayHost = await promptQuestion(
+          rl,
+          'Public domain / hostname for Relay (e.g. relay.example.com)',
+          `relay.${editorHost}`,
+        );
       }
     }
 
     let certificatePath: string | undefined;
     let privateKeyPath: string | undefined;
     if (tlsMode === 'provided') {
-      certificatePath = await promptQuestion(rl, 'Path to certificate PEM file', './certs/cert.pem');
+      certificatePath = await promptQuestion(
+        rl,
+        'Path to certificate PEM file',
+        './certs/cert.pem',
+      );
       privateKeyPath = await promptQuestion(rl, 'Path to private key PEM file', './certs/key.pem');
     }
 
@@ -157,10 +190,21 @@ export async function runInteractiveWizard(answers: WizardAnswers = {}): Promise
     let allowedCidrs: string[] = [];
     if (mode === 'public') {
       console.log('\nNotice: The WebRTC signaling relay is unauthenticated by default.');
-      const restrictAns = await promptQuestion(rl, 'Would you like to restrict relay access to specific IP CIDRs? (y/n)', 'n');
+      const restrictAns = await promptQuestion(
+        rl,
+        'Would you like to restrict relay access to specific IP CIDRs? (y/n)',
+        'n',
+      );
       if (restrictAns.toLowerCase().startsWith('y')) {
-        const cidrs = await promptQuestion(rl, 'Comma-separated allowed CIDRs (e.g. 10.0.0.0/8, 192.168.1.0/24)', '');
-        allowedCidrs = cidrs.split(',').map((s) => s.trim()).filter(Boolean);
+        const cidrs = await promptQuestion(
+          rl,
+          'Comma-separated allowed CIDRs (e.g. 10.0.0.0/8, 192.168.1.0/24)',
+          '',
+        );
+        allowedCidrs = cidrs
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
       }
     }
 
@@ -169,7 +213,11 @@ export async function runInteractiveWizard(answers: WizardAnswers = {}): Promise
     let turnExternalIp: string | undefined;
     if (enableTurn) {
       console.log('\nTopology requires TURN server for reliable media relay.');
-      turnExternalIp = await promptQuestion(rl, 'Public / reachable IP address for TURN server (optional)', '');
+      turnExternalIp = await promptQuestion(
+        rl,
+        'Public / reachable IP address for TURN server (optional)',
+        '',
+      );
     }
 
     const compiledAnswers: WizardAnswers = {

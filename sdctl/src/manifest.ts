@@ -33,11 +33,7 @@ export const DEFAULT_MANIFEST: ReleaseManifest = {
  * e.g., if image is "ghcr.io/jbraunsmajr/system-design" and prefix is "internal-registry.local:5000",
  * the image becomes "internal-registry.local:5000/system-design@sha256:...".
  */
-export function resolveImage(
-  baseImage: string,
-  digest: string,
-  registryPrefix?: string,
-): string {
+export function resolveImage(baseImage: string, digest: string, registryPrefix?: string): string {
   let imagePath = baseImage;
 
   if (registryPrefix) {
@@ -56,10 +52,18 @@ export function getResolvedImages(
   registryPrefix?: string,
 ) {
   return {
-    editor: resolveImage(manifest.images.editor.image, manifest.images.editor.digest, registryPrefix),
+    editor: resolveImage(
+      manifest.images.editor.image,
+      manifest.images.editor.digest,
+      registryPrefix,
+    ),
     relay: resolveImage(manifest.images.relay.image, manifest.images.relay.digest, registryPrefix),
     proxy: resolveImage(manifest.images.proxy.image, manifest.images.proxy.digest, registryPrefix),
     turn: resolveImage(manifest.images.turn.image, manifest.images.turn.digest, registryPrefix),
-    installer: resolveImage(manifest.images.installer.image, manifest.images.installer.digest, registryPrefix),
+    installer: resolveImage(
+      manifest.images.installer.image,
+      manifest.images.installer.digest,
+      registryPrefix,
+    ),
   };
 }

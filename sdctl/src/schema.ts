@@ -4,7 +4,8 @@ const VALID_MODES = ['public', 'isolated'];
 const VALID_TOPOLOGIES = ['lan', 'routed', 'nat', 'multisite'];
 const VALID_TLS_MODES = ['acme', 'provided', 'external', 'none'];
 
-const CIDR_REGEX = /^(([0-9]{1,3}\.){3}[0-9]{1,3}\/([0-9]|[1-2][0-9]|3[0-2])|([a-fA-F0-9:]+)\/([0-9]|[1-9][0-9]|1[0-2][0-8]))$/;
+const CIDR_REGEX =
+  /^(([0-9]{1,3}\.){3}[0-9]{1,3}\/([0-9]|[1-2][0-9]|3[0-2])|([a-fA-F0-9:]+)\/([0-9]|[1-9][0-9]|1[0-2][0-8]))$/;
 
 export function validateDeploymentSpec(spec: unknown): ValidationResult {
   const errors: ValidationError[] = [];
@@ -72,8 +73,10 @@ export function validateDeploymentSpec(spec: unknown): ValidationResult {
     if (s.mode === 'isolated' && tls.mode === 'acme') {
       errors.push({
         path: 'tls.mode',
-        message: 'ACME automatic certificates cannot be used in isolated mode without public internet access',
-        suggestedFix: 'Change `tls.mode` to "provided" (operator-supplied certs), "external", or "none".',
+        message:
+          'ACME automatic certificates cannot be used in isolated mode without public internet access',
+        suggestedFix:
+          'Change `tls.mode` to "provided" (operator-supplied certs), "external", or "none".',
       });
     }
 
@@ -116,20 +119,28 @@ export function validateDeploymentSpec(spec: unknown): ValidationResult {
     errors.push({
       path: 'turn.enabled',
       message: `Network topology "${s.topology}" requires TURN to ensure peer connectivity across NAT/subnets`,
-      suggestedFix: 'Set `turn.enabled: true` to deploy coturn, or provide an external TURN server in `iceServers`.',
+      suggestedFix:
+        'Set `turn.enabled: true` to deploy coturn, or provide an external TURN server in `iceServers`.',
     });
   }
 
   // Isolated mode vs Public STUN
   if (s.mode === 'isolated') {
-    const publicStunPatterns = ['google.com', 'twilio.com', 'cloudflare.com', 'stun.stunprotocol.org'];
+    const publicStunPatterns = [
+      'google.com',
+      'twilio.com',
+      'cloudflare.com',
+      'stun.stunprotocol.org',
+    ];
     const lowerIce = iceServersStr.toLowerCase();
     const hasPublicStun = publicStunPatterns.some((pattern) => lowerIce.includes(pattern));
     if (hasPublicStun) {
       errors.push({
         path: 'iceServers',
-        message: 'Public STUN servers are configured in isolated mode, which will cause connection timeouts',
-        suggestedFix: 'Change `iceServers` to "none" for LAN or specify internal STUN/TURN server URLs.',
+        message:
+          'Public STUN servers are configured in isolated mode, which will cause connection timeouts',
+        suggestedFix:
+          'Change `iceServers` to "none" for LAN or specify internal STUN/TURN server URLs.',
       });
     }
   }
@@ -150,7 +161,8 @@ export function validateDeploymentSpec(spec: unknown): ValidationResult {
             errors.push({
               path: `relay.allowedCidrs[${index}]`,
               message: `Invalid CIDR notation: "${cidr}"`,
-              suggestedFix: 'Use valid IPv4 or IPv6 CIDR format (e.g., "192.168.1.0/24" or "10.0.0.1/32").',
+              suggestedFix:
+                'Use valid IPv4 or IPv6 CIDR format (e.g., "192.168.1.0/24" or "10.0.0.1/32").',
             });
           }
         });

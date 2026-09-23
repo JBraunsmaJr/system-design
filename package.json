@@ -19,6 +19,7 @@
     "test:perf:local": "tsx scripts/run-perf.ts --local",
     "test:perf:gate": "tsx scripts/perf-gate.ts",
     "test:perf:regressions": "tsx scripts/verify-perf-regressions.ts",
+    "sdctl": "tsx sdctl/bin/sdctl.ts",
     "signaling-server": "y-webrtc-signaling"
   },
   "dependencies": {

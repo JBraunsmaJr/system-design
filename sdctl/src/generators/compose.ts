@@ -3,7 +3,11 @@ import type { DeploymentSpec, ReleaseManifest } from '../types.js';
 import { getResolvedImages, DEFAULT_MANIFEST } from '../manifest.js';
 import { generateHeader } from './header.js';
 
-export function deriveEndpoints(spec: DeploymentSpec): { appUrl: string; relayUrl: string; iceServers: string } {
+export function deriveEndpoints(spec: DeploymentSpec): {
+  appUrl: string;
+  relayUrl: string;
+  iceServers: string;
+} {
   const isTls = spec.tls.mode === 'acme' || spec.tls.mode === 'provided';
   const httpScheme = isTls ? 'https' : 'http';
   const wsScheme = isTls ? 'wss' : 'ws';
@@ -49,7 +53,8 @@ export function generateComposeYaml(
   manifest: ReleaseManifest = DEFAULT_MANIFEST,
   specHash?: string,
 ): string {
-  const hash = specHash || createHash('sha256').update(JSON.stringify(spec)).digest('hex').slice(0, 16);
+  const hash =
+    specHash || createHash('sha256').update(JSON.stringify(spec)).digest('hex').slice(0, 16);
   const images = getResolvedImages(manifest, spec.registry?.prefix);
   const { appUrl, relayUrl, iceServers } = deriveEndpoints(spec);
   const hasProxy = spec.tls.mode === 'acme' || spec.tls.mode === 'provided';

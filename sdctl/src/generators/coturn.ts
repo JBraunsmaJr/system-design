@@ -5,7 +5,8 @@ export function generateCoturnConfig(spec: DeploymentSpec): string {
   const header = generateHeader('#');
   const lines: string[] = [header];
 
-  const realm = spec.turn?.realm || spec.tls.domain || spec.tls.editorHost || 'turn.system-design.local';
+  const realm =
+    spec.turn?.realm || spec.tls.domain || spec.tls.editorHost || 'turn.system-design.local';
   const listeningPort = spec.turn?.listeningPort || 3478;
   const tlsListeningPort = spec.turn?.tlsListeningPort || 5349;
 

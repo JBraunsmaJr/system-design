@@ -51,6 +51,15 @@ export function dumpDeploymentSpecYaml(spec: DeploymentSpec): string {
 }
 
 export function parseSimpleYaml(content: string): Record<string, unknown> {
+  const trimmedContent = content.trim();
+  if (trimmedContent.startsWith('{')) {
+    try {
+      return JSON.parse(trimmedContent) as Record<string, unknown>;
+    } catch {
+      // Fall through to YAML parser
+    }
+  }
+
   const result: Record<string, unknown> = {};
   const lines = content.split('\n');
   let currentParent: { key: string; obj: Record<string, unknown> } | null = null;

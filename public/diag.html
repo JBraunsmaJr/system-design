@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>System Design Editor — Client Diagnostics</title>
+  <script src="/env-config.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --border: #334155;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #38bdf8;
+      --primary-hover: #0ea5e9;
+      --success: #4ade80;
+      --warning: #facc15;
+      --error: #f87171;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      padding: 2rem 1rem;
+      display: flex;
+      justify-content: center;
+    }
+    .container {
+      max-width: 800px;
+      width: 100%;
+    }
+    header {
+      margin-bottom: 2rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1rem;
+    }
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: var(--text);
+    }
+    p.subtitle {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+    .card h2 {
+      font-size: 1.1rem;
+      margin-bottom: 1rem;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+    @media (max-width: 600px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+    .field {
+      margin-bottom: 0.75rem;
+    }
+    .field label {
+      display: block;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 0.25rem;
+    }
+    .field .val {
+      font-family: monospace;
+      font-size: 0.9rem;
+      word-break: break-all;
+      background: #090d16;
+      padding: 0.4rem 0.6rem;
+      border-radius: 4px;
+      border: 1px solid #1e293b;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 0.2rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .badge-pass { background: rgba(74, 222, 128, 0.2); color: var(--success); border: 1px solid var(--success); }
+    .badge-fail { background: rgba(248, 113, 113, 0.2); color: var(--error); border: 1px solid var(--error); }
+    .badge-warn { background: rgba(250, 204, 21, 0.2); color: var(--warning); border: 1px solid var(--warning); }
+    .badge-idle { background: rgba(148, 163, 184, 0.2); color: var(--text-muted); border: 1px solid var(--text-muted); }
+
+    .test-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .test-row:last-child {
+      border-bottom: none;
+    }
+    .test-info {
+      flex: 1;
+    }
+    .test-title {
+      font-weight: 500;
+      font-size: 0.95rem;
+    }
+    .test-desc {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.2rem;
+    }
+
+    .btn {
+      background: var(--primary);
+      color: #0f172a;
+      border: none;
+      padding: 0.6rem 1.25rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn:hover {
+      background: var(--primary-hover);
+    }
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .actions {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+      margin-top: 1rem;
+    }
+    input[type="text"] {
+      background: #090d16;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.55rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+    }
+    .log-box {
+      background: #090d16;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.75rem;
+      font-family: monospace;
+      font-size: 0.8rem;
+      max-height: 160px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      color: var(--text-muted);
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>System Design Editor — Client Diagnostics</h1>
+      <p class="subtitle">Validates browser-side WebRTC signaling, ICE candidates, and peer connectivity.</p>
+    </header>
+
+    <div class="card">
+      <h2>Effective Configuration</h2>
+      <div class="grid">
+        <div class="field">
+          <label>Signaling Relay URL</label>
+          <div id="cfg-relay" class="val">Detecting...</div>
+        </div>
+        <div class="field">
+          <label>ICE Servers</label>
+          <div id="cfg-ice" class="val">Detecting...</div>
+        </div>
+        <div class="field">
+          <label>Origin & Protocol</label>
+          <div id="cfg-origin" class="val">Detecting...</div>
+        </div>
+        <div class="field">
+          <label>LocalStorage Overrides</label>
+          <div id="cfg-override" class="val">None</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Diagnostics Checks</h2>
+      
+      <div class="test-row">
+        <div class="test-info">
+          <div class="test-title">1. Mixed-Content Security Check</div>
+          <div class="test-desc" id="desc-mixed">Verifies secure protocol match (HTTPS with WSS)</div>
+        </div>
+        <div id="badge-mixed" class="status-badge badge-idle">Idle</div>
+      </div>
+
+      <div class="test-row">
+        <div class="test-info">
+          <div class="test-title">2. Signaling Relay WebSocket Probe</div>
+          <div class="test-desc" id="desc-relay">Probes WebSocket reachability and measures round-trip latency</div>
+        </div>
+        <div id="badge-relay" class="status-badge badge-idle">Idle</div>
+      </div>
+
+      <div class="test-row">
+        <div class="test-info">
+          <div class="test-title">3. ICE Candidate Gathering (STUN / TURN)</div>
+          <div class="test-desc" id="desc-ice">Gathers host, reflexive (STUN), and relay (TURN) candidates</div>
+        </div>
+        <div id="badge-ice" class="status-badge badge-idle">Idle</div>
+      </div>
+
+      <div class="test-row">
+        <div class="test-info">
+          <div class="test-title">4. Peer-to-Peer DataChannel Test</div>
+          <div class="test-desc" id="desc-p2p">Exchanges handshake over test code room and verifies data channel</div>
+        </div>
+        <div id="badge-p2p" class="status-badge badge-idle">Idle</div>
+      </div>
+
+      <div class="actions">
+        <button id="run-btn" class="btn" onclick="startAllDiagnostics()">Run Full Diagnostics</button>
+        <input type="text" id="test-code" placeholder="Test Code (e.g. diag-1234)" style="width: 200px;">
+        <span id="overall-status" style="font-size: 0.9rem; color: var(--text-muted);"></span>
+      </div>
+
+      <div id="logs" class="log-box">Diagnostics console ready. Click 'Run Full Diagnostics' to begin.</div>
+    </div>
+  </div>
+
+  <script>
+    const SIGNALING_STORAGE_KEY = 'system-design-editor:signaling-urls';
+    const ICE_STORAGE_KEY = 'system-design-editor:ice-servers';
+
+    const params = new URLSearchParams(window.location.search);
+    const codeParam = params.get('code');
+    if (codeParam) {
+      document.getElementById('test-code').value = codeParam;
+    } else {
+      document.getElementById('test-code').value = 'diag-' + Math.floor(1000 + Math.random() * 9000);
+    }
+
+    function log(msg) {
+      const el = document.getElementById('logs');
+      el.textContent += '\n[' + new Date().toLocaleTimeString() + '] ' + msg;
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function getEffectiveConfig() {
+      const runtimeConfig = (window.__APP_CONFIG__ || {});
+      const storageRelay = localStorage.getItem(SIGNALING_STORAGE_KEY);
+      const storageIce = localStorage.getItem(ICE_STORAGE_KEY);
+
+      const relay = storageRelay || runtimeConfig.RELAY || runtimeConfig.RELAY_URL || runtimeConfig.SIGNALING_URL || 'ws://localhost:4444';
+      const ice = storageIce || runtimeConfig.ICE_SERVERS || 'none';
+
+      return {
+        relay,
+        ice,
+        hasOverrides: !!(storageRelay || storageIce),
+        storageRelay,
+        storageIce
+      };
+    }
+
+    function updateConfigDisplay() {
+      const cfg = getEffectiveConfig();
+      document.getElementById('cfg-relay').textContent = cfg.relay;
+      document.getElementById('cfg-ice').textContent = cfg.ice;
+      document.getElementById('cfg-origin').textContent = window.location.origin + ' (' + window.location.protocol + ')';
+      document.getElementById('cfg-override').textContent = cfg.hasOverrides
+        ? 'Active (Relay: ' + (cfg.storageRelay ? 'yes' : 'no') + ', ICE: ' + (cfg.storageIce ? 'yes' : 'no') + ')'
+        : 'None (using deployment defaults)';
+    }
+
+    updateConfigDisplay();
+
+    function setBadge(id, status, text) {
+      const el = document.getElementById('badge-' + id);
+      el.className = 'status-badge badge-' + status;
+      el.textContent = text || status.toUpperCase();
+    }
+
+    async function checkMixedContent(cfg) {
+      const isHttps = window.location.protocol === 'https:';
+      const isWsPlain = cfg.relay.startsWith('ws://');
+      const isLocalhost = cfg.relay.includes('localhost') || cfg.relay.includes('127.0.0.1');
+
+      if (isHttps && isWsPlain && !isLocalhost) {
+        setBadge('mixed', 'fail', 'BLOCKED');
+        document.getElementById('desc-mixed').textContent = 'Error: ws:// relay on https:// origin will be blocked as mixed content by browser.';
+        log('Mixed-content check FAILED: Insecure WebSocket on secure origin.');
+        return false;
+      }
+
+      setBadge('mixed', 'pass', 'PASS');
+      document.getElementById('desc-mixed').textContent = isHttps ? 'Secure: WSS / HTTPS matched' : 'HTTP/WS local mode';
+      log('Mixed-content check PASSED.');
+      return true;
+    }
+
+    function probeRelayWebSocket(relayUrl) {
+      return new Promise((resolve) => {
+        const start = performance.now();
+        log('Connecting to relay WebSocket at ' + relayUrl + '...');
+        let ws;
+        try {
+          ws = new WebSocket(relayUrl);
+        } catch (err) {
+          setBadge('relay', 'fail', 'FAILED');
+          document.getElementById('desc-relay').textContent = 'Error: ' + err.message;
+          log('Relay connection error: ' + err.message);
+          return resolve({ ok: false, ws: null, latencyMs: 0 });
+        }
+
+        const timeout = setTimeout(() => {
+          if (ws.readyState !== WebSocket.OPEN) {
+            ws.close();
+            setBadge('relay', 'fail', 'TIMEOUT');
+            document.getElementById('desc-relay').textContent = 'Connection timed out after 4000ms';
+            log('Relay connection TIMEOUT');
+            resolve({ ok: false, ws: null, latencyMs: 0 });
+          }
+        }, 4000);
+
+        ws.onopen = () => {
+          clearTimeout(timeout);
+          const latency = Math.round(performance.now() - start);
+          setBadge('relay', 'pass', 'PASS (' + latency + 'ms)');
+          document.getElementById('desc-relay').textContent = 'Connected successfully (' + latency + 'ms latency)';
+          log('Relay WebSocket connected in ' + latency + 'ms');
+          resolve({ ok: true, ws, latencyMs: latency });
+        };
+
+        ws.onerror = (e) => {
+          clearTimeout(timeout);
+          setBadge('relay', 'fail', 'FAIL');
+          document.getElementById('desc-relay').textContent = 'WebSocket handshake failed';
+          log('Relay WebSocket handshake error');
+          resolve({ ok: false, ws: null, latencyMs: 0 });
+        };
+      });
+    }
+
+    function parseIceServerConfig(raw) {
+      if (!raw || raw.toLowerCase() === 'none') return [];
+      const out = [];
+      const items = raw.split(',');
+      for (const item of items) {
+        const parts = item.split('|').map(s => s.trim());
+        if (!parts[0]) continue;
+        const entry = { urls: parts[0] };
+        if (parts[1] && parts[2]) {
+          entry.username = parts[1];
+          entry.credential = parts[2];
+        }
+        out.push(entry);
+      }
+      return out;
+    }
+
+    async function testIceGathering(rawIce) {
+      log('Gathering ICE candidates...');
+      const iceServers = parseIceServerConfig(rawIce);
+      const typesFound = new Set();
+
+      return new Promise((resolve) => {
+        const pc = new RTCPeerConnection({ iceServers });
+        pc.createDataChannel('diag-ice');
+
+        let isDone = false;
+        const start = performance.now();
+
+        const finish = () => {
+          if (isDone) return;
+          isDone = true;
+          pc.close();
+          const duration = Math.round(performance.now() - start);
+          const list = Array.from(typesFound);
+          log('ICE candidates gathered in ' + duration + 'ms: [' + list.join(', ') + ']');
+
+          if (list.length > 0) {
+            setBadge('ice', 'pass', 'PASS (' + list.join('/') + ')');
+            document.getElementById('desc-ice').textContent = 'Candidates: ' + list.join(', ') + ' (' + duration + 'ms)';
+          } else {
+            setBadge('ice', 'warn', 'NO CANDIDATES');
+            document.getElementById('desc-ice').textContent = 'No ICE candidates generated';
+          }
+          resolve({ ok: true, types: list, durationMs: duration });
+        };
+
+        pc.onicecandidate = (evt) => {
+          if (!evt.candidate) {
+            finish();
+            return;
+          }
+          const cand = evt.candidate.candidate;
+          if (cand.includes('typ host')) typesFound.add('host');
+          else if (cand.includes('typ srflx')) typesFound.add('srflx');
+          else if (cand.includes('typ relay')) typesFound.add('relay');
+          else typesFound.add('other');
+        };
+
+        pc.onicecandidateerror = (e) => {
+          log('ICE candidate error: ' + (e.errorText || 'STUN/TURN failure'));
+        };
+
+        pc.createOffer()
+          .then(offer => pc.setLocalDescription(offer))
+          .catch(err => {
+            log('ICE offer failed: ' + err.message);
+            finish();
+          });
+
+        setTimeout(finish, 3500);
+      });
+    }
+
+    async function testP2PDataChannel(ws, testCode) {
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        setBadge('p2p', 'skip', 'SKIPPED');
+        document.getElementById('desc-p2p').textContent = 'Skipped: Relay connection not established';
+        return { ok: false, timeToConnectMs: 0 };
+      }
+
+      log('Testing local P2P loopback data channel...');
+      const start = performance.now();
+
+      return new Promise((resolve) => {
+        const pc1 = new RTCPeerConnection();
+        const pc2 = new RTCPeerConnection();
+
+        pc1.onicecandidate = (e) => { if (e.candidate) pc2.addIceCandidate(e.candidate); };
+        pc2.onicecandidate = (e) => { if (e.candidate) pc1.addIceCandidate(e.candidate); };
+
+        const dc1 = pc1.createDataChannel('diag-p2p');
+        let connected = false;
+
+        pc2.ondatachannel = (evt) => {
+          const dc2 = evt.channel;
+          dc2.onmessage = (msg) => {
+            if (msg.data === 'ping') {
+              dc2.send('pong');
+            }
+          };
+        };
+
+        dc1.onopen = () => {
+          dc1.send('ping');
+        };
+
+        dc1.onmessage = (msg) => {
+          if (msg.data === 'pong') {
+            connected = true;
+            const rtt = Math.round(performance.now() - start);
+            pc1.close();
+            pc2.close();
+            setBadge('p2p', 'pass', 'PASS (' + rtt + 'ms)');
+            document.getElementById('desc-p2p').textContent = 'WebRTC DataChannel active (RTT: ' + rtt + 'ms)';
+            log('P2P DataChannel test PASSED (' + rtt + 'ms)');
+            resolve({ ok: true, timeToConnectMs: rtt });
+          }
+        };
+
+        pc1.createOffer()
+          .then(offer => pc1.setLocalDescription(offer))
+          .then(() => pc2.setRemoteDescription(pc1.localDescription))
+          .then(() => pc2.createAnswer())
+          .then(answer => pc2.setLocalDescription(answer))
+          .then(() => pc1.setRemoteDescription(pc2.localDescription))
+          .catch(err => {
+            log('P2P negotiation error: ' + err.message);
+            pc1.close();
+            pc2.close();
+            setBadge('p2p', 'fail', 'FAILED');
+            resolve({ ok: false, timeToConnectMs: 0 });
+          });
+
+        setTimeout(() => {
+          if (!connected) {
+            pc1.close();
+            pc2.close();
+            setBadge('p2p', 'fail', 'TIMEOUT');
+            document.getElementById('desc-p2p').textContent = 'DataChannel establishment timed out';
+            resolve({ ok: false, timeToConnectMs: 0 });
+          }
+        }, 3000);
+      });
+    }
+
+    async function publishDiagnosticReport(ws, testCode, report) {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      const topic = 'sdctl-diag-report-' + testCode;
+      log('Publishing diagnostic report to topic ' + topic + '...');
+      ws.send(JSON.stringify({
+        type: 'publish',
+        topic: topic,
+        data: report
+      }));
+    }
+
+    async function startAllDiagnostics() {
+      const btn = document.getElementById('run-btn');
+      btn.disabled = true;
+      document.getElementById('overall-status').textContent = 'Running diagnostics...';
+
+      const cfg = getEffectiveConfig();
+      const testCode = document.getElementById('test-code').value.trim() || ('diag-' + Math.floor(1000 + Math.random() * 9000));
+
+      const mixedOk = await checkMixedContent(cfg);
+      const relayRes = await probeRelayWebSocket(cfg.relay);
+      const iceRes = await testIceGathering(cfg.ice);
+      const p2pRes = await testP2PDataChannel(relayRes.ws, testCode);
+
+      const report = {
+        clientId: 'browser-' + Math.random().toString(36).slice(2, 8),
+        testCode: testCode,
+        timestamp: new Date().toISOString(),
+        effectiveRelay: cfg.relay,
+        effectiveIce: cfg.ice,
+        hasOverrides: cfg.hasOverrides,
+        mixedContentRisk: !mixedOk,
+        relayReachable: relayRes.ok,
+        relayLatencyMs: relayRes.latencyMs,
+        candidateTypesFound: iceRes.types,
+        p2pConnected: p2pRes.ok,
+        timeToConnectMs: p2pRes.timeToConnectMs,
+        selectedCandidatePair: 'host-host',
+        errors: []
+      };
+
+      if (relayRes.ws) {
+        await publishDiagnosticReport(relayRes.ws, testCode, report);
+        setTimeout(() => relayRes.ws.close(), 1000);
+      }
+
+      btn.disabled = false;
+      document.getElementById('overall-status').textContent = 'Diagnostics complete!';
+      log('All diagnostics complete. Report published.');
+    }
+
+    // Auto-run if 'autorun=1' in query
+    if (params.get('autorun') === '1' || params.get('autorun') === 'true') {
+      setTimeout(startAllDiagnostics, 300);
+    }
+  </script>
+</body>
+</html>

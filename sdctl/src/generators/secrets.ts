@@ -22,7 +22,10 @@ export function parseSecretsEnv(content: string): Record<string, string> {
     if (eqIdx > 0) {
       const key = trimmed.slice(0, eqIdx).trim();
       let val = trimmed.slice(eqIdx + 1).trim();
-      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+      if (
+        (val.startsWith('"') && val.endsWith('"')) ||
+        (val.startsWith("'") && val.endsWith("'"))
+      ) {
         val = val.slice(1, -1);
       }
       result[key] = val;
@@ -40,7 +43,10 @@ export function formatSecretsEnv(secrets: Record<string, string>): string {
   return lines.join('\n') + '\n';
 }
 
-export function loadOrCreateSecrets(filePath: string, needsTurn: boolean = false): Record<string, string> {
+export function loadOrCreateSecrets(
+  filePath: string,
+  needsTurn: boolean = false,
+): Record<string, string> {
   let existing: Record<string, string> = {};
   if (existsSync(filePath)) {
     existing = parseSecretsEnv(readFileSync(filePath, 'utf8'));

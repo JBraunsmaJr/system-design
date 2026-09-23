@@ -9,7 +9,7 @@ COPY package*.json ./
 COPY sdctl/ ./sdctl/
 COPY tsconfig*.json ./
 
-RUN npm ci --omit=dev || npm install --omit=dev
+RUN (npm ci || npm install) && npm install -g tsx
 
-ENTRYPOINT ["npx", "tsx", "/app/sdctl/bin/sdctl.ts"]
+ENTRYPOINT ["tsx", "/app/sdctl/bin/sdctl.ts"]
 CMD ["--help"]

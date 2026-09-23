@@ -68,7 +68,7 @@ export function recordAppliedRevision(
     resolvedDigests: {
       editor: images.editor,
       relay: images.relay,
-      proxy: (spec.tls.mode === 'acme' || spec.tls.mode === 'provided') ? images.proxy : undefined,
+      proxy: spec.tls.mode === 'acme' || spec.tls.mode === 'provided' ? images.proxy : undefined,
       turn: spec.turn?.enabled ? images.turn : undefined,
     },
     verified,
