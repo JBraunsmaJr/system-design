@@ -881,7 +881,7 @@ function App() {
   // works offline. That restored copy and the peers' copy converge on sync the
   // same way two live peers do (WS2-R1).
   const joinSession = useCallback(
-    (roomName: string, passwordOrKey?: string, relayOverride?: string) => {
+    async (roomName: string, passwordOrKey?: string, relayOverride?: string) => {
       // Switching sessions no longer means copying the old one's content
       // anywhere - dropping the provider is the whole job.
       if (activeSessionRef.current) {
@@ -905,11 +905,23 @@ function App() {
         return;
       }
 
+      // Joining needs a token for this room just as starting one does
+      // (WS10-R6). Without it, a relay with RELAY_TOKEN_SECRET set refuses
+      // the joiner's subscribe and publish, so the host never hears its
+      // announce, no peer connection forms, and the session looks empty.
+      // Untouched where the relay does not require tokens.
+      const relay = await authorizeRelayUrls({
+        storeUrl,
+        room: roomName,
+        urls: effectiveSignalingUrls,
+      });
+      if (relay.note) showToast(relay.note);
+
       // WS1-R5: a separate document, never merged into the open one.
       const doc = new Y.Doc();
       const stores = createDocumentStores(doc);
       const session = startCollabSession(doc, roomName, {
-        signalingUrls: effectiveSignalingUrls,
+        signalingUrls: relay.urls,
         password: effectiveKey,
         iceServers,
       });
@@ -934,7 +946,15 @@ function App() {
         ownsDocument: true,
       });
     },
-    [endSession, signalingUrls, setSignalingUrlsInput, iceServers, presenceName, showToast],
+    [
+      endSession,
+      signalingUrls,
+      setSignalingUrlsInput,
+      iceServers,
+      presenceName,
+      showToast,
+      storeUrl,
+    ],
   );
 
   // Auto-join if a session link is present in the URL on initial mount or hash change
@@ -945,7 +965,7 @@ function App() {
       const currentHref = window.location.href;
       const parsed = parseSessionLink(currentHref);
       if (parsed.roomName && parsed.roomName !== currentHref) {
-        joinSession(parsed.roomName, parsed.password || parsed.key || '', parsed.relay);
+        void joinSession(parsed.roomName, parsed.password || parsed.key || '', parsed.relay);
         showToast(`Joined session: ${parsed.roomName}`, 'info');
         sanitizeCurrentUrl();
       }
