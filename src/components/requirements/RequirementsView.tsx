@@ -150,7 +150,7 @@ function findCardElement(itemId: string, preferSectionKey?: string): HTMLElement
   const escaped =
     typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
       ? CSS.escape(itemId)
-      : itemId.replace(/"/g, '\\"');
+      : itemId.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
   const copies = Array.from(
     document.querySelectorAll<HTMLElement>(`[data-requirement-id="${escaped}"]`),
   );
