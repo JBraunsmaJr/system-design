@@ -72,6 +72,8 @@ export function generateComposeYaml(
   lines.push(`    image: ${images.editor}`);
   lines.push('    container_name: sdctl-editor');
   lines.push('    restart: unless-stopped');
+  lines.push('    networks:');
+  lines.push('      - sdctl-net');
   lines.push('    environment:');
   lines.push(`      - RELAY=${relayUrl}`);
   lines.push(`      - APP_URL=${appUrl}`);
@@ -98,6 +100,8 @@ export function generateComposeYaml(
   lines.push(`    image: ${images.relay}`);
   lines.push('    container_name: sdctl-relay');
   lines.push('    restart: unless-stopped');
+  lines.push('    networks:');
+  lines.push('      - sdctl-net');
   lines.push('    environment:');
   lines.push('      - PORT=4444');
   if (!hasProxy) {
@@ -117,6 +121,8 @@ export function generateComposeYaml(
     lines.push(`    image: ${proxyImage}`);
     lines.push('    container_name: sdctl-proxy');
     lines.push('    restart: unless-stopped');
+    lines.push('    networks:');
+    lines.push('      - sdctl-net');
     lines.push('    ports:');
     lines.push('      - "80:80"');
     lines.push('      - "443:443"');
@@ -175,6 +181,12 @@ export function generateComposeYaml(
     lines.push('  caddy_config:');
     lines.push('');
   }
+
+  // Networks definition
+  lines.push('networks:');
+  lines.push('  sdctl-net:');
+  lines.push('    name: sdctl-net');
+  lines.push('');
 
   return lines.join('\n');
 }

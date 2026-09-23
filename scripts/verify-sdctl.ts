@@ -167,6 +167,11 @@ console.log('\n3. Artifact Generation');
     'Containers labelled with sdctl ownership label',
   );
   check(compose.includes(DEFAULT_MANIFEST.images.editor.digest), 'Compose pins editor by digest');
+  check(
+    compose.includes('networks:\n  sdctl-net:\n    name: sdctl-net'),
+    'Generated compose.yaml defines sdctl-net network',
+  );
+  check(compose.includes('networks:\n      - sdctl-net'), 'Services connect to sdctl-net network');
 
   const caddy = generateCaddyfile(spec);
   check(caddy.includes('design.example.com'), 'Caddyfile configures editor host');
