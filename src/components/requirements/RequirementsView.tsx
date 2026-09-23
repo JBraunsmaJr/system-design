@@ -1151,6 +1151,7 @@ export function RequirementsView({
               <button
                 type="button"
                 className={groupBy === 'type' ? 'active' : undefined}
+                aria-pressed={groupBy === 'type'}
                 onClick={() => setGroupBy('type')}
                 title="Group by item type"
               >
@@ -1160,6 +1161,7 @@ export function RequirementsView({
               <button
                 type="button"
                 className={groupBy === 'category' ? 'active' : undefined}
+                aria-pressed={groupBy === 'category'}
                 onClick={() => setGroupBy('category')}
                 title="Group by category"
               >
@@ -1169,6 +1171,7 @@ export function RequirementsView({
               <button
                 type="button"
                 className={groupBy === 'epic' ? 'active' : undefined}
+                aria-pressed={groupBy === 'epic'}
                 onClick={() => setGroupBy('epic')}
                 title="Group by epic, with each epic's children nested beneath it"
               >
@@ -1184,6 +1187,7 @@ export function RequirementsView({
               <button
                 type="button"
                 className={layout === 'list' ? 'active' : undefined}
+                aria-pressed={layout === 'list'}
                 onClick={() => setLayout('list')}
                 title="One scrolling list of cards"
               >
@@ -1193,6 +1197,7 @@ export function RequirementsView({
               <button
                 type="button"
                 className={layout === 'split' ? 'active' : undefined}
+                aria-pressed={layout === 'split'}
                 onClick={() => setLayout('split')}
                 title="An outline on the left, the open item and its children on the right"
               >

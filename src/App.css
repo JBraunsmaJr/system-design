@@ -2735,6 +2735,9 @@ option {
   display: flex;
   flex-direction: column;
   background: var(--canvas-bg);
+  /* The toolbar adapts to the view's own width, not the window's - side
+     panels can make the view much narrower than the screen. */
+  container: requirements-view / inline-size;
 }
 
 .requirements-view__toolbar {
@@ -2755,7 +2758,9 @@ option {
   display: flex;
   align-items: center;
   gap: 12px;
-  min-width: 0;
+  /* Never narrower than its contents: if space ever runs out, the toolbar
+     scrolls rather than letting items overlap the controls on the right. */
+  min-width: min-content;
   flex: 1;
 }
 
@@ -2979,15 +2984,18 @@ option {
   position: relative;
   display: flex;
   align-items: center;
-  width: 220px;
+  /* A preferred size, not a fixed one: when the toolbar is tight the box
+     gives width back instead of pushing the controls off the end. */
+  flex: 0 1 220px;
   min-width: 140px;
   max-width: 340px;
-  flex-shrink: 1;
-  transition: width 0.15s ease;
+  transition: flex-basis 0.15s ease;
 }
 
+/* Room for the match counter and arrows while searching. */
 .requirements-view__search-wrap.has-query {
-  width: 320px;
+  flex-basis: 320px;
+  min-width: 210px;
 }
 
 .requirements-view__search-icon {
@@ -3090,6 +3098,7 @@ option {
 }
 
 .requirements-view__count-badge {
+  flex-shrink: 0;
   font-size: 12px;
   color: var(--chrome-text-dim);
   white-space: nowrap;
@@ -4591,25 +4600,106 @@ mark.search-highlight--ellipsis {
   border-color: rgba(255, 255, 255, 0.2);
 }
 
-@media (max-width: 900px) {
+/*
+ * Narrowing the Requirements view: the toolbar gives up space in steps,
+ * least useful first, so nothing ever overlaps.
+ *
+ *   < 1320px  the "Group:" / "View:" captions go (the toggles explain themselves)
+ *   < 1240px  Types / Relationships become icon buttons
+ *   < 1060px  the grouping and layout toggles become icon buttons
+ *   <  840px  "New Requirement" becomes "+", and the item count goes
+ *   <  640px  two rows: add + a full-width search, then the controls, wrapping
+ *
+ * Text is hidden visually, not removed, so every button keeps its name for
+ * screen readers; each also has a tooltip. Widths are measured with the
+ * app's own fonts - re-check with the toolbar at each step if controls are
+ * added.
+ */
+@container requirements-view (max-width: 1320px) {
   .requirements-view__toolbar {
-    padding: 0 12px;
-    gap: 10px;
+    padding: 0 14px;
+    gap: 12px;
   }
   .requirements-view__toolbar-label {
     display: none;
   }
 }
 
-@media (max-width: 768px) {
+@container requirements-view (max-width: 1240px) {
+  .requirements-view__manage-btn {
+    padding: 6px 8px;
+  }
+  .requirements-view__manage-btn span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+@container requirements-view (max-width: 1060px) {
+  .requirements-view__group-toggle button {
+    padding: 5px 7px;
+  }
+  .requirements-view__group-toggle button span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .requirements-view__toolbar-right,
+  .requirements-view__group-control {
+    gap: 8px;
+  }
+}
+
+@container requirements-view (max-width: 840px) {
   .requirements-view__count-badge {
     display: none;
   }
-  .requirements-view__manage-btn span {
-    display: none;
+  .add-item-dropdown__primary-btn {
+    padding: 6px 9px;
   }
-  .requirements-view__manage-btn {
-    padding: 6px 8px;
+  .add-item-dropdown__primary-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+@container requirements-view (max-width: 640px) {
+  .requirements-view__toolbar {
+    flex-wrap: wrap;
+    height: auto;
+    padding: 8px 12px;
+    row-gap: 8px;
+    overflow-x: visible;
+  }
+  .requirements-view__toolbar-left {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .requirements-view__search-wrap,
+  .requirements-view__search-wrap.has-query {
+    flex: 1 1 auto;
+    width: auto;
+    max-width: none;
+    min-width: 0;
+  }
+  .requirements-view__toolbar-right {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .requirements-view__toolbar-divider {
+    display: none;
   }
 }
 
