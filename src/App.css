@@ -2735,6 +2735,9 @@ option {
   display: flex;
   flex-direction: column;
   background: var(--canvas-bg);
+  /* The toolbar adapts to the view's own width, not the window's - side
+     panels can make the view much narrower than the screen. */
+  container: requirements-view / inline-size;
 }
 
 .requirements-view__toolbar {
@@ -2755,7 +2758,9 @@ option {
   display: flex;
   align-items: center;
   gap: 12px;
-  min-width: 0;
+  /* Never narrower than its contents: if space ever runs out, the toolbar
+     scrolls rather than letting items overlap the controls on the right. */
+  min-width: min-content;
   flex: 1;
 }
 
@@ -2979,15 +2984,18 @@ option {
   position: relative;
   display: flex;
   align-items: center;
-  width: 220px;
+  /* A preferred size, not a fixed one: when the toolbar is tight the box
+     gives width back instead of pushing the controls off the end. */
+  flex: 0 1 220px;
   min-width: 140px;
   max-width: 340px;
-  flex-shrink: 1;
-  transition: width 0.15s ease;
+  transition: flex-basis 0.15s ease;
 }
 
+/* Room for the match counter and arrows while searching. */
 .requirements-view__search-wrap.has-query {
-  width: 320px;
+  flex-basis: 320px;
+  min-width: 210px;
 }
 
 .requirements-view__search-icon {
@@ -3090,6 +3098,7 @@ option {
 }
 
 .requirements-view__count-badge {
+  flex-shrink: 0;
   font-size: 12px;
   color: var(--chrome-text-dim);
   white-space: nowrap;
@@ -3100,17 +3109,383 @@ option {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 24px 32px 80px;
+  /* No top padding: sticky headers pin to the scroll container's content
+     edge, so top padding would leave a strip above them that cards visibly
+     scroll through. The same space comes from the first child's margin. */
+  padding: 0 32px 80px;
   max-width: 820px;
   margin: 0 auto;
   width: 100%;
+}
+
+.requirements-view__content > :where(:first-child) {
+  margin-top: 24px;
+}
+
+/* Holds the list and the floating Back button. */
+.requirements-view__list-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.requirements-view__back {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: var(--chrome-bg-raised);
+  border: 1px solid var(--chrome-border);
+  border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  color: var(--chrome-text);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.requirements-view__back:hover {
+  border-color: var(--accent);
+}
+
+/* ---------- Split view ---------- */
+
+.requirements-split {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(240px, 340px) minmax(0, 1fr);
+}
+
+.requirements-split__outline {
+  min-height: 0;
+  overflow: auto;
+  border-right: 1px solid var(--chrome-border);
+  background: var(--chrome-bg);
+}
+
+.requirements-split__detail {
+  min-height: 0;
+  overflow: auto;
+  padding: 0 32px 80px;
+}
+
+.requirements-split__detail > * {
+  max-width: 880px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.requirements-split__detail > :where(:first-child) {
+  margin-top: 20px;
+}
+
+.requirements-split__breadcrumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 10px;
+  font-size: 12.5px;
+  color: var(--chrome-text-dim);
+}
+
+.requirements-split__crumb-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.requirements-split__crumb {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 2px 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--chrome-text);
+  font-size: 12.5px;
+}
+
+.requirements-split__crumb span {
+  font-family: var(--mono);
+  font-weight: 700;
+}
+
+.requirements-split__crumb:hover {
+  border-color: var(--chrome-border);
+  background: var(--chrome-bg);
+}
+
+.requirements-split__crumb-current {
+  font-family: var(--mono);
+  font-weight: 700;
+  color: var(--chrome-text);
+}
+
+.requirements-split__also {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 10px;
+}
+
+.requirements-split__children {
+  margin-top: 20px;
+}
+
+.requirements-split__children-count {
+  margin-left: 4px;
+  color: var(--chrome-text-dim);
+}
+
+.requirements-split__children-title {
+  display: flex;
+  align-items: center;
+}
+
+.requirements-split__children-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 3px 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--chrome-text-dim);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.requirements-split__children-toggle:hover {
+  color: var(--chrome-text);
+  border-color: var(--chrome-border);
+}
+
+@media (max-width: 900px) {
+  .requirements-split {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 40%) minmax(0, 1fr);
+  }
+
+  .requirements-split__outline {
+    border-right: none;
+    border-bottom: 1px solid var(--chrome-border);
+  }
+}
+
+/* ---------- Outline (split view's left pane) ---------- */
+
+.requirements-outline {
+  padding-bottom: 24px;
+  font-size: 13px;
+}
+
+/* Sticky bar at the top of the pane: counts plus Collapse/Expand all.
+   Its height is mirrored in RequirementsOutline (TOOLBAR_HEIGHT). */
+.requirements-outline__toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px 0 12px;
+  background: var(--chrome-bg);
+  border-bottom: 1px solid var(--chrome-border);
+}
+
+.requirements-outline__toolbar-label {
+  flex: 1;
+  min-width: 0;
+  color: var(--chrome-text-dim);
+  font-size: 11.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.requirements-outline__toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--chrome-text-dim);
+  font-size: 11.5px;
+}
+
+.requirements-outline__toolbar-btn:hover:not(:disabled) {
+  color: var(--chrome-text);
+  border-color: var(--chrome-border);
+}
+
+.requirements-outline__toolbar-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.requirements-outline__section + .requirements-outline__section {
+  margin-top: 4px;
+}
+
+/* A group's header (Tickets, a category, "No epic"): folds the group, and
+   stays pinned under the toolbar while you scroll through the group.
+   Height mirrored in RequirementsOutline (SECTION_HEADER_HEIGHT). */
+.requirements-outline__section-title {
+  position: sticky;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 28px;
+  padding: 0 12px 0 8px;
+  background: var(--chrome-bg);
+  border: none;
+  border-radius: 0;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: left;
+}
+
+.requirements-outline__section-title:hover:not(:disabled) {
+  background: var(--node-bg);
+}
+
+.requirements-outline__section-title:disabled {
+  cursor: default;
+}
+
+.requirements-outline__section-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.requirements-outline__section-count {
+  color: var(--chrome-text-dim);
+  font-weight: 600;
+}
+
+.requirements-outline__row {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  padding-right: 6px;
+}
+
+/* An unfolded parent stays pinned (at an offset set inline) while you
+   scroll through its children; it needs a background to cover them. */
+.requirements-outline__row.is-pinned {
+  position: sticky;
+  background: var(--chrome-bg);
+}
+
+.requirements-outline__row.is-context {
+  opacity: 0.55;
+}
+
+.requirements-outline__fold {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--chrome-text-dim);
+}
+
+.requirements-outline__fold:hover {
+  color: var(--chrome-text);
+}
+
+.requirements-outline__fold-spacer {
+  width: 18px;
+  flex-shrink: 0;
+}
+
+.requirements-outline__select {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 26px;
+  padding: 0 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--chrome-text);
+  font-size: 13px;
+  text-align: left;
+}
+
+.requirements-outline__select:hover {
+  background: var(--node-bg);
+}
+
+.requirements-outline__row.is-selected .requirements-outline__select {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.requirements-outline__id {
+  flex-shrink: 0;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.requirements-outline__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.requirements-outline__count {
+  flex-shrink: 0;
+  color: var(--chrome-text-dim);
+  font-size: 11px;
+}
+
+.requirements-outline__status {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
 }
 
 .requirements-view__empty {
   color: var(--chrome-text-dim);
   font-size: 14px;
   text-align: center;
-  margin-top: 60px;
+  /* 60px below the old 24px top padding, now that the padding is gone. */
+  margin-top: 84px;
 }
 
 .requirements-view__group {
@@ -3125,6 +3500,124 @@ option {
   margin: 0 0 12px;
   padding-bottom: 6px;
   border-bottom: 1px solid var(--chrome-border);
+  /* Stays visible while scrolling through its group, so you always know
+     which section you're in. The background hides cards passing under it. */
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  padding-top: 6px;
+  background: var(--canvas-bg);
+}
+
+/* ---------- Epic grouping (Group: Epic) ---------- */
+
+/* An epic's block: sticky header, the epic's own card, then its children.
+   The header is sticky within this block only, so it stays pinned exactly
+   while you're scrolling through the epic's subtree and leaves with it.
+   Nested headers stack below their ancestors' via --epic-depth. */
+.epic-tree__node {
+  --epic-header-height: 32px;
+  margin-bottom: 16px;
+}
+
+.epic-tree__header {
+  position: sticky;
+  top: calc(var(--epic-depth, 0) * var(--epic-header-height));
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  height: var(--epic-header-height);
+  margin-bottom: 8px;
+  padding: 0 4px;
+  background: var(--canvas-bg);
+  border-left: 3px solid var(--epic-color);
+  border-bottom: 1px solid var(--chrome-border);
+  color: var(--chrome-text);
+  font-size: 12.5px;
+}
+
+.epic-tree__header.is-context {
+  opacity: 0.6;
+}
+
+.epic-tree__fold,
+.requirement-card__collapse {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--chrome-text-dim);
+}
+
+.epic-tree__fold:hover,
+.requirement-card__collapse:hover {
+  color: var(--chrome-text);
+  background: var(--chrome-bg);
+}
+
+.epic-tree__fold-spacer {
+  width: 22px;
+  flex-shrink: 0;
+}
+
+.epic-tree__header-link {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+  padding: 0 6px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  color: inherit;
+  font-size: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.epic-tree__header-link:hover {
+  background: var(--chrome-bg);
+}
+
+.epic-tree__node.is-folded {
+  margin-bottom: 12px;
+}
+
+.epic-tree__header-id {
+  font-family: var(--mono);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.epic-tree__header-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.epic-tree__header-count {
+  color: var(--chrome-text-dim);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.epic-tree__children {
+  margin-left: 10px;
+  padding-left: 12px;
+  border-left: 2px solid color-mix(in srgb, var(--epic-color) 35%, transparent);
 }
 
 /* ---------- Requirement card ---------- */
@@ -3243,6 +3736,193 @@ mark.search-highlight--ellipsis {
 .requirement-card__delete:hover {
   color: var(--danger);
   background: rgba(240, 87, 140, 0.1);
+}
+
+.requirement-card.is-selected {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--node-border));
+}
+
+/* Only shown because something beneath it matched the search. */
+.requirement-card.is-context {
+  opacity: 0.55;
+}
+
+.requirement-card__add-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  color: var(--chrome-text-dim);
+  padding: 3px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.requirement-card__add-child:hover {
+  color: var(--chrome-text);
+  background: var(--chrome-bg);
+}
+
+.requirement-card__add-child + .requirement-card__delete {
+  margin-left: 0;
+}
+
+.requirement-card__open {
+  display: inline-flex;
+  align-items: center;
+  background: transparent;
+  border: none;
+  color: var(--chrome-text-dim);
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.requirement-card__open:hover {
+  color: var(--chrome-text);
+  background: var(--chrome-bg);
+}
+
+.requirement-card__open + .requirement-card__add-child,
+.requirement-card__open + .requirement-card__delete {
+  margin-left: 0;
+}
+
+/* Collapsed: just the header, without the divider under it. */
+.requirement-card.is-collapsed .requirement-card__header {
+  border-bottom: none;
+}
+
+.requirement-card.is-collapsed .child-quick-add {
+  margin-top: 0;
+}
+
+.requirement-card__collapse {
+  margin-left: -6px;
+}
+
+/* ---------- Item peek (hover preview of a related item) ---------- */
+
+.item-peek {
+  z-index: 250;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--chrome-bg-raised);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-md, 8px);
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.45),
+    0 2px 6px rgba(0, 0, 0, 0.2);
+  font-size: 12.5px;
+  color: var(--chrome-text);
+}
+
+.item-peek__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.item-peek__id {
+  font-family: var(--mono);
+  font-weight: 700;
+}
+
+.item-peek__type {
+  color: var(--chrome-text-dim);
+}
+
+.item-peek__status {
+  margin-left: auto;
+  font-weight: 600;
+}
+
+.item-peek__title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.item-peek__excerpt {
+  margin: 0;
+  color: var(--chrome-text-dim);
+  line-height: 1.5;
+}
+
+.item-peek__relationships {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.item-peek__go {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+  padding: 4px 9px;
+  background: transparent;
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  color: var(--chrome-text);
+  font-size: 12px;
+}
+
+.item-peek__go:hover {
+  border-color: var(--accent);
+}
+
+/* ---------- Child quick-add (inside a selected epic card) ---------- */
+
+.child-quick-add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 12px 12px;
+  padding: 4px 8px;
+  border: 1px dashed var(--chrome-border);
+  border-radius: var(--radius-sm);
+}
+
+.child-quick-add:focus-within {
+  border-style: solid;
+  border-color: var(--accent);
+}
+
+/* The shared TypePicker chip, sized to sit inside the input row. */
+.child-quick-add__type {
+  flex-shrink: 0;
+}
+
+.child-quick-add__input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--chrome-text);
+  font-family: var(--sans);
+  font-size: 13px;
+}
+
+.child-quick-add__hint {
+  display: inline-flex;
+  color: var(--chrome-text-dim);
+}
+
+.child-quick-add__confirmation {
+  color: var(--chrome-text-dim);
+  font-size: 11.5px;
+  white-space: nowrap;
 }
 
 .requirement-card__body-wrap {
@@ -3920,25 +4600,106 @@ mark.search-highlight--ellipsis {
   border-color: rgba(255, 255, 255, 0.2);
 }
 
-@media (max-width: 900px) {
+/*
+ * Narrowing the Requirements view: the toolbar gives up space in steps,
+ * least useful first, so nothing ever overlaps.
+ *
+ *   < 1320px  the "Group:" / "View:" captions go (the toggles explain themselves)
+ *   < 1240px  Types / Relationships become icon buttons
+ *   < 1060px  the grouping and layout toggles become icon buttons
+ *   <  840px  "New Requirement" becomes "+", and the item count goes
+ *   <  640px  two rows: add + a full-width search, then the controls, wrapping
+ *
+ * Text is hidden visually, not removed, so every button keeps its name for
+ * screen readers; each also has a tooltip. Widths are measured with the
+ * app's own fonts - re-check with the toolbar at each step if controls are
+ * added.
+ */
+@container requirements-view (max-width: 1320px) {
   .requirements-view__toolbar {
-    padding: 0 12px;
-    gap: 10px;
+    padding: 0 14px;
+    gap: 12px;
   }
   .requirements-view__toolbar-label {
     display: none;
   }
 }
 
-@media (max-width: 768px) {
+@container requirements-view (max-width: 1240px) {
+  .requirements-view__manage-btn {
+    padding: 6px 8px;
+  }
+  .requirements-view__manage-btn span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+@container requirements-view (max-width: 1060px) {
+  .requirements-view__group-toggle button {
+    padding: 5px 7px;
+  }
+  .requirements-view__group-toggle button span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .requirements-view__toolbar-right,
+  .requirements-view__group-control {
+    gap: 8px;
+  }
+}
+
+@container requirements-view (max-width: 840px) {
   .requirements-view__count-badge {
     display: none;
   }
-  .requirements-view__manage-btn span {
-    display: none;
+  .add-item-dropdown__primary-btn {
+    padding: 6px 9px;
   }
-  .requirements-view__manage-btn {
-    padding: 6px 8px;
+  .add-item-dropdown__primary-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+@container requirements-view (max-width: 640px) {
+  .requirements-view__toolbar {
+    flex-wrap: wrap;
+    height: auto;
+    padding: 8px 12px;
+    row-gap: 8px;
+    overflow-x: visible;
+  }
+  .requirements-view__toolbar-left {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .requirements-view__search-wrap,
+  .requirements-view__search-wrap.has-query {
+    flex: 1 1 auto;
+    width: auto;
+    max-width: none;
+    min-width: 0;
+  }
+  .requirements-view__toolbar-right {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .requirements-view__toolbar-divider {
+    display: none;
   }
 }
 

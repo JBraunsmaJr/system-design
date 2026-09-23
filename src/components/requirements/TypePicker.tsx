@@ -11,11 +11,31 @@ interface TypePickerProps {
   onChange: (newTypeId: string) => void;
   disabled?: boolean;
   className?: string;
+  /** Dropdown heading - "Convert Type" by default, since the card header
+   * uses this to convert an existing item. Pickers that choose a type for
+   * something NEW (the child quick-add) say so instead. */
+  headerLabel?: string;
+  /** Trigger tooltip and accessible name; default to the convert wording. */
+  triggerTitle?: string;
+  triggerAriaLabel?: string;
+  /** Called after the dropdown closes by any route (a pick, Escape or an
+   * outside click), e.g. to return focus to a neighbouring input. */
+  onClosed?: () => void;
 }
 
 const DROPDOWN_WIDTH = 220;
 
-export function TypePicker({ doc, typeId, onChange, disabled, className }: TypePickerProps) {
+export function TypePicker({
+  doc,
+  typeId,
+  onChange,
+  disabled,
+  className,
+  headerLabel = 'Convert Type',
+  triggerTitle,
+  triggerAriaLabel,
+  onClosed,
+}: TypePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -32,9 +52,14 @@ export function TypePicker({ doc, typeId, onChange, disabled, className }: TypeP
     setIsOpen(true);
   };
 
-  const close = () => {
+  const onClosedRef = useRef(onClosed);
+  useLayoutEffect(() => {
+    onClosedRef.current = onClosed;
+  }, [onClosed]);
+  const close = useCallback(() => {
     setIsOpen(false);
-  };
+    onClosedRef.current?.();
+  }, []);
 
   useLayoutEffect(() => {
     if (!isOpen) return;
@@ -76,15 +101,25 @@ export function TypePicker({ doc, typeId, onChange, disabled, className }: TypeP
       if (dropdownRef.current && path.includes(dropdownRef.current)) return;
       close();
     };
+    // Escape closes, matching the other pickers' popovers.
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        triggerRef.current?.focus();
+        close();
+      }
+    };
     document.addEventListener('mousedown', handler);
+    document.addEventListener('keydown', onKey);
     window.addEventListener('scroll', reposition, true);
     window.addEventListener('resize', reposition);
     return () => {
       document.removeEventListener('mousedown', handler);
+      document.removeEventListener('keydown', onKey);
       window.removeEventListener('scroll', reposition, true);
       window.removeEventListener('resize', reposition);
     };
-  }, [isOpen, reposition]);
+  }, [isOpen, reposition, close]);
 
   return (
     <>
@@ -103,8 +138,12 @@ export function TypePicker({ doc, typeId, onChange, disabled, className }: TypeP
             : undefined
         }
         onClick={open}
-        title={disabled ? undefined : `Type: ${currentType?.label ?? typeId} (Click to convert)`}
-        aria-label={`Convert type from ${currentType?.label ?? typeId}`}
+        title={
+          disabled
+            ? undefined
+            : (triggerTitle ?? `Type: ${currentType?.label ?? typeId} (Click to convert)`)
+        }
+        aria-label={triggerAriaLabel ?? `Convert type from ${currentType?.label ?? typeId}`}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
       >
@@ -131,7 +170,7 @@ export function TypePicker({ doc, typeId, onChange, disabled, className }: TypeP
             }}
           >
             <div className="type-picker__header">
-              <span>Convert Type</span>
+              <span>{headerLabel}</span>
             </div>
             <div className="type-picker__list">
               {doc.itemTypes.map((type) => {

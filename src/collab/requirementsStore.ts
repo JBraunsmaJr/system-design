@@ -14,6 +14,7 @@ import {
   defaultStatusForType,
   isPrefixTaken,
   countItemsUsingType,
+  buildChildItemParts,
 } from '../domain/requirementsRegistry';
 
 /**
@@ -48,6 +49,12 @@ export interface RequirementsStore {
    * generated id (e.g. "REQ-6"), the same shape callers need today to
    * scroll to / focus the new item immediately after creating it. */
   addItem(typeId: string): string;
+  /** Creates a new item of `typeId` (with `title`, if given) already
+   * linked as a child of `parentId` via "Parent of" - one operation, so
+   * it lands as a single undo step and a collaborator never sees the
+   * item without its link. Returns the new item's id, or null (creating
+   * nothing) if the parent or the type doesn't exist. */
+  addChildItem(parentId: string, typeId: string, title?: string): string | null;
   updateItem(id: string, patch: Partial<Omit<RequirementItem, 'id' | 'typeId'>>): void;
   /** Converts an existing item to a different type, adjusting its ID and workable fields as needed, retroactively updating all references */
   convertItemType(id: string, newTypeId: string): string | undefined;
@@ -154,6 +161,19 @@ export function createLocalRequirementsStore(
       doc = { ...doc, items: [...doc.items, newItem], nextSequence };
       notify();
       return id;
+    },
+
+    addChildItem: (parentId, typeId, title) => {
+      const parts = buildChildItemParts(doc, parentId, typeId, title);
+      if (!parts) return null;
+      doc = {
+        ...doc,
+        items: [...doc.items, parts.item],
+        relationships: [...doc.relationships, parts.relationship],
+        nextSequence: parts.nextSequence,
+      };
+      notify();
+      return parts.item.id;
     },
 
     updateItem: (id, patch) => {
@@ -391,6 +411,20 @@ export function createAdapterRequirementsStore(
       };
       setSnapshot((prev) => ({ ...prev, items: [...prev.items, newItem], nextSequence }));
       return id;
+    },
+
+    // One setSnapshot call, so App.tsx's undo history records the item
+    // and its link as a single step.
+    addChildItem: (parentId, typeId, title) => {
+      const parts = buildChildItemParts(getSnapshot(), parentId, typeId, title);
+      if (!parts) return null;
+      setSnapshot((prev) => ({
+        ...prev,
+        items: [...prev.items, parts.item],
+        relationships: [...prev.relationships, parts.relationship],
+        nextSequence: parts.nextSequence,
+      }));
+      return parts.item.id;
     },
 
     updateItem: (id, patch) => {

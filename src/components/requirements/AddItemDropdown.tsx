@@ -130,13 +130,16 @@ export function AddItemDropdown({
           }
         >
           <Plus size={14} />
-          <span>New {activeType?.label ?? 'Requirement'}</span>
+          <span className="add-item-dropdown__primary-label">
+            New {activeType?.label ?? 'Requirement'}
+          </span>
         </button>
         <button
           type="button"
           className={`add-item-dropdown__toggle-btn ${isOpen ? 'is-open' : ''}`}
           onClick={() => (isOpen ? close() : open())}
           aria-expanded={isOpen}
+          aria-label="Choose requirement type to add"
           title="Choose requirement type to add"
         >
           <ChevronDown size={13} />

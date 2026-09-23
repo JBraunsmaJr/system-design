@@ -11,6 +11,7 @@ import {
 import { computeFlippedPosition } from '../../domain/popoverPosition';
 import type { RequirementsDocument } from '../../domain/requirementsTypes';
 import { HighlightedText, HighlightedTitle } from './HighlightText';
+import { useItemPeek } from './useItemPeek';
 
 interface RelationshipManagerProps {
   itemId: string;
@@ -18,6 +19,14 @@ interface RelationshipManagerProps {
   onAddRelationship: (typeId: string, fromItemId: string, toItemId: string) => string | null;
   onDeleteRelationship: (relationshipId: string) => void;
   onNavigateToItem: (itemId: string) => void;
+  /** The verb ("<typeId>::forward|backward") to open the picker on - the
+   * one last used from this kind of item, or "Parent of" for an epic.
+   * Ignored if it no longer exists; an explicit pick in the open picker
+   * always wins. */
+  preferredVerbKey?: string;
+  /** Called with the verb that was just used to add a relationship, so it
+   * can be remembered for next time. */
+  onVerbUsed?: (verbKey: string) => void;
 }
 
 const DROPDOWN_WIDTH = 320;
@@ -70,7 +79,10 @@ export function RelationshipManager({
   onAddRelationship,
   onDeleteRelationship,
   onNavigateToItem,
+  preferredVerbKey,
+  onVerbUsed,
 }: RelationshipManagerProps) {
+  const { peekHandlers, peekNode } = useItemPeek(doc, onNavigateToItem);
   const [isOpen, setIsOpen] = useState(false);
   const [isSelectingVerb, setIsSelectingVerb] = useState(false);
   const [query, setQuery] = useState('');
@@ -83,12 +95,13 @@ export function RelationshipManager({
   const verbOptions = useMemo(() => buildVerbOptions(doc), [doc]);
   const [selectedVerbKey, setSelectedVerbKey] = useState<string | null>(null);
   const activeVerb = useMemo(() => {
-    if (selectedVerbKey) {
-      const match = verbOptions.find((v) => `${v.typeId}::${v.direction}` === selectedVerbKey);
+    for (const key of [selectedVerbKey, preferredVerbKey]) {
+      if (!key) continue;
+      const match = verbOptions.find((v) => `${v.typeId}::${v.direction}` === key);
       if (match) return match;
     }
     return verbOptions[0] ?? null;
-  }, [verbOptions, selectedVerbKey]);
+  }, [verbOptions, selectedVerbKey, preferredVerbKey]);
 
   const existingRelationships = useMemo(() => getRelationshipsForItem(doc, itemId), [doc, itemId]);
 
@@ -249,7 +262,7 @@ export function RelationshipManager({
                       type="button"
                       className="relationship-manager__chip-target"
                       onClick={() => onNavigateToItem(entry.itemId)}
-                      title={`Go to ${entry.text}`}
+                      {...peekHandlers(entry.itemId)}
                     >
                       {entry.text}
                     </button>
@@ -408,6 +421,7 @@ export function RelationshipManager({
                             setErrorMessage(result);
                           } else {
                             setErrorMessage(null);
+                            onVerbUsed?.(`${activeVerb.typeId}::${activeVerb.direction}`);
                           }
                         }}
                       >
@@ -449,6 +463,7 @@ export function RelationshipManager({
           </div>,
           document.body,
         )}
+      {peekNode}
     </div>
   );
 }

@@ -34,7 +34,14 @@ import { SkillTreeView } from './components/skilltree/SkillTreeView';
 import { NODE_TYPES } from './domain/nodeRegistry';
 import { GROUP_TYPES } from './domain/groupRegistry';
 import { SHAPE_TYPES, globalShapeRegistry } from './domain/shapeRegistry';
-import { reorderWithGroupsFirst, toAbsolutePosition } from './domain/graphUtils';
+import {
+  getDescendantIds,
+  isDescendantOf,
+  reorderWithGroupsFirst,
+  selectNodesToAdopt,
+  toAbsolutePosition,
+  toRelativePosition,
+} from './domain/graphUtils';
 import type { DiagramPath } from './domain/subDiagramTree';
 import {
   toDiagramFile,
@@ -1711,11 +1718,9 @@ function App() {
         for (const [id, parentId] of reparents) {
           const node = current.find((n) => n.id === id);
           if (!node) continue;
+          if (parentId && (parentId === id || isDescendantOf(parentId, id, current))) continue;
           const absolute = toAbsolutePosition(node, current, node.parentId);
-          const parent = parentId ? current.find((n) => n.id === parentId) : undefined;
-          const position = parent
-            ? { x: absolute.x - parent.position.x, y: absolute.y - parent.position.y }
-            : absolute;
+          const position = toRelativePosition(absolute, current, parentId);
           diagramStore.updateParentId(id, parentId, position);
         }
       });
@@ -2087,12 +2092,13 @@ function App() {
       if (!node) return;
       const currentParentId = node.parentId ?? null;
       if (currentParentId === newParentId) return;
+      // Boundaries nest, so a boundary must never end up inside itself or
+      // inside something it already contains - that would be a cycle.
+      if (newParentId && (newParentId === nodeId || isDescendantOf(newParentId, nodeId, nodes)))
+        return;
 
       const absolute = toAbsolutePosition(node, nodes, node.parentId);
-      const newParent = newParentId ? nodes.find((n) => n.id === newParentId) : undefined;
-      const nextPosition = newParent
-        ? { x: absolute.x - newParent.position.x, y: absolute.y - newParent.position.y }
-        : absolute;
+      const nextPosition = toRelativePosition(absolute, nodes, newParentId ?? undefined);
 
       // Dropped at the end of a gesture whose commit is still pending: apply
       // it inside that commit, after the positions, so this node is written
@@ -2108,10 +2114,13 @@ function App() {
 
   // Called after dragging or resizing a *boundary* - see Canvas.tsx's onNodeDragStop
   // and GroupNode.tsx's onResizeEnd.
-  // `nodeIds` are whichever nodes now fall fully inside it and aren't
-  // already its children. Any node already parented to a different group
-  // gets moved over (its position is re-derived relative to the new parent,
-  // same math as onReparentNode).
+  // `nodeIds` are whichever nodes now fall fully inside it - boundaries
+  // included, since they nest. selectNodesToAdopt narrows that down to the
+  // outermost ones: a nested boundary is adopted, its own contents stay
+  // with it. Any node already parented to a different group gets moved
+  // over (its position is re-derived relative to the new parent, same math
+  // as onReparentNode). `groupPosition`, when given, is the group's
+  // position relative to its own current parent, like any node position.
   const onAdoptIntoGroup = useCallback(
     (groupId: string, nodeIds: string[], groupPosition?: { x: number; y: number }) => {
       // Read at call time, not captured: this callback travels through
@@ -2120,13 +2129,16 @@ function App() {
       const current = nodesRef.current;
       const group = current.find((n) => n.id === groupId);
       if (!group) return;
-      const groupPos = groupPosition ?? group.position;
-      for (const nodeId of nodeIds) {
-        if (nodeId === groupId) continue;
+      const groupAbsolute = toAbsolutePosition(
+        { position: groupPosition ?? group.position },
+        current,
+        group.parentId,
+      );
+      for (const nodeId of selectNodesToAdopt(groupId, nodeIds, current)) {
         const n = current.find((nn) => nn.id === nodeId);
         if (!n) continue;
         const absolute = toAbsolutePosition(n, current, n.parentId);
-        const relative = { x: absolute.x - groupPos.x, y: absolute.y - groupPos.y };
+        const relative = { x: absolute.x - groupAbsolute.x, y: absolute.y - groupAbsolute.y };
         diagramStore.updateParentId(nodeId, groupId, relative);
       }
     },
@@ -2317,10 +2329,22 @@ function App() {
       // children (same-level, parentId containment) are a different,
       // unrelated concept that deliberately stays the UI's job (see
       // diagramStore.ts's own doc comment on deleteNode).
-      for (const child of nodes) {
+      // Boundaries nest, so the children are handed to the deleted
+      // boundary's own parent (if any) rather than dropped onto the canvas.
+      // Read from the store rather than `nodes`: deleting a selection calls
+      // this once per node without a re-render in between, and an outer
+      // boundary deleted a moment ago must not be picked as the new parent.
+      const live = getNodesAtPath(diagramStore.getSnapshot().nodes, path);
+      const liveTarget = live.find((n) => n.id === id);
+      const newParentId = liveTarget?.parentId;
+      for (const child of live) {
         if (child.parentId !== id) continue;
-        const absolute = toAbsolutePosition(child, nodes, id);
-        diagramStore.updateParentId(child.id, undefined, absolute);
+        const absolute = toAbsolutePosition(child, live, id);
+        diagramStore.updateParentId(
+          child.id,
+          newParentId,
+          toRelativePosition(absolute, live, newParentId),
+        );
       }
       diagramStore.deleteNode(id);
       setSelectedNodeIds((cur) => cur.filter((n) => n !== id));
@@ -2375,12 +2399,13 @@ function App() {
     const selectedSet = new Set(selectedNodeIds);
     // Copying a boundary brings its contents along, even if they weren't
     // individually selected - an empty duplicated boundary would feel broken.
-    const groupIds = new Set(
-      nodes.filter((n) => selectedSet.has(n.id) && n.type === 'group').map((n) => n.id),
-    );
-    const childNodes = nodes.filter(
-      (n) => n.parentId && groupIds.has(n.parentId) && !selectedSet.has(n.id),
-    );
+    // Boundaries nest, so that means everything inside it at any depth.
+    const containedIds = new Set<string>();
+    for (const n of nodes) {
+      if (!selectedSet.has(n.id) || n.type !== 'group') continue;
+      for (const d of getDescendantIds(n.id, nodes)) containedIds.add(d);
+    }
+    const childNodes = nodes.filter((n) => containedIds.has(n.id) && !selectedSet.has(n.id));
     const toCopy = [...nodes.filter((n) => selectedSet.has(n.id)), ...childNodes];
     const copiedIds = new Set(toCopy.map((n) => n.id));
 
@@ -3337,6 +3362,7 @@ function App() {
             onFocusHandled={onFocusRequirementHandled}
             peers={activeSession ? presencePeers.filter((p) => p.viewMode === 'requirements') : []}
             onFocusedItemChange={setFocusedItemId}
+            documentId={activeDocId}
           />
         )}
         {viewMode === 'timeline' && (

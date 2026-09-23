@@ -474,7 +474,10 @@ export function getRelationshipLabelForItem(
   return relationship.fromItemId === itemId ? type.label : type.inverseLabel;
 }
 
-function nextRelationshipId(): string {
+/** Exported so a store operation that creates a relationship alongside
+ * other changes (see addChildItem below) can mint an id in exactly the
+ * same format addRelationship does, rather than inventing a second one. */
+export function generateRelationshipId(): string {
   return `rel-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
@@ -517,6 +520,48 @@ export function wouldCreateCycle(
     if (visited.has(current)) continue;
     visited.add(current);
     for (const next of adjacency.get(current) ?? []) stack.push(next);
+  }
+  return false;
+}
+
+/** The built-in hierarchy relationship ("Parent of" / "Child of"). The
+ * Requirements view's epic grouping, the timeline's epic scheduling and
+ * the child quick-add all build on this one type id. */
+export const PARENT_OF_RELATIONSHIP_TYPE_ID = 'parent-of';
+
+/**
+ * Whether adding `parentId` "Parent of" `childId` would make an item its
+ * own ancestor - true if `parentId` is already (transitively) a
+ * descendant of `childId`, or if the two are the same item.
+ *
+ * Needed separately from wouldCreateCycle because "Parent of" is
+ * deliberately NOT a blocking type (it says nothing about ordering), so
+ * the blocking-graph check never sees it. A loop in the hierarchy used to
+ * be harmless, but anything that walks the hierarchy - the epic grouping
+ * in the Requirements view, nested epics in particular - would otherwise
+ * have to cope with an infinite ancestry.
+ */
+export function wouldCreateParentCycle(
+  doc: RequirementsDocument,
+  parentId: string,
+  childId: string,
+): boolean {
+  if (parentId === childId) return true;
+  const childrenByParent = new Map<string, string[]>();
+  for (const rel of doc.relationships) {
+    if (rel.typeId !== PARENT_OF_RELATIONSHIP_TYPE_ID) continue;
+    const list = childrenByParent.get(rel.fromItemId) ?? [];
+    list.push(rel.toItemId);
+    childrenByParent.set(rel.fromItemId, list);
+  }
+  const visited = new Set<string>();
+  const stack = [childId];
+  while (stack.length > 0) {
+    const current = stack.pop()!;
+    if (current === parentId) return true;
+    if (visited.has(current)) continue;
+    visited.add(current);
+    for (const next of childrenByParent.get(current) ?? []) stack.push(next);
   }
   return false;
 }
@@ -565,11 +610,58 @@ export function addRelationship(
       error: "That would create a circular dependency, so it wasn't added.",
     };
   }
+  if (
+    typeId === PARENT_OF_RELATIONSHIP_TYPE_ID &&
+    wouldCreateParentCycle(doc, fromItemId, toItemId)
+  ) {
+    return {
+      relationships: doc.relationships,
+      error: "That would make an item its own ancestor, so it wasn't added.",
+    };
+  }
   const newRelationship: RequirementRelationship = {
-    id: nextRelationshipId(),
+    id: generateRelationshipId(),
     typeId,
     fromItemId,
     toItemId,
   };
   return { relationships: [...doc.relationships, newRelationship], error: null };
+}
+
+export interface ChildItemParts {
+  item: RequirementItem;
+  relationship: RequirementRelationship;
+  nextSequence: Record<string, number>;
+}
+
+/**
+ * The pieces needed to create a new item of `typeId` already linked as a
+ * child of `parentId` ("Parent of", from parent to child) - returned as
+ * parts rather than a whole new document so each store can apply them
+ * the way it applies everything else (a closure variable, an updater
+ * against externally-owned state). Returns null when the parent or the
+ * type doesn't exist, so nothing is created half-linked.
+ *
+ * No cycle check is needed: the child is brand new, so it can't already
+ * be an ancestor of anything.
+ */
+export function buildChildItemParts(
+  doc: RequirementsDocument,
+  parentId: string,
+  typeId: string,
+  title = '',
+): ChildItemParts | null {
+  if (!doc.items.some((i) => i.id === parentId)) return null;
+  if (!getItemType(doc, typeId)) return null;
+  const { id, nextSequence } = generateItemId(doc, typeId);
+  return {
+    item: { id, typeId, title, body: '', status: defaultStatusForType(doc, typeId) },
+    relationship: {
+      id: generateRelationshipId(),
+      typeId: PARENT_OF_RELATIONSHIP_TYPE_ID,
+      fromItemId: parentId,
+      toItemId: id,
+    },
+    nextSequence,
+  };
 }

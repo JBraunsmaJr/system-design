@@ -57,6 +57,7 @@ function createMockStore(doc: RequirementsDocument): RequirementsStore {
     getSnapshot: () => doc,
     subscribe: () => () => {},
     addItem: () => 'REQ-99',
+    addChildItem: () => 'TICKET-99',
     updateItem: () => {},
     deleteItem: () => {},
     convertItemType: () => {},
