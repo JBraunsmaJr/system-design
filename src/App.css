@@ -3100,17 +3100,25 @@ option {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 24px 32px 80px;
+  /* No top padding: sticky headers pin to the scroll container's content
+     edge, so top padding would leave a strip above them that cards visibly
+     scroll through. The same space comes from the first child's margin. */
+  padding: 0 32px 80px;
   max-width: 820px;
   margin: 0 auto;
   width: 100%;
+}
+
+.requirements-view__content > :where(:first-child) {
+  margin-top: 24px;
 }
 
 .requirements-view__empty {
   color: var(--chrome-text-dim);
   font-size: 14px;
   text-align: center;
-  margin-top: 60px;
+  /* 60px below the old 24px top padding, now that the padding is gone. */
+  margin-top: 84px;
 }
 
 .requirements-view__group {
@@ -3125,6 +3133,81 @@ option {
   margin: 0 0 12px;
   padding-bottom: 6px;
   border-bottom: 1px solid var(--chrome-border);
+  /* Stays visible while scrolling through its group, so you always know
+     which section you're in. The background hides cards passing under it. */
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  padding-top: 6px;
+  background: var(--canvas-bg);
+}
+
+/* ---------- Epic grouping (Group: Epic) ---------- */
+
+/* An epic's block: sticky header, the epic's own card, then its children.
+   The header is sticky within this block only, so it stays pinned exactly
+   while you're scrolling through the epic's subtree and leaves with it.
+   Nested headers stack below their ancestors' via --epic-depth. */
+.epic-tree__node {
+  --epic-header-height: 32px;
+  margin-bottom: 16px;
+}
+
+.epic-tree__header {
+  position: sticky;
+  top: calc(var(--epic-depth, 0) * var(--epic-header-height));
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: var(--epic-header-height);
+  margin-bottom: 8px;
+  padding: 0 10px;
+  background: var(--canvas-bg);
+  border: none;
+  border-left: 3px solid var(--epic-color);
+  border-bottom: 1px solid var(--chrome-border);
+  border-radius: 0;
+  color: var(--chrome-text);
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.epic-tree__header:hover {
+  background: var(--chrome-bg);
+}
+
+.epic-tree__header.is-context {
+  opacity: 0.6;
+}
+
+.epic-tree__header-id {
+  font-family: var(--mono);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.epic-tree__header-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.epic-tree__header-count {
+  color: var(--chrome-text-dim);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.epic-tree__children {
+  margin-left: 10px;
+  padding-left: 12px;
+  border-left: 2px solid color-mix(in srgb, var(--epic-color) 35%, transparent);
 }
 
 /* ---------- Requirement card ---------- */
@@ -3243,6 +3326,90 @@ mark.search-highlight--ellipsis {
 .requirement-card__delete:hover {
   color: var(--danger);
   background: rgba(240, 87, 140, 0.1);
+}
+
+.requirement-card.is-selected {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--node-border));
+}
+
+/* Only shown because something beneath it matched the search. */
+.requirement-card.is-context {
+  opacity: 0.55;
+}
+
+.requirement-card__add-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  color: var(--chrome-text-dim);
+  padding: 3px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.requirement-card__add-child:hover {
+  color: var(--chrome-text);
+  background: var(--chrome-bg);
+}
+
+.requirement-card__add-child + .requirement-card__delete {
+  margin-left: 0;
+}
+
+/* ---------- Child quick-add (inside a selected epic card) ---------- */
+
+.child-quick-add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 12px 12px;
+  padding: 4px 8px;
+  border: 1px dashed var(--chrome-border);
+  border-radius: var(--radius-sm);
+}
+
+.child-quick-add:focus-within {
+  border-style: solid;
+  border-color: var(--accent);
+}
+
+.child-quick-add__icon {
+  color: var(--chrome-text-dim);
+  flex-shrink: 0;
+}
+
+.child-quick-add__type {
+  background: transparent;
+  border: none;
+  color: var(--chrome-text-dim);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.child-quick-add__input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--chrome-text);
+  font-family: var(--sans);
+  font-size: 13px;
+}
+
+.child-quick-add__hint {
+  display: inline-flex;
+  color: var(--chrome-text-dim);
+}
+
+.child-quick-add__confirmation {
+  color: var(--chrome-text-dim);
+  font-size: 11.5px;
+  white-space: nowrap;
 }
 
 .requirement-card__body-wrap {

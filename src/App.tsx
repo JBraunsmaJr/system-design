@@ -3337,6 +3337,7 @@ function App() {
             onFocusHandled={onFocusRequirementHandled}
             peers={activeSession ? presencePeers.filter((p) => p.viewMode === 'requirements') : []}
             onFocusedItemChange={setFocusedItemId}
+            documentId={openDocId}
           />
         )}
         {viewMode === 'timeline' && (

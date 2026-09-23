@@ -11,6 +11,7 @@ import {
   ChevronDown,
   ChevronUp,
   LayoutList,
+  ListTree,
   Search,
   Settings2,
   Tags,
@@ -33,6 +34,21 @@ import {
 import type { RequirementsStore } from '../../collab/requirementsStore';
 import type { PresenceInfo } from '../../collab/session';
 import plur from 'plur';
+import {
+  buildEpicTree,
+  buildHierarchyIndex,
+  countDescendants,
+  filterEpicTree,
+  flattenEpicTreeMatches,
+  isEpicItem,
+  type EpicTree,
+  type EpicTreeNode,
+} from '../../domain/requirementsHierarchy';
+import {
+  loadRequirementsViewPrefs,
+  saveRequirementsViewPrefs,
+  type RequirementsGroupBy,
+} from '../../domain/requirementsViewPrefs';
 
 interface RequirementsViewProps {
   requirementsStore: RequirementsStore;
@@ -61,6 +77,13 @@ interface RequirementsViewProps {
    * presence broadcasting - null when nothing's being edited. */
   onFocusedItemChange?: (itemId: string | null) => void;
   initialSearch?: string;
+  /** Keys this person's locally-stored view preferences (grouping mode)
+   * to the open document. Optional: without it, one shared "default"
+   * entry is used. */
+  documentId?: string;
+  /** Overrides the stored grouping preference - for tests and for callers
+   * that want to open the view in a specific mode. */
+  initialGroupBy?: RequirementsGroupBy;
 }
 
 const HIGHLIGHT_DURATION_MS = 2000;
@@ -80,8 +103,42 @@ const EMPTY_LINKED_NODES: LinkedNodeRef[] = [];
  */
 const EMPTY_PEERS: PresenceInfo[] = [];
 const UNCATEGORIZED_KEY = '__uncategorized__';
+const NO_EPIC_KEY = '__no-epic__';
+const EMPTY_EPIC_TREE: EpicTree = { roots: [], unparented: [] };
 
-type GroupBy = 'type' | 'category';
+type GroupBy = RequirementsGroupBy;
+
+/**
+ * Finds the card for `itemId` on screen. An item can be shown more than
+ * once when grouping by epic (a ticket under two epics), so this prefers
+ * the copy in `preferSectionKey` - the section the navigation came from -
+ * and otherwise takes the first copy in document order.
+ */
+function findCardElement(itemId: string, preferSectionKey?: string): HTMLElement | null {
+  const escaped =
+    typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
+      ? CSS.escape(itemId)
+      : itemId.replace(/"/g, '\\"');
+  const copies = Array.from(
+    document.querySelectorAll<HTMLElement>(`[data-requirement-id="${escaped}"]`),
+  );
+  if (copies.length === 0) return null;
+  if (preferSectionKey) {
+    const inSection = copies.find((el) => el.dataset.sectionKey === preferSectionKey);
+    if (inSection) return inSection;
+  }
+  return copies[0];
+}
+
+/** The type a new child defaults to: Ticket if it exists, otherwise the
+ * first workable type, otherwise the first type of all. */
+function pickDefaultChildTypeId(itemTypes: RequirementItemType[]): string | undefined {
+  return (
+    itemTypes.find((t) => t.id === 'ticket')?.id ??
+    itemTypes.find((t) => t.isWorkable)?.id ??
+    itemTypes[0]?.id
+  );
+}
 
 interface ItemGroup {
   key: string;
@@ -102,6 +159,8 @@ export function RequirementsView({
   peers = [],
   onFocusedItemChange,
   initialSearch = '',
+  documentId,
+  initialGroupBy,
 }: RequirementsViewProps) {
   const doc = useSyncExternalStore(
     requirementsStore.subscribe,
@@ -110,7 +169,16 @@ export function RequirementsView({
   );
   const [search, setSearch] = useState(initialSearch);
   const [activeMatchItemId, setActiveMatchItemId] = useState<string | null>(null);
-  const [groupBy, setGroupBy] = useState<GroupBy>('type');
+  const [groupBy, setGroupByState] = useState<GroupBy>(
+    () => initialGroupBy ?? loadRequirementsViewPrefs(documentId).groupBy ?? 'type',
+  );
+  const setGroupBy = (next: GroupBy) => {
+    setGroupByState(next);
+    saveRequirementsViewPrefs(documentId, { groupBy: next });
+  };
+  /** Which card copy is selected (see RequirementCard's cardKey) - drives
+   * where the child quick-add row appears. Local UI state only. */
+  const [selectedCardKey, setSelectedCardKey] = useState<string | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [isManagingTypes, setIsManagingTypes] = useState(false);
   const [isManagingRelationshipTypes, setIsManagingRelationshipTypes] = useState(false);
@@ -145,6 +213,12 @@ export function RequirementsView({
     [diagramRoot],
   );
 
+  const { items: docItems, itemTypes: docItemTypes, relationships: docRelationships } = doc;
+  const hierarchyIndex = useMemo(
+    () => buildHierarchyIndex({ items: docItems, relationships: docRelationships }),
+    [docItems, docRelationships],
+  );
+
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return doc.items;
@@ -163,7 +237,42 @@ export function RequirementsView({
    * mode - "group by category" is just a different recipe for the same
    * {key, label, color, items} structure "group by type" already produces.
    */
+  /**
+   * The epic grouping's tree, narrowed to the search when there is one
+   * (keeping the ancestors of every match, dimmed, for context). Only
+   * built in that mode.
+   */
+  const epicTree = useMemo<EpicTree>(() => {
+    if (groupBy !== 'epic') return EMPTY_EPIC_TREE;
+    const tree = buildEpicTree(
+      { items: docItems, itemTypes: docItemTypes, relationships: docRelationships },
+      hierarchyIndex,
+    );
+    if (!search.trim()) return tree;
+    return filterEpicTree(tree, new Set(filteredItems.map((i) => i.id)));
+  }, [groupBy, docItems, docItemTypes, docRelationships, hierarchyIndex, filteredItems, search]);
+
+  /** A distinct DOM id for every copy of every item in the epic tree: the
+   * first copy keeps the plain `requirement-<id>`, later copies get a
+   * numbered suffix. */
+  const domIdByNodeKey = useMemo(() => {
+    const map = new Map<string, string>();
+    const seen = new Map<string, number>();
+    const visit = (node: EpicTreeNode) => {
+      const n = seen.get(node.item.id) ?? 0;
+      seen.set(node.item.id, n + 1);
+      map.set(
+        node.key,
+        n === 0 ? `requirement-${node.item.id}` : `requirement-${node.item.id}--${n + 1}`,
+      );
+      node.children.forEach(visit);
+    };
+    epicTree.roots.forEach(visit);
+    return map;
+  }, [epicTree]);
+
   const groups = useMemo<ItemGroup[]>(() => {
+    if (groupBy === 'epic') return [];
     if (groupBy === 'type') {
       return doc.itemTypes
         .map((type) => ({
@@ -205,10 +314,22 @@ export function RequirementsView({
      */
     setSearch('');
     requestAnimationFrame(() => {
-      const el = document.getElementById(`requirement-${id}`);
-      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      findCardElement(id)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
   };
+
+  /**
+   * Unlike onAddItem, deliberately doesn't scroll or clear the search:
+   * the quick-add row is for staying on the parent and adding several
+   * children in a row.
+   */
+  const onAddChildItem = useCallback(
+    (parentId: string, typeId: string, title: string): string | null =>
+      requirementsStoreRef.current.addChildItem(parentId, typeId, title),
+    [],
+  );
+
+  const defaultChildTypeId = useMemo(() => pickDefaultChildTypeId(doc.itemTypes), [doc.itemTypes]);
 
   const onUpdateItem = useCallback((id: string, patch: Partial<RequirementItem>) => {
     requirementsStoreRef.current.updateItem(id, patch);
@@ -267,8 +388,8 @@ export function RequirementsView({
     requirementsStoreRef.current.deleteRelationship(relationshipId);
   }, []);
 
-  const onNavigateToItem = useCallback((itemId: string) => {
-    const el = document.getElementById(`requirement-${itemId}`);
+  const onNavigateToItem = useCallback((itemId: string, fromSectionKey?: string) => {
+    const el = findCardElement(itemId, fromSectionKey);
     if (!el) return;
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     setHighlightedId(itemId);
@@ -276,7 +397,10 @@ export function RequirementsView({
     highlightTimer.current = setTimeout(() => setHighlightedId(null), HIGHLIGHT_DURATION_MS);
   }, []);
 
-  const visibleItems = useMemo(() => groups.flatMap((g) => g.items), [groups]);
+  const visibleItems = useMemo(
+    () => (groupBy === 'epic' ? flattenEpicTreeMatches(epicTree) : groups.flatMap((g) => g.items)),
+    [groupBy, epicTree, groups],
+  );
 
   const activeIndex = useMemo(() => {
     if (!search.trim() || visibleItems.length === 0) return 0;
@@ -432,6 +556,107 @@ export function RequirementsView({
     requirementsStoreRef.current.deleteCustomRelationshipType(typeId);
   };
 
+  const trimmedSearch = search.trim();
+
+  /**
+   * One card, however it's grouped. `cardKey` and `domId` only differ from
+   * the item id in the epic grouping, where an item can appear several
+   * times.
+   */
+  const renderCard = (
+    item: RequirementItem,
+    options: { sectionKey: string; cardKey?: string; domId?: string; isContext?: boolean },
+  ) => {
+    const cardKey = options.cardKey ?? item.id;
+    return (
+      <RequirementCard
+        key={cardKey}
+        item={item}
+        doc={doc}
+        programIncrements={programIncrements}
+        team={team}
+        diagramRoot={diagramRoot}
+        linkedNodes={linkedNodesByItemId.get(item.id) ?? EMPTY_LINKED_NODES}
+        onNavigateToNode={onNavigateToNode}
+        onCreateLinkedNode={onCreateLinkedNode}
+        onUpdateItem={onUpdateItem}
+        onConvertItemType={onConvertItemType}
+        onDeleteItem={onDeleteItem}
+        onNavigateToItem={onNavigateToItem}
+        onCreateAndAssignCategory={onCreateAndAssignCategory}
+        onDeleteCategory={onDeleteCategory}
+        onAddRelationship={onAddRelationship}
+        onDeleteRelationship={onDeleteRelationship}
+        highlighted={
+          highlightedId === item.id || (Boolean(trimmedSearch) && activeItem?.id === item.id)
+        }
+        peersHere={
+          peers.length === 0 ? EMPTY_PEERS : peers.filter((p) => p.focusedItemId === item.id)
+        }
+        onEditingChange={onEditingChange}
+        searchQuery={trimmedSearch}
+        domId={options.domId}
+        sectionKey={options.sectionKey}
+        cardKey={cardKey}
+        isSelected={selectedCardKey === cardKey}
+        onSelect={setSelectedCardKey}
+        isContext={options.isContext}
+        onAddChildItem={onAddChildItem}
+        defaultChildTypeId={defaultChildTypeId}
+      />
+    );
+  };
+
+  /**
+   * An epic (or any item with children) renders as a block: a compact
+   * header that sticks to the top of the list while you're anywhere in
+   * its subtree, then its own card, then its children indented beneath.
+   * Nested headers stack below their parent's (--epic-depth), so deep in
+   * a nested epic you can still see the whole path above you. A plain
+   * leaf is just its card.
+   */
+  const renderEpicNode = (node: EpicTreeNode): React.ReactNode => {
+    const card = renderCard(node.item, {
+      sectionKey: node.rootId,
+      cardKey: node.key,
+      domId: domIdByNodeKey.get(node.key),
+      isContext: node.isContext,
+    });
+    const isEpic = isEpicItem(doc, node.item);
+    if (!isEpic && node.children.length === 0) {
+      return <div key={node.key}>{card}</div>;
+    }
+    const type = doc.itemTypes.find((t) => t.id === node.item.typeId);
+    const color = type?.color ?? 'var(--chrome-text-dim)';
+    const descendantCount = countDescendants(node);
+    return (
+      <div
+        key={node.key}
+        className="epic-tree__node"
+        style={{ '--epic-depth': node.depth, '--epic-color': color } as React.CSSProperties}
+      >
+        <button
+          type="button"
+          className={`epic-tree__header${node.isContext ? ' is-context' : ''}`}
+          onClick={() => onNavigateToItem(node.item.id, node.rootId)}
+          title={`Go to ${node.item.id}`}
+        >
+          <span className="epic-tree__header-id" style={{ color }}>
+            {node.item.id}
+          </span>
+          <span className="epic-tree__header-title">{node.item.title || 'Untitled'}</span>
+          <span className="epic-tree__header-count">
+            {descendantCount} {descendantCount === 1 ? 'item' : 'items'}
+          </span>
+        </button>
+        {card}
+        {node.children.length > 0 && (
+          <div className="epic-tree__children">{node.children.map(renderEpicNode)}</div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="requirements-view">
       <div className="requirements-view__toolbar">
@@ -545,6 +770,15 @@ export function RequirementsView({
                 <Tags size={12} />
                 <span>Category</span>
               </button>
+              <button
+                type="button"
+                className={groupBy === 'epic' ? 'active' : undefined}
+                onClick={() => setGroupBy('epic')}
+                title="Group by epic, with each epic's children nested beneath it"
+              >
+                <ListTree size={12} />
+                <span>Epic</span>
+              </button>
             </div>
           </div>
 
@@ -573,51 +807,46 @@ export function RequirementsView({
         </div>
       </div>
 
-      <div className="requirements-view__content">
+      <div
+        className={`requirements-view__content requirements-view__content--${groupBy}`}
+        // Clicking empty space (not a card) clears the selection, which
+        // also hides the child quick-add row.
+        onPointerDown={(e) => {
+          if (e.target === e.currentTarget) setSelectedCardKey(null);
+        }}
+      >
         {doc.items.length === 0 ? (
           <p className="requirements-view__empty">
             No requirements yet - add one above to get started.
           </p>
-        ) : groups.length === 0 ? (
+        ) : visibleItems.length === 0 ? (
           <p className="requirements-view__empty">No requirements match your search.</p>
+        ) : groupBy === 'epic' ? (
+          <>
+            {epicTree.roots.length > 0 && (
+              <section className="requirements-view__group epic-tree">
+                {epicTree.roots.map(renderEpicNode)}
+              </section>
+            )}
+            {epicTree.unparented.length > 0 && (
+              <section className="requirements-view__group">
+                <h3
+                  className="requirements-view__group-title"
+                  style={{ color: 'var(--chrome-text-dim)' }}
+                >
+                  No epic
+                </h3>
+                {epicTree.unparented.map((item) => renderCard(item, { sectionKey: NO_EPIC_KEY }))}
+              </section>
+            )}
+          </>
         ) : (
           groups.map((group) => (
             <section key={group.key} className="requirements-view__group">
               <h3 className="requirements-view__group-title" style={{ color: group.color }}>
                 {group.label}
               </h3>
-              {group.items.map((item) => (
-                <RequirementCard
-                  key={item.id}
-                  item={item}
-                  doc={doc}
-                  programIncrements={programIncrements}
-                  team={team}
-                  diagramRoot={diagramRoot}
-                  linkedNodes={linkedNodesByItemId.get(item.id) ?? EMPTY_LINKED_NODES}
-                  onNavigateToNode={onNavigateToNode}
-                  onCreateLinkedNode={onCreateLinkedNode}
-                  onUpdateItem={onUpdateItem}
-                  onConvertItemType={onConvertItemType}
-                  onDeleteItem={onDeleteItem}
-                  onNavigateToItem={onNavigateToItem}
-                  onCreateAndAssignCategory={onCreateAndAssignCategory}
-                  onDeleteCategory={onDeleteCategory}
-                  onAddRelationship={onAddRelationship}
-                  onDeleteRelationship={onDeleteRelationship}
-                  highlighted={
-                    highlightedId === item.id ||
-                    (Boolean(search.trim()) && activeItem?.id === item.id)
-                  }
-                  peersHere={
-                    peers.length === 0
-                      ? EMPTY_PEERS
-                      : peers.filter((p) => p.focusedItemId === item.id)
-                  }
-                  onEditingChange={onEditingChange}
-                  searchQuery={search.trim()}
-                />
-              ))}
+              {group.items.map((item) => renderCard(item, { sectionKey: group.key }))}
             </section>
           ))
         )}

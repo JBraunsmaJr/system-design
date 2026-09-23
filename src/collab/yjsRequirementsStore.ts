@@ -15,6 +15,8 @@ import {
   updateItemReferencesInText,
   BUILT_IN_ITEM_TYPES,
   BUILT_IN_RELATIONSHIP_TYPES,
+  generateRelationshipId,
+  PARENT_OF_RELATIONSHIP_TYPE_ID,
 } from '../domain/requirementsRegistry';
 import type { RequirementsStore } from './requirementsStore';
 
@@ -571,6 +573,49 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
         items.set(storageKey, m);
         itemOrder.push([storageKey]);
         nextSequence.set(typeId, sequence + 1);
+      });
+      return displayId;
+    },
+
+    /**
+     * Same display-id generation (and the same disconnected-peers caveat)
+     * as addItem above. The item, its "Parent of" link and the sequence
+     * bump are written in ONE transaction, so peers - and the undo
+     * manager - only ever see them together.
+     */
+    addChildItem: (parentId, typeId, title = '') => {
+      if (!displayIdToStorageKey.has(parentId)) return null;
+      const typeMap = itemTypes.get(typeId);
+      if (!typeMap) return null;
+      const prefix = itemTypeMapToPlain(typeId, typeMap).prefix ?? typeId;
+      const usedIds = new Set<string>();
+      for (const storageKey of itemOrder.toArray()) {
+        const itId = items.get(storageKey)?.get('id') as string | undefined;
+        if (itId) usedIds.add(itId);
+      }
+      let sequence = 1;
+      while (usedIds.has(`${prefix}-${sequence}`)) {
+        sequence++;
+      }
+      const displayId = `${prefix}-${sequence}`;
+      const storageKey = collisionResistantId('item');
+      const relationship: RequirementRelationship = {
+        id: generateRelationshipId(),
+        typeId: PARENT_OF_RELATIONSHIP_TYPE_ID,
+        fromItemId: parentId,
+        toItemId: displayId,
+      };
+      doc.transact(() => {
+        const m = new Y.Map<unknown>();
+        m.set('id', displayId);
+        m.set('typeId', typeId);
+        m.set('title', title);
+        m.set('body', '');
+        m.set('status', defaultStatusForType(cached, typeId));
+        items.set(storageKey, m);
+        itemOrder.push([storageKey]);
+        nextSequence.set(typeId, sequence + 1);
+        relationships.set(relationship.id, relationship);
       });
       return displayId;
     },

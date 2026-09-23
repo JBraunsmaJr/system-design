@@ -954,4 +954,90 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: RequirementsStore } {
   verifyReferencesAndGapFilling(adapterStore, 'AdapterStore');
 }
 
+// === addChildItem: create-and-link as one operation, in all three stores ===
+{
+  function runChildSequence(store: RequirementsStore) {
+    const epic = store.addItem('epic');
+    const child = store.addChildItem(epic, 'ticket', 'Checkout form');
+    const nestedEpic = store.addChildItem(epic, 'epic', 'Sub-epic');
+    const missingParent = store.addChildItem('EPIC-404', 'ticket', 'Orphan');
+    const unknownType = store.addChildItem(epic, 'no-such-type', 'Nope');
+    return { snapshot: store.getSnapshot(), epic, child, nestedEpic, missingParent, unknownType };
+  }
+
+  // Relationship ids are random by design, so compare everything else.
+  function withoutRelationshipIds(snapshot: ReturnType<RequirementsStore['getSnapshot']>) {
+    return {
+      ...snapshot,
+      relationships: snapshot.relationships.map(({ typeId, fromItemId, toItemId }) => ({
+        typeId,
+        fromItemId,
+        toItemId,
+      })),
+    };
+  }
+
+  const local = runChildSequence(createLocalRequirementsStore(seedDoc()));
+  const yjs = runChildSequence(seedYjsStore().store);
+  let adapterState = seedDoc();
+  let adapterCommits = 0;
+  const adapter = createAdapterRequirementsStore(
+    () => adapterState,
+    (updater) => {
+      adapterCommits++;
+      adapterState = updater(adapterState);
+    },
+  );
+  const adapterResult = runChildSequence(adapter);
+
+  for (const [label, result] of [
+    ['local', local],
+    ['yjs', yjs],
+    ['adapter', adapterResult],
+  ] as const) {
+    const created = result.snapshot.items.find((i) => i.id === result.child);
+    assert(
+      result.child === 'TICKET-1' &&
+        created?.title === 'Checkout form' &&
+        created.status === 'todo',
+      `[${label}] addChildItem returns the new id and creates it with its title and default status`,
+    );
+    assert(
+      result.snapshot.relationships.some(
+        (r) =>
+          r.typeId === 'parent-of' && r.fromItemId === result.epic && r.toItemId === result.child,
+      ),
+      `[${label}] the new child is linked to its parent via "Parent of"`,
+    );
+    assert(result.nestedEpic === 'EPIC-2', `[${label}] a child can itself be an epic (nesting)`);
+    assert(
+      result.missingParent === null && result.unknownType === null,
+      `[${label}] a missing parent or unknown type creates nothing and returns null`,
+    );
+  }
+  assert(
+    canonicalJSON(withoutRelationshipIds(local.snapshot)) ===
+      canonicalJSON(withoutRelationshipIds(yjs.snapshot)) &&
+      canonicalJSON(withoutRelationshipIds(local.snapshot)) ===
+        canonicalJSON(withoutRelationshipIds(adapterResult.snapshot)),
+    'local, Yjs and adapter stores produce the same snapshot after addChildItem',
+  );
+  // addItem (1) + two successful addChildItem calls (1 each); the two
+  // refused calls must not commit anything.
+  assert(
+    adapterCommits === 3,
+    `the adapter store commits each addChildItem as ONE undoable update (got ${adapterCommits} commits for 3 operations)`,
+  );
+
+  const { doc: ydoc, store: yStore } = seedYjsStore();
+  const epicId = yStore.addItem('epic');
+  let transactions = 0;
+  ydoc.on('afterTransaction', () => transactions++);
+  yStore.addChildItem(epicId, 'ticket', 'One step');
+  assert(
+    transactions === 1,
+    `the Yjs store writes the item and its link in a single transaction (got ${transactions})`,
+  );
+}
+
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);

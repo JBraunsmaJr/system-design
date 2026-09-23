@@ -1,5 +1,5 @@
-import { memo, useEffect, useRef, useState } from 'react';
-import { Trash2 } from 'lucide-react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { ListPlus, Trash2 } from 'lucide-react';
 import { getItemType, isItemWorkable } from '../../domain/requirementsRegistry';
 import type { LinkedNodeRef, DiagramPath } from '../../domain/subDiagramTree';
 import { RequirementBody } from './RequirementBody';
@@ -11,6 +11,8 @@ import { StatusPicker } from './StatusPicker';
 import { TypePicker } from './TypePicker';
 import { SprintPicker } from './SprintPicker';
 import { RelationshipManager } from './RelationshipManager';
+import { ChildQuickAdd } from './ChildQuickAdd';
+import { isEpicItem } from '../../domain/requirementsHierarchy';
 import { MemberPicker } from '../team/MemberPicker';
 import { PointsPicker } from '../team/PointsPicker';
 import { HighlightedText, HighlightedTitle } from './HighlightText';
@@ -39,7 +41,10 @@ interface RequirementCardProps {
   onUpdateItem: (id: string, patch: Partial<RequirementItem>) => void;
   onConvertItemType?: (id: string, newTypeId: string) => void;
   onDeleteItem: (id: string) => void;
-  onNavigateToItem: (itemId: string) => void;
+  /** The second argument is this card's sectionKey, so that when the
+   * target item is shown in several places (a ticket under two epics) the
+   * view can prefer the copy in the section the click came from. */
+  onNavigateToItem: (itemId: string, fromSectionKey?: string) => void;
   onCreateAndAssignCategory: (itemId: string, label: string) => void;
   onDeleteCategory: (categoryId: string) => void;
   onAddRelationship: (typeId: string, fromItemId: string, toItemId: string) => string | null;
@@ -62,6 +67,25 @@ interface RequirementCardProps {
    * memoization for every card, permanently. */
   onEditingChange?: (itemId: string, isEditing: boolean) => void;
   searchQuery?: string;
+  /** DOM id for this card. Defaults to `requirement-<id>`; the epic
+   * grouping passes a distinct one for each extra copy of an item that
+   * appears under several parents, since DOM ids must be unique. */
+  domId?: string;
+  /** Which section this copy sits in (the top-level epic's id when
+   * grouping by epic). Written to data-section-key for navigation. */
+  sectionKey?: string;
+  /** Identifies this particular copy for selection - defaults to the item
+   * id, which is unique outside the epic grouping. */
+  cardKey?: string;
+  /** Whether this copy is the selected card - shows the child quick-add on
+   * epics. Passed as a boolean (not the selected key) so selecting a card
+   * only re-renders the card losing and the card gaining selection. */
+  isSelected?: boolean;
+  onSelect?: (cardKey: string | null) => void;
+  /** Shown only because something beneath it matched a search. */
+  isContext?: boolean;
+  onAddChildItem?: (parentId: string, typeId: string, title: string) => string | null;
+  defaultChildTypeId?: string;
 }
 
 function RequirementCardImpl({
@@ -85,8 +109,23 @@ function RequirementCardImpl({
   peersHere = [],
   onEditingChange,
   searchQuery,
+  domId,
+  sectionKey,
+  cardKey,
+  isSelected,
+  onSelect,
+  isContext,
+  onAddChildItem,
+  defaultChildTypeId,
 }: RequirementCardProps) {
   const [isEditingBody, setIsEditingBody] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const pointerIsDownRef = useRef(false);
+  const selectionKey = cardKey ?? item.id;
+  const navigateFromHere = useCallback(
+    (targetId: string) => onNavigateToItem(targetId, sectionKey),
+    [onNavigateToItem, sectionKey],
+  );
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   // Reports every genuine transition, not the initial mount - a card
   // that's never been edited shouldn't fire a spurious "not editing"
@@ -101,13 +140,50 @@ function RequirementCardImpl({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditingBody]);
   const type = getItemType(doc, item.typeId);
+  const canAddChildren =
+    Boolean(onAddChildItem) && Boolean(defaultChildTypeId) && isEpicItem(doc, item);
 
   return (
     <div
       // Used as the scroll-to target for reference navigation - see
       // RequirementsView's onNavigateToItem.
-      id={`requirement-${item.id}`}
-      className={`requirement-card${highlighted ? ' is-highlighted' : ''}`}
+      ref={cardRef}
+      id={domId ?? `requirement-${item.id}`}
+      data-requirement-id={item.id}
+      data-section-key={sectionKey}
+      className={`requirement-card${highlighted ? ' is-highlighted' : ''}${
+        isSelected ? ' is-selected' : ''
+      }${isContext ? ' is-context' : ''}`}
+      // Selection changes layout (the previously selected epic's
+      // quick-add row disappears), so it must never happen between a mouse
+      // press and its release - the content would shift under the pointer
+      // and the click would land on a different element (e.g. a title
+      // would never enter edit mode). So a mouse selects on CLICK, and
+      // focus only selects when no pointer is down (keyboard navigation).
+      // Capture phase, so it runs before the clicked control's own handler.
+      // Re-selecting the selected card is a no-op update in the parent.
+      onPointerDownCapture={
+        onSelect
+          ? () => {
+              pointerIsDownRef.current = true;
+              window.addEventListener(
+                'pointerup',
+                () => {
+                  pointerIsDownRef.current = false;
+                },
+                { once: true, capture: true },
+              );
+            }
+          : undefined
+      }
+      onClickCapture={onSelect ? () => onSelect(selectionKey) : undefined}
+      onFocusCapture={
+        onSelect
+          ? () => {
+              if (!pointerIsDownRef.current) onSelect(selectionKey);
+            }
+          : undefined
+      }
     >
       <div className="requirement-card__header">
         <div className="requirement-card__header-row">
@@ -181,6 +257,27 @@ function RequirementCardImpl({
               onChange={(points) => onUpdateItem(item.id, { points })}
             />
           )}
+          {canAddChildren && (
+            <button
+              type="button"
+              className="requirement-card__add-child"
+              onClick={() => {
+                onSelect?.(selectionKey);
+                // The row only mounts once the parent re-renders this card
+                // as selected, so focus it on the next frame.
+                requestAnimationFrame(() =>
+                  cardRef.current
+                    ?.querySelector<HTMLInputElement>('.child-quick-add__input')
+                    ?.focus(),
+                );
+              }}
+              aria-label={`Add a child to ${item.id}`}
+              title={`Add a child to ${item.id}`}
+            >
+              <ListPlus size={13} />
+              <span>Child</span>
+            </button>
+          )}
           <button
             type="button"
             className="requirement-card__delete"
@@ -239,7 +336,7 @@ function RequirementCardImpl({
           <RequirementBody
             text={item.body}
             doc={doc}
-            onNavigateToItem={onNavigateToItem}
+            onNavigateToItem={navigateFromHere}
             searchQuery={searchQuery}
           />
         </div>
@@ -249,8 +346,16 @@ function RequirementCardImpl({
         doc={doc}
         onAddRelationship={onAddRelationship}
         onDeleteRelationship={onDeleteRelationship}
-        onNavigateToItem={onNavigateToItem}
+        onNavigateToItem={navigateFromHere}
       />
+      {canAddChildren && isSelected && onAddChildItem && defaultChildTypeId && (
+        <ChildQuickAdd
+          doc={doc}
+          parentId={item.id}
+          defaultTypeId={defaultChildTypeId}
+          onAdd={onAddChildItem}
+        />
+      )}
       {diagramRoot && (
         <LinkedDiagramsSection
           itemId={item.id}
@@ -314,6 +419,14 @@ function propsAreEqual(prev: RequirementCardProps, next: RequirementCardProps): 
     prev.onAddRelationship === next.onAddRelationship &&
     prev.onDeleteRelationship === next.onDeleteRelationship &&
     prev.onEditingChange === next.onEditingChange &&
+    prev.domId === next.domId &&
+    prev.sectionKey === next.sectionKey &&
+    prev.cardKey === next.cardKey &&
+    prev.isSelected === next.isSelected &&
+    prev.onSelect === next.onSelect &&
+    prev.isContext === next.isContext &&
+    prev.onAddChildItem === next.onAddChildItem &&
+    prev.defaultChildTypeId === next.defaultChildTypeId &&
     // Not identity: peersHere is rebuilt by a filter on every parent
     // render, and its elements are rebuilt on every presence update -
     // including cursor movement, which no badge here renders. See
