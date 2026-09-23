@@ -21,6 +21,7 @@ function runScript(env: Record<string, string>): {
       const escaped = v
         .replace(/\\/g, '\\\\')
         .replace(/'/g, "\\'")
+        .replace(/\$/g, '\\$')
         .replace(/\r/g, '\\r')
         .replace(/\n/g, '\\n');
       return `export ${k}=$'${escaped}'`;
@@ -47,7 +48,9 @@ function runScript(env: Record<string, string>): {
   } finally {
     try {
       rmSync(targetFile, { force: true });
-    } catch {}
+    } catch {
+      // Ignore cleanup error
+    }
   }
 }
 
@@ -187,6 +190,30 @@ console.log('Testing 40-env-config.sh entrypoint script...\n');
   assert(res.code !== 0, 'Line-feed in env values triggers non-zero exit code');
   assert(res.stderr.includes('line-feed'), 'Error message mentions line-feed characters');
   console.log('✓ Line-feed rejection passed');
+}
+
+// Test 7: TURN credential expansion in ICE_SERVERS
+{
+  const res = runScript({
+    ICE_SERVERS:
+      'stun:turn.example.com:3478,turn:turn.example.com:3478|$TURN_USERNAME|$TURN_PASSWORD',
+    TURN_USERNAME: 'system-design',
+    TURN_PASSWORD: 'supersecretturnpassword',
+  });
+  assert(res.code === 0, 'TURN credentials in ICE_SERVERS substituted cleanly');
+  const config = evaluateConfig(res.targetContent!);
+  if (
+    config.ICE_SERVERS !==
+    'stun:turn.example.com:3478,turn:turn.example.com:3478|system-design|supersecretturnpassword'
+  ) {
+    console.error('Actual config.ICE_SERVERS:', config.ICE_SERVERS);
+  }
+  assert(
+    config.ICE_SERVERS ===
+      'stun:turn.example.com:3478,turn:turn.example.com:3478|system-design|supersecretturnpassword',
+    'ICE_SERVERS expanded username and password from environment',
+  );
+  console.log('✓ TURN credential expansion in ICE_SERVERS passed');
 }
 
 console.log('\nAll 40-env-config.sh tests passed successfully!');

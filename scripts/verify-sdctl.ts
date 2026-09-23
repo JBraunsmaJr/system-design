@@ -172,6 +172,17 @@ console.log('\n3. Artifact Generation');
     'Generated compose.yaml defines sdctl-net network',
   );
   check(compose.includes('networks:\n      - sdctl-net'), 'Services connect to sdctl-net network');
+  check(
+    compose.includes(
+      'ICE_SERVERS=stun:198.51.100.1:3478,turn:198.51.100.1:3478|$$TURN_USERNAME|$$TURN_PASSWORD',
+    ),
+    'Compose escapes ICE_SERVERS TURN variables for runtime resolution',
+  );
+  check(
+    compose.includes('- --user=$$TURN_USERNAME:$$TURN_PASSWORD') &&
+      compose.includes('- --static-auth-secret=$$TURN_SECRET'),
+    'Coturn service runs command with escaped TURN credential variables',
+  );
 
   const caddy = generateCaddyfile(spec);
   check(caddy.includes('design.example.com'), 'Caddyfile configures editor host');
@@ -901,8 +912,8 @@ console.log('\n18. Cloudflare DNS-01 ACME & Wildcard Support');
     'Compose YAML uses custom proxy image override',
   );
   check(
-    composeYaml.includes('CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}'),
-    'Compose YAML passes CLOUDFLARE_API_TOKEN to proxy',
+    composeYaml.includes('env_file:\n      - secrets.env'),
+    'Compose YAML attaches secrets.env to proxy',
   );
   check(composeYaml.includes('ACME_AGREE=true'), 'Compose YAML passes ACME_AGREE=true to proxy');
 

@@ -38,7 +38,7 @@ export function deriveEndpoints(spec: DeploymentSpec): {
       iceServers = 'none';
     } else if (spec.turn?.enabled) {
       const turnHost = spec.turn?.externalIp || spec.tls.domain || editorHost;
-      iceServers = `stun:${turnHost}:3478,turn:${turnHost}:3478|$${'{TURN_USERNAME}'}|$${'{TURN_PASSWORD}'}`;
+      iceServers = `stun:${turnHost}:3478,turn:${turnHost}:3478|$$TURN_USERNAME|$$TURN_PASSWORD`;
     } else if (spec.mode === 'public') {
       iceServers = 'stun:stun.l.google.com:19302,stun:global.stun.twilio.com:3478';
     } else {
@@ -128,10 +128,7 @@ export function generateComposeYaml(
     lines.push('      - "443:443"');
     lines.push('      - "443:443/udp"');
     if (spec.tls.mode === 'acme-dns' || spec.tls.dnsProvider) {
-      const dns = spec.tls.dnsProvider;
-      const tokenVar = dns?.apiTokenEnvVar || 'CLOUDFLARE_API_TOKEN';
       lines.push('    environment:');
-      lines.push(`      - ${tokenVar}=\${${tokenVar}}`);
       lines.push('      - ACME_AGREE=true');
       lines.push('    env_file:');
       lines.push('      - secrets.env');
@@ -166,6 +163,11 @@ export function generateComposeYaml(
     lines.push('      - ./turnserver.conf:/etc/coturn/turnserver.conf:ro');
     lines.push('    env_file:');
     lines.push('      - secrets.env');
+    lines.push('    command:');
+    lines.push('      - -c');
+    lines.push('      - /etc/coturn/turnserver.conf');
+    lines.push('      - --user=$$TURN_USERNAME:$$TURN_PASSWORD');
+    lines.push('      - --static-auth-secret=$$TURN_SECRET');
     lines.push('    labels:');
     lines.push('      sdctl.managed: "true"');
     lines.push('      sdctl.component: "turn"');

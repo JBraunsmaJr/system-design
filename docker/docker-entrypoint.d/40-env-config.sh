@@ -13,6 +13,12 @@ SIGNALING_URL="${RELAY:-${RELAY_URL:-${SIGNALING_URL:-${VITE_SIGNALING_URL:-${VI
 # 3. VITE_APP_URL (Build-time fallback)
 APP_URL="${APP_URL:-${BASE_URL:-${VITE_APP_URL:-${VITE_BASE_URL:-}}}}"
 ICE_SERVERS="${ICE_SERVERS:-${VITE_ICE_SERVERS:-}}"
+if [ -n "$TURN_USERNAME" ]; then
+  ICE_SERVERS="$(printf '%s' "$ICE_SERVERS" | sed "s|\\\${TURN_USERNAME}|$TURN_USERNAME|g; s|\\\$TURN_USERNAME|$TURN_USERNAME|g")"
+fi
+if [ -n "$TURN_PASSWORD" ]; then
+  ICE_SERVERS="$(printf '%s' "$ICE_SERVERS" | sed "s|\\\${TURN_PASSWORD}|$TURN_PASSWORD|g; s|\\\$TURN_PASSWORD|$TURN_PASSWORD|g")"
+fi
 # Where the store is, if this deployment has one. Empty means no workspace:
 # the editor behaves exactly as it does with no store at all.
 STORE_URL="${STORE_URL:-${VITE_STORE_URL:-}}"

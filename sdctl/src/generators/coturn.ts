@@ -16,8 +16,6 @@ export function generateCoturnConfig(spec: DeploymentSpec): string {
   lines.push('fingerprint');
   lines.push('lt-cred-mech');
   lines.push('use-auth-secret');
-  lines.push('static-auth-secret=${TURN_SECRET}');
-  lines.push('user=${TURN_USERNAME}:${TURN_PASSWORD}');
   lines.push('no-cli');
   lines.push('no-multicast-peers');
   lines.push('no-loopback-peers');
