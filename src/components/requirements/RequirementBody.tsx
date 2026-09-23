@@ -18,6 +18,7 @@ import remarkBreaks from 'remark-breaks';
 import { resolveReferencesToMarkdownLinks } from '../../domain/requirementsRegistry';
 import type { RequirementsDocument } from '../../domain/requirementsTypes';
 import { highlightInReactNode } from '../../domain/reactHighlight';
+import { useItemPeek } from './useItemPeek';
 
 interface RequirementBodyProps {
   text: string;
@@ -40,6 +41,8 @@ export function RequirementBody({
   searchQuery,
 }: RequirementBodyProps) {
   const resolved = resolveReferencesToMarkdownLinks(text, doc);
+  // #REQ-3 references get the same hover preview as relationship chips.
+  const { peekHandlers, peekNode } = useItemPeek(doc, onNavigateToItem);
 
   const trimmedQuery = searchQuery?.trim();
 
@@ -58,6 +61,7 @@ export function RequirementBody({
         <button
           type="button"
           className="requirement-body__ref-link"
+          {...peekHandlers(itemId)}
           onClick={(e) => {
             e.preventDefault();
             onNavigateToItem(itemId);
@@ -151,6 +155,7 @@ export function RequirementBody({
       ) : (
         <span className="requirement-body__placeholder">Double-click to edit</span>
       )}
+      {peekNode}
     </div>
   );
 }

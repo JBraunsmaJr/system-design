@@ -8,10 +8,16 @@ import {
   useSyncExternalStore,
 } from 'react';
 import {
-  ChevronDown,
   ChevronUp,
+  ArrowLeft,
+  ChevronDown,
+  ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
+  Columns2,
   LayoutList,
   ListTree,
+  Rows3,
   Search,
   Settings2,
   Tags,
@@ -48,7 +54,9 @@ import {
   loadRequirementsViewPrefs,
   saveRequirementsViewPrefs,
   type RequirementsGroupBy,
+  type RequirementsLayout,
 } from '../../domain/requirementsViewPrefs';
+import { RequirementsOutline } from './RequirementsOutline';
 
 interface RequirementsViewProps {
   requirementsStore: RequirementsStore;
@@ -84,6 +92,8 @@ interface RequirementsViewProps {
   /** Overrides the stored grouping preference - for tests and for callers
    * that want to open the view in a specific mode. */
   initialGroupBy?: RequirementsGroupBy;
+  /** Same, for the list/split layout. */
+  initialLayout?: RequirementsLayout;
 }
 
 const HIGHLIGHT_DURATION_MS = 2000;
@@ -104,6 +114,28 @@ const EMPTY_LINKED_NODES: LinkedNodeRef[] = [];
 const EMPTY_PEERS: PresenceInfo[] = [];
 const UNCATEGORIZED_KEY = '__uncategorized__';
 const NO_EPIC_KEY = '__no-epic__';
+const DETAIL_KEY = '__detail__';
+const DETAIL_CHILDREN_KEY = '__detail-children__';
+const MAX_NAV_HISTORY = 20;
+/** The verb an epic's Add relationship picker opens on when nothing has
+ * been used from an epic yet - decomposing an epic is the common case. */
+const EPIC_DEFAULT_VERB_KEY = 'parent-of::forward';
+
+/**
+ * Where "Back" returns to after following a link between items: in the
+ * list, the scroll position the jump started from; in the split view, the
+ * item that was open. `label` is the item the jump was made from.
+ */
+type NavHistoryEntry =
+  | { kind: 'scroll'; scrollTop: number; label: string }
+  | { kind: 'select'; itemId: string; label: string };
+
+function toggled(set: ReadonlySet<string>, id: string): ReadonlySet<string> {
+  const next = new Set(set);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  return next;
+}
 const EMPTY_EPIC_TREE: EpicTree = { roots: [], unparented: [] };
 
 type GroupBy = RequirementsGroupBy;
@@ -161,6 +193,7 @@ export function RequirementsView({
   initialSearch = '',
   documentId,
   initialGroupBy,
+  initialLayout,
 }: RequirementsViewProps) {
   const doc = useSyncExternalStore(
     requirementsStore.subscribe,
@@ -169,13 +202,38 @@ export function RequirementsView({
   );
   const [search, setSearch] = useState(initialSearch);
   const [activeMatchItemId, setActiveMatchItemId] = useState<string | null>(null);
+  // Per-person view preferences - see requirementsViewPrefs.ts. Read once;
+  // written back by the effect further down whenever any of them change.
+  const [initialPrefs] = useState(() => loadRequirementsViewPrefs(documentId));
   const [groupBy, setGroupByState] = useState<GroupBy>(
-    () => initialGroupBy ?? loadRequirementsViewPrefs(documentId).groupBy ?? 'type',
+    () => initialGroupBy ?? initialPrefs.groupBy ?? 'type',
   );
+  const [layout, setLayoutState] = useState<RequirementsLayout>(
+    () => initialLayout ?? initialPrefs.layout ?? 'list',
+  );
+  const [collapsedIds, setCollapsedIds] = useState<ReadonlySet<string>>(
+    () => new Set(initialPrefs.collapsedIds),
+  );
+  const [foldedIds, setFoldedIds] = useState<ReadonlySet<string>>(
+    () => new Set(initialPrefs.foldedIds),
+  );
+  const [lastVerbByTypeId, setLastVerbByTypeId] = useState<Record<string, string>>(
+    () => initialPrefs.lastVerbByTypeId ?? {},
+  );
+  const [navHistory, setNavHistory] = useState<NavHistoryEntry[]>([]);
+  // Back positions only make sense within the arrangement they were taken
+  // in, so switching grouping or layout starts a fresh history.
   const setGroupBy = (next: GroupBy) => {
     setGroupByState(next);
-    saveRequirementsViewPrefs(documentId, { groupBy: next });
+    setNavHistory([]);
   };
+  const setLayout = (next: RequirementsLayout) => {
+    setLayoutState(next);
+    setNavHistory([]);
+  };
+  /** The item open in the split view's detail pane. */
+  const [splitSelectedId, setSplitSelectedId] = useState<string | null>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   /** Which card copy is selected (see RequirementCard's cardKey) - drives
    * where the child quick-add row appears. Local UI state only. */
   const [selectedCardKey, setSelectedCardKey] = useState<string | null>(null);
@@ -201,6 +259,28 @@ export function RequirementsView({
     requirementsStoreRef.current = requirementsStore;
     onFocusHandledRef.current = onFocusHandled;
   }, [requirementsStore, onFocusHandled]);
+
+  useEffect(() => {
+    saveRequirementsViewPrefs(documentId, {
+      groupBy,
+      layout,
+      collapsedIds: [...collapsedIds],
+      foldedIds: [...foldedIds],
+      lastVerbByTypeId,
+    });
+  }, [documentId, groupBy, layout, collapsedIds, foldedIds, lastVerbByTypeId]);
+
+  const onToggleCollapsed = useCallback((itemId: string) => {
+    setCollapsedIds((prev) => toggled(prev, itemId));
+  }, []);
+  const onToggleFolded = useCallback((itemId: string) => {
+    setFoldedIds((prev) => toggled(prev, itemId));
+  }, []);
+  const onVerbUsed = useCallback((itemTypeId: string, verbKey: string) => {
+    setLastVerbByTypeId((prev) =>
+      prev[itemTypeId] === verbKey ? prev : { ...prev, [itemTypeId]: verbKey },
+    );
+  }, []);
 
   /**
    * Computed once for every item here, rather than each RequirementCard
@@ -313,6 +393,10 @@ export function RequirementsView({
      * to it the same way a reference-click navigation would.
      */
     setSearch('');
+    if (layout === 'split') {
+      setSplitSelectedId(id);
+      return;
+    }
     requestAnimationFrame(() => {
       findCardElement(id)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
@@ -388,19 +472,117 @@ export function RequirementsView({
     requirementsStoreRef.current.deleteRelationship(relationshipId);
   }, []);
 
-  const onNavigateToItem = useCallback((itemId: string, fromSectionKey?: string) => {
-    const el = findCardElement(itemId, fromSectionKey);
-    if (!el) return;
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  /** Read by the stable callbacks below, which must not change identity
+   * (every card compares them in its memo check). Updated after render. */
+  const navStateRef = useRef({
+    layout,
+    groupBy,
+    selectedId: null as string | null,
+    hierarchyIndex,
+  });
+
+  const flash = useCallback((itemId: string) => {
     setHighlightedId(itemId);
     if (highlightTimer.current) clearTimeout(highlightTimer.current);
     highlightTimer.current = setTimeout(() => setHighlightedId(null), HIGHLIGHT_DURATION_MS);
   }, []);
 
+  const pushHistory = useCallback((entry: NavHistoryEntry) => {
+    setNavHistory((prev) => [...prev.slice(-(MAX_NAV_HISTORY - 1)), entry]);
+  }, []);
+
+  /**
+   * Follows a link to another item. `fromItemId` is set when the jump came
+   * from a card (a relationship chip, a #reference, an Open button), which
+   * is what makes it worth a "Back" entry; search-match stepping and
+   * external focus requests leave it out.
+   *
+   * - Split view: opens the item in the detail pane.
+   * - List: scrolls to its card, preferring the copy in `fromSectionKey`.
+   *   If the target sits inside a folded epic, its ancestors are unfolded
+   *   first, then the scroll happens once they've rendered.
+   */
+  const onNavigateToItem = useCallback(
+    (itemId: string, fromSectionKey?: string, fromItemId?: string) => {
+      const nav = navStateRef.current;
+      if (nav.layout === 'split') {
+        if (fromItemId && nav.selectedId && nav.selectedId !== itemId) {
+          pushHistory({ kind: 'select', itemId: nav.selectedId, label: nav.selectedId });
+        }
+        setSplitSelectedId(itemId);
+        flash(itemId);
+        return;
+      }
+      const scrollTo = (el: HTMLElement) => {
+        if (fromItemId && contentRef.current) {
+          pushHistory({
+            kind: 'scroll',
+            scrollTop: contentRef.current.scrollTop,
+            label: fromItemId,
+          });
+        }
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        flash(itemId);
+      };
+      const el = findCardElement(itemId, fromSectionKey);
+      if (el) {
+        scrollTo(el);
+        return;
+      }
+      if (nav.groupBy !== 'epic') return;
+      const ancestors = new Set<string>();
+      const stack = [...(nav.hierarchyIndex.parentsByChildId.get(itemId) ?? [])];
+      while (stack.length > 0) {
+        const id = stack.pop()!;
+        if (ancestors.has(id)) continue;
+        ancestors.add(id);
+        stack.push(...(nav.hierarchyIndex.parentsByChildId.get(id) ?? []));
+      }
+      if (ancestors.size === 0) return;
+      setFoldedIds((prev) => new Set([...prev].filter((id) => !ancestors.has(id))));
+      requestAnimationFrame(() => {
+        const unfolded = findCardElement(itemId, fromSectionKey);
+        if (unfolded) scrollTo(unfolded);
+      });
+    },
+    [flash, pushHistory],
+  );
+
+  const goBack = () => {
+    const entry = navHistory[navHistory.length - 1];
+    if (!entry) return;
+    setNavHistory((prev) => prev.slice(0, -1));
+    if (entry.kind === 'select') {
+      setSplitSelectedId(entry.itemId);
+      flash(entry.itemId);
+    } else {
+      contentRef.current?.scrollTo({ top: entry.scrollTop, behavior: 'smooth' });
+      flash(entry.label);
+    }
+  };
+
+  /** "Open" on a child card in the split view's detail pane. */
+  const onOpenFromDetail = useCallback(
+    (itemId: string) =>
+      onNavigateToItem(itemId, undefined, navStateRef.current.selectedId ?? undefined),
+    [onNavigateToItem],
+  );
+
   const visibleItems = useMemo(
     () => (groupBy === 'epic' ? flattenEpicTreeMatches(epicTree) : groups.flatMap((g) => g.items)),
     [groupBy, epicTree, groups],
   );
+
+  /** The split view's open item: the chosen one while it still exists,
+   * otherwise the first visible item. */
+  const selectedItemId = useMemo(() => {
+    if (splitSelectedId && doc.items.some((i) => i.id === splitSelectedId)) return splitSelectedId;
+    return visibleItems[0]?.id ?? null;
+  }, [splitSelectedId, doc.items, visibleItems]);
+
+  useLayoutEffect(() => {
+    navStateRef.current = { layout, groupBy, selectedId: selectedItemId, hierarchyIndex };
+  }, [layout, groupBy, selectedItemId, hierarchyIndex]);
 
   const activeIndex = useMemo(() => {
     if (!search.trim() || visibleItems.length === 0) return 0;
@@ -565,9 +747,19 @@ export function RequirementsView({
    */
   const renderCard = (
     item: RequirementItem,
-    options: { sectionKey: string; cardKey?: string; domId?: string; isContext?: boolean },
+    options: {
+      sectionKey: string;
+      cardKey?: string;
+      domId?: string;
+      isContext?: boolean;
+      /** False for the split view's open item, which is always expanded. */
+      collapsible?: boolean;
+      /** Show an Open button (children in the split view's detail pane). */
+      openable?: boolean;
+    },
   ) => {
     const cardKey = options.cardKey ?? item.id;
+    const collapsible = options.collapsible ?? true;
     return (
       <RequirementCard
         key={cardKey}
@@ -603,6 +795,14 @@ export function RequirementsView({
         isContext={options.isContext}
         onAddChildItem={onAddChildItem}
         defaultChildTypeId={defaultChildTypeId}
+        isCollapsed={collapsible && collapsedIds.has(item.id)}
+        onToggleCollapsed={collapsible ? onToggleCollapsed : undefined}
+        preferredVerbKey={
+          lastVerbByTypeId[item.typeId] ??
+          (isEpicItem(doc, item) ? EPIC_DEFAULT_VERB_KEY : undefined)
+        }
+        onVerbUsed={onVerbUsed}
+        onOpenItem={options.openable ? onOpenFromDetail : undefined}
       />
     );
   };
@@ -629,33 +829,140 @@ export function RequirementsView({
     const type = doc.itemTypes.find((t) => t.id === node.item.typeId);
     const color = type?.color ?? 'var(--chrome-text-dim)';
     const descendantCount = countDescendants(node);
+    const hasChildren = node.children.length > 0;
+    // A search shows every match, folded or not.
+    const isFolded = hasChildren && foldedIds.has(node.item.id) && !trimmedSearch;
     return (
       <div
         key={node.key}
-        className="epic-tree__node"
+        className={`epic-tree__node${isFolded ? ' is-folded' : ''}`}
         style={{ '--epic-depth': node.depth, '--epic-color': color } as React.CSSProperties}
       >
-        <button
-          type="button"
-          className={`epic-tree__header${node.isContext ? ' is-context' : ''}`}
-          onClick={() => onNavigateToItem(node.item.id, node.rootId)}
-          title={`Go to ${node.item.id}`}
-        >
-          <span className="epic-tree__header-id" style={{ color }}>
-            {node.item.id}
-          </span>
-          <span className="epic-tree__header-title">{node.item.title || 'Untitled'}</span>
-          <span className="epic-tree__header-count">
-            {descendantCount} {descendantCount === 1 ? 'item' : 'items'}
-          </span>
-        </button>
+        <div className={`epic-tree__header${node.isContext ? ' is-context' : ''}`}>
+          {hasChildren ? (
+            <button
+              type="button"
+              className="epic-tree__fold"
+              onClick={() => onToggleFolded(node.item.id)}
+              aria-expanded={!isFolded}
+              aria-label={`${isFolded ? 'Show' : 'Hide'} the items under ${node.item.id}`}
+              title={isFolded ? 'Show children' : 'Hide children'}
+            >
+              {isFolded ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+            </button>
+          ) : (
+            <span className="epic-tree__fold-spacer" />
+          )}
+          <button
+            type="button"
+            className="epic-tree__header-link"
+            onClick={() => onNavigateToItem(node.item.id, node.rootId)}
+            title={`Go to ${node.item.id}`}
+          >
+            <span className="epic-tree__header-id" style={{ color }}>
+              {node.item.id}
+            </span>
+            <span className="epic-tree__header-title">{node.item.title || 'Untitled'}</span>
+            <span className="epic-tree__header-count">
+              {descendantCount} {descendantCount === 1 ? 'item' : 'items'}
+              {isFolded ? ' hidden' : ''}
+            </span>
+          </button>
+        </div>
         {card}
-        {node.children.length > 0 && (
+        {hasChildren && !isFolded && (
           <div className="epic-tree__children">{node.children.map(renderEpicNode)}</div>
         )}
       </div>
     );
   };
+
+  /** The split view's right-hand side: the open item in full, the path of
+   * parents above it, and its children beneath - so an epic and its
+   * tickets are on screen together. */
+  const renderDetail = () => {
+    const item = selectedItemId ? doc.items.find((i) => i.id === selectedItemId) : undefined;
+    if (!item) {
+      return <p className="requirements-view__empty">Select an item on the left to open it.</p>;
+    }
+    const itemById = new Map(doc.items.map((i) => [i.id, i]));
+    const parents = hierarchyIndex.parentsByChildId.get(item.id) ?? [];
+    // The path through the first parent, root first.
+    const path: RequirementItem[] = [];
+    const seen = new Set([item.id]);
+    let cursor: string | undefined = parents[0];
+    while (cursor && !seen.has(cursor)) {
+      seen.add(cursor);
+      const parent = itemById.get(cursor);
+      if (!parent) break;
+      path.unshift(parent);
+      cursor = hierarchyIndex.parentsByChildId.get(cursor)?.[0];
+    }
+    const otherParents = parents
+      .slice(1)
+      .map((id) => itemById.get(id))
+      .filter((p): p is RequirementItem => Boolean(p));
+    const children = (hierarchyIndex.childrenByParentId.get(item.id) ?? [])
+      .map((id) => itemById.get(id))
+      .filter((c): c is RequirementItem => Boolean(c));
+    const crumb = (p: RequirementItem) => (
+      <button
+        key={p.id}
+        type="button"
+        className="requirements-split__crumb"
+        onClick={() => onNavigateToItem(p.id, undefined, item.id)}
+        title={p.title || p.id}
+      >
+        <span style={{ color: doc.itemTypes.find((t) => t.id === p.typeId)?.color }}>{p.id}</span>{' '}
+        {p.title || 'Untitled'}
+      </button>
+    );
+    return (
+      <>
+        {(path.length > 0 || otherParents.length > 0) && (
+          <nav className="requirements-split__breadcrumbs" aria-label="Parents">
+            {path.map((p) => (
+              <span key={p.id} className="requirements-split__crumb-wrap">
+                {crumb(p)}
+                <ChevronRight size={12} aria-hidden />
+              </span>
+            ))}
+            <span className="requirements-split__crumb-current">{item.id}</span>
+            {otherParents.length > 0 && (
+              <span className="requirements-split__also">also under {otherParents.map(crumb)}</span>
+            )}
+          </nav>
+        )}
+        {renderCard(item, {
+          sectionKey: DETAIL_KEY,
+          cardKey: `detail:${item.id}`,
+          collapsible: false,
+        })}
+        {children.length > 0 && (
+          <section className="requirements-split__children">
+            <h3 className="requirements-view__group-title">
+              Children <span className="requirements-split__children-count">{children.length}</span>
+            </h3>
+            {children.map((child) =>
+              renderCard(child, {
+                sectionKey: DETAIL_CHILDREN_KEY,
+                cardKey: `child:${child.id}`,
+                openable: true,
+              }),
+            )}
+          </section>
+        )}
+      </>
+    );
+  };
+
+  const backEntry = navHistory[navHistory.length - 1];
+  const backButton = backEntry ? (
+    <button type="button" className="requirements-view__back" onClick={goBack}>
+      <ArrowLeft size={13} />
+      Back to {backEntry.label}
+    </button>
+  ) : null;
 
   return (
     <div className="requirements-view">
@@ -782,6 +1089,51 @@ export function RequirementsView({
             </div>
           </div>
 
+          <div className="requirements-view__group-control">
+            <span className="requirements-view__toolbar-label">View:</span>
+            <div className="requirements-view__group-toggle">
+              <button
+                type="button"
+                className={layout === 'list' ? 'active' : undefined}
+                onClick={() => setLayout('list')}
+                title="One scrolling list of cards"
+              >
+                <Rows3 size={12} />
+                <span>List</span>
+              </button>
+              <button
+                type="button"
+                className={layout === 'split' ? 'active' : undefined}
+                onClick={() => setLayout('split')}
+                title="An outline on the left, the open item and its children on the right"
+              >
+                <Columns2 size={12} />
+                <span>Split</span>
+              </button>
+            </div>
+            <div className="requirements-view__group-toggle">
+              <button
+                type="button"
+                onClick={() => setCollapsedIds(new Set(doc.items.map((i) => i.id)))}
+                title="Collapse all cards to their headers"
+                aria-label="Collapse all cards"
+              >
+                <ChevronsDownUp size={12} />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setCollapsedIds(new Set());
+                  setFoldedIds(new Set());
+                }}
+                title="Expand all cards and show every epic's children"
+                aria-label="Expand all cards"
+              >
+                <ChevronsUpDown size={12} />
+              </button>
+            </div>
+          </div>
+
           <div className="requirements-view__toolbar-divider" />
 
           <div className="requirements-view__manage-group">
@@ -807,50 +1159,89 @@ export function RequirementsView({
         </div>
       </div>
 
-      <div
-        className={`requirements-view__content requirements-view__content--${groupBy}`}
-        // Clicking empty space (not a card) clears the selection, which
-        // also hides the child quick-add row.
-        onPointerDown={(e) => {
-          if (e.target === e.currentTarget) setSelectedCardKey(null);
-        }}
-      >
-        {doc.items.length === 0 ? (
-          <p className="requirements-view__empty">
-            No requirements yet - add one above to get started.
-          </p>
-        ) : visibleItems.length === 0 ? (
-          <p className="requirements-view__empty">No requirements match your search.</p>
-        ) : groupBy === 'epic' ? (
-          <>
-            {epicTree.roots.length > 0 && (
-              <section className="requirements-view__group epic-tree">
-                {epicTree.roots.map(renderEpicNode)}
-              </section>
+      {layout === 'split' ? (
+        <div className="requirements-split">
+          <aside className="requirements-split__outline">
+            {doc.items.length === 0 ? (
+              <p className="requirements-view__empty">No requirements yet.</p>
+            ) : visibleItems.length === 0 ? (
+              <p className="requirements-view__empty">No matches.</p>
+            ) : (
+              <RequirementsOutline
+                doc={doc}
+                groups={groups}
+                epicTree={groupBy === 'epic' ? epicTree : undefined}
+                selectedId={selectedItemId}
+                onSelect={setSplitSelectedId}
+                foldedIds={foldedIds}
+                onToggleFolded={onToggleFolded}
+                searchQuery={trimmedSearch}
+              />
             )}
-            {epicTree.unparented.length > 0 && (
-              <section className="requirements-view__group">
-                <h3
-                  className="requirements-view__group-title"
-                  style={{ color: 'var(--chrome-text-dim)' }}
-                >
-                  No epic
-                </h3>
-                {epicTree.unparented.map((item) => renderCard(item, { sectionKey: NO_EPIC_KEY }))}
-              </section>
+          </aside>
+          <div className="requirements-split__detail">
+            {doc.items.length === 0 ? (
+              <p className="requirements-view__empty">
+                No requirements yet - add one above to get started.
+              </p>
+            ) : (
+              renderDetail()
             )}
-          </>
-        ) : (
-          groups.map((group) => (
-            <section key={group.key} className="requirements-view__group">
-              <h3 className="requirements-view__group-title" style={{ color: group.color }}>
-                {group.label}
-              </h3>
-              {group.items.map((item) => renderCard(item, { sectionKey: group.key }))}
-            </section>
-          ))
-        )}
-      </div>
+          </div>
+          {backButton}
+        </div>
+      ) : (
+        <div className="requirements-view__list-wrap">
+          <div
+            ref={contentRef}
+            className={`requirements-view__content requirements-view__content--${groupBy}`}
+            // Clicking empty space (not a card) clears the selection, which
+            // also hides the child quick-add row.
+            onPointerDown={(e) => {
+              if (e.target === e.currentTarget) setSelectedCardKey(null);
+            }}
+          >
+            {doc.items.length === 0 ? (
+              <p className="requirements-view__empty">
+                No requirements yet - add one above to get started.
+              </p>
+            ) : visibleItems.length === 0 ? (
+              <p className="requirements-view__empty">No requirements match your search.</p>
+            ) : groupBy === 'epic' ? (
+              <>
+                {epicTree.roots.length > 0 && (
+                  <section className="requirements-view__group epic-tree">
+                    {epicTree.roots.map(renderEpicNode)}
+                  </section>
+                )}
+                {epicTree.unparented.length > 0 && (
+                  <section className="requirements-view__group">
+                    <h3
+                      className="requirements-view__group-title"
+                      style={{ color: 'var(--chrome-text-dim)' }}
+                    >
+                      No epic
+                    </h3>
+                    {epicTree.unparented.map((item) =>
+                      renderCard(item, { sectionKey: NO_EPIC_KEY }),
+                    )}
+                  </section>
+                )}
+              </>
+            ) : (
+              groups.map((group) => (
+                <section key={group.key} className="requirements-view__group">
+                  <h3 className="requirements-view__group-title" style={{ color: group.color }}>
+                    {group.label}
+                  </h3>
+                  {group.items.map((item) => renderCard(item, { sectionKey: group.key }))}
+                </section>
+              ))
+            )}
+          </div>
+          {backButton}
+        </div>
+      )}
 
       {isManagingTypes && (
         <ManageTypesModal

@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
-import { ListPlus, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, ListPlus, Maximize2, Trash2 } from 'lucide-react';
 import { getItemType, isItemWorkable } from '../../domain/requirementsRegistry';
 import type { LinkedNodeRef, DiagramPath } from '../../domain/subDiagramTree';
 import { RequirementBody } from './RequirementBody';
@@ -44,7 +44,7 @@ interface RequirementCardProps {
   /** The second argument is this card's sectionKey, so that when the
    * target item is shown in several places (a ticket under two epics) the
    * view can prefer the copy in the section the click came from. */
-  onNavigateToItem: (itemId: string, fromSectionKey?: string) => void;
+  onNavigateToItem: (itemId: string, fromSectionKey?: string, fromItemId?: string) => void;
   onCreateAndAssignCategory: (itemId: string, label: string) => void;
   onDeleteCategory: (categoryId: string) => void;
   onAddRelationship: (typeId: string, fromItemId: string, toItemId: string) => string | null;
@@ -86,6 +86,17 @@ interface RequirementCardProps {
   isContext?: boolean;
   onAddChildItem?: (parentId: string, typeId: string, title: string) => string | null;
   defaultChildTypeId?: string;
+  /** Collapsed to just its header (id, pickers, title). Only offered when
+   * onToggleCollapsed is given. */
+  isCollapsed?: boolean;
+  onToggleCollapsed?: (itemId: string) => void;
+  /** See RelationshipManager's props of the same name; onVerbUsed also
+   * receives this item's type, since the memory is per item type. */
+  preferredVerbKey?: string;
+  onVerbUsed?: (itemTypeId: string, verbKey: string) => void;
+  /** Shows an "Open" button that makes this item the focus of the split
+   * view's detail pane - used for the children listed under an item. */
+  onOpenItem?: (itemId: string) => void;
 }
 
 function RequirementCardImpl({
@@ -117,14 +128,23 @@ function RequirementCardImpl({
   isContext,
   onAddChildItem,
   defaultChildTypeId,
+  isCollapsed = false,
+  onToggleCollapsed,
+  preferredVerbKey,
+  onVerbUsed,
+  onOpenItem,
 }: RequirementCardProps) {
   const [isEditingBody, setIsEditingBody] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const pointerIsDownRef = useRef(false);
   const selectionKey = cardKey ?? item.id;
   const navigateFromHere = useCallback(
-    (targetId: string) => onNavigateToItem(targetId, sectionKey),
-    [onNavigateToItem, sectionKey],
+    (targetId: string) => onNavigateToItem(targetId, sectionKey, item.id),
+    [onNavigateToItem, sectionKey, item.id],
+  );
+  const reportVerbUsed = useCallback(
+    (verbKey: string) => onVerbUsed?.(item.typeId, verbKey),
+    [onVerbUsed, item.typeId],
   );
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   // Reports every genuine transition, not the initial mount - a card
@@ -142,6 +162,10 @@ function RequirementCardImpl({
   const type = getItemType(doc, item.typeId);
   const canAddChildren =
     Boolean(onAddChildItem) && Boolean(defaultChildTypeId) && isEpicItem(doc, item);
+  const collapsed = isCollapsed && Boolean(onToggleCollapsed);
+  // An expanded epic always offers the quick-add; a collapsed one only
+  // while it's selected, so collapsing still gets you the compact row.
+  const showQuickAdd = canAddChildren && (!collapsed || isSelected);
 
   return (
     <div
@@ -153,7 +177,7 @@ function RequirementCardImpl({
       data-section-key={sectionKey}
       className={`requirement-card${highlighted ? ' is-highlighted' : ''}${
         isSelected ? ' is-selected' : ''
-      }${isContext ? ' is-context' : ''}`}
+      }${isContext ? ' is-context' : ''}${collapsed ? ' is-collapsed' : ''}`}
       // Selection changes layout (the previously selected epic's
       // quick-add row disappears), so it must never happen between a mouse
       // press and its release - the content would shift under the pointer
@@ -187,6 +211,23 @@ function RequirementCardImpl({
     >
       <div className="requirement-card__header">
         <div className="requirement-card__header-row">
+          {onToggleCollapsed && (
+            <button
+              type="button"
+              className="requirement-card__collapse"
+              onClick={() => {
+                // Collapsing hides the body editor, so end the edit rather
+                // than leave it (and the "editing" presence) hanging.
+                if (!collapsed) setIsEditingBody(false);
+                onToggleCollapsed(item.id);
+              }}
+              aria-expanded={!collapsed}
+              aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${item.id}`}
+              title={collapsed ? 'Expand' : 'Collapse'}
+            >
+              {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+            </button>
+          )}
           <span
             className="requirement-card__id"
             style={{ color: type?.color ?? 'var(--chrome-text-dim)' }}
@@ -257,6 +298,17 @@ function RequirementCardImpl({
               onChange={(points) => onUpdateItem(item.id, { points })}
             />
           )}
+          {onOpenItem && (
+            <button
+              type="button"
+              className="requirement-card__open"
+              onClick={() => onOpenItem(item.id)}
+              aria-label={`Open ${item.id}`}
+              title={`Open ${item.id}`}
+            >
+              <Maximize2 size={12} />
+            </button>
+          )}
           {canAddChildren && (
             <button
               type="button"
@@ -322,33 +374,42 @@ function RequirementCardImpl({
           </div>
         )}
       </div>
-      {isEditingBody ? (
-        <RequirementEditor
-          value={item.body}
-          onChange={(body) => onUpdateItem(item.id, { body })}
-          onDone={() => setIsEditingBody(false)}
-          doc={doc}
-          autoFocus
-          placeholder="Write a description... type # to reference another item"
-        />
-      ) : (
-        <div onDoubleClick={() => setIsEditingBody(true)} className="requirement-card__body-wrap">
-          <RequirementBody
-            text={item.body}
+      {!collapsed && (
+        <>
+          {isEditingBody ? (
+            <RequirementEditor
+              value={item.body}
+              onChange={(body) => onUpdateItem(item.id, { body })}
+              onDone={() => setIsEditingBody(false)}
+              doc={doc}
+              autoFocus
+              placeholder="Write a description... type # to reference another item"
+            />
+          ) : (
+            <div
+              onDoubleClick={() => setIsEditingBody(true)}
+              className="requirement-card__body-wrap"
+            >
+              <RequirementBody
+                text={item.body}
+                doc={doc}
+                onNavigateToItem={navigateFromHere}
+                searchQuery={searchQuery}
+              />
+            </div>
+          )}
+          <RelationshipManager
+            itemId={item.id}
             doc={doc}
+            onAddRelationship={onAddRelationship}
+            onDeleteRelationship={onDeleteRelationship}
             onNavigateToItem={navigateFromHere}
-            searchQuery={searchQuery}
+            preferredVerbKey={preferredVerbKey}
+            onVerbUsed={onVerbUsed ? reportVerbUsed : undefined}
           />
-        </div>
+        </>
       )}
-      <RelationshipManager
-        itemId={item.id}
-        doc={doc}
-        onAddRelationship={onAddRelationship}
-        onDeleteRelationship={onDeleteRelationship}
-        onNavigateToItem={navigateFromHere}
-      />
-      {canAddChildren && isSelected && onAddChildItem && defaultChildTypeId && (
+      {showQuickAdd && onAddChildItem && defaultChildTypeId && (
         <ChildQuickAdd
           doc={doc}
           parentId={item.id}
@@ -356,7 +417,7 @@ function RequirementCardImpl({
           onAdd={onAddChildItem}
         />
       )}
-      {diagramRoot && (
+      {!collapsed && diagramRoot && (
         <LinkedDiagramsSection
           itemId={item.id}
           itemTitle={item.title}
@@ -427,6 +488,11 @@ function propsAreEqual(prev: RequirementCardProps, next: RequirementCardProps): 
     prev.isContext === next.isContext &&
     prev.onAddChildItem === next.onAddChildItem &&
     prev.defaultChildTypeId === next.defaultChildTypeId &&
+    prev.isCollapsed === next.isCollapsed &&
+    prev.onToggleCollapsed === next.onToggleCollapsed &&
+    prev.preferredVerbKey === next.preferredVerbKey &&
+    prev.onVerbUsed === next.onVerbUsed &&
+    prev.onOpenItem === next.onOpenItem &&
     // Not identity: peersHere is rebuilt by a filter on every parent
     // render, and its elements are rebuilt on every presence update -
     // including cursor movement, which no badge here renders. See

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { CornerDownLeft, Plus } from 'lucide-react';
+import { CornerDownLeft } from 'lucide-react';
 import type { RequirementsDocument } from '../../domain/requirementsTypes';
+import { TypePicker } from './TypePicker';
 
 interface ChildQuickAddProps {
   doc: RequirementsDocument;
@@ -54,19 +55,20 @@ export function ChildQuickAdd({ doc, parentId, defaultTypeId, onAdd }: ChildQuic
 
   return (
     <div className="child-quick-add">
-      <Plus size={12} className="child-quick-add__icon" aria-hidden />
-      <select
+      {/* The same type chip and dropdown the card header uses, so choosing
+          a child's type looks and behaves like every other type choice in
+          the app. Focus returns to the title input afterwards, so picking a
+          type never interrupts typing. */}
+      <TypePicker
+        doc={doc}
+        typeId={effectiveTypeId}
+        onChange={setTypeId}
         className="child-quick-add__type"
-        value={effectiveTypeId}
-        onChange={(e) => setTypeId(e.target.value)}
-        aria-label={`Type of new child for ${parentId}`}
-      >
-        {doc.itemTypes.map((t) => (
-          <option key={t.id} value={t.id}>
-            {t.label}
-          </option>
-        ))}
-      </select>
+        headerLabel="New child type"
+        triggerTitle="Type of the new child"
+        triggerAriaLabel={`Type of new child for ${parentId}`}
+        onClosed={() => inputRef.current?.focus()}
+      />
       <input
         ref={inputRef}
         className="child-quick-add__input"

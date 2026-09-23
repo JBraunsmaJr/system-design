@@ -122,25 +122,53 @@ console.log('=== Child quick-add on epic cards ===');
   const epic = testDoc.items[0];
   const ticket = testDoc.items[3];
 
-  const unselected = renderToStaticMarkup(
-    React.createElement(RequirementCard, { ...baseProps, item: epic }),
+  const expanded = renderToStaticMarkup(
+    React.createElement(RequirementCard, {
+      ...baseProps,
+      item: epic,
+      onToggleCollapsed: () => {},
+    }),
   );
   assert(
-    unselected.includes('aria-label="Add a child to EPIC-1"'),
+    expanded.includes('aria-label="Add a child to EPIC-1"'),
     'an epic card has an "Add child" button in its header',
   );
   assert(
-    !unselected.includes('child-quick-add'),
-    'the quick-add row is hidden until the card is selected',
+    expanded.includes('class="child-quick-add"'),
+    'an expanded epic always shows the quick-add row',
   );
-
-  const selected = renderToStaticMarkup(
-    React.createElement(RequirementCard, { ...baseProps, item: epic, isSelected: true }),
-  );
-  assert(selected.includes('class="child-quick-add"'), 'selecting an epic shows the quick-add row');
   assert(
-    selected.includes('<option value="ticket" selected="">Ticket</option>'),
-    'the quick-add type defaults to Ticket',
+    expanded.includes('aria-label="Type of new child for EPIC-1"') &&
+      expanded.includes('class="type-picker__trigger child-quick-add__type"') &&
+      expanded.includes('<span class="type-picker__label">Ticket</span>'),
+    "the child's type uses the app's shared type picker, defaulting to Ticket",
+  );
+  assert(!expanded.includes('<select'), 'no native select is used for the child type');
+
+  const collapsed = renderToStaticMarkup(
+    React.createElement(RequirementCard, {
+      ...baseProps,
+      item: epic,
+      isCollapsed: true,
+      onToggleCollapsed: () => {},
+    }),
+  );
+  assert(
+    !collapsed.includes('child-quick-add'),
+    'a collapsed epic hides the quick-add until it is selected',
+  );
+  const collapsedSelected = renderToStaticMarkup(
+    React.createElement(RequirementCard, {
+      ...baseProps,
+      item: epic,
+      isCollapsed: true,
+      isSelected: true,
+      onToggleCollapsed: () => {},
+    }),
+  );
+  assert(
+    collapsedSelected.includes('class="child-quick-add"'),
+    'selecting a collapsed epic shows its quick-add',
   );
 
   const ticketCard = renderToStaticMarkup(
