@@ -163,6 +163,10 @@ function RequirementCardImpl({
   const canAddChildren =
     Boolean(onAddChildItem) && Boolean(defaultChildTypeId) && isEpicItem(doc, item);
   const collapsed = isCollapsed && Boolean(onToggleCollapsed);
+
+  // A collapsed card has no body editor, whoever collapsed it
+  const editingBody = isEditingBody && !collapsed;
+
   // An expanded epic always offers the quick-add; a collapsed one only
   // while it's selected, so collapsing still gets you the compact row.
   const showQuickAdd = canAddChildren && (!collapsed || isSelected);
@@ -376,7 +380,7 @@ function RequirementCardImpl({
       </div>
       {!collapsed && (
         <>
-          {isEditingBody ? (
+          {editingBody ? (
             <RequirementEditor
               value={item.body}
               onChange={(body) => onUpdateItem(item.id, { body })}
