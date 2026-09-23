@@ -55,10 +55,6 @@ export function ChildQuickAdd({ doc, parentId, defaultTypeId, onAdd }: ChildQuic
 
   return (
     <div className="child-quick-add">
-      {/* The same type chip and dropdown the card header uses, so choosing
-          a child's type looks and behaves like every other type choice in
-          the app. Focus returns to the title input afterwards, so picking a
-          type never interrupts typing. */}
       <TypePicker
         doc={doc}
         typeId={effectiveTypeId}

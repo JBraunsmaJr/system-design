@@ -41,7 +41,6 @@ export function RequirementBody({
   searchQuery,
 }: RequirementBodyProps) {
   const resolved = resolveReferencesToMarkdownLinks(text, doc);
-  // #REQ-3 references get the same hover preview as relationship chips.
   const { peekHandlers, peekNode } = useItemPeek(doc, onNavigateToItem);
 
   const trimmedQuery = searchQuery?.trim();
