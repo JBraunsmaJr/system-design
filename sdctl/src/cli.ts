@@ -225,6 +225,17 @@ Flags:
     const yamlStr = dumpDeploymentSpecYaml(spec);
     writeFileSync(specPath, yamlStr, 'utf8');
 
+    // Save secrets if needed (e.g. Turn credentials or DNS provider API token)
+    const secretsPath = join(workingDir, 'secrets.env');
+    const extraSecrets: Record<string, string> = {};
+    if (spec.tls.dnsProvider?.apiToken) {
+      const tokenVar = spec.tls.dnsProvider.apiTokenEnvVar || 'CLOUDFLARE_API_TOKEN';
+      extraSecrets[tokenVar] = spec.tls.dnsProvider.apiToken;
+    }
+    if (spec.turn?.enabled || Object.keys(extraSecrets).length > 0) {
+      loadOrCreateSecrets(secretsPath, Boolean(spec.turn?.enabled), extraSecrets);
+    }
+
     // Run Preflight after init (FR-INIT-06)
     const preflight = runPreflightChecks({ workingDir, spec });
 

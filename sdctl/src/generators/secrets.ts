@@ -71,7 +71,7 @@ export function loadOrCreateSecrets(
 
   if (extraSecrets) {
     for (const [k, v] of Object.entries(extraSecrets)) {
-      if (v && !existing[k]) {
+      if (v && existing[k] !== v) {
         existing[k] = v;
         updated = true;
       }

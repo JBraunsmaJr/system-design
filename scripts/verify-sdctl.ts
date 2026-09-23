@@ -916,7 +916,7 @@ console.log('\n18. Cloudflare DNS-01 ACME & Wildcard Support');
     'secrets.env stores CLOUDFLARE_API_TOKEN',
   );
 
-  // F. Wizard Answers Spec Generation
+  // F. Wizard Answers Spec Generation & CLI Init Secrets Persistence
   const wizardSpec = buildDeploymentSpec({
     mode: 'public',
     topology: 'routed',
@@ -938,6 +938,38 @@ console.log('\n18. Cloudflare DNS-01 ACME & Wildcard Support');
     wizardSpec.proxy?.image === 'slothcroissant/caddy-cloudflaredns:latest',
     'Wizard records proxy image',
   );
+
+  // Test CLI init persists secrets.env with Cloudflare token
+  const cfInitDir = mkdtempSync(join(tmpdir(), 'sdctl-cf-init-'));
+  const cfAnswersPath = join(cfInitDir, 'answers.json');
+  writeFileSync(
+    cfAnswersPath,
+    JSON.stringify({
+      mode: 'public',
+      topology: 'routed',
+      tlsMode: 'acme-dns',
+      domain: '*.home.jbraunsma.dev',
+      editorHost: 'design.home.jbraunsma.dev',
+      relayHost: 'relay.home.jbraunsma.dev',
+      cloudflareApiToken: 'cf-secret-token-init-xyz',
+    }),
+    'utf8',
+  );
+  const initCode = await runCli(
+    ['init', '--answers', cfAnswersPath, '--force', 'PRE-HOST-SOCK', '--output', 'json'],
+    cfInitDir,
+  );
+  check(initCode === 0, 'CLI `sdctl init` with Cloudflare token exits 0');
+  check(
+    existsSync(join(cfInitDir, 'secrets.env')),
+    'CLI `sdctl init` writes secrets.env when API token is provided',
+  );
+  const initSecretsContent = readFileSync(join(cfInitDir, 'secrets.env'), 'utf8');
+  check(
+    initSecretsContent.includes('CLOUDFLARE_API_TOKEN=cf-secret-token-init-xyz'),
+    'CLI `sdctl init` populates CLOUDFLARE_API_TOKEN in secrets.env',
+  );
+  rmSync(cfInitDir, { recursive: true, force: true });
 
   rmSync(testDir, { recursive: true, force: true });
 }
