@@ -74,6 +74,16 @@ console.log('1. Release Manifest and Registry Rewriting');
       `${DEFAULT_MANIFEST.images.editor.image}@${DEFAULT_MANIFEST.images.editor.digest}`,
     'Default image resolution preserves repository and digest',
   );
+  check(
+    !defaultResolved.turn.split('@')[0].includes(':') &&
+      defaultResolved.turn === `coturn/coturn@${DEFAULT_MANIFEST.images.turn.digest}`,
+    'Coturn resolved image does not include redundant :latest tag before digest',
+  );
+  check(
+    !defaultResolved.proxy.split('@')[0].includes(':') &&
+      defaultResolved.proxy === `caddy@${DEFAULT_MANIFEST.images.proxy.digest}`,
+    'Proxy resolved image does not include tag before digest',
+  );
 
   const customRegistry = 'registry.internal.corp:5000';
   const customResolved = getResolvedImages(DEFAULT_MANIFEST, customRegistry);
@@ -167,6 +177,11 @@ console.log('\n3. Artifact Generation');
     'Containers labelled with sdctl ownership label',
   );
   check(compose.includes(DEFAULT_MANIFEST.images.editor.digest), 'Compose pins editor by digest');
+  check(
+    compose.includes(`image: coturn/coturn@${DEFAULT_MANIFEST.images.turn.digest}`) &&
+      !compose.includes(':latest@'),
+    'Compose pins coturn image cleanly by digest without :latest tag',
+  );
   check(
     compose.includes('networks:\n  sdctl-net:\n    name: sdctl-net'),
     'Generated compose.yaml defines sdctl-net network',

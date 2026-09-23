@@ -14,11 +14,11 @@ export const DEFAULT_MANIFEST: ReleaseManifest = {
       digest: 'sha256:4d8a1c9e821fa91b5c3e6605a9c9f2b1897d9e4a3c10b7a421ef88012fcd99a0',
     },
     proxy: {
-      image: 'caddy:2.8-alpine',
+      image: 'caddy',
       digest: 'sha256:2b2cf691ad5c2f0f4a86b1d62c938f4d9241b7145b59740b284d7a8d8e63a8a3',
     },
     turn: {
-      image: 'coturn/coturn:latest',
+      image: 'coturn/coturn',
       digest: 'sha256:1e6c382103f6bbda28f6f0ea99616d2b512ab424d9f6ea9b5f5832a84ba7a35c',
     },
     installer: {
@@ -42,6 +42,14 @@ export function resolveImage(baseImage: string, digest: string, registryPrefix?:
     const parts = baseImage.split('/');
     const imageName = parts.length > 1 ? parts.slice(1).join('/') : parts[0];
     imagePath = `${cleanPrefix}/${imageName}`;
+  }
+
+  // Strip any tag if present before appending digest (e.g. repo:tag -> repo@digest)
+  // Tags only appear after the last slash (to avoid stripping port numbers like localhost:5000/image)
+  const lastSlash = imagePath.lastIndexOf('/');
+  const lastColon = imagePath.lastIndexOf(':');
+  if (lastColon > lastSlash) {
+    imagePath = imagePath.slice(0, lastColon);
   }
 
   return `${imagePath}@${digest}`;
