@@ -21,7 +21,7 @@ import {
   loadRequirementsViewPrefs,
   saveRequirementsViewPrefs,
 } from '../../domain/requirementsViewPrefs';
-import { markdownExcerpt } from '../../domain/markdownExcerpt';
+import { markdownExcerpt, markdownPreviewSource } from '../../domain/markdownExcerpt';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {
@@ -337,6 +337,25 @@ console.log('=== Peek excerpts ===');
   );
   const long = markdownExcerpt('word '.repeat(100), 40);
   assert(long.length <= 40 && long.endsWith('…'), 'long bodies are truncated with an ellipsis');
+
+  const table = '| A | B |\n| --- | --- |\n| x | y |';
+  assert(
+    markdownPreviewSource(table).source === table && !markdownPreviewSource(table).truncated,
+    'a short body is previewed whole, markdown intact',
+  );
+  const blocks = markdownPreviewSource(`${'a '.repeat(30)}\n\n${'b '.repeat(30)}`, 80);
+  assert(
+    blocks.truncated && blocks.source === 'a '.repeat(30).trim(),
+    'a long body is cut at a block boundary, not mid-block',
+  );
+  const fenced = markdownPreviewSource(
+    `\`\`\`\n${'c\n'.repeat(10)}\n\n${'d\n'.repeat(40)}\`\`\``,
+    40,
+  );
+  assert(
+    (fenced.source.match(/^```/gm)?.length ?? 0) === 2,
+    'a code fence cut in half is closed again',
+  );
 }
 
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);

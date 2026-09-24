@@ -8,7 +8,7 @@ import {
   isItemWorkable,
 } from '../../domain/requirementsRegistry';
 import type { RequirementsDocument } from '../../domain/requirementsTypes';
-import { markdownExcerpt } from '../../domain/markdownExcerpt';
+import { ItemPeekBody } from './ItemPeekBody';
 
 /** The body of the hover preview - see useItemPeek. */
 export function ItemPeekContent({
@@ -24,7 +24,6 @@ export function ItemPeekContent({
   if (!item) return null;
   const type = getItemType(doc, item.typeId);
   const status = isItemWorkable(doc, item) ? getStatusMeta(item.status) : null;
-  const excerpt = markdownExcerpt(item.body);
 
   // "Parent of 3 · Blocks 1" - counts per direction-correct verb.
   const counts = new Map<string, { color: string; count: number }>();
@@ -51,7 +50,7 @@ export function ItemPeekContent({
         )}
       </div>
       <div className="item-peek__title">{item.title || 'Untitled'}</div>
-      {excerpt && <p className="item-peek__excerpt">{excerpt}</p>}
+      <ItemPeekBody markdown={item.body} doc={doc} />
       {counts.size > 0 && (
         <div className="item-peek__relationships">
           {[...counts.entries()].map(([label, { color, count }]) => (

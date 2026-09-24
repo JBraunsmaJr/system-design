@@ -77,13 +77,20 @@ export function useItemPeek(doc: RequirementsDocument, onGoTo: (itemId: string) 
   useEffect(() => {
     if (!peek) return;
     const dismiss = () => setPeek(null);
+    // Scrolling the page moves the anchor out from under the peek, but
+    // scrolling inside the peek itself (a long body, a wide table) is just
+    // reading it.
+    const onScroll = (e: Event) => {
+      if (e.target instanceof Node && popoverRef.current?.contains(e.target)) return;
+      dismiss();
+    };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') dismiss();
     };
-    window.addEventListener('scroll', dismiss, true);
+    window.addEventListener('scroll', onScroll, true);
     document.addEventListener('keydown', onKey);
     return () => {
-      window.removeEventListener('scroll', dismiss, true);
+      window.removeEventListener('scroll', onScroll, true);
       document.removeEventListener('keydown', onKey);
     };
   }, [peek]);
