@@ -98,6 +98,17 @@ console.log('=== Ordinary states ===');
     'a synced document reports synced',
   );
   assert(
+    deriveDurability({ ...base, serverSync: 'pending' }).level === 'synced' &&
+      deriveDurability({ ...base, serverSync: 'pending' }).label === 'Syncing',
+    'a syncing document reports synced level with Syncing label',
+  );
+  assert(
+    deriveDurability({ ...base, serverSync: 'synced', fileBacked: true }).detail.includes(
+      'to the file',
+    ),
+    'a document saved to workspace and file mentions the file',
+  );
+  assert(
     deriveDurability({ ...base, fileBacked: false, fileAccess: 'available' }).action ===
       'choose-file',
     'browser-only storage offers to attach a file where the browser can',

@@ -996,13 +996,12 @@ function App() {
 
   useEffect(() => {
     return () => {
-      if (activeSession) endSession(activeSession);
+      if (activeSessionRef.current) endSession(activeSessionRef.current);
     };
-    // Only ever runs on unmount - intentionally not re-running when
-    // activeSession itself changes, since that would disconnect and
-    // immediately reconnect on every session state update.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    // Only ever runs on unmount - reads activeSessionRef.current to avoid
+    // closing over a stale activeSession value, while keeping the cleanup
+    // restricted to component unmount.
+  }, [endSession]);
 
   /**
    * The active store set (WS1-R1).

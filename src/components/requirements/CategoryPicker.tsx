@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Tag, Trash2, X } from 'lucide-react';
 import {
@@ -155,7 +155,16 @@ export function CategoryPicker({
     };
   }, [isOpen, reposition]);
 
-  const filtered = doc.categories.filter((c) =>
+  const uniqueCategories = useMemo(() => {
+    const seen = new Set<string>();
+    return doc.categories.filter((c) => {
+      if (seen.has(c.id)) return false;
+      seen.add(c.id);
+      return true;
+    });
+  }, [doc.categories]);
+
+  const filtered = uniqueCategories.filter((c) =>
     c.label.toLowerCase().includes(query.trim().toLowerCase()),
   );
   const exactMatch = findCategoryByLabel(doc, query);

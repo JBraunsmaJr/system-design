@@ -204,7 +204,7 @@ export function DurabilityIndicator({
     Boolean(isLoggedIn && onSaveToWorkspace) ||
     Boolean(!isLoggedIn && (onLoginOidc || isOidcAvailable) && onLoginOidc) ||
     state.action === 'resolve-conflict' ||
-    Boolean(onStopFile && state.level === 'file');
+    Boolean(onStopFile && (state.level === 'file' || signals.fileBacked));
 
   const detailNode = (
     <div
@@ -284,7 +284,7 @@ export function DurabilityIndicator({
               )}
             </div>
           )}
-          {onStopFile && state.level === 'file' && (
+          {onStopFile && (state.level === 'file' || signals.fileBacked) && (
             <button
               type="button"
               className="durability__secondary durability__stop-file"

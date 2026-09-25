@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ArrowRightLeft, Briefcase, Check, Lock, Pencil, Trash2, X } from 'lucide-react';
 import { countItemsUsingType, isPrefixTaken } from '../../domain/requirementsRegistry';
 import type { RequirementItemType, RequirementsDocument } from '../../domain/requirementsTypes';
@@ -37,6 +37,15 @@ export function ManageTypesModal({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  const uniqueItemTypes = useMemo(() => {
+    const seen = new Set<string>();
+    return doc.itemTypes.filter((t) => {
+      if (seen.has(t.id)) return false;
+      seen.add(t.id);
+      return true;
+    });
+  }, [doc.itemTypes]);
+
   // Editing an existing type - label/color/isWorkable only, never prefix
   // (see onUpdateType's own doc comment in RequirementsView for why
   // prefix specifically stays locked once a type exists). Tracked as one
@@ -55,7 +64,7 @@ export function ManageTypesModal({
   const startTransfer = (fromTypeId: string) => {
     setEditingTypeId(null);
     setTransferringTypeId(fromTypeId);
-    const firstOther = doc.itemTypes.find((t) => t.id !== fromTypeId);
+    const firstOther = uniqueItemTypes.find((t) => t.id !== fromTypeId);
     setTransferTargetTypeId(firstOther?.id ?? '');
     setError(null);
     setSuccess(null);
@@ -63,8 +72,8 @@ export function ManageTypesModal({
   const cancelTransfer = () => setTransferringTypeId(null);
   const executeTransfer = (fromTypeId: string) => {
     if (!onConvertAllItemsOfType || !transferTargetTypeId) return;
-    const fromType = doc.itemTypes.find((t) => t.id === fromTypeId);
-    const toType = doc.itemTypes.find((t) => t.id === transferTargetTypeId);
+    const fromType = uniqueItemTypes.find((t) => t.id === fromTypeId);
+    const toType = uniqueItemTypes.find((t) => t.id === transferTargetTypeId);
     const count = onConvertAllItemsOfType(fromTypeId, transferTargetTypeId);
     setTransferringTypeId(null);
     setSuccess(
@@ -124,7 +133,7 @@ export function ManageTypesModal({
         </div>
 
         <div className="manage-types-modal__list">
-          {doc.itemTypes.map((type) => {
+          {uniqueItemTypes.map((type) => {
             if (editingTypeId === type.id) {
               return (
                 <div
@@ -197,7 +206,7 @@ export function ManageTypesModal({
                     onChange={(e) => setTransferTargetTypeId(e.target.value)}
                     className="manage-types-modal__transfer-select"
                   >
-                    {doc.itemTypes
+                    {uniqueItemTypes
                       .filter((t) => t.id !== type.id)
                       .map((t) => (
                         <option key={t.id} value={t.id}>

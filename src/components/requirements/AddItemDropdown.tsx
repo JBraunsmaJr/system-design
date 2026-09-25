@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Plus, Search, Settings2 } from 'lucide-react';
 import type { RequirementItemType } from '../../domain/requirementsTypes';
@@ -27,8 +27,17 @@ export function AddItemDropdown({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
+  const uniqueItemTypes = useMemo(() => {
+    const seen = new Set<string>();
+    return itemTypes.filter((t) => {
+      if (seen.has(t.id)) return false;
+      seen.add(t.id);
+      return true;
+    });
+  }, [itemTypes]);
+
   // Keep active type synced if types change or on initial render
-  const activeType = itemTypes.find((t) => t.id === selectedTypeId) ?? itemTypes[0];
+  const activeType = uniqueItemTypes.find((t) => t.id === selectedTypeId) ?? uniqueItemTypes[0];
 
   const close = useCallback(() => {
     setIsOpen(false);
@@ -67,10 +76,10 @@ export function AddItemDropdown({
 
   // Focus search when dropdown opens if there are many types
   useEffect(() => {
-    if (isOpen && itemTypes.length > 5) {
+    if (isOpen && uniqueItemTypes.length > 5) {
       searchInputRef.current?.focus();
     }
-  }, [isOpen, itemTypes.length]);
+  }, [isOpen, uniqueItemTypes.length]);
 
   // Handle outside click & escape key
   useEffect(() => {
@@ -101,8 +110,8 @@ export function AddItemDropdown({
   const handleQuickAdd = () => {
     if (activeType) {
       onAddItem(activeType.id);
-    } else if (itemTypes.length > 0) {
-      onAddItem(itemTypes[0].id);
+    } else if (uniqueItemTypes.length > 0) {
+      onAddItem(uniqueItemTypes[0].id);
     }
   };
 
@@ -112,7 +121,7 @@ export function AddItemDropdown({
     close();
   };
 
-  const filteredTypes = itemTypes.filter((t) => {
+  const filteredTypes = uniqueItemTypes.filter((t) => {
     if (!filterQuery.trim()) return true;
     const q = filterQuery.toLowerCase();
     return t.label.toLowerCase().includes(q) || t.prefix.toLowerCase().includes(q);

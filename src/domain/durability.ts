@@ -139,18 +139,26 @@ export function deriveDurability(signals: DurabilitySignals): DurabilityState {
     };
   }
 
-  if (signals.serverSync === 'offline' || signals.serverSync === 'pending') {
+  if (signals.serverSync === 'offline') {
     const queued = signals.pendingUpdates ?? 0;
     return {
       level: 'local',
       tone: 'caution',
-      label: signals.serverSync === 'offline' ? 'Offline' : 'Syncing',
+      label: 'Offline',
       detail:
-        signals.serverSync === 'offline'
-          ? queued > 0
-            ? `${queued} ${queued === 1 ? 'change is' : 'changes are'} waiting for the workspace. They are saved on this device in the meantime.`
-            : 'The workspace is unreachable. Changes are saved on this device and go up when it returns.'
-          : 'Sending recent changes to the workspace.',
+        queued > 0
+          ? `${queued} ${queued === 1 ? 'change is' : 'changes are'} waiting for the workspace. They are saved on this device in the meantime.`
+          : 'The workspace is unreachable. Changes are saved on this device and go up when it returns.',
+      persistent: false,
+    };
+  }
+
+  if (signals.serverSync === 'pending') {
+    return {
+      level: 'synced',
+      tone: 'ok',
+      label: 'Syncing',
+      detail: 'Sending recent changes to the workspace.',
       persistent: false,
     };
   }
@@ -160,7 +168,9 @@ export function deriveDurability(signals: DurabilitySignals): DurabilityState {
       level: 'synced',
       tone: 'ok',
       label: 'In workspace',
-      detail: 'Saved in the workspace, and on this device. Everyone with access sees it.',
+      detail: signals.fileBacked
+        ? 'Saved in the workspace, and to the file on this device.'
+        : 'Saved in the workspace, and on this device. Everyone with access sees it.',
       persistent: false,
     };
   }

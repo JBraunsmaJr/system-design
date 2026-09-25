@@ -181,9 +181,16 @@ export function getItemType(
  * saved. Idempotent - calling this on a document that already has every
  * current built-in returns the array unchanged. */
 export function withMissingBuiltInTypes(itemTypes: RequirementItemType[]): RequirementItemType[] {
-  const existingIds = new Set(itemTypes.map((t) => t.id));
+  const existingIds = new Set<string>();
+  const deduped: RequirementItemType[] = [];
+  for (const t of itemTypes) {
+    if (!existingIds.has(t.id)) {
+      existingIds.add(t.id);
+      deduped.push(t);
+    }
+  }
   const missing = BUILT_IN_ITEM_TYPES.filter((t) => !existingIds.has(t.id));
-  return missing.length > 0 ? [...itemTypes, ...missing] : itemTypes;
+  return missing.length > 0 ? [...deduped, ...missing] : deduped;
 }
 
 /** Same reasoning as withMissingBuiltInTypes, for relationship types -
@@ -193,9 +200,16 @@ export function withMissingBuiltInTypes(itemTypes: RequirementItemType[]): Requi
 export function withMissingBuiltInRelationshipTypes(
   relationshipTypes: RelationshipType[],
 ): RelationshipType[] {
-  const existingIds = new Set(relationshipTypes.map((t) => t.id));
+  const existingIds = new Set<string>();
+  const deduped: RelationshipType[] = [];
+  for (const t of relationshipTypes) {
+    if (!existingIds.has(t.id)) {
+      existingIds.add(t.id);
+      deduped.push(t);
+    }
+  }
   const missing = BUILT_IN_RELATIONSHIP_TYPES.filter((t) => !existingIds.has(t.id));
-  return missing.length > 0 ? [...relationshipTypes, ...missing] : relationshipTypes;
+  return missing.length > 0 ? [...deduped, ...missing] : deduped;
 }
 
 /** True if `prefix` (case-insensitive) is already used by another type in

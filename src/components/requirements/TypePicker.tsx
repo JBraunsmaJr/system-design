@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Briefcase, Check, ChevronDown } from 'lucide-react';
 import { getItemType } from '../../domain/requirementsRegistry';
@@ -40,6 +40,15 @@ export function TypePicker({
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const uniqueItemTypes = useMemo(() => {
+    const seen = new Set<string>();
+    return doc.itemTypes.filter((t) => {
+      if (seen.has(t.id)) return false;
+      seen.add(t.id);
+      return true;
+    });
+  }, [doc.itemTypes]);
 
   const currentType = getItemType(doc, typeId);
 
@@ -173,7 +182,7 @@ export function TypePicker({
               <span>{headerLabel}</span>
             </div>
             <div className="type-picker__list">
-              {doc.itemTypes.map((type) => {
+              {uniqueItemTypes.map((type) => {
                 const isSelected = type.id === typeId;
                 return (
                   <button

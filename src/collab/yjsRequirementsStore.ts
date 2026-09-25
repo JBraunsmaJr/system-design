@@ -455,6 +455,46 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
     return true;
   }
 
+  function hasDuplicates(ids: string[]): { hasDuplicateEntries: boolean, duplicateIndices: number[] } {
+    const seen = new Set<string>()
+    const duplicateIndices: number[] = []
+
+    for (let i = 0; i < ids.length; i++) {
+      if (seen.has(ids[i])) {
+        duplicateIndices.push(i);
+      } else {
+        seen.add(ids[i]);
+      }
+    }
+    return {
+      hasDuplicateEntries: duplicateIndices.length > 0,
+      duplicateIndices
+    };
+  }
+
+  function repairDuplicateItemTypes(): boolean {
+    const { hasDuplicateEntries, duplicateIndices } = hasDuplicates(itemTypeOrder.toArray())
+    if(!hasDuplicateEntries) return false
+
+    doc.transact(() => {
+      for (let i = duplicateIndices.length - 1; i >= 0; i--) {
+        itemTypeOrder.delete(duplicateIndices[i], 1);
+      }
+    });
+    return true;
+  }
+
+  function repairDuplicateCategories(): boolean {
+    const { hasDuplicateEntries, duplicateIndices } = hasDuplicates(categoryOrder.toArray())
+    if(!hasDuplicateEntries) return false
+    doc.transact(() => {
+      for (let i = duplicateIndices.length - 1; i >= 0; i--) {
+        categoryOrder.delete(duplicateIndices[i], 1);
+      }
+    });
+    return true;
+  }
+
   function buildSnapshot(): RequirementsDocument {
     const idIndex = new Map<string, string>();
     const items_ = itemOrder
@@ -469,18 +509,27 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
       .filter((i): i is RequirementItem => i !== null);
     displayIdToStorageKey = idIndex;
 
+    const seenTypeIds = new Set<string>();
+    const types: RequirementItemType[] = [];
+    for (const id of itemTypeOrder.toArray()) {
+      if (seenTypeIds.has(id)) continue;
+      seenTypeIds.add(id);
+      const t = itemTypes.get(id);
+      if (t) types.push(itemTypeMapToPlain(id, t));
+    }
+
+    const seenCategoryIds = new Set<string>();
+    const categories_: RequirementCategory[] = [];
+    for (const id of categoryOrder.toArray()) {
+      if (seenCategoryIds.has(id)) continue;
+      seenCategoryIds.add(id);
+      const c = categories.get(id);
+      if (c) categories_.push(c);
+    }
+
     return {
-      itemTypes: itemTypeOrder
-        .toArray()
-        .map((id) => {
-          const t = itemTypes.get(id);
-          return t ? itemTypeMapToPlain(id, t) : null;
-        })
-        .filter((t): t is RequirementItemType => t !== null),
-      categories: categoryOrder
-        .toArray()
-        .map((id) => categories.get(id))
-        .filter((c): c is RequirementCategory => c !== undefined),
+      itemTypes: types,
+      categories: categories_,
       items: items_,
       relationshipTypes: Array.from(relationshipTypes.values()),
       relationships: Array.from(relationships.values()),
@@ -495,12 +544,16 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
    * observe anything.
    */
   repairDuplicateDisplayIds();
+  repairDuplicateItemTypes();
+  repairDuplicateCategories();
   repairOrphanedReferences();
 
   let cached = buildSnapshot();
   const listeners = new Set<() => void>();
   const recomputeAndNotify = () => {
     if (repairDuplicateDisplayIds()) return; // its own transact() triggers another observeDeep round, which will rebuild `cached` correctly
+    if (repairDuplicateItemTypes()) return;
+    if (repairDuplicateCategories()) return;
     if (repairOrphanedReferences()) return; // same - its writes re-enter here with the document already consistent
     cached = buildSnapshot();
     for (const listener of listeners) listener();

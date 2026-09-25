@@ -65,6 +65,24 @@ console.log('=== DurabilityIndicator OIDC and Workspace Persistence ===');
   assert(!html.includes('Sign in with OIDC'), 'does not render Sign in with OIDC when logged in');
 }
 
+// 4. File-backed document in at-risk/alert state renders Stop saving to file option
+{
+  const atRiskFileSignals: DurabilitySignals = {
+    localPersistence: 'unavailable',
+    fileBacked: true,
+    fileAccess: 'available',
+  };
+  const html = renderToStaticMarkup(
+    <DurabilityIndicator
+      signals={atRiskFileSignals}
+      fileName="diagram.json"
+      onStopFile={() => {}}
+      onExport={() => {}}
+    />,
+  );
+  assert(html.includes('Stop saving to diagram.json'), 'renders Stop saving to file option when file-backed');
+}
+
 if (failures > 0) {
   console.error(`\n${failures} test(s) failed`);
   (globalThis as unknown as { process: { exitCode: number } }).process?.exitCode ? ((globalThis as unknown as { process: { exitCode: number } }).process.exitCode = 1) : undefined;

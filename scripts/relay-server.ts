@@ -43,7 +43,15 @@ interface SignalMessage {
 }
 
 const send = (socket: WebSocket, message: unknown) => {
-  if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(message));
+  if (socket.readyState === socket.OPEN) {
+    try {
+      socket.send(JSON.stringify(message), (err) => {
+        if (err) disconnect(socket);
+      });
+    } catch {
+      disconnect(socket);
+    }
+  }
 };
 
 function subscribe(socket: WebSocket, topic: string) {
@@ -58,7 +66,11 @@ function subscribe(socket: WebSocket, topic: string) {
 function unsubscribe(socket: WebSocket, topic: string) {
   topics.get(topic)?.delete(socket);
   if (topics.get(topic)?.size === 0) topics.delete(topic);
-  subscriptions.get(socket)?.delete(topic);
+  const mine = subscriptions.get(socket);
+  if (mine) {
+    mine.delete(topic);
+    if (mine.size === 0) subscriptions.delete(socket);
+  }
 }
 
 function disconnect(socket: WebSocket) {
@@ -86,9 +98,20 @@ const server = createServer((request, response) => {
   response.end();
 });
 
+server.on('error', (error) => {
+  console.error('Relay HTTP server error:', error);
+});
+
 const sockets = new WebSocketServer({ server });
 
+sockets.on('error', (error) => {
+  console.error('Relay WebSocket server error:', error);
+});
+
 sockets.on('connection', (socket, request) => {
+  socket.on('error', () => {
+    disconnect(socket);
+  });
   // A token may arrive in the connection's query string, which is the only
   // place y-webrtc's client can carry one without modifying it, or in each
   // subscribe message for a client that can.

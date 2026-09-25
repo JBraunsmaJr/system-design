@@ -378,7 +378,13 @@ export function RequirementsView({
   const groups = useMemo<ItemGroup[]>(() => {
     if (groupBy === 'epic') return [];
     if (groupBy === 'type') {
+      const seenTypeKeys = new Set<string>();
       return doc.itemTypes
+        .filter((type) => {
+          if (seenTypeKeys.has(type.id)) return false;
+          seenTypeKeys.add(type.id);
+          return true;
+        })
         .map((type) => ({
           key: type.id,
           label: plur(type.label, 2),
@@ -387,7 +393,13 @@ export function RequirementsView({
         }))
         .filter((g) => g.items.length > 0);
     }
+    const seenCategoryKeys = new Set<string>();
     const categoryGroups = doc.categories
+      .filter((cat) => {
+        if (seenCategoryKeys.has(cat.id)) return false;
+        seenCategoryKeys.add(cat.id);
+        return true;
+      })
       .map((cat) => ({
         key: cat.id,
         label: cat.label,
