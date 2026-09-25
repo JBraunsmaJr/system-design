@@ -712,11 +712,19 @@ option {
   text-align: left;
   text-transform: none;
   letter-spacing: normal;
+  cursor: pointer;
 }
 
-.canvas-context-menu button:hover {
+.canvas-context-menu button:hover,
+.canvas-context-menu button.is-active {
   background: var(--chrome-bg);
   color: var(--accent);
+}
+
+.canvas-context-menu__divider {
+  height: 1px;
+  background: var(--chrome-border);
+  margin: 3px 2px;
 }
 
 .inspector__z-order {
@@ -792,11 +800,19 @@ option {
   text-align: left;
   text-transform: none;
   letter-spacing: normal;
+  cursor: pointer;
 }
 
-.canvas-context-menu button:hover {
+.canvas-context-menu button:hover,
+.canvas-context-menu button.is-active {
   background: var(--chrome-bg);
   color: var(--accent);
+}
+
+.canvas-context-menu__divider {
+  height: 1px;
+  background: var(--chrome-border);
+  margin: 3px 2px;
 }
 
 .inspector__z-order {
