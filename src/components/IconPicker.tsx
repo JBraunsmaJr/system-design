@@ -348,33 +348,29 @@ export function IconPicker({ value, defaultValue, onChange }: IconPickerProps) {
               </div>
 
               {activeTab === 'all' && categories.length > 1 && (
-                <div
-                  style={{
-                    padding: '6px 8px',
-                    overflowX: 'auto',
-                    display: 'flex',
-                    gap: 4,
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {categories.map((cat) => (
-                    <button
-                      key={cat}
-                      type="button"
-                      style={{
-                        fontSize: 11,
-                        padding: '2px 6px',
-                        borderRadius: 12,
-                        background: selectedCategory === cat ? 'var(--accent)' : 'var(--bg-field)',
-                        color: selectedCategory === cat ? '#fff' : 'var(--text-muted)',
-                        border: '1px solid var(--border)',
-                        cursor: 'pointer',
-                      }}
-                      onClick={() => setSelectedCategory(cat)}
-                    >
-                      {cat === 'all' ? 'All Categories' : cat}
-                    </button>
-                  ))}
+                <div style={{ padding: '6px 8px 4px 8px' }}>
+                  <select
+                    className="icon-picker__category-select"
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
+                    style={{
+                      width: '100%',
+                      background: 'var(--bg-field, var(--chrome-bg, #1a1b23))',
+                      color: 'var(--chrome-text, #e7e9ee)',
+                      border: '1px solid var(--border, var(--chrome-border, #2d3139))',
+                      borderRadius: 4,
+                      padding: '4px 8px',
+                      fontSize: 12,
+                      cursor: 'pointer',
+                      outline: 'none',
+                    }}
+                  >
+                    {categories.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat === 'all' ? 'All Categories' : cat}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               )}
 
