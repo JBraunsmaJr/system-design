@@ -66,7 +66,8 @@ export function TypedNode({ id, data, selected, onDrillInto: propOnDrillInto }: 
         <div className="typed-node__chips">
           {visibleProperties.map(([key, value]) => (
             <span className="prop-chip" key={key} title={`${key}: ${value}`}>
-              {key}: {value}
+              <span className="prop-chip__key">{key}:</span>
+              <span className="prop-chip__val">{value}</span>
             </span>
           ))}
           {hiddenCount > 0 && (

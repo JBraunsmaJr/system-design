@@ -2420,6 +2420,9 @@ option {
 }
 
 .prop-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   background: var(--chrome-bg);
   border: 1px solid var(--node-border);
   border-radius: 999px;
@@ -2427,10 +2430,24 @@ option {
   font-family: var(--mono);
   font-size: 9.5px;
   color: var(--chrome-text-dim);
-  max-width: 110px;
+  max-width: 100%;
+  box-sizing: border-box;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.prop-chip__key {
+  color: var(--chrome-text-dim);
+  flex-shrink: 0;
+}
+
+.prop-chip__val {
+  color: var(--chrome-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .prop-chip--more {
@@ -2439,6 +2456,7 @@ option {
   font-weight: 600;
   cursor: default;
   max-width: none;
+  flex-shrink: 0;
 }
 
 .prop-chip__tooltip {
@@ -2448,7 +2466,7 @@ option {
   left: 0;
   z-index: 50;
   min-width: 150px;
-  max-width: 240px;
+  max-width: 280px;
   background: var(--node-bg);
   border: 1px solid var(--node-border);
   border-radius: 6px;
