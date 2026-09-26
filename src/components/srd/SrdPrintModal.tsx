@@ -121,6 +121,7 @@ export function SrdPrintModal({
     Record<string, { pan: { x: number; y: number }; zoom: number }>
   >({});
   const [isCapturingItemSnapshot, setIsCapturingItemSnapshot] = useState(false);
+  const [isInteractingWithSlider, setIsInteractingWithSlider] = useState(false);
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -167,6 +168,20 @@ export function SrdPrintModal({
     }
     return 1.0;
   }, [effectiveFramingItemId, framingAdjustments, currentFramingItem]);
+
+  // Live CSS transform calculations for 0ms visual preview response while adjusting sliders
+  const framingBaseline = useMemo(() => {
+    return currentFramingItem?.snapshotFraming || { offsetX: 0, offsetY: 0, zoom: 1.0 };
+  }, [currentFramingItem?.snapshotFraming]);
+
+  const framingDx = framingPanOffset.x - (framingBaseline.offsetX ?? 0);
+  const framingDy = framingPanOffset.y - (framingBaseline.offsetY ?? 0);
+  const framingRelZoom =
+    framingBaseline.zoom && framingBaseline.zoom > 0 ? framingZoom / framingBaseline.zoom : 1.0;
+  const framingDxPercent = (framingDx / 1200) * 100;
+  const framingDyPercent = (framingDy / 600) * 100;
+  const isFramingTransformed =
+    Math.abs(framingDx) > 0.1 || Math.abs(framingDy) > 0.1 || Math.abs(framingRelZoom - 1.0) > 0.001;
 
   const setFramingPanX = (x: number) => {
     if (!effectiveFramingItemId) return;
@@ -507,8 +522,32 @@ export function SrdPrintModal({
     [currentFramingItem, framingPanOffset, framingZoom, nodes],
   );
 
-  // Debounced auto-capture when user adjusts framing sliders
+  // Global pointer release listeners to ensure we detect when the user stops dragging/holding a slider
   useEffect(() => {
+    if (!isInteractingWithSlider) return;
+
+    const handleGlobalPointerRelease = () => {
+      setIsInteractingWithSlider(false);
+    };
+
+    window.addEventListener('pointerup', handleGlobalPointerRelease);
+    window.addEventListener('pointercancel', handleGlobalPointerRelease);
+    window.addEventListener('mouseup', handleGlobalPointerRelease);
+    window.addEventListener('touchend', handleGlobalPointerRelease);
+
+    return () => {
+      window.removeEventListener('pointerup', handleGlobalPointerRelease);
+      window.removeEventListener('pointercancel', handleGlobalPointerRelease);
+      window.removeEventListener('mouseup', handleGlobalPointerRelease);
+      window.removeEventListener('touchend', handleGlobalPointerRelease);
+    };
+  }, [isInteractingWithSlider]);
+
+  // Debounced auto-capture when user finishes adjusting framing sliders
+  useEffect(() => {
+    if (isInteractingWithSlider) {
+      return;
+    }
     if (!effectiveFramingItemId || !currentFramingItem || !currentFramingItem.linkedNodeIds?.length) {
       return;
     }
@@ -528,10 +567,16 @@ export function SrdPrintModal({
 
     const timer = setTimeout(() => {
       handleCaptureItemSnapshot(currentFramingItem, adj.pan, adj.zoom);
-    }, 250);
+    }, 200);
 
     return () => clearTimeout(timer);
-  }, [framingAdjustments, effectiveFramingItemId, currentFramingItem, handleCaptureItemSnapshot]);
+  }, [
+    isInteractingWithSlider,
+    framingAdjustments,
+    effectiveFramingItemId,
+    currentFramingItem,
+    handleCaptureItemSnapshot,
+  ]);
 
   const handleRemoveItemSnapshot = (itemId: string) => {
     setFramingAdjustments((prev) => {
@@ -1194,20 +1239,31 @@ export function SrdPrintModal({
 
                         <div className="srd-framing-preview-box">
                           {isCapturingItemSnapshot && (
-                            <div className="srd-framing-loading-overlay">
-                              <div className="srd-loading-spinner" style={{ width: 22, height: 22, borderWidth: 2 }} />
-                              <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>
-                                {batchProgress
-                                  ? `Capturing (${batchProgress.current}/${batchProgress.total})...`
-                                  : 'Updating snapshot...'}
-                              </span>
-                            </div>
+                            batchProgress ? (
+                              <div className="srd-framing-loading-overlay">
+                                <div className="srd-loading-spinner" style={{ width: 22, height: 22, borderWidth: 2 }} />
+                                <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>
+                                  Capturing ({batchProgress.current}/${batchProgress.total})...
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="srd-framing-sync-badge">
+                                <RefreshCw size={11} className="animate-spin" />
+                                <span>Rendering hi-res...</span>
+                              </div>
+                            )
                           )}
                           {currentFramingItem.contextSnapshotBase64 ? (
                             <img
                               src={currentFramingItem.contextSnapshotBase64}
                               alt="Context preview"
                               className="srd-framing-preview-img"
+                              style={{
+                                transform: isFramingTransformed
+                                  ? `translate(${framingDxPercent}%, ${framingDyPercent}%) scale(${framingRelZoom})`
+                                  : undefined,
+                                transformOrigin: 'center center',
+                              }}
                             />
                           ) : (
                             <div style={{ color: '#64748b', fontSize: '0.75rem', textAlign: 'center', padding: '1rem' }}>
@@ -1230,6 +1286,8 @@ export function SrdPrintModal({
                               max="800"
                               step="10"
                               value={framingPanOffset.x}
+                              onPointerDown={() => setIsInteractingWithSlider(true)}
+                              onPointerUp={() => setIsInteractingWithSlider(false)}
                               onChange={(e) => setFramingPanX(parseInt(e.target.value, 10))}
                             />
                           </div>
@@ -1245,6 +1303,8 @@ export function SrdPrintModal({
                               max="600"
                               step="10"
                               value={framingPanOffset.y}
+                              onPointerDown={() => setIsInteractingWithSlider(true)}
+                              onPointerUp={() => setIsInteractingWithSlider(false)}
                               onChange={(e) => setFramingPanY(parseInt(e.target.value, 10))}
                             />
                           </div>
@@ -1262,6 +1322,8 @@ export function SrdPrintModal({
                             max="3.0"
                             step="0.05"
                             value={framingZoom}
+                            onPointerDown={() => setIsInteractingWithSlider(true)}
+                            onPointerUp={() => setIsInteractingWithSlider(false)}
                             onChange={(e) => setFramingZoomScale(parseFloat(e.target.value))}
                           />
                         </div>
@@ -1730,12 +1792,6 @@ export function SrdPrintModal({
 
                                         {item.contextSnapshotBase64 ? (
                                           <div className="srd-doc__item-snapshot-container" style={{ position: 'relative' }}>
-                                            {isCapturingItemSnapshot && currentFramingItem?.id === item.id && (
-                                              <div className="srd-doc__snapshot-loading-overlay">
-                                                <div className="srd-loading-spinner" style={{ width: 22, height: 22, borderWidth: 2 }} />
-                                                <span>Updating context snapshot...</span>
-                                              </div>
-                                            )}
                                             <div className="srd-doc__item-snapshot-caption">
                                               Architecture Context Snapshot
                                             </div>
@@ -1743,6 +1799,13 @@ export function SrdPrintModal({
                                               src={item.contextSnapshotBase64}
                                               alt={`Context snapshot for ${item.id}`}
                                               className="srd-doc__item-snapshot-img"
+                                              style={{
+                                                transform:
+                                                  currentFramingItem?.id === item.id && isFramingTransformed
+                                                    ? `translate(${framingDxPercent}%, ${framingDyPercent}%) scale(${framingRelZoom})`
+                                                    : undefined,
+                                                transformOrigin: 'center center',
+                                              }}
                                             />
                                           </div>
                                         ) : isCapturingItemSnapshot && currentFramingItem?.id === item.id ? (
