@@ -100,6 +100,7 @@ export const dragGroupScenario: ScenarioDefinition = {
     const start = await pointOnTarget(
       page,
       `${nodeSelector('group-0')} .group-node__edge-hit--top`,
+      { orAnyOf: `${nodeSelector('group-0')} *` },
     );
     await resetCounters(page);
 

@@ -3,18 +3,18 @@
 The editor runs entirely in the browser, so you can host it for your team
 with no database at all. Choose the path that fits.
 
-| | [Core](/deployment/core) | [With workspaces](/deployment/with-workspaces) |
-| :--- | :--- | :--- |
-| Draw, save to the browser and to files | ✓ | ✓ |
-| Live sessions, by sharing a link | ✓ | ✓ |
-| Shared team storage | | ✓ |
-| Sign in with your identity provider | | ✓ |
-| Live sessions only for people who signed in | | ✓ |
-| Documents open from any browser you sign in on | | ✓ |
-| Services | editor, relay | editor, relay, store, PostgreSQL |
-| Stores documents on your server | No | Yes, encrypted - the server cannot read them |
-| You look after | a TLS certificate | a certificate, a database, backups, and a recovery key |
-| Setup time | ~10 minutes | ~30 minutes |
+|                                                | [Core](/deployment/core) | [With workspaces](/deployment/with-workspaces)         |
+| :--------------------------------------------- | :----------------------- | :----------------------------------------------------- |
+| Draw, save to the browser and to files         | ✓                        | ✓                                                      |
+| Live sessions, by sharing a link               | ✓                        | ✓                                                      |
+| Shared team storage                            |                          | ✓                                                      |
+| Sign in with your identity provider            |                          | ✓                                                      |
+| Live sessions only for people who signed in    |                          | ✓                                                      |
+| Documents open from any browser you sign in on |                          | ✓                                                      |
+| Services                                       | editor, relay            | editor, relay, store, PostgreSQL                       |
+| Stores documents on your server                | No                       | Yes, encrypted - the server cannot read them           |
+| You look after                                 | a TLS certificate        | a certificate, a database, backups, and a recovery key |
+| Setup time                                     | ~10 minutes              | ~30 minutes                                            |
 
 **Not sure?** Start with [Core](/deployment/core). Moving to workspaces later
 means adding services, not replacing anything, and documents people already
@@ -26,11 +26,11 @@ there are fewer settings to get wrong.
 
 ## Container images
 
-| Image | Service |
-| :--- | :--- |
-| `ghcr.io/jbraunsmajr/system-design` | The editor, with this documentation at `/docs/` |
-| `ghcr.io/jbraunsmajr/system-design-relay` | The relay, for live sessions |
-| `ghcr.io/jbraunsmajr/system-design-store` | The workspace store - with workspaces only |
+| Image                                     | Service                                         |
+| :---------------------------------------- | :---------------------------------------------- |
+| `ghcr.io/jbraunsmajr/system-design`       | The editor, with this documentation at `/docs/` |
+| `ghcr.io/jbraunsmajr/system-design-relay` | The relay, for live sessions                    |
+| `ghcr.io/jbraunsmajr/system-design-store` | The workspace store - with workspaces only      |
 
 Each is tagged `latest` and with its release date. The three are released
 together; pin the same date on all of them.
@@ -85,11 +85,11 @@ internet access to read it.
 The path is applied when the container starts, not when the image is built,
 so one image works anywhere:
 
-| Setting | Result |
-| :--- | :--- |
-| Nothing set | Docs at `/docs/` |
+| Setting                                      | Result                         |
+| :------------------------------------------- | :----------------------------- |
+| Nothing set                                  | Docs at `/docs/`               |
 | `APP_URL=https://example.gov/system-design/` | Docs at `/system-design/docs/` |
-| `DOCS_BASE=/help/` | Docs at `/help/` |
+| `DOCS_BASE=/help/`                           | Docs at `/help/`               |
 
 `DOCS_BASE` wins where both are set. A value without a leading or trailing
 slash is corrected rather than rejected.

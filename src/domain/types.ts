@@ -12,6 +12,7 @@ export type NodeCategory =
   | 'messaging'
   | 'external'
   | 'observability'
+  | 'cloud'
   | 'logic'
   | 'vcs'
   | 'custom';

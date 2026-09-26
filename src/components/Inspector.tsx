@@ -417,7 +417,8 @@ export function Inspector({
               ? `Open sub-diagram (${subCount})`
               : hasSubDiagram
                 ? 'Open sub-diagram'
-                : 'Create sub-diagram'} →
+                : 'Create sub-diagram'}{' '}
+            →
           </button>
         )}
 

@@ -21,9 +21,7 @@ console.log('=== DurabilityIndicator OIDC and Workspace Persistence ===');
 
 // 1. Durability indicator renders chip with local state
 {
-  const html = renderToStaticMarkup(
-    <DurabilityIndicator signals={localSignals} />,
-  );
+  const html = renderToStaticMarkup(<DurabilityIndicator signals={localSignals} />);
   assert(html.includes('durability__chip'), 'renders durability chip');
   assert(html.includes('Saved in browser'), 'renders label Saved in browser');
 }
@@ -43,7 +41,10 @@ console.log('=== DurabilityIndicator OIDC and Workspace Persistence ===');
     />,
   );
   assert(html.includes('durability__detail'), 'renders detail popup for persistent/alert state');
-  assert(html.includes('Sign in with OIDC'), 'renders Sign in with OIDC button when logged out and OIDC is available');
+  assert(
+    html.includes('Sign in with OIDC'),
+    'renders Sign in with OIDC button when logged out and OIDC is available',
+  );
   assert(html.includes('Export a copy'), 'renders Export a copy action');
 }
 
@@ -80,12 +81,17 @@ console.log('=== DurabilityIndicator OIDC and Workspace Persistence ===');
       onExport={() => {}}
     />,
   );
-  assert(html.includes('Stop saving to diagram.json'), 'renders Stop saving to file option when file-backed');
+  assert(
+    html.includes('Stop saving to diagram.json'),
+    'renders Stop saving to file option when file-backed',
+  );
 }
 
 if (failures > 0) {
   console.error(`\n${failures} test(s) failed`);
-  (globalThis as unknown as { process: { exitCode: number } }).process?.exitCode ? ((globalThis as unknown as { process: { exitCode: number } }).process.exitCode = 1) : undefined;
+  (globalThis as unknown as { process: { exitCode: number } }).process?.exitCode
+    ? ((globalThis as unknown as { process: { exitCode: number } }).process.exitCode = 1)
+    : undefined;
   throw new Error(`${failures} test(s) failed`);
 } else {
   console.log('\nAll DurabilityIndicator verification checks passed.');

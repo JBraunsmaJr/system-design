@@ -18,7 +18,12 @@ function extractScript(htmlContent: string): string {
   return match[1];
 }
 
-function testHtmlRedirect(scriptCode: string, pathname: string, search = '', hash = ''): string | null {
+function testHtmlRedirect(
+  scriptCode: string,
+  pathname: string,
+  search = '',
+  hash = '',
+): string | null {
   let replacedUrl: string | null = null;
   const sandbox = {
     window: {
@@ -62,10 +67,7 @@ check(
     '/system-design/docs/index.html?v=1#intro',
   'preserves query params and hash on redirect',
 );
-check(
-  testHtmlRedirect(indexScript, '/') === null,
-  'root path / does not redirect',
-);
+check(testHtmlRedirect(indexScript, '/') === null, 'root path / does not redirect');
 check(
   testHtmlRedirect(indexScript, '/system-design/') === null,
   '/system-design/ does not redirect',
@@ -91,10 +93,7 @@ check(
   testHtmlRedirect(notFoundScript, '/system-design/docs/') === '/system-design/docs/index.html',
   '404 on /system-design/docs/ redirects to /system-design/docs/index.html',
 );
-check(
-  testHtmlRedirect(notFoundScript, '/unknown') === '/',
-  'unknown path at root redirects to /',
-);
+check(testHtmlRedirect(notFoundScript, '/unknown') === '/', 'unknown path at root redirects to /');
 check(
   testHtmlRedirect(notFoundScript, '/system-design/unknown') === '/system-design/',
   'unknown path under /system-design redirects to /system-design/',
@@ -114,7 +113,10 @@ check(denylistRegex.test('/docs'), 'SW denylist matches /docs');
 check(denylistRegex.test('/docs/'), 'SW denylist matches /docs/');
 check(denylistRegex.test('/docs/index.html'), 'SW denylist matches /docs/index.html');
 check(denylistRegex.test('/system-design/docs'), 'SW denylist matches /system-design/docs');
-check(denylistRegex.test('/system-design/docs/index.html'), 'SW denylist matches /system-design/docs/index.html');
+check(
+  denylistRegex.test('/system-design/docs/index.html'),
+  'SW denylist matches /system-design/docs/index.html',
+);
 check(!denylistRegex.test('/doctor'), 'SW denylist does not match /doctor');
 check(!denylistRegex.test('/system-design/'), 'SW denylist does not match /system-design/');
 

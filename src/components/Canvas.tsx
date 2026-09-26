@@ -35,7 +35,16 @@ import {
   type NodeTypes,
   type EdgeTypes,
 } from '@xyflow/react';
-import { MousePointer2, BringToFront, SendToBack, ChevronUp, ChevronDown } from 'lucide-react';
+import {
+  MousePointer2,
+  BringToFront,
+  SendToBack,
+  ChevronUp,
+  ChevronDown,
+  Palette,
+  Sparkles,
+  ChevronRight,
+} from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { TypedNode } from './nodes/TypedNode';
 import { TypedEdge } from './edges/TypedEdge';
@@ -47,8 +56,10 @@ import { PresentationOverlay } from './PresentationOverlay';
 import { Breadcrumb } from './Breadcrumb';
 import { DocumentationPopup } from './documentation/DocumentationPopup';
 import { useDiagramHoverDocumentation } from './documentation/useDiagramHoverDocumentation';
-import { NODE_TYPES } from '../domain/nodeRegistry';
-import { GROUP_TYPES } from '../domain/groupRegistry';
+import { ColorPickerPanel } from './ColorPickerPanel';
+import { IconPickerPanel } from './IconPicker';
+import { getNodeType, NODE_TYPES } from '../domain/nodeRegistry';
+import { getGroupType, GROUP_TYPES } from '../domain/groupRegistry';
 import { SHAPE_TYPES, globalShapeRegistry } from '../domain/shapeRegistry';
 import { computeAlignment, type AlignBox, type AlignmentGuide } from '../domain/alignmentGuides';
 import type { ZOrderCommand } from '../domain/zOrder';
@@ -124,10 +135,9 @@ function nodeToAlignBox(n: Node<ArchNodeData>, allNodes: Node<ArchNodeData>[]): 
   };
 }
 
-// Fixed because the menu always holds the same four items - see
-// openContextMenu's clamping.
+// Clamped so the menu and submenus never open partly off-screen.
 const CONTEXT_MENU_WIDTH = 184;
-const CONTEXT_MENU_HEIGHT = 140;
+const CONTEXT_MENU_HEIGHT = 240;
 
 const DIMMED_NODE_OPACITY = 0.15;
 const DIMMED_EDGE_OPACITY = 0.12;
@@ -652,8 +662,12 @@ export function Canvas({
     y: number;
     targetIds: string[];
   } | null>(null);
+  const [activeSubmenu, setActiveSubmenu] = useState<'color' | 'icon' | null>(null);
 
-  const closeContextMenu = useCallback(() => setContextMenu(null), []);
+  const closeContextMenu = useCallback(() => {
+    setContextMenu(null);
+    setActiveSubmenu(null);
+  }, []);
 
   const openContextMenu = useCallback(
     (event: ReactMouseEvent, nodeId: string | null) => {
@@ -669,15 +683,95 @@ export function Canvas({
         nodeId === null ? selectedIds : selectedIds.includes(nodeId) ? selectedIds : [nodeId];
       if (targetIds.length === 0) return;
 
-      // Clamped so the menu never opens partly off-screen. The size is
-      // fixed (four items), so constants are enough here and avoid a
-      // measure-then-reposition pass.
+      // Clamped so the menu never opens partly off-screen.
       const left = Math.min(event.clientX, window.innerWidth - CONTEXT_MENU_WIDTH - 8);
       const top = Math.min(event.clientY, window.innerHeight - CONTEXT_MENU_HEIGHT - 8);
+      setActiveSubmenu(null);
       setContextMenu({ x: Math.max(8, left), y: Math.max(8, top), targetIds });
     },
     [isPresenting],
   );
+
+  const handleColorChange = useCallback(
+    (color: string | undefined) => {
+      if (!contextMenu) return;
+      for (const id of contextMenu.targetIds) {
+        const node = nodesRef.current.find((n) => n.id === id);
+        if (node?.type === 'text') {
+          onUpdateNode(id, { color, textColor: color });
+        } else {
+          onUpdateNode(id, { color });
+        }
+      }
+      closeContextMenu();
+    },
+    [contextMenu, onUpdateNode, closeContextMenu],
+  );
+
+  const handleIconChange = useCallback(
+    (icon: string | undefined) => {
+      if (!contextMenu) return;
+      for (const id of contextMenu.targetIds) {
+        onUpdateNode(id, { icon });
+      }
+      closeContextMenu();
+    },
+    [contextMenu, onUpdateNode, closeContextMenu],
+  );
+
+  const targetPrimaryNode = useMemo(() => {
+    if (!contextMenu || contextMenu.targetIds.length === 0) return undefined;
+    return nodes.find((n) => n.id === contextMenu.targetIds[0]);
+  }, [contextMenu, nodes]);
+
+  const targetCurrentColor = useMemo(() => {
+    if (!targetPrimaryNode) return undefined;
+    return (
+      targetPrimaryNode.data.color ??
+      (targetPrimaryNode.type === 'text' ? targetPrimaryNode.data.textColor : undefined)
+    );
+  }, [targetPrimaryNode]);
+
+  const targetDefaultColor = useMemo(() => {
+    if (!targetPrimaryNode) return '#5B7CFA';
+    if (targetPrimaryNode.type === 'typed') {
+      return getNodeType(targetPrimaryNode.data.nodeType)?.color ?? '#98A2B3';
+    }
+    if (targetPrimaryNode.type === 'group') {
+      return getGroupType(targetPrimaryNode.data.nodeType)?.color ?? '#7C8598';
+    }
+    if (targetPrimaryNode.type === 'shape') {
+      return (
+        globalShapeRegistry.getShape(targetPrimaryNode.data.nodeType)?.defaults.color ?? '#5B7CFA'
+      );
+    }
+    if (targetPrimaryNode.type === 'code') {
+      return '#22B8CF';
+    }
+    if (targetPrimaryNode.type === 'text') {
+      return '#e7e9ee';
+    }
+    return '#5B7CFA';
+  }, [targetPrimaryNode]);
+
+  const targetCurrentIcon = useMemo(() => {
+    if (!targetPrimaryNode) return undefined;
+    return targetPrimaryNode.data.icon;
+  }, [targetPrimaryNode]);
+
+  const targetDefaultIcon = useMemo(() => {
+    if (!targetPrimaryNode) return undefined;
+    if (targetPrimaryNode.type === 'typed') {
+      return getNodeType(targetPrimaryNode.data.nodeType)?.icon;
+    }
+    if (targetPrimaryNode.type === 'group') {
+      return getGroupType(targetPrimaryNode.data.nodeType)?.icon;
+    }
+    if (targetPrimaryNode.type === 'shape') {
+      return globalShapeRegistry.getShape(targetPrimaryNode.data.nodeType)?.iconId;
+    }
+    return undefined;
+  }, [targetPrimaryNode]);
 
   /**
    * Both handlers are memoized rather than written inline on the
@@ -1040,49 +1134,129 @@ export function Canvas({
             would be scaled with the zoom and clipped at the pane edge. */}
         {contextMenu &&
           createPortal(
-            <div
-              className="canvas-context-menu"
-              style={{
-                position: 'fixed',
-                top: contextMenu.y,
-                left: contextMenu.x,
-                width: CONTEXT_MENU_WIDTH,
-              }}
-              role="menu"
-            >
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => onZOrderCommand('front', contextMenu.targetIds)}
+            <>
+              <div
+                className="canvas-context-menu"
+                style={{
+                  position: 'fixed',
+                  top: contextMenu.y,
+                  left: contextMenu.x,
+                  width: CONTEXT_MENU_WIDTH,
+                }}
+                role="menu"
+                onClick={(e) => e.stopPropagation()}
               >
-                <BringToFront size={13} />
-                Bring to front
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => onZOrderCommand('forward', contextMenu.targetIds)}
-              >
-                <ChevronUp size={13} />
-                Bring forward
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => onZOrderCommand('backward', contextMenu.targetIds)}
-              >
-                <ChevronDown size={13} />
-                Send backward
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => onZOrderCommand('back', contextMenu.targetIds)}
-              >
-                <SendToBack size={13} />
-                Send to back
-              </button>
-            </div>,
+                <button
+                  type="button"
+                  role="menuitem"
+                  className={activeSubmenu === 'color' ? 'is-active' : undefined}
+                  onClick={() => setActiveSubmenu((prev) => (prev === 'color' ? null : 'color'))}
+                  onMouseEnter={() => setActiveSubmenu('color')}
+                >
+                  <Palette size={13} />
+                  <span>Change color</span>
+                  <ChevronRight size={13} style={{ marginLeft: 'auto', opacity: 0.6 }} />
+                </button>
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  className={activeSubmenu === 'icon' ? 'is-active' : undefined}
+                  onClick={() => setActiveSubmenu((prev) => (prev === 'icon' ? null : 'icon'))}
+                  onMouseEnter={() => setActiveSubmenu('icon')}
+                >
+                  <Sparkles size={13} />
+                  <span>Change icon</span>
+                  <ChevronRight size={13} style={{ marginLeft: 'auto', opacity: 0.6 }} />
+                </button>
+
+                <div className="canvas-context-menu__divider" />
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  onMouseEnter={() => setActiveSubmenu(null)}
+                  onClick={() => {
+                    onZOrderCommand('front', contextMenu.targetIds);
+                    closeContextMenu();
+                  }}
+                >
+                  <BringToFront size={13} />
+                  Bring to front
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onMouseEnter={() => setActiveSubmenu(null)}
+                  onClick={() => {
+                    onZOrderCommand('forward', contextMenu.targetIds);
+                    closeContextMenu();
+                  }}
+                >
+                  <ChevronUp size={13} />
+                  Bring forward
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onMouseEnter={() => setActiveSubmenu(null)}
+                  onClick={() => {
+                    onZOrderCommand('backward', contextMenu.targetIds);
+                    closeContextMenu();
+                  }}
+                >
+                  <ChevronDown size={13} />
+                  Send backward
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onMouseEnter={() => setActiveSubmenu(null)}
+                  onClick={() => {
+                    onZOrderCommand('back', contextMenu.targetIds);
+                    closeContextMenu();
+                  }}
+                >
+                  <SendToBack size={13} />
+                  Send to back
+                </button>
+              </div>
+
+              {activeSubmenu === 'color' && (
+                <ColorPickerPanel
+                  value={targetCurrentColor}
+                  defaultValue={targetDefaultColor}
+                  onChange={handleColorChange}
+                  onClose={closeContextMenu}
+                  style={{
+                    position: 'fixed',
+                    top: Math.min(Math.max(8, contextMenu.y), window.innerHeight - 220 - 8),
+                    left:
+                      contextMenu.x + CONTEXT_MENU_WIDTH + 176 <= window.innerWidth - 8
+                        ? contextMenu.x + CONTEXT_MENU_WIDTH + 4
+                        : Math.max(8, contextMenu.x - 176 - 4),
+                  }}
+                />
+              )}
+
+              {activeSubmenu === 'icon' && (
+                <IconPickerPanel
+                  value={targetCurrentIcon}
+                  defaultValue={targetDefaultIcon}
+                  onChange={handleIconChange}
+                  onClose={closeContextMenu}
+                  style={{
+                    position: 'fixed',
+                    top: Math.min(Math.max(8, contextMenu.y), window.innerHeight - 420 - 8),
+                    left:
+                      contextMenu.x + CONTEXT_MENU_WIDTH + 340 <= window.innerWidth - 8
+                        ? contextMenu.x + CONTEXT_MENU_WIDTH + 4
+                        : Math.max(8, contextMenu.x - 340 - 4),
+                    zIndex: 301,
+                  }}
+                />
+              )}
+            </>,
             document.body,
           )}
 

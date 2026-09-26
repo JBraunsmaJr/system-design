@@ -159,11 +159,11 @@ else can read them either.
 
 They differ in who they need:
 
-| Route | Needs | Typical use |
-|---|---|---|
-| Another browser | Someone with a working browser | A new laptop, a colleague joining |
-| Recovery code | Only you | Every browser gone |
-| Offline recovery key | The organization, not you | Someone has left; a records request |
+| Route                | Needs                          | Typical use                         |
+| -------------------- | ------------------------------ | ----------------------------------- |
+| Another browser      | Someone with a working browser | A new laptop, a colleague joining   |
+| Recovery code        | Only you                       | Every browser gone                  |
+| Offline recovery key | The organization, not you      | Someone has left; a records request |
 
 The offline key is why **every document must carry a recovery wrap**. A
 workspace that accepted documents without one would accumulate content that

@@ -1,4 +1,5 @@
 import * as Icons from 'lucide-react';
+import { CLOUD_ICONS } from './cloudIcons';
 
 export interface IconAttribution {
   author?: string;
@@ -40,6 +41,9 @@ export const BUILTIN_LUCIDE_NAMES = Object.keys(Icons)
 // Categorization helper for built-in icons
 function getBuiltinCategory(name: string): string {
   const n = name.toLowerCase();
+  if (n.includes('cloud')) {
+    return 'Cloud';
+  }
   if (
     n.includes('server') ||
     n.includes('cpu') ||
@@ -445,6 +449,10 @@ export class IconRegistry {
         },
       };
       this.icons.set(name, def);
+    }
+
+    for (const cloudIcon of CLOUD_ICONS) {
+      this.icons.set(cloudIcon.id, cloudIcon);
     }
   }
 

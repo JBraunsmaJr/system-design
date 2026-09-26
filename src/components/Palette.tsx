@@ -1,9 +1,20 @@
-import { useEffect, useState, type DragEvent } from 'react';
-import { Boxes, Shapes, Code2, GitBranch, type LucideIcon } from 'lucide-react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type DragEvent } from 'react';
+import { createPortal } from 'react-dom';
+import {
+  Boxes,
+  Cloud,
+  Shapes,
+  Code2,
+  GitBranch,
+  ChevronDown,
+  Check,
+  type LucideIcon,
+} from 'lucide-react';
 import {
   NODE_TYPES,
   CATEGORY_LABELS,
   CATEGORY_COLORS,
+  CLOUD_SUBCATEGORY_ORDER,
   LOGIC_SUBCATEGORY_ORDER,
   VCS_SUBCATEGORY_ORDER,
 } from '../domain/nodeRegistry';
@@ -19,6 +30,7 @@ const SYSTEM_CATEGORIES: NodeCategory[] = [
   'messaging',
   'external',
   'observability',
+  'cloud',
 ];
 
 export const DRAG_MIME_TYPE = 'application/x-archnode';
@@ -27,10 +39,11 @@ export const TEXT_DRAG_MIME_TYPE = 'application/x-archtext';
 export const SHAPE_DRAG_MIME_TYPE = 'application/x-archshape';
 export const CODE_DRAG_MIME_TYPE = 'application/x-archcode';
 
-type PaletteMode = 'system' | 'shapes' | 'code' | 'git';
+type PaletteMode = 'system' | 'cloud' | 'shapes' | 'code' | 'git';
 
 const PALETTE_TABS: { id: PaletteMode; label: string; icon: LucideIcon }[] = [
   { id: 'system', label: 'System', icon: Boxes },
+  { id: 'cloud', label: 'Cloud', icon: Cloud },
   { id: 'shapes', label: 'Shapes', icon: Shapes },
   { id: 'code', label: 'Code', icon: Code2 },
   { id: 'git', label: 'Git', icon: GitBranch },
@@ -38,6 +51,7 @@ const PALETTE_TABS: { id: PaletteMode; label: string; icon: LucideIcon }[] = [
 
 const MODE_HINTS: Record<PaletteMode, string | null> = {
   system: null,
+  cloud: 'Preset services and infrastructure components for AWS, Azure, and Google Cloud Platform.',
   shapes:
     'Diagram shapes, flowchart symbols, infrastructure components, and imported custom libraries.',
   code: "Endpoints and pseudo-code steps for modeling request-handling logic - most useful inside a node's sub-diagram (double-click a node to drill in).",
@@ -47,6 +61,11 @@ const MODE_HINTS: Record<PaletteMode, string | null> = {
 export function Palette() {
   const [mode, setMode] = useState<PaletteMode>('system');
   const [, setVersion] = useState(0);
+  const [isOpen, setIsOpen] = useState(false);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
+  const [dropdownWidth, setDropdownWidth] = useState<number>(220);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     return globalShapeRegistry.subscribe(() => {
@@ -54,22 +73,153 @@ export function Palette() {
     });
   }, []);
 
+  const open = () => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    setDropdownWidth(rect.width);
+    setDropdownPos({ top: rect.bottom + 4, left: rect.left });
+    setIsOpen(true);
+  };
+
+  const close = () => {
+    setIsOpen(false);
+  };
+
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    const trigger = triggerRef.current;
+    const dropdown = dropdownRef.current;
+    if (!trigger || !dropdown) return;
+    const triggerRect = trigger.getBoundingClientRect();
+    const dropdownRect = dropdown.getBoundingClientRect();
+
+    const left = Math.max(
+      8,
+      Math.min(triggerRect.left, window.innerWidth - dropdownRect.width - 8),
+    );
+    const spaceBelow = window.innerHeight - triggerRect.bottom;
+    const spaceAbove = triggerRect.top;
+    const top =
+      spaceBelow >= dropdownRect.height + 4 || spaceBelow >= spaceAbove
+        ? triggerRect.bottom + 4
+        : Math.max(8, triggerRect.top - dropdownRect.height - 4);
+
+    setDropdownPos((prev) =>
+      prev && prev.top === top && prev.left === left ? prev : { top, left },
+    );
+  }, [isOpen]);
+
+  const reposition = useCallback(() => {
+    const trigger = triggerRef.current;
+    const dropdown = dropdownRef.current;
+    if (!trigger || !dropdown) return;
+    const triggerRect = trigger.getBoundingClientRect();
+    const dropdownRect = dropdown.getBoundingClientRect();
+
+    const left = Math.max(
+      8,
+      Math.min(triggerRect.left, window.innerWidth - dropdownRect.width - 8),
+    );
+    const spaceBelow = window.innerHeight - triggerRect.bottom;
+    const spaceAbove = triggerRect.top;
+    const top =
+      spaceBelow >= dropdownRect.height + 4 || spaceBelow >= spaceAbove
+        ? triggerRect.bottom + 4
+        : Math.max(8, triggerRect.top - dropdownRect.height - 4);
+
+    setDropdownPos({ top, left });
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleMouseDown = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (triggerRef.current?.contains(target)) return;
+      if (dropdownRef.current?.contains(target)) return;
+      close();
+    };
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        close();
+        triggerRef.current?.focus();
+      }
+    };
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('keydown', handleEscape);
+    window.addEventListener('scroll', reposition, true);
+    window.addEventListener('resize', reposition);
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('keydown', handleEscape);
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
+    };
+  }, [isOpen, reposition]);
+
   const shapeCategories = globalShapeRegistry.getCategories();
+  const currentTab = PALETTE_TABS.find((t) => t.id === mode) || PALETTE_TABS[0];
+  const CurrentIcon = currentTab.icon;
 
   return (
     <aside className="palette">
-      <div className="palette__tabs">
-        {PALETTE_TABS.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            type="button"
-            className={mode === id ? 'is-active' : undefined}
-            onClick={() => setMode(id)}
-          >
-            <Icon size={14} className="palette__tab-icon" />
-            <span>{label}</span>
-          </button>
-        ))}
+      <div className="palette__mode-selector">
+        <button
+          ref={triggerRef}
+          type="button"
+          className={`palette__mode-trigger${isOpen ? ' is-open' : ''}`}
+          onClick={() => (isOpen ? close() : open())}
+          aria-expanded={isOpen}
+          aria-haspopup="listbox"
+          aria-label="Select shape category"
+        >
+          <div className="palette__mode-trigger-content">
+            <CurrentIcon size={14} className="palette__tab-icon" />
+            <span className="palette__mode-trigger-label">{currentTab.label}</span>
+          </div>
+          <ChevronDown size={14} className="palette__mode-trigger-chevron" />
+        </button>
+
+        {isOpen &&
+          dropdownPos &&
+          createPortal(
+            <div
+              ref={dropdownRef}
+              className="palette__mode-dropdown"
+              role="listbox"
+              aria-label="Shape category options"
+              style={{
+                position: 'fixed',
+                top: dropdownPos.top,
+                left: dropdownPos.left,
+                width: dropdownWidth,
+              }}
+            >
+              {PALETTE_TABS.map(({ id, label, icon: Icon }) => {
+                const isSelected = mode === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    role="option"
+                    aria-selected={isSelected}
+                    className={`palette__mode-option${isSelected ? ' is-selected' : ''}`}
+                    onClick={() => {
+                      setMode(id);
+                      close();
+                    }}
+                  >
+                    <div className="palette__mode-option-content">
+                      <Icon size={14} className="palette__tab-icon" />
+                      <span>{label}</span>
+                    </div>
+                    {isSelected && <Check size={14} className="palette__mode-option-check" />}
+                  </button>
+                );
+              })}
+            </div>,
+            document.body,
+          )}
       </div>
 
       <div className="palette__list">
@@ -119,6 +269,21 @@ export function Palette() {
             />
           </>
         )}
+
+        {mode === 'cloud' &&
+          CLOUD_SUBCATEGORY_ORDER.map((subcategory) => (
+            <PaletteGroup
+              key={subcategory}
+              label={subcategory}
+              color={
+                subcategory === 'AWS' ? '#FF9900' : subcategory === 'Azure' ? '#0089D6' : '#4285F4'
+              }
+              dragMimeType={DRAG_MIME_TYPE}
+              items={NODE_TYPES.filter(
+                (n) => n.category === 'cloud' && n.subcategory === subcategory,
+              )}
+            />
+          ))}
 
         {mode === 'shapes' && (
           <>

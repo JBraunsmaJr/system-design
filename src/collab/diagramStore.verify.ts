@@ -300,14 +300,8 @@ function canonicalJSON(value: unknown): string {
 
   const levels = populatedLevels(nodes);
   const counts = populatedLevelCounts(nodes);
-  assert(
-    !levels.has(levelKey([emptyNode])),
-    'populatedLevels does not contain empty node path',
-  );
-  assert(
-    levels.has(levelKey([populatedNode])),
-    'populatedLevels contains populated node path',
-  );
+  assert(!levels.has(levelKey([emptyNode])), 'populatedLevels does not contain empty node path');
+  assert(levels.has(levelKey([populatedNode])), 'populatedLevels contains populated node path');
   assert(
     counts.get(levelKey([emptyNode])) === undefined,
     'populatedLevelCounts has undefined/0 for empty node path',

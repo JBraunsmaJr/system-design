@@ -79,7 +79,7 @@ function assert(condition: boolean, message: string) {
   );
 }
 
-// === Part 4: Registry integration ===
+// === Part 4: Registry integration & Cloud Icons ===
 {
   const icons = globalIconRegistry.searchIcons('Server');
   assert(icons.length > 0, 'registry contains matching icons for query');
@@ -87,6 +87,60 @@ function assert(condition: boolean, message: string) {
     icons.some((i) => i.id === 'Server'),
     'Server icon found in registry',
   );
+
+  // AWS Icons
+  const awsIcons = globalIconRegistry.searchIcons('aws');
+  assert(awsIcons.length > 0, 'registry contains AWS icons');
+  assert(
+    awsIcons.some((i) => i.id === 'aws-lambda'),
+    'AWS Lambda icon found in registry',
+  );
+  assert(
+    awsIcons.some((i) => i.id === 'aws-ec2'),
+    'AWS EC2 icon found in registry',
+  );
+  assert(
+    awsIcons.some((i) => i.id === 'aws-s3'),
+    'AWS S3 icon found in registry',
+  );
+
+  // Azure Icons
+  const azureIcons = globalIconRegistry.searchIcons('azure');
+  assert(azureIcons.length > 0, 'registry contains Azure icons');
+  assert(
+    azureIcons.some((i) => i.id === 'azure-functions'),
+    'Azure Functions icon found in registry',
+  );
+  assert(
+    azureIcons.some((i) => i.id === 'azure-vm'),
+    'Azure VM icon found in registry',
+  );
+  assert(
+    azureIcons.some((i) => i.id === 'azure-cosmos-db'),
+    'Azure Cosmos DB icon found in registry',
+  );
+
+  // GCP Icons
+  const gcpIcons = globalIconRegistry.searchIcons('gcp');
+  assert(gcpIcons.length > 0, 'registry contains GCP icons');
+  assert(
+    gcpIcons.some((i) => i.id === 'gcp-cloud-functions'),
+    'GCP Functions icon found in registry',
+  );
+  assert(
+    gcpIcons.some((i) => i.id === 'gcp-compute-engine'),
+    'GCP Compute Engine icon found in registry',
+  );
+  assert(
+    gcpIcons.some((i) => i.id === 'gcp-cloud-storage'),
+    'GCP Storage icon found in registry',
+  );
+
+  // Category filtering
+  const categories = globalIconRegistry.getCategories();
+  assert(categories.includes('Cloud'), "registry categories include 'Cloud'");
+  const cloudCategoryIcons = globalIconRegistry.getIconsByCategory('Cloud');
+  assert(cloudCategoryIcons.length > 20, 'Cloud category contains multiple icons');
 }
 
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);

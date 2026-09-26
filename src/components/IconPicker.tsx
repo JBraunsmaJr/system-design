@@ -14,7 +14,7 @@ import {
 const RESULT_LIMIT = 80;
 const DROPDOWN_WIDTH = 340;
 
-interface IconPickerProps {
+export interface IconPickerProps {
   /** Current override, if any - undefined means "use defaultValue". */
   value: string | undefined;
   /** The node type's own default icon, shown when there's no override. */
@@ -22,16 +22,29 @@ interface IconPickerProps {
   onChange: (icon: string | undefined) => void;
 }
 
-export function IconPicker({ value, defaultValue, onChange }: IconPickerProps) {
-  const [isOpen, setIsOpen] = useState(false);
+export interface IconPickerPanelProps {
+  /** Current override, if any - undefined means "use defaultValue". */
+  value: string | undefined;
+  /** The node type's own default icon, shown when there's no override. */
+  defaultValue?: string;
+  onChange: (icon: string | undefined) => void;
+  onClose?: () => void;
+  style?: React.CSSProperties;
+  className?: string;
+}
+
+export function IconPickerPanel({
+  value,
+  defaultValue,
+  onChange,
+  onClose,
+  style,
+  className,
+}: IconPickerPanelProps) {
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [activeTab, setActiveTab] = useState<'all' | 'recent' | 'favorites'>('all');
-  const [, setVersion] = useState(0);
-  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
-
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [version, setVersion] = useState(0);
 
   // Subscribe to registry changes
   useEffect(() => {
@@ -40,8 +53,8 @@ export function IconPicker({ value, defaultValue, onChange }: IconPickerProps) {
     });
   }, []);
 
-  const recentIconIds = useMemo(() => getRecentIcons(), [isOpen]);
-  const favoriteIconIds = useMemo(() => new Set(getFavoriteIcons()), [isOpen]);
+  const recentIconIds = useMemo(() => getRecentIcons(), []);
+  const favoriteIconIds = useMemo(() => new Set(getFavoriteIcons()), [version]);
 
   const categories = useMemo(() => {
     return ['all', ...globalIconRegistry.getCategories()];
@@ -97,6 +110,268 @@ export function IconPicker({ value, defaultValue, onChange }: IconPickerProps) {
 
   const resolved = value !== undefined ? value : defaultValue;
   const isNone = !resolved || resolved === 'none';
+
+  const handleSelectIcon = (iconId: string) => {
+    addRecentIcon(iconId);
+    onChange(iconId);
+    onClose?.();
+  };
+
+  const handleToggleFavorite = (e: React.MouseEvent, iconId: string) => {
+    e.stopPropagation();
+    toggleFavoriteIcon(iconId);
+    setVersion((v) => v + 1);
+  };
+
+  return (
+    <div
+      className={`icon-picker__panel ${className ?? ''}`}
+      style={{
+        width: DROPDOWN_WIDTH,
+        maxHeight: 420,
+        display: 'flex',
+        flexDirection: 'column',
+        zIndex: 250,
+        ...style,
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div style={{ padding: '8px 8px 4px 8px' }}>
+        <input
+          className="icon-picker__search"
+          type="text"
+          placeholder="Search icons (name, tags, category)..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          autoFocus
+        />
+      </div>
+
+      <div
+        className="icon-picker__tabs"
+        style={{
+          display: 'flex',
+          gap: 4,
+          padding: '0 8px 6px 8px',
+          borderBottom: '1px solid var(--border)',
+        }}
+      >
+        <button
+          type="button"
+          className={`icon-picker__tab-btn ${activeTab === 'all' ? 'is-active' : ''}`}
+          style={{
+            fontSize: 12,
+            padding: '3px 8px',
+            borderRadius: 4,
+            background: activeTab === 'all' ? 'var(--bg-active)' : 'transparent',
+            color: activeTab === 'all' ? 'var(--accent)' : 'var(--text-muted)',
+            border: 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+          }}
+          onClick={() => setActiveTab('all')}
+        >
+          <Sparkles size={12} /> All
+        </button>
+        <button
+          type="button"
+          className={`icon-picker__tab-btn ${activeTab === 'recent' ? 'is-active' : ''}`}
+          style={{
+            fontSize: 12,
+            padding: '3px 8px',
+            borderRadius: 4,
+            background: activeTab === 'recent' ? 'var(--bg-active)' : 'transparent',
+            color: activeTab === 'recent' ? 'var(--accent)' : 'var(--text-muted)',
+            border: 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+          }}
+          onClick={() => setActiveTab('recent')}
+        >
+          <Clock size={12} /> Recent
+        </button>
+        <button
+          type="button"
+          className={`icon-picker__tab-btn ${activeTab === 'favorites' ? 'is-active' : ''}`}
+          style={{
+            fontSize: 12,
+            padding: '3px 8px',
+            borderRadius: 4,
+            background: activeTab === 'favorites' ? 'var(--bg-active)' : 'transparent',
+            color: activeTab === 'favorites' ? 'var(--accent)' : 'var(--text-muted)',
+            border: 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+          }}
+          onClick={() => setActiveTab('favorites')}
+        >
+          <Star size={12} /> Favorites
+        </button>
+      </div>
+
+      <div style={{ padding: '6px 8px 2px 8px' }}>
+        <button
+          type="button"
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '5px 8px',
+            borderRadius: 4,
+            background: isNone ? 'var(--bg-active)' : 'var(--bg-field)',
+            border: isNone ? '1px solid var(--accent)' : '1px solid var(--border)',
+            color: isNone ? 'var(--accent)' : 'var(--text-muted)',
+            fontSize: 12,
+            cursor: 'pointer',
+          }}
+          onClick={() => {
+            onChange(defaultValue ? 'none' : undefined);
+            onClose?.();
+          }}
+        >
+          <Ban size={13} />
+          <span>No icon</span>
+        </button>
+      </div>
+
+      {activeTab === 'all' && categories.length > 1 && (
+        <div style={{ padding: '6px 8px 4px 8px' }}>
+          <select
+            className="icon-picker__category-select"
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            style={{
+              width: '100%',
+              background: 'var(--bg-field, var(--chrome-bg, #1a1b23))',
+              color: 'var(--chrome-text, #e7e9ee)',
+              border: '1px solid var(--border, var(--chrome-border, #2d3139))',
+              borderRadius: 4,
+              padding: '4px 8px',
+              fontSize: 12,
+              cursor: 'pointer',
+              outline: 'none',
+            }}
+          >
+            {categories.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat === 'all' ? 'All Categories' : cat}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      <div style={{ flex: 1, overflowY: 'auto', padding: '6px 8px' }}>
+        {results.length > 0 ? (
+          <div
+            className="icon-picker__grid"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(36px, 1fr))',
+              gap: 4,
+            }}
+          >
+            {results.map((item) => {
+              const isFav = favoriteIconIds.has(item.id);
+              const tooltip = [
+                item.name,
+                item.category ? `Category: ${item.category}` : null,
+                item.attribution?.author ? `Author: ${item.attribution.author}` : null,
+                item.attribution?.license ? `License: ${item.attribution.license}` : null,
+              ]
+                .filter(Boolean)
+                .join('\n');
+
+              return (
+                <div
+                  key={item.id}
+                  style={{ position: 'relative' }}
+                  className="icon-picker__item-wrapper"
+                >
+                  <button
+                    type="button"
+                    className={`icon-picker__item${item.id === resolved ? ' is-selected' : ''}`}
+                    title={tooltip}
+                    style={{
+                      width: '100%',
+                      height: 36,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: 4,
+                      border:
+                        item.id === resolved ? '1px solid var(--accent)' : '1px solid transparent',
+                      background: item.id === resolved ? 'var(--bg-active)' : 'var(--bg-field)',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => handleSelectIcon(item.id)}
+                  >
+                    <IconRenderer iconDefinition={item} icon={item.id} size={18} />
+                  </button>
+                  <button
+                    type="button"
+                    style={{
+                      position: 'absolute',
+                      top: 2,
+                      right: 2,
+                      padding: 0,
+                      margin: 0,
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: isFav ? '#FFD700' : 'rgba(255,255,255,0.2)',
+                      opacity: isFav ? 1 : 0.4,
+                    }}
+                    title={isFav ? 'Remove from Favorites' : 'Add to Favorites'}
+                    onClick={(e) => handleToggleFavorite(e, item.id)}
+                  >
+                    <Star size={10} fill={isFav ? '#FFD700' : 'none'} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p
+            className="icon-picker__empty"
+            style={{ padding: 16, textAlign: 'center', color: 'var(--text-muted)' }}
+          >
+            No icons found.
+          </p>
+        )}
+      </div>
+
+      <div
+        style={{
+          padding: '4px 8px',
+          fontSize: 11,
+          color: 'var(--text-muted)',
+          borderTop: '1px solid var(--border)',
+          textAlign: 'center',
+        }}
+      >
+        {results.length} icon(s) shown
+      </div>
+    </div>
+  );
+}
+
+export function IconPicker({ value, defaultValue, onChange }: IconPickerProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
+
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const resolved = value !== undefined ? value : defaultValue;
+  const isNone = !resolved || resolved === 'none';
   const displayLabel = isNone ? 'None' : globalIconRegistry.getIcon(resolved)?.name || resolved;
 
   const open = () => {
@@ -114,7 +389,6 @@ export function IconPicker({ value, defaultValue, onChange }: IconPickerProps) {
 
   const close = () => {
     setIsOpen(false);
-    setQuery('');
   };
 
   useLayoutEffect(() => {
@@ -132,7 +406,7 @@ export function IconPicker({ value, defaultValue, onChange }: IconPickerProps) {
     setDropdownPos((prev) =>
       prev && prev.top === next.top && prev.left === next.left ? prev : next,
     );
-  }, [isOpen, query, selectedCategory, activeTab, results.length]);
+  }, [isOpen]);
 
   const reposition = useCallback(() => {
     const trigger = triggerRef.current;
@@ -178,18 +452,6 @@ export function IconPicker({ value, defaultValue, onChange }: IconPickerProps) {
     };
   }, [isOpen, reposition]);
 
-  const handleSelectIcon = (iconId: string) => {
-    addRecentIcon(iconId);
-    onChange(iconId);
-    close();
-  };
-
-  const handleToggleFavorite = (e: React.MouseEvent, iconId: string) => {
-    e.stopPropagation();
-    toggleFavoriteIcon(iconId);
-    setVersion((v) => v + 1);
-  };
-
   return (
     <label className="inspector__field">
       <span>Icon</span>
@@ -230,248 +492,19 @@ export function IconPicker({ value, defaultValue, onChange }: IconPickerProps) {
           createPortal(
             <div
               ref={dropdownRef}
-              className="icon-picker__panel"
               style={{
                 position: 'fixed',
                 top: dropdownPos.top,
                 left: dropdownPos.left,
-                width: DROPDOWN_WIDTH,
-                maxHeight: 420,
-                display: 'flex',
-                flexDirection: 'column',
                 zIndex: 250,
               }}
             >
-              <div style={{ padding: '8px 8px 4px 8px' }}>
-                <input
-                  className="icon-picker__search"
-                  type="text"
-                  placeholder="Search icons (name, tags, category)..."
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  autoFocus
-                />
-              </div>
-
-              <div
-                className="icon-picker__tabs"
-                style={{
-                  display: 'flex',
-                  gap: 4,
-                  padding: '0 8px 6px 8px',
-                  borderBottom: '1px solid var(--border)',
-                }}
-              >
-                <button
-                  type="button"
-                  className={`icon-picker__tab-btn ${activeTab === 'all' ? 'is-active' : ''}`}
-                  style={{
-                    fontSize: 12,
-                    padding: '3px 8px',
-                    borderRadius: 4,
-                    background: activeTab === 'all' ? 'var(--bg-active)' : 'transparent',
-                    color: activeTab === 'all' ? 'var(--accent)' : 'var(--text-muted)',
-                    border: 'none',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 4,
-                  }}
-                  onClick={() => setActiveTab('all')}
-                >
-                  <Sparkles size={12} /> All
-                </button>
-                <button
-                  type="button"
-                  className={`icon-picker__tab-btn ${activeTab === 'recent' ? 'is-active' : ''}`}
-                  style={{
-                    fontSize: 12,
-                    padding: '3px 8px',
-                    borderRadius: 4,
-                    background: activeTab === 'recent' ? 'var(--bg-active)' : 'transparent',
-                    color: activeTab === 'recent' ? 'var(--accent)' : 'var(--text-muted)',
-                    border: 'none',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 4,
-                  }}
-                  onClick={() => setActiveTab('recent')}
-                >
-                  <Clock size={12} /> Recent
-                </button>
-                <button
-                  type="button"
-                  className={`icon-picker__tab-btn ${activeTab === 'favorites' ? 'is-active' : ''}`}
-                  style={{
-                    fontSize: 12,
-                    padding: '3px 8px',
-                    borderRadius: 4,
-                    background: activeTab === 'favorites' ? 'var(--bg-active)' : 'transparent',
-                    color: activeTab === 'favorites' ? 'var(--accent)' : 'var(--text-muted)',
-                    border: 'none',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 4,
-                  }}
-                  onClick={() => setActiveTab('favorites')}
-                >
-                  <Star size={12} /> Favorites
-                </button>
-              </div>
-
-              <div style={{ padding: '6px 8px 2px 8px' }}>
-                <button
-                  type="button"
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    padding: '5px 8px',
-                    borderRadius: 4,
-                    background: isNone ? 'var(--bg-active)' : 'var(--bg-field)',
-                    border: isNone ? '1px solid var(--accent)' : '1px solid var(--border)',
-                    color: isNone ? 'var(--accent)' : 'var(--text-muted)',
-                    fontSize: 12,
-                    cursor: 'pointer',
-                  }}
-                  onClick={() => {
-                    onChange(defaultValue ? 'none' : undefined);
-                    close();
-                  }}
-                >
-                  <Ban size={13} />
-                  <span>No icon</span>
-                </button>
-              </div>
-
-              {activeTab === 'all' && categories.length > 1 && (
-                <div
-                  style={{
-                    padding: '6px 8px',
-                    overflowX: 'auto',
-                    display: 'flex',
-                    gap: 4,
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {categories.map((cat) => (
-                    <button
-                      key={cat}
-                      type="button"
-                      style={{
-                        fontSize: 11,
-                        padding: '2px 6px',
-                        borderRadius: 12,
-                        background: selectedCategory === cat ? 'var(--accent)' : 'var(--bg-field)',
-                        color: selectedCategory === cat ? '#fff' : 'var(--text-muted)',
-                        border: '1px solid var(--border)',
-                        cursor: 'pointer',
-                      }}
-                      onClick={() => setSelectedCategory(cat)}
-                    >
-                      {cat === 'all' ? 'All Categories' : cat}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              <div style={{ flex: 1, overflowY: 'auto', padding: '6px 8px' }}>
-                {results.length > 0 ? (
-                  <div
-                    className="icon-picker__grid"
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fill, minmax(36px, 1fr))',
-                      gap: 4,
-                    }}
-                  >
-                    {results.map((item) => {
-                      const isFav = favoriteIconIds.has(item.id);
-                      const tooltip = [
-                        item.name,
-                        item.category ? `Category: ${item.category}` : null,
-                        item.attribution?.author ? `Author: ${item.attribution.author}` : null,
-                        item.attribution?.license ? `License: ${item.attribution.license}` : null,
-                      ]
-                        .filter(Boolean)
-                        .join('\n');
-
-                      return (
-                        <div
-                          key={item.id}
-                          style={{ position: 'relative' }}
-                          className="icon-picker__item-wrapper"
-                        >
-                          <button
-                            type="button"
-                            className={`icon-picker__item${item.id === resolved ? ' is-selected' : ''}`}
-                            title={tooltip}
-                            style={{
-                              width: '100%',
-                              height: 36,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              borderRadius: 4,
-                              border:
-                                item.id === resolved
-                                  ? '1px solid var(--accent)'
-                                  : '1px solid transparent',
-                              background:
-                                item.id === resolved ? 'var(--bg-active)' : 'var(--bg-field)',
-                              cursor: 'pointer',
-                            }}
-                            onClick={() => handleSelectIcon(item.id)}
-                          >
-                            <IconRenderer iconDefinition={item} icon={item.id} size={18} />
-                          </button>
-                          <button
-                            type="button"
-                            style={{
-                              position: 'absolute',
-                              top: 2,
-                              right: 2,
-                              padding: 0,
-                              margin: 0,
-                              background: 'transparent',
-                              border: 'none',
-                              cursor: 'pointer',
-                              color: isFav ? '#FFD700' : 'rgba(255,255,255,0.2)',
-                              opacity: isFav ? 1 : 0.4,
-                            }}
-                            title={isFav ? 'Remove from Favorites' : 'Add to Favorites'}
-                            onClick={(e) => handleToggleFavorite(e, item.id)}
-                          >
-                            <Star size={10} fill={isFav ? '#FFD700' : 'none'} />
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p
-                    className="icon-picker__empty"
-                    style={{ padding: 16, textAlign: 'center', color: 'var(--text-muted)' }}
-                  >
-                    No icons found.
-                  </p>
-                )}
-              </div>
-
-              <div
-                style={{
-                  padding: '4px 8px',
-                  fontSize: 11,
-                  color: 'var(--text-muted)',
-                  borderTop: '1px solid var(--border)',
-                  textAlign: 'center',
-                }}
-              >
-                {results.length} icon(s) shown
-              </div>
+              <IconPickerPanel
+                value={value}
+                defaultValue={defaultValue}
+                onChange={onChange}
+                onClose={close}
+              />
             </div>,
             document.body,
           )}

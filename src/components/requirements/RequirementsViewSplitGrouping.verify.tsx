@@ -16,7 +16,10 @@ import {
 } from '../../domain/requirementsRegistry';
 import type { RequirementsDocument } from '../../domain/requirementsTypes';
 import { createLocalRequirementsStore } from '../../collab/requirementsStore';
-import { createYjsRequirementsStore, seedYjsRequirementsDoc } from '../../collab/yjsRequirementsStore';
+import {
+  createYjsRequirementsStore,
+  seedYjsRequirementsDoc,
+} from '../../collab/yjsRequirementsStore';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {
@@ -47,8 +50,20 @@ const testDocWithDuplicates: RequirementsDocument = {
   items: [
     { id: 'EPIC-1', typeId: 'epic', title: 'User Onboarding', body: '', categoryId: 'cat-1' },
     { id: 'REQ-1', typeId: 'requirement', title: 'Sign-up form', body: '', categoryId: 'cat-1' },
-    { id: 'REQ-2', typeId: 'requirement', title: 'Email verification', body: '', categoryId: 'cat-2' },
-    { id: 'TICKET-1', typeId: 'ticket', title: 'Build form component', body: '', categoryId: 'cat-1' },
+    {
+      id: 'REQ-2',
+      typeId: 'requirement',
+      title: 'Email verification',
+      body: '',
+      categoryId: 'cat-2',
+    },
+    {
+      id: 'TICKET-1',
+      typeId: 'ticket',
+      title: 'Build form component',
+      body: '',
+      categoryId: 'cat-1',
+    },
   ],
   relationships: [
     { id: 'r1', typeId: 'parent-of', fromItemId: 'EPIC-1', toItemId: 'REQ-1' },
@@ -71,10 +86,22 @@ console.log('=== Split view grouping: Epic ===');
 
   assert(html.includes('requirements-split'), 'renders split view container');
   assert(html.includes('requirements-outline'), 'renders outline pane');
-  assert(count(html, 'data-outline-id="REQ-1"') === 1, 'REQ-1 appears exactly once in epic outline');
-  assert(count(html, 'data-outline-id="REQ-2"') === 1, 'REQ-2 appears exactly once in epic outline (under No epic)');
-  assert(count(html, 'data-outline-id="TICKET-1"') === 1, 'TICKET-1 appears exactly once in epic outline');
-  assert(count(html, 'data-outline-id="EPIC-1"') === 1, 'EPIC-1 appears exactly once in epic outline');
+  assert(
+    count(html, 'data-outline-id="REQ-1"') === 1,
+    'REQ-1 appears exactly once in epic outline',
+  );
+  assert(
+    count(html, 'data-outline-id="REQ-2"') === 1,
+    'REQ-2 appears exactly once in epic outline (under No epic)',
+  );
+  assert(
+    count(html, 'data-outline-id="TICKET-1"') === 1,
+    'TICKET-1 appears exactly once in epic outline',
+  );
+  assert(
+    count(html, 'data-outline-id="EPIC-1"') === 1,
+    'EPIC-1 appears exactly once in epic outline',
+  );
 }
 
 console.log('=== Split view grouping: Type ===');
@@ -104,10 +131,22 @@ console.log('=== Split view grouping: Type ===');
   );
 
   // Items should not be duplicated in the outline
-  assert(count(html, 'data-outline-id="REQ-1"') === 1, 'REQ-1 appears exactly once in type outline');
-  assert(count(html, 'data-outline-id="REQ-2"') === 1, 'REQ-2 appears exactly once in type outline');
-  assert(count(html, 'data-outline-id="TICKET-1"') === 1, 'TICKET-1 appears exactly once in type outline');
-  assert(count(html, 'data-outline-id="EPIC-1"') === 1, 'EPIC-1 appears exactly once in type outline');
+  assert(
+    count(html, 'data-outline-id="REQ-1"') === 1,
+    'REQ-1 appears exactly once in type outline',
+  );
+  assert(
+    count(html, 'data-outline-id="REQ-2"') === 1,
+    'REQ-2 appears exactly once in type outline',
+  );
+  assert(
+    count(html, 'data-outline-id="TICKET-1"') === 1,
+    'TICKET-1 appears exactly once in type outline',
+  );
+  assert(
+    count(html, 'data-outline-id="EPIC-1"') === 1,
+    'EPIC-1 appears exactly once in type outline',
+  );
 }
 
 console.log('=== Split view grouping: Category ===');
@@ -133,10 +172,22 @@ console.log('=== Split view grouping: Category ===');
   );
 
   // Items should not be duplicated in the outline
-  assert(count(html, 'data-outline-id="REQ-1"') === 1, 'REQ-1 appears exactly once in category outline');
-  assert(count(html, 'data-outline-id="REQ-2"') === 1, 'REQ-2 appears exactly once in category outline');
-  assert(count(html, 'data-outline-id="TICKET-1"') === 1, 'TICKET-1 appears exactly once in category outline');
-  assert(count(html, 'data-outline-id="EPIC-1"') === 1, 'EPIC-1 appears exactly once in category outline');
+  assert(
+    count(html, 'data-outline-id="REQ-1"') === 1,
+    'REQ-1 appears exactly once in category outline',
+  );
+  assert(
+    count(html, 'data-outline-id="REQ-2"') === 1,
+    'REQ-2 appears exactly once in category outline',
+  );
+  assert(
+    count(html, 'data-outline-id="TICKET-1"') === 1,
+    'TICKET-1 appears exactly once in category outline',
+  );
+  assert(
+    count(html, 'data-outline-id="EPIC-1"') === 1,
+    'EPIC-1 appears exactly once in category outline',
+  );
 }
 
 console.log('=== Yjs store deduplication on categories and types ===');
@@ -159,11 +210,17 @@ console.log('=== Yjs store deduplication on categories and types ===');
 
   // Check that store repairs the underlying Y.Array order
   assert(
-    ydoc.getArray<string>('itemTypeOrder').toArray().filter((id) => id === 'requirement').length === 1,
+    ydoc
+      .getArray<string>('itemTypeOrder')
+      .toArray()
+      .filter((id) => id === 'requirement').length === 1,
     'Y.Array itemTypeOrder is repaired to have no duplicates',
   );
   assert(
-    ydoc.getArray<string>('categoryOrder').toArray().filter((id) => id === 'cat-1').length === 1,
+    ydoc
+      .getArray<string>('categoryOrder')
+      .toArray()
+      .filter((id) => id === 'cat-1').length === 1,
     'Y.Array categoryOrder is repaired to have no duplicates',
   );
 }

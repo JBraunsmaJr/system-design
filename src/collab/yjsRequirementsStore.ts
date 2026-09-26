@@ -455,9 +455,12 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
     return true;
   }
 
-  function hasDuplicates(ids: string[]): { hasDuplicateEntries: boolean, duplicateIndices: number[] } {
-    const seen = new Set<string>()
-    const duplicateIndices: number[] = []
+  function hasDuplicates(ids: string[]): {
+    hasDuplicateEntries: boolean;
+    duplicateIndices: number[];
+  } {
+    const seen = new Set<string>();
+    const duplicateIndices: number[] = [];
 
     for (let i = 0; i < ids.length; i++) {
       if (seen.has(ids[i])) {
@@ -468,13 +471,13 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
     }
     return {
       hasDuplicateEntries: duplicateIndices.length > 0,
-      duplicateIndices
+      duplicateIndices,
     };
   }
 
   function repairDuplicateItemTypes(): boolean {
-    const { hasDuplicateEntries, duplicateIndices } = hasDuplicates(itemTypeOrder.toArray())
-    if(!hasDuplicateEntries) return false
+    const { hasDuplicateEntries, duplicateIndices } = hasDuplicates(itemTypeOrder.toArray());
+    if (!hasDuplicateEntries) return false;
 
     doc.transact(() => {
       for (let i = duplicateIndices.length - 1; i >= 0; i--) {
@@ -485,8 +488,8 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
   }
 
   function repairDuplicateCategories(): boolean {
-    const { hasDuplicateEntries, duplicateIndices } = hasDuplicates(categoryOrder.toArray())
-    if(!hasDuplicateEntries) return false
+    const { hasDuplicateEntries, duplicateIndices } = hasDuplicates(categoryOrder.toArray());
+    if (!hasDuplicateEntries) return false;
     doc.transact(() => {
       for (let i = duplicateIndices.length - 1; i >= 0; i--) {
         categoryOrder.delete(duplicateIndices[i], 1);

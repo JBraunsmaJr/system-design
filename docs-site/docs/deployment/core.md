@@ -78,11 +78,13 @@ certs/privkey.pem      its private key
 ```
 
 ::: details Just trying it out? A self-signed certificate
+
 ```bash
 openssl req -x509 -newkey rsa:2048 -nodes -days 30 \
   -keyout certs/privkey.pem -out certs/fullchain.pem \
   -subj "/CN=design.example.gov"
 ```
+
 Browsers will warn about it, and live sessions may refuse to connect until
 you accept it. Use a real certificate for anything people depend on.
 :::
@@ -111,12 +113,12 @@ one (**Collaborate → Start a new session**), and open its link in the other.
 
 ## Keeping it running
 
-| Task | Command |
-| :--- | :--- |
-| See what is running | `docker compose ps` |
-| Read the logs | `docker compose logs -f` |
+| Task                         | Command                                       |
+| :--------------------------- | :-------------------------------------------- |
+| See what is running          | `docker compose ps`                           |
+| Read the logs                | `docker compose logs -f`                      |
 | Update to the newest release | `docker compose pull && docker compose up -d` |
-| Stop everything | `docker compose down` |
+| Stop everything              | `docker compose down`                         |
 
 There is nothing to back up: this deployment stores no documents.
 

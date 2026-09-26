@@ -58,11 +58,11 @@ nobody new can join, and a peer who reloads can't get back in.
 ghcr.io/jbraunsmajr/system-design-relay:latest
 ```
 
-| Variable | Default | Purpose |
-| :--- | :--- | :--- |
-| `PORT` | `4444` | The port it listens on inside the container. |
-| `RELAY_TOKEN_SECRET` | *(unset)* | Require a room token from the workspace store. See [Who can use it](#who-can-use-it). At least 32 random characters. |
-| `RELAY_PING_TIMEOUT_MS` | `30000` | How often it pings each connection; one that misses a ping is dropped, which keeps a room's peer list honest. |
+| Variable                | Default   | Purpose                                                                                                              |
+| :---------------------- | :-------- | :------------------------------------------------------------------------------------------------------------------- |
+| `PORT`                  | `4444`    | The port it listens on inside the container.                                                                         |
+| `RELAY_TOKEN_SECRET`    | _(unset)_ | Require a room token from the workspace store. See [Who can use it](#who-can-use-it). At least 32 random characters. |
+| `RELAY_PING_TIMEOUT_MS` | `30000`   | How often it pings each connection; one that misses a ping is dropped, which keeps a room's peer list honest.        |
 
 It answers one plain HTTP request, for health checks:
 
@@ -245,8 +245,9 @@ WebRTC, however, has a dependency that isn't obvious.
 ### ICE servers (STUN and TURN)
 
 To establish a direct peer connection, WebRTC gathers **ICE candidates**
+
 - possible network paths between two browsers. The underlying library
-ships with two public STUN servers configured by default:
+  ships with two public STUN servers configured by default:
 
 ```
 stun:stun.l.google.com:19302
@@ -347,11 +348,11 @@ npx wscat -c wss://design.example.gov/relay/
 
 Common causes:
 
-| Symptom | Likely cause |
-| :--- | :--- |
-| Step 2 fails, step 3 works | The proxy: its WebSocket settings, or the path. |
-| `curl` works, the editor never connects | `ws://` on an HTTPS page, blocked silently. Use `wss://`. |
-| The editor connects, then drops within a minute | A proxy read timeout shorter than the session. |
-| Signed-in people cannot join a session | The relay requires tokens and the store cannot issue them. Check both `/health` responses (above). |
-| Connected, but people never see each other | They are using different relays, or a network that blocks direct paths - see [ICE servers](#ice-servers-stun-and-turn). |
-| `relay.example.gov` rejected as a URL | No scheme. Relay URLs start with `wss://` or `ws://`. |
+| Symptom                                         | Likely cause                                                                                                            |
+| :---------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------- |
+| Step 2 fails, step 3 works                      | The proxy: its WebSocket settings, or the path.                                                                         |
+| `curl` works, the editor never connects         | `ws://` on an HTTPS page, blocked silently. Use `wss://`.                                                               |
+| The editor connects, then drops within a minute | A proxy read timeout shorter than the session.                                                                          |
+| Signed-in people cannot join a session          | The relay requires tokens and the store cannot issue them. Check both `/health` responses (above).                      |
+| Connected, but people never see each other      | They are using different relays, or a network that blocks direct paths - see [ICE servers](#ice-servers-stun-and-turn). |
+| `relay.example.gov` rejected as a URL           | No scheme. Relay URLs start with `wss://` or `ws://`.                                                                   |

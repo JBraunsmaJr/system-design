@@ -138,9 +138,18 @@ function assert(condition: boolean, message: string) {
     />,
   );
 
-  assert(html.includes('Create sub-diagram'), 'Renders "Create sub-diagram" when node has no sub-diagram');
-  assert(!html.includes('Open sub-diagram'), 'Does not render "Open sub-diagram" when node has no sub-diagram');
-  assert(!html.includes('Deleting this node also deletes its sub-diagram'), 'Does not render sub-diagram deletion hint');
+  assert(
+    html.includes('Create sub-diagram'),
+    'Renders "Create sub-diagram" when node has no sub-diagram',
+  );
+  assert(
+    !html.includes('Open sub-diagram'),
+    'Does not render "Open sub-diagram" when node has no sub-diagram',
+  );
+  assert(
+    !html.includes('Deleting this node also deletes its sub-diagram'),
+    'Does not render sub-diagram deletion hint',
+  );
 }
 
 // 4. Inspector with node having populated sub-diagram (subDiagramNodeCount > 0) shows "Open sub-diagram (N)" and count hint
@@ -176,8 +185,14 @@ function assert(condition: boolean, message: string) {
     />,
   );
 
-  assert(html.includes('Open sub-diagram (3)'), 'Renders "Open sub-diagram (3)" when node has 3 sub-diagram nodes');
-  assert(!html.includes('Create sub-diagram'), 'Does not render "Create sub-diagram" when sub-diagram exists');
+  assert(
+    html.includes('Open sub-diagram (3)'),
+    'Renders "Open sub-diagram (3)" when node has 3 sub-diagram nodes',
+  );
+  assert(
+    !html.includes('Create sub-diagram'),
+    'Does not render "Create sub-diagram" when sub-diagram exists',
+  );
   assert(
     html.includes('Deleting this node also deletes its sub-diagram (3 nodes inside).'),
     'Renders sub-diagram deletion hint with correct node count pluralization',
@@ -217,7 +232,10 @@ function assert(condition: boolean, message: string) {
     />,
   );
 
-  assert(html.includes('Open sub-diagram (1)'), 'Renders "Open sub-diagram (1)" for 1 sub-diagram node');
+  assert(
+    html.includes('Open sub-diagram (1)'),
+    'Renders "Open sub-diagram (1)" for 1 sub-diagram node',
+  );
   assert(
     html.includes('Deleting this node also deletes its sub-diagram (1 node inside).'),
     'Renders singular "1 node inside" in deletion hint',
@@ -257,8 +275,14 @@ function assert(condition: boolean, message: string) {
     />,
   );
 
-  assert(html.includes('Open sub-diagram'), 'Renders "Open sub-diagram" without count when count is 0');
-  assert(!html.includes('Create sub-diagram'), 'Does not render "Create sub-diagram" when hasSubDiagram is true');
+  assert(
+    html.includes('Open sub-diagram'),
+    'Renders "Open sub-diagram" without count when count is 0',
+  );
+  assert(
+    !html.includes('Create sub-diagram'),
+    'Does not render "Create sub-diagram" when hasSubDiagram is true',
+  );
 }
 
 // 7. Group node does not render sub-diagram drill button or sub-diagram deletion hint
