@@ -44,7 +44,7 @@ export function IconPickerPanel({
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [activeTab, setActiveTab] = useState<'all' | 'recent' | 'favorites'>('all');
-  const [, setVersion] = useState(0);
+  const [version, setVersion] = useState(0);
 
   // Subscribe to registry changes
   useEffect(() => {
@@ -54,7 +54,7 @@ export function IconPickerPanel({
   }, []);
 
   const recentIconIds = useMemo(() => getRecentIcons(), []);
-  const favoriteIconIds = useMemo(() => new Set(getFavoriteIcons()), []);
+  const favoriteIconIds = useMemo(() => new Set(getFavoriteIcons()), [version]);
 
   const categories = useMemo(() => {
     return ['all', ...globalIconRegistry.getCategories()];
