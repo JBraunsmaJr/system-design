@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import type { Node } from '@xyflow/react';
 import {
   Printer,
@@ -121,6 +121,7 @@ export function SrdPrintModal({
     Record<string, { pan: { x: number; y: number }; zoom: number }>
   >({});
   const [isCapturingItemSnapshot, setIsCapturingItemSnapshot] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const diagramUploadInputRef = useRef<HTMLInputElement>(null);
@@ -330,6 +331,7 @@ export function SrdPrintModal({
 
   const handleCaptureSnapshot = async () => {
     setIsCapturingSnapshot(true);
+    await new Promise((resolve) => setTimeout(resolve, 20));
     try {
       let dataUrl: string | undefined;
       if (snapshotScope === 'selected' && selectedNodeIds.length > 0) {
@@ -440,56 +442,103 @@ export function SrdPrintModal({
     setActivePresetId('custom');
   };
 
-  const handleCaptureItemSnapshot = async (
-    targetItem?: RequirementItemViewModel,
-    panOverride?: { x: number; y: number },
-    zoomOverride?: number,
-  ) => {
-    const item = targetItem || currentFramingItem;
-    if (!item || !item.linkedNodeIds || item.linkedNodeIds.length === 0) return;
-    setIsCapturingItemSnapshot(true);
-    try {
-      const pan = panOverride || framingPanOffset;
-      const zoom = zoomOverride != null ? zoomOverride : framingZoom;
-      const dataUrl = await captureNodeSubsetSnapshot(nodes, item.linkedNodeIds, {
-        panOffset: pan,
-        zoomMultiplier: zoom,
-        width: 1200,
-        height: 600,
-        padding: 0.25,
-      });
-      if (dataUrl) {
-        setCurrentSrdData((prev) => {
-          const nextItemsByCategory = { ...prev.requirements.itemsByCategory };
-          for (const catId in nextItemsByCategory) {
-            nextItemsByCategory[catId] = nextItemsByCategory[catId].map((it) => {
-              if (it.id === item.id) {
-                return {
-                  ...it,
-                  contextSnapshotBase64: dataUrl,
-                  snapshotFraming: { offsetX: pan.x, offsetY: pan.y, zoom },
-                };
-              }
-              return it;
-            });
-          }
-          return {
-            ...prev,
-            requirements: {
-              ...prev.requirements,
-              itemsByCategory: nextItemsByCategory,
-            },
-          };
-        });
-      }
-    } catch (err) {
-      console.warn('Failed to capture item snapshot:', err);
-    } finally {
-      setIsCapturingItemSnapshot(false);
-    }
+  const handleToggleConnectionsTable = (enabled: boolean) => {
+    setTemplateConfig((prev) => ({
+      ...prev,
+      includeConnectionsTable: enabled,
+    }));
+    setActivePresetId('custom');
   };
 
+  const handleCaptureItemSnapshot = useCallback(
+    async (
+      targetItem?: RequirementItemViewModel,
+      panOverride?: { x: number; y: number },
+      zoomOverride?: number,
+    ) => {
+      const item = targetItem || currentFramingItem;
+      if (!item || !item.linkedNodeIds || item.linkedNodeIds.length === 0) return;
+      setIsCapturingItemSnapshot(true);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      try {
+        const pan = panOverride || framingPanOffset;
+        const zoom = zoomOverride != null ? zoomOverride : framingZoom;
+        const dataUrl = await captureNodeSubsetSnapshot(nodes, item.linkedNodeIds, {
+          panOffset: pan,
+          zoomMultiplier: zoom,
+          width: 1200,
+          height: 600,
+          padding: 0.25,
+        });
+        if (dataUrl) {
+          setFramingAdjustments((prev) => ({
+            ...prev,
+            [item.id]: { pan: { x: pan.x, y: pan.y }, zoom },
+          }));
+          setCurrentSrdData((prev) => {
+            const nextItemsByCategory = { ...prev.requirements.itemsByCategory };
+            for (const catId in nextItemsByCategory) {
+              nextItemsByCategory[catId] = nextItemsByCategory[catId].map((it) => {
+                if (it.id === item.id) {
+                  return {
+                    ...it,
+                    contextSnapshotBase64: dataUrl,
+                    snapshotFraming: { offsetX: pan.x, offsetY: pan.y, zoom },
+                  };
+                }
+                return it;
+              });
+            }
+            return {
+              ...prev,
+              requirements: {
+                ...prev.requirements,
+                itemsByCategory: nextItemsByCategory,
+              },
+            };
+          });
+        }
+      } catch (err) {
+        console.warn('Failed to capture item snapshot:', err);
+      } finally {
+        setIsCapturingItemSnapshot(false);
+      }
+    },
+    [currentFramingItem, framingPanOffset, framingZoom, nodes],
+  );
+
+  // Debounced auto-capture when user adjusts framing sliders
+  useEffect(() => {
+    if (!effectiveFramingItemId || !currentFramingItem || !currentFramingItem.linkedNodeIds?.length) {
+      return;
+    }
+    const adj = framingAdjustments[effectiveFramingItemId];
+    if (!adj) return;
+
+    const currentFraming = currentFramingItem.snapshotFraming;
+    if (
+      currentFraming &&
+      currentFraming.offsetX === adj.pan.x &&
+      currentFraming.offsetY === adj.pan.y &&
+      currentFraming.zoom === adj.zoom &&
+      currentFramingItem.contextSnapshotBase64
+    ) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      handleCaptureItemSnapshot(currentFramingItem, adj.pan, adj.zoom);
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [framingAdjustments, effectiveFramingItemId, currentFramingItem, handleCaptureItemSnapshot]);
+
   const handleRemoveItemSnapshot = (itemId: string) => {
+    setFramingAdjustments((prev) => {
+      const copy = { ...prev };
+      delete copy[itemId];
+      return copy;
+    });
     setCurrentSrdData((prev) => {
       const nextItemsByCategory = { ...prev.requirements.itemsByCategory };
       for (const catId in nextItemsByCategory) {
@@ -517,12 +566,17 @@ export function SrdPrintModal({
   const handleBatchCaptureAllSnapshots = async () => {
     if (linkedRequirementItems.length === 0 || nodes.length === 0) return;
     setIsCapturingItemSnapshot(true);
+    setBatchProgress({ current: 0, total: linkedRequirementItems.length });
+    await new Promise((resolve) => setTimeout(resolve, 20));
     try {
       const updates: Record<
         string,
         { url: string; framing: { offsetX: number; offsetY: number; zoom: number } }
       > = {};
+      let count = 0;
       for (const it of linkedRequirementItems) {
+        count++;
+        setBatchProgress({ current: count, total: linkedRequirementItems.length });
         if (!it.linkedNodeIds || it.linkedNodeIds.length === 0) continue;
         const pan = it.snapshotFraming
           ? { x: it.snapshotFraming.offsetX, y: it.snapshotFraming.offsetY }
@@ -566,6 +620,7 @@ export function SrdPrintModal({
       console.warn('Batch capture failed:', err);
     } finally {
       setIsCapturingItemSnapshot(false);
+      setBatchProgress(null);
     }
   };
 
@@ -998,19 +1053,32 @@ export function SrdPrintModal({
 
                 <div className="srd-sidebar__field" style={{ marginTop: '0.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid #374151' }}>
                   <label className="srd-sidebar__label">Architecture Detail Tables</label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <input
-                      type="checkbox"
-                      id="includeComponentTableCheckbox"
-                      checked={!!templateConfig.includeComponentTable}
-                      onChange={(e) => handleToggleComponentTable(e.target.checked)}
-                    />
-                    <label htmlFor="includeComponentTableCheckbox" className="srd-sidebar__label" style={{ cursor: 'pointer', margin: 0 }}>
-                      Include Full Component Inventory Table
-                    </label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <input
+                        type="checkbox"
+                        id="includeComponentTableCheckbox"
+                        checked={!!templateConfig.includeComponentTable}
+                        onChange={(e) => handleToggleComponentTable(e.target.checked)}
+                      />
+                      <label htmlFor="includeComponentTableCheckbox" className="srd-sidebar__label" style={{ cursor: 'pointer', margin: 0 }}>
+                        Include Full Component Inventory Table
+                      </label>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <input
+                        type="checkbox"
+                        id="includeConnectionsTableCheckbox"
+                        checked={!!templateConfig.includeConnectionsTable}
+                        onChange={(e) => handleToggleConnectionsTable(e.target.checked)}
+                      />
+                      <label htmlFor="includeConnectionsTableCheckbox" className="srd-sidebar__label" style={{ cursor: 'pointer', margin: 0 }}>
+                        Include Connections & Data Flows Table
+                      </label>
+                    </div>
                   </div>
-                  <p style={{ fontSize: '0.6875rem', color: '#9ca3af', margin: '0.2rem 0 0 1.4rem' }}>
-                    Uncheck to keep architecture overview focused on visual diagram and data flows.
+                  <p style={{ fontSize: '0.6875rem', color: '#9ca3af', margin: '0.35rem 0 0 0' }}>
+                    Leave unchecked to keep architecture overview clean and focused on visual diagrams.
                   </p>
                 </div>
 
@@ -1080,7 +1148,9 @@ export function SrdPrintModal({
                       title="Auto-capture snapshots for all linked requirement items"
                     >
                       <RefreshCw size={11} className={isCapturingItemSnapshot ? 'animate-spin' : ''} style={{ marginRight: 3 }} />
-                      Batch Capture All
+                      {batchProgress
+                        ? `Capturing (${batchProgress.current}/${batchProgress.total})`
+                        : 'Batch Capture All'}
                     </button>
                   )}
                 </div>
@@ -1123,15 +1193,21 @@ export function SrdPrintModal({
                         </div>
 
                         <div className="srd-framing-preview-box">
+                          {isCapturingItemSnapshot && (
+                            <div className="srd-framing-loading-overlay">
+                              <div className="srd-loading-spinner" style={{ width: 22, height: 22, borderWidth: 2 }} />
+                              <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>
+                                {batchProgress
+                                  ? `Capturing (${batchProgress.current}/${batchProgress.total})...`
+                                  : 'Updating snapshot...'}
+                              </span>
+                            </div>
+                          )}
                           {currentFramingItem.contextSnapshotBase64 ? (
                             <img
                               src={currentFramingItem.contextSnapshotBase64}
                               alt="Context preview"
                               className="srd-framing-preview-img"
-                              style={{
-                                transform: `translate(${framingPanOffset.x / 4}px, ${framingPanOffset.y / 4}px) scale(${framingZoom})`,
-                                transition: 'transform 0.1s ease-out',
-                              }}
                             />
                           ) : (
                             <div style={{ color: '#64748b', fontSize: '0.75rem', textAlign: 'center', padding: '1rem' }}>
@@ -1150,8 +1226,8 @@ export function SrdPrintModal({
                             <input
                               type="range"
                               className="srd-framing-slider"
-                              min="-250"
-                              max="250"
+                              min="-800"
+                              max="800"
                               step="10"
                               value={framingPanOffset.x}
                               onChange={(e) => setFramingPanX(parseInt(e.target.value, 10))}
@@ -1165,8 +1241,8 @@ export function SrdPrintModal({
                             <input
                               type="range"
                               className="srd-framing-slider"
-                              min="-250"
-                              max="250"
+                              min="-600"
+                              max="600"
                               step="10"
                               value={framingPanOffset.y}
                               onChange={(e) => setFramingPanY(parseInt(e.target.value, 10))}
@@ -1182,8 +1258,8 @@ export function SrdPrintModal({
                           <input
                             type="range"
                             className="srd-framing-slider"
-                            min="0.5"
-                            max="2.5"
+                            min="0.2"
+                            max="3.0"
                             step="0.05"
                             value={framingZoom}
                             onChange={(e) => setFramingZoomScale(parseFloat(e.target.value))}
@@ -1465,15 +1541,28 @@ export function SrdPrintModal({
 
                     {section.id === 'architecture' && (
                       <div>
-                        {currentSrdData.architecture.diagramImageBase64 && (
-                          <div className="srd-doc__diagram-container">
+                        {currentSrdData.architecture.diagramImageBase64 ? (
+                          <div className="srd-doc__diagram-container" style={{ position: 'relative' }}>
+                            {isCapturingSnapshot && (
+                              <div className="srd-doc__snapshot-loading-overlay">
+                                <div className="srd-loading-spinner" style={{ width: 28, height: 28, borderWidth: 2.5 }} />
+                                <span>Refreshing architecture snapshot...</span>
+                              </div>
+                            )}
                             <img
                               src={currentSrdData.architecture.diagramImageBase64}
                               alt="System Architecture Diagram"
                               className="srd-doc__diagram-img"
                             />
                           </div>
-                        )}
+                        ) : isCapturingSnapshot ? (
+                          <div className="srd-doc__diagram-container" style={{ position: 'relative', minHeight: 140, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <div className="srd-doc__snapshot-loading-overlay">
+                              <div className="srd-loading-spinner" style={{ width: 28, height: 28, borderWidth: 2.5 }} />
+                              <span>Capturing architecture snapshot...</span>
+                            </div>
+                          </div>
+                        ) : null}
 
                         {templateConfig.includeComponentTable && (
                           <>
@@ -1511,36 +1600,40 @@ export function SrdPrintModal({
                           </>
                         )}
 
-                        <h3 className="srd-doc__sub-title">Connections & Data Flows</h3>
-                        {currentSrdData.architecture.connections.length === 0 ? (
-                          <p style={{ color: '#6b7280', fontStyle: 'italic' }}>
-                            No connections defined between components.
-                          </p>
-                        ) : (
-                          <table
-                            className={`srd-doc__table ${
-                              templateConfig.theme.tableDense ? 'srd-doc__table--dense' : ''
-                            }`}
-                          >
-                            <thead>
-                              <tr>
-                                <th>Source</th>
-                                <th>Target</th>
-                                <th>Flow Label</th>
-                                <th>Protocol</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {currentSrdData.architecture.connections.map((conn, i) => (
-                                <tr key={i}>
-                                  <td><strong>{conn.fromName || conn.from}</strong></td>
-                                  <td><strong>{conn.toName || conn.to}</strong></td>
-                                  <td>{conn.label || '-'}</td>
-                                  <td><code>{conn.protocol || conn.edgeType || '-'}</code></td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                        {templateConfig.includeConnectionsTable && (
+                          <>
+                            <h3 className="srd-doc__sub-title">Connections & Data Flows</h3>
+                            {currentSrdData.architecture.connections.length === 0 ? (
+                              <p style={{ color: '#6b7280', fontStyle: 'italic' }}>
+                                No connections defined between components.
+                              </p>
+                            ) : (
+                              <table
+                                className={`srd-doc__table ${
+                                  templateConfig.theme.tableDense ? 'srd-doc__table--dense' : ''
+                                }`}
+                              >
+                                <thead>
+                                  <tr>
+                                    <th>Source</th>
+                                    <th>Target</th>
+                                    <th>Flow Label</th>
+                                    <th>Protocol</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {currentSrdData.architecture.connections.map((conn, i) => (
+                                    <tr key={i}>
+                                      <td><strong>{conn.fromName || conn.from}</strong></td>
+                                      <td><strong>{conn.toName || conn.to}</strong></td>
+                                      <td>{conn.label || '-'}</td>
+                                      <td><code>{conn.protocol || conn.edgeType || '-'}</code></td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            )}
+                          </>
                         )}
                       </div>
                     )}
@@ -1635,8 +1728,14 @@ export function SrdPrintModal({
                                           </div>
                                         </div>
 
-                                        {item.contextSnapshotBase64 && (
-                                          <div className="srd-doc__item-snapshot-container">
+                                        {item.contextSnapshotBase64 ? (
+                                          <div className="srd-doc__item-snapshot-container" style={{ position: 'relative' }}>
+                                            {isCapturingItemSnapshot && currentFramingItem?.id === item.id && (
+                                              <div className="srd-doc__snapshot-loading-overlay">
+                                                <div className="srd-loading-spinner" style={{ width: 22, height: 22, borderWidth: 2 }} />
+                                                <span>Updating context snapshot...</span>
+                                              </div>
+                                            )}
                                             <div className="srd-doc__item-snapshot-caption">
                                               Architecture Context Snapshot
                                             </div>
@@ -1646,7 +1745,14 @@ export function SrdPrintModal({
                                               className="srd-doc__item-snapshot-img"
                                             />
                                           </div>
-                                        )}
+                                        ) : isCapturingItemSnapshot && currentFramingItem?.id === item.id ? (
+                                          <div className="srd-doc__item-snapshot-container" style={{ position: 'relative', minHeight: 120, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <div className="srd-doc__snapshot-loading-overlay">
+                                              <div className="srd-loading-spinner" style={{ width: 22, height: 22, borderWidth: 2 }} />
+                                              <span>Capturing context snapshot...</span>
+                                            </div>
+                                          </div>
+                                        ) : null}
 
                                         {item.linkedNodeLabels && item.linkedNodeLabels.length > 0 && (
                                           <div className="srd-doc__item-linked-nodes">

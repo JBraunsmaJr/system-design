@@ -157,6 +157,7 @@ export interface SrdTemplateConfig {
   description?: string;
   requirementsLayout?: 'table' | 'list';
   includeComponentTable?: boolean;
+  includeConnectionsTable?: boolean;
   theme: SrdTemplateTheme;
   headersAndFooters: SrdTemplateHeadersAndFooters;
   sections: SrdSectionConfig[];

@@ -1,5 +1,6 @@
 import { getNodesBounds, getViewportForBounds, type Node } from '@xyflow/react';
 import { toPng, toSvg } from 'html-to-image';
+import { toAbsolutePosition, getDescendantIds } from './graphUtils';
 
 const EXPORT_WIDTH = 1600;
 const EXPORT_HEIGHT = 1000;
@@ -119,6 +120,62 @@ export interface SubsetSnapshotOptions {
 }
 
 /**
+ * Calculates the bounding box of a list of nodes in absolute canvas coordinates,
+ * resolving parentId relative offsets and explicit or fallback node dimensions.
+ */
+export function calculateNodesAbsoluteBounds(
+  nodesToMeasure: Node[],
+  allNodes: Node[],
+): { x: number; y: number; width: number; height: number } {
+  if (nodesToMeasure.length === 0) {
+    return { x: 0, y: 0, width: 0, height: 0 };
+  }
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  for (const n of nodesToMeasure) {
+    const absPos = toAbsolutePosition(n, allNodes, n.parentId);
+    let w = n.measured?.width ?? n.width;
+    let h = n.measured?.height ?? n.height;
+
+    if (w == null && n.style?.width != null) {
+      w = typeof n.style.width === 'number' ? n.style.width : parseFloat(String(n.style.width));
+    }
+    if (h == null && n.style?.height != null) {
+      h = typeof n.style.height === 'number' ? n.style.height : parseFloat(String(n.style.height));
+    }
+    if (w == null && (n as { initialWidth?: number }).initialWidth != null) {
+      w = (n as { initialWidth?: number }).initialWidth;
+    }
+    if (h == null && (n as { initialHeight?: number }).initialHeight != null) {
+      h = (n as { initialHeight?: number }).initialHeight;
+    }
+
+    if (!w || isNaN(w) || w <= 0) {
+      w = n.type === 'group' ? 320 : n.type === 'text' ? 140 : 180;
+    }
+    if (!h || isNaN(h) || h <= 0) {
+      h = n.type === 'group' ? 220 : n.type === 'text' ? 40 : 80;
+    }
+
+    minX = Math.min(minX, absPos.x);
+    minY = Math.min(minY, absPos.y);
+    maxX = Math.max(maxX, absPos.x + w);
+    maxY = Math.max(maxY, absPos.y + h);
+  }
+
+  return {
+    x: minX,
+    y: minY,
+    width: Math.max(1, maxX - minX),
+    height: Math.max(1, maxY - minY),
+  };
+}
+
+/**
  * Captures a focused snapshot tightly centered on a subset of nodes (e.g. linked
  * requirement nodes) with optional pan offsets and zoom adjustment for framing.
  */
@@ -130,7 +187,17 @@ export async function captureNodeSubsetSnapshot(
   if (!allNodes || allNodes.length === 0 || !targetNodeIds || targetNodeIds.length === 0) {
     return undefined;
   }
-  const targetNodes = allNodes.filter((n) => targetNodeIds.includes(n.id));
+
+  // Include descendant nodes if any target node is a group container
+  const targetIdSet = new Set<string>(targetNodeIds);
+  for (const id of targetNodeIds) {
+    const descendants = getDescendantIds(id, allNodes);
+    for (const dId of descendants) {
+      targetIdSet.add(dId);
+    }
+  }
+
+  const targetNodes = allNodes.filter((n) => targetIdSet.has(n.id));
   if (targetNodes.length === 0) {
     return undefined;
   }
@@ -150,19 +217,24 @@ export async function captureNodeSubsetSnapshot(
   const bgColor = options?.backgroundColor ?? EXPORT_BACKGROUND;
 
   try {
-    const bounds = getNodesBounds(targetNodes);
-    const { x, y, zoom } = getViewportForBounds(
-      bounds,
-      width,
-      height,
-      MIN_ZOOM,
-      MAX_ZOOM,
-      padding,
-    );
+    const bounds = calculateNodesAbsoluteBounds(targetNodes, allNodes);
 
-    const adjustedZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom * zoomMultiplier));
-    const finalX = x + panOffset.x;
-    const finalY = y + panOffset.y;
+    const paddingFraction = Math.max(0, Math.min(0.4, padding));
+    const effectiveW = width * (1 - paddingFraction * 2);
+    const effectiveH = height * (1 - paddingFraction * 2);
+
+    const baseZoom = Math.min(
+      effectiveW / bounds.width,
+      effectiveH / bounds.height,
+    );
+    const clampedBaseZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, baseZoom));
+    const adjustedZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, clampedBaseZoom * zoomMultiplier));
+
+    const centerX = bounds.x + bounds.width / 2;
+    const centerY = bounds.y + bounds.height / 2;
+
+    const finalX = width / 2 + panOffset.x - centerX * adjustedZoom;
+    const finalY = height / 2 + panOffset.y - centerY * adjustedZoom;
 
     const renderOptions = {
       backgroundColor: bgColor,

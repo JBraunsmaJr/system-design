@@ -167,7 +167,20 @@ const srdData = aggregateSrdData({
   });
   assert(!mdWithoutCompTable.includes('### Component Inventory'), 'Component inventory omitted when disabled');
 
-  console.log('✓ Test 4: Dual layouts, snapshot embeds, and component table toggle passed');
+  // 4d. Connections & Protocols Table toggle
+  const mdWithConnTable = generateSrdMarkdown(srdData, {
+    ...ENTERPRISE_FORMAL_TEMPLATE,
+    includeConnectionsTable: true,
+  });
+  assert(mdWithConnTable.includes('### Connections & Protocols'), 'Connections table included when enabled');
+
+  const mdWithoutConnTable = generateSrdMarkdown(srdData, {
+    ...ENTERPRISE_FORMAL_TEMPLATE,
+    includeConnectionsTable: false,
+  });
+  assert(!mdWithoutConnTable.includes('### Connections & Protocols'), 'Connections table omitted when disabled');
+
+  console.log('✓ Test 4: Dual layouts, snapshot embeds, component and connections table toggles passed');
 }
 
 if (failures > 0) {

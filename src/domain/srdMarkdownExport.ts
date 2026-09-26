@@ -110,18 +110,20 @@ export function generateSrdMarkdown(data: SrdDataContext, config: SrdTemplateCon
           }
         }
 
-        lines.push('### Connections & Protocols', '');
-        if (data.architecture.connections.length === 0) {
-          lines.push('*No connections defined between components.*', '');
-        } else {
-          lines.push('| Source | Target | Label / Flow | Protocol / Edge Type | Direction |');
-          lines.push('| ------ | ------ | ------------ | -------------------- | --------- |');
-          for (const conn of data.architecture.connections) {
-            lines.push(
-              `| **${escapeTableCol(conn.fromName || conn.from)}** | **${escapeTableCol(conn.toName || conn.to)}** | ${escapeTableCol(conn.label)} | \`${escapeTableCol(conn.protocol || conn.edgeType)}\` | ${escapeTableCol(conn.direction || 'forward')} |`,
-            );
+        if (config.includeConnectionsTable) {
+          lines.push('### Connections & Protocols', '');
+          if (data.architecture.connections.length === 0) {
+            lines.push('*No connections defined between components.*', '');
+          } else {
+            lines.push('| Source | Target | Label / Flow | Protocol / Edge Type | Direction |');
+            lines.push('| ------ | ------ | ------------ | -------------------- | --------- |');
+            for (const conn of data.architecture.connections) {
+              lines.push(
+                `| **${escapeTableCol(conn.fromName || conn.from)}** | **${escapeTableCol(conn.toName || conn.to)}** | ${escapeTableCol(conn.label)} | \`${escapeTableCol(conn.protocol || conn.edgeType)}\` | ${escapeTableCol(conn.direction || 'forward')} |`,
+              );
+            }
+            lines.push('');
           }
-          lines.push('');
         }
         break;
       }

@@ -39,6 +39,7 @@ console.log('Testing SRD Template Presets & Serialization...');
   cloned.name = 'Custom Corporate SRD';
   cloned.requirementsLayout = 'list';
   cloned.includeComponentTable = true;
+  cloned.includeConnectionsTable = true;
   cloned.theme.primaryColor = '#059669';
 
   const json = serializeTemplateConfig(cloned);
@@ -47,6 +48,7 @@ console.log('Testing SRD Template Presets & Serialization...');
   assert(restored.name === 'Custom Corporate SRD', 'Restored name matches');
   assert(restored.requirementsLayout === 'list', 'Restored requirementsLayout matches');
   assert(restored.includeComponentTable === true, 'Restored includeComponentTable matches');
+  assert(restored.includeConnectionsTable === true, 'Restored includeConnectionsTable matches');
   assert(restored.theme.primaryColor === '#059669', 'Restored theme color matches');
   assert(restored.sections.length === 5, 'Restored all sections');
 

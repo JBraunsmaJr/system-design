@@ -3081,6 +3081,8 @@ function App() {
 
   const openSrdModal = useCallback(async () => {
     setIsGeneratingSrd(true);
+    // Yield to allow the browser to immediately paint the loading overlay
+    await new Promise((resolve) => setTimeout(resolve, 20));
     try {
       let diagramImg: string | undefined;
       const itemSnapshots: Record<string, string> = {};
@@ -3139,6 +3141,8 @@ function App() {
 
   const onExportSrdMarkdown = useCallback(async () => {
     setIsGeneratingSrd(true);
+    // Yield to allow the browser to immediately paint the loading overlay
+    await new Promise((resolve) => setTimeout(resolve, 20));
     try {
       let diagramImg: string | undefined;
       const itemSnapshots: Record<string, string> = {};
