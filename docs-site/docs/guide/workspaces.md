@@ -46,6 +46,22 @@ up within a few seconds.
 Nothing you do while waiting can read the workspace - and neither can the
 server.
 
+### Joining automatically
+
+Your workspace may be set up to let in everyone in a particular group at your
+organization. If you are in it, you do not wait for anyone to press a button:
+a teammate's open editor checks your sign-in and lets you in, usually within
+a few seconds.
+
+If nobody in the workspace has the editor open, you wait until someone does -
+the screen says so. Leave it open, or come back later; if a day passes, you
+will be asked to sign in again so your sign-in can be checked.
+
+Your teammate's browser checks your organization's signed record of your
+groups itself, rather than trusting the workspace server, so the server
+cannot use this to let anyone else in. Administrators set it up as described
+in [Automatic Access from Groups](/deployment/group-access).
+
 ## Saving
 
 Save the open document with **Save this document to the workspace**. From
