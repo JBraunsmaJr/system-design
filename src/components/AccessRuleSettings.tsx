@@ -35,6 +35,7 @@ export function AccessRuleSettings(props: AccessRuleSettingsProps) {
   const [groupsText, setGroupsText] = useState('');
   const [validity, setValidity] = useState(EVIDENCE_MAX_AGE_DEFAULT);
   const [confirmed, setConfirmed] = useState(false);
+  const [removeNow, setRemoveNow] = useState(false);
   const [fromHere, setFromHere] = useState(() => autoGrantEnabledHere());
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -77,6 +78,11 @@ export function AccessRuleSettings(props: AccessRuleSettingsProps) {
     !!identity &&
     (saved.issuer !== identity.issuer || saved.audience !== identity.clientId);
   const needsConfirmation = !saved || identityChanged;
+  // WS14-R32, R37: a save that admits fewer people asks what happens to the
+  // ones it no longer admits.
+  const turningOff = !!saved?.enabled && !enabled;
+  const dropping = saved?.enabled ? saved.groups.filter((group) => !groups.includes(group)) : [];
+  const narrows = turningOff || (enabled && dropping.length > 0);
 
   const save = async () => {
     if (!identity) return;
@@ -95,11 +101,13 @@ export function AccessRuleSettings(props: AccessRuleSettingsProps) {
           evidenceMaxAgeSeconds: validity,
           issuer: identity.issuer,
           audience: identity.clientId,
+          removeMembers: narrows && removeNow,
         },
         updatedBy: userId,
       });
       setSaved(next);
       setConfirmed(false);
+      setRemoveNow(false);
       setMessage(
         next.enabled
           ? `Saved. People in ${next.groups.join(', ')} are let in automatically.`
@@ -158,6 +166,22 @@ export function AccessRuleSettings(props: AccessRuleSettingsProps) {
                 ))}
               </select>
             </label>
+            {narrows && (
+              <label style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+                <input
+                  type="checkbox"
+                  className="workspace-panel__auto-access-remove"
+                  checked={removeNow}
+                  onChange={(event) => setRemoveNow(event.target.checked)}
+                />
+                <span>
+                  {turningOff
+                    ? 'Also remove everyone who joined through a group, now. Otherwise they keep their access.'
+                    : `Also remove people who joined through ${dropping.join(', ')}, now. Otherwise they are removed when they next sign in.`}{' '}
+                  Removing anyone replaces the workspace key.
+                </span>
+              </label>
+            )}
             {identity && needsConfirmation && (
               <label style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
                 <input

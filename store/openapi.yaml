@@ -308,8 +308,13 @@ paths:
                 claim: { type: string }
                 groups: { type: array, minItems: 1, maxItems: 50, items: { type: string } }
                 evidenceMaxAgeSeconds: { type: integer, minimum: 300, maximum: 604800 }
+                removeMembers:
+                  type: boolean
+                  description: |
+                    WS14-R32: also remove, now, members a group let in who no longer match
+                    (judged on their last-seen groups). Otherwise at their next sign-in.
       responses:
-        '200': { description: Stored }
+        '200': { description: '`{ rule, removed }`' }
         '403': { description: Not a key holder, or AUTO_ACCESS=off }
         '409': { description: '`stale-version`: not newer than the stored rule' }
 
@@ -334,3 +339,26 @@ paths:
         '403': { description: An automatic grant from someone without the current key }
         '409':
           { description: '`request-closed`: that request is no longer open on the current key' }
+
+  /workspace/members/{userId}:
+    delete:
+      summary: Remove someone now, however they were let in (WS14-R40)
+      description: |
+        Refused on their next request (403 `removed`) on every route that serves the
+        workspace; the workspace is marked as needing a new key. Key holders only.
+      parameters: [{ name: userId, in: path, required: true, schema: { type: string } }]
+      responses:
+        '204': { description: Removed }
+        '403': { description: The caller does not hold the current workspace key }
+        '409': { description: Removing yourself }
+
+  /workspaces/{wsId}/rotation-lease:
+    post:
+      summary: The right to replace the key, for one browser at a time (WS14-R34)
+      description: |
+        Granted only while a removal requires a new key and nobody else holds the lease
+        (five minutes). The flag and lease clear when the index reaches a newer generation.
+      parameters: [{ name: wsId, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: '`{ leaseMs }`: rotate now' }
+        '409': { description: '`lease-held` or `not-required`: do nothing' }

@@ -101,6 +101,8 @@ interface Member {
   hasAccess: boolean;
   /** WS14-R30: set when a group's rule let them in. */
   matchedGroup?: string | null;
+  /** WS14-R40: when they were removed, if they were. */
+  removedAt?: string | null;
 }
 
 interface PendingDevice {
@@ -238,6 +240,7 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
                 publicKey: member.publicKey,
                 hasAccess: (member.workspaceKeyGenerations ?? []).includes(generation),
                 matchedGroup: member.source === 'oidc_group' ? member.matchedGroup : null,
+                removedAt: member.removedAt ?? null,
               })),
           );
           setCanGrant(true);
@@ -447,6 +450,19 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
    * nothing secret passes through this one except in wrapped form, and
    * the store never sees the key itself.
    */
+  /** WS14-R40: takes someone out now; the key is replaced after. */
+  const removeAccess = (member: Member) => {
+    const name = member.displayName ?? member.userId;
+    const confirmed = globalThis.confirm?.(
+      `Remove ${name} from this workspace? They lose access at once, and the workspace key is replaced so the key they hold opens nothing saved from now on.`,
+    );
+    if (!confirmed) return;
+    return run(async () => {
+      await client.removeMember(member.userId);
+      await refresh();
+    });
+  };
+
   const grantAccess = (member: Member) =>
     run(async () => {
       const key = workspaceKey.current;
@@ -819,10 +835,27 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
                 >
                   <Users size={12} />
                   <span style={{ flex: 1 }}>{member.displayName ?? member.userId}</span>
-                  {member.hasAccess ? (
+                  {member.removedAt ? (
                     <span style={{ color: 'var(--text-muted, #9aa3b2)' }}>
-                      {member.matchedGroup ? `joined through ${member.matchedGroup}` : 'has access'}
+                      removed {new Date(member.removedAt).toLocaleDateString()}
                     </span>
+                  ) : member.hasAccess ? (
+                    <>
+                      <span style={{ color: 'var(--text-muted, #9aa3b2)' }}>
+                        {member.matchedGroup
+                          ? `joined through ${member.matchedGroup}`
+                          : 'has access'}
+                      </span>
+                      <button
+                        type="button"
+                        className="workspace-panel__remove"
+                        onClick={() => void removeAccess(member)}
+                        disabled={busy}
+                        title="Take away their access now, and replace the workspace key"
+                      >
+                        Remove
+                      </button>
+                    </>
                   ) : (
                     <button
                       type="button"

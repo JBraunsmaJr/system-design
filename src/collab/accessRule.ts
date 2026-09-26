@@ -51,6 +51,8 @@ export interface AccessRuleEdit {
   issuer: string;
   audience: string;
   claim?: string;
+  /** WS14-R32: remove, now, members a group let in who no longer match. */
+  removeMembers?: boolean;
 }
 
 /**
@@ -111,6 +113,7 @@ export async function saveAccessRule(options: {
         claim: next.claim,
         groups: next.groups,
         evidenceMaxAgeSeconds: next.evidenceMaxAgeSeconds,
+        ...(edit.removeMembers ? { removeMembers: true } : {}),
       });
     } catch (error) {
       // A newer routing copy is already there: someone saved after us, and

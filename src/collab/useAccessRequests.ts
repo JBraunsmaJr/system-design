@@ -28,6 +28,8 @@ import {
   createRejectionMemory,
   runAutoGrant,
 } from './autoGrant.ts';
+import { rotateIfRequired } from './autoRotation.ts';
+import { announceWorkspaceChange } from './useWorkspaceSync.ts';
 
 const WORKSPACE_ID = 'default';
 
@@ -161,6 +163,17 @@ export function useAccessRequests(options: AccessRequestsOptions) {
           show(waiting);
         }
       }
+
+      // WS14-R34: someone was removed, so the key they hold must stop
+      // opening anything new. Not tied to the setting above: letting people
+      // in is a choice; locking out people who left is not.
+      const rotated = await rotateIfRequired({
+        client,
+        workspaceId: WORKSPACE_ID,
+        workspaceKey: device.workspaceKey,
+        generation,
+      });
+      if (rotated) announceWorkspaceChange();
     } catch {
       // Unreachable, or signed out. The notice is a convenience: the same
       // requests are in File > Documents whenever this can see them.

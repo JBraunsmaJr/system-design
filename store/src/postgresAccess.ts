@@ -237,6 +237,65 @@ export function createPostgresAccessStore(pool: pg.Pool): AccessStore {
       return toMembership(result.rows[0]);
     },
 
+    async listMemberships(workspaceId) {
+      const result = await pool.query<MembershipRow>(
+        `SELECT * FROM workspace_memberships WHERE workspace_id = $1 ORDER BY granted_at`,
+        [workspaceId],
+      );
+      return result.rows.map(toMembership);
+    },
+
+    async removeMembership(workspaceId, userId) {
+      const result = await pool.query(
+        `UPDATE workspace_memberships SET removed_at = now()
+          WHERE workspace_id = $1 AND user_id = $2 AND removed_at IS NULL`,
+        [workspaceId, userId],
+      );
+      return (result.rowCount ?? 0) > 0;
+    },
+
+    async isRemoved(workspaceId, userId) {
+      const result = await pool.query(
+        `SELECT 1 FROM workspace_memberships
+          WHERE workspace_id = $1 AND user_id = $2 AND removed_at IS NOT NULL`,
+        [workspaceId, userId],
+      );
+      return (result.rowCount ?? 0) > 0;
+    },
+
+    async setRotationRequired(workspaceId) {
+      await pool.query(
+        `UPDATE workspace_access_rules SET rotation_required = TRUE WHERE workspace_id = $1`,
+        [workspaceId],
+      );
+    },
+
+    async claimRotation(workspaceId, holder, ttlMs) {
+      // One conditional statement, so two browsers asking at once cannot
+      // both be told yes.
+      const result = await pool.query(
+        `UPDATE workspace_access_rules
+            SET rotation_lease_holder = $2,
+                rotation_lease_until = now() + ($3::int * interval '1 millisecond')
+          WHERE workspace_id = $1
+            AND rotation_required
+            AND (rotation_lease_until IS NULL
+                 OR rotation_lease_until < now()
+                 OR rotation_lease_holder = $2)`,
+        [workspaceId, holder, ttlMs],
+      );
+      return (result.rowCount ?? 0) > 0;
+    },
+
+    async rotationCompleted(workspaceId) {
+      await pool.query(
+        `UPDATE workspace_access_rules
+            SET rotation_required = FALSE, rotation_lease_holder = NULL, rotation_lease_until = NULL
+          WHERE workspace_id = $1`,
+        [workspaceId],
+      );
+    },
+
     async setLastGroups(userId, groups) {
       await pool.query(
         `UPDATE users SET last_groups = $2, last_groups_at = now() WHERE user_id = $1`,

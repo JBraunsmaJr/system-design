@@ -56,9 +56,9 @@ and client names.
 
 In the admin console, open your realm, then **Groups → Create group**.
 
-| Group | Path in the token |
-| :--- | :--- |
-| `design-team-a` at the top level | `/design-team-a` |
+| Group                                | Path in the token            |
+| :----------------------------------- | :--------------------------- |
+| `design-team-a` at the top level     | `/design-team-a`             |
 | `design-team-a` inside `engineering` | `/engineering/design-team-a` |
 
 The workspace rule matches the **full path**, so a subgroup's name alone is
@@ -75,15 +75,15 @@ subgroup is not automatically in its parent, and the other way round.
 **Clients → system-design-store → Client scopes →
 system-design-store-dedicated → Configure a new mapper → Group Membership**.
 
-| Field | Value |
-| :--- | :--- |
-| Name | `groups` |
-| Token Claim Name | `groups` |
-| Full group path | **On** |
-| Add to ID token | **On** |
-| Add to access token | Off |
-| Add to userinfo | On |
-| Add to token introspection | On |
+| Field                      | Value    |
+| :------------------------- | :------- |
+| Name                       | `groups` |
+| Token Claim Name           | `groups` |
+| Full group path            | **On**   |
+| Add to ID token            | **On**   |
+| Add to access token        | Off      |
+| Add to userinfo            | On       |
+| Add to token introspection | On       |
 
 **Add to ID token** is the one that matters. The store never reads the access
 token, and the granting browser checks only the ID token. Groups in any other
@@ -158,10 +158,10 @@ Nothing else changes on the store. Restart it if you set this.
 A member of the workspace opens **File → Documents → Workspace settings →
 Automatic access** and adds the group paths:
 
-| Setting | Example | Meaning |
-| :--- | :--- | :--- |
-| Groups | `/design-team-a` | Anyone whose token lists one of these may join. |
-| Evidence valid for | `24h` (default) | How old a sign-in may be when it is checked. |
+| Setting            | Example          | Meaning                                         |
+| :----------------- | :--------------- | :---------------------------------------------- |
+| Groups             | `/design-team-a` | Anyone whose token lists one of these may join. |
+| Evidence valid for | `24h` (default)  | How old a sign-in may be when it is checked.    |
 
 The editor fills in the issuer and client from the running deployment and
 shows them for confirmation. They are saved inside the workspace's sealed
@@ -172,10 +172,10 @@ document list, next to the titles, so the store cannot read or change them.
 The example realm (`docker/store/keycloak/system-design-realm.json`) already
 has `design-team-a` and `design-team-b`, and three accounts:
 
-| User | Password | Groups |
-| :--- | :--- | :--- |
-| `demo` | `demo` | `/design-team-a` |
-| `otter` | `otter` | `/design-team-a` |
+| User     | Password | Groups           |
+| :------- | :------- | :--------------- |
+| `demo`   | `demo`   | `/design-team-a` |
+| `otter`  | `otter`  | `/design-team-a` |
 | `Badger` | `badger` | `/design-team-b` |
 
 1. Sign in as `demo` and set up the workspace. Add `/design-team-a` under
@@ -183,7 +183,7 @@ has `design-team-a` and `design-team-b`, and three accounts:
 2. Leave that window open. In a private window, sign in as `otter`. Within
    about fifteen seconds the workspace opens, with no button pressed.
 3. In another private window, sign in as `Badger`. They wait, and `demo` sees
-   them under *People in this workspace* with **Give access**, as before.
+   them under _People in this workspace_ with **Give access**, as before.
 
 ## How a grant is checked
 
@@ -197,8 +197,8 @@ nonce = base64url( SHA-256( "system-design/join/v1" ‖ 0x00 ‖ SPKI(public key
 ```
 
 `salt` is 32 random bytes the browser keeps. The provider copies the nonce
-into the ID token it signs, so the token now says: *this person, in these
-groups, holds this key*. The store checks the nonce as it always has, and
+into the ID token it signs, so the token now says: _this person, in these
+groups, holds this key_. The store checks the nonce as it always has, and
 keeps the raw ID token alongside the person's request to join.
 
 **At grant.** A member's browser that holds the workspace key sees the
@@ -210,7 +210,7 @@ all of these hold:
 2. The token's signature verifies against keys fetched **from the issuer
    named in the rule**, not from the store.
 3. `iss` is that issuer and `aud` includes the client named in the rule.
-4. `iat` is within *Evidence valid for*, and not in the future. Expiry
+4. `iat` is within _Evidence valid for_, and not in the future. Expiry
    (`exp`) is not used: ID tokens live for minutes, and a join may be checked
    hours later.
 5. `sub` is the person the store says is asking.
@@ -239,44 +239,64 @@ from members.
 ## Leaving a group
 
 The store re-reads groups at every sign-in. Sessions last eight hours, so
-someone removed from the group loses access to the store **within eight
-hours**, when they next have to sign in and no longer match.
+someone taken out of the group loses access **within eight hours**, when
+they next have to sign in and no longer match. From that moment the store
+refuses them everything that serves the workspace - documents, the index,
+keys, their devices and the relay - even on a session they already had.
+They can still sign in, so putting them back in the group lets them join
+again.
 
-They still hold the workspace key they were given. When the store notices
-someone who joined through a group no longer matches, it marks the workspace
-as needing a new key, and the next member browser to open it
-[rotates the key](/guide/workspaces#losing-a-laptop) automatically. Saved
-work is not re-encrypted and nothing is lost.
+They still hold the workspace key they were given. So when the store removes
+someone, it marks the workspace as needing a new key, and the next member
+browser to have the editor open
+[replaces it](/guide/workspaces#losing-a-laptop) without anyone asking.
+Only one browser does this, even if several are open. Saved work is not
+re-encrypted and nothing is lost; people still in the workspace pick up the
+new key on their own.
 
-For anyone who must lose access now rather than within eight hours - someone
-leaving on bad terms - do both straight away:
+Removal only happens while the rule is on. Turning automatic access off
+removes nobody unless you ask it to.
 
-1. In Keycloak, **disable the user** (or sign them out: **Users →** the user
-   **→ Sessions → Sign out**).
-2. In the editor, remove them under *People in this workspace* and press
-   **Rotate key**.
+### Narrowing the rule
 
-People given access by hand are never removed by a group change.
+When you save a rule that admits fewer people - a group taken out of it, or
+automatic access turned off - the settings ask whether to remove the people
+it no longer admits **now**. Without that, they are removed at their next
+sign-in (or, if the rule is off, not at all). "Now" is judged on the groups
+each person had when they last signed in.
+
+### Someone who must lose access immediately
+
+For someone leaving on bad terms, do both straight away:
+
+1. In the editor, open _People in this workspace_ and press **Remove** next
+   to them. They are refused on their very next request, and the key is
+   replaced.
+2. In Keycloak, **disable the user**, so they cannot sign in and be let back
+   in through the group.
+
+**Remove** works on anyone, however they were let in. Group changes, on the
+other hand, never remove people who were given access by hand.
 
 ## When nobody is online
 
 A grant needs a browser that holds the key, so a newcomer who signs in at
 3 a.m. waits until a member opens the editor. The waiting screen says so:
-*Access will be given automatically when a teammate next opens the editor.*
+_Access will be given automatically when a teammate next opens the editor._
 
-If they wait longer than *Evidence valid for*, their sign-in is too old to
+If they wait longer than _Evidence valid for_, their sign-in is too old to
 check. The waiting screen asks them to sign in again; nothing else is needed.
 
 ## Troubleshooting
 
-| What you see | Likely cause |
-| :--- | :--- |
+| What you see                                          | Likely cause                                                                                                                                                   |
+| :---------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Newcomer waits, members see them with **Give access** | Their token does not match the rule. Compare the rule with **Evaluate → Generated ID token** for that user - usually a path versus a bare name, or a subgroup. |
-| Newcomer waits, members see nothing | The store's `OIDC_GROUPS_CLAIM` does not match the mapper's claim name, so the store does not know which workspace they are for. |
-| Members see *Could not check this sign-in* | The browser could not fetch the signing keys. Run the CORS check in [step 4](#_4-check-the-browser-can-reach-the-signing-keys) from a member's network. |
-| *Sign-in too old to check* | Longer than *Evidence valid for* has passed. The newcomer signs in again. |
-| Worked in the example, not in production | The rule's issuer is the one the **browser** sees (`OIDC_ISSUER`), not `OIDC_INTERNAL_URL`. A token's `iss` never contains the internal name. |
-| Nobody in the group is ever let in | Groups are only in the access token. Turn on **Add to ID token**. |
+| Newcomer waits, members see nothing                   | The store's `OIDC_GROUPS_CLAIM` does not match the mapper's claim name, so the store does not know which workspace they are for.                               |
+| Members see _Could not check this sign-in_            | The browser could not fetch the signing keys. Run the CORS check in [step 4](#_4-check-the-browser-can-reach-the-signing-keys) from a member's network.        |
+| _Sign-in too old to check_                            | Longer than _Evidence valid for_ has passed. The newcomer signs in again.                                                                                      |
+| Worked in the example, not in production              | The rule's issuer is the one the **browser** sees (`OIDC_ISSUER`), not `OIDC_INTERNAL_URL`. A token's `iss` never contains the internal name.                  |
+| Nobody in the group is ever let in                    | Groups are only in the access token. Turn on **Add to ID token**.                                                                                              |
 
 ## Things to decide before turning it on
 

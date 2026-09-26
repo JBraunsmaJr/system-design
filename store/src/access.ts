@@ -94,11 +94,26 @@ export interface AccessStore {
   expireEvidence(cutoff: Date): Promise<number>;
 
   getMembership(workspaceId: string, userId: string): Promise<MembershipRecord | null>;
+  /** Grants, or re-grants: a removed membership is restored. */
   putMembership(
     record: Omit<MembershipRecord, 'grantedAt' | 'removedAt'>,
   ): Promise<MembershipRecord>;
+  listMemberships(workspaceId: string): Promise<MembershipRecord[]>;
+  /** Marks a membership removed. False if it already was, or does
+   * not exist, so a removal is recorded once. */
+  removeMembership(workspaceId: string, userId: string): Promise<boolean>;
+  /** Whether this user has been removed from this workspace. */
+  isRemoved(workspaceId: string, userId: string): Promise<boolean>;
 
-  /** WS14-R32: what each user's groups were at their last sign-in. */
+  /** A removal means the key must be replaced. */
+  setRotationRequired(workspaceId: string): Promise<void>;
+  /** Takes the right to rotate for `ttlMs`, if rotation is required and
+   * nobody else holds it, so exactly one browser rotates. */
+  claimRotation(workspaceId: string, holder: string, ttlMs: number): Promise<boolean>;
+  /** The key has been replaced: clears the flag and the lease. */
+  rotationCompleted(workspaceId: string): Promise<void>;
+
+  /** What each user's groups were at their last sign-in. */
   setLastGroups(userId: string, groups: string[]): Promise<void>;
   getLastGroups(userId: string): Promise<string[] | null>;
 }
@@ -109,6 +124,7 @@ export function createMemoryAccessStore(options: { now?: () => number } = {}): A
   const requests = new Map<string, JoinRequestRecord>();
   const memberships = new Map<string, MembershipRecord>();
   const lastGroups = new Map<string, string[]>();
+  const leases = new Map<string, { holder: string; until: number }>();
   const key = (workspaceId: string, userId: string) => `${workspaceId}\u0000${userId}`;
   const iso = () => new Date(now()).toISOString();
   const copy = <T>(value: T): T => structuredClone(value);
@@ -192,6 +208,35 @@ export function createMemoryAccessStore(options: { now?: () => number } = {}): A
       const stored: MembershipRecord = { ...copy(record), grantedAt: iso(), removedAt: null };
       memberships.set(key(record.workspaceId, record.userId), stored);
       return copy(stored);
+    },
+    async listMemberships(workspaceId) {
+      return [...memberships.values()].filter((m) => m.workspaceId === workspaceId).map(copy);
+    },
+    async removeMembership(workspaceId, userId) {
+      const found = memberships.get(key(workspaceId, userId));
+      if (!found || found.removedAt) return false;
+      found.removedAt = iso();
+      return true;
+    },
+    async isRemoved(workspaceId, userId) {
+      return !!memberships.get(key(workspaceId, userId))?.removedAt;
+    },
+
+    async setRotationRequired(workspaceId) {
+      const rule = rules.get(workspaceId);
+      if (rule) rule.rotationRequired = true;
+    },
+    async claimRotation(workspaceId, holder, ttlMs) {
+      if (!rules.get(workspaceId)?.rotationRequired) return false;
+      const lease = leases.get(workspaceId);
+      if (lease && lease.until > now() && lease.holder !== holder) return false;
+      leases.set(workspaceId, { holder, until: now() + ttlMs });
+      return true;
+    },
+    async rotationCompleted(workspaceId) {
+      const rule = rules.get(workspaceId);
+      if (rule) rule.rotationRequired = false;
+      leases.delete(workspaceId);
     },
 
     async setLastGroups(userId, groups) {

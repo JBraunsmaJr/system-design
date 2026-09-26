@@ -251,3 +251,9 @@ ALTER TABLE users          ADD COLUMN IF NOT EXISTS last_groups_at TIMESTAMPTZ;
 INSERT INTO workspace_memberships (workspace_id, user_id, source)
 SELECT DISTINCT 'default', user_id, 'manual' FROM workspace_keys
 ON CONFLICT (workspace_id, user_id) DO NOTHING;
+
+-- WS14-R34: after a removal, exactly one browser replaces the key. It takes a
+-- short lease first; the lease and the flag clear when the index moves to a
+-- newer key generation.
+ALTER TABLE workspace_access_rules ADD COLUMN IF NOT EXISTS rotation_lease_holder TEXT;
+ALTER TABLE workspace_access_rules ADD COLUMN IF NOT EXISTS rotation_lease_until  TIMESTAMPTZ;

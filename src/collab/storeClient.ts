@@ -824,13 +824,38 @@ export function createStoreClient(options: StoreClientOptions) {
         claim: string;
         groups: string[];
         evidenceMaxAgeSeconds: number;
+        /** WS14-R32: remove, now, members a group let in who no longer
+         * match - rather than at each one's next sign-in. */
+        removeMembers?: boolean;
       },
-    ): Promise<RoutingRule> {
+    ): Promise<RoutingRule & { removed?: number }> {
       const { body } = await request(
         `/v1/workspaces/${encodeURIComponent(workspaceId)}/access-rule`,
         { method: 'PUT', body: JSON.stringify(rule) },
       );
-      return body.rule as RoutingRule;
+      return { ...(body.rule as RoutingRule), removed: (body.removed as number) ?? 0 };
+    },
+
+    /** WS14-R40: removes someone from the workspace now; the key is then
+     * replaced by the next key holder's browser. */
+    async removeMember(userId: string): Promise<void> {
+      await request(`/v1/workspace/members/${encodeURIComponent(userId)}`, { method: 'DELETE' });
+    },
+
+    /**
+     * WS14-R34: asks for the right to replace the workspace key. True for
+     * exactly one browser at a time, and only when a removal requires it.
+     */
+    async claimRotation(workspaceId: string): Promise<boolean> {
+      try {
+        await request(`/v1/workspaces/${encodeURIComponent(workspaceId)}/rotation-lease`, {
+          method: 'POST',
+        });
+        return true;
+      } catch (error) {
+        if (error instanceof StoreClientError && error.status === 409) return false;
+        throw error;
+      }
     },
 
     /**
