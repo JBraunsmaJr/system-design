@@ -3072,24 +3072,32 @@ function App() {
 
   const [isSrdModalOpen, setIsSrdModalOpen] = useState(false);
   const [srdModalData, setSrdModalData] = useState<SrdDataContext | null>(null);
+  const [isGeneratingSrd, setIsGeneratingSrd] = useState(false);
 
   const openSrdModal = useCallback(async () => {
-    let diagramImg: string | undefined;
-    if (nodes.length > 0) {
-      diagramImg = await captureDiagramSnapshot(nodes, 'png');
+    setIsGeneratingSrd(true);
+    try {
+      let diagramImg: string | undefined;
+      if (nodes.length > 0) {
+        diagramImg = await captureDiagramSnapshot(nodes, 'png');
+      }
+      const data = aggregateSrdData({
+        title,
+        nodes,
+        edges,
+        doc: requirementsSnapshot,
+        milestones: milestonesSnapshot,
+        programIncrements: programIncrementsSnapshot,
+        teamDoc: teamSnapshot,
+        diagramImageBase64: diagramImg,
+      });
+      setSrdModalData(data);
+      setIsSrdModalOpen(true);
+    } catch (err) {
+      console.warn('Failed to prepare SRD:', err);
+    } finally {
+      setIsGeneratingSrd(false);
     }
-    const data = aggregateSrdData({
-      title,
-      nodes,
-      edges,
-      doc: requirementsSnapshot,
-      milestones: milestonesSnapshot,
-      programIncrements: programIncrementsSnapshot,
-      teamDoc: teamSnapshot,
-      diagramImageBase64: diagramImg,
-    });
-    setSrdModalData(data);
-    setIsSrdModalOpen(true);
   }, [
     title,
     nodes,
@@ -3101,21 +3109,28 @@ function App() {
   ]);
 
   const onExportSrdMarkdown = useCallback(async () => {
-    let diagramImg: string | undefined;
-    if (nodes.length > 0) {
-      diagramImg = await captureDiagramSnapshot(nodes, 'png');
+    setIsGeneratingSrd(true);
+    try {
+      let diagramImg: string | undefined;
+      if (nodes.length > 0) {
+        diagramImg = await captureDiagramSnapshot(nodes, 'png');
+      }
+      const data = aggregateSrdData({
+        title,
+        nodes,
+        edges,
+        doc: requirementsSnapshot,
+        milestones: milestonesSnapshot,
+        programIncrements: programIncrementsSnapshot,
+        teamDoc: teamSnapshot,
+        diagramImageBase64: diagramImg,
+      });
+      downloadSrdMarkdown(data, DEFAULT_SRD_TEMPLATE);
+    } catch (err) {
+      console.warn('Failed to export SRD markdown:', err);
+    } finally {
+      setIsGeneratingSrd(false);
     }
-    const data = aggregateSrdData({
-      title,
-      nodes,
-      edges,
-      doc: requirementsSnapshot,
-      milestones: milestonesSnapshot,
-      programIncrements: programIncrementsSnapshot,
-      teamDoc: teamSnapshot,
-      diagramImageBase64: diagramImg,
-    });
-    downloadSrdMarkdown(data, DEFAULT_SRD_TEMPLATE);
   }, [
     title,
     nodes,
@@ -3530,7 +3545,18 @@ function App() {
           isOpen={isSrdModalOpen}
           onClose={() => setIsSrdModalOpen(false)}
           srdData={srdModalData}
+          nodes={nodes}
+          selectedNodeIds={selectedNodeIds}
         />
+      )}
+      {isGeneratingSrd && (
+        <div className="srd-loading-overlay">
+          <div className="srd-loading-spinner" />
+          <div className="srd-loading-title">Preparing Solution Requirement Document...</div>
+          <div className="srd-loading-desc">
+            Aggregating requirements, architecture models, and generating snapshot...
+          </div>
+        </div>
       )}
       {toast && (
         <Toast

@@ -123,9 +123,9 @@ export const AGILE_ENGINEERING_TEMPLATE: SrdTemplateConfig = {
   },
   headersAndFooters: {
     classificationBanner: 'ENGINEERING SPECIFICATION',
-    headerLeft: '{{metadata.title}} | Sprint Ready',
+    headerLeft: '{{metadata.title}} | Agile Architecture',
     headerRight: 'Generated: {{metadata.generatedAt}}',
-    footerLeft: 'Agile Architecture & Execution Spec',
+    footerLeft: '© {{metadata.organization}}',
     footerRight: 'Page {{pageNumber}} of {{totalPages}}',
     showPageNumbers: true,
   },
@@ -186,9 +186,9 @@ export const EXECUTIVE_SUMMARY_TEMPLATE: SrdTemplateConfig = {
   },
   headersAndFooters: {
     classificationBanner: 'EXECUTIVE BRIEFING',
-    headerLeft: '{{metadata.title}}',
+    headerLeft: '{{metadata.title}} | Executive Briefing',
     headerRight: 'Status: In Review',
-    footerLeft: 'Strategic Architecture Overview',
+    footerLeft: '© {{metadata.organization}} | Strategic Overview',
     footerRight: 'Page {{pageNumber}} of {{totalPages}}',
     showPageNumbers: true,
   },

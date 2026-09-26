@@ -145,6 +145,26 @@ const mockTeam: TeamDocument = {
   console.log('✓ Test 1: Aggregation and summary stats passed');
 }
 
+// --- Test 1b: Custom Organization & Metadata Overrides ---
+{
+  const srdData = aggregateSrdData({
+    title: 'Acme Architecture SRD',
+    nodes: mockNodes,
+    edges: mockEdges,
+    doc: mockDoc,
+    metadataOverrides: {
+      organization: 'Acme Corp Labs',
+      version: '2.1.0',
+    },
+  });
+
+  assert(srdData.metadata.organization === 'Acme Corp Labs', 'Custom organization override respected');
+  assert(srdData.metadata.version === '2.1.0', 'Custom version override respected');
+  assert(Boolean(srdData.headersAndFooters.footerLeft?.includes('Acme Corp Labs')), 'Organization reflected in footer default');
+
+  console.log('✓ Test 1b: Metadata overrides passed');
+}
+
 // --- Test 2: Traceability Matrix with cross-node and cross-requirement links ---
 {
   const srdData = aggregateSrdData({

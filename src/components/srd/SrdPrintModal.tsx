@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import type { Node } from '@xyflow/react';
 import {
   Printer,
   FileDown,
@@ -11,6 +12,10 @@ import {
   Palette,
   Sliders,
   FileText,
+  Building2,
+  Camera,
+  Trash2,
+  RefreshCw,
 } from 'lucide-react';
 import type { SrdDataContext, SrdTemplateConfig } from '../../domain/srdTypes';
 import {
@@ -21,21 +26,90 @@ import {
   parseTemplateConfig,
 } from '../../domain/srdTemplatePresets';
 import { downloadSrdMarkdown, interpolateTokens } from '../../domain/srdMarkdownExport';
+import {
+  captureDiagramSnapshot,
+  captureSelectedNodesSnapshot,
+  captureCurrentScreenViewport,
+} from '../../domain/imageExport';
 import './SrdPrintModal.css';
+
+interface AutoResizeTextareaProps {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  className?: string;
+  minHeight?: number;
+}
+
+function AutoResizeTextarea({
+  value,
+  onChange,
+  placeholder,
+  className,
+  minHeight = 44,
+}: AutoResizeTextareaProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.max(minHeight, el.scrollHeight + 2)}px`;
+  }, [value, minHeight]);
+
+  return (
+    <textarea
+      ref={textareaRef}
+      className={className}
+      value={value}
+      placeholder={placeholder}
+      onChange={(e) => {
+        onChange(e.target.value);
+        const el = textareaRef.current;
+        if (el) {
+          el.style.height = 'auto';
+          el.style.height = `${Math.max(minHeight, el.scrollHeight + 2)}px`;
+        }
+      }}
+      style={{
+        width: '100%',
+        fontSize: '0.75rem',
+        overflow: 'hidden',
+        resize: 'vertical',
+        minHeight: `${minHeight}px`,
+        boxSizing: 'border-box',
+        lineHeight: '1.45',
+      }}
+    />
+  );
+}
 
 interface SrdPrintModalProps {
   isOpen: boolean;
   onClose: () => void;
   srdData: SrdDataContext;
+  nodes?: Array<Node<Record<string, unknown>>>;
+  selectedNodeIds?: string[];
 }
 
-export function SrdPrintModal({ isOpen, onClose, srdData }: SrdPrintModalProps) {
+export function SrdPrintModal({
+  isOpen,
+  onClose,
+  srdData,
+  nodes = [],
+  selectedNodeIds = [],
+}: SrdPrintModalProps) {
   const [activePresetId, setActivePresetId] = useState<string>('enterprise_formal');
   const [templateConfig, setTemplateConfig] = useState<SrdTemplateConfig>(() =>
     cloneTemplateConfig(DEFAULT_SRD_TEMPLATE),
   );
-  const [activeTab, setActiveTab] = useState<'theme' | 'sections' | 'headers'>('theme');
+  const [currentSrdData, setCurrentSrdData] = useState<SrdDataContext>(srdData);
+  const [activeTab, setActiveTab] = useState<'doc' | 'theme' | 'sections' | 'headers'>('doc');
+  const [snapshotScope, setSnapshotScope] = useState<'all' | 'selected' | 'viewport'>('all');
+  const [isCapturingSnapshot, setIsCapturingSnapshot] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const diagramUploadInputRef = useRef<HTMLInputElement>(null);
 
   // Close on Escape key
   useEffect(() => {
@@ -56,6 +130,40 @@ export function SrdPrintModal({ isOpen, onClose, srdData }: SrdPrintModalProps) 
       setTemplateConfig(cloneTemplateConfig(found));
     }
   };
+
+  const handleMetadataChange = <K extends keyof SrdDataContext['metadata']>(
+    key: K,
+    value: SrdDataContext['metadata'][K],
+  ) => {
+    setCurrentSrdData((prev) => ({
+      ...prev,
+      metadata: {
+        ...prev.metadata,
+        [key]: value,
+      },
+    }));
+  };
+
+  const handleAuthorsStringChange = (str: string) => {
+    const authors = str
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .map((item) => {
+        const match = item.match(/^(.*?)\s*\((.*?)\)$/);
+        if (match) {
+          return { name: match[1].trim(), role: match[2].trim() };
+        }
+        return { name: item, role: 'Author' };
+      });
+    handleMetadataChange('authors', authors);
+  };
+
+  const authorsDisplayString = useMemo(() => {
+    return currentSrdData.metadata.authors
+      .map((a) => (a.role ? `${a.name} (${a.role})` : a.name))
+      .join(', ');
+  }, [currentSrdData.metadata.authors]);
 
   const handleThemeChange = <K extends keyof SrdTemplateConfig['theme']>(
     key: K,
@@ -120,12 +228,70 @@ export function SrdPrintModal({ isOpen, onClose, srdData }: SrdPrintModalProps) 
     setActivePresetId('custom');
   };
 
+  const handleCaptureSnapshot = async () => {
+    setIsCapturingSnapshot(true);
+    try {
+      let dataUrl: string | undefined;
+      if (snapshotScope === 'selected' && selectedNodeIds.length > 0) {
+        dataUrl = await captureSelectedNodesSnapshot(nodes, selectedNodeIds, 'png');
+      } else if (snapshotScope === 'viewport') {
+        dataUrl = await captureCurrentScreenViewport('png');
+      } else {
+        dataUrl = await captureDiagramSnapshot(nodes, 'png');
+      }
+
+      if (dataUrl) {
+        setCurrentSrdData((prev) => ({
+          ...prev,
+          architecture: {
+            ...prev.architecture,
+            diagramImageBase64: dataUrl,
+          },
+        }));
+      }
+    } catch (err) {
+      console.warn('Failed to capture snapshot:', err);
+    } finally {
+      setIsCapturingSnapshot(false);
+    }
+  };
+
+  const handleUploadDiagramImage = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      if (result) {
+        setCurrentSrdData((prev) => ({
+          ...prev,
+          architecture: {
+            ...prev.architecture,
+            diagramImageBase64: result,
+          },
+        }));
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleRemoveDiagram = () => {
+    setCurrentSrdData((prev) => ({
+      ...prev,
+      architecture: {
+        ...prev.architecture,
+        diagramImageBase64: undefined,
+      },
+    }));
+  };
+
   const handlePrint = () => {
     window.print();
   };
 
   const handleDownloadMarkdown = () => {
-    downloadSrdMarkdown(srdData, templateConfig);
+    downloadSrdMarkdown(currentSrdData, templateConfig);
   };
 
   const handleExportTemplateJson = () => {
@@ -180,7 +346,7 @@ export function SrdPrintModal({ isOpen, onClose, srdData }: SrdPrintModalProps) 
             <div>
               <h2 className="srd-modal__title">Solution Requirement Document (SRD) Generator</h2>
               <p className="srd-modal__subtitle">
-                Customize corporate theming, configure sections, and export as Markdown or Print/PDF.
+                Customize corporate metadata, configure sections, and export as Markdown or Print/PDF.
               </p>
             </div>
           </div>
@@ -248,56 +414,209 @@ export function SrdPrintModal({ isOpen, onClose, srdData }: SrdPrintModalProps) 
             </div>
 
             {/* Sidebar Tabs */}
-            <div style={{ display: 'flex', gap: '0.25rem', borderBottom: '1px solid #374151' }}>
+            <div style={{ display: 'flex', gap: '0.2rem', borderBottom: '1px solid #374151' }}>
               <button
                 type="button"
                 className="srd-btn-icon"
                 style={{
                   flex: 1,
-                  padding: '0.5rem',
+                  padding: '0.45rem 0.2rem',
+                  borderRadius: '4px 4px 0 0',
+                  borderBottom: 'none',
+                  backgroundColor: activeTab === 'doc' ? '#1f2937' : 'transparent',
+                  color: activeTab === 'doc' ? '#3b82f6' : '#9ca3af',
+                  fontWeight: 600,
+                  fontSize: '0.75rem',
+                }}
+                onClick={() => setActiveTab('doc')}
+              >
+                <Building2 size={13} style={{ marginRight: 3 }} /> Doc
+              </button>
+              <button
+                type="button"
+                className="srd-btn-icon"
+                style={{
+                  flex: 1,
+                  padding: '0.45rem 0.2rem',
                   borderRadius: '4px 4px 0 0',
                   borderBottom: 'none',
                   backgroundColor: activeTab === 'theme' ? '#1f2937' : 'transparent',
                   color: activeTab === 'theme' ? '#3b82f6' : '#9ca3af',
                   fontWeight: 600,
+                  fontSize: '0.75rem',
                 }}
                 onClick={() => setActiveTab('theme')}
               >
-                <Palette size={14} style={{ marginRight: 4 }} /> Theme
+                <Palette size={13} style={{ marginRight: 3 }} /> Theme
               </button>
               <button
                 type="button"
                 className="srd-btn-icon"
                 style={{
                   flex: 1,
-                  padding: '0.5rem',
+                  padding: '0.45rem 0.2rem',
                   borderRadius: '4px 4px 0 0',
                   borderBottom: 'none',
                   backgroundColor: activeTab === 'sections' ? '#1f2937' : 'transparent',
                   color: activeTab === 'sections' ? '#3b82f6' : '#9ca3af',
                   fontWeight: 600,
+                  fontSize: '0.75rem',
                 }}
                 onClick={() => setActiveTab('sections')}
               >
-                <Sliders size={14} style={{ marginRight: 4 }} /> Sections
+                <Sliders size={13} style={{ marginRight: 3 }} /> Sections
               </button>
               <button
                 type="button"
                 className="srd-btn-icon"
                 style={{
                   flex: 1,
-                  padding: '0.5rem',
+                  padding: '0.45rem 0.2rem',
                   borderRadius: '4px 4px 0 0',
                   borderBottom: 'none',
                   backgroundColor: activeTab === 'headers' ? '#1f2937' : 'transparent',
                   color: activeTab === 'headers' ? '#3b82f6' : '#9ca3af',
                   fontWeight: 600,
+                  fontSize: '0.75rem',
                 }}
                 onClick={() => setActiveTab('headers')}
               >
-                <FileText size={14} style={{ marginRight: 4 }} /> Headers
+                <FileText size={13} style={{ marginRight: 3 }} /> Headers
               </button>
             </div>
+
+            {/* Tab: Document & Metadata */}
+            {activeTab === 'doc' && (
+              <div className="srd-sidebar__field-group">
+                <div className="srd-sidebar__field">
+                  <label className="srd-sidebar__label">Organization</label>
+                  <input
+                    type="text"
+                    className="srd-sidebar__input"
+                    placeholder="e.g. Acme Corporation"
+                    value={currentSrdData.metadata.organization || ''}
+                    onChange={(e) => handleMetadataChange('organization', e.target.value)}
+                  />
+                </div>
+
+                <div className="srd-sidebar__field">
+                  <label className="srd-sidebar__label">Document Title</label>
+                  <input
+                    type="text"
+                    className="srd-sidebar__input"
+                    value={currentSrdData.metadata.title}
+                    onChange={(e) => handleMetadataChange('title', e.target.value)}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '0.5rem', width: '100%' }}>
+                  <div className="srd-sidebar__field" style={{ minWidth: 0 }}>
+                    <label className="srd-sidebar__label">Version</label>
+                    <input
+                      type="text"
+                      className="srd-sidebar__input"
+                      value={currentSrdData.metadata.version}
+                      onChange={(e) => handleMetadataChange('version', e.target.value)}
+                    />
+                  </div>
+                  <div className="srd-sidebar__field" style={{ minWidth: 0 }}>
+                    <label className="srd-sidebar__label">Date</label>
+                    <input
+                      type="text"
+                      className="srd-sidebar__input"
+                      value={currentSrdData.metadata.generatedAt}
+                      onChange={(e) => handleMetadataChange('generatedAt', e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="srd-sidebar__field">
+                  <label className="srd-sidebar__label">Authors / Contributors</label>
+                  <input
+                    type="text"
+                    className="srd-sidebar__input"
+                    placeholder="e.g. Alice (Lead Architect), Bob (Tech Lead)"
+                    value={authorsDisplayString}
+                    onChange={(e) => handleAuthorsStringChange(e.target.value)}
+                  />
+                </div>
+
+                <div className="srd-sidebar__field">
+                  <label className="srd-sidebar__label">Executive Scope & Description</label>
+                  <AutoResizeTextarea
+                    className="srd-sidebar__textarea"
+                    placeholder="Executive scope and solution objectives..."
+                    value={currentSrdData.metadata.description || ''}
+                    onChange={(val) => handleMetadataChange('description', val)}
+                  />
+                </div>
+
+                {/* Specific Diagram Snapshot Controls */}
+                <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid #374151' }}>
+                  <div className="srd-sidebar__section-title">
+                    <Camera size={14} />
+                    <span>Diagram Snapshot</span>
+                  </div>
+
+                  <div className="srd-sidebar__field" style={{ marginBottom: '0.5rem' }}>
+                    <label className="srd-sidebar__label">Capture Target</label>
+                    <select
+                      className="srd-sidebar__select"
+                      value={snapshotScope}
+                      onChange={(e) => setSnapshotScope(e.target.value as 'all' | 'selected' | 'viewport')}
+                    >
+                      <option value="all">Full Diagram (All {nodes.length} Nodes)</option>
+                      <option value="selected" disabled={selectedNodeIds.length === 0}>
+                        Selected Nodes Only ({selectedNodeIds.length} selected)
+                      </option>
+                      <option value="viewport">Current Viewport (Exact Canvas View)</option>
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="srd-btn-icon"
+                      style={{ flex: 1, padding: '0.4rem', gap: '0.3rem', backgroundColor: '#1e3a8a', color: '#ffffff' }}
+                      onClick={handleCaptureSnapshot}
+                      disabled={isCapturingSnapshot}
+                      title="Capture diagram snapshot from canvas"
+                    >
+                      <RefreshCw size={13} className={isCapturingSnapshot ? 'animate-spin' : ''} />
+                      <span>{isCapturingSnapshot ? 'Capturing...' : 'Capture Snapshot'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="srd-btn-icon"
+                      style={{ padding: '0.4rem', gap: '0.3rem' }}
+                      onClick={() => diagramUploadInputRef.current?.click()}
+                      title="Upload custom PNG or SVG image"
+                    >
+                      <Upload size={13} />
+                      <span>Upload</span>
+                    </button>
+                    {currentSrdData.architecture.diagramImageBase64 && (
+                      <button
+                        type="button"
+                        className="srd-btn-icon"
+                        style={{ padding: '0.4rem', color: '#f87171' }}
+                        onClick={handleRemoveDiagram}
+                        title="Remove diagram from document"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
+                    <input
+                      type="file"
+                      ref={diagramUploadInputRef}
+                      style={{ display: 'none' }}
+                      accept="image/png,image/jpeg,image/svg+xml"
+                      onChange={handleUploadDiagramImage}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Tab: Theme */}
             {activeTab === 'theme' && (
@@ -387,8 +706,8 @@ export function SrdPrintModal({ isOpen, onClose, srdData }: SrdPrintModalProps) 
               <div>
                 <div className="srd-sidebar__section-title">Toggle & Order Sections</div>
                 {sortedSections.map((section, idx) => (
-                  <div key={section.id} style={{ marginBottom: '0.75rem' }}>
-                    <div className="srd-sidebar__section-item" style={{ marginBottom: section.enabled ? '0.25rem' : '0' }}>
+                  <div key={section.id} style={{ marginBottom: '0.85rem' }}>
+                    <div className="srd-sidebar__section-item" style={{ marginBottom: section.enabled ? '0.35rem' : '0' }}>
                       <div className="srd-sidebar__section-item-left">
                         <input
                           type="checkbox"
@@ -421,13 +740,11 @@ export function SrdPrintModal({ isOpen, onClose, srdData }: SrdPrintModalProps) 
                       </div>
                     </div>
                     {section.enabled && (
-                      <textarea
+                      <AutoResizeTextarea
                         className="srd-sidebar__textarea"
-                        rows={2}
-                        style={{ width: '100%', fontSize: '0.75rem', resize: 'vertical' }}
                         placeholder="Custom section introduction text..."
                         value={section.customIntroText || ''}
-                        onChange={(e) => handleSectionIntroChange(section.id, e.target.value)}
+                        onChange={(val) => handleSectionIntroChange(section.id, val)}
                       />
                     )}
                   </div>
@@ -443,7 +760,7 @@ export function SrdPrintModal({ isOpen, onClose, srdData }: SrdPrintModalProps) 
                   <input
                     type="text"
                     className="srd-sidebar__input"
-                    placeholder="e.g. CONFIDENTIAL, INTERNAL ONLY"
+                    placeholder="e.g. CONFIDENTIAL — INTERNAL USE ONLY"
                     value={templateConfig.headersAndFooters.classificationBanner || ''}
                     onChange={(e) => handleHeadersChange('classificationBanner', e.target.value)}
                   />
@@ -467,7 +784,7 @@ export function SrdPrintModal({ isOpen, onClose, srdData }: SrdPrintModalProps) 
                   />
                 </div>
                 <div className="srd-sidebar__field">
-                  <label className="srd-sidebar__label">Footer Left</label>
+                  <label className="srd-sidebar__label">Footer Left (Copyright / Classification)</label>
                   <input
                     type="text"
                     className="srd-sidebar__input"
@@ -476,7 +793,7 @@ export function SrdPrintModal({ isOpen, onClose, srdData }: SrdPrintModalProps) 
                   />
                 </div>
                 <div className="srd-sidebar__field">
-                  <label className="srd-sidebar__label">Footer Right</label>
+                  <label className="srd-sidebar__label">Footer Right (Page Count)</label>
                   <input
                     type="text"
                     className="srd-sidebar__input"
@@ -551,30 +868,45 @@ export function SrdPrintModal({ isOpen, onClose, srdData }: SrdPrintModalProps) 
                 <div className="srd-doc__banner">
                   {interpolateTokens(
                     templateConfig.headersAndFooters.classificationBanner,
-                    srdData,
+                    currentSrdData,
                   )}
+                </div>
+              )}
+
+              {/* Document Running Header */}
+              {(templateConfig.headersAndFooters.headerLeft ||
+                templateConfig.headersAndFooters.headerRight) && (
+                <div className="srd-doc__running-header">
+                  <div>
+                    {templateConfig.headersAndFooters.headerLeft &&
+                      interpolateTokens(templateConfig.headersAndFooters.headerLeft, currentSrdData)}
+                  </div>
+                  <div>
+                    {templateConfig.headersAndFooters.headerRight &&
+                      interpolateTokens(templateConfig.headersAndFooters.headerRight, currentSrdData)}
+                  </div>
                 </div>
               )}
 
               {/* Document Header */}
               <div className="srd-doc__header">
-                <h1 className="srd-doc__title">{srdData.metadata.title}</h1>
+                <h1 className="srd-doc__title">{currentSrdData.metadata.title}</h1>
                 <div className="srd-doc__meta-grid">
                   <div className="srd-doc__meta-item">
-                    <strong>Version:</strong> {srdData.metadata.version}
+                    <strong>Version:</strong> {currentSrdData.metadata.version}
                   </div>
                   <div className="srd-doc__meta-item">
-                    <strong>Date:</strong> {srdData.metadata.generatedAt}
+                    <strong>Date:</strong> {currentSrdData.metadata.generatedAt}
                   </div>
-                  {srdData.metadata.organization && (
+                  {currentSrdData.metadata.organization && (
                     <div className="srd-doc__meta-item">
-                      <strong>Organization:</strong> {srdData.metadata.organization}
+                      <strong>Organization:</strong> {currentSrdData.metadata.organization}
                     </div>
                   )}
-                  {srdData.metadata.authors.length > 0 && (
+                  {currentSrdData.metadata.authors.length > 0 && (
                     <div className="srd-doc__meta-item">
                       <strong>Authors:</strong>{' '}
-                      {srdData.metadata.authors
+                      {currentSrdData.metadata.authors
                         .map((a) => (a.role ? `${a.name} (${a.role})` : a.name))
                         .join(', ')}
                     </div>
@@ -584,28 +916,28 @@ export function SrdPrintModal({ isOpen, onClose, srdData }: SrdPrintModalProps) 
 
               {/* Dynamic Sections */}
               {activeSortedSections.map((section) => {
-                const sectionTitle = interpolateTokens(section.title, srdData);
+                const sectionTitle = interpolateTokens(section.title, currentSrdData);
 
                 return (
                   <div key={section.id} className="srd-doc__section">
                     <h2 className="srd-doc__section-title">{sectionTitle}</h2>
                     {section.customIntroText && (
                       <p className="srd-doc__intro-text">
-                        {interpolateTokens(section.customIntroText, srdData)}
+                        {interpolateTokens(section.customIntroText, currentSrdData)}
                       </p>
                     )}
 
                     {section.id === 'executive_summary' && (
                       <div>
-                        {srdData.metadata.description && (
+                        {currentSrdData.metadata.description && (
                           <div style={{ marginBottom: '1.25rem' }}>
                             <h3 className="srd-doc__sub-title">Scope & Objectives</h3>
                             <p style={{ lineHeight: 1.6, color: '#374151' }}>
-                              {srdData.metadata.description}
+                              {currentSrdData.metadata.description}
                             </p>
                           </div>
                         )}
-                        <h3 className="srd-doc__sub-title">Key Metrics</h3>
+                        <h3 className="srd-doc__sub-title">Scope & Architecture Metrics</h3>
                         <table
                           className={`srd-doc__table ${
                             templateConfig.theme.tableDense ? 'srd-doc__table--dense' : ''
@@ -613,32 +945,38 @@ export function SrdPrintModal({ isOpen, onClose, srdData }: SrdPrintModalProps) 
                         >
                           <tbody>
                             <tr>
-                              <td>Total Requirements & Items</td>
-                              <td><strong>{srdData.requirements.summaryStats.total}</strong></td>
+                              <td>Total Requirements & Scope Items</td>
+                              <td><strong>{currentSrdData.requirements.summaryStats.total}</strong></td>
                             </tr>
                             <tr>
-                              <td>Completed Work Items</td>
-                              <td><strong>{srdData.requirements.summaryStats.completed}</strong></td>
+                              <td>Requirement Categories Defined</td>
+                              <td><strong>{currentSrdData.requirements.categories.length}</strong></td>
                             </tr>
                             <tr>
-                              <td>In-Progress Work Items</td>
-                              <td><strong>{srdData.requirements.summaryStats.inProgress}</strong></td>
+                              <td>Total Estimated Scope / Effort</td>
+                              <td>
+                                <strong>
+                                  {currentSrdData.requirements.summaryStats.totalPoints > 0
+                                    ? `${currentSrdData.requirements.summaryStats.totalPoints} pts`
+                                    : 'Unestimated'}
+                                </strong>
+                              </td>
                             </tr>
                             <tr>
-                              <td>Total Estimated Story Points</td>
-                              <td><strong>{srdData.requirements.summaryStats.totalPoints} pts</strong></td>
+                              <td>Architecture Components Defined</td>
+                              <td><strong>{currentSrdData.architecture.components.length}</strong></td>
                             </tr>
                             <tr>
-                              <td>Completed Story Points</td>
-                              <td><strong>{srdData.requirements.summaryStats.completedPoints} pts</strong></td>
+                              <td>Component Interfaces & Data Flows</td>
+                              <td><strong>{currentSrdData.architecture.connections.length}</strong></td>
                             </tr>
                             <tr>
-                              <td>Architecture Components</td>
-                              <td><strong>{srdData.architecture.components.length}</strong></td>
+                              <td>Target Delivery Milestones</td>
+                              <td><strong>{currentSrdData.roadmap.milestones.length}</strong></td>
                             </tr>
                             <tr>
-                              <td>Milestones Defined</td>
-                              <td><strong>{srdData.roadmap.milestones.length}</strong></td>
+                              <td>Planned Delivery Sprints</td>
+                              <td><strong>{currentSrdData.roadmap.sprints.length}</strong></td>
                             </tr>
                           </tbody>
                         </table>
@@ -647,17 +985,17 @@ export function SrdPrintModal({ isOpen, onClose, srdData }: SrdPrintModalProps) 
 
                     {section.id === 'architecture' && (
                       <div>
-                        {srdData.architecture.diagramImageBase64 && (
+                        {currentSrdData.architecture.diagramImageBase64 && (
                           <div className="srd-doc__diagram-container">
                             <img
-                              src={srdData.architecture.diagramImageBase64}
+                              src={currentSrdData.architecture.diagramImageBase64}
                               alt="System Architecture Diagram"
                               className="srd-doc__diagram-img"
                             />
                           </div>
                         )}
                         <h3 className="srd-doc__sub-title">Component Inventory</h3>
-                        {srdData.architecture.components.length === 0 ? (
+                        {currentSrdData.architecture.components.length === 0 ? (
                           <p style={{ color: '#6b7280', fontStyle: 'italic' }}>
                             No architecture components defined in canvas.
                           </p>
@@ -676,7 +1014,7 @@ export function SrdPrintModal({ isOpen, onClose, srdData }: SrdPrintModalProps) 
                               </tr>
                             </thead>
                             <tbody>
-                              {srdData.architecture.components.map((c) => (
+                              {currentSrdData.architecture.components.map((c) => (
                                 <tr key={c.id}>
                                   <td><strong>{c.name}</strong></td>
                                   <td><code>{c.type}</code></td>
@@ -689,7 +1027,7 @@ export function SrdPrintModal({ isOpen, onClose, srdData }: SrdPrintModalProps) 
                         )}
 
                         <h3 className="srd-doc__sub-title">Connections & Data Flows</h3>
-                        {srdData.architecture.connections.length === 0 ? (
+                        {currentSrdData.architecture.connections.length === 0 ? (
                           <p style={{ color: '#6b7280', fontStyle: 'italic' }}>
                             No connections defined between components.
                           </p>
@@ -708,7 +1046,7 @@ export function SrdPrintModal({ isOpen, onClose, srdData }: SrdPrintModalProps) 
                               </tr>
                             </thead>
                             <tbody>
-                              {srdData.architecture.connections.map((conn, i) => (
+                              {currentSrdData.architecture.connections.map((conn, i) => (
                                 <tr key={i}>
                                   <td><strong>{conn.fromName || conn.from}</strong></td>
                                   <td><strong>{conn.toName || conn.to}</strong></td>
@@ -724,13 +1062,13 @@ export function SrdPrintModal({ isOpen, onClose, srdData }: SrdPrintModalProps) 
 
                     {section.id === 'requirements' && (
                       <div>
-                        {srdData.requirements.categories.map((cat) => {
-                          const items = srdData.requirements.itemsByCategory[cat.id] || [];
+                        {currentSrdData.requirements.categories.map((cat) => {
+                          const items = currentSrdData.requirements.itemsByCategory[cat.id] || [];
                           if (items.length === 0) return null;
 
                           return (
                             <div key={cat.id} style={{ marginBottom: '1.5rem' }}>
-                              <h3 className="srd-doc__sub-title" style={{ color: '#2563eb' }}>
+                              <h3 className="srd-doc__sub-title">
                                 Category: {cat.label}
                               </h3>
                               <table
@@ -769,7 +1107,7 @@ export function SrdPrintModal({ isOpen, onClose, srdData }: SrdPrintModalProps) 
 
                     {section.id === 'traceability' && (
                       <div>
-                        {srdData.traceability.length === 0 ? (
+                        {currentSrdData.traceability.length === 0 ? (
                           <p style={{ color: '#6b7280', fontStyle: 'italic' }}>
                             No relationships or architecture linkages established.
                           </p>
@@ -787,7 +1125,7 @@ export function SrdPrintModal({ isOpen, onClose, srdData }: SrdPrintModalProps) 
                               </tr>
                             </thead>
                             <tbody>
-                              {srdData.traceability.map((link, idx) => (
+                              {currentSrdData.traceability.map((link, idx) => (
                                 <tr key={idx}>
                                   <td>
                                     <code>{link.sourceId}</code> ({link.sourceTitle})
@@ -807,7 +1145,7 @@ export function SrdPrintModal({ isOpen, onClose, srdData }: SrdPrintModalProps) 
                     {section.id === 'roadmap' && (
                       <div>
                         <h3 className="srd-doc__sub-title">Milestones</h3>
-                        {srdData.roadmap.milestones.length === 0 ? (
+                        {currentSrdData.roadmap.milestones.length === 0 ? (
                           <p style={{ color: '#6b7280', fontStyle: 'italic' }}>
                             No milestones scheduled.
                           </p>
@@ -826,7 +1164,7 @@ export function SrdPrintModal({ isOpen, onClose, srdData }: SrdPrintModalProps) 
                               </tr>
                             </thead>
                             <tbody>
-                              {srdData.roadmap.milestones.map((m) => (
+                              {currentSrdData.roadmap.milestones.map((m) => (
                                 <tr key={m.id}>
                                   <td><strong>{m.title}</strong></td>
                                   <td><code>{m.type}</code></td>
@@ -839,7 +1177,7 @@ export function SrdPrintModal({ isOpen, onClose, srdData }: SrdPrintModalProps) 
                         )}
 
                         <h3 className="srd-doc__sub-title">Program Increments & Sprints</h3>
-                        {srdData.roadmap.sprints.length === 0 ? (
+                        {currentSrdData.roadmap.sprints.length === 0 ? (
                           <p style={{ color: '#6b7280', fontStyle: 'italic' }}>
                             No sprint iterations planned.
                           </p>
@@ -859,7 +1197,7 @@ export function SrdPrintModal({ isOpen, onClose, srdData }: SrdPrintModalProps) 
                               </tr>
                             </thead>
                             <tbody>
-                              {srdData.roadmap.sprints.map((s) => (
+                              {currentSrdData.roadmap.sprints.map((s) => (
                                 <tr key={s.id}>
                                   <td><strong>{s.piName}</strong></td>
                                   <td>{s.name}</td>
@@ -881,11 +1219,11 @@ export function SrdPrintModal({ isOpen, onClose, srdData }: SrdPrintModalProps) 
               <div className="srd-doc__footer">
                 <div>
                   {templateConfig.headersAndFooters.footerLeft &&
-                    interpolateTokens(templateConfig.headersAndFooters.footerLeft, srdData)}
+                    interpolateTokens(templateConfig.headersAndFooters.footerLeft, currentSrdData)}
                 </div>
                 <div>
                   {templateConfig.headersAndFooters.footerRight &&
-                    interpolateTokens(templateConfig.headersAndFooters.footerRight, srdData)}
+                    interpolateTokens(templateConfig.headersAndFooters.footerRight, currentSrdData)}
                 </div>
               </div>
             </div>

@@ -92,6 +92,45 @@ export async function captureDiagramSnapshot(
   }
 }
 
+/**
+ * Captures specifically the selected nodes, framing the snapshot
+ * tightly around the selection. Falls back to all nodes if selection is empty.
+ */
+export async function captureSelectedNodesSnapshot(
+  allNodes: Node[],
+  selectedNodeIds: string[],
+  format: 'png' | 'svg' = 'png',
+): Promise<string | undefined> {
+  const targetNodes =
+    selectedNodeIds && selectedNodeIds.length > 0
+      ? allNodes.filter((n) => selectedNodeIds.includes(n.id))
+      : allNodes;
+  return captureDiagramSnapshot(targetNodes, format);
+}
+
+/**
+ * Captures the exact currently visible screen viewport of the canvas as seen
+ * by the user (respecting manual pan and zoom positions).
+ */
+export async function captureCurrentScreenViewport(
+  format: 'png' | 'svg' = 'png',
+): Promise<string | undefined> {
+  const containerEl = document.querySelector<HTMLElement>('.react-flow');
+  if (!containerEl) {
+    console.warn("Couldn't find .react-flow container to export.");
+    return undefined;
+  }
+  try {
+    const options = {
+      backgroundColor: EXPORT_BACKGROUND,
+    };
+    return format === 'png' ? toPng(containerEl, options) : toSvg(containerEl, options);
+  } catch (err) {
+    console.warn('Could not capture screen viewport snapshot:', err);
+    return undefined;
+  }
+}
+
 export async function exportDiagramAsSvg(nodes: Node[], title: string): Promise<void> {
   const dataUrl = await captureViewport('svg', nodes);
   downloadDataUrl(dataUrl, `${safeName(title)}.svg`);

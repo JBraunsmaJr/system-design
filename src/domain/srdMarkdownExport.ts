@@ -70,23 +70,17 @@ export function generateSrdMarkdown(data: SrdDataContext, config: SrdTemplateCon
         }
 
         const stats = data.requirements.summaryStats;
-        const completionRate =
-          stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
-        const pointCompletionRate =
-          stats.totalPoints > 0 ? Math.round((stats.completedPoints / stats.totalPoints) * 100) : 0;
 
-        lines.push('### Key Project Metrics', '');
-        lines.push('| Metric | Count / Value |');
-        lines.push('| ------ | ------------- |');
-        lines.push(`| Total Requirements & Items | ${stats.total} |`);
-        lines.push(`| Completed Work Items | ${stats.completed} (${completionRate}%) |`);
-        lines.push(`| In-Progress Work Items | ${stats.inProgress} |`);
-        lines.push(`| Total Estimated Story Points | ${stats.totalPoints} pts |`);
-        lines.push(`| Completed Story Points | ${stats.completedPoints} pts (${pointCompletionRate}%) |`);
-        lines.push(`| Architecture Components | ${data.architecture.components.length} |`);
-        lines.push(`| Interaction Connections | ${data.architecture.connections.length} |`);
-        lines.push(`| Milestones Defined | ${data.roadmap.milestones.length} |`);
-        lines.push(`| Planned Sprints | ${data.roadmap.sprints.length} |`);
+        lines.push('### Scope & Architecture Metrics', '');
+        lines.push('| Metric | Value |');
+        lines.push('| ------ | ----- |');
+        lines.push(`| Total Requirements & Scope Items | ${stats.total} |`);
+        lines.push(`| Requirement Categories Defined | ${data.requirements.categories.length} |`);
+        lines.push(`| Total Estimated Scope / Effort | ${stats.totalPoints > 0 ? `${stats.totalPoints} pts` : 'Unestimated'} |`);
+        lines.push(`| Architecture Components Defined | ${data.architecture.components.length} |`);
+        lines.push(`| Component Interfaces & Data Flows | ${data.architecture.connections.length} |`);
+        lines.push(`| Target Delivery Milestones | ${data.roadmap.milestones.length} |`);
+        lines.push(`| Planned Delivery Sprints | ${data.roadmap.sprints.length} |`);
         lines.push('');
         break;
       }
@@ -133,7 +127,7 @@ export function generateSrdMarkdown(data: SrdDataContext, config: SrdTemplateCon
       case 'requirements': {
         const stats = data.requirements.summaryStats;
         lines.push(
-          `*Summary: ${stats.total} total items | ${stats.completed} completed | ${stats.totalPoints} total story points*`,
+          `*Summary: ${stats.total} total requirements across ${data.requirements.categories.length} categories | ${stats.totalPoints} estimated story points*`,
           '',
         );
 
