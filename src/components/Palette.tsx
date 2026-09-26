@@ -94,7 +94,10 @@ export function Palette() {
     const triggerRect = trigger.getBoundingClientRect();
     const dropdownRect = dropdown.getBoundingClientRect();
 
-    const left = Math.max(8, Math.min(triggerRect.left, window.innerWidth - dropdownRect.width - 8));
+    const left = Math.max(
+      8,
+      Math.min(triggerRect.left, window.innerWidth - dropdownRect.width - 8),
+    );
     const spaceBelow = window.innerHeight - triggerRect.bottom;
     const spaceAbove = triggerRect.top;
     const top =
@@ -114,7 +117,10 @@ export function Palette() {
     const triggerRect = trigger.getBoundingClientRect();
     const dropdownRect = dropdown.getBoundingClientRect();
 
-    const left = Math.max(8, Math.min(triggerRect.left, window.innerWidth - dropdownRect.width - 8));
+    const left = Math.max(
+      8,
+      Math.min(triggerRect.left, window.innerWidth - dropdownRect.width - 8),
+    );
     const spaceBelow = window.innerHeight - triggerRect.bottom;
     const spaceAbove = triggerRect.top;
     const top =
@@ -270,11 +276,7 @@ export function Palette() {
               key={subcategory}
               label={subcategory}
               color={
-                subcategory === 'AWS'
-                  ? '#FF9900'
-                  : subcategory === 'Azure'
-                    ? '#0089D6'
-                    : '#4285F4'
+                subcategory === 'AWS' ? '#FF9900' : subcategory === 'Azure' ? '#0089D6' : '#4285F4'
               }
               dragMimeType={DRAG_MIME_TYPE}
               items={NODE_TYPES.filter(

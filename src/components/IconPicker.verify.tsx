@@ -91,23 +91,50 @@ function assert(condition: boolean, message: string) {
   // AWS Icons
   const awsIcons = globalIconRegistry.searchIcons('aws');
   assert(awsIcons.length > 0, 'registry contains AWS icons');
-  assert(awsIcons.some((i) => i.id === 'aws-lambda'), 'AWS Lambda icon found in registry');
-  assert(awsIcons.some((i) => i.id === 'aws-ec2'), 'AWS EC2 icon found in registry');
-  assert(awsIcons.some((i) => i.id === 'aws-s3'), 'AWS S3 icon found in registry');
+  assert(
+    awsIcons.some((i) => i.id === 'aws-lambda'),
+    'AWS Lambda icon found in registry',
+  );
+  assert(
+    awsIcons.some((i) => i.id === 'aws-ec2'),
+    'AWS EC2 icon found in registry',
+  );
+  assert(
+    awsIcons.some((i) => i.id === 'aws-s3'),
+    'AWS S3 icon found in registry',
+  );
 
   // Azure Icons
   const azureIcons = globalIconRegistry.searchIcons('azure');
   assert(azureIcons.length > 0, 'registry contains Azure icons');
-  assert(azureIcons.some((i) => i.id === 'azure-functions'), 'Azure Functions icon found in registry');
-  assert(azureIcons.some((i) => i.id === 'azure-vm'), 'Azure VM icon found in registry');
-  assert(azureIcons.some((i) => i.id === 'azure-cosmos-db'), 'Azure Cosmos DB icon found in registry');
+  assert(
+    azureIcons.some((i) => i.id === 'azure-functions'),
+    'Azure Functions icon found in registry',
+  );
+  assert(
+    azureIcons.some((i) => i.id === 'azure-vm'),
+    'Azure VM icon found in registry',
+  );
+  assert(
+    azureIcons.some((i) => i.id === 'azure-cosmos-db'),
+    'Azure Cosmos DB icon found in registry',
+  );
 
   // GCP Icons
   const gcpIcons = globalIconRegistry.searchIcons('gcp');
   assert(gcpIcons.length > 0, 'registry contains GCP icons');
-  assert(gcpIcons.some((i) => i.id === 'gcp-cloud-functions'), 'GCP Functions icon found in registry');
-  assert(gcpIcons.some((i) => i.id === 'gcp-compute-engine'), 'GCP Compute Engine icon found in registry');
-  assert(gcpIcons.some((i) => i.id === 'gcp-cloud-storage'), 'GCP Storage icon found in registry');
+  assert(
+    gcpIcons.some((i) => i.id === 'gcp-cloud-functions'),
+    'GCP Functions icon found in registry',
+  );
+  assert(
+    gcpIcons.some((i) => i.id === 'gcp-compute-engine'),
+    'GCP Compute Engine icon found in registry',
+  );
+  assert(
+    gcpIcons.some((i) => i.id === 'gcp-cloud-storage'),
+    'GCP Storage icon found in registry',
+  );
 
   // Category filtering
   const categories = globalIconRegistry.getCategories();

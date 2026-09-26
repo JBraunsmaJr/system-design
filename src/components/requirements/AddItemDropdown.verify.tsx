@@ -8,7 +8,10 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import React from 'react';
 import { AddItemDropdown } from './AddItemDropdown';
 import { TypePicker } from './TypePicker';
-import { BUILT_IN_ITEM_TYPES, BUILT_IN_RELATIONSHIP_TYPES } from '../../domain/requirementsRegistry';
+import {
+  BUILT_IN_ITEM_TYPES,
+  BUILT_IN_RELATIONSHIP_TYPES,
+} from '../../domain/requirementsRegistry';
 import type { RequirementItemType, RequirementsDocument } from '../../domain/requirementsTypes';
 
 let failures = 0;

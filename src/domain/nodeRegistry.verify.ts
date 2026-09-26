@@ -32,7 +32,10 @@ console.log('=== 1. Testing Cloud Category & Labels ===');
 console.log('\n=== 2. Testing Cloud Preset Nodes ===');
 {
   const cloudNodes = NODE_TYPES.filter((n) => n.category === 'cloud');
-  assert(cloudNodes.length >= 20, `At least 20 cloud preset nodes defined (found ${cloudNodes.length})`);
+  assert(
+    cloudNodes.length >= 20,
+    `At least 20 cloud preset nodes defined (found ${cloudNodes.length})`,
+  );
 
   // AWS nodes
   const awsNodes = cloudNodes.filter((n) => n.subcategory === 'AWS');
@@ -44,7 +47,10 @@ console.log('\n=== 2. Testing Cloud Preset Nodes ===');
 
   // Azure nodes
   const azureNodes = cloudNodes.filter((n) => n.subcategory === 'Azure');
-  assert(azureNodes.length >= 6, `At least 6 Azure preset nodes defined (found ${azureNodes.length})`);
+  assert(
+    azureNodes.length >= 6,
+    `At least 6 Azure preset nodes defined (found ${azureNodes.length})`,
+  );
   assert(getNodeType('azure-functions') !== undefined, 'Azure Functions preset node exists');
   assert(getNodeType('azure-vm') !== undefined, 'Azure VM preset node exists');
   assert(getNodeType('azure-blob-storage') !== undefined, 'Azure Blob Storage preset node exists');

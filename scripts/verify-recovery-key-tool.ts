@@ -110,7 +110,9 @@ try {
         'and says plainly that nothing was created',
       );
     } else {
-      console.log('  (symlink creation requires elevated privileges on Windows: half-written test checked in CI instead)');
+      console.log(
+        '  (symlink creation requires elevated privileges on Windows: half-written test checked in CI instead)',
+      );
     }
   }
   if (process.getuid && process.getuid() !== 0) {

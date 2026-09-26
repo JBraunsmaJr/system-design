@@ -38,8 +38,8 @@ screens. Comparing the code is what stops someone substituting their own
 browser for yours; if the codes differ, refuse.
 
 A **different person** signing in is told they are waiting for access.
-Anyone already in the workspace sees them listed under *People in this
-workspace* with a **Give access** button. Pressing it hands them the
+Anyone already in the workspace sees them listed under _People in this
+workspace_ with a **Give access** button. Pressing it hands them the
 workspace key, wrapped so that only they can open it. Their browser picks it
 up within a few seconds.
 
@@ -71,7 +71,7 @@ come back.
 
 Two steps, and both matter:
 
-1. **Revoke the browser.** Under *Browsers with access*, press **Revoke**.
+1. **Revoke the browser.** Under _Browsers with access_, press **Revoke**.
    The workspace stops serving it immediately.
 2. **Rotate the key.** A revoked browser still holds the workspace key it
    already had. **Rotate key** replaces it so that key opens nothing saved
@@ -82,12 +82,12 @@ Revoking alone is not enough, and the editor says so at the point you do it.
 
 ## Getting back in
 
-| Situation | What to use |
-|---|---|
-| New browser, one you already use still works | Approve it from the working browser |
-| Every browser gone, you have your recovery code | The recovery code unseals your keys |
-| Every browser gone and no recovery code | An administrator re-grants access |
-| The workspace itself has lost its keys | The organization's offline recovery key |
+| Situation                                       | What to use                             |
+| ----------------------------------------------- | --------------------------------------- |
+| New browser, one you already use still works    | Approve it from the working browser     |
+| Every browser gone, you have your recovery code | The recovery code unseals your keys     |
+| Every browser gone and no recovery code         | An administrator re-grants access       |
+| The workspace itself has lost its keys          | The organization's offline recovery key |
 
 ### Your recovery code
 
