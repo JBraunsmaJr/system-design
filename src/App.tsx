@@ -3294,6 +3294,7 @@ function App() {
                 }}
                 autoGranted={accessRequests.autoGranted}
                 onDismissAutoGranted={accessRequests.dismissAutoGranted}
+                rotating={accessRequests.rotating}
               />
               <ReactFlowProvider>
                 {isPerfInstrumentationActive() ? (

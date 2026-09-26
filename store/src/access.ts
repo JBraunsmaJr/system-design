@@ -55,7 +55,11 @@ export interface MembershipRecord {
   grantedBy: string | null;
   grantedAt: string;
   removedAt: string | null;
+  /** WS14-R40: why they were removed. */
+  removedCause: RemovalCause | null;
 }
+
+export type RemovalCause = 'sign-in' | 'rule-change' | 'by-member';
 
 export type AccessErrorReason = 'stale' | 'not-found';
 
@@ -96,12 +100,12 @@ export interface AccessStore {
   getMembership(workspaceId: string, userId: string): Promise<MembershipRecord | null>;
   /** Grants, or re-grants: a removed membership is restored. */
   putMembership(
-    record: Omit<MembershipRecord, 'grantedAt' | 'removedAt'>,
+    record: Omit<MembershipRecord, 'grantedAt' | 'removedAt' | 'removedCause'>,
   ): Promise<MembershipRecord>;
   listMemberships(workspaceId: string): Promise<MembershipRecord[]>;
   /** Marks a membership removed. False if it already was, or does
    * not exist, so a removal is recorded once. */
-  removeMembership(workspaceId: string, userId: string): Promise<boolean>;
+  removeMembership(workspaceId: string, userId: string, cause: RemovalCause): Promise<boolean>;
   /** Whether this user has been removed from this workspace. */
   isRemoved(workspaceId: string, userId: string): Promise<boolean>;
 
@@ -205,17 +209,23 @@ export function createMemoryAccessStore(options: { now?: () => number } = {}): A
       return found ? copy(found) : null;
     },
     async putMembership(record) {
-      const stored: MembershipRecord = { ...copy(record), grantedAt: iso(), removedAt: null };
+      const stored: MembershipRecord = {
+        ...copy(record),
+        grantedAt: iso(),
+        removedAt: null,
+        removedCause: null,
+      };
       memberships.set(key(record.workspaceId, record.userId), stored);
       return copy(stored);
     },
     async listMemberships(workspaceId) {
       return [...memberships.values()].filter((m) => m.workspaceId === workspaceId).map(copy);
     },
-    async removeMembership(workspaceId, userId) {
+    async removeMembership(workspaceId, userId, cause) {
       const found = memberships.get(key(workspaceId, userId));
       if (!found || found.removedAt) return false;
       found.removedAt = iso();
+      found.removedCause = cause;
       return true;
     },
     async isRemoved(workspaceId, userId) {

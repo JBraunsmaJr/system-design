@@ -17,11 +17,14 @@ export async function rotateIfRequired(options: {
   workspaceId: string;
   workspaceKey: CryptoKey;
   generation: number;
+  /** Called once this browser has the lease and is about to rotate. */
+  onRotating?: () => void;
 }): Promise<RotationResult | null> {
   const { client, workspaceId } = options;
   const rule = await client.getRoutingRule(workspaceId).catch(() => null);
   if (!rule?.rotationRequired) return null;
   if (!(await client.claimRotation(workspaceId))) return null;
+  options.onRotating?.();
   // The store clears the flag and the lease when the index reaches the new
   // generation, which rotation writes before handing out the new key.
   return rotateWorkspaceKey({

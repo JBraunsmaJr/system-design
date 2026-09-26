@@ -42,6 +42,8 @@ export type StoreClientErrorReason =
   | 'too-large'
   | 'offline'
   | 'unreadable'
+  /** WS14-R31: this person was removed from the workspace. */
+  | 'removed'
   | 'store-error';
 
 export class StoreClientError extends Error {
@@ -189,6 +191,7 @@ export function createStoreClient(options: StoreClientOptions) {
                   'conflict',
                   'quota',
                   'too-large',
+                  'removed',
                 ] as const
               ).includes(error.reason as never)
             ? (error.reason as StoreClientErrorReason)
@@ -507,6 +510,8 @@ export function createStoreClient(options: StoreClientOptions) {
         source?: 'manual' | 'oidc_group';
         matchedGroup?: string | null;
         removedAt?: string | null;
+        /** WS14-R40: why, when they were removed. */
+        removedCause?: 'sign-in' | 'rule-change' | 'by-member' | null;
       }[]
     > {
       const { body } = await request('/v1/workspace/members');
@@ -518,6 +523,7 @@ export function createStoreClient(options: StoreClientOptions) {
         source?: 'manual' | 'oidc_group';
         matchedGroup?: string | null;
         removedAt?: string | null;
+        removedCause?: 'sign-in' | 'rule-change' | 'by-member' | null;
       }[];
     },
 

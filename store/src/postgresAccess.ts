@@ -45,6 +45,7 @@ interface MembershipRow {
   granted_by: string | null;
   granted_at: Date;
   removed_at: Date | null;
+  removed_cause: MembershipRecord['removedCause'];
 }
 
 const toRule = (row: RuleRow): RoutingRule => ({
@@ -80,6 +81,7 @@ const toMembership = (row: MembershipRow): MembershipRecord => ({
   grantedBy: row.granted_by,
   grantedAt: row.granted_at.toISOString(),
   removedAt: row.removed_at?.toISOString() ?? null,
+  removedCause: row.removed_cause ?? null,
 });
 
 export function createPostgresAccessStore(pool: pg.Pool): AccessStore {
@@ -230,7 +232,8 @@ export function createPostgresAccessStore(pool: pg.Pool): AccessStore {
            matched_group = EXCLUDED.matched_group,
            granted_by = EXCLUDED.granted_by,
            granted_at = now(),
-           removed_at = NULL
+           removed_at = NULL,
+           removed_cause = NULL
          RETURNING *`,
         [record.workspaceId, record.userId, record.source, record.matchedGroup, record.grantedBy],
       );
@@ -245,11 +248,11 @@ export function createPostgresAccessStore(pool: pg.Pool): AccessStore {
       return result.rows.map(toMembership);
     },
 
-    async removeMembership(workspaceId, userId) {
+    async removeMembership(workspaceId, userId, cause) {
       const result = await pool.query(
-        `UPDATE workspace_memberships SET removed_at = now()
+        `UPDATE workspace_memberships SET removed_at = now(), removed_cause = $3
           WHERE workspace_id = $1 AND user_id = $2 AND removed_at IS NULL`,
-        [workspaceId, userId],
+        [workspaceId, userId, cause],
       );
       return (result.rowCount ?? 0) > 0;
     },

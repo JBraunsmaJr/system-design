@@ -347,6 +347,16 @@ export function createHttpService(options: HttpServiceOptions): Server {
     return wraps.some((wrap) => wrap.generation === generation);
   }
 
+  /**
+   * For joining: a removed person may still hold the current key until it is
+   * replaced, but they are not a member. Counting them as one would leave a
+   * person put back in the group unable to ask to rejoin until rotation.
+   */
+  async function isCurrentMember(userId: string, workspaceId: string): Promise<boolean> {
+    if (await options.access?.isRemoved(workspaceId, userId)) return false;
+    return holdsCurrentKey(userId, workspaceId);
+  }
+
   /** WS14-R17: evidence, rules and rejections are for key holders only. */
   async function requireKeyHolder(session: Session | null, workspaceId: string): Promise<string> {
     if (!session?.userId) throw new HttpError(401, 'unauthenticated', 'Sign in first.');
@@ -369,7 +379,7 @@ export function createHttpService(options: HttpServiceOptions): Server {
     matchedGroup: string | null,
   ) {
     const access = options.access;
-    if (!access || !(await access.removeMembership(workspaceId, userId))) return;
+    if (!access || !(await access.removeMembership(workspaceId, userId, cause))) return;
     await access.setRotationRequired(workspaceId);
     await record({
       operation: 'membership.removed',
@@ -611,6 +621,7 @@ export function createHttpService(options: HttpServiceOptions): Server {
                     source: membership.source,
                     matchedGroup: membership.matchedGroup,
                     removedAt: membership.removedAt,
+                    removedCause: membership.removedCause,
                   }
                 : {}),
             });
@@ -1762,7 +1773,7 @@ export function createHttpService(options: HttpServiceOptions): Server {
     const results: { workspaceId: string; status: string }[] = [];
     for (const rule of await access.listRules()) {
       if (!rule.enabled || !rule.groups.some((group) => groups.has(group))) continue;
-      if (await holdsCurrentKey(userId, rule.workspaceId)) {
+      if (await isCurrentMember(userId, rule.workspaceId)) {
         results.push({ workspaceId: rule.workspaceId, status: 'member' });
         continue;
       }
@@ -1919,7 +1930,7 @@ export function createHttpService(options: HttpServiceOptions): Server {
       for (const joinRequest of await access.listRequests(workspaceId)) {
         if (joinRequest.status !== 'open' || !joinRequest.idToken) continue;
         if (rule && evidenceExpired(joinRequest.iat, rule.evidenceMaxAgeSeconds)) continue;
-        if (await holdsCurrentKey(joinRequest.userId, workspaceId)) {
+        if (await isCurrentMember(joinRequest.userId, workspaceId)) {
           // Let in some other way meanwhile - by hand, usually.
           await access.closeRequest(workspaceId, joinRequest.userId, 'granted');
           continue;

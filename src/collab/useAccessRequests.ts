@@ -68,6 +68,8 @@ export function useAccessRequests(options: AccessRequestsOptions) {
   const [requests, setRequests] = useState<AccessRequest[]>([]);
   const [granting, setGranting] = useState<string | null>(null);
   const [autoGranted, setAutoGranted] = useState<AutoGrantNotice[]>([]);
+  /** WS14-R40: this browser is replacing the workspace key. */
+  const [rotating, setRotating] = useState(false);
   // WS14: kept for the life of the hook, so the key cache (R21), the rule
   // versions seen (R20) and the quiet period for failures (R27) persist
   // across polls.
@@ -167,13 +169,18 @@ export function useAccessRequests(options: AccessRequestsOptions) {
       // WS14-R34: someone was removed, so the key they hold must stop
       // opening anything new. Not tied to the setting above: letting people
       // in is a choice; locking out people who left is not.
-      const rotated = await rotateIfRequired({
-        client,
-        workspaceId: WORKSPACE_ID,
-        workspaceKey: device.workspaceKey,
-        generation,
-      });
-      if (rotated) announceWorkspaceChange();
+      try {
+        const rotated = await rotateIfRequired({
+          client,
+          workspaceId: WORKSPACE_ID,
+          workspaceKey: device.workspaceKey,
+          generation,
+          onRotating: () => setRotating(true),
+        });
+        if (rotated) announceWorkspaceChange();
+      } finally {
+        setRotating(false);
+      }
     } catch {
       // Unreachable, or signed out. The notice is a convenience: the same
       // requests are in File > Documents whenever this can see them.
@@ -220,5 +227,13 @@ export function useAccessRequests(options: AccessRequestsOptions) {
     setAutoGranted((current) => current.filter((notice) => notice.userId !== userId));
   }, []);
 
-  return { requests, grant, granting, refresh: look, autoGranted, dismissAutoGranted };
+  return {
+    requests,
+    grant,
+    granting,
+    refresh: look,
+    autoGranted,
+    dismissAutoGranted,
+    rotating,
+  };
 }

@@ -7,7 +7,7 @@
  * with nobody reminded they are.
  */
 import { useState } from 'react';
-import { UserCheck, UserPlus, X } from 'lucide-react';
+import { KeyRound, UserCheck, UserPlus, X } from 'lucide-react';
 import type { AccessRequest, AutoGrantNotice } from '../collab/useAccessRequests';
 import { describeRejection } from '../collab/autoGrant';
 
@@ -18,6 +18,8 @@ export interface AccessRequestNoticeProps {
   /** WS14-R39: people this browser just let in automatically. */
   autoGranted?: AutoGrantNotice[];
   onDismissAutoGranted?: (userId: string) => void;
+  /** WS14-R40: this browser is replacing the workspace key. */
+  rotating?: boolean;
 }
 
 const cardStyle = {
@@ -46,10 +48,11 @@ export function AccessRequestNotice({
   onGrant,
   autoGranted = [],
   onDismissAutoGranted,
+  rotating = false,
 }: AccessRequestNoticeProps) {
   const [later, setLater] = useState<Set<string>>(() => new Set());
   const showing = requests.filter((request) => !later.has(request.userId));
-  if (showing.length === 0 && autoGranted.length === 0) return null;
+  if (showing.length === 0 && autoGranted.length === 0 && !rotating) return null;
 
   return (
     <div
@@ -66,6 +69,15 @@ export function AccessRequestNotice({
         maxWidth: 360,
       }}
     >
+      {rotating && (
+        <div className="access-request access-request--rotating" role="status" style={cardStyle}>
+          <KeyRound size={16} aria-hidden="true" />
+          <span className="access-request__text" style={{ flex: 1 }}>
+            Replacing the workspace key, because someone was removed. Keep this tab open for a
+            moment.
+          </span>
+        </div>
+      )}
       {autoGranted.map((notice) => (
         <div
           key={`joined-${notice.userId}`}

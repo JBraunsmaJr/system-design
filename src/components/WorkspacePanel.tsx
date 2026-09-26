@@ -90,6 +90,8 @@ type Phase =
   /** Signed in, with keys of their own, but not yet given the workspace
    * key by anyone who has it (WS7-R8). */
   | 'awaiting-access'
+  /** WS14-R31, R40: taken out of the workspace; the store refuses them. */
+  | 'removed'
   | 'ready'
   | 'error';
 
@@ -101,9 +103,17 @@ interface Member {
   hasAccess: boolean;
   /** WS14-R30: set when a group's rule let them in. */
   matchedGroup?: string | null;
-  /** WS14-R40: when they were removed, if they were. */
+  /** WS14-R40: when they were removed, if they were, and why. */
   removedAt?: string | null;
+  removedCause?: 'sign-in' | 'rule-change' | 'by-member' | null;
 }
+
+/** WS14-R40: why someone was removed, in the member list's words. */
+const REMOVED_BECAUSE = {
+  'sign-in': 'no longer in a group this workspace admits',
+  'rule-change': 'the automatic access rule changed',
+  'by-member': 'removed by a member',
+} as const;
 
 interface PendingDevice {
   deviceId: string;
@@ -188,7 +198,9 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
   const join = useJoinStatus({
     client,
     storeUrl: props.storeUrl,
-    active: phase === 'awaiting-access',
+    // Someone removed can ask to rejoin the same way, once they are back in
+    // a group the workspace admits.
+    active: phase === 'awaiting-access' || phase === 'removed',
   });
 
   const refresh = useCallback(async () => {
@@ -241,6 +253,7 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
                 hasAccess: (member.workspaceKeyGenerations ?? []).includes(generation),
                 matchedGroup: member.source === 'oidc_group' ? member.matchedGroup : null,
                 removedAt: member.removedAt ?? null,
+                removedCause: member.removedCause ?? null,
               })),
           );
           setCanGrant(true);
@@ -266,16 +279,25 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
       } else if (state.status === 'needs-setup') {
         // The person's first browser: it makes the keys.
         setPhase('enrolling');
+      } else if (state.cause instanceof StoreClientError && state.cause.reason === 'removed') {
+        // WS14-R31: not a fault - they were taken out of the workspace.
+        setPhase('removed');
       } else {
         setPhase('error');
         setMessage(state.message ?? null);
       }
       setMessage(null);
     } catch (error) {
+      const removed = error instanceof StoreClientError && error.reason === 'removed';
       setPhase(
-        error instanceof StoreClientError && error.reason === 'offline' ? 'offline' : 'error',
+        removed
+          ? 'removed'
+          : error instanceof StoreClientError && error.reason === 'offline'
+            ? 'offline'
+            : 'error',
       );
-      setMessage(say(error));
+      // The removed screen says it in its own words.
+      setMessage(removed ? null : say(error));
     } finally {
       setBusy(false);
     }
@@ -289,7 +311,8 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
    * closing and reopening the dialog.
    */
   useEffect(() => {
-    if (phase !== 'ready' && phase !== 'awaiting-access') return;
+    // Removed people too: being let back in should show without reopening.
+    if (phase !== 'ready' && phase !== 'awaiting-access' && phase !== 'removed') return;
     const timer = setInterval(() => void refresh(), 5000);
     return () => clearInterval(timer);
   }, [phase, refresh]);
@@ -634,6 +657,32 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
         </div>
       )}
 
+      {phase === 'removed' && (
+        <div className="workspace-panel__removed-notice" style={{ display: 'grid', gap: 6 }}>
+          <p style={{ margin: 0 }}>
+            You are no longer in this workspace, so this browser can no longer open it. If that is a
+            mistake, ask someone in it to give you access again.
+          </p>
+          {join.view === 'waiting' && (
+            <p style={{ margin: 0 }} data-join-view="waiting">
+              You are in a group this workspace admits again, so you will be let back in the next
+              time someone in it has the editor open.
+            </p>
+          )}
+          {join.view !== 'waiting' && join.view !== 'manual' && (
+            <button
+              type="button"
+              className="workspace-panel__sign-in-again"
+              onClick={() => void join.signInAgain()}
+              disabled={busy}
+              style={{ justifySelf: 'start' }}
+            >
+              Back in the group? Sign in again
+            </button>
+          )}
+        </div>
+      )}
+
       {phase === 'awaiting-access' && (
         <div className="workspace-panel__awaiting-access" style={{ display: 'grid', gap: 6 }}>
           {join.view === 'waiting' ? (
@@ -836,8 +885,12 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
                   <Users size={12} />
                   <span style={{ flex: 1 }}>{member.displayName ?? member.userId}</span>
                   {member.removedAt ? (
-                    <span style={{ color: 'var(--text-muted, #9aa3b2)' }}>
+                    <span
+                      style={{ color: 'var(--text-muted, #9aa3b2)' }}
+                      className="workspace-panel__removed"
+                    >
                       removed {new Date(member.removedAt).toLocaleDateString()}
+                      {member.removedCause && ` — ${REMOVED_BECAUSE[member.removedCause]}`}
                     </span>
                   ) : member.hasAccess ? (
                     <>

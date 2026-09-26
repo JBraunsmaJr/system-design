@@ -140,6 +140,11 @@ async function run(name: string, backend: Backend) {
         .some((e) => e.operation === 'membership.removed' && e.detail?.cause === 'sign-in'),
       'the removal is audited, with its cause',
     );
+    check(
+      (await demo.client.listMembers()).find((m) => m.userId === otterId)?.removedCause ===
+        'sign-in',
+      'and the member list says why (R40)',
+    );
 
     console.log('\n=== R31: what a removed member is refused ===');
     const indexKey = await indexKeyFor(workspaceKey);
@@ -182,15 +187,24 @@ async function run(name: string, backend: Backend) {
 
     // -- R34: rotation, by exactly one browser -----------------------------
     console.log('\n=== R34: the key is replaced by exactly one browser ===');
+    let announced = 0;
     const attempts = await Promise.all([
-      rotateIfRequired({ client: demo.client, workspaceId: WORKSPACE, workspaceKey, generation }),
+      rotateIfRequired({
+        client: demo.client,
+        workspaceId: WORKSPACE,
+        workspaceKey,
+        generation,
+        onRotating: () => announced++,
+      }),
       rotateIfRequired({
         client: vole.client,
         workspaceId: WORKSPACE,
         workspaceKey: voleState.workspaceKey!,
         generation,
+        onRotating: () => announced++,
       }),
     ]);
+    check(announced === 1, 'only the browser that rotates says it is replacing the key');
     const winners = attempts.filter((result) => result !== null);
     check(winners.length === 1, 'two browsers try at once; exactly one rotates');
     const rotated = winners[0]!;
@@ -299,6 +313,39 @@ async function run(name: string, backend: Backend) {
       'otter is removed without signing in',
     );
     check(
+      (await backend.access.getMembership(WORKSPACE, otterId))?.removedCause === 'rule-change',
+      'recorded as a rule change',
+    );
+
+    console.log('\n=== Rejoining before the key is replaced ===');
+    {
+      // otter still holds the current key: rotation has not run yet. Being
+      // removed, they must still be able to ask - not be told "member".
+      const otterB = as('otter', ['/design-team-b']);
+      await otterB.signInAt(
+        await signInUrlFor({
+          client: otterB.client,
+          provider: 'oidc',
+          storage: otterB.pending,
+          publishedPublicKey: fromBase64((await otter.client.me()).publicKey!),
+        }),
+      );
+      const ask = await submitJoinRequest(otterB.client, otterB.pending);
+      check(
+        ask.status === 'sent' && ask.requests[0]?.status === 'open',
+        'a removed person in an admitted group can ask again at once',
+      );
+      const back = await grantPass();
+      check(
+        back.granted.some((g) => g.userId === otterId),
+        'and is let back in',
+      );
+      check(
+        !(await backend.access.getMembership(WORKSPACE, otterId))?.removedAt,
+        'the removal is lifted',
+      );
+    }
+    check(
       !(await backend.access.getMembership(WORKSPACE, doraId))?.removedAt,
       'dora, let in by hand, is still untouched',
     );
@@ -335,8 +382,10 @@ async function run(name: string, backend: Backend) {
       (await statusOf(() => demo.client.removeMember(demoId))) === 409,
       'nobody can remove themselves',
     );
+    const stoat = as('stoat', []);
+    await stoat.signInAt(stoat.client.signInUrl('oidc'));
     check(
-      (await statusOf(() => otter.client.removeMember(doraId))) === 403,
+      (await statusOf(() => stoat.client.removeMember(doraId))) === 403,
       'someone without the key cannot remove anyone',
     );
     check((await statusOf(() => dora.client.listDevices())) === 200, 'dora is served before');
@@ -350,6 +399,10 @@ async function run(name: string, backend: Backend) {
         .all()
         .some((e) => e.operation === 'membership.removed' && e.detail?.cause === 'by-member'),
       'the removal is audited as made by a member',
+    );
+    check(
+      (await backend.access.getMembership(WORKSPACE, doraId))?.removedCause === 'by-member',
+      'and recorded as such',
     );
     const fourth = await rotateIfRequired({
       client: demo.client,

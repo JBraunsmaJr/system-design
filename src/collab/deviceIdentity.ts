@@ -59,6 +59,9 @@ export interface DeviceState {
   verificationCode: string | null;
   workspaceKey: CryptoKey | null;
   message?: string;
+  /** The error behind an 'error' status, so a caller can tell a refusal
+   * it understands (such as having been removed, WS14-R31) from a fault. */
+  cause?: unknown;
 }
 
 /** Where the device keypair lives between visits. */
@@ -249,6 +252,7 @@ export async function enrollDevice(options: EnrollOptions): Promise<DeviceState>
       verificationCode: null,
       workspaceKey: null,
       message: String(error),
+      cause: error,
     };
   }
 }

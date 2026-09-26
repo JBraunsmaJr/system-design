@@ -75,14 +75,19 @@ export function useJoinStatus(options: {
         if (submission.reason === 'groups-overage') return setView('overage');
         if (submission.requests.some((request) => request.status === 'evidence-expired'))
           return setView('expired');
-        return setView(submission.requests.length > 0 ? 'waiting' : 'manual');
+        return setView(
+          submission.requests.some((request) => request.status === 'open') ? 'waiting' : 'manual',
+        );
       }
       if (submission.status === 'unsupported') return setView('manual');
       // Nothing sent (no evidence, nothing prepared here, or another key
       // published first). A request may still be open from an earlier
       // visit; if not, a fresh sign-in committing to the published key is
       // what lets them in automatically.
-      if ((await client.myJoinRequests()).length === 0) return setView('can-retry');
+      // Only an open one counts: a request granted long ago (someone since
+      // removed) is history, not something to wait on.
+      const open = (await client.myJoinRequests()).filter((request) => request.status === 'open');
+      if (open.length === 0) return setView('can-retry');
       submitted.current = true;
     }
 

@@ -124,7 +124,9 @@ curl -s -D - -o /dev/null -H "Origin: $EDITOR" \
 ```
 
 Each should print an `access-control-allow-origin` line naming the editor or
-`*`. If either prints nothing:
+`*`. Keycloak 26 sends it on both as soon as the editor's origin is in the
+client's **Web origins** - the example realm already has it. If either prints
+nothing:
 
 1. Add the editor's origin under **Clients → system-design-store → Settings
    → Web origins**, and run the check again.
@@ -184,6 +186,20 @@ has `design-team-a` and `design-team-b`, and three accounts:
    about fifteen seconds the workspace opens, with no button pressed.
 3. In another private window, sign in as `Badger`. They wait, and `demo` sees
    them under _People in this workspace_ with **Give access**, as before.
+
+The same walk-through runs as a test, in a real browser against a real
+Keycloak - `scripts/verify-auto-grant-keycloak.ts`. With Keycloak running
+from `docker/store/compose.yaml` (or any Keycloak 26 with the example realm
+imported on port 8081), and ports 8080 and 8088 free:
+
+```bash
+npx tsx scripts/verify-auto-grant-keycloak.ts
+```
+
+It also takes otter out of the group through Keycloak's admin API, checks
+the store removes them and the key is replaced, then puts them back and
+checks they rejoin from the interface. Without Keycloak it says so and does
+nothing.
 
 ## How a grant is checked
 

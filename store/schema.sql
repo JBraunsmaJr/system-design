@@ -257,3 +257,6 @@ ON CONFLICT (workspace_id, user_id) DO NOTHING;
 -- newer key generation.
 ALTER TABLE workspace_access_rules ADD COLUMN IF NOT EXISTS rotation_lease_holder TEXT;
 ALTER TABLE workspace_access_rules ADD COLUMN IF NOT EXISTS rotation_lease_until  TIMESTAMPTZ;
+
+-- WS14-R40: why a member was removed: sign-in, rule-change or by-member.
+ALTER TABLE workspace_memberships ADD COLUMN IF NOT EXISTS removed_cause TEXT;
