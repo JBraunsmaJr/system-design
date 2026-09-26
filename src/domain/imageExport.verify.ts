@@ -101,6 +101,21 @@ assert(groupBounds.y === 150, 'fallback group minY matches 150');
 assert(groupBounds.width === 320, 'fallback group width defaults to 320');
 assert(groupBounds.height === 220, 'fallback group height defaults to 220');
 
+// Test 5: Styled group with explicit dimensions
+const styledGroup: Node = {
+  id: 'group-styled',
+  type: 'group',
+  position: { x: 50, y: 80 },
+  style: { width: 600, height: 450 },
+  data: { label: 'Cluster' },
+};
+
+const styledBounds = calculateNodesAbsoluteBounds([styledGroup], [styledGroup]);
+assert(styledBounds.x === 50, 'styled group minX matches 50');
+assert(styledBounds.y === 80, 'styled group minY matches 80');
+assert(styledBounds.width === 600, 'styled group width matches 600');
+assert(styledBounds.height === 450, 'styled group height matches 450');
+
 if (failures === 0) {
   console.log('All image export bounds tests passed!');
 } else {

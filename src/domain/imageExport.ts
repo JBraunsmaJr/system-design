@@ -1,6 +1,6 @@
 import { getNodesBounds, getViewportForBounds, type Node } from '@xyflow/react';
 import { toPng, toSvg } from 'html-to-image';
-import { toAbsolutePosition, getDescendantIds } from './graphUtils';
+import { toAbsolutePosition, getDescendantIds, findNodesContainedInRect } from './graphUtils';
 
 const EXPORT_WIDTH = 1600;
 const EXPORT_HEIGHT = 1000;
@@ -188,12 +188,38 @@ export async function captureNodeSubsetSnapshot(
     return undefined;
   }
 
-  // Include descendant nodes if any target node is a group container
+  // Include descendant nodes if any target node is a group container,
+  // as well as any nodes geometrically contained within group boundaries.
   const targetIdSet = new Set<string>(targetNodeIds);
   for (const id of targetNodeIds) {
     const descendants = getDescendantIds(id, allNodes);
     for (const dId of descendants) {
       targetIdSet.add(dId);
+    }
+    const targetNode = allNodes.find((n) => n.id === id);
+    if (targetNode?.type === 'group') {
+      const absPos = toAbsolutePosition(targetNode, allNodes, targetNode.parentId);
+      let groupW = targetNode.measured?.width ?? targetNode.width;
+      let groupH = targetNode.measured?.height ?? targetNode.height;
+      if (groupW == null && targetNode.style?.width != null) {
+        groupW = typeof targetNode.style.width === 'number'
+          ? targetNode.style.width
+          : parseFloat(String(targetNode.style.width));
+      }
+      if (groupH == null && targetNode.style?.height != null) {
+        groupH = typeof targetNode.style.height === 'number'
+          ? targetNode.style.height
+          : parseFloat(String(targetNode.style.height));
+      }
+      const w = groupW && !isNaN(groupW) && groupW > 0 ? groupW : 320;
+      const h = groupH && !isNaN(groupH) && groupH > 0 ? groupH : 220;
+      const contained = findNodesContainedInRect(
+        { x: absPos.x, y: absPos.y, width: w, height: h },
+        allNodes,
+      );
+      for (const cNode of contained) {
+        targetIdSet.add(cNode.id);
+      }
     }
   }
 
@@ -210,7 +236,7 @@ export async function captureNodeSubsetSnapshot(
 
   const width = options?.width ?? 1200;
   const height = options?.height ?? 600;
-  const padding = options?.padding ?? 0.25;
+  const padding = options?.padding ?? 0.06;
   const panOffset = options?.panOffset ?? { x: 0, y: 0 };
   const zoomMultiplier = options?.zoomMultiplier ?? 1.0;
   const format = options?.format ?? 'png';
@@ -219,7 +245,7 @@ export async function captureNodeSubsetSnapshot(
   try {
     const bounds = calculateNodesAbsoluteBounds(targetNodes, allNodes);
 
-    const paddingFraction = Math.max(0, Math.min(0.4, padding));
+    const paddingFraction = Math.max(0, Math.min(0.2, padding));
     const effectiveW = width * (1 - paddingFraction * 2);
     const effectiveH = height * (1 - paddingFraction * 2);
 
@@ -227,8 +253,10 @@ export async function captureNodeSubsetSnapshot(
       effectiveW / bounds.width,
       effectiveH / bounds.height,
     );
-    const clampedBaseZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, baseZoom));
-    const adjustedZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, clampedBaseZoom * zoomMultiplier));
+    const MIN_SUBSET_ZOOM = 0.2;
+    const MAX_SUBSET_ZOOM = 4.0;
+    const clampedBaseZoom = Math.min(MAX_SUBSET_ZOOM, Math.max(MIN_SUBSET_ZOOM, baseZoom));
+    const adjustedZoom = Math.min(MAX_SUBSET_ZOOM, Math.max(MIN_SUBSET_ZOOM, clampedBaseZoom * zoomMultiplier));
 
     const centerX = bounds.x + bounds.width / 2;
     const centerY = bounds.y + bounds.height / 2;

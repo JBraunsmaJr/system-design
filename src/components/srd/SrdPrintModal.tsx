@@ -483,7 +483,7 @@ export function SrdPrintModal({
           zoomMultiplier: zoom,
           width: 1200,
           height: 600,
-          padding: 0.25,
+          padding: 0.06,
         });
         if (dataUrl) {
           setFramingAdjustments((prev) => ({
@@ -632,7 +632,7 @@ export function SrdPrintModal({
           zoomMultiplier: zoom,
           width: 1200,
           height: 600,
-          padding: 0.25,
+          padding: 0.06,
         });
         if (dataUrl) {
           updates[it.id] = { url: dataUrl, framing: { offsetX: pan.x, offsetY: pan.y, zoom } };
@@ -1282,8 +1282,8 @@ export function SrdPrintModal({
                             <input
                               type="range"
                               className="srd-framing-slider"
-                              min="-800"
-                              max="800"
+                              min="-1000"
+                              max="1000"
                               step="10"
                               value={framingPanOffset.x}
                               onPointerDown={() => setIsInteractingWithSlider(true)}
@@ -1299,8 +1299,8 @@ export function SrdPrintModal({
                             <input
                               type="range"
                               className="srd-framing-slider"
-                              min="-600"
-                              max="600"
+                              min="-800"
+                              max="800"
                               step="10"
                               value={framingPanOffset.y}
                               onPointerDown={() => setIsInteractingWithSlider(true)}
@@ -1318,8 +1318,8 @@ export function SrdPrintModal({
                           <input
                             type="range"
                             className="srd-framing-slider"
-                            min="0.2"
-                            max="3.0"
+                            min="0.3"
+                            max="3.5"
                             step="0.05"
                             value={framingZoom}
                             onPointerDown={() => setIsInteractingWithSlider(true)}

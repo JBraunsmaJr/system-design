@@ -3100,7 +3100,7 @@ function App() {
               const snap = await captureNodeSubsetSnapshot(
                 nodes,
                 linkedNodes.map((n) => n.id),
-                { width: 1200, height: 600, padding: 0.25 },
+                { width: 1200, height: 600, padding: 0.06 },
               );
               if (snap) {
                 itemSnapshots[item.id] = snap;
@@ -3160,7 +3160,7 @@ function App() {
               const snap = await captureNodeSubsetSnapshot(
                 nodes,
                 linkedNodes.map((n) => n.id),
-                { width: 1200, height: 600, padding: 0.25 },
+                { width: 1200, height: 600, padding: 0.06 },
               );
               if (snap) {
                 itemSnapshots[item.id] = snap;
