@@ -6,12 +6,20 @@ import { computeFlippedPosition } from '../domain/popoverPosition';
 interface ExportMenuProps {
   onExportPng: () => void;
   onExportSvg: () => void;
+  onExportSrdMarkdown?: () => void;
+  onExportSrdPrint?: () => void;
   disabled?: boolean;
 }
 
-const DROPDOWN_WIDTH = 150;
+const DROPDOWN_WIDTH = 190;
 
-export function ExportMenu({ onExportPng, onExportSvg, disabled }: ExportMenuProps) {
+export function ExportMenu({
+  onExportPng,
+  onExportSvg,
+  onExportSrdMarkdown,
+  onExportSrdPrint,
+  disabled,
+}: ExportMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -131,6 +139,28 @@ export function ExportMenu({ onExportPng, onExportSvg, disabled }: ExportMenuPro
             >
               Download SVG
             </button>
+            {onExportSrdMarkdown && (
+              <button
+                type="button"
+                onClick={() => {
+                  onExportSrdMarkdown();
+                  close();
+                }}
+              >
+                Export SRD (.md)
+              </button>
+            )}
+            {onExportSrdPrint && (
+              <button
+                type="button"
+                onClick={() => {
+                  onExportSrdPrint();
+                  close();
+                }}
+              >
+                Export SRD (PDF / Print)
+              </button>
+            )}
           </div>,
           document.body,
         )}

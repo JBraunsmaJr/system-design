@@ -105,7 +105,12 @@ import {
 } from './collab/localDocument';
 import { undoableStore, undoControllerFor, releaseUndoController } from './collab/undoManager';
 import { downloadRequirementsMarkdown } from './domain/requirementsExport';
-import { exportDiagramAsPng, exportDiagramAsSvg } from './domain/imageExport';
+import { exportDiagramAsPng, exportDiagramAsSvg, captureDiagramSnapshot } from './domain/imageExport';
+import { SrdPrintModal } from './components/srd/SrdPrintModal';
+import { aggregateSrdData } from './domain/srdDataAggregator';
+import { downloadSrdMarkdown } from './domain/srdMarkdownExport';
+import { DEFAULT_SRD_TEMPLATE } from './domain/srdTemplatePresets';
+import type { SrdDataContext } from './domain/srdTypes';
 import type {
   ArchNodeData,
   ArchEdgeData,
@@ -3065,6 +3070,62 @@ function App() {
     exportDiagramAsSvg(nodes, title).catch((err) => window.alert((err as Error).message));
   }, [nodes, title]);
 
+  const [isSrdModalOpen, setIsSrdModalOpen] = useState(false);
+  const [srdModalData, setSrdModalData] = useState<SrdDataContext | null>(null);
+
+  const openSrdModal = useCallback(async () => {
+    let diagramImg: string | undefined;
+    if (nodes.length > 0) {
+      diagramImg = await captureDiagramSnapshot(nodes, 'png');
+    }
+    const data = aggregateSrdData({
+      title,
+      nodes,
+      edges,
+      doc: requirementsSnapshot,
+      milestones: milestonesSnapshot,
+      programIncrements: programIncrementsSnapshot,
+      teamDoc: teamSnapshot,
+      diagramImageBase64: diagramImg,
+    });
+    setSrdModalData(data);
+    setIsSrdModalOpen(true);
+  }, [
+    title,
+    nodes,
+    edges,
+    requirementsSnapshot,
+    milestonesSnapshot,
+    programIncrementsSnapshot,
+    teamSnapshot,
+  ]);
+
+  const onExportSrdMarkdown = useCallback(async () => {
+    let diagramImg: string | undefined;
+    if (nodes.length > 0) {
+      diagramImg = await captureDiagramSnapshot(nodes, 'png');
+    }
+    const data = aggregateSrdData({
+      title,
+      nodes,
+      edges,
+      doc: requirementsSnapshot,
+      milestones: milestonesSnapshot,
+      programIncrements: programIncrementsSnapshot,
+      teamDoc: teamSnapshot,
+      diagramImageBase64: diagramImg,
+    });
+    downloadSrdMarkdown(data, DEFAULT_SRD_TEMPLATE);
+  }, [
+    title,
+    nodes,
+    edges,
+    requirementsSnapshot,
+    milestonesSnapshot,
+    programIncrementsSnapshot,
+    teamSnapshot,
+  ]);
+
   const onExportRequirementsMarkdown = useCallback(() => {
     downloadRequirementsMarkdown(title, requirementsSnapshot);
   }, [title, requirementsSnapshot]);
@@ -3174,6 +3235,8 @@ function App() {
           onToggleScenarioPanel={() => setIsScenarioPanelOpen((v) => !v)}
           onExportPng={onExportPng}
           onExportSvg={onExportSvg}
+          onExportSrdMarkdown={onExportSrdMarkdown}
+          onExportSrdPrint={openSrdModal}
           canExport={nodes.length > 0}
           onUndo={onUndo}
           onRedo={onRedo}
@@ -3462,6 +3525,13 @@ function App() {
         isOpen={isLibraryModalOpen}
         onClose={() => setIsLibraryModalOpen(false)}
       />
+      {isSrdModalOpen && srdModalData && (
+        <SrdPrintModal
+          isOpen={isSrdModalOpen}
+          onClose={() => setIsSrdModalOpen(false)}
+          srdData={srdModalData}
+        />
+      )}
       {toast && (
         <Toast
           key={toast.id}

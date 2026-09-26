@@ -79,6 +79,19 @@ export async function exportDiagramAsPng(nodes: Node[], title: string): Promise<
  * behave like a "clean" vector file in every design tool (e.g. Illustrator).
  * A true vector exporter is a bigger, separate undertaking if that's ever needed.
  */
+export async function captureDiagramSnapshot(
+  nodes: Node[],
+  format: 'png' | 'svg' = 'png',
+): Promise<string | undefined> {
+  if (!nodes || nodes.length === 0) return undefined;
+  try {
+    return await captureViewport(format, nodes);
+  } catch (err) {
+    console.warn('Could not capture diagram snapshot:', err);
+    return undefined;
+  }
+}
+
 export async function exportDiagramAsSvg(nodes: Node[], title: string): Promise<void> {
   const dataUrl = await captureViewport('svg', nodes);
   downloadDataUrl(dataUrl, `${safeName(title)}.svg`);
