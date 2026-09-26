@@ -173,6 +173,58 @@ CREATE TABLE IF NOT EXISTS audit_log (
 CREATE INDEX IF NOT EXISTS audit_at_idx ON audit_log (at DESC);
 CREATE INDEX IF NOT EXISTS audit_doc_idx ON audit_log (doc_id, at DESC);
 
+-- WS14: automatic access from identity-provider groups. None of this decides
+-- a grant - a member's browser does, from the sealed rule and the provider's
+-- own signature. These rows route requests to those browsers, carry the
+-- evidence they check, and remember how each member was let in.
+
+-- WS14-R10: the store's routing copy of each workspace's sealed rule. Used to
+-- list who is waiting and to find members who no longer match; never read
+-- in a grant decision (WS14-R11).
+CREATE TABLE IF NOT EXISTS workspace_access_rules (
+    workspace_id             TEXT PRIMARY KEY,
+    rule_version             INTEGER     NOT NULL,
+    enabled                  BOOLEAN     NOT NULL,
+    claim                    TEXT        NOT NULL,
+    groups                   TEXT[]      NOT NULL,
+    evidence_max_age_seconds INTEGER     NOT NULL,
+    rotation_required        BOOLEAN     NOT NULL DEFAULT FALSE,
+    updated_at               TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- WS14-R14 to R19. One open request per (workspace, user); the raw ID token
+-- is dropped as soon as the request closes or ages out (WS14-R18).
+CREATE TABLE IF NOT EXISTS join_requests (
+    workspace_id      TEXT        NOT NULL,
+    user_id           TEXT        NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
+    id_token          TEXT,
+    evidence_hash     TEXT        NOT NULL,
+    salt              TEXT        NOT NULL,
+    public_key        TEXT        NOT NULL,
+    iat               BIGINT      NOT NULL,
+    status            TEXT        NOT NULL,
+    last_rejection    TEXT,
+    last_rejection_at TIMESTAMPTZ,
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (workspace_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS join_requests_evidence_idx
+    ON join_requests (iat) WHERE id_token IS NOT NULL;
+
+-- WS14-R30: how each member was let in, so a group change removes only the
+-- people a group admitted.
+CREATE TABLE IF NOT EXISTS workspace_memberships (
+    workspace_id  TEXT        NOT NULL,
+    user_id       TEXT        NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
+    source        TEXT        NOT NULL,
+    matched_group TEXT,
+    granted_by    TEXT,
+    granted_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    removed_at    TIMESTAMPTZ,
+    PRIMARY KEY (workspace_id, user_id)
+);
+
 -- Columns added after a deployment may already have created these tables.
 -- Applied every startup, so an existing database catches up without a
 -- separate migration step. A real migration tool arrives with WS8-R9.
@@ -183,3 +235,19 @@ ALTER TABLE devices   ADD COLUMN IF NOT EXISTS wrapped_user_key_wrap BYTEA;
 ALTER TABLE devices   DROP COLUMN IF EXISTS wrapped_user_key;
 ALTER TABLE users     ADD COLUMN IF NOT EXISTS user_public_key BYTEA;
 ALTER TABLE workspace_index ADD COLUMN IF NOT EXISTS generation INTEGER NOT NULL DEFAULT 1;
+-- WS14: evidence on a session that signed in with a key commitment
+-- (WS14-R4), the groups it carried (R6), and last-seen groups (R32).
+ALTER TABLE sessions       ADD COLUMN IF NOT EXISTS id_token       TEXT;
+ALTER TABLE sessions       ADD COLUMN IF NOT EXISTS commitment     TEXT;
+ALTER TABLE sessions       ADD COLUMN IF NOT EXISTS evidence_iat   BIGINT;
+ALTER TABLE sessions       ADD COLUMN IF NOT EXISTS groups         TEXT[];
+ALTER TABLE sessions       ADD COLUMN IF NOT EXISTS groups_overage BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE pending_logins ADD COLUMN IF NOT EXISTS has_commitment BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE users          ADD COLUMN IF NOT EXISTS last_groups    TEXT[];
+ALTER TABLE users          ADD COLUMN IF NOT EXISTS last_groups_at TIMESTAMPTZ;
+
+-- WS14-R30 backfill: everyone who already holds a workspace key was let in
+-- by hand, so no group change can ever remove them (WS14-R35).
+INSERT INTO workspace_memberships (workspace_id, user_id, source)
+SELECT DISTINCT 'default', user_id, 'manual' FROM workspace_keys
+ON CONFLICT (workspace_id, user_id) DO NOTHING;

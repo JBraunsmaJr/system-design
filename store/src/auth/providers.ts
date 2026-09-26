@@ -38,12 +38,31 @@ export interface ProviderConfig {
   tokenUrl?: string;
   userUrl?: string;
   scopes?: string[];
+  /** OIDC only: the ID-token claim holding groups (WS14-R6). Default `groups`. */
+  groupsClaim?: string;
 }
 
 export interface Identity {
   issuer: string;
   subject: string;
   displayName?: string;
+  /** WS14-R6: the groups the verified ID token carried. OIDC only. */
+  groups?: string[];
+  /** WS14-R6: the provider left groups out of the token (Entra overage). */
+  groupsOverage?: boolean;
+  /**
+   * WS14-R4: present only when the sign-in carried a key commitment. The
+   * raw token is kept so a member's browser can check the provider's own
+   * signature later, rather than taking the store's word for anything.
+   */
+  evidence?: JoinEvidenceRecord;
+}
+
+export interface JoinEvidenceRecord {
+  idToken: string;
+  commitment: string;
+  /** Seconds since the epoch, from the token. */
+  iat: number;
 }
 
 /** What a sign-in needs to remember between the redirect out and back. */
@@ -54,6 +73,9 @@ export interface PendingLogin {
   codeVerifier: string;
   redirectUri: string;
   createdAt: number;
+  /** WS14-R3: the nonce is a key commitment the browser supplied, so the
+   * token is kept as evidence when the sign-in completes. */
+  hasCommitment?: boolean;
 }
 
 export interface Provider {
@@ -61,9 +83,22 @@ export interface Provider {
   /** Where to send the browser, plus what to remember. Async because an
    * OIDC provider's authorization endpoint comes from discovery: guessing it
    * from the issuer is wrong for Keycloak, among others. */
-  begin(redirectUri: string): Promise<{ url: string; pending: PendingLogin }>;
+  begin(
+    redirectUri: string,
+    options?: { commitment?: string },
+  ): Promise<{ url: string; pending: PendingLogin }>;
   /** Exchanges the code and returns who signed in. */
   complete(code: string, pending: PendingLogin): Promise<Identity>;
+  /** What the editor needs to pre-fill an access rule (WS14-R12). */
+  describe(): { kind: 'oidc' | 'github'; issuer?: string; clientId: string };
+}
+
+/** WS14-R7: only OIDC produces a signed token a member can check. */
+export class CommitmentUnsupported extends Error {
+  constructor(provider: string) {
+    super(`Automatic access needs an ID token, which ${provider} sign-in does not provide.`);
+    this.name = 'CommitmentUnsupported';
+  }
 }
 
 const base64url = (bytes: Buffer) => bytes.toString('base64url');
@@ -163,15 +198,26 @@ export function createOidcProvider(config: ProviderConfig, fetcher: Fetcher = fe
   return {
     id: config.id,
 
-    async begin(redirectUri) {
+    describe() {
+      return { kind: 'oidc' as const, issuer, clientId: config.clientId };
+    },
+
+    async begin(redirectUri, beginOptions = {}) {
       const document = await discover();
+      // WS14-R3: a key commitment from the browser becomes the nonce, so the
+      // provider signs it into the token. Validated by the caller; checked
+      // again here because this is where it turns into a signed claim.
+      const commitment = beginOptions.commitment;
+      if (commitment !== undefined && !/^[A-Za-z0-9_-]{43}$/.test(commitment))
+        throw new Error('A key commitment must be 43 base64url characters.');
       const pending: PendingLogin = {
         provider: config.id,
         state: randomToken(),
-        nonce: randomToken(),
+        nonce: commitment ?? randomToken(),
         codeVerifier: randomToken(),
         redirectUri,
         createdAt: Date.now(),
+        hasCommitment: commitment !== undefined,
       };
       const challenge = base64url(createHash('sha256').update(pending.codeVerifier).digest());
       const query = new URLSearchParams({
@@ -225,10 +271,28 @@ export function createOidcProvider(config: ProviderConfig, fetcher: Fetcher = fe
           keys: await jwks(),
         });
       }
+      // WS14-R6: groups, from the verified token only.
+      const all = claims as unknown as Record<string, unknown>;
+      const groupsClaim = config.groupsClaim ?? 'groups';
+      const rawGroups = all[groupsClaim];
+      const claimNames = all._claim_names;
+      const groupsOverage =
+        rawGroups === undefined &&
+        !!claimNames &&
+        typeof claimNames === 'object' &&
+        groupsClaim in (claimNames as Record<string, unknown>);
       return {
         issuer,
         subject: claims.sub,
         displayName: claims.name ?? claims.preferred_username ?? undefined,
+        groups: Array.isArray(rawGroups)
+          ? rawGroups.filter((group): group is string => typeof group === 'string')
+          : [],
+        groupsOverage,
+        // WS14-R4: kept only for a sign-in that committed to a key.
+        ...(pending.hasCommitment && typeof claims.iat === 'number'
+          ? { evidence: { idToken: token.id_token, commitment: pending.nonce, iat: claims.iat } }
+          : {}),
       };
     },
   };
@@ -248,7 +312,12 @@ export function createGitHubProvider(config: ProviderConfig, fetcher: Fetcher = 
   return {
     id: config.id,
 
-    async begin(redirectUri) {
+    describe() {
+      return { kind: 'github' as const, clientId: config.clientId };
+    },
+
+    async begin(redirectUri, beginOptions = {}) {
+      if (beginOptions.commitment !== undefined) throw new CommitmentUnsupported('GitHub');
       const pending: PendingLogin = {
         provider: config.id,
         state: randomToken(),

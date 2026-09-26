@@ -191,6 +191,54 @@ console.log('\n=== Retention and limits ===');
   );
 }
 
+console.log('\n=== WS14: automatic access ===');
+{
+  const plain = loadStoreConfig(WORKING);
+  assert(plain.autoAccess === true, 'automatic access is on by default');
+  assert(
+    plain.joinEvidenceRetentionMs === 7 * 86_400_000,
+    'evidence is kept at most 7 days by default',
+  );
+  assert(plain.providers[0].groupsClaim === 'groups', 'groups are read from "groups" by default');
+  assert(/Automatic access: on/.test(describeConfig(plain).join('\n')), 'and startup says so');
+  const tuned = loadStoreConfig({
+    ...WORKING,
+    AUTO_ACCESS: 'off',
+    JOIN_EVIDENCE_RETENTION: '12h',
+    OIDC_GROUPS_CLAIM: 'roles',
+  });
+  assert(tuned.autoAccess === false, 'AUTO_ACCESS=off turns it off');
+  assert(tuned.joinEvidenceRetentionMs === 12 * 3_600_000, 'JOIN_EVIDENCE_RETENTION takes hours');
+  assert(tuned.providers[0].groupsClaim === 'roles', 'OIDC_GROUPS_CLAIM names another claim');
+  assert(/Automatic access: OFF/.test(describeConfig(tuned).join('\n')), 'and off is announced');
+  refuses(
+    { ...WORKING, AUTO_ACCESS: 'maybe' },
+    /AUTO_ACCESS/,
+    'refuses an AUTO_ACCESS that is not on or off',
+  );
+  refuses(
+    { ...WORKING, JOIN_EVIDENCE_RETENTION: '31d' },
+    /at most 30d/,
+    'refuses evidence kept past 30 days',
+  );
+  refuses(
+    { ...WORKING, JOIN_EVIDENCE_RETENTION: 'forever' },
+    /JOIN_EVIDENCE_RETENTION/,
+    'refuses a retention that is not a duration',
+  );
+  refuses({ ...WORKING, JOIN_EVIDENCE_RETENTION: '0d' }, /JOIN_EVIDENCE_RETENTION/, 'refuses zero');
+  const github = loadStoreConfig({
+    PUBLIC_URL: 'https://store.example.gov',
+    AUTH_PROVIDERS: 'github',
+    GITHUB_CLIENT_ID: 'x',
+    GITHUB_CLIENT_SECRET: 'y',
+  });
+  assert(
+    /unavailable - it needs OIDC/.test(describeConfig(github).join('\n')),
+    'a GitHub-only store says automatic access is unavailable',
+  );
+}
+
 if (failures > 0) {
   console.error(`\n${failures} assertion(s) failed`);
   (globalThis as unknown as { process: { exitCode: number } }).process.exitCode = 1;

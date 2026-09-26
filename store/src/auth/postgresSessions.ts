@@ -29,6 +29,11 @@ interface SessionRow {
   user_id: string | null;
   created_at: Date;
   expires_at: Date;
+  id_token: string | null;
+  commitment: string | null;
+  evidence_iat: string | null;
+  groups: string[] | null;
+  groups_overage: boolean;
 }
 
 export function createPostgresSessionStore(
@@ -60,6 +65,17 @@ export function createPostgresSessionStore(
     userId: row.user_id ?? undefined,
     createdAt: row.created_at.getTime(),
     expiresAt: row.expires_at.getTime(),
+    ...(row.groups ? { groups: row.groups } : {}),
+    ...(row.groups_overage ? { groupsOverage: true } : {}),
+    ...(row.id_token && row.commitment && row.evidence_iat !== null
+      ? {
+          evidence: {
+            idToken: row.id_token,
+            commitment: row.commitment,
+            iat: Number(row.evidence_iat),
+          },
+        }
+      : {}),
   });
 
   return {
@@ -67,8 +83,9 @@ export function createPostgresSessionStore(
       await sweep();
       const id = randomBytes(32).toString('base64url');
       const result = await pool.query<SessionRow>(
-        `INSERT INTO sessions (session_id, issuer, subject, display_name, created_at, expires_at)
-         VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+        `INSERT INTO sessions (session_id, issuer, subject, display_name, created_at, expires_at,
+                               id_token, commitment, evidence_iat, groups, groups_overage)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
         [
           id,
           identity.issuer,
@@ -76,6 +93,11 @@ export function createPostgresSessionStore(
           identity.displayName ?? null,
           new Date(now()),
           new Date(now() + ttl),
+          identity.evidence?.idToken ?? null,
+          identity.evidence?.commitment ?? null,
+          identity.evidence?.iat ?? null,
+          identity.groups ?? null,
+          identity.groupsOverage ?? false,
         ],
       );
       return toSession(result.rows[0]);
@@ -103,8 +125,8 @@ export function createPostgresSessionStore(
     async remember(login: PendingLogin) {
       await sweep();
       await pool.query(
-        `INSERT INTO pending_logins (state, provider, nonce, code_verifier, redirect_uri, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
+        `INSERT INTO pending_logins (state, provider, nonce, code_verifier, redirect_uri, created_at, has_commitment)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [
           login.state,
           login.provider,
@@ -112,6 +134,7 @@ export function createPostgresSessionStore(
           login.codeVerifier,
           login.redirectUri,
           new Date(login.createdAt),
+          login.hasCommitment ?? false,
         ],
       );
     },
@@ -126,10 +149,11 @@ export function createPostgresSessionStore(
         code_verifier: string;
         redirect_uri: string;
         created_at: Date;
+        has_commitment: boolean;
       }>(
         `DELETE FROM pending_logins WHERE state = $1
            AND created_at > now() - ($2::int * interval '1 millisecond')
-         RETURNING provider, nonce, code_verifier, redirect_uri, created_at`,
+         RETURNING provider, nonce, code_verifier, redirect_uri, created_at, has_commitment`,
         [state, pendingTtl],
       );
       const row = result.rows[0];
@@ -141,6 +165,7 @@ export function createPostgresSessionStore(
             codeVerifier: row.code_verifier,
             redirectUri: row.redirect_uri,
             createdAt: row.created_at.getTime(),
+            hasCommitment: row.has_commitment,
           }
         : null;
     },

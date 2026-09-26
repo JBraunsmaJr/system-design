@@ -11,7 +11,7 @@
  * or an administrator (WS7-R11 to R13).
  */
 import { randomBytes } from 'crypto';
-import type { Identity, PendingLogin } from './providers.ts';
+import type { Identity, JoinEvidenceRecord, PendingLogin } from './providers.ts';
 
 export const SESSION_COOKIE = 'sd_session';
 
@@ -25,6 +25,12 @@ export interface Session {
   displayName?: string;
   createdAt: number;
   expiresAt: number;
+  /** WS14-R6: the groups the sign-in's ID token carried. */
+  groups?: string[];
+  groupsOverage?: boolean;
+  /** WS14-R4: the raw token and its commitment, for a sign-in that made one.
+   * Never sent back to the browser that owns the session (WS14-R45). */
+  evidence?: JoinEvidenceRecord;
 }
 
 /**
@@ -77,6 +83,9 @@ export function createSessionStore(options: SessionOptions = {}): SessionStore {
         displayName: identity.displayName,
         createdAt: now(),
         expiresAt: now() + ttl,
+        ...(identity.groups ? { groups: [...identity.groups] } : {}),
+        ...(identity.groupsOverage ? { groupsOverage: true } : {}),
+        ...(identity.evidence ? { evidence: { ...identity.evidence } } : {}),
       };
       sessions.set(session.id, session);
       return session;

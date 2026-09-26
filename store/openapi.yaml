@@ -186,3 +186,151 @@ paths:
       summary: Sealed workspace index (planned - WS9-R1)
       parameters: [{ name: wsId, in: path, required: true, schema: { type: string } }]
       responses: { '501': { description: Not implemented yet } }
+
+  # ---------------------------------------------------------------------------
+  # WS14: automatic access from identity-provider groups. None of these routes
+  # grants anything: a member's browser checks the evidence and wraps the key.
+  # Covered end to end by scripts/verify-store-join-requests.ts.
+  # ---------------------------------------------------------------------------
+
+  /auth/{provider}/start:
+    get:
+      summary: Start sign-in; optionally commit to a user key (WS14-R3, R7)
+      parameters:
+        - { name: provider, in: path, required: true, schema: { type: string } }
+        - name: commitment
+          in: query
+          required: false
+          schema: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' }
+          description: |
+            base64url(SHA-256("system-design/join/v1" ‖ 0x00 ‖ SPKI ‖ salt)), sent to
+            the provider as the nonce. Ignored when AUTO_ACCESS=off; refused (400) for
+            providers without ID tokens.
+      responses:
+        '302': { description: To the provider }
+        '400': { description: Malformed commitment, or a provider that cannot carry one }
+
+  /auth/providers:
+    get:
+      summary: Sign-in providers, and what an access rule is pre-filled with (WS14-R12)
+      responses:
+        '200':
+          description: |
+            `providers` keeps its original shape (ids). `providerDetails` adds kind,
+            issuer and clientId; `autoAccess` says whether the feature is on.
+
+  /join-requests:
+    post:
+      summary: Ask to join every workspace whose rule names one of my groups (WS14-R14 to R16)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [salt]
+              properties: { salt: { type: string, description: base64, 32 bytes } }
+      responses:
+        '200':
+          description: |
+            `{ requests: [{ workspaceId, status: open | member | evidence-expired }],
+            reason?: no-matching-rule | groups-overage | auto-access-off }`
+        '409': { description: '`no-evidence` (sign in again) or `no-public-key`' }
+        '422':
+          { description: '`commitment-mismatch`: not the key and salt this sign-in committed to' }
+    get:
+      summary: My own requests' status, without evidence (WS14-R17)
+      responses:
+        { '200': { description: '`{ requests: [{ workspaceId, status, lastRejection }] }`' } }
+
+  /workspaces/{wsId}/join-requests:
+    get:
+      summary: Open requests with their evidence, for key holders only (WS14-R17)
+      parameters: [{ name: wsId, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200':
+          description: |
+            `{ requests: [{ userId, displayName, issuer, subject, publicKey, salt,
+            idToken, evidenceHash, iat, lastRejection, lastRejectionAt }] }`
+        '403': { description: The caller does not hold the current workspace key }
+
+  /workspaces/{wsId}/join-requests/{userId}/rejections:
+    post:
+      summary: Report why a check failed (WS14-R27)
+      parameters:
+        - { name: wsId, in: path, required: true, schema: { type: string } }
+        - { name: userId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+                  enum:
+                    [
+                      rule-missing,
+                      rule-disabled,
+                      rule-rollback,
+                      discovery-failed,
+                      unknown-key,
+                      bad-signature,
+                      bad-alg,
+                      wrong-issuer,
+                      wrong-audience,
+                      too-old,
+                      future-iat,
+                      subject-mismatch,
+                      nonce-mismatch,
+                      no-group-match,
+                      groups-overage,
+                    ]
+      responses: { '204': { description: Recorded }, '404': { description: No such request } }
+
+  /workspaces/{wsId}/access-rule:
+    get:
+      summary: The store's routing copy of the rule (WS14-R10). Never used to grant.
+      parameters: [{ name: wsId, in: path, required: true, schema: { type: string } }]
+      responses: { '200': { description: '`{ rule: RoutingRule | null, autoAccess }`' } }
+    put:
+      summary: Replace the routing copy; newer versions only (WS14-R10)
+      parameters: [{ name: wsId, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ruleVersion, enabled, claim, groups, evidenceMaxAgeSeconds]
+              properties:
+                ruleVersion: { type: integer, minimum: 1 }
+                enabled: { type: boolean }
+                claim: { type: string }
+                groups: { type: array, minItems: 1, maxItems: 50, items: { type: string } }
+                evidenceMaxAgeSeconds: { type: integer, minimum: 300, maximum: 604800 }
+      responses:
+        '200': { description: Stored }
+        '403': { description: Not a key holder, or AUTO_ACCESS=off }
+        '409': { description: '`stale-version`: not newer than the stored rule' }
+
+  /workspace/members/{userId}/key:
+    put:
+      summary: Give a member the workspace key; automatic grants name their evidence (WS14-R26)
+      parameters: [{ name: userId, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [wrappedKey]
+              properties:
+                generation: { type: integer }
+                wrappedKey: { type: string }
+                joinEvidenceHash:
+                  { type: string, description: base64url SHA-256 of the raw ID token checked }
+                matchedGroup: { type: string, description: Recorded only if the rule names it }
+      responses:
+        '204': { description: Granted (repeats of a granted automatic grant also answer 204) }
+        '403': { description: An automatic grant from someone without the current key }
+        '409':
+          { description: '`request-closed`: that request is no longer open on the current key' }

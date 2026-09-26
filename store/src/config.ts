@@ -50,6 +50,11 @@ export interface StoreConfig {
   purgeIntervalMs: number;
   /** Development only: no sign-in at all. */
   allowUnauthenticated: boolean;
+  /** WS14-R36: AUTO_ACCESS. Off stops automatic access at once. */
+  autoAccess: boolean;
+  /** WS14-R18: JOIN_EVIDENCE_RETENTION, the ceiling on keeping a raw ID
+   * token for a join request. */
+  joinEvidenceRetentionMs: number;
 }
 
 export class ConfigError extends Error {}
@@ -123,6 +128,8 @@ export function loadStoreConfig(env: Env = process.env): StoreConfig {
           'the client secret; it stays on the server.',
         ),
         scopes: list(env.OIDC_SCOPES).length ? list(env.OIDC_SCOPES) : undefined,
+        // WS14-R6: the ID-token claim holding groups.
+        groupsClaim: env.OIDC_GROUPS_CLAIM?.trim() || 'groups',
       });
     } else if (id === 'github') {
       providers.push({
@@ -209,6 +216,12 @@ export function loadStoreConfig(env: Env = process.env): StoreConfig {
     throw new ConfigError(`CRYPTO_MODE must be "webcrypto" or "passthrough", not "${cryptoMode}".`);
   }
 
+  const autoAccessRaw = (env.AUTO_ACCESS ?? 'on').trim().toLowerCase();
+  if (autoAccessRaw !== 'on' && autoAccessRaw !== 'off') {
+    throw new ConfigError(`AUTO_ACCESS must be "on" or "off", not "${env.AUTO_ACCESS}".`);
+  }
+  const joinEvidenceRetentionMs = parseEvidenceRetention(env.JOIN_EVIDENCE_RETENTION);
+
   return {
     port: positive(env, 'PORT', 8080),
     databaseUrl: env.DATABASE_URL?.trim() || null,
@@ -226,7 +239,27 @@ export function loadStoreConfig(env: Env = process.env): StoreConfig {
     maxTotalBytes: positive(env, 'MAX_TOTAL_BYTES', Number.POSITIVE_INFINITY),
     purgeIntervalMs: positive(env, 'PURGE_INTERVAL_MINUTES', 60) * 60_000,
     allowUnauthenticated,
+    autoAccess: autoAccessRaw === 'on',
+    joinEvidenceRetentionMs,
   };
+}
+
+const EVIDENCE_UNITS: Record<string, number> = { h: 3_600_000, d: 86_400_000, w: 604_800_000 };
+const EVIDENCE_RETENTION_MAX_MS = 30 * 86_400_000;
+
+/** WS14-R18: `12h`, `7d`, `2w`; default 7d, at most 30d. An ID token names a
+ * person and their groups, so it is kept no longer than it is useful. */
+function parseEvidenceRetention(raw: string | undefined): number {
+  const value = (raw ?? '7d').trim().toLowerCase();
+  const match = /^(\d+)\s*([hdw])$/.exec(value);
+  if (!match || Number(match[1]) === 0)
+    throw new ConfigError(
+      `JOIN_EVIDENCE_RETENTION must be a duration such as 12h, 7d or 2w, not "${raw}".`,
+    );
+  const ms = Number(match[1]) * EVIDENCE_UNITS[match[2]];
+  if (ms > EVIDENCE_RETENTION_MAX_MS)
+    throw new ConfigError(`JOIN_EVIDENCE_RETENTION may be at most 30d, not "${raw}".`);
+  return ms;
 }
 
 /** What the store prints at startup, so an operator can see what it is. */
@@ -263,5 +296,10 @@ export function describeConfig(config: StoreConfig): string[] {
       : config.recoveryPublicKeyPem
         ? "Recovery escrow: configured - every document is also recoverable with the organization's offline key"
         : 'Recovery escrow: NOT CONFIGURED - documents will be refused (WS7-R4). Set RECOVERY_PUBLIC_KEY_FILE.',
+    !config.providers.some((provider) => provider.kind === 'oidc')
+      ? 'Automatic access: unavailable - it needs OIDC sign-in'
+      : config.autoAccess
+        ? `Automatic access: on - groups read from the "${config.providers.find((provider) => provider.kind === 'oidc')?.groupsClaim ?? 'groups'}" claim, sign-in evidence kept at most ${Math.round(config.joinEvidenceRetentionMs / 3_600_000)}h`
+        : 'Automatic access: OFF (AUTO_ACCESS=off) - everyone is let in by hand',
   ];
 }
