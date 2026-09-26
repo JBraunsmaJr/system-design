@@ -48,6 +48,8 @@ export const ENTERPRISE_FORMAL_TEMPLATE: SrdTemplateConfig = {
   name: 'Enterprise Formal',
   description:
     'Full formal specification with classification banner, comprehensive traceability matrix, and revision details.',
+  requirementsLayout: 'table',
+  includeComponentTable: false,
   theme: {
     primaryColor: '#1e3a8a',
     secondaryColor: '#475569',
@@ -113,6 +115,8 @@ export const AGILE_ENGINEERING_TEMPLATE: SrdTemplateConfig = {
   name: 'Agile Engineering',
   description:
     'Engineering-focused brief prioritizing component interfaces, story points, sprint backlog allocations, and dependencies.',
+  requirementsLayout: 'list',
+  includeComponentTable: false,
   theme: {
     primaryColor: '#0f766e',
     secondaryColor: '#334155',
@@ -176,6 +180,8 @@ export const EXECUTIVE_SUMMARY_TEMPLATE: SrdTemplateConfig = {
   name: 'Executive Summary',
   description:
     'High-level overview designed for executive stakeholders with diagrams, business goals, and milestone projections.',
+  requirementsLayout: 'list',
+  includeComponentTable: false,
   theme: {
     primaryColor: '#4c1d95',
     secondaryColor: '#475569',

@@ -120,6 +120,56 @@ const srdData = aggregateSrdData({
   console.log('✓ Test 3: Token interpolation passed');
 }
 
+// --- Test 4: Dual Requirements Rendering (List vs Table) & Snapshots ---
+{
+  const dataWithSnapshots = {
+    ...srdData,
+    requirements: {
+      ...srdData.requirements,
+      itemsByCategory: {
+        ...srdData.requirements.itemsByCategory,
+        'cat-auth': srdData.requirements.itemsByCategory['cat-auth'].map((it) =>
+          it.id === 'REQ-1'
+            ? { ...it, contextSnapshotBase64: 'data:image/png;base64,mockSnap123' }
+            : it,
+        ),
+      },
+    },
+  };
+
+  // 4a. List view
+  const mdList = generateSrdMarkdown(dataWithSnapshots, {
+    ...AGILE_ENGINEERING_TEMPLATE,
+    requirementsLayout: 'list',
+  });
+  assert(mdList.includes('#### REQ-1: OAuth2 Authentication'), 'List view renders H4 item headers');
+  assert(mdList.includes('![Architecture Context for REQ-1](data:image/png;base64,mockSnap123)'), 'List view embeds context snapshot');
+  assert(mdList.includes('*Dependencies & Links:*'), 'List view renders dependency links');
+
+  // 4b. Table view
+  const mdTable = generateSrdMarkdown(dataWithSnapshots, {
+    ...AGILE_ENGINEERING_TEMPLATE,
+    requirementsLayout: 'table',
+  });
+  assert(mdTable.includes('| ID | Title | Type | Status | Points | Sprint | Assignee |'), 'Table view renders GFM table header');
+  assert(mdTable.includes('| `REQ-1` | **OAuth2 Authentication** |'), 'Table view renders row');
+
+  // 4c. Component Inventory Table toggle
+  const mdWithCompTable = generateSrdMarkdown(srdData, {
+    ...ENTERPRISE_FORMAL_TEMPLATE,
+    includeComponentTable: true,
+  });
+  assert(mdWithCompTable.includes('### Component Inventory'), 'Component inventory included when enabled');
+
+  const mdWithoutCompTable = generateSrdMarkdown(srdData, {
+    ...ENTERPRISE_FORMAL_TEMPLATE,
+    includeComponentTable: false,
+  });
+  assert(!mdWithoutCompTable.includes('### Component Inventory'), 'Component inventory omitted when disabled');
+
+  console.log('✓ Test 4: Dual layouts, snapshot embeds, and component table toggle passed');
+}
+
 if (failures > 0) {
   console.error(`\n${failures} check(s) failed`);
 } else {

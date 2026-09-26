@@ -26,6 +26,8 @@ export interface AggregateSrdDataParams {
   programIncrements?: ProgramIncrement[];
   teamDoc?: TeamDocument;
   diagramImageBase64?: string;
+  itemSnapshots?: Record<string, string>;
+  itemFramings?: Record<string, { offsetX: number; offsetY: number; zoom: number }>;
   metadataOverrides?: Partial<SrdDataContext['metadata']>;
   brandingOverrides?: Partial<SrdDataContext['branding']>;
   headersAndFootersOverrides?: Partial<SrdDataContext['headersAndFooters']>;
@@ -264,6 +266,8 @@ export function aggregateSrdData(params: AggregateSrdDataParams): SrdDataContext
       status: itemStatus,
       linkedNodeIds: linkedNodes.map((n) => n.id),
       linkedNodeLabels: linkedNodes.map((n) => n.label),
+      contextSnapshotBase64: params.itemSnapshots?.[item.id],
+      snapshotFraming: params.itemFramings?.[item.id],
     };
 
     const targetCatKey = item.categoryId && categoryMap.has(item.categoryId)

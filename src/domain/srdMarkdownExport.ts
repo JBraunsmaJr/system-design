@@ -91,21 +91,23 @@ export function generateSrdMarkdown(data: SrdDataContext, config: SrdTemplateCon
           lines.push(`![System Architecture Diagram](${data.architecture.diagramImageBase64})`, '');
         }
 
-        lines.push('### Component Inventory', '');
-        if (data.architecture.components.length === 0) {
-          lines.push('*No architectural components defined in diagram.*', '');
-        } else {
-          lines.push('| ID | Component Name | Type | Description | Status | Linked Requirements |');
-          lines.push('| -- | -------------- | ---- | ----------- | ------ | ------------------- |');
-          for (const c of data.architecture.components) {
-            const reqs = c.linkedRequirementIds && c.linkedRequirementIds.length > 0
-              ? c.linkedRequirementIds.join(', ')
-              : '-';
-            lines.push(
-              `| \`${c.id}\` | **${escapeTableCol(c.name)}** | \`${escapeTableCol(c.type)}\` | ${escapeTableCol(c.description)} | ${escapeTableCol(c.status)} | ${escapeTableCol(reqs)} |`,
-            );
+        if (config.includeComponentTable) {
+          lines.push('### Component Inventory', '');
+          if (data.architecture.components.length === 0) {
+            lines.push('*No architectural components defined in diagram.*', '');
+          } else {
+            lines.push('| ID | Component Name | Type | Description | Status | Linked Requirements |');
+            lines.push('| -- | -------------- | ---- | ----------- | ------ | ------------------- |');
+            for (const c of data.architecture.components) {
+              const reqs = c.linkedRequirementIds && c.linkedRequirementIds.length > 0
+                ? c.linkedRequirementIds.join(', ')
+                : '-';
+              lines.push(
+                `| \`${c.id}\` | **${escapeTableCol(c.name)}** | \`${escapeTableCol(c.type)}\` | ${escapeTableCol(c.description)} | ${escapeTableCol(c.status)} | ${escapeTableCol(reqs)} |`,
+              );
+            }
+            lines.push('');
           }
-          lines.push('');
         }
 
         lines.push('### Connections & Protocols', '');
@@ -131,37 +133,59 @@ export function generateSrdMarkdown(data: SrdDataContext, config: SrdTemplateCon
           '',
         );
 
+        const isListLayout = config.requirementsLayout === 'list';
+
         for (const cat of data.requirements.categories) {
           const items = data.requirements.itemsByCategory[cat.id] || [];
           if (items.length === 0) continue;
 
           lines.push(`### Category: ${cat.label}`, '');
-          lines.push('| ID | Title | Type | Status | Points | Sprint | Assignee |');
-          lines.push('| -- | ----- | ---- | ------ | ------ | ------ | -------- |');
-          for (const item of items) {
-            lines.push(
-              `| \`${item.id}\` | **${escapeTableCol(item.title)}** | ${escapeTableCol(item.typeLabel)} | ${escapeTableCol(item.status)} | ${item.points != null ? `${item.points} pts` : '-'} | ${escapeTableCol(item.sprintName)} | ${escapeTableCol(item.assigneeName)} |`,
-            );
-          }
-          lines.push('');
 
-          // Details breakdown for items with descriptions or links
-          for (const item of items) {
-            lines.push(`#### ${item.id}: ${item.title || '(Untitled)'}`, '');
-            const metaParts: string[] = [];
-            metaParts.push(`**Type:** ${item.typeLabel}`);
-            if (item.status) metaParts.push(`**Status:** ${item.status}`);
-            if (item.points != null) metaParts.push(`**Points:** ${item.points}`);
-            if (item.sprintName) metaParts.push(`**Sprint:** ${item.sprintName}`);
-            if (item.assigneeName) metaParts.push(`**Assignee:** ${item.assigneeName}`);
-            lines.push(metaParts.join(' | '), '');
-
-            if (item.linkedNodeLabels && item.linkedNodeLabels.length > 0) {
-              lines.push(`*Linked Components:* ${item.linkedNodeLabels.join(', ')}`, '');
+          if (!isListLayout) {
+            // High-density Table format
+            lines.push('| ID | Title | Type | Status | Points | Sprint | Assignee |');
+            lines.push('| -- | ----- | ---- | ------ | ------ | ------ | -------- |');
+            for (const item of items) {
+              lines.push(
+                `| \`${item.id}\` | **${escapeTableCol(item.title)}** | ${escapeTableCol(item.typeLabel)} | ${escapeTableCol(item.status)} | ${item.points != null ? `${item.points} pts` : '-'} | ${escapeTableCol(item.sprintName)} | ${escapeTableCol(item.assigneeName)} |`,
+              );
             }
+            lines.push('');
+          } else {
+            // Detailed List / Card format with embedded snapshots and links
+            for (const item of items) {
+              lines.push(`#### ${item.id}: ${item.title || '(Untitled)'}`, '');
+              const metaParts: string[] = [];
+              metaParts.push(`**Type:** ${item.typeLabel}`);
+              if (item.status) metaParts.push(`**Status:** ${item.status}`);
+              if (item.points != null) metaParts.push(`**Points:** ${item.points}`);
+              if (item.sprintName) metaParts.push(`**Sprint:** ${item.sprintName}`);
+              if (item.assigneeName) metaParts.push(`**Assignee:** ${item.assigneeName}`);
+              lines.push(metaParts.join(' | '), '');
 
-            if (item.body && item.body.trim()) {
-              lines.push(item.body.trim(), '');
+              if (item.contextSnapshotBase64) {
+                lines.push(`![Architecture Context for ${item.id}](${item.contextSnapshotBase64})`, '');
+              }
+
+              if (item.linkedNodeLabels && item.linkedNodeLabels.length > 0) {
+                lines.push(`*Linked Architecture Components:* ${item.linkedNodeLabels.join(', ')}`, '');
+              }
+
+              if (item.body && item.body.trim()) {
+                lines.push(item.body.trim(), '');
+              }
+
+              const itemLinks = data.traceability.filter(
+                (t) => t.sourceId === item.id || t.targetId === item.id,
+              );
+              if (itemLinks.length > 0) {
+                const linkStrs = itemLinks.map((l) =>
+                  l.sourceId === item.id
+                    ? `${l.relation} \`${l.targetId}\` (${l.targetTitle})`
+                    : `Linked from \`${l.sourceId}\` (${l.sourceTitle}) via ${l.relation}`,
+                );
+                lines.push(`*Dependencies & Links:* ${linkStrs.join('; ')}`, '');
+              }
             }
           }
         }

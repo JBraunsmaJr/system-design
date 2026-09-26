@@ -108,6 +108,80 @@ export async function captureSelectedNodesSnapshot(
   return captureDiagramSnapshot(targetNodes, format);
 }
 
+export interface SubsetSnapshotOptions {
+  padding?: number;
+  width?: number;
+  height?: number;
+  panOffset?: { x: number; y: number };
+  zoomMultiplier?: number;
+  format?: 'png' | 'svg';
+  backgroundColor?: string;
+}
+
+/**
+ * Captures a focused snapshot tightly centered on a subset of nodes (e.g. linked
+ * requirement nodes) with optional pan offsets and zoom adjustment for framing.
+ */
+export async function captureNodeSubsetSnapshot(
+  allNodes: Node[],
+  targetNodeIds: string[],
+  options?: SubsetSnapshotOptions,
+): Promise<string | undefined> {
+  if (!allNodes || allNodes.length === 0 || !targetNodeIds || targetNodeIds.length === 0) {
+    return undefined;
+  }
+  const targetNodes = allNodes.filter((n) => targetNodeIds.includes(n.id));
+  if (targetNodes.length === 0) {
+    return undefined;
+  }
+
+  const viewportEl = document.querySelector<HTMLElement>('.react-flow__viewport');
+  if (!viewportEl) {
+    console.warn("Couldn't find .react-flow__viewport to export node subset.");
+    return undefined;
+  }
+
+  const width = options?.width ?? 1200;
+  const height = options?.height ?? 600;
+  const padding = options?.padding ?? 0.25;
+  const panOffset = options?.panOffset ?? { x: 0, y: 0 };
+  const zoomMultiplier = options?.zoomMultiplier ?? 1.0;
+  const format = options?.format ?? 'png';
+  const bgColor = options?.backgroundColor ?? EXPORT_BACKGROUND;
+
+  try {
+    const bounds = getNodesBounds(targetNodes);
+    const { x, y, zoom } = getViewportForBounds(
+      bounds,
+      width,
+      height,
+      MIN_ZOOM,
+      MAX_ZOOM,
+      padding,
+    );
+
+    const adjustedZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom * zoomMultiplier));
+    const finalX = x + panOffset.x;
+    const finalY = y + panOffset.y;
+
+    const renderOptions = {
+      backgroundColor: bgColor,
+      width,
+      height,
+      style: {
+        width: `${width}px`,
+        height: `${height}px`,
+        transform: `translate(${finalX}px, ${finalY}px) scale(${adjustedZoom})`,
+      },
+    };
+
+    return format === 'png' ? toPng(viewportEl, renderOptions) : toSvg(viewportEl, renderOptions);
+  } catch (err) {
+    console.warn('Could not capture node subset snapshot:', err);
+    return undefined;
+  }
+}
+
 /**
  * Captures the exact currently visible screen viewport of the canvas as seen
  * by the user (respecting manual pan and zoom positions).

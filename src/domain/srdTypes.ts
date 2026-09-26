@@ -17,6 +17,12 @@ export interface RequirementItemViewModel {
   status?: RequirementStatus;
   linkedNodeIds?: string[];
   linkedNodeLabels?: string[];
+  contextSnapshotBase64?: string;
+  snapshotFraming?: {
+    offsetX: number;
+    offsetY: number;
+    zoom: number;
+  };
 }
 
 export interface SrdArchitectureComponent {
@@ -149,6 +155,8 @@ export interface SrdTemplateConfig {
   id: string;
   name: string;
   description?: string;
+  requirementsLayout?: 'table' | 'list';
+  includeComponentTable?: boolean;
   theme: SrdTemplateTheme;
   headersAndFooters: SrdTemplateHeadersAndFooters;
   sections: SrdSectionConfig[];

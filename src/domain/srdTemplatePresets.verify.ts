@@ -37,12 +37,16 @@ console.log('Testing SRD Template Presets & Serialization...');
 {
   const cloned = cloneTemplateConfig(ENTERPRISE_FORMAL_TEMPLATE);
   cloned.name = 'Custom Corporate SRD';
+  cloned.requirementsLayout = 'list';
+  cloned.includeComponentTable = true;
   cloned.theme.primaryColor = '#059669';
 
   const json = serializeTemplateConfig(cloned);
   const restored = parseTemplateConfig(json);
 
   assert(restored.name === 'Custom Corporate SRD', 'Restored name matches');
+  assert(restored.requirementsLayout === 'list', 'Restored requirementsLayout matches');
+  assert(restored.includeComponentTable === true, 'Restored includeComponentTable matches');
   assert(restored.theme.primaryColor === '#059669', 'Restored theme color matches');
   assert(restored.sections.length === 5, 'Restored all sections');
 

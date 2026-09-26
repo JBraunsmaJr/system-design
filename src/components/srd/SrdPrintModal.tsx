@@ -16,8 +16,14 @@ import {
   Camera,
   Trash2,
   RefreshCw,
+  List,
+  Table as TableIcon,
 } from 'lucide-react';
-import type { SrdDataContext, SrdTemplateConfig } from '../../domain/srdTypes';
+import type {
+  RequirementItemViewModel,
+  SrdDataContext,
+  SrdTemplateConfig,
+} from '../../domain/srdTypes';
 import {
   BUILTIN_SRD_TEMPLATES,
   DEFAULT_SRD_TEMPLATE,
@@ -30,6 +36,7 @@ import {
   captureDiagramSnapshot,
   captureSelectedNodesSnapshot,
   captureCurrentScreenViewport,
+  captureNodeSubsetSnapshot,
 } from '../../domain/imageExport';
 import './SrdPrintModal.css';
 
@@ -104,12 +111,105 @@ export function SrdPrintModal({
     cloneTemplateConfig(DEFAULT_SRD_TEMPLATE),
   );
   const [currentSrdData, setCurrentSrdData] = useState<SrdDataContext>(srdData);
-  const [activeTab, setActiveTab] = useState<'doc' | 'theme' | 'sections' | 'headers'>('doc');
+  const [activeTab, setActiveTab] = useState<'doc' | 'theme' | 'sections' | 'snapshots' | 'headers'>('doc');
   const [snapshotScope, setSnapshotScope] = useState<'all' | 'selected' | 'viewport'>('all');
   const [isCapturingSnapshot, setIsCapturingSnapshot] = useState(false);
 
+  // Snapshot Framing State for Requirement Items
+  const [selectedFramingItemId, setSelectedFramingItemId] = useState<string>('');
+  const [framingAdjustments, setFramingAdjustments] = useState<
+    Record<string, { pan: { x: number; y: number }; zoom: number }>
+  >({});
+  const [isCapturingItemSnapshot, setIsCapturingItemSnapshot] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const diagramUploadInputRef = useRef<HTMLInputElement>(null);
+
+  const allRequirementItems = useMemo(() => {
+    const items: RequirementItemViewModel[] = [];
+    for (const catId in currentSrdData.requirements.itemsByCategory) {
+      items.push(...currentSrdData.requirements.itemsByCategory[catId]);
+    }
+    return items;
+  }, [currentSrdData.requirements.itemsByCategory]);
+
+  const linkedRequirementItems = useMemo(() => {
+    return allRequirementItems.filter((i) => i.linkedNodeIds && i.linkedNodeIds.length > 0);
+  }, [allRequirementItems]);
+
+  const effectiveFramingItemId =
+    selectedFramingItemId || linkedRequirementItems[0]?.id || '';
+
+  const currentFramingItem = useMemo(() => {
+    return allRequirementItems.find((i) => i.id === effectiveFramingItemId);
+  }, [allRequirementItems, effectiveFramingItemId]);
+
+  const framingPanOffset = useMemo(() => {
+    if (effectiveFramingItemId && framingAdjustments[effectiveFramingItemId]?.pan) {
+      return framingAdjustments[effectiveFramingItemId].pan;
+    }
+    if (currentFramingItem?.snapshotFraming) {
+      return {
+        x: currentFramingItem.snapshotFraming.offsetX,
+        y: currentFramingItem.snapshotFraming.offsetY,
+      };
+    }
+    return { x: 0, y: 0 };
+  }, [effectiveFramingItemId, framingAdjustments, currentFramingItem]);
+
+  const framingZoom = useMemo(() => {
+    if (effectiveFramingItemId && framingAdjustments[effectiveFramingItemId]?.zoom != null) {
+      return framingAdjustments[effectiveFramingItemId].zoom;
+    }
+    if (currentFramingItem?.snapshotFraming) {
+      return currentFramingItem.snapshotFraming.zoom;
+    }
+    return 1.0;
+  }, [effectiveFramingItemId, framingAdjustments, currentFramingItem]);
+
+  const setFramingPanX = (x: number) => {
+    if (!effectiveFramingItemId) return;
+    setFramingAdjustments((prev) => ({
+      ...prev,
+      [effectiveFramingItemId]: {
+        pan: { x, y: prev[effectiveFramingItemId]?.pan?.y ?? framingPanOffset.y },
+        zoom: prev[effectiveFramingItemId]?.zoom ?? framingZoom,
+      },
+    }));
+  };
+
+  const setFramingPanY = (y: number) => {
+    if (!effectiveFramingItemId) return;
+    setFramingAdjustments((prev) => ({
+      ...prev,
+      [effectiveFramingItemId]: {
+        pan: { x: prev[effectiveFramingItemId]?.pan?.x ?? framingPanOffset.x, y },
+        zoom: prev[effectiveFramingItemId]?.zoom ?? framingZoom,
+      },
+    }));
+  };
+
+  const setFramingZoomScale = (zoom: number) => {
+    if (!effectiveFramingItemId) return;
+    setFramingAdjustments((prev) => ({
+      ...prev,
+      [effectiveFramingItemId]: {
+        pan: prev[effectiveFramingItemId]?.pan ?? framingPanOffset,
+        zoom,
+      },
+    }));
+  };
+
+  const resetFraming = () => {
+    if (!effectiveFramingItemId) return;
+    setFramingAdjustments((prev) => ({
+      ...prev,
+      [effectiveFramingItemId]: {
+        pan: { x: 0, y: 0 },
+        zoom: 1.0,
+      },
+    }));
+  };
 
   // Close on Escape key
   useEffect(() => {
@@ -324,6 +424,151 @@ export function SrdPrintModal({
     e.target.value = '';
   };
 
+  const handleLayoutChange = (layout: 'table' | 'list') => {
+    setTemplateConfig((prev) => ({
+      ...prev,
+      requirementsLayout: layout,
+    }));
+    setActivePresetId('custom');
+  };
+
+  const handleToggleComponentTable = (enabled: boolean) => {
+    setTemplateConfig((prev) => ({
+      ...prev,
+      includeComponentTable: enabled,
+    }));
+    setActivePresetId('custom');
+  };
+
+  const handleCaptureItemSnapshot = async (
+    targetItem?: RequirementItemViewModel,
+    panOverride?: { x: number; y: number },
+    zoomOverride?: number,
+  ) => {
+    const item = targetItem || currentFramingItem;
+    if (!item || !item.linkedNodeIds || item.linkedNodeIds.length === 0) return;
+    setIsCapturingItemSnapshot(true);
+    try {
+      const pan = panOverride || framingPanOffset;
+      const zoom = zoomOverride != null ? zoomOverride : framingZoom;
+      const dataUrl = await captureNodeSubsetSnapshot(nodes, item.linkedNodeIds, {
+        panOffset: pan,
+        zoomMultiplier: zoom,
+        width: 1200,
+        height: 600,
+        padding: 0.25,
+      });
+      if (dataUrl) {
+        setCurrentSrdData((prev) => {
+          const nextItemsByCategory = { ...prev.requirements.itemsByCategory };
+          for (const catId in nextItemsByCategory) {
+            nextItemsByCategory[catId] = nextItemsByCategory[catId].map((it) => {
+              if (it.id === item.id) {
+                return {
+                  ...it,
+                  contextSnapshotBase64: dataUrl,
+                  snapshotFraming: { offsetX: pan.x, offsetY: pan.y, zoom },
+                };
+              }
+              return it;
+            });
+          }
+          return {
+            ...prev,
+            requirements: {
+              ...prev.requirements,
+              itemsByCategory: nextItemsByCategory,
+            },
+          };
+        });
+      }
+    } catch (err) {
+      console.warn('Failed to capture item snapshot:', err);
+    } finally {
+      setIsCapturingItemSnapshot(false);
+    }
+  };
+
+  const handleRemoveItemSnapshot = (itemId: string) => {
+    setCurrentSrdData((prev) => {
+      const nextItemsByCategory = { ...prev.requirements.itemsByCategory };
+      for (const catId in nextItemsByCategory) {
+        nextItemsByCategory[catId] = nextItemsByCategory[catId].map((it) => {
+          if (it.id === itemId) {
+            return {
+              ...it,
+              contextSnapshotBase64: undefined,
+              snapshotFraming: undefined,
+            };
+          }
+          return it;
+        });
+      }
+      return {
+        ...prev,
+        requirements: {
+          ...prev.requirements,
+          itemsByCategory: nextItemsByCategory,
+        },
+      };
+    });
+  };
+
+  const handleBatchCaptureAllSnapshots = async () => {
+    if (linkedRequirementItems.length === 0 || nodes.length === 0) return;
+    setIsCapturingItemSnapshot(true);
+    try {
+      const updates: Record<
+        string,
+        { url: string; framing: { offsetX: number; offsetY: number; zoom: number } }
+      > = {};
+      for (const it of linkedRequirementItems) {
+        if (!it.linkedNodeIds || it.linkedNodeIds.length === 0) continue;
+        const pan = it.snapshotFraming
+          ? { x: it.snapshotFraming.offsetX, y: it.snapshotFraming.offsetY }
+          : { x: 0, y: 0 };
+        const zoom = it.snapshotFraming?.zoom ?? 1.0;
+        const dataUrl = await captureNodeSubsetSnapshot(nodes, it.linkedNodeIds, {
+          panOffset: pan,
+          zoomMultiplier: zoom,
+          width: 1200,
+          height: 600,
+          padding: 0.25,
+        });
+        if (dataUrl) {
+          updates[it.id] = { url: dataUrl, framing: { offsetX: pan.x, offsetY: pan.y, zoom } };
+        }
+      }
+
+      setCurrentSrdData((prev) => {
+        const nextItemsByCategory = { ...prev.requirements.itemsByCategory };
+        for (const catId in nextItemsByCategory) {
+          nextItemsByCategory[catId] = nextItemsByCategory[catId].map((it) => {
+            if (updates[it.id]) {
+              return {
+                ...it,
+                contextSnapshotBase64: updates[it.id].url,
+                snapshotFraming: updates[it.id].framing,
+              };
+            }
+            return it;
+          });
+        }
+        return {
+          ...prev,
+          requirements: {
+            ...prev.requirements,
+            itemsByCategory: nextItemsByCategory,
+          },
+        };
+      });
+    } catch (err) {
+      console.warn('Batch capture failed:', err);
+    } finally {
+      setIsCapturingItemSnapshot(false);
+    }
+  };
+
   const sortedSections = useMemo(
     () => [...templateConfig.sections].sort((a, b) => a.order - b.order),
     [templateConfig.sections],
@@ -420,68 +665,85 @@ export function SrdPrintModal({
                 className="srd-btn-icon"
                 style={{
                   flex: 1,
-                  padding: '0.45rem 0.2rem',
+                  padding: '0.45rem 0.15rem',
                   borderRadius: '4px 4px 0 0',
                   borderBottom: 'none',
                   backgroundColor: activeTab === 'doc' ? '#1f2937' : 'transparent',
                   color: activeTab === 'doc' ? '#3b82f6' : '#9ca3af',
                   fontWeight: 600,
-                  fontSize: '0.75rem',
+                  fontSize: '0.72rem',
                 }}
                 onClick={() => setActiveTab('doc')}
               >
-                <Building2 size={13} style={{ marginRight: 3 }} /> Doc
+                <Building2 size={12} style={{ marginRight: 2 }} /> Doc
               </button>
               <button
                 type="button"
                 className="srd-btn-icon"
                 style={{
                   flex: 1,
-                  padding: '0.45rem 0.2rem',
-                  borderRadius: '4px 4px 0 0',
-                  borderBottom: 'none',
-                  backgroundColor: activeTab === 'theme' ? '#1f2937' : 'transparent',
-                  color: activeTab === 'theme' ? '#3b82f6' : '#9ca3af',
-                  fontWeight: 600,
-                  fontSize: '0.75rem',
-                }}
-                onClick={() => setActiveTab('theme')}
-              >
-                <Palette size={13} style={{ marginRight: 3 }} /> Theme
-              </button>
-              <button
-                type="button"
-                className="srd-btn-icon"
-                style={{
-                  flex: 1,
-                  padding: '0.45rem 0.2rem',
+                  padding: '0.45rem 0.15rem',
                   borderRadius: '4px 4px 0 0',
                   borderBottom: 'none',
                   backgroundColor: activeTab === 'sections' ? '#1f2937' : 'transparent',
                   color: activeTab === 'sections' ? '#3b82f6' : '#9ca3af',
                   fontWeight: 600,
-                  fontSize: '0.75rem',
+                  fontSize: '0.72rem',
                 }}
                 onClick={() => setActiveTab('sections')}
               >
-                <Sliders size={13} style={{ marginRight: 3 }} /> Sections
+                <Sliders size={12} style={{ marginRight: 2 }} /> Layout
               </button>
               <button
                 type="button"
                 className="srd-btn-icon"
                 style={{
                   flex: 1,
-                  padding: '0.45rem 0.2rem',
+                  padding: '0.45rem 0.15rem',
+                  borderRadius: '4px 4px 0 0',
+                  borderBottom: 'none',
+                  backgroundColor: activeTab === 'snapshots' ? '#1f2937' : 'transparent',
+                  color: activeTab === 'snapshots' ? '#3b82f6' : '#9ca3af',
+                  fontWeight: 600,
+                  fontSize: '0.72rem',
+                }}
+                onClick={() => setActiveTab('snapshots')}
+              >
+                <Camera size={12} style={{ marginRight: 2 }} /> Snapshots
+              </button>
+              <button
+                type="button"
+                className="srd-btn-icon"
+                style={{
+                  flex: 1,
+                  padding: '0.45rem 0.15rem',
+                  borderRadius: '4px 4px 0 0',
+                  borderBottom: 'none',
+                  backgroundColor: activeTab === 'theme' ? '#1f2937' : 'transparent',
+                  color: activeTab === 'theme' ? '#3b82f6' : '#9ca3af',
+                  fontWeight: 600,
+                  fontSize: '0.72rem',
+                }}
+                onClick={() => setActiveTab('theme')}
+              >
+                <Palette size={12} style={{ marginRight: 2 }} /> Theme
+              </button>
+              <button
+                type="button"
+                className="srd-btn-icon"
+                style={{
+                  flex: 1,
+                  padding: '0.45rem 0.15rem',
                   borderRadius: '4px 4px 0 0',
                   borderBottom: 'none',
                   backgroundColor: activeTab === 'headers' ? '#1f2937' : 'transparent',
                   color: activeTab === 'headers' ? '#3b82f6' : '#9ca3af',
                   fontWeight: 600,
-                  fontSize: '0.75rem',
+                  fontSize: '0.72rem',
                 }}
                 onClick={() => setActiveTab('headers')}
               >
-                <FileText size={13} style={{ marginRight: 3 }} /> Headers
+                <FileText size={12} style={{ marginRight: 2 }} /> Headers
               </button>
             </div>
 
@@ -701,9 +963,57 @@ export function SrdPrintModal({
               </div>
             )}
 
-            {/* Tab: Sections */}
+            {/* Tab: Sections & Layout */}
             {activeTab === 'sections' && (
-              <div>
+              <div className="srd-sidebar__field-group">
+                <div className="srd-sidebar__field">
+                  <label className="srd-sidebar__label">Requirements Display Layout</label>
+                  <div className="srd-layout-toggle-group">
+                    <button
+                      type="button"
+                      className={`srd-layout-toggle-btn ${
+                        (templateConfig.requirementsLayout || 'list') === 'list'
+                          ? 'srd-layout-toggle-btn--active'
+                          : ''
+                      }`}
+                      onClick={() => handleLayoutChange('list')}
+                    >
+                      <List size={16} />
+                      <span>List View (Cards & Context)</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`srd-layout-toggle-btn ${
+                        templateConfig.requirementsLayout === 'table'
+                          ? 'srd-layout-toggle-btn--active'
+                          : ''
+                      }`}
+                      onClick={() => handleLayoutChange('table')}
+                    >
+                      <TableIcon size={16} />
+                      <span>Table View (Dense)</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="srd-sidebar__field" style={{ marginTop: '0.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid #374151' }}>
+                  <label className="srd-sidebar__label">Architecture Detail Tables</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <input
+                      type="checkbox"
+                      id="includeComponentTableCheckbox"
+                      checked={!!templateConfig.includeComponentTable}
+                      onChange={(e) => handleToggleComponentTable(e.target.checked)}
+                    />
+                    <label htmlFor="includeComponentTableCheckbox" className="srd-sidebar__label" style={{ cursor: 'pointer', margin: 0 }}>
+                      Include Full Component Inventory Table
+                    </label>
+                  </div>
+                  <p style={{ fontSize: '0.6875rem', color: '#9ca3af', margin: '0.2rem 0 0 1.4rem' }}>
+                    Uncheck to keep architecture overview focused on visual diagram and data flows.
+                  </p>
+                </div>
+
                 <div className="srd-sidebar__section-title">Toggle & Order Sections</div>
                 {sortedSections.map((section, idx) => (
                   <div key={section.id} style={{ marginBottom: '0.85rem' }}>
@@ -749,6 +1059,176 @@ export function SrdPrintModal({
                     )}
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* Tab: Snapshots & Framing */}
+            {activeTab === 'snapshots' && (
+              <div className="srd-sidebar__field-group">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div className="srd-sidebar__section-title" style={{ margin: 0 }}>
+                    <Camera size={14} />
+                    <span>Linked Context Snapshots</span>
+                  </div>
+                  {linkedRequirementItems.length > 0 && (
+                    <button
+                      type="button"
+                      className="srd-btn-icon"
+                      style={{ fontSize: '0.6875rem', padding: '0.25rem 0.5rem', color: '#60a5fa' }}
+                      onClick={handleBatchCaptureAllSnapshots}
+                      disabled={isCapturingItemSnapshot}
+                      title="Auto-capture snapshots for all linked requirement items"
+                    >
+                      <RefreshCw size={11} className={isCapturingItemSnapshot ? 'animate-spin' : ''} style={{ marginRight: 3 }} />
+                      Batch Capture All
+                    </button>
+                  )}
+                </div>
+
+                {linkedRequirementItems.length === 0 ? (
+                  <div style={{ backgroundColor: '#1e293b', border: '1px solid #374151', borderRadius: '6px', padding: '1rem', textAlign: 'center', color: '#9ca3af', fontSize: '0.8125rem' }}>
+                    <p style={{ margin: '0 0 0.5rem 0', fontWeight: 600, color: '#e2e8f0' }}>No Linked Requirements</p>
+                    <p style={{ margin: 0, fontSize: '0.75rem', lineHeight: '1.4' }}>
+                      To embed focused architectural snapshots, link requirement items to canvas nodes in the diagram.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="srd-sidebar__field">
+                      <label className="srd-sidebar__label">Select Requirement Item</label>
+                      <select
+                        className="srd-sidebar__select"
+                        value={selectedFramingItemId}
+                        onChange={(e) => setSelectedFramingItemId(e.target.value)}
+                      >
+                        {linkedRequirementItems.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.id}: {item.title || '(Untitled)'} ({item.linkedNodeLabels?.length || 0} nodes)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {currentFramingItem && (
+                      <div className="srd-framing-panel">
+                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                          <strong style={{ color: '#ffffff' }}>{currentFramingItem.id}</strong>: {currentFramingItem.title}
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', marginTop: '0.35rem' }}>
+                            {currentFramingItem.linkedNodeLabels?.map((lbl, idx) => (
+                              <span key={idx} className="srd-doc__node-tag">
+                                {lbl}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="srd-framing-preview-box">
+                          {currentFramingItem.contextSnapshotBase64 ? (
+                            <img
+                              src={currentFramingItem.contextSnapshotBase64}
+                              alt="Context preview"
+                              className="srd-framing-preview-img"
+                              style={{
+                                transform: `translate(${framingPanOffset.x / 4}px, ${framingPanOffset.y / 4}px) scale(${framingZoom})`,
+                                transition: 'transform 0.1s ease-out',
+                              }}
+                            />
+                          ) : (
+                            <div style={{ color: '#64748b', fontSize: '0.75rem', textAlign: 'center', padding: '1rem' }}>
+                              <Camera size={24} style={{ margin: '0 auto 0.5rem auto', opacity: 0.5 }} />
+                              No snapshot captured yet. Click Capture to frame linked nodes.
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="srd-framing-grid">
+                          <div>
+                            <div className="srd-framing-slider-label">
+                              <span>Pan X Offset</span>
+                              <span>{framingPanOffset.x}px</span>
+                            </div>
+                            <input
+                              type="range"
+                              className="srd-framing-slider"
+                              min="-250"
+                              max="250"
+                              step="10"
+                              value={framingPanOffset.x}
+                              onChange={(e) => setFramingPanX(parseInt(e.target.value, 10))}
+                            />
+                          </div>
+                          <div>
+                            <div className="srd-framing-slider-label">
+                              <span>Pan Y Offset</span>
+                              <span>{framingPanOffset.y}px</span>
+                            </div>
+                            <input
+                              type="range"
+                              className="srd-framing-slider"
+                              min="-250"
+                              max="250"
+                              step="10"
+                              value={framingPanOffset.y}
+                              onChange={(e) => setFramingPanY(parseInt(e.target.value, 10))}
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="srd-framing-slider-label">
+                            <span>Zoom Scale</span>
+                            <span>{framingZoom.toFixed(2)}x</span>
+                          </div>
+                          <input
+                            type="range"
+                            className="srd-framing-slider"
+                            min="0.5"
+                            max="2.5"
+                            step="0.05"
+                            value={framingZoom}
+                            onChange={(e) => setFramingZoomScale(parseFloat(e.target.value))}
+                          />
+                        </div>
+
+                        <div className="srd-framing-btn-row">
+                          <button
+                            type="button"
+                            className="srd-btn-icon"
+                            style={{ flex: 1, padding: '0.4rem', fontSize: '0.75rem', backgroundColor: '#2563eb', color: '#ffffff', fontWeight: 600 }}
+                            onClick={() => handleCaptureItemSnapshot()}
+                            disabled={isCapturingItemSnapshot}
+                          >
+                            <RefreshCw size={12} className={isCapturingItemSnapshot ? 'animate-spin' : ''} style={{ marginRight: 4 }} />
+                            {currentFramingItem.contextSnapshotBase64 ? 'Update Snapshot' : 'Capture Snapshot'}
+                          </button>
+                          <button
+                            type="button"
+                            className="srd-btn-icon"
+                            style={{ padding: '0.4rem 0.6rem', fontSize: '0.75rem' }}
+                            onClick={() => {
+                              resetFraming();
+                              handleCaptureItemSnapshot(currentFramingItem, { x: 0, y: 0 }, 1.0);
+                            }}
+                            title="Reset pan and zoom to center"
+                          >
+                            <RotateCcw size={12} />
+                          </button>
+                          {currentFramingItem.contextSnapshotBase64 && (
+                            <button
+                              type="button"
+                              className="srd-btn-icon"
+                              style={{ padding: '0.4rem 0.6rem', color: '#f87171' }}
+                              onClick={() => handleRemoveItemSnapshot(currentFramingItem.id)}
+                              title="Remove item snapshot"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             )}
 
@@ -994,36 +1474,41 @@ export function SrdPrintModal({
                             />
                           </div>
                         )}
-                        <h3 className="srd-doc__sub-title">Component Inventory</h3>
-                        {currentSrdData.architecture.components.length === 0 ? (
-                          <p style={{ color: '#6b7280', fontStyle: 'italic' }}>
-                            No architecture components defined in canvas.
-                          </p>
-                        ) : (
-                          <table
-                            className={`srd-doc__table ${
-                              templateConfig.theme.tableDense ? 'srd-doc__table--dense' : ''
-                            }`}
-                          >
-                            <thead>
-                              <tr>
-                                <th>Component Name</th>
-                                <th>Type</th>
-                                <th>Description</th>
-                                <th>Linked Requirements</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {currentSrdData.architecture.components.map((c) => (
-                                <tr key={c.id}>
-                                  <td><strong>{c.name}</strong></td>
-                                  <td><code>{c.type}</code></td>
-                                  <td>{c.description || '-'}</td>
-                                  <td>{c.linkedRequirementIds?.join(', ') || '-'}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+
+                        {templateConfig.includeComponentTable && (
+                          <>
+                            <h3 className="srd-doc__sub-title">Component Inventory</h3>
+                            {currentSrdData.architecture.components.length === 0 ? (
+                              <p style={{ color: '#6b7280', fontStyle: 'italic' }}>
+                                No architecture components defined in canvas.
+                              </p>
+                            ) : (
+                              <table
+                                className={`srd-doc__table ${
+                                  templateConfig.theme.tableDense ? 'srd-doc__table--dense' : ''
+                                }`}
+                              >
+                                <thead>
+                                  <tr>
+                                    <th>Component Name</th>
+                                    <th>Type</th>
+                                    <th>Description</th>
+                                    <th>Linked Requirements</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {currentSrdData.architecture.components.map((c) => (
+                                    <tr key={c.id}>
+                                      <td><strong>{c.name}</strong></td>
+                                      <td><code>{c.type}</code></td>
+                                      <td>{c.description || '-'}</td>
+                                      <td>{c.linkedRequirementIds?.join(', ') || '-'}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            )}
+                          </>
                         )}
 
                         <h3 className="srd-doc__sub-title">Connections & Data Flows</h3>
@@ -1066,39 +1551,140 @@ export function SrdPrintModal({
                           const items = currentSrdData.requirements.itemsByCategory[cat.id] || [];
                           if (items.length === 0) return null;
 
+                          const isTableLayout = templateConfig.requirementsLayout === 'table';
+
                           return (
-                            <div key={cat.id} style={{ marginBottom: '1.5rem' }}>
+                            <div key={cat.id} style={{ marginBottom: '2rem' }}>
                               <h3 className="srd-doc__sub-title">
                                 Category: {cat.label}
                               </h3>
-                              <table
-                                className={`srd-doc__table ${
-                                  templateConfig.theme.tableDense ? 'srd-doc__table--dense' : ''
-                                }`}
-                              >
-                                <thead>
-                                  <tr>
-                                    <th>ID</th>
-                                    <th>Title</th>
-                                    <th>Type</th>
-                                    <th>Status</th>
-                                    <th>Effort</th>
-                                    <th>Assignee</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {items.map((item) => (
-                                    <tr key={item.id}>
-                                      <td><code>{item.id}</code></td>
-                                      <td><strong>{item.title}</strong></td>
-                                      <td>{item.typeLabel}</td>
-                                      <td>{item.status || '-'}</td>
-                                      <td>{item.points != null ? `${item.points} pts` : '-'}</td>
-                                      <td>{item.assigneeName || '-'}</td>
+
+                              {isTableLayout ? (
+                                <table
+                                  className={`srd-doc__table ${
+                                    templateConfig.theme.tableDense ? 'srd-doc__table--dense' : ''
+                                  }`}
+                                >
+                                  <thead>
+                                    <tr>
+                                      <th>ID</th>
+                                      <th>Title</th>
+                                      <th>Type</th>
+                                      <th>Status</th>
+                                      <th>Effort</th>
+                                      <th>Assignee</th>
                                     </tr>
-                                  ))}
-                                </tbody>
-                              </table>
+                                  </thead>
+                                  <tbody>
+                                    {items.map((item) => (
+                                      <tr key={item.id}>
+                                        <td><code>{item.id}</code></td>
+                                        <td><strong>{item.title}</strong></td>
+                                        <td>{item.typeLabel}</td>
+                                        <td>{item.status || '-'}</td>
+                                        <td>{item.points != null ? `${item.points} pts` : '-'}</td>
+                                        <td>{item.assigneeName || '-'}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              ) : (
+                                <div className="srd-doc__item-cards-list">
+                                  {items.map((item) => {
+                                    const relatedLinks = currentSrdData.traceability.filter(
+                                      (t) => t.sourceId === item.id || t.targetId === item.id,
+                                    );
+
+                                    return (
+                                      <div key={item.id} className="srd-doc__item-card">
+                                        <div className="srd-doc__item-card-header">
+                                          <div className="srd-doc__item-card-title-row">
+                                            <span className="srd-doc__badge srd-doc__badge--id">
+                                              {item.id}
+                                            </span>
+                                            <h4 className="srd-doc__item-card-title">
+                                              {item.title || '(Untitled Requirement)'}
+                                            </h4>
+                                          </div>
+                                          <div className="srd-doc__item-card-pills">
+                                            <span className="srd-doc__badge srd-doc__badge--type">
+                                              {item.typeLabel}
+                                            </span>
+                                            {item.status && (
+                                              <span
+                                                className={`srd-doc__badge srd-doc__badge--status srd-doc__badge--status-${item.status}`}
+                                              >
+                                                {item.status}
+                                              </span>
+                                            )}
+                                            {item.points != null && (
+                                              <span className="srd-doc__badge srd-doc__badge--points">
+                                                {item.points} pts
+                                              </span>
+                                            )}
+                                            {item.sprintName && (
+                                              <span className="srd-doc__badge srd-doc__badge--sprint">
+                                                {item.sprintName}
+                                              </span>
+                                            )}
+                                            {item.assigneeName && (
+                                              <span className="srd-doc__badge srd-doc__badge--assignee">
+                                                {item.assigneeName}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+
+                                        {item.contextSnapshotBase64 && (
+                                          <div className="srd-doc__item-snapshot-container">
+                                            <div className="srd-doc__item-snapshot-caption">
+                                              Architecture Context Snapshot
+                                            </div>
+                                            <img
+                                              src={item.contextSnapshotBase64}
+                                              alt={`Context snapshot for ${item.id}`}
+                                              className="srd-doc__item-snapshot-img"
+                                            />
+                                          </div>
+                                        )}
+
+                                        {item.linkedNodeLabels && item.linkedNodeLabels.length > 0 && (
+                                          <div className="srd-doc__item-linked-nodes">
+                                            <strong>Linked Components: </strong>
+                                            {item.linkedNodeLabels.map((lbl, li) => (
+                                              <span key={li} className="srd-doc__node-tag">
+                                                {lbl}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        )}
+
+                                        {item.body && item.body.trim() && (
+                                          <div className="srd-doc__item-body">
+                                            {item.body.trim()}
+                                          </div>
+                                        )}
+
+                                        {relatedLinks.length > 0 && (
+                                          <div className="srd-doc__item-dependencies">
+                                            <strong>Dependencies & Links: </strong>
+                                            <span className="srd-doc__deps-list">
+                                              {relatedLinks.map((l, li) => (
+                                                <span key={li} className="srd-doc__dep-item">
+                                                  {l.sourceId === item.id
+                                                    ? `${l.relation} ${l.targetId} (${l.targetTitle})`
+                                                    : `Linked from ${l.sourceId} (${l.sourceTitle}) via ${l.relation}`}
+                                                  {li < relatedLinks.length - 1 ? ' • ' : ''}
+                                                </span>
+                                              ))}
+                                            </span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
                             </div>
                           );
                         })}

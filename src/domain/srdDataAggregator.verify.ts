@@ -209,6 +209,31 @@ const mockTeam: TeamDocument = {
   console.log('✓ Test 3: Roadmap sprints and epic schedule passed');
 }
 
+// --- Test 4: Item Context Snapshots and Framings ---
+{
+  const srdData = aggregateSrdData({
+    title: 'Item Snapshots Test',
+    nodes: mockNodes,
+    edges: mockEdges,
+    doc: mockDoc,
+    itemSnapshots: {
+      'REQ-1': 'data:image/png;base64,sampleSnap',
+    },
+    itemFramings: {
+      'REQ-1': { offsetX: 20, offsetY: -10, zoom: 1.25 },
+    },
+  });
+
+  const authItems = srdData.requirements.itemsByCategory['cat-auth'];
+  const req1 = authItems.find((i) => i.id === 'REQ-1');
+  assert(req1 !== undefined, 'REQ-1 found in auth category');
+  assert(req1?.contextSnapshotBase64 === 'data:image/png;base64,sampleSnap', 'Snapshot attached to REQ-1');
+  assert(req1?.snapshotFraming?.offsetX === 20, 'Framing offsetX attached to REQ-1');
+  assert(req1?.snapshotFraming?.zoom === 1.25, 'Framing zoom attached to REQ-1');
+
+  console.log('✓ Test 4: Item snapshots and framings passed');
+}
+
 if (failures > 0) {
   console.error(`\n${failures} check(s) failed`);
 } else {

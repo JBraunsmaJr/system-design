@@ -105,7 +105,12 @@ import {
 } from './collab/localDocument';
 import { undoableStore, undoControllerFor, releaseUndoController } from './collab/undoManager';
 import { downloadRequirementsMarkdown } from './domain/requirementsExport';
-import { exportDiagramAsPng, exportDiagramAsSvg, captureDiagramSnapshot } from './domain/imageExport';
+import {
+  exportDiagramAsPng,
+  exportDiagramAsSvg,
+  captureDiagramSnapshot,
+  captureNodeSubsetSnapshot,
+} from './domain/imageExport';
 import { SrdPrintModal } from './components/srd/SrdPrintModal';
 import { aggregateSrdData } from './domain/srdDataAggregator';
 import { downloadSrdMarkdown } from './domain/srdMarkdownExport';
@@ -3078,8 +3083,31 @@ function App() {
     setIsGeneratingSrd(true);
     try {
       let diagramImg: string | undefined;
+      const itemSnapshots: Record<string, string> = {};
       if (nodes.length > 0) {
         diagramImg = await captureDiagramSnapshot(nodes, 'png');
+
+        for (const item of requirementsSnapshot.items) {
+          const linkedNodes = nodes.filter((n) => {
+            const data = (n.data || {}) as Record<string, unknown>;
+            const reqIds = Array.isArray(data.linkedRequirementIds) ? data.linkedRequirementIds : [];
+            return reqIds.includes(item.id);
+          });
+          if (linkedNodes.length > 0) {
+            try {
+              const snap = await captureNodeSubsetSnapshot(
+                nodes,
+                linkedNodes.map((n) => n.id),
+                { width: 1200, height: 600, padding: 0.25 },
+              );
+              if (snap) {
+                itemSnapshots[item.id] = snap;
+              }
+            } catch (err) {
+              console.warn('Failed to snapshot linked nodes for item', item.id, err);
+            }
+          }
+        }
       }
       const data = aggregateSrdData({
         title,
@@ -3090,6 +3118,7 @@ function App() {
         programIncrements: programIncrementsSnapshot,
         teamDoc: teamSnapshot,
         diagramImageBase64: diagramImg,
+        itemSnapshots,
       });
       setSrdModalData(data);
       setIsSrdModalOpen(true);
@@ -3112,8 +3141,31 @@ function App() {
     setIsGeneratingSrd(true);
     try {
       let diagramImg: string | undefined;
+      const itemSnapshots: Record<string, string> = {};
       if (nodes.length > 0) {
         diagramImg = await captureDiagramSnapshot(nodes, 'png');
+
+        for (const item of requirementsSnapshot.items) {
+          const linkedNodes = nodes.filter((n) => {
+            const data = (n.data || {}) as Record<string, unknown>;
+            const reqIds = Array.isArray(data.linkedRequirementIds) ? data.linkedRequirementIds : [];
+            return reqIds.includes(item.id);
+          });
+          if (linkedNodes.length > 0) {
+            try {
+              const snap = await captureNodeSubsetSnapshot(
+                nodes,
+                linkedNodes.map((n) => n.id),
+                { width: 1200, height: 600, padding: 0.25 },
+              );
+              if (snap) {
+                itemSnapshots[item.id] = snap;
+              }
+            } catch (err) {
+              console.warn('Failed to snapshot linked nodes for item', item.id, err);
+            }
+          }
+        }
       }
       const data = aggregateSrdData({
         title,
@@ -3124,6 +3176,7 @@ function App() {
         programIncrements: programIncrementsSnapshot,
         teamDoc: teamSnapshot,
         diagramImageBase64: diagramImg,
+        itemSnapshots,
       });
       downloadSrdMarkdown(data, DEFAULT_SRD_TEMPLATE);
     } catch (err) {
