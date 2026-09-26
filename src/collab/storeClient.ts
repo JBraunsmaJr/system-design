@@ -68,7 +68,53 @@ export interface SessionInfo {
   issuer: string;
   subject: string;
   displayName?: string;
+  /** WS14: this sign-in committed to a key, so it can back a join request.
+   * Absent from stores that predate WS14. */
+  hasEvidence?: boolean;
+  evidenceIat?: number | null;
+  groupsOverage?: boolean;
 }
+
+/** WS14-R12: what the store says about its sign-in providers. */
+export interface ProviderDetails {
+  id: string;
+  kind: 'oidc' | 'github';
+  issuer?: string;
+  clientId: string;
+}
+
+/** WS14-R17: an open join request, as a key holder sees it. */
+export interface JoinRequestEvidence {
+  userId: string;
+  displayName: string | null;
+  issuer: string;
+  subject: string;
+  /** base64 SPKI committed to. */
+  publicKey: string;
+  /** base64, 32 bytes. */
+  salt: string;
+  idToken: string;
+  evidenceHash: string;
+  iat: number;
+  lastRejection: string | null;
+  lastRejectionAt: string | null;
+}
+
+/** WS14-R10: the store's routing copy of a workspace's rule. */
+export interface RoutingRule {
+  workspaceId: string;
+  ruleVersion: number;
+  enabled: boolean;
+  claim: string;
+  groups: string[];
+  evidenceMaxAgeSeconds: number;
+  rotationRequired: boolean;
+  updatedAt: string;
+}
+
+/** WS14-R8: the sealed rule is its own record beside the index, so editors
+ * that read the index as a bare list of documents are unaffected. */
+export const accessRuleRecordId = (workspaceId: string) => `${workspaceId}.access`;
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -220,6 +266,23 @@ export function createStoreClient(options: StoreClientOptions) {
     async providers(): Promise<string[]> {
       const { body } = await request('/v1/auth/providers');
       return (body.providers as string[]) ?? [];
+    },
+
+    /** WS14-R12, R44: provider details, and whether automatic access is on.
+     * A store that predates WS14 answers with neither, which reads as off. */
+    async providerDetails(): Promise<{ providers: ProviderDetails[]; autoAccess: boolean }> {
+      const { body } = await request('/v1/auth/providers');
+      return {
+        providers: (body.providerDetails as ProviderDetails[] | undefined) ?? [],
+        autoAccess: body.autoAccess === true,
+      };
+    },
+
+    /** Where to send the browser to sign in; with a key commitment when the
+     * sign-in should be able to back a join request (WS14-R3). */
+    signInUrl(provider: string, commitment?: string): string {
+      const query = commitment ? `?commitment=${encodeURIComponent(commitment)}` : '';
+      return `${base}/v1/auth/${encodeURIComponent(provider)}/start${query}`;
     },
 
     /** The highest version this client has seen, for the durability UI. */
@@ -440,6 +503,10 @@ export function createStoreClient(options: StoreClientOptions) {
         publicKey?: string;
         /** Which workspace key generations this member holds (WS7-R8). */
         workspaceKeyGenerations?: number[];
+        /** WS14-R30: how they were let in, where the store knows. */
+        source?: 'manual' | 'oidc_group';
+        matchedGroup?: string | null;
+        removedAt?: string | null;
       }[]
     > {
       const { body } = await request('/v1/workspace/members');
@@ -448,16 +515,25 @@ export function createStoreClient(options: StoreClientOptions) {
         displayName?: string;
         publicKey?: string;
         workspaceKeyGenerations?: number[];
+        source?: 'manual' | 'oidc_group';
+        matchedGroup?: string | null;
+        removedAt?: string | null;
       }[];
     },
 
     /** Hands the workspace key to another member, wrapped to their public
      * key (WS7-R8). Any member may: they could share it out of band
      * anyway, and the store records who did it. */
-    async grantWorkspaceKey(userId: string, generation: number, wrappedKey: string): Promise<void> {
+    async grantWorkspaceKey(
+      userId: string,
+      generation: number,
+      wrappedKey: string,
+      /** WS14-R26: an automatic grant names the evidence it checked. */
+      automatic?: { joinEvidenceHash: string; matchedGroup: string },
+    ): Promise<void> {
       await request(`/v1/workspace/members/${encodeURIComponent(userId)}/key`, {
         method: 'PUT',
-        body: JSON.stringify({ generation, wrappedKey }),
+        body: JSON.stringify({ generation, wrappedKey, ...(automatic ?? {}) }),
       });
     },
 
@@ -685,6 +761,128 @@ export function createStoreClient(options: StoreClientOptions) {
         'The workspace index is being changed faster than this client can keep up.',
         'conflict',
       );
+    },
+
+    // -- automatic access (WS14) -----------------------------------------
+
+    /** WS14-R14: asks to join every workspace whose rule names one of this
+     * person's groups. The salt is the one the sign-in committed to. */
+    async requestToJoin(salt: Uint8Array): Promise<{
+      requests: { workspaceId: string; status: string }[];
+      reason?: string;
+    }> {
+      const { body } = await request('/v1/join-requests', {
+        method: 'POST',
+        body: JSON.stringify({ salt: toBase64(salt) }),
+      });
+      return body as { requests: { workspaceId: string; status: string }[]; reason?: string };
+    },
+
+    /** WS14-R17: this person's own requests, without evidence. */
+    async myJoinRequests(): Promise<
+      { workspaceId: string; status: string; lastRejection: string | null }[]
+    > {
+      const { body } = await request('/v1/join-requests');
+      return (
+        (body.requests as {
+          workspaceId: string;
+          status: string;
+          lastRejection: string | null;
+        }[]) ?? []
+      );
+    },
+
+    /** WS14-R17: open requests with their evidence. Key holders only. */
+    async listJoinRequests(workspaceId: string): Promise<JoinRequestEvidence[]> {
+      const { body } = await request(
+        `/v1/workspaces/${encodeURIComponent(workspaceId)}/join-requests`,
+      );
+      return (body.requests as JoinRequestEvidence[]) ?? [];
+    },
+
+    /** WS14-R27: why a check failed. */
+    async reportJoinRejection(workspaceId: string, userId: string, reason: string): Promise<void> {
+      await request(
+        `/v1/workspaces/${encodeURIComponent(workspaceId)}/join-requests/${encodeURIComponent(userId)}/rejections`,
+        { method: 'POST', body: JSON.stringify({ reason }) },
+      );
+    },
+
+    /** WS14-R10: the store's routing copy. Never used to grant. */
+    async getRoutingRule(workspaceId: string): Promise<RoutingRule | null> {
+      const { body } = await request(
+        `/v1/workspaces/${encodeURIComponent(workspaceId)}/access-rule`,
+      );
+      return (body.rule as RoutingRule | null) ?? null;
+    },
+
+    async putRoutingRule(
+      workspaceId: string,
+      rule: {
+        ruleVersion: number;
+        enabled: boolean;
+        claim: string;
+        groups: string[];
+        evidenceMaxAgeSeconds: number;
+      },
+    ): Promise<RoutingRule> {
+      const { body } = await request(
+        `/v1/workspaces/${encodeURIComponent(workspaceId)}/access-rule`,
+        { method: 'PUT', body: JSON.stringify(rule) },
+      );
+      return body.rule as RoutingRule;
+    },
+
+    /**
+     * WS14-R8: the sealed rule, opened with the index key. Null when there is
+     * none, or when it cannot be opened with this key - sealed under a key
+     * generation this browser does not hold, or tampered with. Both mean "no
+     * rule to act on", which grants nothing (WS14-R20).
+     */
+    async readAccessRule(
+      workspaceId: string,
+      indexKey: CryptoKey,
+    ): Promise<{ rule: unknown; version: number | null; generation: number | null }> {
+      const recordId = accessRuleRecordId(workspaceId);
+      const { body } = await request(`/v1/workspaces/${encodeURIComponent(recordId)}/index`);
+      const sealed = body.index as string | null;
+      const version = (body.version as number | null) ?? null;
+      const generation = (body.generation as number | null) ?? null;
+      if (!sealed) return { rule: null, version, generation };
+      try {
+        const opened = await crypto.open(
+          { docId: recordId, kind: 'access-rule', version: 1 },
+          fromBase64(sealed),
+          indexKey,
+        );
+        return { rule: JSON.parse(decoder.decode(opened)), version, generation };
+      } catch {
+        return { rule: null, version, generation };
+      }
+    },
+
+    /** Seals and writes the rule, conditional on the version read (WS9-R3). */
+    async writeAccessRule(
+      workspaceId: string,
+      indexKey: CryptoKey,
+      rule: unknown,
+      expectedVersion: number | null,
+      generation?: number,
+    ): Promise<void> {
+      const recordId = accessRuleRecordId(workspaceId);
+      const sealed = await crypto.seal(
+        { docId: recordId, kind: 'access-rule', version: 1 },
+        encoder.encode(JSON.stringify(rule)),
+        indexKey,
+      );
+      await request(`/v1/workspaces/${encodeURIComponent(recordId)}/index`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          index: toBase64(sealed),
+          expectedVersion,
+          ...(generation ? { generation } : {}),
+        }),
+      });
     },
   };
 }

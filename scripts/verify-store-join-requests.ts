@@ -709,7 +709,7 @@ if (DATABASE_URL) {
   const pool = new pg.Pool({ connectionString: DATABASE_URL });
   // A clean slate for the tables this suite reads back.
   await pool.query(
-    `TRUNCATE join_requests, workspace_memberships, workspace_access_rules, workspace_keys, devices, users, sessions, pending_logins CASCADE`,
+    `TRUNCATE join_requests, workspace_memberships, workspace_access_rules, workspace_keys, workspace_index, devices, users, sessions, pending_logins CASCADE`,
   );
   try {
     await run('PostgreSQL', {

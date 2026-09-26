@@ -44,7 +44,15 @@ export const IV_BYTES = 12; // 96-bit, per WS6-R5
 const HEADER_FIXED_BYTES = 9;
 
 /** What a blob is, so one kind cannot be served in place of another. */
-export type BlobKind = 'update' | 'snapshot' | 'index' | 'key-wrap' | 'recovery-wrap' | 'test';
+export type BlobKind =
+  | 'update'
+  | 'snapshot'
+  | 'index'
+  | 'key-wrap'
+  | 'recovery-wrap'
+  /** WS14-R8: a workspace's automatic access rule, sealed beside its index. */
+  | 'access-rule'
+  | 'test';
 
 /**
  * The context a blob belongs to. Every field is authenticated, so all of them

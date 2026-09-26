@@ -88,13 +88,27 @@ export async function rotateWorkspaceKey(options: RotationOptions): Promise<Rota
   const newIndexKey = await indexKeyFor(newKey);
   await client.writeIndex(workspaceId, newIndexKey, rewrapped, version, generation);
 
+  // WS14-R8: the automatic access rule is sealed under the index key too.
+  // Left under the old key, it would open for nobody and automatic access
+  // would stop without anyone having turned it off.
+  const rule = await client.readAccessRule(workspaceId, currentIndexKey);
+  if (rule.rule) {
+    await client.writeAccessRule(workspaceId, newIndexKey, rule.rule, rule.version, generation);
+  }
+
   // Last: hand the new key to each member. Listing them is an
   // administrator's right; a member rotating after losing their own device
   // replaces their own key and says so.
   const skipped: string[] = [];
   let granted = 0;
   let selfOnly = false;
-  let members: { userId: string; displayName?: string; publicKey?: string }[] = [];
+  let members: {
+    userId: string;
+    displayName?: string;
+    publicKey?: string;
+    workspaceKeyGenerations?: number[];
+    removedAt?: string | null;
+  }[] = [];
   try {
     members = await client.listMembers();
   } catch {
@@ -116,6 +130,14 @@ export async function rotateWorkspaceKey(options: RotationOptions): Promise<Rota
     granted = 1;
   } else {
     for (const member of members) {
+      // Only people who hold the key being replaced. The member list names
+      // everyone who has signed in, including people still waiting to be
+      // let in and people removed; handing them the new key would let them
+      // in by rotation (WS7-R8, WS14-R34).
+      const holdsCurrent = (member.workspaceKeyGenerations ?? []).includes(
+        options.currentGeneration,
+      );
+      if (!holdsCurrent || member.removedAt) continue;
       if (!member.publicKey) {
         skipped.push(member.displayName ?? member.userId);
         continue;

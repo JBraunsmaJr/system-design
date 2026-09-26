@@ -10,6 +10,7 @@
  * the browser, wrapped under the workspace key, and kept in the sealed index
  * (WS7-R3); the storage key is derived from it (WS7-R1).
  */
+import { startSignIn } from './joinFlow.ts';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   createStoreClient,
@@ -218,7 +219,7 @@ export function useWorkspace(options: WorkspaceOptions = {}): WorkspaceApi {
       if (!storeUrl) return;
       // A full navigation: the store is the OAuth client, and the session
       // comes back as a cookie (WS10-R1).
-      globalThis.location.assign(`${storeUrl}/v1/auth/${encodeURIComponent(provider)}/start`);
+      void startSignIn(storeUrl, provider);
     },
     [storeUrl],
   );

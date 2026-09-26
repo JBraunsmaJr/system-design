@@ -193,14 +193,23 @@ try {
 
   console.log('\n=== Members ===');
   {
-    // Two members, one of whom has never published a key.
+    // Two members holding the current key, one of whom has never published
+    // a public key; and someone who signed in but was never let in.
     const alice = await directory.upsertUser({ issuer: 'https://idp', subject: 'alice' });
     const userKey = await generateWrappingKeyPair('user');
     await directory.setUserPublicKey(
       alice.userId,
       Buffer.from(await exportPublicKey(userKey.publicKey)).toString('base64'),
     );
-    await directory.upsertUser({ issuer: 'https://idp', subject: 'bob' });
+    await directory.putWorkspaceKey(alice.userId, 2, 'placeholder-wrap');
+    const bob = await directory.upsertUser({ issuer: 'https://idp', subject: 'bob' });
+    await directory.putWorkspaceKey(bob.userId, 2, 'placeholder-wrap');
+    const carol = await directory.upsertUser({ issuer: 'https://idp', subject: 'carol' });
+    const carolKey = await generateWrappingKeyPair('user');
+    await directory.setUserPublicKey(
+      carol.userId,
+      Buffer.from(await exportPublicKey(carolKey.publicKey)).toString('base64'),
+    );
 
     const second = await rotateWorkspaceKey({
       client,
@@ -220,6 +229,10 @@ try {
     check(
       wraps.some((wrap) => wrap.generation === 3),
       "the member's wrap is recorded at the new generation",
+    );
+    check(
+      (await directory.getWorkspaceKeys(carol.userId)).length === 0,
+      'someone who was never let in is not let in by rotation',
     );
     check(
       (await exportSymmetricKeyHex(second.workspaceKey)) !== (await exportSymmetricKeyHex(newKey)),

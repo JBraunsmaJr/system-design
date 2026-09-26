@@ -1,3 +1,4 @@
+import { startSignIn } from './collab/joinFlow.ts';
 import {
   useCallback,
   useEffect,
@@ -467,7 +468,8 @@ function App() {
   const handleLoginOidc = useCallback(() => {
     if (!storeUrl) return;
     const provider = storeProviders.includes('oidc') ? 'oidc' : (storeProviders[0] ?? 'oidc');
-    globalThis.location.assign(`${storeUrl}/v1/auth/${encodeURIComponent(provider)}/start`);
+    // WS14-R2: commits to a key first where automatic access can use it.
+    void startSignIn(storeUrl, provider);
   }, [storeUrl, storeProviders]);
 
   /** People waiting to be let into the workspace, noticed from here rather
@@ -3290,6 +3292,8 @@ function App() {
                     () => showToast('Could not give access. Try again from File > Documents.'),
                   );
                 }}
+                autoGranted={accessRequests.autoGranted}
+                onDismissAutoGranted={accessRequests.dismissAutoGranted}
               />
               <ReactFlowProvider>
                 {isPerfInstrumentationActive() ? (

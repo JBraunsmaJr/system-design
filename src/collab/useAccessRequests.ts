@@ -21,12 +21,28 @@ import {
 } from './deviceIdentity.ts';
 import { fromBase64, indexKeyFor, toBase64 } from './workspaceDocuments.ts';
 import { importPublicKey, wrapKeyForPublicKey } from '../crypto/keys.ts';
+import { createJwksSource, type RejectionReason } from '../crypto/idToken.ts';
+import {
+  autoGrantEnabledHere,
+  createLocalStorageRuleVersionStore,
+  createRejectionMemory,
+  runAutoGrant,
+} from './autoGrant.ts';
 
 const WORKSPACE_ID = 'default';
 
 export interface AccessRequest {
   userId: string;
   displayName: string;
+  /** WS14-R39: why this browser did not let them in automatically. */
+  rejection?: RejectionReason;
+}
+
+/** WS14-R39: someone this browser just let in, and through which group. */
+export interface AutoGrantNotice {
+  userId: string;
+  displayName: string;
+  matchedGroup: string;
 }
 
 export interface AccessRequestsOptions {
@@ -49,6 +65,15 @@ export function useAccessRequests(options: AccessRequestsOptions) {
   );
   const [requests, setRequests] = useState<AccessRequest[]>([]);
   const [granting, setGranting] = useState<string | null>(null);
+  const [autoGranted, setAutoGranted] = useState<AutoGrantNotice[]>([]);
+  // WS14: kept for the life of the hook, so the key cache (R21), the rule
+  // versions seen (R20) and the quiet period for failures (R27) persist
+  // across polls.
+  const [keySource] = useState(() => createJwksSource());
+  const [ruleVersions] = useState(() => createLocalStorageRuleVersionStore());
+  const [memory] = useState(() => createRejectionMemory());
+  const rejections = useRef(new Map<string, RejectionReason>());
+  const looking = useRef(false);
   /** What granting needs, found while looking. */
   const holding = useRef<{
     workspaceKey: CryptoKey;
@@ -57,7 +82,8 @@ export function useAccessRequests(options: AccessRequestsOptions) {
   } | null>(null);
 
   const look = useCallback(async () => {
-    if (!client) return;
+    if (!client || looking.current) return;
+    looking.current = true;
     const api: EnrollmentApi = {
       registerDevice: (publicKey, label) => client.registerDevice(publicKey, label),
       keysForDevice: (deviceId) => client.keysForDevice(deviceId),
@@ -94,17 +120,54 @@ export function useAccessRequests(options: AccessRequestsOptions) {
         generation,
         publicKeys: new Map(waiting.map((member) => [member.userId, member.publicKey!])),
       };
-      setRequests(
-        waiting.map((member) => ({
-          userId: member.userId,
-          displayName: member.displayName ?? 'Someone',
-        })),
-      );
+      const show = (list: typeof waiting) =>
+        setRequests(
+          list.map((member) => ({
+            userId: member.userId,
+            displayName: member.displayName ?? 'Someone',
+            ...(rejections.current.has(member.userId)
+              ? { rejection: rejections.current.get(member.userId) }
+              : {}),
+          })),
+        );
+      show(waiting);
+
+      // WS14-R26 to R28: let in, without a click, anyone the workspace's
+      // own rule admits. The decision is the verifier's; see autoGrant.ts.
+      if (autoGrantEnabledHere()) {
+        const outcome = await runAutoGrant({
+          client,
+          workspaceId: WORKSPACE_ID,
+          workspaceKey: device.workspaceKey,
+          generation,
+          keySource,
+          ruleVersions,
+          memory,
+        });
+        for (const rejected of outcome.rejected)
+          rejections.current.set(rejected.userId, rejected.reason);
+        if (outcome.granted.length > 0) {
+          const letIn = new Set(outcome.granted.map((granted) => granted.userId));
+          setAutoGranted((current) => [
+            ...current,
+            ...outcome.granted.map((granted) => ({
+              userId: granted.userId,
+              displayName: granted.displayName ?? 'Someone',
+              matchedGroup: granted.matchedGroup,
+            })),
+          ]);
+          show(waiting.filter((member) => !letIn.has(member.userId)));
+        } else if (outcome.rejected.length > 0) {
+          show(waiting);
+        }
+      }
     } catch {
       // Unreachable, or signed out. The notice is a convenience: the same
       // requests are in File > Documents whenever this can see them.
+    } finally {
+      looking.current = false;
     }
-  }, [client, storage]);
+  }, [client, storage, keySource, ruleVersions, memory]);
 
   useEffect(() => {
     if (!client) return;
@@ -140,5 +203,9 @@ export function useAccessRequests(options: AccessRequestsOptions) {
     [client],
   );
 
-  return { requests, grant, granting, refresh: look };
+  const dismissAutoGranted = useCallback((userId: string) => {
+    setAutoGranted((current) => current.filter((notice) => notice.userId !== userId));
+  }, []);
+
+  return { requests, grant, granting, refresh: look, autoGranted, dismissAutoGranted };
 }
