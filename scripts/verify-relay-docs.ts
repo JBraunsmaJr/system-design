@@ -34,12 +34,12 @@ for (const name of new Set(read)) {
 }
 const port = /process\.env\.PORT \?\? (\d+)/.exec(relay)?.[1];
 check(
-  !!port && page.includes(`| \`PORT\` | \`${port}\``),
+  !!port && new RegExp(`\\|\\s*\`PORT\`\\s*\\|\\s*\`${port}\``).test(page),
   `the documented default port matches the code (${port})`,
 );
 const ping = /RELAY_PING_TIMEOUT_MS \?\? ([\d_]+)/.exec(relay)?.[1]?.replace(/_/g, '');
 check(
-  !!ping && page.includes(`| \`RELAY_PING_TIMEOUT_MS\` | \`${ping}\``),
+  !!ping && new RegExp(`\\|\\s*\`RELAY_PING_TIMEOUT_MS\`\\s*\\|\\s*\`${ping}\``).test(page),
   `and the ping interval (${ping} ms)`,
 );
 
