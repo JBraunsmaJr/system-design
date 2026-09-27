@@ -43,6 +43,7 @@ import {
   captureCurrentScreenViewport,
   captureNodeSubsetSnapshot,
 } from '../../domain/canvas/imageExport';
+import { fitHeightToContent } from '../../common/utils/autoSizeTextarea';
 
 interface AutoResizeTextareaProps {
   value: string;
@@ -64,8 +65,7 @@ function AutoResizeTextarea({
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${Math.max(minHeight, el.scrollHeight + 2)}px`;
+    fitHeightToContent(el);
   }, [value, minHeight]);
 
   return (
@@ -78,8 +78,7 @@ function AutoResizeTextarea({
         onChange(e.target.value);
         const el = textareaRef.current;
         if (el) {
-          el.style.height = 'auto';
-          el.style.height = `${Math.max(minHeight, el.scrollHeight + 2)}px`;
+          fitHeightToContent(el);
         }
       }}
       style={{

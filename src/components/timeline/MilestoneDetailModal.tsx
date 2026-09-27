@@ -123,7 +123,7 @@ export function MilestoneDetailModal({
       if (!map.has(t.id)) map.set(t.id, t);
     }
     return Array.from(map.values());
-  }, [doc.itemTypes]);
+  }, [doc]);
 
   const currentRelatedIds = useMemo(
     () => milestone.relatedItemIds ?? milestone.relatedWorkableItemIds ?? [],

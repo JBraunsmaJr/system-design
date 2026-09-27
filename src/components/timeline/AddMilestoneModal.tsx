@@ -78,7 +78,7 @@ export function AddMilestoneModal({
       if (!map.has(t.id)) map.set(t.id, t);
     }
     return Array.from(map.values());
-  }, [doc.itemTypes]);
+  }, [doc]);
 
   const allDocItems = useMemo(() => doc.items, [doc]);
 
