@@ -59,6 +59,7 @@ export default defineConfig({
           { text: 'Core Deployment', link: '/deployment/core' },
           { text: 'Deployment with Workspaces', link: '/deployment/with-workspaces' },
           { text: 'Administering a Workspace', link: '/deployment/administration' },
+          { text: 'Automatic Access from Groups', link: '/deployment/group-access' },
           { text: 'Workspace Store Reference', link: '/deployment/workspace-store' },
           { text: 'Relay Server Reference', link: '/deployment/relay-server' },
         ],

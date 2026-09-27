@@ -170,6 +170,19 @@ workspace that accepted documents without one would accumulate content that
 nobody - including the organization that owns it - could ever recover. The
 store refuses them rather than let that happen.
 
+## Automatic access
+
+A workspace can let in everyone in a group without anyone pressing **Give
+access**. The key is still handed over by a member's browser, never by the
+server. That browser checks your identity provider's signature on the
+newcomer's sign-in, checks the sign-in names the exact key it is handing the
+workspace key to, and checks the group against a rule kept in the sealed
+document list. The server can delay a join, but cannot make one. See
+[How a grant is checked](/deployment/group-access#how-a-grant-is-checked).
+
+This does mean anyone who can add people to that group at your identity
+provider can add them to the workspace.
+
 ## Replacing a key
 
 Revoking a browser stops the workspace serving it, but that browser still

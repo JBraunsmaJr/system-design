@@ -59,6 +59,10 @@ import { createRecoveryCode, recoverWithCode } from '../collab/recoveryCode';
 import { importPublicKey, wrapKeyForPublicKey } from '../crypto/keys';
 import { announceWorkspaceChange } from '../collab/useWorkspaceSync';
 import { unwrapPrivateKeyWithPrivateKey } from '../crypto/keys';
+import { startSignIn } from '../collab/joinFlow';
+import { useJoinStatus } from '../collab/useJoinStatus';
+import { describeRejection } from '../collab/autoGrant';
+import { AccessRuleSettings } from './AccessRuleSettings';
 
 const WORKSPACE_ID = 'default';
 
@@ -86,6 +90,8 @@ type Phase =
   /** Signed in, with keys of their own, but not yet given the workspace
    * key by anyone who has it (WS7-R8). */
   | 'awaiting-access'
+  /** WS14-R31, R40: taken out of the workspace; the store refuses them. */
+  | 'removed'
   | 'ready'
   | 'error';
 
@@ -95,7 +101,19 @@ interface Member {
   displayName?: string;
   publicKey?: string;
   hasAccess: boolean;
+  /** WS14-R30: set when a group's rule let them in. */
+  matchedGroup?: string | null;
+  /** WS14-R40: when they were removed, if they were, and why. */
+  removedAt?: string | null;
+  removedCause?: 'sign-in' | 'rule-change' | 'by-member' | null;
 }
+
+/** WS14-R40: why someone was removed, in the member list's words. */
+const REMOVED_BECAUSE = {
+  'sign-in': 'no longer in a group this workspace admits',
+  'rule-change': 'the automatic access rule changed',
+  'by-member': 'removed by a member',
+} as const;
 
 interface PendingDevice {
   deviceId: string;
@@ -126,6 +144,12 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
   /** Whether this person may grant access: discovered by asking, since
    * only an administrator may list members (WS10-R2). */
   const [canGrant, setCanGrant] = useState(false);
+  /** This person's own id, once known: automatic access records who saved
+   * the rule (WS14-R8). */
+  const [myUserId, setMyUserId] = useState<string | null>(null);
+  /** The workspace key, as state for rendering; the ref above is for
+   * handlers, which must not wait for a render to see a new key. */
+  const [readyKey, setReadyKey] = useState<CryptoKey | null>(null);
   const [devices, setDevices] = useState<
     { deviceId: string; label?: string; approvedAt: string | null; revokedAt: string | null }[]
   >([]);
@@ -170,6 +194,15 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
     [client],
   );
 
+  // WS14-R38: what someone waiting is told, and how to sign in again.
+  const join = useJoinStatus({
+    client,
+    storeUrl: props.storeUrl,
+    // Someone removed can ask to rejoin the same way, once they are back in
+    // a group the workspace admits.
+    active: phase === 'awaiting-access' || phase === 'removed',
+  });
+
   const refresh = useCallback(async () => {
     setBusy(true);
     try {
@@ -186,6 +219,7 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
       setDevice(state);
       if (state.status === 'ready' && state.workspaceKey) {
         workspaceKey.current = state.workspaceKey;
+        setReadyKey(state.workspaceKey);
         setPhase('ready');
         await loadEntries(state.workspaceKey);
         // Devices of this person still waiting for approval (WS7-R11).
@@ -208,6 +242,7 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
         try {
           const listedMembers = await client.listMembers();
           const me = await client.me();
+          setMyUserId(me.userId);
           setMembers(
             listedMembers
               .filter((member) => member.userId !== me.userId)
@@ -216,6 +251,9 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
                 displayName: member.displayName,
                 publicKey: member.publicKey,
                 hasAccess: (member.workspaceKeyGenerations ?? []).includes(generation),
+                matchedGroup: member.source === 'oidc_group' ? member.matchedGroup : null,
+                removedAt: member.removedAt ?? null,
+                removedCause: member.removedCause ?? null,
               })),
           );
           setCanGrant(true);
@@ -241,16 +279,25 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
       } else if (state.status === 'needs-setup') {
         // The person's first browser: it makes the keys.
         setPhase('enrolling');
+      } else if (state.cause instanceof StoreClientError && state.cause.reason === 'removed') {
+        // WS14-R31: not a fault - they were taken out of the workspace.
+        setPhase('removed');
       } else {
         setPhase('error');
         setMessage(state.message ?? null);
       }
       setMessage(null);
     } catch (error) {
+      const removed = error instanceof StoreClientError && error.reason === 'removed';
       setPhase(
-        error instanceof StoreClientError && error.reason === 'offline' ? 'offline' : 'error',
+        removed
+          ? 'removed'
+          : error instanceof StoreClientError && error.reason === 'offline'
+            ? 'offline'
+            : 'error',
       );
-      setMessage(say(error));
+      // The removed screen says it in its own words.
+      setMessage(removed ? null : say(error));
     } finally {
       setBusy(false);
     }
@@ -264,7 +311,8 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
    * closing and reopening the dialog.
    */
   useEffect(() => {
-    if (phase !== 'ready' && phase !== 'awaiting-access') return;
+    // Removed people too: being let back in should show without reopening.
+    if (phase !== 'ready' && phase !== 'awaiting-access' && phase !== 'removed') return;
     const timer = setInterval(() => void refresh(), 5000);
     return () => clearInterval(timer);
   }, [phase, refresh]);
@@ -303,6 +351,7 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
       setDevice(state);
       if (state.status === 'ready' && state.workspaceKey) {
         workspaceKey.current = state.workspaceKey;
+        setReadyKey(state.workspaceKey);
         setPhase('ready');
         await loadEntries(state.workspaceKey);
       } else {
@@ -401,6 +450,7 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
           currentGeneration: generation,
         });
         workspaceKey.current = result.workspaceKey;
+        setReadyKey(result.workspaceKey);
         setGeneration(result.generation);
         setRotationAdvised(false);
         await loadEntries(result.workspaceKey);
@@ -423,6 +473,19 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
    * nothing secret passes through this one except in wrapped form, and
    * the store never sees the key itself.
    */
+  /** WS14-R40: takes someone out now; the key is replaced after. */
+  const removeAccess = (member: Member) => {
+    const name = member.displayName ?? member.userId;
+    const confirmed = globalThis.confirm?.(
+      `Remove ${name} from this workspace? They lose access at once, and the workspace key is replaced so the key they hold opens nothing saved from now on.`,
+    );
+    if (!confirmed) return;
+    return run(async () => {
+      await client.removeMember(member.userId);
+      await refresh();
+    });
+  };
+
   const grantAccess = (member: Member) =>
     run(async () => {
       const key = workspaceKey.current;
@@ -571,11 +634,8 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
               key={provider}
               type="button"
               className="workspace-panel__sign-in"
-              onClick={() =>
-                globalThis.location.assign(
-                  `${props.storeUrl}/v1/auth/${encodeURIComponent(provider)}/start`,
-                )
-              }
+              // WS14-R2: commits to a key first where automatic access can use it.
+              onClick={() => void startSignIn(props.storeUrl, provider)}
             >
               {provider}
             </button>
@@ -597,13 +657,72 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
         </div>
       )}
 
+      {phase === 'removed' && (
+        <div className="workspace-panel__removed-notice" style={{ display: 'grid', gap: 6 }}>
+          <p style={{ margin: 0 }}>
+            You are no longer in this workspace, so this browser can no longer open it. If that is a
+            mistake, ask someone in it to give you access again.
+          </p>
+          {join.view === 'waiting' && (
+            <p style={{ margin: 0 }} data-join-view="waiting">
+              You are in a group this workspace admits again, so you will be let back in the next
+              time someone in it has the editor open.
+            </p>
+          )}
+          {join.view !== 'waiting' && join.view !== 'manual' && (
+            <button
+              type="button"
+              className="workspace-panel__sign-in-again"
+              onClick={() => void join.signInAgain()}
+              disabled={busy}
+              style={{ justifySelf: 'start' }}
+            >
+              Back in the group? Sign in again
+            </button>
+          )}
+        </div>
+      )}
+
       {phase === 'awaiting-access' && (
         <div className="workspace-panel__awaiting-access" style={{ display: 'grid', gap: 6 }}>
-          <p style={{ margin: 0 }}>
-            You are signed in, and this workspace already exists. Anyone already in it can see that
-            you are waiting and give you access — ask them to open File &gt; Documents. Until they
-            do, nothing here can read the workspace, and neither can the server.
-          </p>
+          {join.view === 'waiting' ? (
+            <p style={{ margin: 0 }} data-join-view="waiting">
+              You will be let in automatically the next time someone in this workspace has the
+              editor open. You do not need to ask anyone.
+              {join.lastRejection &&
+                ` The last check did not pass: ${describeRejection(join.lastRejection)}.`}
+            </p>
+          ) : join.view === 'expired' ? (
+            <p style={{ margin: 0 }} data-join-view="expired">
+              Your sign-in is too old to be checked. Sign in again to be let in automatically.
+            </p>
+          ) : (
+            <p style={{ margin: 0 }} data-join-view={join.view}>
+              {join.view === 'overage'
+                ? 'Your organization sent too many groups with your sign-in for them to be checked, so someone has to give you access by hand. '
+                : join.view === 'needs-oidc'
+                  ? "Automatic access needs your organization's sign-in. Sign in with it to be let in automatically, or wait for someone to give you access. "
+                  : join.view === 'not-covered'
+                    ? 'None of your groups is set up for automatic access here. '
+                    : ''}
+              You are signed in, and this workspace already exists. Anyone already in it can see
+              that you are waiting and give you access — ask them to open File &gt; Documents. Until
+              they do, nothing here can read the workspace, and neither can the server.
+            </p>
+          )}
+          {(join.view === 'expired' || join.view === 'can-retry' || join.view === 'needs-oidc') && (
+            <button
+              type="button"
+              className="workspace-panel__sign-in-again"
+              onClick={() => void join.signInAgain()}
+              disabled={busy}
+              style={{ justifySelf: 'start' }}
+            >
+              {join.view === 'can-retry'
+                ? 'Sign in again to be let in automatically'
+                : 'Sign in again'}
+            </button>
+          )}
           <button
             type="button"
             className="workspace-panel__recheck"
@@ -765,8 +884,31 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
                 >
                   <Users size={12} />
                   <span style={{ flex: 1 }}>{member.displayName ?? member.userId}</span>
-                  {member.hasAccess ? (
-                    <span style={{ color: 'var(--text-muted, #9aa3b2)' }}>has access</span>
+                  {member.removedAt ? (
+                    <span
+                      style={{ color: 'var(--text-muted, #9aa3b2)' }}
+                      className="workspace-panel__removed"
+                    >
+                      removed {new Date(member.removedAt).toLocaleDateString()}
+                      {member.removedCause && ` — ${REMOVED_BECAUSE[member.removedCause]}`}
+                    </span>
+                  ) : member.hasAccess ? (
+                    <>
+                      <span style={{ color: 'var(--text-muted, #9aa3b2)' }}>
+                        {member.matchedGroup
+                          ? `joined through ${member.matchedGroup}`
+                          : 'has access'}
+                      </span>
+                      <button
+                        type="button"
+                        className="workspace-panel__remove"
+                        onClick={() => void removeAccess(member)}
+                        disabled={busy}
+                        title="Take away their access now, and replace the workspace key"
+                      >
+                        Remove
+                      </button>
+                    </>
                   ) : (
                     <button
                       type="button"
@@ -785,6 +927,15 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
                 </div>
               ))}
             </div>
+          )}
+
+          {canGrant && myUserId && readyKey && (
+            <AccessRuleSettings
+              client={client}
+              workspaceId={WORKSPACE_ID}
+              workspaceKey={readyKey}
+              userId={myUserId}
+            />
           )}
 
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>

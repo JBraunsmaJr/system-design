@@ -78,24 +78,26 @@ The store reads its configuration from the environment, prints what it is at
 startup, and refuses to start on anything unusable rather than falling back
 to a quiet default.
 
-| Variable                                   | Required                      | Purpose                                                                                      |
-| :----------------------------------------- | :---------------------------- | :------------------------------------------------------------------------------------------- |
-| `PUBLIC_URL`                               | yes                           | Where people reach the store. Sign-in returns here.                                          |
-| `DATABASE_URL`                             | no                            | PostgreSQL. Without it everything is kept in memory - demonstrations only.                   |
-| `PORT`                                     | no                            | Default 8080.                                                                                |
-| `ALLOWED_ORIGINS`                          | where the editor is elsewhere | Exact origins the editor is served from. No wildcards.                                       |
-| `AFTER_LOGIN_URL`                          | no                            | Where people land after signing in. Defaults to the first allowed origin.                    |
-| `AUTH_PROVIDERS`                           | yes                           | `oidc`, `github`, or both.                                                                   |
-| `OIDC_ISSUER`                              | with `oidc`                   | The issuer URL **as the browser sees it**.                                                   |
-| `OIDC_INTERNAL_URL`                        | in a container network        | The address _the store_ uses, when it differs.                                               |
-| `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`     | with `oidc`                   | This store's client. The secret stays on the server.                                         |
-| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | with `github`                 | A GitHub OAuth app.                                                                          |
-| `RECOVERY_PUBLIC_KEY_FILE`                 | with encryption on            | PEM file holding the recovery **public** key.                                                |
-| `ADMIN_SUBJECTS`                           | no                            | `issuer#subject` per administrator. With none set, holds and purges are refused to everyone. |
-| `RETENTION_PERIOD`                         | no                            | `immediate`, a duration (`7d`, `6m`, `7y`), or `indefinite`. Default `30d`.                  |
-| `RELAY_TOKEN_SECRET`                       | no                            | Shared with the relay to require membership for sessions.                                    |
-| `CRYPTO_MODE`                              | no                            | `webcrypto` (default) or `passthrough`.                                                      |
-| `ALLOW_UNAUTHENTICATED`                    | no                            | `true` runs with no sign-in at all. Development only.                                        |
+| Variable                                   | Required                      | Purpose                                                                                                                                                                                                                                                                          |
+| :----------------------------------------- | :---------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PUBLIC_URL`                               | yes                           | Where people reach the store. Sign-in returns here.                                                                                                                                                                                                                              |
+| `DATABASE_URL`                             | no                            | PostgreSQL. Without it everything is kept in memory - demonstrations only.                                                                                                                                                                                                       |
+| `PORT`                                     | no                            | Default 8080.                                                                                                                                                                                                                                                                    |
+| `ALLOWED_ORIGINS`                          | where the editor is elsewhere | Exact origins the editor is served from. No wildcards.                                                                                                                                                                                                                           |
+| `AFTER_LOGIN_URL`                          | no                            | Where people land after signing in. Defaults to the first allowed origin.                                                                                                                                                                                                        |
+| `AUTH_PROVIDERS`                           | yes                           | `oidc`, `github`, or both.                                                                                                                                                                                                                                                       |
+| `OIDC_ISSUER`                              | with `oidc`                   | The issuer URL **as the browser sees it**.                                                                                                                                                                                                                                       |
+| `OIDC_INTERNAL_URL`                        | in a container network        | The address _the store_ uses, when it differs.                                                                                                                                                                                                                                   |
+| `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`     | with `oidc`                   | This store's client. The secret stays on the server.                                                                                                                                                                                                                             |
+| `OIDC_GROUPS_CLAIM`                        | no                            | The ID-token claim holding groups, for [automatic access](/deployment/group-access). Default `groups`.                                                                                                                                                                           |
+| `OIDC_GROUPS_CLAIM_ABSENT`                 | no                            | What a token without the groups claim means: `no-groups` (default; Keycloak leaves the claim out for someone in no groups, so they are removed as for leaving) or `unknown` (it tells nothing, and removes nobody). A claim that is present but not a list always tells nothing. |
+| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | with `github`                 | A GitHub OAuth app.                                                                                                                                                                                                                                                              |
+| `RECOVERY_PUBLIC_KEY_FILE`                 | with encryption on            | PEM file holding the recovery **public** key.                                                                                                                                                                                                                                    |
+| `ADMIN_SUBJECTS`                           | no                            | `issuer#subject` per administrator. With none set, holds and purges are refused to everyone.                                                                                                                                                                                     |
+| `RETENTION_PERIOD`                         | no                            | `immediate`, a duration (`7d`, `6m`, `7y`), or `indefinite`. Default `30d`.                                                                                                                                                                                                      |
+| `RELAY_TOKEN_SECRET`                       | no                            | Shared with the relay to require membership for sessions.                                                                                                                                                                                                                        |
+| `CRYPTO_MODE`                              | no                            | `webcrypto` (default) or `passthrough`.                                                                                                                                                                                                                                          |
+| `ALLOW_UNAUTHENTICATED`                    | no                            | `true` runs with no sign-in at all. Development only.                                                                                                                                                                                                                            |
 
 The editor needs one setting of its own: `STORE_URL`, the store's public
 address. Without it, the editor shows no workspace.
@@ -104,12 +106,12 @@ address. Without it, the editor shows no workspace.
 
 Register the store as a **confidential client**:
 
-| Setting      | Value                                                           |
-| :----------- | :-------------------------------------------------------------- |
-| Redirect URI | **Exactly** `<PUBLIC_URL>/v1/auth/callback`                     |
-| Client type  | Confidential - the secret stays on the server                   |
-| Flow         | Authorization Code with PKCE                                    |
-| Scopes       | `openid profile` - only the subject and a display name are read |
+| Setting      | Value                                                                                                                    |
+| :----------- | :----------------------------------------------------------------------------------------------------------------------- |
+| Redirect URI | **Exactly** `<PUBLIC_URL>/v1/auth/callback`                                                                              |
+| Client type  | Confidential - the secret stays on the server                                                                            |
+| Flow         | Authorization Code with PKCE                                                                                             |
+| Scopes       | `openid profile` - the subject and a display name, plus groups when [automatic access](/deployment/group-access) is used |
 
 Two things catch people out:
 

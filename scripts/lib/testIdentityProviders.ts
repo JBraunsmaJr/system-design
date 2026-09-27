@@ -35,6 +35,9 @@ export interface TestOidcProvider {
   misbehave(mode: Misbehaviour): void;
   /** Who the provider says signed in. */
   setSubject(subject: string, name?: string): void;
+  /** Extra claims for the next tokens - `groups` for WS14, or `_claim_names`
+   * to act like Entra's group overage. Replaces any set before. */
+  setClaims(claims: Record<string, unknown>): void;
   close(): Promise<void>;
 }
 
@@ -77,6 +80,7 @@ export async function startTestOidcProvider(
   let subject = options.subject ?? 'user-1';
   let displayName = 'Test User';
   let misbehaviour: Misbehaviour = 'none';
+  let extraClaims: Record<string, unknown> = {};
   let profileCompleted = false;
   let issuer = '';
 
@@ -244,6 +248,7 @@ export async function startTestOidcProvider(
         iat: mode === 'expired' ? nowSeconds - 7200 : nowSeconds,
         nonce: mode === 'wrong-nonce' ? 'not-the-nonce' : pending.nonce,
         name: displayName,
+        ...extraClaims,
       };
       return json(200, { access_token: 'x', token_type: 'Bearer', id_token: sign(payload, mode) });
     }
@@ -265,6 +270,9 @@ export async function startTestOidcProvider(
     setSubject(next, name) {
       subject = next;
       if (name) displayName = name;
+    },
+    setClaims(claims) {
+      extraClaims = { ...claims };
     },
     close: () => new Promise<void>((resolve) => server.close(() => resolve())),
   };

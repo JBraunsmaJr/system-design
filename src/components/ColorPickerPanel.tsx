@@ -57,20 +57,6 @@ export function ColorPickerPanel({
   className,
 }: ColorPickerPanelProps) {
   const resolved = value !== undefined ? value : defaultValue;
-  const customColorInputRef = React.useRef<HTMLInputElement>(null);
-
-  React.useEffect(() => {
-    const input = customColorInputRef.current;
-    if (!input) return;
-
-    const handleNativeChange = () => {
-      onChange(input.value);
-      onClose?.();
-    };
-
-    input.addEventListener('change', handleNativeChange);
-    return () => input.removeEventListener('change', handleNativeChange);
-  }, [onClose, onChange]);
 
   const handleSelectColor = (color: string) => {
     onChange(color);
@@ -165,7 +151,10 @@ export function ColorPickerPanel({
               ? resolved
               : '#5B7CFA'
           }
-          ref={customColorInputRef}
+          onChange={(e) => {
+            onChange(e.target.value);
+            onClose?.();
+          }}
           style={{
             width: 20,
             height: 20,

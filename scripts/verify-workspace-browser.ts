@@ -144,8 +144,7 @@ async function run() {
     };
 
     const signIn = async (page: Page) => {
-      await page.click('.workspace-panel__sign-in');
-      await page.waitForURL(/system-design/, { timeout: 15000 });
+      await Promise.all([page.waitForNavigation(), page.click('.workspace-panel__sign-in')]);
       await page.waitForFunction("typeof window.__PERF__?.loadFixture === 'function'", null, {
         timeout: 15000,
       });
