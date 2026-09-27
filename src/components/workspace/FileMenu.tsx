@@ -34,10 +34,14 @@ export function FileMenu({
     isOpen,
   });
 
+  const close = () => {
+    setIsOpen(false);
+  };
+
   useOutsideClick({
     refs: [triggerRef, dropdownRef],
     isOpen,
-    onClose: () => setIsOpen(false),
+    onClose: close,
   });
 
   return (
@@ -45,7 +49,7 @@ export function FileMenu({
       <button
         ref={triggerRef}
         type="button"
-        onClick={() => (isOpen ? close() : open())}
+        onClick={() => setIsOpen((prev) => !prev)}
         title="File"
       >
         <FilePlus2 size={14} />

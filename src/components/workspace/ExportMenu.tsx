@@ -31,10 +31,14 @@ export function ExportMenu({
     isOpen,
   });
 
+  const close = () => {
+    setIsOpen(false);
+  };
+
   useOutsideClick({
     refs: [triggerRef, dropdownRef],
     isOpen,
-    onClose: () => setIsOpen(false),
+    onClose: close,
   });
 
   return (
@@ -43,7 +47,7 @@ export function ExportMenu({
         ref={triggerRef}
         type="button"
         disabled={disabled}
-        onClick={() => (isOpen ? close() : open())}
+        onClick={() => setIsOpen((prev) => !prev)}
         title="Export"
       >
         <Download size={14} />

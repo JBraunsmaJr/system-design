@@ -94,7 +94,7 @@ export function CategoryPicker({
         type="button"
         className={`category-picker__trigger${current ? '' : ' is-empty'}`}
         style={current ? { borderColor: `${current.color}66`, color: current.color } : undefined}
-        onClick={() => (isOpen ? close() : open())}
+        onClick={() => (isOpen ? close() : setIsOpen(true))}
       >
         <Tag size={11} />
         {current ? <HighlightedText text={current.label} search={searchQuery} /> : 'Category'}

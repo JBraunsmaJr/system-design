@@ -84,7 +84,7 @@ export function SprintPicker({
         ref={triggerRef}
         type="button"
         className={`sprint-picker__trigger${current ? '' : ' is-empty'}`}
-        onClick={() => (isOpen ? close() : open())}
+        onClick={() => (isOpen ? close() : setIsOpen(true))}
         title={
           current
             ? `${current.pi.name} \u2022 ${current.range?.startDate} \u2013 ${current.range?.endDate}`

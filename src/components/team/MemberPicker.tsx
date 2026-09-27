@@ -37,10 +37,14 @@ export function MemberPicker({
     isOpen,
   });
 
+  const close = () => {
+    setIsOpen(false);
+  };
+
   useOutsideClick({
     refs: [triggerRef, menuRef],
     isOpen,
-    onClose: () => setIsOpen(false),
+    onClose: close,
   });
 
   const getInitials = (name: string) => {
@@ -61,7 +65,7 @@ export function MemberPicker({
         className={`member-picker__trigger${compact ? ' member-picker__trigger--compact' : ''}${
           assignedMember ? ' is-assigned' : ''
         }`}
-        onClick={() => (isOpen ? close() : open())}
+        onClick={() => setIsOpen((prev) => !prev)}
         title={assignedMember ? `Assigned to ${assignedMember.name}` : 'Assign team member'}
         aria-label={assignedMember ? `Assigned to ${assignedMember.name}` : 'Assign team member'}
       >
