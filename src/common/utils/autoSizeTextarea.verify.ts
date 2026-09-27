@@ -1,5 +1,5 @@
 /**
- * Run with: npx tsx --tsconfig tsconfig.app.json src/domain/autoSizeTextarea.verify.ts
+ * Run with: npx tsx --tsconfig tsconfig.app.json src/common/utils/autoSizeTextarea.verify.ts
  *
  * The stub below MODELS the browser's scrollHeight rule (it reports the
  * greater of the content height and the element's own height) rather

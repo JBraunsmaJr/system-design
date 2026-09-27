@@ -129,12 +129,6 @@ export function getListIndentBehavior(line: string, indent: boolean): IndentResu
 }
 
 /**
- * Wraps the selected text in `before`/`after` markers (e.g. bold/italic).
- * If nothing is selected, inserts `before` + `placeholder` + `after` with
- * the placeholder itself selected, so the user can either type over it
- * immediately or click past it to keep the markers empty.
- */
-/**
  * Wraps the current selection in `before`/`after`, or inserts
  * `placeholder` wrapped when nothing is selected.
  *

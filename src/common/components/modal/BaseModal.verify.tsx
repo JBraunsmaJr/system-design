@@ -53,5 +53,28 @@ function assert(condition: boolean, message: string) {
   assert(html.includes('aria-label="Warning Notice"'), 'aria-label is passed correctly');
 }
 
+// 4. BaseModal supports custom width and lets class styles apply when width is omitted
+{
+  const withCustomWidth = renderToStaticMarkup(
+    <BaseModal isOpen={true} onClose={() => {}} width={720}>
+      <p>Custom Width</p>
+    </BaseModal>,
+  );
+  assert(
+    withCustomWidth.includes('width:720px') || withCustomWidth.includes('width: 720px'),
+    'Custom width is applied in style attribute',
+  );
+
+  const withClassOnly = renderToStaticMarkup(
+    <BaseModal isOpen={true} onClose={() => {}} className="milestone-detail-modal">
+      <p>Class Sized</p>
+    </BaseModal>,
+  );
+  assert(
+    !withClassOnly.includes('width:520px') && !withClassOnly.includes('width: 520px'),
+    'Omitted width does not force a 520px inline style',
+  );
+}
+
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);
 if (failures > 0) throw new Error(`${failures} test(s) failed`);

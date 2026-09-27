@@ -1,6 +1,6 @@
 import { useOutsideClick } from './useOutsideClick';
 import { usePositionedDropdown } from './usePositionedDropdown';
-import { computeFlippedPosition } from '../../domain/canvas/popoverPosition';
+import { computeFlippedPosition } from '../utils/popoverPosition';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {

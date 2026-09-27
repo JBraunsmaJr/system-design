@@ -177,6 +177,7 @@ export function RequirementDetailModal({
       className="requirement-detail-modal"
       padding={0}
       closeOnEscape={!isEditing}
+      width={window.innerWidth >= 1200 ? 1200 : window.innerWidth * 0.8}
     >
       <div className="requirement-detail-modal__header">
         <div className="requirement-detail-modal__tags">

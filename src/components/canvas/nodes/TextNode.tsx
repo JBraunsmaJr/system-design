@@ -3,6 +3,7 @@ import { NodeResizer, type NodeProps, type Node } from '@xyflow/react';
 import type { ArchNodeData } from '../../../domain/canvas/types';
 import { useCanvasContext } from '../CanvasContext';
 import { recordNodeRender } from '../../../perf/instrumentation';
+import { fitHeightToContent } from '../../../common/utils/autoSizeTextarea';
 
 type TextNodeType = Node<ArchNodeData, 'text'>;
 
@@ -44,8 +45,7 @@ export function TextNode({
   // manually-set size yet - once resized, the box owns its own dimensions.
   useEffect(() => {
     if (isEditing && textareaRef.current && !hasManualSize) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+      fitHeightToContent(textareaRef.current);
     }
   }, [isEditing, data.label, hasManualSize]);
 

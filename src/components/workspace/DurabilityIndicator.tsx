@@ -14,8 +14,8 @@ import {
   deriveDurability,
   type DurabilitySignals,
   type DurabilityLevel,
-} from '../../domain/storage/durability.ts';
-import { computeFlippedPosition } from '../../domain/canvas/popoverPosition';
+} from '../../domain/storage/durability';
+import { computeFlippedPosition } from '../../common/utils/popoverPosition';
 
 /**
  * Tells the user whether their work is actually safe (WS13-R8, WS13-R9).

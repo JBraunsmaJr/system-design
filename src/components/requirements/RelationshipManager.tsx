@@ -8,7 +8,7 @@ import {
   getOtherItemId,
   getRelationshipLabelForItem,
 } from '../../domain/requirements/requirementsRegistry';
-import { computeFlippedPosition } from '../../domain/canvas/popoverPosition';
+import { computeFlippedPosition } from '../../common/utils/popoverPosition';
 import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
 import { HighlightedText, HighlightedTitle } from '../../common/components/highlight/HighlightText';
 import { useItemPeek } from './useItemPeek';

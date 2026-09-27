@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useState, type RefObject } from 'react';
-import { computeFlippedPosition } from '../../domain/canvas/popoverPosition';
+import { computeFlippedPosition } from '../utils/popoverPosition';
 
 export interface UsePositionedDropdownOptions {
   triggerRef: RefObject<HTMLElement | null>;
@@ -33,10 +33,7 @@ export function usePositionedDropdown({
     const dropdown = dropdownRef.current;
 
     if (!dropdown) {
-      const estimatedLeft = Math.max(
-        8,
-        Math.min(triggerRect.right - 240, window.innerWidth - 248),
-      );
+      const estimatedLeft = Math.max(8, Math.min(triggerRect.right - 240, window.innerWidth - 248));
       setPosition({
         top: triggerRect.bottom + offsetY,
         left: estimatedLeft,
@@ -53,10 +50,7 @@ export function usePositionedDropdown({
       offsetY,
     );
     setPosition((prev) =>
-      prev &&
-      prev.top === next.top &&
-      prev.left === next.left &&
-      prev.width === triggerRect.width
+      prev && prev.top === next.top && prev.left === next.left && prev.width === triggerRect.width
         ? prev
         : { ...next, width: triggerRect.width },
     );

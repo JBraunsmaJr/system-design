@@ -8,14 +8,14 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { getCaretPixelPosition } from '../../domain/canvas/caretPosition';
-import { computeFlippedPosition, type AnchorRect } from '../../domain/canvas/popoverPosition';
+import { getCaretPixelPosition } from '../../common/utils/caretPosition';
+import { computeFlippedPosition, type AnchorRect } from '../../common/utils/popoverPosition';
 import {
   getCurrentLineBounds,
   getListEnterBehavior,
   getListIndentBehavior,
-} from '../../domain/requirements/markdownEditing';
-import { fitHeightToContent } from '../../domain/requirements/autoSizeTextarea';
+} from '../../common/utils/markdownEditing';
+import { fitHeightToContent } from '../../common/utils/autoSizeTextarea';
 import type {
   RequirementItem,
   RequirementsDocument,

@@ -204,6 +204,7 @@ export function ManageReservationsModal({
       ariaLabel={`Capacity Reservations for ${pi.name}`}
       className="manage-reservations-modal"
       padding={0}
+      width={1200}
     >
       {/* Header */}
       <div className="manage-reservations-modal__header">

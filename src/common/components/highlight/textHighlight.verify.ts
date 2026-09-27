@@ -1,5 +1,5 @@
 /**
- * Run with: npx tsx --tsconfig tsconfig.app.json src/domain/textHighlight.verify.ts
+ * Run with: npx tsx --tsconfig tsconfig.app.json src/common/components/highlight/textHighlight.verify.ts
  */
 import { splitByHighlight, computeTruncationWithHighlight } from './textHighlight';
 

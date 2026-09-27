@@ -21,7 +21,7 @@ import {
   loadRequirementsViewPrefs,
   saveRequirementsViewPrefs,
 } from '../../domain/requirements/requirementsViewPrefs';
-import { markdownExcerpt, markdownPreviewSource } from '../../domain/requirements/markdownExcerpt';
+import { markdownExcerpt, markdownPreviewSource } from '../../common/utils/markdownExcerpt';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {

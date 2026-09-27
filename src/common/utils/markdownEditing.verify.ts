@@ -1,5 +1,5 @@
 /**
- * Run with: npx tsx --tsconfig tsconfig.app.json src/domain/markdownEditing.verify.ts
+ * Run with: npx tsx --tsconfig tsconfig.app.json src/common/utils/markdownEditing.verify.ts
  *
  * The key assertions here don't just compare strings - they run the
  * produced text through the SAME markdown parser the app renders with,

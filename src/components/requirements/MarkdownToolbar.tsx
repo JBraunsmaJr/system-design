@@ -4,7 +4,7 @@ import {
   insertLinePrefix,
   insertTableSkeleton,
   wrapSelection,
-} from '../../domain/requirements/markdownEditing';
+} from '../../common/utils/markdownEditing';
 
 interface MarkdownToolbarProps {
   textareaRef: RefObject<HTMLTextAreaElement | null>;

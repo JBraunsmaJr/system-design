@@ -10,7 +10,7 @@ import {
 import { NodeResizer, type NodeProps, type Node } from '@xyflow/react';
 import * as Icons from 'lucide-react';
 import { getCodeLanguage } from '../../../domain/canvas/codeRegistry';
-import { highlightCode } from '../../../domain/requirements/prismSetup';
+import { highlightCode } from '../../../common/utils/prismSetup';
 import { EdgeHandles } from './EdgeHandles';
 import type { ArchNodeData } from '../../../domain/canvas/types';
 import { useCanvasContext } from '../CanvasContext';

@@ -3,7 +3,7 @@ import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import { resolveReferencesToMarkdownLinks } from '../../domain/requirements/requirementsRegistry';
 import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
-import { markdownPreviewSource } from '../../domain/requirements/markdownExcerpt';
+import { markdownPreviewSource } from '../../common/utils/markdownExcerpt';
 
 /** Same sentinel RequirementBody uses for #ID references turned into links. */
 const REF_SCHEME_PREFIX = '#ref:';
