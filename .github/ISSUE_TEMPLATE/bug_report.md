@@ -26,12 +26,12 @@ If applicable, add screenshots to help explain your problem.
 
 **Desktop (please complete the following information):**
 
-| Info                         |                       |
-| ---------------------------- | --------------------- |
-| OS                           | [e.g. iOS]            |
-| Browser                      | [e.g. chrome, safari] |
-| Browser Version              | [e.g. 22]             |
-| System Design Editor Version | [e.g. 0.91.3]         |
+| Info                       |                       |
+| -------------------------- | --------------------- |
+| OS                         | [e.g. iOS]            |
+| Browser                    | [e.g. chrome, safari] |
+| Browser Version            | [e.g. 22]             |
+| Engineers Notebook Version | [e.g. 0.91.3]         |
 
 **Additional context**
 Add any other context about the problem here.

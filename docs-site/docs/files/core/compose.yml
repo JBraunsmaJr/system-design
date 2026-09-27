@@ -1,4 +1,4 @@
-# System Design Editor - core deployment: the editor and its relay.
+# Engineers Notebook - core deployment: the editor and its relay.
 #
 # One domain, one TLS proxy:
 #   https://<DOMAIN>/        the editor (and its documentation at /docs/)

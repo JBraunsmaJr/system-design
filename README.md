@@ -1,4 +1,4 @@
-# System Design Editor
+# Engineers Notebook
 
 [Hosting Guide](https://jbraunsmajr.github.io/system-design/docs/deployment/self-host)
 

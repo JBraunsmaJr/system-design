@@ -48,7 +48,13 @@ async function documentIndex(
   return p.evaluate(
     () =>
       new Promise((res, rej) => {
-        const open = indexedDB.open('system-design-editor');
+        const open = indexedDB.open('system-design-editor', 1);
+        open.onupgradeneeded = () => {
+          const db = open.result;
+          if (!db.objectStoreNames.contains('documents')) {
+            db.createObjectStore('documents');
+          }
+        };
         open.onerror = () => rej(open.error);
         open.onsuccess = () => {
           const db = open.result;
@@ -66,6 +72,26 @@ async function documentIndex(
         };
       }),
   );
+}
+
+async function waitForDocumentIndex(
+  p: Page,
+  predicate: (
+    entries: { docId: string; title: string; origin: string; sessionRoom?: string }[],
+  ) => boolean,
+  timeout = 10000,
+): Promise<{ docId: string; title: string; origin: string; sessionRoom?: string }[]> {
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    try {
+      const entries = await documentIndex(p);
+      if (predicate(entries)) return entries;
+    } catch {
+      // transient read failure while writing
+    }
+    await sleep(100);
+  }
+  return documentIndex(p);
 }
 
 const databaseNames = (p: Page) =>
@@ -102,7 +128,9 @@ async function run() {
       await p.fill('[aria-label="Diagram title"]', 'Persisted title');
       await sleep(SAVE_WAIT);
       check((await legacyDraft(p)) === null, 'the retired localStorage draft slot is not written');
-      const index = await documentIndex(p);
+      const index = await waitForDocumentIndex(p, (entries) =>
+        entries.some((e) => e.docId === 'local' && e.title === 'Persisted title'),
+      );
       check(
         index.some((e) => e.docId === 'local' && e.title === 'Persisted title'),
         'the document index lists it with its current title',
@@ -170,7 +198,11 @@ async function run() {
       );
       await beta.evaluate(`window.__PERF__.loadFixture("small")`);
       await beta.fill('[aria-label="Diagram title"]', 'Beta');
-      await sleep(SAVE_WAIT);
+      await waitForDocumentIndex(
+        alpha,
+        (entries) =>
+          entries.some((e) => e.docId === 'alpha') && entries.some((e) => e.docId === 'beta'),
+      );
       await alpha.reload();
       await beta.reload();
       await ready(alpha);
@@ -184,7 +216,12 @@ async function run() {
         (await nodeCount(beta)) === 25 && (await titleOf(beta)) === 'Beta',
         `beta keeps its own content (${await nodeCount(beta)} nodes, "${await titleOf(beta)}")`,
       );
-      const ids = (await documentIndex(alpha)).map((e) => e.docId);
+      const index = await waitForDocumentIndex(
+        alpha,
+        (entries) =>
+          entries.some((e) => e.docId === 'alpha') && entries.some((e) => e.docId === 'beta'),
+      );
+      const ids = index.map((e) => e.docId);
       check(
         ids.includes('alpha') && ids.includes('beta'),
         `both are in the index (${ids.join(', ')})`,
@@ -336,7 +373,15 @@ async function run() {
         'starting a session does not store the document again under a room key',
       );
       check(hostDbs.includes('system-design:doc:hosted'), 'it stays stored under its document key');
-      const hostEntry = (await documentIndex(host)).find((e) => e.docId === 'hosted');
+      const hostEntry = (
+        await waitForDocumentIndex(
+          host,
+          (entries) =>
+            !!entries.find(
+              (e) => e.docId === 'hosted' && e.origin === 'session' && !!e.sessionRoom,
+            ),
+        )
+      ).find((e) => e.docId === 'hosted');
       check(
         hostEntry?.origin === 'session' && !!hostEntry.sessionRoom,
         'the index records the session room, for rehosting later (WS13-R12)',
@@ -368,7 +413,9 @@ async function run() {
         guestDbs.some((n) => n.startsWith('system-design:room:')),
         'the guest keeps its own replica of the session (WS2-R6)',
       );
-      const guestIndex = await documentIndex(guest);
+      const guestIndex = await waitForDocumentIndex(guest, (entries) =>
+        entries.some((e) => e.docId.startsWith('session:') && e.origin === 'session'),
+      );
       check(
         guestIndex.some((e) => e.docId.startsWith('session:') && e.origin === 'session'),
         'and it is indexed as a session document',

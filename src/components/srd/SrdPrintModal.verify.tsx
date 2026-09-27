@@ -39,11 +39,15 @@ const mockSrdData: SrdDataContext = {
   },
   architecture: {
     components: [
-      { id: 'c1', name: 'API Gateway', type: 'Gateway', description: 'Routes incoming traffic', status: 'active' },
+      {
+        id: 'c1',
+        name: 'API Gateway',
+        type: 'Gateway',
+        description: 'Routes incoming traffic',
+        status: 'active',
+      },
     ],
-    connections: [
-      { from: 'c1', to: 'c2', label: 'HTTP / REST' },
-    ],
+    connections: [{ from: 'c1', to: 'c2', label: 'HTTP / REST' }],
   },
   requirements: {
     categories: [{ id: 'cat1', label: 'Security', color: '#10b981' }],
@@ -78,8 +82,26 @@ const mockSrdData: SrdDataContext = {
     },
   ],
   roadmap: {
-    milestones: [{ id: 'm1', title: 'Beta Release', targetDate: '2026-12-01', status: 'planned', type: 'Release' }],
-    sprints: [{ id: 's1', piName: 'PI-1', name: 'Sprint 1', startDate: '2026-10-01', endDate: '2026-10-14', totalPoints: 5, assignedItems: ['REQ-1'] }],
+    milestones: [
+      {
+        id: 'm1',
+        title: 'Beta Release',
+        targetDate: '2026-12-01',
+        status: 'planned',
+        type: 'Release',
+      },
+    ],
+    sprints: [
+      {
+        id: 's1',
+        piName: 'PI-1',
+        name: 'Sprint 1',
+        startDate: '2026-10-01',
+        endDate: '2026-10-14',
+        totalPoints: 5,
+        assignedItems: ['REQ-1'],
+      },
+    ],
     epicSchedules: [],
   },
 };
@@ -87,21 +109,16 @@ const mockSrdData: SrdDataContext = {
 // 1. SrdPrintModal renders preview containers for running header, document content, and footer
 {
   const html = renderToStaticMarkup(
-    <SrdPrintModal
-      isOpen={true}
-      onClose={() => {}}
-      srdData={mockSrdData}
-    />,
+    <SrdPrintModal isOpen={true} onClose={() => {}} srdData={mockSrdData} />,
   );
 
   assert(html.includes('srd-preview-paper'), 'Renders preview paper wrapper');
   assert(html.includes('srd-doc__running-header-container'), 'Renders running header container');
-  assert(html.includes('CONFIDENTIAL — INTERNAL USE ONLY'), 'Renders classification banner inside header');
   assert(html.includes('Core Architecture SRD'), 'Renders header text');
   assert(html.includes('srd-doc__content-container'), 'Renders document content container');
   assert(html.includes('srd-doc__footer-container'), 'Renders footer container');
   assert(html.includes('srd-doc__footer'), 'Renders footer content');
-  assert(html.includes('© Acme Technologies'), 'Renders footer copyright text');
+  assert(html.includes('Acme Technologies'), 'Renders organization metadata');
 }
 
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);

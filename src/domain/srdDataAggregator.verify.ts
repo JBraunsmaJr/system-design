@@ -23,24 +23,98 @@ console.log('Testing SRD Data Aggregator...');
 
 const mockDoc: RequirementsDocument = {
   itemTypes: [
-    { id: 'req', label: 'Requirement', prefix: 'REQ', color: '#3b82f6', isBuiltIn: true, isWorkable: false },
-    { id: 'epic', label: 'Epic', prefix: 'EPIC', color: '#8b5cf6', isBuiltIn: true, isWorkable: false },
-    { id: 'task', label: 'Task', prefix: 'TSK', color: '#10b981', isBuiltIn: true, isWorkable: true },
+    {
+      id: 'req',
+      label: 'Requirement',
+      prefix: 'REQ',
+      color: '#3b82f6',
+      isBuiltIn: true,
+      isWorkable: false,
+    },
+    {
+      id: 'epic',
+      label: 'Epic',
+      prefix: 'EPIC',
+      color: '#8b5cf6',
+      isBuiltIn: true,
+      isWorkable: false,
+    },
+    {
+      id: 'task',
+      label: 'Task',
+      prefix: 'TSK',
+      color: '#10b981',
+      isBuiltIn: true,
+      isWorkable: true,
+    },
   ],
   categories: [
     { id: 'cat-auth', label: 'Authentication', color: '#6366f1' },
     { id: 'cat-core', label: 'Core Engine', color: '#ec4899' },
   ],
   items: [
-    { id: 'REQ-1', typeId: 'req', title: 'User Login Support', body: 'Must support OAuth2', categoryId: 'cat-auth' },
-    { id: 'EPIC-1', typeId: 'epic', title: 'Core Security', body: 'Security epic', categoryId: 'cat-auth' },
-    { id: 'TSK-1', typeId: 'task', title: 'Implement JWT validation', body: 'Token checks', categoryId: 'cat-auth', sprintId: 'sprint-1', points: 5, status: 'done', assigneeId: 'member-1' },
-    { id: 'TSK-2', typeId: 'task', title: 'Rate Limiter', body: 'Redis based', categoryId: 'cat-core', sprintId: 'sprint-1', points: 3, status: 'in-progress' },
-    { id: 'TSK-3', typeId: 'task', title: 'Audit Logger', body: 'Structured logs', categoryId: 'cat-core', points: 2, status: 'todo' },
+    {
+      id: 'REQ-1',
+      typeId: 'req',
+      title: 'User Login Support',
+      body: 'Must support OAuth2',
+      categoryId: 'cat-auth',
+    },
+    {
+      id: 'EPIC-1',
+      typeId: 'epic',
+      title: 'Core Security',
+      body: 'Security epic',
+      categoryId: 'cat-auth',
+    },
+    {
+      id: 'TSK-1',
+      typeId: 'task',
+      title: 'Implement JWT validation',
+      body: 'Token checks',
+      categoryId: 'cat-auth',
+      sprintId: 'sprint-1',
+      points: 5,
+      status: 'done',
+      assigneeId: 'member-1',
+    },
+    {
+      id: 'TSK-2',
+      typeId: 'task',
+      title: 'Rate Limiter',
+      body: 'Redis based',
+      categoryId: 'cat-core',
+      sprintId: 'sprint-1',
+      points: 3,
+      status: 'in-progress',
+    },
+    {
+      id: 'TSK-3',
+      typeId: 'task',
+      title: 'Audit Logger',
+      body: 'Structured logs',
+      categoryId: 'cat-core',
+      points: 2,
+      status: 'todo',
+    },
   ],
   relationshipTypes: [
-    { id: 'blocks', label: 'Blocks', inverseLabel: 'Is blocked by', color: '#ef4444', isBuiltIn: true, isBlocking: true },
-    { id: 'parent-of', label: 'Parent of', inverseLabel: 'Child of', color: '#8b5cf6', isBuiltIn: true, isBlocking: false },
+    {
+      id: 'blocks',
+      label: 'Blocks',
+      inverseLabel: 'Is blocked by',
+      color: '#ef4444',
+      isBuiltIn: true,
+      isBlocking: true,
+    },
+    {
+      id: 'parent-of',
+      label: 'Parent of',
+      inverseLabel: 'Child of',
+      color: '#8b5cf6',
+      isBuiltIn: true,
+      isBlocking: false,
+    },
   ],
   relationships: [
     { id: 'rel-1', typeId: 'parent-of', fromItemId: 'EPIC-1', toItemId: 'TSK-1' },
@@ -103,16 +177,12 @@ const mockPIs: ProgramIncrement[] = [
     id: 'pi-1',
     name: 'PI 1',
     startDate: '2026-10-01',
-    sprints: [
-      { id: 'sprint-1', name: 'Sprint 1', durationDays: 14 },
-    ],
+    sprints: [{ id: 'sprint-1', name: 'Sprint 1', durationDays: 14 }],
   },
 ];
 
 const mockTeam: TeamDocument = {
-  members: [
-    { id: 'member-1', name: 'Alice Engineer', role: 'Lead Architect', ptoSpans: [] },
-  ],
+  members: [{ id: 'member-1', name: 'Alice Engineer', role: 'Lead Architect', ptoSpans: [] }],
   settings: { defaultPointsPerDay: 1, excludeUsHolidays: true, extraDaysOff: [] },
 };
 
@@ -132,8 +202,14 @@ const mockTeam: TeamDocument = {
   assert(srdData.metadata.authors[0].name === 'Alice Engineer', 'Author mapped from teamDoc');
   assert(srdData.architecture.components.length === 2, 'Component count matches nodes');
   assert(srdData.architecture.connections.length === 1, 'Connection count matches edges');
-  assert(srdData.architecture.connections[0].fromName === 'Auth Service', 'Resolved source node name');
-  assert(srdData.architecture.connections[0].toName === 'PostgreSQL DB', 'Resolved target node name');
+  assert(
+    srdData.architecture.connections[0].fromName === 'Auth Service',
+    'Resolved source node name',
+  );
+  assert(
+    srdData.architecture.connections[0].toName === 'PostgreSQL DB',
+    'Resolved target node name',
+  );
 
   const stats = srdData.requirements.summaryStats;
   assert(stats.total === 5, 'Total requirements is 5');
@@ -158,9 +234,15 @@ const mockTeam: TeamDocument = {
     },
   });
 
-  assert(srdData.metadata.organization === 'Acme Corp Labs', 'Custom organization override respected');
+  assert(
+    srdData.metadata.organization === 'Acme Corp Labs',
+    'Custom organization override respected',
+  );
   assert(srdData.metadata.version === '2.1.0', 'Custom version override respected');
-  assert(Boolean(srdData.headersAndFooters.footerLeft?.includes('Acme Corp Labs')), 'Organization reflected in footer default');
+  assert(
+    Boolean(srdData.headersAndFooters.footerLeft?.includes('Acme Corp Labs')),
+    'Organization reflected in footer default',
+  );
 
   console.log('✓ Test 1b: Metadata overrides passed');
 }
@@ -176,12 +258,20 @@ const mockTeam: TeamDocument = {
     programIncrements: mockPIs,
   });
 
-  assert(srdData.traceability.length === 4, 'Traceability matrix contains 2 requirement rels + 2 node req links');
+  assert(
+    srdData.traceability.length === 4,
+    'Traceability matrix contains 2 requirement rels + 2 node req links',
+  );
   const reqRel = srdData.traceability.find((t) => t.sourceId === 'TSK-1' && t.targetId === 'TSK-2');
   assert(reqRel !== undefined && reqRel.relation === 'Blocks', 'Requirement relation mapped');
 
-  const nodeRel = srdData.traceability.find((t) => t.sourceId === 'node-auth' && t.targetId === 'REQ-1');
-  assert(nodeRel !== undefined && nodeRel.relation === 'Implements / Satisfies', 'Node to requirement link mapped');
+  const nodeRel = srdData.traceability.find(
+    (t) => t.sourceId === 'node-auth' && t.targetId === 'REQ-1',
+  );
+  assert(
+    nodeRel !== undefined && nodeRel.relation === 'Implements / Satisfies',
+    'Node to requirement link mapped',
+  );
 
   console.log('✓ Test 2: Traceability matrix passed');
 }
@@ -204,7 +294,10 @@ const mockTeam: TeamDocument = {
 
   assert(srdData.roadmap.epicSchedules.length === 1, 'Epic schedule computed');
   assert(srdData.roadmap.epicSchedules[0].epicId === 'EPIC-1', 'Epic schedule has EPIC-1');
-  assert(srdData.roadmap.epicSchedules[0].epicTitle === 'Core Security', 'Epic title is Core Security');
+  assert(
+    srdData.roadmap.epicSchedules[0].epicTitle === 'Core Security',
+    'Epic title is Core Security',
+  );
 
   console.log('✓ Test 3: Roadmap sprints and epic schedule passed');
 }
@@ -227,7 +320,10 @@ const mockTeam: TeamDocument = {
   const authItems = srdData.requirements.itemsByCategory['cat-auth'];
   const req1 = authItems.find((i) => i.id === 'REQ-1');
   assert(req1 !== undefined, 'REQ-1 found in auth category');
-  assert(req1?.contextSnapshotBase64 === 'data:image/png;base64,sampleSnap', 'Snapshot attached to REQ-1');
+  assert(
+    req1?.contextSnapshotBase64 === 'data:image/png;base64,sampleSnap',
+    'Snapshot attached to REQ-1',
+  );
   assert(req1?.snapshotFraming?.offsetX === 20, 'Framing offsetX attached to REQ-1');
   assert(req1?.snapshotFraming?.zoom === 1.25, 'Framing zoom attached to REQ-1');
 

@@ -1,7 +1,7 @@
 {
   "name": "system-design-docs",
   "version": "1.0.0",
-  "description": "Documentation site for System Design Editor",
+  "description": "Documentation site for Engineers Notebook",
   "type": "module",
   "scripts": {
     "dev": "vitepress dev docs",

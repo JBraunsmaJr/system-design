@@ -102,7 +102,7 @@ export function Toolbar({
       <div className="toolbar__row toolbar__row--primary">
         <div className="toolbar__brand">
           <span className="toolbar__brand-mark">SD</span>
-          <span className="toolbar__brand-name">System Design Editor</span>
+          <span className="toolbar__brand-name">Engineers Notebook</span>
         </div>
         <input
           className="toolbar__title"

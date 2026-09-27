@@ -1,9 +1,5 @@
 import type { Node, Edge } from '@xyflow/react';
-import type {
-  RequirementsDocument,
-  RequirementItem,
-  RequirementStatus,
-} from './requirementsTypes';
+import type { RequirementsDocument, RequirementItem, RequirementStatus } from './requirementsTypes';
 import type { Milestone } from './milestones';
 import type { ProgramIncrement } from './programIncrements';
 import { computeSprintDateRanges } from './programIncrements';
@@ -52,7 +48,8 @@ export function aggregateSrdData(params: AggregateSrdDataParams): SrdDataContext
   const todayIso = new Date().toISOString().split('T')[0];
 
   // 1. Authors & Organization
-  const authors = metadataOverrides?.authors ||
+  const authors =
+    metadataOverrides?.authors ||
     (teamDoc && teamDoc.members && teamDoc.members.length > 0
       ? teamDoc.members.map((m) => ({
           name: m.name,
@@ -270,9 +267,8 @@ export function aggregateSrdData(params: AggregateSrdDataParams): SrdDataContext
       snapshotFraming: params.itemFramings?.[item.id],
     };
 
-    const targetCatKey = item.categoryId && categoryMap.has(item.categoryId)
-      ? item.categoryId
-      : 'uncategorized';
+    const targetCatKey =
+      item.categoryId && categoryMap.has(item.categoryId) ? item.categoryId : 'uncategorized';
 
     itemsByCategory[targetCatKey].push(vm);
   }
@@ -359,7 +355,8 @@ export function aggregateSrdData(params: AggregateSrdDataParams): SrdDataContext
       const range = rangeMap.get(sprint.id);
       const itemsInSprint = doc.items.filter((i) => i.sprintId === sprint.id);
       const sprintPoints = itemsInSprint.reduce(
-        (sum, item) => sum + (typeof item.points === 'number' && !isNaN(item.points) ? item.points : 0),
+        (sum, item) =>
+          sum + (typeof item.points === 'number' && !isNaN(item.points) ? item.points : 0),
         0,
       );
 

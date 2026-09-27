@@ -1,6 +1,6 @@
 # Diagrams
 
-The **System Design Editor** provides an interactive canvas tailored for architectural modeling, multi-tier system
+The **Engineers Notebook** provides an interactive canvas tailored for architectural modeling, multi-tier system
 visualization, and technical presentations. It combines the familiar drag-and-drop ergonomics of tools like Draw.io with
 deep architectural primitives, hierarchical sub-diagrams, and dynamic presentation scenarios.
 

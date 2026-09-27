@@ -30,6 +30,7 @@ import {
   cloneTemplateConfig,
   serializeTemplateConfig,
   parseTemplateConfig,
+  mergeTemplateWithDefaults,
 } from '../../domain/srdTemplatePresets';
 import { downloadSrdMarkdown, interpolateTokens } from '../../domain/srdMarkdownExport';
 import { downloadSrdPdf } from '../../domain/srdPdfExport';
@@ -111,7 +112,9 @@ export function SrdPrintModal({
     cloneTemplateConfig(DEFAULT_SRD_TEMPLATE),
   );
   const [currentSrdData, setCurrentSrdData] = useState<SrdDataContext>(srdData);
-  const [activeTab, setActiveTab] = useState<'doc' | 'theme' | 'sections' | 'snapshots' | 'headers'>('doc');
+  const [activeTab, setActiveTab] = useState<
+    'doc' | 'theme' | 'sections' | 'snapshots' | 'headers'
+  >('doc');
   const [snapshotScope, setSnapshotScope] = useState<'all' | 'selected' | 'viewport'>('all');
   const [isCapturingSnapshot, setIsCapturingSnapshot] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
@@ -124,7 +127,11 @@ export function SrdPrintModal({
   >({});
   const [isCapturingItemSnapshot, setIsCapturingItemSnapshot] = useState(false);
   const [isInteractingWithSlider, setIsInteractingWithSlider] = useState(false);
-  const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null);
+  const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(
+    null,
+  );
+  // Per-item capture request sequence so results from superseded captures are ignored.
+  const itemCaptureSeqRef = useRef<Record<string, number>>({});
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const diagramUploadInputRef = useRef<HTMLInputElement>(null);
@@ -142,8 +149,7 @@ export function SrdPrintModal({
     return allRequirementItems.filter((i) => i.linkedNodeIds && i.linkedNodeIds.length > 0);
   }, [allRequirementItems]);
 
-  const effectiveFramingItemId =
-    selectedFramingItemId || linkedRequirementItems[0]?.id || '';
+  const effectiveFramingItemId = selectedFramingItemId || linkedRequirementItems[0]?.id || '';
 
   const currentFramingItem = useMemo(() => {
     return allRequirementItems.find((i) => i.id === effectiveFramingItemId);
@@ -184,7 +190,9 @@ export function SrdPrintModal({
   const framingDxPercent = (framingDx / 1200) * 100;
   const framingDyPercent = (framingDy / 600) * 100;
   const isFramingTransformed =
-    Math.abs(framingDx) > 0.1 || Math.abs(framingDy) > 0.1 || Math.abs(framingRelZoom - 1.0) > 0.001;
+    Math.abs(framingDx) > 0.1 ||
+    Math.abs(framingDy) > 0.1 ||
+    Math.abs(framingRelZoom - 1.0) > 0.001;
 
   const setFramingPanX = (x: number) => {
     if (!effectiveFramingItemId) return;
@@ -451,7 +459,7 @@ export function SrdPrintModal({
     reader.onload = (event) => {
       try {
         const parsed = parseTemplateConfig(event.target?.result as string);
-        setTemplateConfig(parsed);
+        setTemplateConfig(mergeTemplateWithDefaults(parsed));
         setActivePresetId('custom');
       } catch (err) {
         alert((err as Error).message);
@@ -493,6 +501,9 @@ export function SrdPrintModal({
     ) => {
       const item = targetItem || currentFramingItem;
       if (!item || !item.linkedNodeIds || item.linkedNodeIds.length === 0) return;
+      const requestSeq = (itemCaptureSeqRef.current[item.id] ?? 0) + 1;
+      itemCaptureSeqRef.current[item.id] = requestSeq;
+      const isLatestRequest = () => itemCaptureSeqRef.current[item.id] === requestSeq;
       setIsCapturingItemSnapshot(true);
       await new Promise((resolve) => setTimeout(resolve, 20));
       try {
@@ -505,11 +516,11 @@ export function SrdPrintModal({
           height: 600,
           padding: 0.06,
         });
+        // A newer capture for this item was started while this one was
+        // rendering; drop the stale result. Framing adjustments are owned by
+        // the user's slider input and are never overwritten here.
+        if (!isLatestRequest()) return;
         if (dataUrl) {
-          setFramingAdjustments((prev) => ({
-            ...prev,
-            [item.id]: { pan: { x: pan.x, y: pan.y }, zoom },
-          }));
           setCurrentSrdData((prev) => {
             const nextItemsByCategory = { ...prev.requirements.itemsByCategory };
             for (const catId in nextItemsByCategory) {
@@ -534,9 +545,13 @@ export function SrdPrintModal({
           });
         }
       } catch (err) {
-        console.warn('Failed to capture item snapshot:', err);
+        if (isLatestRequest()) {
+          console.warn('Failed to capture item snapshot:', err);
+        }
       } finally {
-        setIsCapturingItemSnapshot(false);
+        if (isLatestRequest()) {
+          setIsCapturingItemSnapshot(false);
+        }
       }
     },
     [currentFramingItem, framingPanOffset, framingZoom, nodes],
@@ -568,7 +583,11 @@ export function SrdPrintModal({
     if (isInteractingWithSlider) {
       return;
     }
-    if (!effectiveFramingItemId || !currentFramingItem || !currentFramingItem.linkedNodeIds?.length) {
+    if (
+      !effectiveFramingItemId ||
+      !currentFramingItem ||
+      !currentFramingItem.linkedNodeIds?.length
+    ) {
       return;
     }
     const adj = framingAdjustments[effectiveFramingItemId];
@@ -711,7 +730,8 @@ export function SrdPrintModal({
             <div>
               <h2 className="srd-modal__title">Solution Requirement Document (SRD) Generator</h2>
               <p className="srd-modal__subtitle">
-                Customize corporate metadata, configure sections, and export as Markdown or Print/PDF.
+                Customize corporate metadata, configure sections, and export as Markdown or
+                Print/PDF.
               </p>
             </div>
           </div>
@@ -796,7 +816,9 @@ export function SrdPrintModal({
                     {preset.name}
                   </option>
                 ))}
-                {activePresetId === 'custom' && <option value="custom">Custom Configuration</option>}
+                {activePresetId === 'custom' && (
+                  <option value="custom">Custom Configuration</option>
+                )}
               </select>
             </div>
 
@@ -913,7 +935,14 @@ export function SrdPrintModal({
                   />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '0.5rem', width: '100%' }}>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+                    gap: '0.5rem',
+                    width: '100%',
+                  }}
+                >
                   <div className="srd-sidebar__field" style={{ minWidth: 0 }}>
                     <label className="srd-sidebar__label">Version</label>
                     <input
@@ -956,7 +985,13 @@ export function SrdPrintModal({
                 </div>
 
                 {/* Specific Diagram Snapshot Controls */}
-                <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid #374151' }}>
+                <div
+                  style={{
+                    marginTop: '0.75rem',
+                    paddingTop: '0.75rem',
+                    borderTop: '1px solid #374151',
+                  }}
+                >
                   <div className="srd-sidebar__section-title">
                     <Camera size={14} />
                     <span>Diagram Snapshot</span>
@@ -967,7 +1002,9 @@ export function SrdPrintModal({
                     <select
                       className="srd-sidebar__select"
                       value={snapshotScope}
-                      onChange={(e) => setSnapshotScope(e.target.value as 'all' | 'selected' | 'viewport')}
+                      onChange={(e) =>
+                        setSnapshotScope(e.target.value as 'all' | 'selected' | 'viewport')
+                      }
                     >
                       <option value="all">Full Diagram (All {nodes.length} Nodes)</option>
                       <option value="selected" disabled={selectedNodeIds.length === 0}>
@@ -981,7 +1018,13 @@ export function SrdPrintModal({
                     <button
                       type="button"
                       className="srd-btn-icon"
-                      style={{ flex: 1, padding: '0.4rem', gap: '0.3rem', backgroundColor: '#1e3a8a', color: '#ffffff' }}
+                      style={{
+                        flex: 1,
+                        padding: '0.4rem',
+                        gap: '0.3rem',
+                        backgroundColor: '#1e3a8a',
+                        color: '#ffffff',
+                      }}
                       onClick={handleCaptureSnapshot}
                       disabled={isCapturingSnapshot}
                       title="Capture diagram snapshot from canvas"
@@ -1083,7 +1126,10 @@ export function SrdPrintModal({
                     className="srd-sidebar__select"
                     value={templateConfig.theme.pageOrientation}
                     onChange={(e) =>
-                      handleThemeChange('pageOrientation', e.target.value as 'portrait' | 'landscape')
+                      handleThemeChange(
+                        'pageOrientation',
+                        e.target.value as 'portrait' | 'landscape',
+                      )
                     }
                   >
                     <option value="portrait">Portrait</option>
@@ -1091,14 +1137,25 @@ export function SrdPrintModal({
                   </select>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    marginTop: '0.5rem',
+                  }}
+                >
                   <input
                     type="checkbox"
                     id="denseTablesCheckbox"
                     checked={templateConfig.theme.tableDense}
                     onChange={(e) => handleThemeChange('tableDense', e.target.checked)}
                   />
-                  <label htmlFor="denseTablesCheckbox" className="srd-sidebar__label" style={{ cursor: 'pointer' }}>
+                  <label
+                    htmlFor="denseTablesCheckbox"
+                    className="srd-sidebar__label"
+                    style={{ cursor: 'pointer' }}
+                  >
                     Compact / Dense Table Layout
                   </label>
                 </div>
@@ -1138,7 +1195,14 @@ export function SrdPrintModal({
                   </div>
                 </div>
 
-                <div className="srd-sidebar__field" style={{ marginTop: '0.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid #374151' }}>
+                <div
+                  className="srd-sidebar__field"
+                  style={{
+                    marginTop: '0.25rem',
+                    paddingBottom: '0.75rem',
+                    borderBottom: '1px solid #374151',
+                  }}
+                >
                   <label className="srd-sidebar__label">Architecture Detail Tables</label>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -1148,7 +1212,11 @@ export function SrdPrintModal({
                         checked={!!templateConfig.includeComponentTable}
                         onChange={(e) => handleToggleComponentTable(e.target.checked)}
                       />
-                      <label htmlFor="includeComponentTableCheckbox" className="srd-sidebar__label" style={{ cursor: 'pointer', margin: 0 }}>
+                      <label
+                        htmlFor="includeComponentTableCheckbox"
+                        className="srd-sidebar__label"
+                        style={{ cursor: 'pointer', margin: 0 }}
+                      >
                         Include Full Component Inventory Table
                       </label>
                     </div>
@@ -1159,27 +1227,40 @@ export function SrdPrintModal({
                         checked={!!templateConfig.includeConnectionsTable}
                         onChange={(e) => handleToggleConnectionsTable(e.target.checked)}
                       />
-                      <label htmlFor="includeConnectionsTableCheckbox" className="srd-sidebar__label" style={{ cursor: 'pointer', margin: 0 }}>
+                      <label
+                        htmlFor="includeConnectionsTableCheckbox"
+                        className="srd-sidebar__label"
+                        style={{ cursor: 'pointer', margin: 0 }}
+                      >
                         Include Connections & Data Flows Table
                       </label>
                     </div>
                   </div>
                   <p style={{ fontSize: '0.6875rem', color: '#9ca3af', margin: '0.35rem 0 0 0' }}>
-                    Leave unchecked to keep architecture overview clean and focused on visual diagrams.
+                    Leave unchecked to keep architecture overview clean and focused on visual
+                    diagrams.
                   </p>
                 </div>
 
                 <div className="srd-sidebar__section-title">Toggle & Order Sections</div>
                 {sortedSections.map((section, idx) => (
                   <div key={section.id} style={{ marginBottom: '0.85rem' }}>
-                    <div className="srd-sidebar__section-item" style={{ marginBottom: section.enabled ? '0.35rem' : '0' }}>
+                    <div
+                      className="srd-sidebar__section-item"
+                      style={{ marginBottom: section.enabled ? '0.35rem' : '0' }}
+                    >
                       <div className="srd-sidebar__section-item-left">
                         <input
                           type="checkbox"
                           checked={section.enabled}
                           onChange={(e) => handleToggleSection(section.id, e.target.checked)}
                         />
-                        <span style={{ fontWeight: section.enabled ? 600 : 400, color: section.enabled ? '#ffffff' : '#6b7280' }}>
+                        <span
+                          style={{
+                            fontWeight: section.enabled ? 600 : 400,
+                            color: section.enabled ? '#ffffff' : '#6b7280',
+                          }}
+                        >
                           {section.title}
                         </span>
                       </div>
@@ -1220,7 +1301,9 @@ export function SrdPrintModal({
             {/* Tab: Snapshots & Framing */}
             {activeTab === 'snapshots' && (
               <div className="srd-sidebar__field-group">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                >
                   <div className="srd-sidebar__section-title" style={{ margin: 0 }}>
                     <Camera size={14} />
                     <span>Linked Context Snapshots</span>
@@ -1234,7 +1317,11 @@ export function SrdPrintModal({
                       disabled={isCapturingItemSnapshot}
                       title="Auto-capture snapshots for all linked requirement items"
                     >
-                      <RefreshCw size={11} className={isCapturingItemSnapshot ? 'animate-spin' : ''} style={{ marginRight: 3 }} />
+                      <RefreshCw
+                        size={11}
+                        className={isCapturingItemSnapshot ? 'animate-spin' : ''}
+                        style={{ marginRight: 3 }}
+                      />
                       {batchProgress
                         ? `Capturing (${batchProgress.current}/${batchProgress.total})`
                         : 'Batch Capture All'}
@@ -1243,10 +1330,23 @@ export function SrdPrintModal({
                 </div>
 
                 {linkedRequirementItems.length === 0 ? (
-                  <div style={{ backgroundColor: '#1e293b', border: '1px solid #374151', borderRadius: '6px', padding: '1rem', textAlign: 'center', color: '#9ca3af', fontSize: '0.8125rem' }}>
-                    <p style={{ margin: '0 0 0.5rem 0', fontWeight: 600, color: '#e2e8f0' }}>No Linked Requirements</p>
+                  <div
+                    style={{
+                      backgroundColor: '#1e293b',
+                      border: '1px solid #374151',
+                      borderRadius: '6px',
+                      padding: '1rem',
+                      textAlign: 'center',
+                      color: '#9ca3af',
+                      fontSize: '0.8125rem',
+                    }}
+                  >
+                    <p style={{ margin: '0 0 0.5rem 0', fontWeight: 600, color: '#e2e8f0' }}>
+                      No Linked Requirements
+                    </p>
                     <p style={{ margin: 0, fontSize: '0.75rem', lineHeight: '1.4' }}>
-                      To embed focused architectural snapshots, link requirement items to canvas nodes in the diagram.
+                      To embed focused architectural snapshots, link requirement items to canvas
+                      nodes in the diagram.
                     </p>
                   </div>
                 ) : (
@@ -1260,7 +1360,8 @@ export function SrdPrintModal({
                       >
                         {linkedRequirementItems.map((item) => (
                           <option key={item.id} value={item.id}>
-                            {item.id}: {item.title || '(Untitled)'} ({item.linkedNodeLabels?.length || 0} nodes)
+                            {item.id}: {item.title || '(Untitled)'} (
+                            {item.linkedNodeLabels?.length || 0} nodes)
                           </option>
                         ))}
                       </select>
@@ -1269,8 +1370,16 @@ export function SrdPrintModal({
                     {currentFramingItem && (
                       <div className="srd-framing-panel">
                         <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                          <strong style={{ color: '#ffffff' }}>{currentFramingItem.id}</strong>: {currentFramingItem.title}
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', marginTop: '0.35rem' }}>
+                          <strong style={{ color: '#ffffff' }}>{currentFramingItem.id}</strong>:{' '}
+                          {currentFramingItem.title}
+                          <div
+                            style={{
+                              display: 'flex',
+                              flexWrap: 'wrap',
+                              gap: '0.25rem',
+                              marginTop: '0.35rem',
+                            }}
+                          >
                             {currentFramingItem.linkedNodeLabels?.map((lbl, idx) => (
                               <span key={idx} className="srd-doc__node-tag">
                                 {lbl}
@@ -1280,12 +1389,15 @@ export function SrdPrintModal({
                         </div>
 
                         <div className="srd-framing-preview-box">
-                          {isCapturingItemSnapshot && (
-                            batchProgress ? (
+                          {isCapturingItemSnapshot &&
+                            (batchProgress ? (
                               <div className="srd-framing-loading-overlay">
-                                <div className="srd-loading-spinner" style={{ width: 22, height: 22, borderWidth: 2 }} />
+                                <div
+                                  className="srd-loading-spinner"
+                                  style={{ width: 22, height: 22, borderWidth: 2 }}
+                                />
                                 <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>
-                                  Capturing ({batchProgress.current}/${batchProgress.total})...
+                                  Capturing ({batchProgress.current}/{batchProgress.total})...
                                 </span>
                               </div>
                             ) : (
@@ -1293,8 +1405,7 @@ export function SrdPrintModal({
                                 <RefreshCw size={11} className="animate-spin" />
                                 <span>Rendering hi-res...</span>
                               </div>
-                            )
-                          )}
+                            ))}
                           {currentFramingItem.contextSnapshotBase64 ? (
                             <img
                               src={currentFramingItem.contextSnapshotBase64}
@@ -1308,8 +1419,18 @@ export function SrdPrintModal({
                               }}
                             />
                           ) : (
-                            <div style={{ color: '#64748b', fontSize: '0.75rem', textAlign: 'center', padding: '1rem' }}>
-                              <Camera size={24} style={{ margin: '0 auto 0.5rem auto', opacity: 0.5 }} />
+                            <div
+                              style={{
+                                color: '#64748b',
+                                fontSize: '0.75rem',
+                                textAlign: 'center',
+                                padding: '1rem',
+                              }}
+                            >
+                              <Camera
+                                size={24}
+                                style={{ margin: '0 auto 0.5rem auto', opacity: 0.5 }}
+                              />
                               No snapshot captured yet. Click Capture to frame linked nodes.
                             </div>
                           )}
@@ -1374,21 +1495,31 @@ export function SrdPrintModal({
                           <button
                             type="button"
                             className="srd-btn-icon"
-                            style={{ flex: 1, padding: '0.4rem', fontSize: '0.75rem', backgroundColor: '#2563eb', color: '#ffffff', fontWeight: 600 }}
+                            style={{
+                              flex: 1,
+                              padding: '0.4rem',
+                              fontSize: '0.75rem',
+                              backgroundColor: '#2563eb',
+                              color: '#ffffff',
+                              fontWeight: 600,
+                            }}
                             onClick={() => handleCaptureItemSnapshot()}
                             disabled={isCapturingItemSnapshot}
                           >
-                            <RefreshCw size={12} className={isCapturingItemSnapshot ? 'animate-spin' : ''} style={{ marginRight: 4 }} />
-                            {currentFramingItem.contextSnapshotBase64 ? 'Update Snapshot' : 'Capture Snapshot'}
+                            <RefreshCw
+                              size={12}
+                              className={isCapturingItemSnapshot ? 'animate-spin' : ''}
+                              style={{ marginRight: 4 }}
+                            />
+                            {currentFramingItem.contextSnapshotBase64
+                              ? 'Update Snapshot'
+                              : 'Capture Snapshot'}
                           </button>
                           <button
                             type="button"
                             className="srd-btn-icon"
                             style={{ padding: '0.4rem 0.6rem', fontSize: '0.75rem' }}
-                            onClick={() => {
-                              resetFraming();
-                              handleCaptureItemSnapshot(currentFramingItem, { x: 0, y: 0 }, 1.0);
-                            }}
+                            onClick={resetFraming}
                             title="Reset pan and zoom to center"
                           >
                             <RotateCcw size={12} />
@@ -1444,7 +1575,9 @@ export function SrdPrintModal({
                   />
                 </div>
                 <div className="srd-sidebar__field">
-                  <label className="srd-sidebar__label">Footer Left (Copyright / Classification)</label>
+                  <label className="srd-sidebar__label">
+                    Footer Left (Copyright / Classification)
+                  </label>
                   <input
                     type="text"
                     className="srd-sidebar__input"
@@ -1465,7 +1598,16 @@ export function SrdPrintModal({
             )}
 
             {/* Template JSON Import/Export */}
-            <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid #374151', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div
+              style={{
+                marginTop: 'auto',
+                paddingTop: '1rem',
+                borderTop: '1px solid #374151',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.5rem',
+              }}
+            >
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <button
                   type="button"
@@ -1542,11 +1684,17 @@ export function SrdPrintModal({
                   <div className="srd-doc__running-header">
                     <div>
                       {templateConfig.headersAndFooters.headerLeft &&
-                        interpolateTokens(templateConfig.headersAndFooters.headerLeft, currentSrdData)}
+                        interpolateTokens(
+                          templateConfig.headersAndFooters.headerLeft,
+                          currentSrdData,
+                        )}
                     </div>
                     <div>
                       {templateConfig.headersAndFooters.headerRight &&
-                        interpolateTokens(templateConfig.headersAndFooters.headerRight, currentSrdData)}
+                        interpolateTokens(
+                          templateConfig.headersAndFooters.headerRight,
+                          currentSrdData,
+                        )}
                     </div>
                   </div>
                 )}
@@ -1580,189 +1728,138 @@ export function SrdPrintModal({
                   </div>
                 </div>
 
-              {/* Dynamic Sections */}
-              {activeSortedSections.map((section) => {
-                const sectionTitle = interpolateTokens(section.title, currentSrdData);
+                {/* Dynamic Sections */}
+                {activeSortedSections.map((section) => {
+                  const sectionTitle = interpolateTokens(section.title, currentSrdData);
 
-                return (
-                  <div key={section.id} className="srd-doc__section">
-                    <h2 className="srd-doc__section-title">{sectionTitle}</h2>
-                    {section.customIntroText && (
-                      <p className="srd-doc__intro-text">
-                        {interpolateTokens(section.customIntroText, currentSrdData)}
-                      </p>
-                    )}
+                  return (
+                    <div key={section.id} className="srd-doc__section">
+                      <h2 className="srd-doc__section-title">{sectionTitle}</h2>
+                      {section.customIntroText && (
+                        <p className="srd-doc__intro-text">
+                          {interpolateTokens(section.customIntroText, currentSrdData)}
+                        </p>
+                      )}
 
-                    {section.id === 'executive_summary' && (
-                      <div>
-                        {currentSrdData.metadata.description && (
-                          <div style={{ marginBottom: '1.25rem' }}>
-                            <h3 className="srd-doc__sub-title">Scope & Objectives</h3>
-                            <p style={{ lineHeight: 1.6, color: '#374151' }}>
-                              {currentSrdData.metadata.description}
-                            </p>
-                          </div>
-                        )}
-                        <h3 className="srd-doc__sub-title">Scope & Architecture Metrics</h3>
-                        <table
-                          className={`srd-doc__table ${
-                            templateConfig.theme.tableDense ? 'srd-doc__table--dense' : ''
-                          }`}
-                        >
-                          <tbody>
-                            <tr>
-                              <td>Total Requirements & Scope Items</td>
-                              <td><strong>{currentSrdData.requirements.summaryStats.total}</strong></td>
-                            </tr>
-                            <tr>
-                              <td>Requirement Categories Defined</td>
-                              <td><strong>{currentSrdData.requirements.categories.length}</strong></td>
-                            </tr>
-                            <tr>
-                              <td>Total Estimated Scope / Effort</td>
-                              <td>
-                                <strong>
-                                  {currentSrdData.requirements.summaryStats.totalPoints > 0
-                                    ? `${currentSrdData.requirements.summaryStats.totalPoints} pts`
-                                    : 'Unestimated'}
-                                </strong>
-                              </td>
-                            </tr>
-                            <tr>
-                              <td>Architecture Components Defined</td>
-                              <td><strong>{currentSrdData.architecture.components.length}</strong></td>
-                            </tr>
-                            <tr>
-                              <td>Component Interfaces & Data Flows</td>
-                              <td><strong>{currentSrdData.architecture.connections.length}</strong></td>
-                            </tr>
-                            <tr>
-                              <td>Target Delivery Milestones</td>
-                              <td><strong>{currentSrdData.roadmap.milestones.length}</strong></td>
-                            </tr>
-                            <tr>
-                              <td>Planned Delivery Sprints</td>
-                              <td><strong>{currentSrdData.roadmap.sprints.length}</strong></td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-
-                    {section.id === 'architecture' && (
-                      <div>
-                        {currentSrdData.architecture.diagramImageBase64 ? (
-                          <div className="srd-doc__diagram-container" style={{ position: 'relative' }}>
-                            {isCapturingSnapshot && (
-                              <div className="srd-doc__snapshot-loading-overlay">
-                                <div className="srd-loading-spinner" style={{ width: 28, height: 28, borderWidth: 2.5 }} />
-                                <span>Refreshing architecture snapshot...</span>
-                              </div>
-                            )}
-                            <img
-                              src={currentSrdData.architecture.diagramImageBase64}
-                              alt="System Architecture Diagram"
-                              className="srd-doc__diagram-img"
-                            />
-                          </div>
-                        ) : isCapturingSnapshot ? (
-                          <div className="srd-doc__diagram-container" style={{ position: 'relative', minHeight: 140, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <div className="srd-doc__snapshot-loading-overlay">
-                              <div className="srd-loading-spinner" style={{ width: 28, height: 28, borderWidth: 2.5 }} />
-                              <span>Capturing architecture snapshot...</span>
+                      {section.id === 'executive_summary' && (
+                        <div>
+                          {currentSrdData.metadata.description && (
+                            <div style={{ marginBottom: '1.25rem' }}>
+                              <h3 className="srd-doc__sub-title">Scope & Objectives</h3>
+                              <p style={{ lineHeight: 1.6, color: '#374151' }}>
+                                {currentSrdData.metadata.description}
+                              </p>
                             </div>
-                          </div>
-                        ) : null}
+                          )}
+                          <h3 className="srd-doc__sub-title">Scope & Architecture Metrics</h3>
+                          <table
+                            className={`srd-doc__table ${
+                              templateConfig.theme.tableDense ? 'srd-doc__table--dense' : ''
+                            }`}
+                          >
+                            <tbody>
+                              <tr>
+                                <td>Total Requirements & Scope Items</td>
+                                <td>
+                                  <strong>{currentSrdData.requirements.summaryStats.total}</strong>
+                                </td>
+                              </tr>
+                              <tr>
+                                <td>Requirement Categories Defined</td>
+                                <td>
+                                  <strong>{currentSrdData.requirements.categories.length}</strong>
+                                </td>
+                              </tr>
+                              <tr>
+                                <td>Total Estimated Scope / Effort</td>
+                                <td>
+                                  <strong>
+                                    {currentSrdData.requirements.summaryStats.totalPoints > 0
+                                      ? `${currentSrdData.requirements.summaryStats.totalPoints} pts`
+                                      : 'Unestimated'}
+                                  </strong>
+                                </td>
+                              </tr>
+                              <tr>
+                                <td>Architecture Components Defined</td>
+                                <td>
+                                  <strong>{currentSrdData.architecture.components.length}</strong>
+                                </td>
+                              </tr>
+                              <tr>
+                                <td>Component Interfaces & Data Flows</td>
+                                <td>
+                                  <strong>{currentSrdData.architecture.connections.length}</strong>
+                                </td>
+                              </tr>
+                              <tr>
+                                <td>Target Delivery Milestones</td>
+                                <td>
+                                  <strong>{currentSrdData.roadmap.milestones.length}</strong>
+                                </td>
+                              </tr>
+                              <tr>
+                                <td>Planned Delivery Sprints</td>
+                                <td>
+                                  <strong>{currentSrdData.roadmap.sprints.length}</strong>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
 
-                        {templateConfig.includeComponentTable && (
-                          <>
-                            <h3 className="srd-doc__sub-title">Component Inventory</h3>
-                            {currentSrdData.architecture.components.length === 0 ? (
-                              <p style={{ color: '#6b7280', fontStyle: 'italic' }}>
-                                No architecture components defined in canvas.
-                              </p>
-                            ) : (
-                              <table
-                                className={`srd-doc__table ${
-                                  templateConfig.theme.tableDense ? 'srd-doc__table--dense' : ''
-                                }`}
-                              >
-                                <thead>
-                                  <tr>
-                                    <th>Component Name</th>
-                                    <th>Type</th>
-                                    <th>Description</th>
-                                    <th>Linked Requirements</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {currentSrdData.architecture.components.map((c) => (
-                                    <tr key={c.id}>
-                                      <td><strong>{c.name}</strong></td>
-                                      <td><code>{c.type}</code></td>
-                                      <td>{c.description || '-'}</td>
-                                      <td>{c.linkedRequirementIds?.join(', ') || '-'}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            )}
-                          </>
-                        )}
+                      {section.id === 'architecture' && (
+                        <div>
+                          {currentSrdData.architecture.diagramImageBase64 ? (
+                            <div
+                              className="srd-doc__diagram-container"
+                              style={{ position: 'relative' }}
+                            >
+                              {isCapturingSnapshot && (
+                                <div className="srd-doc__snapshot-loading-overlay">
+                                  <div
+                                    className="srd-loading-spinner"
+                                    style={{ width: 28, height: 28, borderWidth: 2.5 }}
+                                  />
+                                  <span>Refreshing architecture snapshot...</span>
+                                </div>
+                              )}
+                              <img
+                                src={currentSrdData.architecture.diagramImageBase64}
+                                alt="System Architecture Diagram"
+                                className="srd-doc__diagram-img"
+                              />
+                            </div>
+                          ) : isCapturingSnapshot ? (
+                            <div
+                              className="srd-doc__diagram-container"
+                              style={{
+                                position: 'relative',
+                                minHeight: 140,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              <div className="srd-doc__snapshot-loading-overlay">
+                                <div
+                                  className="srd-loading-spinner"
+                                  style={{ width: 28, height: 28, borderWidth: 2.5 }}
+                                />
+                                <span>Capturing architecture snapshot...</span>
+                              </div>
+                            </div>
+                          ) : null}
 
-                        {templateConfig.includeConnectionsTable && (
-                          <>
-                            <h3 className="srd-doc__sub-title">Connections & Data Flows</h3>
-                            {currentSrdData.architecture.connections.length === 0 ? (
-                              <p style={{ color: '#6b7280', fontStyle: 'italic' }}>
-                                No connections defined between components.
-                              </p>
-                            ) : (
-                              <table
-                                className={`srd-doc__table ${
-                                  templateConfig.theme.tableDense ? 'srd-doc__table--dense' : ''
-                                }`}
-                              >
-                                <thead>
-                                  <tr>
-                                    <th>Source</th>
-                                    <th>Target</th>
-                                    <th>Flow Label</th>
-                                    <th>Protocol</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {currentSrdData.architecture.connections.map((conn, i) => (
-                                    <tr key={i}>
-                                      <td><strong>{conn.fromName || conn.from}</strong></td>
-                                      <td><strong>{conn.toName || conn.to}</strong></td>
-                                      <td>{conn.label || '-'}</td>
-                                      <td><code>{conn.protocol || conn.edgeType || '-'}</code></td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    )}
-
-                    {section.id === 'requirements' && (
-                      <div>
-                        {currentSrdData.requirements.categories.map((cat) => {
-                          const items = currentSrdData.requirements.itemsByCategory[cat.id] || [];
-                          if (items.length === 0) return null;
-
-                          const isTableLayout = templateConfig.requirementsLayout === 'table';
-
-                          return (
-                            <div key={cat.id} style={{ marginBottom: '2rem' }}>
-                              <h3 className="srd-doc__sub-title">
-                                Category: {cat.label}
-                              </h3>
-
-                              {isTableLayout ? (
+                          {templateConfig.includeComponentTable && (
+                            <>
+                              <h3 className="srd-doc__sub-title">Component Inventory</h3>
+                              {currentSrdData.architecture.components.length === 0 ? (
+                                <p style={{ color: '#6b7280', fontStyle: 'italic' }}>
+                                  No architecture components defined in canvas.
+                                </p>
+                              ) : (
                                 <table
                                   className={`srd-doc__table ${
                                     templateConfig.theme.tableDense ? 'srd-doc__table--dense' : ''
@@ -1770,253 +1867,376 @@ export function SrdPrintModal({
                                 >
                                   <thead>
                                     <tr>
-                                      <th>ID</th>
-                                      <th>Title</th>
+                                      <th>Component Name</th>
                                       <th>Type</th>
-                                      <th>Status</th>
-                                      <th>Effort</th>
-                                      <th>Assignee</th>
+                                      <th>Description</th>
+                                      <th>Linked Requirements</th>
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    {items.map((item) => (
-                                      <tr key={item.id}>
-                                        <td><code>{item.id}</code></td>
-                                        <td><strong>{item.title}</strong></td>
-                                        <td>{item.typeLabel}</td>
-                                        <td>{item.status || '-'}</td>
-                                        <td>{item.points != null ? `${item.points} pts` : '-'}</td>
-                                        <td>{item.assigneeName || '-'}</td>
+                                    {currentSrdData.architecture.components.map((c) => (
+                                      <tr key={c.id}>
+                                        <td>
+                                          <strong>{c.name}</strong>
+                                        </td>
+                                        <td>
+                                          <code>{c.type}</code>
+                                        </td>
+                                        <td>{c.description || '-'}</td>
+                                        <td>{c.linkedRequirementIds?.join(', ') || '-'}</td>
                                       </tr>
                                     ))}
                                   </tbody>
                                 </table>
-                              ) : (
-                                <div className="srd-doc__item-cards-list">
-                                  {items.map((item) => {
-                                    const relatedLinks = currentSrdData.traceability.filter(
-                                      (t) => t.sourceId === item.id || t.targetId === item.id,
-                                    );
-
-                                    return (
-                                      <div key={item.id} className="srd-doc__item-card">
-                                        <div className="srd-doc__item-card-header">
-                                          <div className="srd-doc__item-card-title-row">
-                                            <span className="srd-doc__badge srd-doc__badge--id">
-                                              {item.id}
-                                            </span>
-                                            <h4 className="srd-doc__item-card-title">
-                                              {item.title || '(Untitled Requirement)'}
-                                            </h4>
-                                          </div>
-                                          <div className="srd-doc__item-card-pills">
-                                            <span className="srd-doc__badge srd-doc__badge--type">
-                                              {item.typeLabel}
-                                            </span>
-                                            {item.status && (
-                                              <span
-                                                className={`srd-doc__badge srd-doc__badge--status srd-doc__badge--status-${item.status}`}
-                                              >
-                                                {item.status}
-                                              </span>
-                                            )}
-                                            {item.points != null && (
-                                              <span className="srd-doc__badge srd-doc__badge--points">
-                                                {item.points} pts
-                                              </span>
-                                            )}
-                                            {item.sprintName && (
-                                              <span className="srd-doc__badge srd-doc__badge--sprint">
-                                                {item.sprintName}
-                                              </span>
-                                            )}
-                                            {item.assigneeName && (
-                                              <span className="srd-doc__badge srd-doc__badge--assignee">
-                                                {item.assigneeName}
-                                              </span>
-                                            )}
-                                          </div>
-                                        </div>
-
-                                        {item.contextSnapshotBase64 ? (
-                                          <div className="srd-doc__item-snapshot-container" style={{ position: 'relative' }}>
-                                            <div className="srd-doc__item-snapshot-caption">
-                                              Architecture Context Snapshot
-                                            </div>
-                                            <img
-                                              src={item.contextSnapshotBase64}
-                                              alt={`Context snapshot for ${item.id}`}
-                                              className="srd-doc__item-snapshot-img"
-                                              style={{
-                                                transform:
-                                                  currentFramingItem?.id === item.id && isFramingTransformed
-                                                    ? `translate(${framingDxPercent}%, ${framingDyPercent}%) scale(${framingRelZoom})`
-                                                    : undefined,
-                                                transformOrigin: 'center center',
-                                              }}
-                                            />
-                                          </div>
-                                        ) : isCapturingItemSnapshot && currentFramingItem?.id === item.id ? (
-                                          <div className="srd-doc__item-snapshot-container" style={{ position: 'relative', minHeight: 120, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                            <div className="srd-doc__snapshot-loading-overlay">
-                                              <div className="srd-loading-spinner" style={{ width: 22, height: 22, borderWidth: 2 }} />
-                                              <span>Capturing context snapshot...</span>
-                                            </div>
-                                          </div>
-                                        ) : null}
-
-                                        {item.linkedNodeLabels && item.linkedNodeLabels.length > 0 && (
-                                          <div className="srd-doc__item-linked-nodes">
-                                            <strong>Linked Components: </strong>
-                                            {item.linkedNodeLabels.map((lbl, li) => (
-                                              <span key={li} className="srd-doc__node-tag">
-                                                {lbl}
-                                              </span>
-                                            ))}
-                                          </div>
-                                        )}
-
-                                        {item.body && item.body.trim() && (
-                                          <div className="srd-doc__item-body">
-                                            {item.body.trim()}
-                                          </div>
-                                        )}
-
-                                        {relatedLinks.length > 0 && (
-                                          <div className="srd-doc__item-dependencies">
-                                            <strong>Dependencies & Links: </strong>
-                                            <span className="srd-doc__deps-list">
-                                              {relatedLinks.map((l, li) => (
-                                                <span key={li} className="srd-doc__dep-item">
-                                                  {l.sourceId === item.id
-                                                    ? `${l.relation} ${l.targetId} (${l.targetTitle})`
-                                                    : `Linked from ${l.sourceId} (${l.sourceTitle}) via ${l.relation}`}
-                                                  {li < relatedLinks.length - 1 ? ' • ' : ''}
-                                                </span>
-                                              ))}
-                                            </span>
-                                          </div>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
                               )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
+                            </>
+                          )}
 
-                    {section.id === 'traceability' && (
-                      <div>
-                        {currentSrdData.traceability.length === 0 ? (
-                          <p style={{ color: '#6b7280', fontStyle: 'italic' }}>
-                            No relationships or architecture linkages established.
-                          </p>
-                        ) : (
-                          <table
-                            className={`srd-doc__table ${
-                              templateConfig.theme.tableDense ? 'srd-doc__table--dense' : ''
-                            }`}
-                          >
-                            <thead>
-                              <tr>
-                                <th>Source Entity</th>
-                                <th>Relationship</th>
-                                <th>Target Entity</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {currentSrdData.traceability.map((link, idx) => (
-                                <tr key={idx}>
-                                  <td>
-                                    <code>{link.sourceId}</code> ({link.sourceTitle})
-                                  </td>
-                                  <td><strong>{link.relation}</strong></td>
-                                  <td>
-                                    <code>{link.targetId}</code> ({link.targetTitle})
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        )}
-                      </div>
-                    )}
+                          {templateConfig.includeConnectionsTable && (
+                            <>
+                              <h3 className="srd-doc__sub-title">Connections & Data Flows</h3>
+                              {currentSrdData.architecture.connections.length === 0 ? (
+                                <p style={{ color: '#6b7280', fontStyle: 'italic' }}>
+                                  No connections defined between components.
+                                </p>
+                              ) : (
+                                <table
+                                  className={`srd-doc__table ${
+                                    templateConfig.theme.tableDense ? 'srd-doc__table--dense' : ''
+                                  }`}
+                                >
+                                  <thead>
+                                    <tr>
+                                      <th>Source</th>
+                                      <th>Target</th>
+                                      <th>Flow Label</th>
+                                      <th>Protocol</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {currentSrdData.architecture.connections.map((conn, i) => (
+                                      <tr key={i}>
+                                        <td>
+                                          <strong>{conn.fromName || conn.from}</strong>
+                                        </td>
+                                        <td>
+                                          <strong>{conn.toName || conn.to}</strong>
+                                        </td>
+                                        <td>{conn.label || '-'}</td>
+                                        <td>
+                                          <code>{conn.protocol || conn.edgeType || '-'}</code>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      )}
 
-                    {section.id === 'roadmap' && (
-                      <div>
-                        <h3 className="srd-doc__sub-title">Milestones</h3>
-                        {currentSrdData.roadmap.milestones.length === 0 ? (
-                          <p style={{ color: '#6b7280', fontStyle: 'italic' }}>
-                            No milestones scheduled.
-                          </p>
-                        ) : (
-                          <table
-                            className={`srd-doc__table ${
-                              templateConfig.theme.tableDense ? 'srd-doc__table--dense' : ''
-                            }`}
-                          >
-                            <thead>
-                              <tr>
-                                <th>Milestone</th>
-                                <th>Type</th>
-                                <th>Target Date</th>
-                                <th>Description</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {currentSrdData.roadmap.milestones.map((m) => (
-                                <tr key={m.id}>
-                                  <td><strong>{m.title}</strong></td>
-                                  <td><code>{m.type}</code></td>
-                                  <td>{m.targetDate || '-'}</td>
-                                  <td>{m.description || '-'}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        )}
+                      {section.id === 'requirements' && (
+                        <div>
+                          {currentSrdData.requirements.categories.map((cat) => {
+                            const items = currentSrdData.requirements.itemsByCategory[cat.id] || [];
+                            if (items.length === 0) return null;
 
-                        <h3 className="srd-doc__sub-title">Program Increments & Sprints</h3>
-                        {currentSrdData.roadmap.sprints.length === 0 ? (
-                          <p style={{ color: '#6b7280', fontStyle: 'italic' }}>
-                            No sprint iterations planned.
-                          </p>
-                        ) : (
-                          <table
-                            className={`srd-doc__table ${
-                              templateConfig.theme.tableDense ? 'srd-doc__table--dense' : ''
-                            }`}
-                          >
-                            <thead>
-                              <tr>
-                                <th>PI</th>
-                                <th>Sprint</th>
-                                <th>Timeline</th>
-                                <th>Effort</th>
-                                <th>Items</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {currentSrdData.roadmap.sprints.map((s) => (
-                                <tr key={s.id}>
-                                  <td><strong>{s.piName}</strong></td>
-                                  <td>{s.name}</td>
-                                  <td>{s.startDate} - {s.endDate}</td>
-                                  <td>{s.totalPoints} pts</td>
-                                  <td>{s.assignedItems.length} items</td>
+                            const isTableLayout = templateConfig.requirementsLayout === 'table';
+
+                            return (
+                              <div key={cat.id} style={{ marginBottom: '2rem' }}>
+                                <h3 className="srd-doc__sub-title">Category: {cat.label}</h3>
+
+                                {isTableLayout ? (
+                                  <table
+                                    className={`srd-doc__table ${
+                                      templateConfig.theme.tableDense ? 'srd-doc__table--dense' : ''
+                                    }`}
+                                  >
+                                    <thead>
+                                      <tr>
+                                        <th>ID</th>
+                                        <th>Title</th>
+                                        <th>Type</th>
+                                        <th>Status</th>
+                                        <th>Effort</th>
+                                        <th>Assignee</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {items.map((item) => (
+                                        <tr key={item.id}>
+                                          <td>
+                                            <code>{item.id}</code>
+                                          </td>
+                                          <td>
+                                            <strong>{item.title}</strong>
+                                          </td>
+                                          <td>{item.typeLabel}</td>
+                                          <td>{item.status || '-'}</td>
+                                          <td>
+                                            {item.points != null ? `${item.points} pts` : '-'}
+                                          </td>
+                                          <td>{item.assigneeName || '-'}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                ) : (
+                                  <div className="srd-doc__item-cards-list">
+                                    {items.map((item) => {
+                                      const relatedLinks = currentSrdData.traceability.filter(
+                                        (t) => t.sourceId === item.id || t.targetId === item.id,
+                                      );
+
+                                      return (
+                                        <div key={item.id} className="srd-doc__item-card">
+                                          <div className="srd-doc__item-card-header">
+                                            <div className="srd-doc__item-card-title-row">
+                                              <span className="srd-doc__badge srd-doc__badge--id">
+                                                {item.id}
+                                              </span>
+                                              <h4 className="srd-doc__item-card-title">
+                                                {item.title || '(Untitled Requirement)'}
+                                              </h4>
+                                            </div>
+                                            <div className="srd-doc__item-card-pills">
+                                              <span className="srd-doc__badge srd-doc__badge--type">
+                                                {item.typeLabel}
+                                              </span>
+                                              {item.status && (
+                                                <span
+                                                  className={`srd-doc__badge srd-doc__badge--status srd-doc__badge--status-${item.status}`}
+                                                >
+                                                  {item.status}
+                                                </span>
+                                              )}
+                                              {item.points != null && (
+                                                <span className="srd-doc__badge srd-doc__badge--points">
+                                                  {item.points} pts
+                                                </span>
+                                              )}
+                                              {item.sprintName && (
+                                                <span className="srd-doc__badge srd-doc__badge--sprint">
+                                                  {item.sprintName}
+                                                </span>
+                                              )}
+                                              {item.assigneeName && (
+                                                <span className="srd-doc__badge srd-doc__badge--assignee">
+                                                  {item.assigneeName}
+                                                </span>
+                                              )}
+                                            </div>
+                                          </div>
+
+                                          {item.contextSnapshotBase64 ? (
+                                            <div
+                                              className="srd-doc__item-snapshot-container"
+                                              style={{ position: 'relative' }}
+                                            >
+                                              <div className="srd-doc__item-snapshot-caption">
+                                                Architecture Context Snapshot
+                                              </div>
+                                              <img
+                                                src={item.contextSnapshotBase64}
+                                                alt={`Context snapshot for ${item.id}`}
+                                                className="srd-doc__item-snapshot-img"
+                                                style={{
+                                                  transform:
+                                                    currentFramingItem?.id === item.id &&
+                                                    isFramingTransformed
+                                                      ? `translate(${framingDxPercent}%, ${framingDyPercent}%) scale(${framingRelZoom})`
+                                                      : undefined,
+                                                  transformOrigin: 'center center',
+                                                }}
+                                              />
+                                            </div>
+                                          ) : isCapturingItemSnapshot &&
+                                            currentFramingItem?.id === item.id ? (
+                                            <div
+                                              className="srd-doc__item-snapshot-container"
+                                              style={{
+                                                position: 'relative',
+                                                minHeight: 120,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                              }}
+                                            >
+                                              <div className="srd-doc__snapshot-loading-overlay">
+                                                <div
+                                                  className="srd-loading-spinner"
+                                                  style={{ width: 22, height: 22, borderWidth: 2 }}
+                                                />
+                                                <span>Capturing context snapshot...</span>
+                                              </div>
+                                            </div>
+                                          ) : null}
+
+                                          {item.linkedNodeLabels &&
+                                            item.linkedNodeLabels.length > 0 && (
+                                              <div className="srd-doc__item-linked-nodes">
+                                                <strong>Linked Components: </strong>
+                                                {item.linkedNodeLabels.map((lbl, li) => (
+                                                  <span key={li} className="srd-doc__node-tag">
+                                                    {lbl}
+                                                  </span>
+                                                ))}
+                                              </div>
+                                            )}
+
+                                          {item.body && item.body.trim() && (
+                                            <div className="srd-doc__item-body">
+                                              {item.body.trim()}
+                                            </div>
+                                          )}
+
+                                          {relatedLinks.length > 0 && (
+                                            <div className="srd-doc__item-dependencies">
+                                              <strong>Dependencies & Links: </strong>
+                                              <span className="srd-doc__deps-list">
+                                                {relatedLinks.map((l, li) => (
+                                                  <span key={li} className="srd-doc__dep-item">
+                                                    {l.sourceId === item.id
+                                                      ? `${l.relation} ${l.targetId} (${l.targetTitle})`
+                                                      : `Linked from ${l.sourceId} (${l.sourceTitle}) via ${l.relation}`}
+                                                    {li < relatedLinks.length - 1 ? ' • ' : ''}
+                                                  </span>
+                                                ))}
+                                              </span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {section.id === 'traceability' && (
+                        <div>
+                          {currentSrdData.traceability.length === 0 ? (
+                            <p style={{ color: '#6b7280', fontStyle: 'italic' }}>
+                              No relationships or architecture linkages established.
+                            </p>
+                          ) : (
+                            <table
+                              className={`srd-doc__table ${
+                                templateConfig.theme.tableDense ? 'srd-doc__table--dense' : ''
+                              }`}
+                            >
+                              <thead>
+                                <tr>
+                                  <th>Source Entity</th>
+                                  <th>Relationship</th>
+                                  <th>Target Entity</th>
                                 </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                              </thead>
+                              <tbody>
+                                {currentSrdData.traceability.map((link, idx) => (
+                                  <tr key={idx}>
+                                    <td>
+                                      <code>{link.sourceId}</code> ({link.sourceTitle})
+                                    </td>
+                                    <td>
+                                      <strong>{link.relation}</strong>
+                                    </td>
+                                    <td>
+                                      <code>{link.targetId}</code> ({link.targetTitle})
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          )}
+                        </div>
+                      )}
+
+                      {section.id === 'roadmap' && (
+                        <div>
+                          <h3 className="srd-doc__sub-title">Milestones</h3>
+                          {currentSrdData.roadmap.milestones.length === 0 ? (
+                            <p style={{ color: '#6b7280', fontStyle: 'italic' }}>
+                              No milestones scheduled.
+                            </p>
+                          ) : (
+                            <table
+                              className={`srd-doc__table ${
+                                templateConfig.theme.tableDense ? 'srd-doc__table--dense' : ''
+                              }`}
+                            >
+                              <thead>
+                                <tr>
+                                  <th>Milestone</th>
+                                  <th>Type</th>
+                                  <th>Target Date</th>
+                                  <th>Description</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {currentSrdData.roadmap.milestones.map((m) => (
+                                  <tr key={m.id}>
+                                    <td>
+                                      <strong>{m.title}</strong>
+                                    </td>
+                                    <td>
+                                      <code>{m.type}</code>
+                                    </td>
+                                    <td>{m.targetDate || '-'}</td>
+                                    <td>{m.description || '-'}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          )}
+
+                          <h3 className="srd-doc__sub-title">Program Increments & Sprints</h3>
+                          {currentSrdData.roadmap.sprints.length === 0 ? (
+                            <p style={{ color: '#6b7280', fontStyle: 'italic' }}>
+                              No sprint iterations planned.
+                            </p>
+                          ) : (
+                            <table
+                              className={`srd-doc__table ${
+                                templateConfig.theme.tableDense ? 'srd-doc__table--dense' : ''
+                              }`}
+                            >
+                              <thead>
+                                <tr>
+                                  <th>PI</th>
+                                  <th>Sprint</th>
+                                  <th>Timeline</th>
+                                  <th>Effort</th>
+                                  <th>Items</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {currentSrdData.roadmap.sprints.map((s) => (
+                                  <tr key={s.id}>
+                                    <td>
+                                      <strong>{s.piName}</strong>
+                                    </td>
+                                    <td>{s.name}</td>
+                                    <td>
+                                      {s.startDate} - {s.endDate}
+                                    </td>
+                                    <td>{s.totalPoints} pts</td>
+                                    <td>{s.assignedItems.length} items</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
 
               {/* Running Footer Container (for preview) */}
@@ -2026,14 +2246,21 @@ export function SrdPrintModal({
                   <div className="srd-doc__footer">
                     <div>
                       {templateConfig.headersAndFooters.footerLeft &&
-                        interpolateTokens(templateConfig.headersAndFooters.footerLeft, currentSrdData)}
+                        interpolateTokens(
+                          templateConfig.headersAndFooters.footerLeft,
+                          currentSrdData,
+                        )}
                     </div>
                     <div>
                       {templateConfig.headersAndFooters.footerRight &&
-                        interpolateTokens(templateConfig.headersAndFooters.footerRight, currentSrdData, {
-                          pageNumber: 1,
-                          totalPages: 1,
-                        })}
+                        interpolateTokens(
+                          templateConfig.headersAndFooters.footerRight,
+                          currentSrdData,
+                          {
+                            pageNumber: 1,
+                            totalPages: 1,
+                          },
+                        )}
                     </div>
                   </div>
                 )}

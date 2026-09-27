@@ -1,4 +1,4 @@
-import type { SrdSectionConfig, SrdTemplateConfig } from './srdTypes';
+import type { SrdSectionConfig, SrdSectionId, SrdTemplateConfig } from './srdTypes';
 
 export const DEFAULT_SRD_SECTIONS: SrdSectionConfig[] = [
   {
@@ -149,8 +149,7 @@ export const AGILE_ENGINEERING_TEMPLATE: SrdTemplateConfig = {
       title: 'Work Items & Backlog Requirements',
       enabled: true,
       order: 2,
-      customIntroText:
-        'Granular workable items, story point estimates, and sprint assignments.',
+      customIntroText: 'Granular workable items, story point estimates, and sprint assignments.',
     },
     {
       id: 'roadmap',
@@ -165,8 +164,7 @@ export const AGILE_ENGINEERING_TEMPLATE: SrdTemplateConfig = {
       title: 'Blocking & Dependency Matrix',
       enabled: true,
       order: 4,
-      customIntroText:
-        'Upstream and downstream blocker links across epics and tickets.',
+      customIntroText: 'Upstream and downstream blocker links across epics and tickets.',
     },
     {
       id: 'executive_summary',
@@ -207,24 +205,21 @@ export const EXECUTIVE_SUMMARY_TEMPLATE: SrdTemplateConfig = {
       title: 'Executive Summary & Vision',
       enabled: true,
       order: 1,
-      customIntroText:
-        'Strategic project goals, core scope boundaries, and delivery outcomes.',
+      customIntroText: 'Strategic project goals, core scope boundaries, and delivery outcomes.',
     },
     {
       id: 'architecture',
       title: 'System Architecture Overview',
       enabled: true,
       order: 2,
-      customIntroText:
-        'Visual architecture diagram and key component capabilities.',
+      customIntroText: 'Visual architecture diagram and key component capabilities.',
     },
     {
       id: 'roadmap',
       title: 'Milestone Roadmap & Delivery Targets',
       enabled: true,
       order: 3,
-      customIntroText:
-        'Key delivery milestones, target dates, and progress tracking.',
+      customIntroText: 'Key delivery milestones, target dates, and progress tracking.',
     },
     {
       id: 'requirements',
@@ -257,13 +252,179 @@ export function serializeTemplateConfig(template: SrdTemplateConfig): string {
   return JSON.stringify(template, null, 2);
 }
 
+const VALID_SECTION_IDS: ReadonlySet<SrdSectionId> = new Set<SrdSectionId>([
+  'executive_summary',
+  'architecture',
+  'requirements',
+  'traceability',
+  'roadmap',
+]);
+
+// Values that end up in CSS custom properties must be tightly constrained so an
+// imported template cannot inject arbitrary declarations.
+const HEX_COLOR_PATTERN = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+const FONT_FAMILY_PATTERN = /^[A-Za-z0-9 ,'"_.-]+$/;
+const MAX_FONT_FAMILY_LENGTH = 200;
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function assertOptionalType(
+  obj: Record<string, unknown>,
+  key: string,
+  type: 'string' | 'boolean',
+  context: string,
+): void {
+  if (obj[key] !== undefined && typeof obj[key] !== type) {
+    throw new Error(`Invalid template schema: ${context}.${key} must be a ${type}.`);
+  }
+}
+
+function validateTheme(theme: unknown): void {
+  if (!isPlainObject(theme)) {
+    throw new Error('Invalid template schema: theme must be an object.');
+  }
+  for (const key of ['primaryColor', 'secondaryColor', 'accentColor'] as const) {
+    const value = theme[key];
+    if (value === undefined) continue;
+    if (typeof value !== 'string' || !HEX_COLOR_PATTERN.test(value)) {
+      throw new Error(`Invalid template schema: theme.${key} must be a hex color (e.g. #1e3a8a).`);
+    }
+  }
+  if (theme.fontFamily !== undefined) {
+    const font = theme.fontFamily;
+    if (
+      typeof font !== 'string' ||
+      font.trim().length === 0 ||
+      font.length > MAX_FONT_FAMILY_LENGTH ||
+      !FONT_FAMILY_PATTERN.test(font)
+    ) {
+      throw new Error('Invalid template schema: theme.fontFamily contains unsupported characters.');
+    }
+  }
+  assertOptionalType(theme, 'tableDense', 'boolean', 'theme');
+  if (
+    theme.pageOrientation !== undefined &&
+    theme.pageOrientation !== 'portrait' &&
+    theme.pageOrientation !== 'landscape'
+  ) {
+    throw new Error(
+      "Invalid template schema: theme.pageOrientation must be 'portrait' or 'landscape'.",
+    );
+  }
+}
+
+function validateHeadersAndFooters(value: unknown): void {
+  if (value === undefined) return;
+  if (!isPlainObject(value)) {
+    throw new Error('Invalid template schema: headersAndFooters must be an object.');
+  }
+  for (const key of [
+    'headerLeft',
+    'headerRight',
+    'footerLeft',
+    'footerRight',
+    'classificationBanner',
+  ]) {
+    assertOptionalType(value, key, 'string', 'headersAndFooters');
+  }
+  assertOptionalType(value, 'showPageNumbers', 'boolean', 'headersAndFooters');
+}
+
+function validateSections(sections: unknown[]): void {
+  const seen = new Set<string>();
+  sections.forEach((section, index) => {
+    const context = `sections[${index}]`;
+    if (!isPlainObject(section)) {
+      throw new Error(`Invalid template schema: ${context} must be an object.`);
+    }
+    if (typeof section.id !== 'string' || !VALID_SECTION_IDS.has(section.id as SrdSectionId)) {
+      throw new Error(`Invalid template schema: ${context}.id is not a known section id.`);
+    }
+    if (seen.has(section.id)) {
+      throw new Error(`Invalid template schema: duplicate section id '${section.id}'.`);
+    }
+    seen.add(section.id);
+    if (typeof section.title !== 'string') {
+      throw new Error(`Invalid template schema: ${context}.title must be a string.`);
+    }
+    // enabled/order may be absent in older templates (filled in by
+    // mergeTemplateWithDefaults), but must have the right type when present.
+    assertOptionalType(section, 'enabled', 'boolean', context);
+    if (
+      section.order !== undefined &&
+      (typeof section.order !== 'number' || !Number.isFinite(section.order))
+    ) {
+      throw new Error(`Invalid template schema: ${context}.order must be a finite number.`);
+    }
+    assertOptionalType(section, 'customIntroText', 'string', context);
+  });
+}
+
 export function parseTemplateConfig(jsonString: string): SrdTemplateConfig {
-  const parsed = JSON.parse(jsonString);
-  if (!parsed || typeof parsed !== 'object') {
+  const parsed: unknown = JSON.parse(jsonString);
+  if (!isPlainObject(parsed)) {
     throw new Error('Invalid template JSON format: expected an object.');
   }
-  if (!parsed.id || !parsed.name || !parsed.theme || !Array.isArray(parsed.sections)) {
+  if (
+    typeof parsed.id !== 'string' ||
+    !parsed.id ||
+    typeof parsed.name !== 'string' ||
+    !parsed.name ||
+    !parsed.theme ||
+    !Array.isArray(parsed.sections)
+  ) {
     throw new Error('Invalid template schema: missing required fields.');
   }
-  return parsed as SrdTemplateConfig;
+  assertOptionalType(parsed, 'description', 'string', 'template');
+  assertOptionalType(parsed, 'includeComponentTable', 'boolean', 'template');
+  assertOptionalType(parsed, 'includeConnectionsTable', 'boolean', 'template');
+  if (
+    parsed.requirementsLayout !== undefined &&
+    parsed.requirementsLayout !== 'table' &&
+    parsed.requirementsLayout !== 'list'
+  ) {
+    throw new Error("Invalid template schema: requirementsLayout must be 'table' or 'list'.");
+  }
+  validateTheme(parsed.theme);
+  validateHeadersAndFooters(parsed.headersAndFooters);
+  validateSections(parsed.sections);
+  return parsed as unknown as SrdTemplateConfig;
+}
+
+/**
+ * Fills in anything an older or partial template omits, using the given base
+ * template (defaults to DEFAULT_SRD_TEMPLATE). Nested theme and
+ * headersAndFooters are merged field-by-field, and every section is guaranteed
+ * a boolean `enabled` and a finite `order`.
+ */
+export function mergeTemplateWithDefaults(
+  imported: SrdTemplateConfig,
+  base: SrdTemplateConfig = DEFAULT_SRD_TEMPLATE,
+): SrdTemplateConfig {
+  const defaults = cloneTemplateConfig(base);
+  const defaultSectionsById = new Map(defaults.sections.map((s) => [s.id, s]));
+  const importedSections = Array.isArray(imported.sections) ? imported.sections : [];
+
+  const sections: SrdSectionConfig[] = importedSections.map((section, index) => {
+    const fallback = defaultSectionsById.get(section.id);
+    return {
+      ...fallback,
+      ...section,
+      enabled: typeof section.enabled === 'boolean' ? section.enabled : (fallback?.enabled ?? true),
+      order:
+        typeof section.order === 'number' && Number.isFinite(section.order)
+          ? section.order
+          : (fallback?.order ?? index + 1),
+    };
+  });
+
+  return {
+    ...defaults,
+    ...imported,
+    theme: { ...defaults.theme, ...(imported.theme ?? {}) },
+    headersAndFooters: { ...defaults.headersAndFooters, ...(imported.headersAndFooters ?? {}) },
+    sections: sections.length > 0 ? sections : defaults.sections,
+  };
 }

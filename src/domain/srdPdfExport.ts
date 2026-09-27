@@ -1,10 +1,6 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import type {
-  SrdDataContext,
-  SrdTemplateConfig,
-  RequirementItemViewModel,
-} from './srdTypes';
+import type { SrdDataContext, SrdTemplateConfig, RequirementItemViewModel } from './srdTypes';
 import { interpolateTokens } from './srdMarkdownExport';
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -37,7 +33,8 @@ export async function buildSrdPdf(
   templateConfig: SrdTemplateConfig,
   options?: GeneratePdfOptions,
 ): Promise<jsPDF> {
-  const orientation = templateConfig.theme.pageOrientation === 'landscape' ? 'landscape' : 'portrait';
+  const orientation =
+    templateConfig.theme.pageOrientation === 'landscape' ? 'landscape' : 'portrait';
   const doc = new jsPDF({
     orientation,
     unit: 'pt',
@@ -53,12 +50,14 @@ export async function buildSrdPdf(
   const primaryRgb = hexToRgb(templateConfig.theme.primaryColor || '#1e3a8a');
   const secondaryRgb = hexToRgb(templateConfig.theme.secondaryColor || '#475569');
 
-  const topMargin = templateConfig.headersAndFooters.classificationBanner ||
+  const topMargin =
+    templateConfig.headersAndFooters.classificationBanner ||
     templateConfig.headersAndFooters.headerLeft ||
     templateConfig.headersAndFooters.headerRight
       ? 54
       : 40;
-  const bottomMargin = templateConfig.headersAndFooters.footerLeft ||
+  const bottomMargin =
+    templateConfig.headersAndFooters.footerLeft ||
     templateConfig.headersAndFooters.footerRight ||
     templateConfig.headersAndFooters.showPageNumbers
       ? 48
@@ -85,9 +84,10 @@ export async function buildSrdPdf(
   currentY += titleLines.length * 24 + 6;
 
   // Metadata Grid / Table
-  const authorsStr = srdData.metadata.authors.length > 0
-    ? srdData.metadata.authors.map((a) => (a.role ? `${a.name} (${a.role})` : a.name)).join(', ')
-    : 'Not specified';
+  const authorsStr =
+    srdData.metadata.authors.length > 0
+      ? srdData.metadata.authors.map((a) => (a.role ? `${a.name} (${a.role})` : a.name)).join(', ')
+      : 'Not specified';
 
   const metaRows: string[][] = [
     ['Version:', srdData.metadata.version, 'Date:', srdData.metadata.generatedAt],
@@ -117,7 +117,9 @@ export async function buildSrdPdf(
     },
   });
 
-  currentY = ((doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable?.finalY ?? currentY) + 12;
+  currentY =
+    ((doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable?.finalY ?? currentY) +
+    12;
 
   // Horizontal divider
   doc.setDrawColor(226, 232, 240);
@@ -134,7 +136,8 @@ export async function buildSrdPdf(
     options?.onProgress?.(`Rendering ${section.title}...`);
     const sectionTitle = interpolateTokens(section.title, srdData);
 
-    const minSectionSpace = section.id === 'architecture' && srdData.architecture.diagramImageBase64 ? 100 : 40;
+    const minSectionSpace =
+      section.id === 'architecture' && srdData.architecture.diagramImageBase64 ? 100 : 40;
     ensureSpace(minSectionSpace);
 
     // Section Heading
@@ -192,7 +195,10 @@ export async function buildSrdPdf(
         const metricsData = [
           ['Total Requirements & Scope Items', String(stats.total)],
           ['Requirement Categories Defined', String(srdData.requirements.categories.length)],
-          ['Total Estimated Scope / Effort', stats.totalPoints > 0 ? `${stats.totalPoints} pts` : 'Unestimated'],
+          [
+            'Total Estimated Scope / Effort',
+            stats.totalPoints > 0 ? `${stats.totalPoints} pts` : 'Unestimated',
+          ],
           ['Architecture Components Defined', String(srdData.architecture.components.length)],
           ['Component Interfaces & Data Flows', String(srdData.architecture.connections.length)],
           ['Target Delivery Milestones', String(srdData.roadmap.milestones.length)],
@@ -221,7 +227,9 @@ export async function buildSrdPdf(
           },
         });
 
-        currentY = ((doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable?.finalY ?? currentY) + 16;
+        currentY =
+          ((doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable?.finalY ??
+            currentY) + 16;
         break;
       }
 
@@ -300,7 +308,12 @@ export async function buildSrdPdf(
 
             autoTable(doc, {
               startY: currentY,
-              margin: { left: marginLeft, right: marginRight, top: topMargin, bottom: bottomMargin },
+              margin: {
+                left: marginLeft,
+                right: marginRight,
+                top: topMargin,
+                bottom: bottomMargin,
+              },
               head: [['Component Name', 'Type', 'Description', 'Linked Requirements']],
               body: compRows,
               theme: 'striped',
@@ -322,7 +335,9 @@ export async function buildSrdPdf(
               },
             });
 
-            currentY = ((doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable?.finalY ?? currentY) + 16;
+            currentY =
+              ((doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable?.finalY ??
+                currentY) + 16;
           }
         }
 
@@ -350,7 +365,12 @@ export async function buildSrdPdf(
 
             autoTable(doc, {
               startY: currentY,
-              margin: { left: marginLeft, right: marginRight, top: topMargin, bottom: bottomMargin },
+              margin: {
+                left: marginLeft,
+                right: marginRight,
+                top: topMargin,
+                bottom: bottomMargin,
+              },
               head: [['Source', 'Target', 'Flow Label', 'Protocol']],
               body: connRows,
               theme: 'striped',
@@ -372,7 +392,9 @@ export async function buildSrdPdf(
               },
             });
 
-            currentY = ((doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable?.finalY ?? currentY) + 16;
+            currentY =
+              ((doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable?.finalY ??
+                currentY) + 16;
           }
         }
         break;
@@ -382,7 +404,8 @@ export async function buildSrdPdf(
         const isTableLayout = templateConfig.requirementsLayout === 'table';
 
         for (const cat of srdData.requirements.categories) {
-          const items: RequirementItemViewModel[] = srdData.requirements.itemsByCategory[cat.id] || [];
+          const items: RequirementItemViewModel[] =
+            srdData.requirements.itemsByCategory[cat.id] || [];
           if (items.length === 0) continue;
 
           ensureSpace(30);
@@ -404,7 +427,12 @@ export async function buildSrdPdf(
 
             autoTable(doc, {
               startY: currentY,
-              margin: { left: marginLeft, right: marginRight, top: topMargin, bottom: bottomMargin },
+              margin: {
+                left: marginLeft,
+                right: marginRight,
+                top: topMargin,
+                bottom: bottomMargin,
+              },
               head: [['ID', 'Title', 'Type', 'Status', 'Effort', 'Assignee']],
               body: reqRows,
               theme: 'striped',
@@ -428,7 +456,9 @@ export async function buildSrdPdf(
               },
             });
 
-            currentY = ((doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable?.finalY ?? currentY) + 14;
+            currentY =
+              ((doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable?.finalY ??
+                currentY) + 14;
           } else {
             // Card / List Layout
             for (const item of items) {
@@ -460,10 +490,37 @@ export async function buildSrdPdf(
                 }
               }
 
+              // Wrap the card header to the available width
+              const HEADER_LINE_HEIGHT = 11.5;
+              const headerText = `[${item.id}] ${item.title || '(Untitled Requirement)'}`;
+              doc.setFont('helvetica', 'bold');
+              doc.setFontSize(9.5);
+              const headerLines: string[] = doc.splitTextToSize(headerText, contentWidth - 12);
+              const headerExtraHeight = Math.max(0, headerLines.length - 1) * HEADER_LINE_HEIGHT;
+
+              // Wrap linked component labels to the width remaining after the label
+              const LINKED_LINE_HEIGHT = 10;
+              const linkedLabelText = 'Linked Components: ';
+              let linkedLabelWidth = 0;
+              let linkedLines: string[] = [];
+              if (item.linkedNodeLabels && item.linkedNodeLabels.length > 0) {
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(8);
+                linkedLabelWidth = doc.getTextWidth(linkedLabelText);
+                doc.setFont('helvetica', 'normal');
+                linkedLines = doc.splitTextToSize(
+                  item.linkedNodeLabels.join(', '),
+                  Math.max(40, contentWidth - 12 - linkedLabelWidth),
+                );
+              }
+              const linkedBlockHeight =
+                linkedLines.length > 0 ? 12 + (linkedLines.length - 1) * LINKED_LINE_HEIGHT : 0;
+
               const estimatedCardHeight =
                 34 +
+                headerExtraHeight +
                 (snapshotHeight > 0 ? snapshotHeight + 8 : 0) +
-                (item.linkedNodeLabels && item.linkedNodeLabels.length > 0 ? 14 : 0) +
+                (linkedBlockHeight > 0 ? linkedBlockHeight + 2 : 0) +
                 (itemBodyLines.length > 0 ? itemBodyLines.length * 10 + 6 : 0) +
                 10;
 
@@ -476,8 +533,9 @@ export async function buildSrdPdf(
               doc.setFontSize(9.5);
               doc.setTextColor(30, 41, 59);
 
-              const headerText = `[${item.id}] ${item.title || '(Untitled Requirement)'}`;
-              doc.text(headerText, marginLeft + 6, currentY + 12);
+              doc.text(headerLines, marginLeft + 6, currentY + 12, {
+                lineHeightFactor: HEADER_LINE_HEIGHT / 9.5,
+              });
 
               // Pills (Type, Status, Effort, Assignee)
               const pills: string[] = [item.typeLabel];
@@ -489,9 +547,9 @@ export async function buildSrdPdf(
               doc.setFont('helvetica', 'normal');
               doc.setFontSize(7.5);
               doc.setTextColor(71, 85, 105);
-              doc.text(pills.join('  •  '), marginLeft + 6, currentY + 24);
+              doc.text(pills.join('  •  '), marginLeft + 6, currentY + 24 + headerExtraHeight);
 
-              currentY += 32;
+              currentY += 32 + headerExtraHeight;
 
               // Context Snapshot if present
               if (item.contextSnapshotBase64 && snapshotHeight > 0) {
@@ -514,14 +572,16 @@ export async function buildSrdPdf(
               }
 
               // Linked Components
-              if (item.linkedNodeLabels && item.linkedNodeLabels.length > 0) {
+              if (linkedLines.length > 0) {
                 doc.setFont('helvetica', 'bold');
                 doc.setFontSize(8);
                 doc.setTextColor(71, 85, 105);
-                doc.text('Linked Components: ', marginLeft + 6, currentY);
+                doc.text(linkedLabelText, marginLeft + 6, currentY);
                 doc.setFont('helvetica', 'normal');
-                doc.text(item.linkedNodeLabels.join(', '), marginLeft + 95, currentY);
-                currentY += 12;
+                doc.text(linkedLines, marginLeft + 6 + linkedLabelWidth, currentY, {
+                  lineHeightFactor: LINKED_LINE_HEIGHT / 8,
+                });
+                currentY += linkedBlockHeight;
               }
 
               // Body text
@@ -583,7 +643,9 @@ export async function buildSrdPdf(
             },
           });
 
-          currentY = ((doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable?.finalY ?? currentY) + 16;
+          currentY =
+            ((doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable?.finalY ??
+              currentY) + 16;
         }
         break;
       }
@@ -635,7 +697,9 @@ export async function buildSrdPdf(
             },
           });
 
-          currentY = ((doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable?.finalY ?? currentY) + 16;
+          currentY =
+            ((doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable?.finalY ??
+              currentY) + 16;
         }
 
         // Sprints
@@ -686,7 +750,9 @@ export async function buildSrdPdf(
             },
           });
 
-          currentY = ((doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable?.finalY ?? currentY) + 16;
+          currentY =
+            ((doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable?.finalY ??
+              currentY) + 16;
         }
         break;
       }
@@ -702,10 +768,14 @@ export async function buildSrdPdf(
 
     // Top Classification Banner
     if (templateConfig.headersAndFooters.classificationBanner) {
-      const banner = interpolateTokens(templateConfig.headersAndFooters.classificationBanner, srdData, {
-        pageNumber: p,
-        totalPages,
-      });
+      const banner = interpolateTokens(
+        templateConfig.headersAndFooters.classificationBanner,
+        srdData,
+        {
+          pageNumber: p,
+          totalPages,
+        },
+      );
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(7.5);
       doc.setTextColor(100, 116, 139);
@@ -714,10 +784,16 @@ export async function buildSrdPdf(
 
     // Running Header (Left and Right)
     const hl = templateConfig.headersAndFooters.headerLeft
-      ? interpolateTokens(templateConfig.headersAndFooters.headerLeft, srdData, { pageNumber: p, totalPages })
+      ? interpolateTokens(templateConfig.headersAndFooters.headerLeft, srdData, {
+          pageNumber: p,
+          totalPages,
+        })
       : '';
     const hr = templateConfig.headersAndFooters.headerRight
-      ? interpolateTokens(templateConfig.headersAndFooters.headerRight, srdData, { pageNumber: p, totalPages })
+      ? interpolateTokens(templateConfig.headersAndFooters.headerRight, srdData, {
+          pageNumber: p,
+          totalPages,
+        })
       : '';
 
     if (hl || hr) {
@@ -741,10 +817,16 @@ export async function buildSrdPdf(
 
     // Running Footer (Left and Right)
     const fl = templateConfig.headersAndFooters.footerLeft
-      ? interpolateTokens(templateConfig.headersAndFooters.footerLeft, srdData, { pageNumber: p, totalPages })
+      ? interpolateTokens(templateConfig.headersAndFooters.footerLeft, srdData, {
+          pageNumber: p,
+          totalPages,
+        })
       : '';
     const fr = templateConfig.headersAndFooters.footerRight
-      ? interpolateTokens(templateConfig.headersAndFooters.footerRight, srdData, { pageNumber: p, totalPages })
+      ? interpolateTokens(templateConfig.headersAndFooters.footerRight, srdData, {
+          pageNumber: p,
+          totalPages,
+        })
       : templateConfig.headersAndFooters.showPageNumbers
         ? `Page ${p} of ${totalPages}`
         : '';
@@ -781,7 +863,19 @@ export async function downloadSrdPdf(
   onProgress?: (status: string) => void,
 ): Promise<void> {
   const doc = await buildSrdPdf(srdData, templateConfig, { onProgress });
-  const safeTitle = srdData.metadata.title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-  const actualFilename = filename || `srd-${safeTitle}-v${srdData.metadata.version}.pdf`;
-  doc.save(actualFilename);
+  doc.save(filename || buildDefaultPdfFilename(srdData));
+}
+
+/** Lowercases, collapses non-alphanumerics to '-', and trims leading/trailing dashes. */
+function slugifyFilenamePart(value: string | undefined): string {
+  return (value ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function buildDefaultPdfFilename(srdData: SrdDataContext): string {
+  const safeTitle = slugifyFilenamePart(srdData.metadata.title) || 'document';
+  const safeVersion = slugifyFilenamePart(srdData.metadata.version);
+  return safeVersion ? `srd-${safeTitle}-v${safeVersion}.pdf` : `srd-${safeTitle}.pdf`;
 }

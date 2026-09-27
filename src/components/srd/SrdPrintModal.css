@@ -821,7 +821,9 @@
   }
 
   .srd-modal-backdrop {
-    position: static !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
     background-color: #ffffff !important;
     background: #ffffff !important;
     padding: 0 !important;

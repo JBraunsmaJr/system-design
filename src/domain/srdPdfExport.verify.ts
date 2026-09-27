@@ -41,7 +41,8 @@ const mockSrdData: SrdDataContext = {
     footerRight: 'Page {{pageNumber}} of {{totalPages}}',
   },
   architecture: {
-    diagramImageBase64: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+    diagramImageBase64:
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
     components: [
       {
         id: 'comp-gw',
@@ -170,7 +171,10 @@ async function runTests() {
   {
     for (const preset of BUILTIN_SRD_TEMPLATES) {
       const doc = await buildSrdPdf(mockSrdData, preset);
-      assert(doc.getNumberOfPages() >= 1, `Builtin template "${preset.name}" generated successfully`);
+      assert(
+        doc.getNumberOfPages() >= 1,
+        `Builtin template "${preset.name}" generated successfully`,
+      );
     }
   }
 
@@ -200,11 +204,17 @@ async function runTests() {
     };
     const doc = await buildSrdPdf(largeDocData, DEFAULT_SRD_TEMPLATE);
     const pageCount = doc.getNumberOfPages();
-    assert(pageCount >= 2, `Multi-page document with large diagram generated ${pageCount} pages safely`);
+    assert(
+      pageCount >= 2,
+      `Multi-page document with large diagram generated ${pageCount} pages safely`,
+    );
   }
 
   console.log(failures === 0 ? '\nALL PDF EXPORT TESTS PASSED' : `\n${failures} FAILURE(S)`);
   if (failures > 0) throw new Error(`${failures} test(s) failed`);
 }
 
-runTests();
+runTests().catch((err: unknown) => {
+  console.error(err);
+  (globalThis as unknown as { process: { exitCode: number } }).process.exitCode = 1;
+});

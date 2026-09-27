@@ -25,9 +25,9 @@ export default defineConfig({
   // the way the app's relative base can.
   base: process.env.DOCS_BASE ?? '/system-design/docs/',
   outDir: '../../dist/docs',
-  title: 'System Design Editor',
+  title: 'Engineers Notebook',
   description:
-    'Documentation for System Design Editor: collaborative architecture, requirement linking, and capacity planning.',
+    'Documentation for Engineers Notebook: collaborative architecture, requirement linking, and capacity planning.',
   cleanUrls: true,
   themeConfig: {
     nav: [
@@ -73,7 +73,7 @@ export default defineConfig({
     socialLinks: [{ icon: 'github', link: 'https://github.com/jbraunsmajr/system-design' }],
 
     footer: {
-      message: 'System Design Editor Documentation',
+      message: 'Engineers Notebook Documentation',
       copyright: 'Released under the MIT License',
     },
   },

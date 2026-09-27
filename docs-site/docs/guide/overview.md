@@ -1,6 +1,6 @@
 # Overview
 
-**System Design Editor** is an interactive, browser-based architectural modeling and requirements gathering tool
+**Engineers Notebook** is an interactive, browser-based architectural modeling and requirements gathering tool
 designed for engineering teams.
 
 ## Core Capabilities

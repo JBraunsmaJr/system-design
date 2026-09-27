@@ -23,11 +23,7 @@ export function interpolateTokens(
 
 function escapeTableCol(text?: string): string {
   if (!text) return '-';
-  return text
-    .replace(/\\/g, '\\\\')
-    .replace(/\|/g, '\\|')
-    .replace(/\r?\n/g, ' ')
-    .trim() || '-';
+  return text.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\r?\n/g, ' ').trim() || '-';
 }
 
 export function generateSrdMarkdown(data: SrdDataContext, config: SrdTemplateConfig): string {
@@ -61,9 +57,7 @@ export function generateSrdMarkdown(data: SrdDataContext, config: SrdTemplateCon
   lines.push('');
 
   // 3. Render Sections by configured order
-  const activeSections = config.sections
-    .filter((s) => s.enabled)
-    .sort((a, b) => a.order - b.order);
+  const activeSections = config.sections.filter((s) => s.enabled).sort((a, b) => a.order - b.order);
 
   for (const section of activeSections) {
     const sectionTitle = interpolateTokens(section.title, data);
@@ -86,9 +80,13 @@ export function generateSrdMarkdown(data: SrdDataContext, config: SrdTemplateCon
         lines.push('| ------ | ----- |');
         lines.push(`| Total Requirements & Scope Items | ${stats.total} |`);
         lines.push(`| Requirement Categories Defined | ${data.requirements.categories.length} |`);
-        lines.push(`| Total Estimated Scope / Effort | ${stats.totalPoints > 0 ? `${stats.totalPoints} pts` : 'Unestimated'} |`);
+        lines.push(
+          `| Total Estimated Scope / Effort | ${stats.totalPoints > 0 ? `${stats.totalPoints} pts` : 'Unestimated'} |`,
+        );
         lines.push(`| Architecture Components Defined | ${data.architecture.components.length} |`);
-        lines.push(`| Component Interfaces & Data Flows | ${data.architecture.connections.length} |`);
+        lines.push(
+          `| Component Interfaces & Data Flows | ${data.architecture.connections.length} |`,
+        );
         lines.push(`| Target Delivery Milestones | ${data.roadmap.milestones.length} |`);
         lines.push(`| Planned Delivery Sprints | ${data.roadmap.sprints.length} |`);
         lines.push('');
@@ -106,14 +104,19 @@ export function generateSrdMarkdown(data: SrdDataContext, config: SrdTemplateCon
           if (data.architecture.components.length === 0) {
             lines.push('*No architectural components defined in diagram.*', '');
           } else {
-            lines.push('| ID | Component Name | Type | Description | Status | Linked Requirements |');
-            lines.push('| -- | -------------- | ---- | ----------- | ------ | ------------------- |');
+            lines.push(
+              '| ID | Component Name | Type | Description | Status | Linked Requirements |',
+            );
+            lines.push(
+              '| -- | -------------- | ---- | ----------- | ------ | ------------------- |',
+            );
             for (const c of data.architecture.components) {
-              const reqs = c.linkedRequirementIds && c.linkedRequirementIds.length > 0
-                ? c.linkedRequirementIds.join(', ')
-                : '-';
+              const reqs =
+                c.linkedRequirementIds && c.linkedRequirementIds.length > 0
+                  ? c.linkedRequirementIds.join(', ')
+                  : '-';
               lines.push(
-                `| \`${c.id}\` | **${escapeTableCol(c.name)}** | \`${escapeTableCol(c.type)}\` | ${escapeTableCol(c.description)} | ${escapeTableCol(c.status)} | ${escapeTableCol(reqs)} |`,
+                `| \`${escapeTableCol(c.id)}\` | **${escapeTableCol(c.name)}** | \`${escapeTableCol(c.type)}\` | ${escapeTableCol(c.description)} | ${escapeTableCol(c.status)} | ${escapeTableCol(reqs)} |`,
               );
             }
             lines.push('');
@@ -159,7 +162,7 @@ export function generateSrdMarkdown(data: SrdDataContext, config: SrdTemplateCon
             lines.push('| -- | ----- | ---- | ------ | ------ | ------ | -------- |');
             for (const item of items) {
               lines.push(
-                `| \`${item.id}\` | **${escapeTableCol(item.title)}** | ${escapeTableCol(item.typeLabel)} | ${escapeTableCol(item.status)} | ${item.points != null ? `${item.points} pts` : '-'} | ${escapeTableCol(item.sprintName)} | ${escapeTableCol(item.assigneeName)} |`,
+                `| \`${escapeTableCol(item.id)}\` | **${escapeTableCol(item.title)}** | ${escapeTableCol(item.typeLabel)} | ${escapeTableCol(item.status)} | ${item.points != null ? `${item.points} pts` : '-'} | ${escapeTableCol(item.sprintName)} | ${escapeTableCol(item.assigneeName)} |`,
               );
             }
             lines.push('');
@@ -176,11 +179,17 @@ export function generateSrdMarkdown(data: SrdDataContext, config: SrdTemplateCon
               lines.push(metaParts.join(' | '), '');
 
               if (item.contextSnapshotBase64) {
-                lines.push(`![Architecture Context for ${item.id}](${item.contextSnapshotBase64})`, '');
+                lines.push(
+                  `![Architecture Context for ${item.id}](${item.contextSnapshotBase64})`,
+                  '',
+                );
               }
 
               if (item.linkedNodeLabels && item.linkedNodeLabels.length > 0) {
-                lines.push(`*Linked Architecture Components:* ${item.linkedNodeLabels.join(', ')}`, '');
+                lines.push(
+                  `*Linked Architecture Components:* ${item.linkedNodeLabels.join(', ')}`,
+                  '',
+                );
               }
 
               if (item.body && item.body.trim()) {
@@ -212,7 +221,7 @@ export function generateSrdMarkdown(data: SrdDataContext, config: SrdTemplateCon
           lines.push('| ------------- | ------------ | ------------- |');
           for (const link of data.traceability) {
             lines.push(
-              `| \`${link.sourceId}\` (${escapeTableCol(link.sourceTitle)}) | **${escapeTableCol(link.relation)}** | \`${link.targetId}\` (${escapeTableCol(link.targetTitle)}) |`,
+              `| \`${escapeTableCol(link.sourceId)}\` (${escapeTableCol(link.sourceTitle)}) | **${escapeTableCol(link.relation)}** | \`${escapeTableCol(link.targetId)}\` (${escapeTableCol(link.targetTitle)}) |`,
             );
           }
           lines.push('');
@@ -228,9 +237,8 @@ export function generateSrdMarkdown(data: SrdDataContext, config: SrdTemplateCon
           lines.push('| Milestone | Type | Target Date | Description | Related Items |');
           lines.push('| --------- | ---- | ----------- | ----------- | ------------- |');
           for (const m of data.roadmap.milestones) {
-            const relItems = m.relatedItemIds && m.relatedItemIds.length > 0
-              ? m.relatedItemIds.join(', ')
-              : '-';
+            const relItems =
+              m.relatedItemIds && m.relatedItemIds.length > 0 ? m.relatedItemIds.join(', ') : '-';
             lines.push(
               `| **${escapeTableCol(m.title)}** | \`${escapeTableCol(m.type)}\` | ${escapeTableCol(m.targetDate)} | ${escapeTableCol(m.description)} | ${escapeTableCol(relItems)} |`,
             );
@@ -242,12 +250,17 @@ export function generateSrdMarkdown(data: SrdDataContext, config: SrdTemplateCon
         if (data.roadmap.sprints.length === 0) {
           lines.push('*No sprint iterations planned.*', '');
         } else {
-          lines.push('| Program Increment | Sprint | Start Date | End Date | Effort | Work Items |');
-          lines.push('| ----------------- | ------ | ---------- | -------- | ------ | ---------- |');
+          lines.push(
+            '| Program Increment | Sprint | Start Date | End Date | Effort | Work Items |',
+          );
+          lines.push(
+            '| ----------------- | ------ | ---------- | -------- | ------ | ---------- |',
+          );
           for (const s of data.roadmap.sprints) {
-            const itemsStr = s.assignedItems.length > 0
-              ? `${s.assignedItems.length} items (${s.assignedItems.join(', ')})`
-              : '-';
+            const itemsStr =
+              s.assignedItems.length > 0
+                ? `${s.assignedItems.length} items (${s.assignedItems.join(', ')})`
+                : '-';
             lines.push(
               `| **${escapeTableCol(s.piName)}** | ${escapeTableCol(s.name)} | ${escapeTableCol(s.startDate)} | ${escapeTableCol(s.endDate)} | ${s.totalPoints} pts | ${escapeTableCol(itemsStr)} |`,
             );
@@ -263,7 +276,7 @@ export function generateSrdMarkdown(data: SrdDataContext, config: SrdTemplateCon
             const statusLabel = epic.isFullyScheduled ? 'Scheduled' : 'In Progress / Partial';
             const childProgress = `${epic.completedChildrenCount}/${epic.totalChildrenCount} done (${epic.scheduledChildrenCount} scheduled)`;
             lines.push(
-              `| \`${epic.epicId}\` ${escapeTableCol(epic.epicTitle)} | ${escapeTableCol(epic.startDate)} | ${escapeTableCol(epic.endDate)} | ${escapeTableCol(statusLabel)} | ${escapeTableCol(childProgress)} | ${epic.totalPoints} pts |`,
+              `| \`${escapeTableCol(epic.epicId)}\` ${escapeTableCol(epic.epicTitle)} | ${escapeTableCol(epic.startDate)} | ${escapeTableCol(epic.endDate)} | ${escapeTableCol(statusLabel)} | ${escapeTableCol(childProgress)} | ${epic.totalPoints} pts |`,
             );
           }
           lines.push('');
@@ -306,5 +319,7 @@ export function downloadSrdMarkdown(
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
-  URL.revokeObjectURL(url);
+  // Some browsers start the download asynchronously after click(); revoking the
+  // object URL immediately can cancel it, so defer the cleanup.
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

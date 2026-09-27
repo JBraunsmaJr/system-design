@@ -119,11 +119,7 @@ export interface SrdDataContext {
 }
 
 export type SrdSectionId =
-  | 'executive_summary'
-  | 'architecture'
-  | 'requirements'
-  | 'traceability'
-  | 'roadmap';
+  'executive_summary' | 'architecture' | 'requirements' | 'traceability' | 'roadmap';
 
 export interface SrdSectionConfig {
   id: SrdSectionId;

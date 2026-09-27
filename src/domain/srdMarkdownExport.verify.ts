@@ -3,10 +3,7 @@
  */
 import { generateSrdMarkdown, interpolateTokens } from './srdMarkdownExport';
 import { aggregateSrdData } from './srdDataAggregator';
-import {
-  ENTERPRISE_FORMAL_TEMPLATE,
-  AGILE_ENGINEERING_TEMPLATE,
-} from './srdTemplatePresets';
+import { ENTERPRISE_FORMAL_TEMPLATE, AGILE_ENGINEERING_TEMPLATE } from './srdTemplatePresets';
 import type { RequirementsDocument } from './requirementsTypes';
 
 let failures = 0;
@@ -24,22 +21,53 @@ console.log('Testing SRD Markdown Exporter...');
 
 const mockDoc: RequirementsDocument = {
   itemTypes: [
-    { id: 'req', label: 'Requirement', prefix: 'REQ', color: '#3b82f6', isBuiltIn: true, isWorkable: false },
-    { id: 'task', label: 'Task', prefix: 'TSK', color: '#10b981', isBuiltIn: true, isWorkable: true },
+    {
+      id: 'req',
+      label: 'Requirement',
+      prefix: 'REQ',
+      color: '#3b82f6',
+      isBuiltIn: true,
+      isWorkable: false,
+    },
+    {
+      id: 'task',
+      label: 'Task',
+      prefix: 'TSK',
+      color: '#10b981',
+      isBuiltIn: true,
+      isWorkable: true,
+    },
   ],
-  categories: [
-    { id: 'cat-auth', label: 'Authentication', color: '#6366f1' },
-  ],
+  categories: [{ id: 'cat-auth', label: 'Authentication', color: '#6366f1' }],
   items: [
-    { id: 'REQ-1', typeId: 'req', title: 'OAuth2 Authentication', body: 'Supports SSO via Google/GitHub', categoryId: 'cat-auth' },
-    { id: 'TSK-1', typeId: 'task', title: 'Issue JWT Tokens', body: 'RS256 algorithm', categoryId: 'cat-auth', points: 5, status: 'done' },
+    {
+      id: 'REQ-1',
+      typeId: 'req',
+      title: 'OAuth2 Authentication',
+      body: 'Supports SSO via Google/GitHub',
+      categoryId: 'cat-auth',
+    },
+    {
+      id: 'TSK-1',
+      typeId: 'task',
+      title: 'Issue JWT Tokens',
+      body: 'RS256 algorithm',
+      categoryId: 'cat-auth',
+      points: 5,
+      status: 'done',
+    },
   ],
   relationshipTypes: [
-    { id: 'relates-to', label: 'Relates to', inverseLabel: 'Relates to', color: '#3b82f6', isBuiltIn: true, isBlocking: false },
+    {
+      id: 'relates-to',
+      label: 'Relates to',
+      inverseLabel: 'Relates to',
+      color: '#3b82f6',
+      isBuiltIn: true,
+      isBlocking: false,
+    },
   ],
-  relationships: [
-    { id: 'r1', typeId: 'relates-to', fromItemId: 'REQ-1', toItemId: 'TSK-1' },
-  ],
+  relationships: [{ id: 'r1', typeId: 'relates-to', fromItemId: 'REQ-1', toItemId: 'TSK-1' }],
   nextSequence: { REQ: 2, TSK: 2 },
 };
 
@@ -114,8 +142,14 @@ const srdData = aggregateSrdData({
 
 // --- Test 3: Macro Token Replacement ---
 {
-  const result = interpolateTokens('Doc: {{title}} | Ver: {{version}} | Org: {{organization}}', srdData);
-  assert(result === 'Doc: Secure Gateway SRD | Ver: 1.0 | Org: Engineering Organization', 'Interpolates all tokens');
+  const result = interpolateTokens(
+    'Doc: {{title}} | Ver: {{version}} | Org: {{organization}}',
+    srdData,
+  );
+  assert(
+    result === 'Doc: Secure Gateway SRD | Ver: 1.0 | Org: Engineering Organization',
+    'Interpolates all tokens',
+  );
 
   console.log('✓ Test 3: Token interpolation passed');
 }
@@ -143,7 +177,10 @@ const srdData = aggregateSrdData({
     requirementsLayout: 'list',
   });
   assert(mdList.includes('#### REQ-1: OAuth2 Authentication'), 'List view renders H4 item headers');
-  assert(mdList.includes('![Architecture Context for REQ-1](data:image/png;base64,mockSnap123)'), 'List view embeds context snapshot');
+  assert(
+    mdList.includes('![Architecture Context for REQ-1](data:image/png;base64,mockSnap123)'),
+    'List view embeds context snapshot',
+  );
   assert(mdList.includes('*Dependencies & Links:*'), 'List view renders dependency links');
 
   // 4b. Table view
@@ -151,7 +188,10 @@ const srdData = aggregateSrdData({
     ...AGILE_ENGINEERING_TEMPLATE,
     requirementsLayout: 'table',
   });
-  assert(mdTable.includes('| ID | Title | Type | Status | Points | Sprint | Assignee |'), 'Table view renders GFM table header');
+  assert(
+    mdTable.includes('| ID | Title | Type | Status | Points | Sprint | Assignee |'),
+    'Table view renders GFM table header',
+  );
   assert(mdTable.includes('| `REQ-1` | **OAuth2 Authentication** |'), 'Table view renders row');
 
   // 4c. Component Inventory Table toggle
@@ -159,28 +199,42 @@ const srdData = aggregateSrdData({
     ...ENTERPRISE_FORMAL_TEMPLATE,
     includeComponentTable: true,
   });
-  assert(mdWithCompTable.includes('### Component Inventory'), 'Component inventory included when enabled');
+  assert(
+    mdWithCompTable.includes('### Component Inventory'),
+    'Component inventory included when enabled',
+  );
 
   const mdWithoutCompTable = generateSrdMarkdown(srdData, {
     ...ENTERPRISE_FORMAL_TEMPLATE,
     includeComponentTable: false,
   });
-  assert(!mdWithoutCompTable.includes('### Component Inventory'), 'Component inventory omitted when disabled');
+  assert(
+    !mdWithoutCompTable.includes('### Component Inventory'),
+    'Component inventory omitted when disabled',
+  );
 
   // 4d. Connections & Protocols Table toggle
   const mdWithConnTable = generateSrdMarkdown(srdData, {
     ...ENTERPRISE_FORMAL_TEMPLATE,
     includeConnectionsTable: true,
   });
-  assert(mdWithConnTable.includes('### Connections & Protocols'), 'Connections table included when enabled');
+  assert(
+    mdWithConnTable.includes('### Connections & Protocols'),
+    'Connections table included when enabled',
+  );
 
   const mdWithoutConnTable = generateSrdMarkdown(srdData, {
     ...ENTERPRISE_FORMAL_TEMPLATE,
     includeConnectionsTable: false,
   });
-  assert(!mdWithoutConnTable.includes('### Connections & Protocols'), 'Connections table omitted when disabled');
+  assert(
+    !mdWithoutConnTable.includes('### Connections & Protocols'),
+    'Connections table omitted when disabled',
+  );
 
-  console.log('✓ Test 4: Dual layouts, snapshot embeds, component and connections table toggles passed');
+  console.log(
+    '✓ Test 4: Dual layouts, snapshot embeds, component and connections table toggles passed',
+  );
 }
 
 if (failures > 0) {

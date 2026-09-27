@@ -2,7 +2,7 @@
 layout: home
 
 hero:
-  name: 'System Design Editor'
+  name: 'Engineers Notebook'
   text: 'Collaborative Architecture & Planning'
   tagline: Real-time peer-to-peer diagrams, requirement traceability, and capacity planning.
   actions:

@@ -202,14 +202,16 @@ export async function captureNodeSubsetSnapshot(
       let groupW = targetNode.measured?.width ?? targetNode.width;
       let groupH = targetNode.measured?.height ?? targetNode.height;
       if (groupW == null && targetNode.style?.width != null) {
-        groupW = typeof targetNode.style.width === 'number'
-          ? targetNode.style.width
-          : parseFloat(String(targetNode.style.width));
+        groupW =
+          typeof targetNode.style.width === 'number'
+            ? targetNode.style.width
+            : parseFloat(String(targetNode.style.width));
       }
       if (groupH == null && targetNode.style?.height != null) {
-        groupH = typeof targetNode.style.height === 'number'
-          ? targetNode.style.height
-          : parseFloat(String(targetNode.style.height));
+        groupH =
+          typeof targetNode.style.height === 'number'
+            ? targetNode.style.height
+            : parseFloat(String(targetNode.style.height));
       }
       const w = groupW && !isNaN(groupW) && groupW > 0 ? groupW : 320;
       const h = groupH && !isNaN(groupH) && groupH > 0 ? groupH : 220;
@@ -249,14 +251,14 @@ export async function captureNodeSubsetSnapshot(
     const effectiveW = width * (1 - paddingFraction * 2);
     const effectiveH = height * (1 - paddingFraction * 2);
 
-    const baseZoom = Math.min(
-      effectiveW / bounds.width,
-      effectiveH / bounds.height,
-    );
+    const baseZoom = Math.min(effectiveW / bounds.width, effectiveH / bounds.height);
     const MIN_SUBSET_ZOOM = 0.2;
     const MAX_SUBSET_ZOOM = 4.0;
     const clampedBaseZoom = Math.min(MAX_SUBSET_ZOOM, Math.max(MIN_SUBSET_ZOOM, baseZoom));
-    const adjustedZoom = Math.min(MAX_SUBSET_ZOOM, Math.max(MIN_SUBSET_ZOOM, clampedBaseZoom * zoomMultiplier));
+    const adjustedZoom = Math.min(
+      MAX_SUBSET_ZOOM,
+      Math.max(MIN_SUBSET_ZOOM, clampedBaseZoom * zoomMultiplier),
+    );
 
     const centerX = bounds.x + bounds.width / 2;
     const centerY = bounds.y + bounds.height / 2;
@@ -275,7 +277,9 @@ export async function captureNodeSubsetSnapshot(
       },
     };
 
-    return format === 'png' ? toPng(viewportEl, renderOptions) : toSvg(viewportEl, renderOptions);
+    return await (format === 'png'
+      ? toPng(viewportEl, renderOptions)
+      : toSvg(viewportEl, renderOptions));
   } catch (err) {
     console.warn('Could not capture node subset snapshot:', err);
     return undefined;
@@ -298,7 +302,7 @@ export async function captureCurrentScreenViewport(
     const options = {
       backgroundColor: EXPORT_BACKGROUND,
     };
-    return format === 'png' ? toPng(containerEl, options) : toSvg(containerEl, options);
+    return await (format === 'png' ? toPng(containerEl, options) : toSvg(containerEl, options));
   } catch (err) {
     console.warn('Could not capture screen viewport snapshot:', err);
     return undefined;

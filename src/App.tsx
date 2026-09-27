@@ -3082,124 +3082,98 @@ function App() {
   const [srdModalData, setSrdModalData] = useState<SrdDataContext | null>(null);
   const [isGeneratingSrd, setIsGeneratingSrd] = useState(false);
 
-  const openSrdModal = useCallback(async () => {
-    setIsGeneratingSrd(true);
+  /**
+   * Shared SRD preparation used by both the print modal and the markdown
+   * export: shows the loading overlay, captures the diagram and per-requirement
+   * linked-node snapshots, and aggregates everything into an SrdDataContext.
+   * Callers own the try/catch/finally so they can report their own errors.
+   */
+  const prepareSrdData = useCallback(async (): Promise<SrdDataContext> => {
     // Yield to allow the browser to immediately paint the loading overlay
     await new Promise((resolve) => setTimeout(resolve, 20));
-    try {
-      let diagramImg: string | undefined;
-      const itemSnapshots: Record<string, string> = {};
-      if (nodes.length > 0) {
-        diagramImg = await captureDiagramSnapshot(nodes, 'png');
 
-        for (const item of requirementsSnapshot.items) {
-          const linkedNodes = nodes.filter((n) => {
+    let diagramImg: string | undefined;
+    const itemSnapshots: Record<string, string> = {};
+    if (nodes.length > 0) {
+      diagramImg = await captureDiagramSnapshot(nodes, 'png');
+
+      for (const item of requirementsSnapshot.items) {
+        const linkedNodeIds = nodes
+          .filter((n) => {
             const data = (n.data || {}) as Record<string, unknown>;
-            const reqIds = Array.isArray(data.linkedRequirementIds) ? data.linkedRequirementIds : [];
+            const reqIds = Array.isArray(data.linkedRequirementIds)
+              ? data.linkedRequirementIds
+              : [];
             return reqIds.includes(item.id);
+          })
+          .map((n) => n.id);
+        if (linkedNodeIds.length === 0) continue;
+        try {
+          const snap = await captureNodeSubsetSnapshot(nodes, linkedNodeIds, {
+            width: 1200,
+            height: 600,
+            padding: 0.06,
           });
-          if (linkedNodes.length > 0) {
-            try {
-              const snap = await captureNodeSubsetSnapshot(
-                nodes,
-                linkedNodes.map((n) => n.id),
-                { width: 1200, height: 600, padding: 0.06 },
-              );
-              if (snap) {
-                itemSnapshots[item.id] = snap;
-              }
-            } catch (err) {
-              console.warn('Failed to snapshot linked nodes for item', item.id, err);
-            }
+          if (snap) {
+            itemSnapshots[item.id] = snap;
           }
+        } catch (err) {
+          console.warn('Failed to snapshot linked nodes for item', item.id, err);
         }
       }
-      const data = aggregateSrdData({
-        title,
-        nodes,
-        edges,
-        doc: requirementsSnapshot,
-        milestones: milestonesSnapshot,
-        programIncrements: programIncrementsSnapshot,
-        teamDoc: teamSnapshot,
-        diagramImageBase64: diagramImg,
-        itemSnapshots,
-      });
+    }
+
+    return aggregateSrdData({
+      title,
+      nodes,
+      edges,
+      doc: requirementsSnapshot,
+      milestones: milestonesSnapshot,
+      programIncrements: programIncrementsSnapshot,
+      teamDoc: teamSnapshot,
+      diagramImageBase64: diagramImg,
+      itemSnapshots,
+    });
+  }, [
+    title,
+    nodes,
+    edges,
+    requirementsSnapshot,
+    milestonesSnapshot,
+    programIncrementsSnapshot,
+    teamSnapshot,
+  ]);
+
+  const openSrdModal = useCallback(async () => {
+    setIsGeneratingSrd(true);
+    try {
+      const data = await prepareSrdData();
       setSrdModalData(data);
       setIsSrdModalOpen(true);
     } catch (err) {
       console.warn('Failed to prepare SRD:', err);
+      showToast('Failed to prepare SRD', 'error', err instanceof Error ? err.message : undefined);
     } finally {
       setIsGeneratingSrd(false);
     }
-  }, [
-    title,
-    nodes,
-    edges,
-    requirementsSnapshot,
-    milestonesSnapshot,
-    programIncrementsSnapshot,
-    teamSnapshot,
-  ]);
+  }, [prepareSrdData, showToast]);
 
   const onExportSrdMarkdown = useCallback(async () => {
     setIsGeneratingSrd(true);
-    // Yield to allow the browser to immediately paint the loading overlay
-    await new Promise((resolve) => setTimeout(resolve, 20));
     try {
-      let diagramImg: string | undefined;
-      const itemSnapshots: Record<string, string> = {};
-      if (nodes.length > 0) {
-        diagramImg = await captureDiagramSnapshot(nodes, 'png');
-
-        for (const item of requirementsSnapshot.items) {
-          const linkedNodes = nodes.filter((n) => {
-            const data = (n.data || {}) as Record<string, unknown>;
-            const reqIds = Array.isArray(data.linkedRequirementIds) ? data.linkedRequirementIds : [];
-            return reqIds.includes(item.id);
-          });
-          if (linkedNodes.length > 0) {
-            try {
-              const snap = await captureNodeSubsetSnapshot(
-                nodes,
-                linkedNodes.map((n) => n.id),
-                { width: 1200, height: 600, padding: 0.06 },
-              );
-              if (snap) {
-                itemSnapshots[item.id] = snap;
-              }
-            } catch (err) {
-              console.warn('Failed to snapshot linked nodes for item', item.id, err);
-            }
-          }
-        }
-      }
-      const data = aggregateSrdData({
-        title,
-        nodes,
-        edges,
-        doc: requirementsSnapshot,
-        milestones: milestonesSnapshot,
-        programIncrements: programIncrementsSnapshot,
-        teamDoc: teamSnapshot,
-        diagramImageBase64: diagramImg,
-        itemSnapshots,
-      });
+      const data = await prepareSrdData();
       downloadSrdMarkdown(data, DEFAULT_SRD_TEMPLATE);
     } catch (err) {
       console.warn('Failed to export SRD markdown:', err);
+      showToast(
+        'Failed to export SRD markdown',
+        'error',
+        err instanceof Error ? err.message : undefined,
+      );
     } finally {
       setIsGeneratingSrd(false);
     }
-  }, [
-    title,
-    nodes,
-    edges,
-    requirementsSnapshot,
-    milestonesSnapshot,
-    programIncrementsSnapshot,
-    teamSnapshot,
-  ]);
+  }, [prepareSrdData, showToast]);
 
   const onExportRequirementsMarkdown = useCallback(() => {
     downloadRequirementsMarkdown(title, requirementsSnapshot);
