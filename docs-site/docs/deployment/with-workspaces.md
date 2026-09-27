@@ -134,6 +134,10 @@ Then set `OIDC_ISSUER` in `.env` to your provider's issuer - the URL that
 serves `/.well-known/openid-configuration`. For Keycloak that is
 `https://<keycloak>/realms/<realm>`. Leave `OIDC_INTERNAL_URL` empty.
 
+If you plan to use [Automatic Access from Groups](/deployment/group-access),
+ensure your provider includes group membership in the **ID token** (for example,
+via a `groups` claim mapper emitting full group paths).
+
 ::: tip Check the issuer before going further
 
 ```bash
@@ -148,7 +152,7 @@ If that doesn't return JSON from this server, the store won't reach it either.
 In `.env`, replace the three Option A lines with the Option B ones, and set
 `KEYCLOAK_ADMIN_PASSWORD` and `KEYCLOAK_DB_PASSWORD` (the loop from step 3
 works for these too). Nothing else to edit: the realm file reads your domain
-and client secret when Keycloak imports it.
+and client secret when Keycloak imports it, and already includes a group mapper for [automatic access](/deployment/group-access).
 
 You'll add people to Keycloak in step 8.
 
@@ -210,7 +214,7 @@ Assuming everything is hosted at `design.example.com` and your proxy is set to f
 instance), sign in as `admin` with `KEYCLOAK_ADMIN_PASSWORD`, switch to the **system-design** realm, and add a user under
 **Users**. Give each person an
 email address, marked verified: Keycloak will otherwise interrupt their first
-sign-in to ask for one.
+sign-in to ask for one. If you want to use [automatic access](/deployment/group-access), create groups under **Groups** (such as `design-team-a`) and assign users to them.
 
 ## 9. Sign in, and make yourself an administrator
 
@@ -233,9 +237,10 @@ and restart the store: `docker compose up -d store`. (With Keycloak, add
 
 ## 10. Invite your team
 
-Send people the address. When someone new signs in, everyone already in the
-workspace sees a notice over their document with **Give access** on it; one
-press lets them in. [Workspaces](/guide/workspaces) is the guide to give them.
+Send people the address. When someone new signs in, members already in the
+workspace can admit them by clicking **Give access** when prompted.
+Alternatively, if you configure [Automatic Access from Groups](/deployment/group-access),
+teammates in authorized groups are admitted automatically as soon as an existing member has the editor open. [Workspaces](/guide/workspaces) is the guide to give them.
 
 ## Keeping it running
 
@@ -264,5 +269,7 @@ backups.**
 
 - [Administering a Workspace](/deployment/administration) - legal holds,
   purges, restoring someone's access.
+- [Automatic Access from Groups](/deployment/group-access) - admit members
+  automatically based on identity provider group membership.
 - [Workspace Store](/deployment/workspace-store) - every setting, including
   retention and running more than one instance.
