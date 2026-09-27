@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
-import { NodeResizer, type NodeProps, type Node, Handle, Position } from '@xyflow/react';
+import { NodeResizer, type NodeProps, type Node } from '@xyflow/react';
 import { globalShapeRegistry, type ConnectionPoint } from '../../domain/shapeRegistry';
-import { BidirectionalHandles } from './BidirectionalHandles';
+import { EdgeHandles } from './EdgeHandles';
 import { SvgShapeRenderer } from './SvgShapeRenderer';
 import type { ArchNodeData } from '../../domain/types';
 import { useCanvasContext } from '../CanvasContext';
@@ -54,7 +54,6 @@ export function ShapeNode({
   }, [isEditing]);
 
   const connectionPoints: ConnectionPoint[] = def?.connectionPoints ?? [];
-  const hasCustomPoints = connectionPoints.length > 0;
 
   return (
     <>
@@ -67,38 +66,7 @@ export function ShapeNode({
         handleClassName="node-resize-handle"
       />
 
-      {hasCustomPoints ? (
-        <>
-          {connectionPoints.map((pt) => {
-            let pos = Position.Top;
-            if (pt.direction === 'right') pos = Position.Right;
-            else if (pt.direction === 'bottom') pos = Position.Bottom;
-            else if (pt.direction === 'left') pos = Position.Left;
-            else if (pt.x > 0.75) pos = Position.Right;
-            else if (pt.x < 0.25) pos = Position.Left;
-            else if (pt.y > 0.75) pos = Position.Bottom;
-
-            return (
-              <div key={pt.id}>
-                <Handle
-                  id={`target-${pt.id}`}
-                  type="target"
-                  position={pos}
-                  style={{ left: `${pt.x * 100}%`, top: `${pt.y * 100}%` }}
-                />
-                <Handle
-                  id={`source-${pt.id}`}
-                  type="source"
-                  position={pos}
-                  style={{ left: `${pt.x * 100}%`, top: `${pt.y * 100}%` }}
-                />
-              </div>
-            );
-          })}
-        </>
-      ) : (
-        <BidirectionalHandles />
-      )}
+      <EdgeHandles points={connectionPoints} />
 
       <div
         className={`shape-node-wrapper${selected ? ' is-selected' : ''}`}

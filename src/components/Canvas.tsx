@@ -20,17 +20,20 @@ import {
   SelectionMode,
   ViewportPortal,
   useReactFlow,
+  useStoreApi,
   useUpdateNodeInternals,
   type Node,
   type Edge,
-  type Connection,
   type OnNodesChange,
   type OnEdgesChange,
   type OnConnect,
   type OnConnectStart,
+  type OnConnectEnd,
   type OnNodeDrag,
   type OnReconnect,
   type HandleType,
+  type FinalConnectionState,
+  type InternalNode,
   type NodeMouseHandler,
   type NodeTypes,
   type EdgeTypes,
@@ -85,13 +88,15 @@ import type {
   ScenarioStep,
 } from '../domain/types';
 import {
-  normalizeReconnection,
   validateReconnection,
   isSameEndpoints,
   type EdgeEnd,
   draggedEndFromReconnectStart,
   type EdgeEndpoints,
 } from '../domain/edgeReconnect';
+import { sourceHandleId, targetHandleId } from '../domain/edgeAnchoring';
+import { resolveConnectionDrag } from './edges/edgeAnchoringAdapter';
+import { EdgeConnectionLine } from './edges/EdgeConnectionLine';
 import type { PresenceInfo } from '../collab/session';
 import { CanvasContext, type CanvasContextValue } from './CanvasContext';
 import { recordCanvasRender, registerPerfViewportFramer } from '../perf/instrumentation';
@@ -393,46 +398,66 @@ export function Canvas({
 
   const pathKey = breadcrumbLabels.join('>');
 
-  // Each node has both a source-type and a target-type handle stacked at
-  // every position (see TypedNode.tsx), so a connection can be dragged
-  // starting from either end. React Flow decides a resulting connection's
-  // source/target based on which HANDLE TYPE is on each side, not which one
-  // the drag actually started from - with overlapping handles at every
-  // position that can silently produce an edge running opposite to the
-  // direction you actually dragged. This tracks the node the drag genuinely
-  // started from and, if React Flow's own result doesn't match it, swaps
-  // source/target (and their handles) back before the edge is created.
-  const connectStartNodeId = useRef<string | null>(null);
+  /**
+   * Which END of the edge is being dragged during a reconnection, or null
+   * when no reconnection is in progress. React Flow reports it (inverted)
+   * to onReconnectStart and routes the gesture's end through onConnectEnd
+   * as well as onReconnectEnd - this is also how handleConnectEnd tells a
+   * reconnection apart from a brand new connection and stays out of it.
+   */
+  const reconnectEndRef = useRef<EdgeEnd | null>(null);
+  const reactFlowStore = useStoreApi<Node<ArchNodeData>, Edge<ArchEdgeData>>();
 
-  const onConnectStart = useCallback<OnConnectStart>((_event, { nodeId }) => {
-    connectStartNodeId.current = nodeId;
-  }, []);
-
-  const handleConnect = useCallback<OnConnect>(
-    (connection: Connection) => {
-      const startId = connectStartNodeId.current;
-      connectStartNodeId.current = null;
-      if (startId && startId === connection.target && startId !== connection.source) {
-        onConnect({
-          source: connection.target,
-          sourceHandle: connection.targetHandle,
-          target: connection.source,
-          targetHandle: connection.sourceHandle,
-        });
-        return;
-      }
-      onConnect(connection);
+  /**
+   * Where a drag that just ended should attach, resolved geometrically
+   * from the release point rather than from whichever React Flow handle
+   * happened to be under it - see domain/edgeAnchoring.ts. The same
+   * resolution drives EdgeConnectionLine's live preview.
+   */
+  const resolveRelease = useCallback(
+    (event: MouseEvent | TouchEvent, state: FinalConnectionState) => {
+      if (!state.fromNode || !state.fromHandle) return null;
+      const touch = 'changedTouches' in event ? event.changedTouches[0] : null;
+      const client = touch
+        ? { x: touch.clientX, y: touch.clientY }
+        : { x: (event as MouseEvent).clientX, y: (event as MouseEvent).clientY };
+      const { nodeLookup, transform } = reactFlowStore.getState();
+      return resolveConnectionDrag({
+        nodeLookup,
+        zoom: transform[2],
+        fromNode: state.fromNode as InternalNode<Node>,
+        fromHandle: state.fromHandle,
+        pointer: screenToFlowPosition(client),
+      });
     },
-    [onConnect],
+    [reactFlowStore, screenToFlowPosition],
   );
 
   /**
-   * Which END of the edge is being dragged. React Flow reports it (inverted)
-   * to onReconnectStart and then doesn't mention it again, but onReconnect
-   * can't be interpreted without it - see handleReconnect. Same ref
-   * pattern, and for much the same reason, as connectStartNodeId above.
+   * Edge creation. Every node's sides are invisible `grab-<side>` strips
+   * (see EdgeHandles.tsx) that can only START a drag, never end one, so
+   * React Flow's own onConnect never fires - the edge is created here
+   * instead, from the node under the release point: on the side released
+   * on, or the side nearest the pointer if released over the body.
+   *
+   * Direction always follows the drag, by construction: source is the
+   * node the drag started on. (The old stacked source/target dots let
+   * React Flow flip that, which needed a correction here.)
    */
-  const reconnectEndRef = useRef<EdgeEnd | null>(null);
+  const handleConnectEnd = useCallback<OnConnectEnd>(
+    (event, state) => {
+      if (reconnectEndRef.current) return; // handled by handleReconnectEnd
+      const resolved = resolveRelease(event, state);
+      if (!resolved?.sourceAnchor || !resolved.target || !state.fromNode) return;
+      onConnect({
+        source: state.fromNode.id,
+        sourceHandle: sourceHandleId(resolved.sourceAnchor.pointId),
+        target: resolved.target.nodeId,
+        targetHandle: targetHandleId(resolved.target.anchor.pointId),
+      });
+    },
+    [onConnect, resolveRelease],
+  );
 
   const handleReconnectStart = useCallback(
     (_event: ReactMouseEvent, _edge: Edge<ArchEdgeData>, handleType: HandleType) => {
@@ -444,31 +469,52 @@ export function Canvas({
   );
 
   /**
-   * Endpoint reconnection, with the same correction edge CREATION needs
-   * just above.
-   *
-   * Every node stacks a source-type and a target-type handle at each
-   * position, so React Flow labels the two ends of the resulting
-   * Connection from the handle types it landed on rather than from which
-   * end was dragged - which means taking it at face value can silently
-   * reverse the edge as a side effect of moving one of its ends.
-   * normalizeReconnection pins the end that WASN'T dragged to what it
-   * already was and reads the other end off the Connection.
+   * React Flow only makes edges reconnectable when onReconnect is set, but
+   * it only calls it when a release lands on a valid drop HANDLE - which
+   * nothing is any more. The real work happens in handleReconnectEnd.
+   */
+  const handleReconnect = useCallback<OnReconnect<Edge<ArchEdgeData>>>(() => {}, []);
+
+  /**
+   * Endpoint reconnection: the dragged end moves to wherever the release
+   * resolves to (same rules as creating an edge), the other end stays
+   * exactly as it was, so moving one end can never reverse the edge.
    *
    * Two guards before anything is written. A drag released back where it
-   * started still fires this, and writing that would sync a no-op to
+   * started still ends up here, and writing that would sync a no-op to
    * every peer and put an entry in undo history for a gesture that
    * changed nothing. And both ends have to be nodes at this level of the
    * sub-diagram tree - React Flow only renders one level so a drag
    * shouldn't be able to reach off it, but an edge that did would be
    * invisible from every level rather than visibly wrong.
    */
-  const handleReconnect = useCallback<OnReconnect<Edge<ArchEdgeData>>>(
-    (oldEdge, connection) => {
-      const draggedEnd = reconnectEndRef.current ?? 'target';
+  const handleReconnectEnd = useCallback(
+    (
+      event: MouseEvent | TouchEvent,
+      oldEdge: Edge<ArchEdgeData>,
+      handleType: HandleType,
+      state: FinalConnectionState,
+    ) => {
+      const draggedEnd = reconnectEndRef.current ?? draggedEndFromReconnectStart(handleType);
       reconnectEndRef.current = null;
 
-      const next = normalizeReconnection(oldEdge, connection, draggedEnd);
+      const target = resolveRelease(event, state)?.target;
+      if (!target) return;
+
+      const next: EdgeEndpoints =
+        draggedEnd === 'target'
+          ? {
+              source: oldEdge.source,
+              sourceHandle: oldEdge.sourceHandle ?? null,
+              target: target.nodeId,
+              targetHandle: targetHandleId(target.anchor.pointId),
+            }
+          : {
+              source: target.nodeId,
+              sourceHandle: sourceHandleId(target.anchor.pointId),
+              target: oldEdge.target,
+              targetHandle: oldEdge.targetHandle ?? null,
+            };
       if (isSameEndpoints(oldEdge, next)) return;
 
       const check = validateReconnection(next, new Set(nodesRef.current.map((n) => n.id)));
@@ -476,7 +522,7 @@ export function Canvas({
 
       onReconnectEdge(oldEdge.id, next);
     },
-    [onReconnectEdge],
+    [onReconnectEdge, resolveRelease],
   );
 
   const onDragOver = useCallback((event: DragEvent) => {
@@ -922,14 +968,10 @@ export function Canvas({
     docHover.closeDocumentation();
   }, [closeContextMenu, docHover.closeDocumentation]);
 
-  const handleConnectStartWithDoc = useCallback<OnConnectStart>(
-    (event, params) => {
-      closeContextMenu();
-      docHover.closeDocumentation();
-      onConnectStart(event, params);
-    },
-    [closeContextMenu, docHover.closeDocumentation, onConnectStart],
-  );
+  const handleConnectStartWithDoc = useCallback<OnConnectStart>(() => {
+    closeContextMenu();
+    docHover.closeDocumentation();
+  }, [closeContextMenu, docHover.closeDocumentation]);
 
   const onNodeDragStart = useCallback(() => {
     closeContextMenu();
@@ -961,10 +1003,16 @@ export function Canvas({
           edgeTypes={CANVAS_EDGE_TYPES}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
-          onConnect={handleConnect}
           onConnectStart={handleConnectStartWithDoc}
+          onConnectEnd={handleConnectEnd}
           onReconnect={handleReconnect}
           onReconnectStart={handleReconnectStart}
+          onReconnectEnd={handleReconnectEnd}
+          connectionLineComponent={EdgeConnectionLine}
+          // Clicking a border would otherwise arm React Flow's click-to-connect
+          // mode, which has nothing to complete against now that no handle
+          // is a drop target - connections are drag-only.
+          connectOnClick={false}
           onNodeContextMenu={onNodeContextMenu}
           onSelectionContextMenu={onSelectionContextMenu}
           onNodeMouseEnter={docHover.handleNodeMouseEnter}

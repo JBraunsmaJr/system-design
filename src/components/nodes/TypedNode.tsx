@@ -1,7 +1,7 @@
 import { type NodeProps, type Node } from '@xyflow/react';
 import { Maximize2 } from 'lucide-react';
 import { getNodeType, CATEGORY_LABELS } from '../../domain/nodeRegistry';
-import { BidirectionalHandles } from './BidirectionalHandles';
+import { EdgeHandles } from './EdgeHandles';
 import { IconRenderer } from '../IconRenderer';
 import type { ArchNodeData } from '../../domain/types';
 import { useCanvasContext } from '../CanvasContext';
@@ -42,7 +42,7 @@ export function TypedNode({ id, data, selected, onDrillInto: propOnDrillInto }: 
       className={`typed-node${selected ? ' is-selected' : ''}`}
       style={{ borderLeftColor: accent }}
     >
-      <BidirectionalHandles />
+      <EdgeHandles />
 
       <div className="typed-node__body">
         {iconName && (

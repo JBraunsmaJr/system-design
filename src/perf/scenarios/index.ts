@@ -248,9 +248,9 @@ export const reconnectEdgeScenario: ScenarioDefinition = {
     // Some edge's endpoint updater - see findGrabbableUpdater for why not a
     // specific one. assertGestureCommitted below proves a reconnect happened.
     const start = await findGrabbableUpdater(page);
-    // Released over a connection HANDLE, not the node body: React Flow only
-    // completes a reconnect within connectionRadius of a handle, so a drop on
-    // the middle of a node (what this scenario used to do) connects nothing.
+    // Released on the target's top anchor, i.e. on its top border. Any
+    // release over the node would now reconnect (see edgeAnchoring.ts), but
+    // a fixed, border-exact point keeps the gesture identical run to run.
     const target = await page.evaluate(
       (sel) => {
         const handle = document.querySelector(sel);

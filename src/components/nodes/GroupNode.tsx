@@ -1,7 +1,7 @@
 import { NodeResizer, useReactFlow, type NodeProps, type Node } from '@xyflow/react';
 import * as Icons from 'lucide-react';
 import { getGroupType } from '../../domain/groupRegistry';
-import { BidirectionalHandles } from './BidirectionalHandles';
+import { EdgeHandles } from './EdgeHandles';
 import type { ArchNodeData } from '../../domain/types';
 import { useCanvasContext } from '../CanvasContext';
 import { recordNodeRender } from '../../perf/instrumentation';
@@ -37,7 +37,7 @@ interface GroupNodeProps extends NodeProps<GroupNodeType> {
  * A group/boundary can also be connected to other nodes directly - e.g. an
  * edge from a "Kubernetes Cluster" boundary to a "Database" node,
  * representing the whole subsystem rather than one specific node inside
- * it. BidirectionalHandles is the same shared handle set TypedNode and
+ * it. EdgeHandles is the same shared handle set TypedNode and
  * ShapeNode already use, kept as a sibling of the click-through div below
  * for the same reason NodeResizer is - pointer-events:none is inherited by
  * descendants, so a handle nested inside that div would inherit it too and
@@ -72,7 +72,7 @@ export function GroupNode({
       {/* Sibling, not nested inside the click-through div below - pointer-events
           is inherited by default, and NodeResizer's own handles need to stay
           fully interactive regardless of the group's interior being
-          click-through. Same reasoning applies to BidirectionalHandles just
+          click-through. Same reasoning applies to EdgeHandles just
           below it. */}
       <NodeResizer
         isVisible={selected}
@@ -113,7 +113,7 @@ export function GroupNode({
           }
         }}
       />
-      <BidirectionalHandles />
+      <EdgeHandles />
       <div
         className={`group-node${selected ? ' is-selected' : ''}`}
         style={{
@@ -123,10 +123,11 @@ export function GroupNode({
           background: selected ? 'rgba(91, 124, 250, 0.09)' : `${accent}0d`,
         }}
       >
-        {/* Clickable border frame - 4 thin strips along each edge, each
-            explicitly re-enabling pointer-events since the parent above
-            turns them off. Slightly thicker than the visual border itself
-            for an easier, more forgiving click target. */}
+        {/* Clickable border frame - 4 thin strips along the INNER side of
+            each edge, each explicitly re-enabling pointer-events since the
+            parent above turns them off. The outer side of the border belongs
+            to EdgeHandles' grab strips (drag out a connection); see the
+            .react-flow__node-group rule in App.css for the split. */}
         <div className="group-node__edge-hit group-node__edge-hit--top" />
         <div className="group-node__edge-hit group-node__edge-hit--right" />
         <div className="group-node__edge-hit group-node__edge-hit--bottom" />

@@ -11,7 +11,7 @@ import { NodeResizer, type NodeProps, type Node } from '@xyflow/react';
 import * as Icons from 'lucide-react';
 import { getCodeLanguage } from '../../domain/codeRegistry';
 import { highlightCode } from '../../domain/prismSetup';
-import { BidirectionalHandles } from './BidirectionalHandles';
+import { EdgeHandles } from './EdgeHandles';
 import type { ArchNodeData } from '../../domain/types';
 import { useCanvasContext } from '../CanvasContext';
 import { recordNodeRender } from '../../perf/instrumentation';
@@ -127,7 +127,7 @@ export function CodeNode({
         lineClassName="node-resize-line"
         handleClassName="node-resize-handle"
       />
-      <BidirectionalHandles />
+      <EdgeHandles />
       <div
         className={`code-node${selected ? ' is-selected' : ''}`}
         style={{ borderColor: selected ? 'var(--accent)' : `${accent}66` }}

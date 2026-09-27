@@ -24,7 +24,9 @@ The editor is designed for rapid, low-friction diagramming with zero configurati
 
 ### Connecting & Routing Edges
 
-- **Handles**: Hover over any node boundary and drag from connection handles to link elements.
+- **Connecting**: Press on any border of a node (or the outer edge of a boundary's border) and drag to another node.
+  Release on one of its borders to attach to that side, or anywhere over it to attach to the nearest side. A highlight
+  shows which side will be used before you let go. Dragging an existing edge's end works the same way.
 - **Edge Types & Styles**: Customize connection pathways as directional, bi-directional, solid, dashed, or dotted.
 - **Waypoints**: Click and drag mid-points on connection lines to insert bends and cleanly route edges around
   intervening components.

@@ -1018,15 +1018,144 @@ option {
   overflow: hidden;
 }
 
-.react-flow__handle {
-  width: 8px;
-  height: 8px;
-  background: #98a2b3;
-  border: 2px solid var(--canvas-bg);
+/* ---------- Connection handles (see nodes/EdgeHandles.tsx) ----------
+
+   No visible connector dots. Two kinds of handle, both invisible:
+
+   .edge-anchor - where edges attach. Kept at the exact size the old
+   visible dots were (8px + 2px border, centred on the border) because an
+   edge's endpoint is derived from its handle's box - changing the size
+   would shift every existing edge's endpoint. React Flow's base CSS
+   already gives non-connectable handles pointer-events: none.
+
+   .edge-grab - a strip along each full side, straddling the border.
+   Pressing here and dragging starts a connection. React Flow only makes
+   a handle hit-testable while it's a valid START point
+   (.connectionindicator), so these switch themselves off during an
+   in-progress drag, in presentation mode, and anywhere else nodes aren't
+   connectable - nothing extra needed for any of those. */
+:root {
+  --edge-grab-outside: 6px;
+  --edge-grab-inside: 4px;
 }
 
-.react-flow__handle:hover {
+.react-flow__handle.edge-anchor {
+  width: 8px;
+  height: 8px;
+  border: 2px solid transparent;
+  background: transparent;
+  opacity: 0;
+}
+
+.react-flow__handle.edge-grab {
+  min-width: 0;
+  min-height: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  transform: none;
+  /* Above the node's own content, below NodeResizer's controls (z-index 2,
+     below) so resizing a selected node from a corner still works. */
+  z-index: 1;
+}
+
+.react-flow__handle.edge-grab.connectionindicator {
+  cursor: crosshair;
+}
+
+.react-flow__handle.edge-grab--top,
+.react-flow__handle.edge-grab--bottom {
+  left: 0;
+  right: 0;
+  width: auto;
+  height: calc(var(--edge-grab-outside) + var(--edge-grab-inside));
+}
+
+.react-flow__handle.edge-grab--top {
+  top: calc(-1 * var(--edge-grab-outside));
+}
+
+.react-flow__handle.edge-grab--bottom {
+  top: auto;
+  bottom: calc(-1 * var(--edge-grab-outside));
+}
+
+.react-flow__handle.edge-grab--left,
+.react-flow__handle.edge-grab--right {
+  top: 0;
+  bottom: 0;
+  height: auto;
+  width: calc(var(--edge-grab-outside) + var(--edge-grab-inside));
+}
+
+.react-flow__handle.edge-grab--left {
+  left: calc(-1 * var(--edge-grab-outside));
+}
+
+.react-flow__handle.edge-grab--right {
+  left: auto;
+  right: calc(-1 * var(--edge-grab-outside));
+}
+
+/* Hover affordance: a thin accent line along the side you're about to
+   drag from - the only visual hint that a border is connectable. */
+.react-flow__handle.edge-grab::after {
+  content: '';
+  position: absolute;
   background: var(--accent);
+  border-radius: 1px;
+  opacity: 0;
+  transition: opacity 80ms ease-out;
+  pointer-events: none;
+}
+
+.react-flow__handle.edge-grab.connectionindicator:hover::after {
+  opacity: 0.85;
+}
+
+.react-flow__handle.edge-grab--top::after,
+.react-flow__handle.edge-grab--bottom::after {
+  left: 0;
+  right: 0;
+  height: 2px;
+}
+
+.react-flow__handle.edge-grab--top::after {
+  top: calc(var(--edge-grab-outside) - 1px);
+}
+
+.react-flow__handle.edge-grab--bottom::after {
+  bottom: calc(var(--edge-grab-outside) - 1px);
+}
+
+.react-flow__handle.edge-grab--left::after,
+.react-flow__handle.edge-grab--right::after {
+  top: 0;
+  bottom: 0;
+  width: 2px;
+}
+
+.react-flow__handle.edge-grab--left::after {
+  left: calc(var(--edge-grab-outside) - 1px);
+}
+
+.react-flow__handle.edge-grab--right::after {
+  right: calc(var(--edge-grab-outside) - 1px);
+}
+
+.react-flow__resize-control {
+  z-index: 2;
+}
+
+/* Drop preview drawn by EdgeConnectionLine while a connection or
+   reconnection is in progress: which side of which node the release
+   would attach to. */
+.edge-drop-preview {
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-linecap: round;
+  fill: none;
+  pointer-events: none;
 }
 
 /* ---------- Group / boundary node ---------- */
@@ -1114,20 +1243,19 @@ option {
   pointer-events: auto;
 }
 
-/* Connection handles have to sit ABOVE the border hit-strips below.
-   GroupNode renders <BidirectionalHandles /> and then the .group-node div
-   that contains those strips, as siblings with no z-index between them -
-   so the strips, being later in the DOM, painted on top and won every hit
-   test. The top strip spans y -5..+5 around the border and the top handle
-   is centred on that same line, so a press on the connector landed on the
-   strip instead: the boundary started dragging rather than a connection
-   starting. Scoped to boundaries because they're the only node type with
-   a full-width interactive strip laid over their own handles.
+/* A boundary's border does two jobs, split across its thickness: the
+   OUTER half (a grab strip, see EdgeHandles.tsx) starts a connection, the
+   INNER half (these strips) selects/drags the boundary. They used to
+   overlap - both centred on the border - and whichever painted last won
+   every press. Cursors differ (crosshair vs. move) so the split is
+   discoverable. */
+.react-flow__node-group {
+  --edge-grab-outside: 8px;
+  --edge-grab-inside: 2px;
+}
 
-   Kept below .react-flow__edgelabel-renderer's 1000 and React Flow's
-   in-progress connection line at 1001, both of which should stay on top. */
-.react-flow__node-group .react-flow__handle {
-  z-index: 1;
+.group-node__edge-hit {
+  cursor: move;
 }
 
 .group-node__edge-hit--top,
@@ -1138,11 +1266,11 @@ option {
 }
 
 .group-node__edge-hit--top {
-  top: -5px;
+  top: 0;
 }
 
 .group-node__edge-hit--bottom {
-  bottom: -5px;
+  bottom: 0;
 }
 
 .group-node__edge-hit--left,
@@ -1150,6 +1278,14 @@ option {
   top: 0;
   bottom: 0;
   width: 10px;
+}
+
+.group-node__edge-hit--left {
+  left: 0;
+}
+
+.group-node__edge-hit--right {
+  right: 0;
 }
 
 .group-node__edge-hit--left {
@@ -1162,6 +1298,10 @@ option {
 
 .group-node__label {
   position: absolute;
+  /* Above the boundary's connection grab strips (z-index 1), which run
+     along the same top border the label sits on - the label should
+     still select/drag the boundary, not start a connection. */
+  z-index: 2;
   top: -11px;
   left: 14px;
   display: flex;

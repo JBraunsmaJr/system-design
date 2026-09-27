@@ -139,7 +139,7 @@ export interface DiagramStore {
   deleteNode(id: string): void;
 
   /** sourceHandle/targetHandle matter here: several node types define
-   * multiple named handles (see BidirectionalHandles.tsx), so which
+   * multiple named handles (see EdgeHandles.tsx), so which
    * specific handle a connection was made from/to is real, meaningful
    * data - not something that can be left to default to "the only
    * handle" the way a simpler node might get away with. Only ever set

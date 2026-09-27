@@ -6,12 +6,17 @@
  * reason: React Flow's own `onReconnect` hands back a Connection whose
  * source/target orientation can't be taken at face value in this app.
  * Every node stacks a source-type AND a target-type handle at each
- * position (see BidirectionalHandles.tsx), and React Flow decides which
+ * position (see EdgeHandles.tsx), and React Flow decides which
  * end of a Connection is which from the handle TYPES it ended up on, not
  * from which end the person actually dragged. Canvas.tsx already carries
  * a fix for exactly this on edge CREATION (see connectStartNodeId);
  * reconnection has the same problem and needs the same kind of fix,
  * which is worth having somewhere it can be tested directly.
+ *
+ * NOTE: Canvas.tsx no longer relies on React Flow's Connection for either
+ * gesture - drops are resolved geometrically (domain/edgeAnchoring.ts), so
+ * the dragged end is known directly and normalizeReconnection isn't on
+ * the live path any more. The remaining helpers here still are.
  */
 
 export interface EdgeEndpoints {
