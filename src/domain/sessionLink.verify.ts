@@ -355,7 +355,9 @@ const {
       },
     },
   };
-  (globalThis as unknown as { document?: { title: string } }).document = { title: 'System Design' };
+  (globalThis as unknown as { document?: { title: string } }).document = {
+    title: 'Engineers Notebook',
+  };
 
   sanitizeCurrentUrl();
   assert(

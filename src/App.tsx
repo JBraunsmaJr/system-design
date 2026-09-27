@@ -106,7 +106,17 @@ import {
 } from './collab/localDocument';
 import { undoableStore, undoControllerFor, releaseUndoController } from './collab/undoManager';
 import { downloadRequirementsMarkdown } from './domain/requirementsExport';
-import { exportDiagramAsPng, exportDiagramAsSvg } from './domain/imageExport';
+import {
+  exportDiagramAsPng,
+  exportDiagramAsSvg,
+  captureDiagramSnapshot,
+  captureNodeSubsetSnapshot,
+} from './domain/imageExport';
+import { SrdPrintModal } from './components/srd/SrdPrintModal';
+import { aggregateSrdData } from './domain/srdDataAggregator';
+import { downloadSrdMarkdown } from './domain/srdMarkdownExport';
+import { DEFAULT_SRD_TEMPLATE } from './domain/srdTemplatePresets';
+import type { SrdDataContext } from './domain/srdTypes';
 import type {
   ArchNodeData,
   ArchEdgeData,
@@ -201,6 +211,7 @@ import {
 } from './perf/instrumentation';
 import { getStandardFixture, type FixtureName } from './perf/fixtures';
 import './App.css';
+import './components/srd/SrdPrintModal.css';
 
 /**
  * The objects the canvas was last handed for each store node/edge, reused
@@ -3067,6 +3078,103 @@ function App() {
     exportDiagramAsSvg(nodes, title).catch((err) => window.alert((err as Error).message));
   }, [nodes, title]);
 
+  const [isSrdModalOpen, setIsSrdModalOpen] = useState(false);
+  const [srdModalData, setSrdModalData] = useState<SrdDataContext | null>(null);
+  const [isGeneratingSrd, setIsGeneratingSrd] = useState(false);
+
+  /**
+   * Shared SRD preparation used by both the print modal and the markdown
+   * export: shows the loading overlay, captures the diagram and per-requirement
+   * linked-node snapshots, and aggregates everything into an SrdDataContext.
+   * Callers own the try/catch/finally so they can report their own errors.
+   */
+  const prepareSrdData = useCallback(async (): Promise<SrdDataContext> => {
+    // Yield to allow the browser to immediately paint the loading overlay
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    let diagramImg: string | undefined;
+    const itemSnapshots: Record<string, string> = {};
+    if (nodes.length > 0) {
+      diagramImg = await captureDiagramSnapshot(nodes, 'png');
+
+      for (const item of requirementsSnapshot.items) {
+        const linkedNodeIds = nodes
+          .filter((n) => {
+            const data = (n.data || {}) as Record<string, unknown>;
+            const reqIds = Array.isArray(data.linkedRequirementIds)
+              ? data.linkedRequirementIds
+              : [];
+            return reqIds.includes(item.id);
+          })
+          .map((n) => n.id);
+        if (linkedNodeIds.length === 0) continue;
+        try {
+          const snap = await captureNodeSubsetSnapshot(nodes, linkedNodeIds, {
+            width: 1200,
+            height: 600,
+            padding: 0.06,
+          });
+          if (snap) {
+            itemSnapshots[item.id] = snap;
+          }
+        } catch (err) {
+          console.warn('Failed to snapshot linked nodes for item', item.id, err);
+        }
+      }
+    }
+
+    return aggregateSrdData({
+      title,
+      nodes,
+      edges,
+      doc: requirementsSnapshot,
+      milestones: milestonesSnapshot,
+      programIncrements: programIncrementsSnapshot,
+      teamDoc: teamSnapshot,
+      diagramImageBase64: diagramImg,
+      itemSnapshots,
+    });
+  }, [
+    title,
+    nodes,
+    edges,
+    requirementsSnapshot,
+    milestonesSnapshot,
+    programIncrementsSnapshot,
+    teamSnapshot,
+  ]);
+
+  const openSrdModal = useCallback(async () => {
+    setIsGeneratingSrd(true);
+    try {
+      const data = await prepareSrdData();
+      setSrdModalData(data);
+      setIsSrdModalOpen(true);
+    } catch (err) {
+      console.warn('Failed to prepare SRD:', err);
+      showToast('Failed to prepare SRD', 'error', err instanceof Error ? err.message : undefined);
+    } finally {
+      setIsGeneratingSrd(false);
+    }
+  }, [prepareSrdData, showToast]);
+
+  const onExportSrdMarkdown = useCallback(async () => {
+    setIsGeneratingSrd(true);
+    try {
+      const data = await prepareSrdData();
+      downloadSrdMarkdown(data, DEFAULT_SRD_TEMPLATE);
+    } catch (err) {
+      console.warn('Failed to export SRD markdown:', err);
+      showToast(
+        'Failed to export SRD markdown',
+        'error',
+        err instanceof Error ? err.message : undefined,
+      );
+    } finally {
+      setIsGeneratingSrd(false);
+    }
+  }, [prepareSrdData, showToast]);
+
   const onExportRequirementsMarkdown = useCallback(() => {
     downloadRequirementsMarkdown(title, requirementsSnapshot);
   }, [title, requirementsSnapshot]);
@@ -3176,6 +3284,8 @@ function App() {
           onToggleScenarioPanel={() => setIsScenarioPanelOpen((v) => !v)}
           onExportPng={onExportPng}
           onExportSvg={onExportSvg}
+          onExportSrdMarkdown={onExportSrdMarkdown}
+          onExportSrdPrint={openSrdModal}
           canExport={nodes.length > 0}
           onUndo={onUndo}
           onRedo={onRedo}
@@ -3467,6 +3577,24 @@ function App() {
         isOpen={isLibraryModalOpen}
         onClose={() => setIsLibraryModalOpen(false)}
       />
+      {isSrdModalOpen && srdModalData && (
+        <SrdPrintModal
+          isOpen={isSrdModalOpen}
+          onClose={() => setIsSrdModalOpen(false)}
+          srdData={srdModalData}
+          nodes={nodes}
+          selectedNodeIds={selectedNodeIds}
+        />
+      )}
+      {isGeneratingSrd && (
+        <div className="srd-loading-overlay">
+          <div className="srd-loading-spinner" />
+          <div className="srd-loading-title">Preparing Solution Requirement Document...</div>
+          <div className="srd-loading-desc">
+            Aggregating requirements, architecture models, and generating snapshot...
+          </div>
+        </div>
+      )}
       {toast && (
         <Toast
           key={toast.id}

@@ -1,12 +1,12 @@
 # Container Configuration & Deployment
 
-This document describes how to configure, run, and deploy the containerized **System Design Editor** web application.
+This document describes how to configure, run, and deploy the containerized **Engineers Notebook** web application.
 
 ---
 
 ### Overview
 
-The System Design Editor container image is a lightweight Nginx web server packaging the pre-built, static single-page application (SPA).
+The Engineers Notebook container image is a lightweight Nginx web server packaging the pre-built, static single-page application (SPA).
 
 - **Base Image:** `nginx:stable-alpine`
 - **Port:** `80` (HTTP)

@@ -67,8 +67,8 @@ export default defineConfig({
       includeAssets: ['favicon_16x16.png, favicon_144x144.png'],
 
       manifest: {
-        name: 'System Design Editor',
-        short_name: 'System Design',
+        name: 'Engineers Notebook',
+        short_name: 'Engineers Notebook',
         description: 'A node-based system design and architecture diagram editor',
         start_url: '/system-design/',
         scope: '/system-design/',

@@ -1,4 +1,4 @@
-# System Design Editor - with workspaces: shared, encrypted team storage.
+# Engineers Notebook - with workspaces: shared, encrypted team storage.
 #
 # One domain, one TLS proxy:
 #   https://<DOMAIN>/         the editor (and its documentation at /docs/)

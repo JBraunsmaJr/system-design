@@ -125,7 +125,7 @@ The team capacity engine directly powers the planning views across the applicati
 
 ## 6. Real-Time Collaborative Sync
 
-Like all modules in System Design Editor, team data synchronizes seamlessly across distributed peers:
+Like all modules in Engineers Notebook, team data synchronizes seamlessly across distributed peers:
 
 - **Zero-Conflict CRDTs**: Roster updates, PTO bookings, and calendar changes merge instantaneously over peer-to-peer WebRTC connections.
 - **Live Feedback**: Capacity adjustments made by team leads or project managers immediately reflect on all connected teammates' screens during live sprint planning ceremonies.

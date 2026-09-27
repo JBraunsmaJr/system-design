@@ -31,6 +31,8 @@ interface ToolbarProps {
   onToggleScenarioPanel: () => void;
   onExportPng: () => void;
   onExportSvg: () => void;
+  onExportSrdMarkdown?: () => void;
+  onExportSrdPrint?: () => void;
   canExport: boolean;
   onUndo: () => void;
   onRedo: () => void;
@@ -78,6 +80,8 @@ export function Toolbar({
   onToggleScenarioPanel,
   onExportPng,
   onExportSvg,
+  onExportSrdMarkdown,
+  onExportSrdPrint,
   canExport,
   onUndo,
   onRedo,
@@ -98,7 +102,7 @@ export function Toolbar({
       <div className="toolbar__row toolbar__row--primary">
         <div className="toolbar__brand">
           <span className="toolbar__brand-mark">SD</span>
-          <span className="toolbar__brand-name">System Design Editor</span>
+          <span className="toolbar__brand-name">Engineers Notebook</span>
         </div>
         <input
           className="toolbar__title"
@@ -153,7 +157,13 @@ export function Toolbar({
             </button>
           )}
           {viewMode === 'diagram' && (
-            <ExportMenu onExportPng={onExportPng} onExportSvg={onExportSvg} disabled={!canExport} />
+            <ExportMenu
+              onExportPng={onExportPng}
+              onExportSvg={onExportSvg}
+              onExportSrdMarkdown={onExportSrdMarkdown}
+              onExportSrdPrint={onExportSrdPrint}
+              disabled={!canExport}
+            />
           )}
           {viewMode === 'requirements' && (
             <button
