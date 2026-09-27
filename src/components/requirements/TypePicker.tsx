@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Briefcase, Check, ChevronDown } from 'lucide-react';
 import { getItemType } from '../../domain/requirements/requirementsRegistry';
-import { computeFlippedPosition } from '../../domain/canvas/popoverPosition';
 import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
+import { useOutsideClick } from '../../common/hooks/useOutsideClick';
+import { usePositionedDropdown } from '../../common/hooks/usePositionedDropdown';
 
 interface TypePickerProps {
   doc: RequirementsDocument;
@@ -37,7 +38,6 @@ export function TypePicker({
   onClosed,
 }: TypePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -52,83 +52,27 @@ export function TypePicker({
 
   const currentType = getItemType(doc, typeId);
 
-  const open = () => {
-    if (disabled) return;
-    const trigger = triggerRef.current;
-    if (!trigger) return;
-    const rect = trigger.getBoundingClientRect();
-    setDropdownPos({ top: rect.bottom + 4, left: Math.max(8, rect.left) });
-    setIsOpen(true);
-  };
-
   const onClosedRef = useRef(onClosed);
   useLayoutEffect(() => {
     onClosedRef.current = onClosed;
   }, [onClosed]);
+
   const close = useCallback(() => {
     setIsOpen(false);
     onClosedRef.current?.();
   }, []);
 
-  useLayoutEffect(() => {
-    if (!isOpen) return;
-    const trigger = triggerRef.current;
-    const dropdown = dropdownRef.current;
-    if (!trigger || !dropdown) return;
-    const triggerRect = trigger.getBoundingClientRect();
-    const dropdownRect = dropdown.getBoundingClientRect();
-    const next = computeFlippedPosition(
-      triggerRect,
-      { width: dropdownRect.width, height: dropdownRect.height },
-      { width: window.innerWidth, height: window.innerHeight },
-    );
-    setDropdownPos((prev) =>
-      prev && prev.top === next.top && prev.left === next.left ? prev : next,
-    );
-  }, [isOpen]);
+  const { position: dropdownPos } = usePositionedDropdown({
+    triggerRef,
+    dropdownRef,
+    isOpen,
+  });
 
-  const reposition = useCallback(() => {
-    const trigger = triggerRef.current;
-    const dropdown = dropdownRef.current;
-    if (!trigger || !dropdown) return;
-    const triggerRect = trigger.getBoundingClientRect();
-    const dropdownRect = dropdown.getBoundingClientRect();
-    setDropdownPos(
-      computeFlippedPosition(
-        triggerRect,
-        { width: dropdownRect.width, height: dropdownRect.height },
-        { width: window.innerWidth, height: window.innerHeight },
-      ),
-    );
-  }, []);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handler = (event: MouseEvent) => {
-      const path = event.composedPath();
-      if (triggerRef.current && path.includes(triggerRef.current)) return;
-      if (dropdownRef.current && path.includes(dropdownRef.current)) return;
-      close();
-    };
-    // Escape closes, matching the other pickers' popovers.
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        triggerRef.current?.focus();
-        close();
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    document.addEventListener('keydown', onKey);
-    window.addEventListener('scroll', reposition, true);
-    window.addEventListener('resize', reposition);
-    return () => {
-      document.removeEventListener('mousedown', handler);
-      document.removeEventListener('keydown', onKey);
-      window.removeEventListener('scroll', reposition, true);
-      window.removeEventListener('resize', reposition);
-    };
-  }, [isOpen, reposition, close]);
+  useOutsideClick({
+    refs: [triggerRef, dropdownRef],
+    isOpen,
+    onClose: close,
+  });
 
   return (
     <>
@@ -146,7 +90,9 @@ export function TypePicker({
               }
             : undefined
         }
-        onClick={open}
+        onClick={() => {
+          if (!disabled) setIsOpen((prev) => !prev);
+        }}
         title={
           disabled
             ? undefined

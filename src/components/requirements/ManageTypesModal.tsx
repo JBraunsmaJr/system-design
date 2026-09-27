@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { ArrowRightLeft, Briefcase, Check, Lock, Pencil, Trash2, X } from 'lucide-react';
 import { countItemsUsingType, isPrefixTaken } from '../../domain/requirements/requirementsRegistry';
 import type { RequirementItemType, RequirementsDocument } from '../../domain/requirements/requirementsTypes';
+import { BaseModal } from '../../common/components/modal/BaseModal';
 
 interface ManageTypesModalProps {
   doc: RequirementsDocument;
@@ -123,16 +124,13 @@ export function ManageTypesModal({
   };
 
   return (
-    <div className="modal-overlay" onMouseDown={onClose}>
-      <div className="manage-types-modal" onMouseDown={(e) => e.stopPropagation()}>
-        <div className="manage-types-modal__header">
-          <span>Manage item types</span>
-          <button type="button" onClick={onClose} aria-label="Close">
-            <X size={16} />
-          </button>
-        </div>
-
-        <div className="manage-types-modal__list">
+    <BaseModal
+      isOpen={true}
+      onClose={onClose}
+      title="Manage item types"
+      className="manage-types-modal"
+    >
+      <div className="manage-types-modal__list">
           {uniqueItemTypes.map((type) => {
             if (editingTypeId === type.id) {
               return (
@@ -347,7 +345,6 @@ export function ManageTypesModal({
             {success}
           </p>
         )}
-      </div>
-    </div>
+    </BaseModal>
   );
 }

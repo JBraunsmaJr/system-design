@@ -15,7 +15,7 @@ import { ChildQuickAdd } from './ChildQuickAdd';
 import { isEpicItem } from '../../domain/requirements/requirementsHierarchy';
 import { MemberPicker } from '../team/MemberPicker';
 import { PointsPicker } from '../team/PointsPicker';
-import { HighlightedText, HighlightedTitle } from './HighlightText';
+import { HighlightedText, HighlightedTitle } from '../../common/components/highlight/HighlightText';
 import type { RequirementItem, RequirementsDocument } from '../../domain/requirements/requirementsTypes';
 import type { ProgramIncrement } from '../../domain/timeline/programIncrements';
 import type { TeamDocument } from '../../domain/timeline/teamTypes';

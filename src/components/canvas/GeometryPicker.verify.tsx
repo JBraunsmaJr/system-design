@@ -1,6 +1,7 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { GeometryPicker, GEOMETRY_OPTIONS } from './GeometryPicker';
+import { GeometryPicker } from './GeometryPicker';
+import { GEOMETRY_OPTIONS } from './geometryOptions';
 
 function assert(condition: boolean, message: string) {
   if (!condition) {

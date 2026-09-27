@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
 
 export interface BaseModalProps {
   isOpen: boolean;
@@ -12,6 +12,10 @@ export interface BaseModalProps {
   role?: 'dialog' | 'alertdialog';
   ariaLabel?: string;
   closeOnBackdropClick?: boolean;
+  closeOnEscape?: boolean;
+  style?: CSSProperties;
+  bodyStyle?: CSSProperties;
+  padding?: number | string;
 }
 
 /**
@@ -30,11 +34,15 @@ export function BaseModal({
   role = 'dialog',
   ariaLabel,
   closeOnBackdropClick = true,
+  closeOnEscape = true,
+  style,
+  bodyStyle,
+  padding,
 }: BaseModalProps) {
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !closeOnEscape) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         onClose();
@@ -42,7 +50,7 @@ export function BaseModal({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, closeOnEscape, onClose]);
 
   if (!isOpen) return null;
 
@@ -76,13 +84,14 @@ export function BaseModal({
           borderRadius: 8,
           width,
           maxWidth,
-          padding: '18px 20px',
+          padding: padding !== undefined ? padding : '18px 20px',
           border: '1px solid var(--border, #2d3342)',
           boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)',
           display: 'flex',
           flexDirection: 'column',
           maxHeight: '90vh',
           boxSizing: 'border-box',
+          ...style,
         }}
       >
         {title && (
@@ -90,7 +99,7 @@ export function BaseModal({
             {title}
           </div>
         )}
-        <div style={{ flex: 1, overflowY: 'auto' }}>
+        <div style={{ flex: 1, overflowY: 'auto', ...bodyStyle }}>
           {children}
         </div>
         {footer && (

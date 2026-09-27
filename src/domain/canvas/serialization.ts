@@ -13,6 +13,9 @@ import { globalShapeRegistry, type ShapeDefinition } from './shapeRegistry.ts';
 import { globalIconRegistry, type IconDefinition } from './iconRegistry.ts';
 import { migrateToCurrent, type RawDiagramFile } from '../storage/schemaMigrations.ts';
 
+import { sanitizeFileName } from '../../common/utils/string.ts';
+import { downloadFile } from '../../common/utils/download.ts';
+
 export const SCHEMA_VERSION = '0.7';
 
 export interface DiagramFile {
@@ -102,25 +105,13 @@ export function toDiagramFile(
 
 /** Triggers a browser download of the diagram as a .json file. */
 export function downloadDiagram(file: DiagramFile): void {
-  const safeName = file.title
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '');
-  downloadDiagramAs(file, `${safeName || 'diagram'}.json`);
+  const safeName = sanitizeFileName(file.title, 'diagram');
+  downloadDiagramAs(file, `${safeName}.json`);
 }
 
 /** downloadDiagram under a caller-chosen file name (timed copies, WS13-R6). */
 export function downloadDiagramAs(file: DiagramFile, fileName: string): void {
-  const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = fileName;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
+  downloadFile(JSON.stringify(file, null, 2), fileName, 'application/json');
 }
 
 function parseRequirementsDocument(raw: unknown): RequirementsDocument {

@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CalendarRange, X } from 'lucide-react';
 import { computeSprintDateRanges, type ProgramIncrement } from '../../domain/timeline/programIncrements';
-import { computeFlippedPosition } from '../../domain/canvas/popoverPosition';
+import { useOutsideClick } from '../../common/hooks/useOutsideClick';
+import { usePositionedDropdown } from '../../common/hooks/usePositionedDropdown';
 
 interface SprintPickerProps {
   programIncrements: ProgramIncrement[];
@@ -19,9 +20,7 @@ const DROPDOWN_WIDTH = 240;
  * range) has to look it back up like this each render. A sprintId that no
  * longer resolves to anything (its sprint was deleted without going
  * through the cleanup path, or the file was hand-edited) simply doesn't
- * match, and the picker falls back to its unassigned appearance - same
- * "stale reference is a display-time concern, not a data-integrity one"
- * approach used for linked requirement ids elsewhere in this app. */
+ * match, and the picker falls back to its unassigned appearance. */
 function findSprint(pis: ProgramIncrement[], sprintId: string | undefined) {
   if (!sprintId) return undefined;
   for (const pi of pis) {
@@ -34,11 +33,7 @@ function findSprint(pis: ProgramIncrement[], sprintId: string | undefined) {
   return undefined;
 }
 
-/** Same portal + flip-positioning approach as CategoryPicker - see that
- * component's comments for the full reasoning. This one is single-select
- * (a requirement item sits in at most one sprint, matching how sprints
- * work in most agile tooling) and has no "create" option, since sprints
- * are only ever created from the Timeline view, not from here. */
+/** Same portal + flip-positioning approach as CategoryPicker. */
 export function SprintPicker({
   programIncrements,
   sprintId,
@@ -47,77 +42,28 @@ export function SprintPicker({
 }: SprintPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const current = findSprint(programIncrements, sprintId);
 
-  const open = () => {
-    const trigger = triggerRef.current;
-    if (!trigger) return;
-    const rect = trigger.getBoundingClientRect();
-    setDropdownPos({ top: rect.bottom + 4, left: Math.max(8, rect.right - DROPDOWN_WIDTH) });
-    setIsOpen(true);
-  };
   const close = () => {
     setIsOpen(false);
     setQuery('');
   };
 
-  useLayoutEffect(() => {
-    if (!isOpen) return;
-    const trigger = triggerRef.current;
-    const dropdown = dropdownRef.current;
-    if (!trigger || !dropdown) return;
-    const triggerRect = trigger.getBoundingClientRect();
-    const dropdownRect = dropdown.getBoundingClientRect();
-    const next = computeFlippedPosition(
-      triggerRect,
-      { width: dropdownRect.width, height: dropdownRect.height },
-      { width: window.innerWidth, height: window.innerHeight },
-    );
-    setDropdownPos((prev) =>
-      prev && prev.top === next.top && prev.left === next.left ? prev : next,
-    );
-  }, [isOpen, query]);
+  const { position: dropdownPos } = usePositionedDropdown({
+    triggerRef,
+    dropdownRef,
+    isOpen,
+    dependencies: [query],
+  });
 
-  const reposition = useCallback(() => {
-    const trigger = triggerRef.current;
-    const dropdown = dropdownRef.current;
-    if (!trigger || !dropdown) return;
-    const triggerRect = trigger.getBoundingClientRect();
-    const dropdownRect = dropdown.getBoundingClientRect();
-    setDropdownPos(
-      computeFlippedPosition(
-        triggerRect,
-        { width: dropdownRect.width, height: dropdownRect.height },
-        { width: window.innerWidth, height: window.innerHeight },
-      ),
-    );
-  }, []);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handler = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (triggerRef.current?.contains(target)) return;
-      if (dropdownRef.current?.contains(target)) return;
-      close();
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    window.addEventListener('scroll', reposition, true);
-    window.addEventListener('resize', reposition);
-    return () => {
-      window.removeEventListener('scroll', reposition, true);
-      window.removeEventListener('resize', reposition);
-    };
-  }, [isOpen, reposition]);
+  useOutsideClick({
+    refs: [triggerRef, dropdownRef],
+    isOpen,
+    onClose: close,
+  });
 
   const q = query.trim().toLowerCase();
   const groups = programIncrements
@@ -155,7 +101,12 @@ export function SprintPicker({
           <div
             ref={dropdownRef}
             className="sprint-picker__dropdown"
-            style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left }}
+            style={{
+              position: 'fixed',
+              top: dropdownPos.top,
+              left: dropdownPos.left,
+              width: DROPDOWN_WIDTH,
+            }}
           >
             <input
               autoFocus

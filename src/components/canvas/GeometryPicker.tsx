@@ -1,198 +1,10 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Check } from 'lucide-react';
-import { computeFlippedPosition } from '../../domain/canvas/popoverPosition';
-
-export interface GeometryOption {
-  id: string;
-  label: string;
-  renderIcon: () => React.ReactNode;
-}
-
-export const GEOMETRY_OPTIONS: GeometryOption[] = [
-  {
-    id: 'rounded-rectangle',
-    label: 'Rounded Rectangle',
-    renderIcon: () => (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 18 18"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      >
-        <rect x="1.5" y="2.5" width="15" height="13" rx="3.5" />
-      </svg>
-    ),
-  },
-  {
-    id: 'rectangle',
-    label: 'Rectangle',
-    renderIcon: () => (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 18 18"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      >
-        <rect x="1.5" y="2.5" width="15" height="13" />
-      </svg>
-    ),
-  },
-  {
-    id: 'circle',
-    label: 'Circle / Ellipse',
-    renderIcon: () => (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 18 18"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      >
-        <circle cx="9" cy="9" r="6.5" />
-      </svg>
-    ),
-  },
-  {
-    id: 'cylinder',
-    label: 'Cylinder (Database)',
-    renderIcon: () => (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 18 18"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      >
-        <path d="M 2.5 4.5 C 2.5 3 15.5 3 15.5 4.5 L 15.5 13.5 C 15.5 15 2.5 15 2.5 13.5 Z" />
-        <path d="M 2.5 4.5 C 2.5 6 15.5 6 15.5 4.5" />
-      </svg>
-    ),
-  },
-  {
-    id: 'diamond',
-    label: 'Diamond (Decision)',
-    renderIcon: () => (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 18 18"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      >
-        <polygon points="9,2 16,9 9,16 2,9" />
-      </svg>
-    ),
-  },
-  {
-    id: 'hexagon',
-    label: 'Hexagon',
-    renderIcon: () => (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 18 18"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      >
-        <polygon points="4.5,2 13.5,2 16.5,9 13.5,16 4.5,16 1.5,9" />
-      </svg>
-    ),
-  },
-  {
-    id: 'parallelogram',
-    label: 'Parallelogram',
-    renderIcon: () => (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 18 18"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      >
-        <polygon points="4.5,3 16.5,3 13.5,15 1.5,15" />
-      </svg>
-    ),
-  },
-  {
-    id: 'document',
-    label: 'Document',
-    renderIcon: () => (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 18 18"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      >
-        <path d="M 2.5 2.5 L 11.5 2.5 L 15.5 6.5 L 15.5 15.5 C 11.5 13.5 6.5 16.5 2.5 14.5 Z" />
-      </svg>
-    ),
-  },
-  {
-    id: 'cloud',
-    label: 'Cloud',
-    renderIcon: () => (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 18 18"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      >
-        <path d="M 3.5 13 C 1.5 13 1.5 10 3.5 9.5 C 3 6.5 7 5 9 6.5 C 11 4.5 15 6 14.5 9 C 16.5 9.5 16.5 13 14.5 13 Z" />
-      </svg>
-    ),
-  },
-  {
-    id: 'actor',
-    label: 'Actor (User)',
-    renderIcon: () => (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 18 18"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      >
-        <circle cx="9" cy="5" r="2.5" />
-        <path d="M 2.5 15.5 C 2.5 11 15.5 11 15.5 15.5" />
-      </svg>
-    ),
-  },
-  {
-    id: 'path',
-    label: 'Custom SVG Path',
-    renderIcon: () => (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 18 18"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      >
-        <path
-          d="M 2.5 14.5 L 6.5 3.5 L 11.5 14.5 L 15.5 7.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    ),
-  },
-];
+import { useOutsideClick } from '../../common/hooks/useOutsideClick';
+import { usePositionedDropdown } from '../../common/hooks/usePositionedDropdown';
+import { GEOMETRY_OPTIONS } from './geometryOptions';
+export type { GeometryOption } from './geometryOptions';
 
 interface GeometryPickerProps {
   value: string;
@@ -201,90 +13,33 @@ interface GeometryPickerProps {
 
 export function GeometryPicker({ value, onChange }: GeometryPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
-  const [dropdownWidth, setDropdownWidth] = useState<number>(220);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const selectedOption = GEOMETRY_OPTIONS.find((opt) => opt.id === value) || GEOMETRY_OPTIONS[0];
 
-  const open = () => {
-    const trigger = triggerRef.current;
-    if (!trigger) return;
-    const rect = trigger.getBoundingClientRect();
-    setDropdownWidth(Math.max(220, rect.width));
-    setDropdownPos({ top: rect.bottom + 4, left: rect.left });
-    setIsOpen(true);
-  };
+  const { position: dropdownPos } = usePositionedDropdown({
+    triggerRef,
+    dropdownRef,
+    isOpen,
+  });
 
   const close = () => {
     setIsOpen(false);
   };
 
-  useLayoutEffect(() => {
-    if (!isOpen) return;
-    const trigger = triggerRef.current;
-    const dropdown = dropdownRef.current;
-    if (!trigger || !dropdown) return;
-    const triggerRect = trigger.getBoundingClientRect();
-    const dropdownRect = dropdown.getBoundingClientRect();
-    const next = computeFlippedPosition(
-      triggerRect,
-      { width: dropdownRect.width, height: dropdownRect.height },
-      { width: window.innerWidth, height: window.innerHeight },
-    );
-    setDropdownPos((prev) =>
-      prev && prev.top === next.top && prev.left === next.left ? prev : next,
-    );
-  }, [isOpen]);
-
-  const reposition = useCallback(() => {
-    const trigger = triggerRef.current;
-    const dropdown = dropdownRef.current;
-    if (!trigger || !dropdown) return;
-    const triggerRect = trigger.getBoundingClientRect();
-    const dropdownRect = dropdown.getBoundingClientRect();
-    setDropdownPos(
-      computeFlippedPosition(
-        triggerRect,
-        { width: dropdownRect.width, height: dropdownRect.height },
-        { width: window.innerWidth, height: window.innerHeight },
-      ),
-    );
-  }, []);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const onMouseDown = (e: MouseEvent) => {
-      const target = e.target as Node | null;
-      if (!target) return;
-      if (triggerRef.current?.contains(target)) return;
-      if (dropdownRef.current?.contains(target)) return;
-      close();
-    };
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        close();
-      }
-    };
-    window.addEventListener('mousedown', onMouseDown, true);
-    window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('scroll', reposition, true);
-    window.addEventListener('resize', reposition);
-    return () => {
-      window.removeEventListener('mousedown', onMouseDown, true);
-      window.removeEventListener('keydown', onKeyDown);
-      window.removeEventListener('scroll', reposition, true);
-      window.removeEventListener('resize', reposition);
-    };
-  }, [isOpen, reposition]);
+  useOutsideClick({
+    refs: [triggerRef, dropdownRef],
+    isOpen,
+    onClose: close,
+  });
 
   return (
     <div style={{ position: 'relative', width: '100%' }}>
       <button
         ref={triggerRef}
         type="button"
-        onClick={() => (isOpen ? close() : open())}
+        onClick={() => setIsOpen((prev) => !prev)}
         aria-expanded={isOpen}
         style={{
           width: '100%',
@@ -321,7 +76,7 @@ export function GeometryPicker({ value, onChange }: GeometryPickerProps) {
               position: 'fixed',
               top: dropdownPos?.top ?? 0,
               left: dropdownPos?.left ?? 0,
-              width: dropdownWidth,
+              minWidth: 220,
               maxHeight: 280,
               overflowY: 'auto',
               background: 'var(--chrome-bg-raised, #1b1e27)',

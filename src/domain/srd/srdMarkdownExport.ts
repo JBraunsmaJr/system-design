@@ -1,4 +1,6 @@
 import type { SrdDataContext, SrdTemplateConfig } from './srdTypes';
+import { sanitizeFileName } from '../../common/utils/string';
+import { downloadFile } from '../../common/utils/download';
 
 export function interpolateTokens(
   text: string,
@@ -304,22 +306,7 @@ export function downloadSrdMarkdown(
   filename?: string,
 ): void {
   const markdown = generateSrdMarkdown(data, config);
-  const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-
-  const safeTitle = (filename || data.metadata.title || 'srd-specification')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '');
-
-  anchor.download = `${safeTitle || 'srd'}.md`;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  // Some browsers start the download asynchronously after click(); revoking the
-  // object URL immediately can cancel it, so defer the cleanup.
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  const rawTitle = filename || data.metadata.title || 'srd-specification';
+  const safeTitle = sanitizeFileName(rawTitle, 'srd');
+  downloadFile(markdown, `${safeTitle}.md`, 'text/markdown;charset=utf-8;');
 }

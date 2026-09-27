@@ -35,6 +35,7 @@ import { SprintPicker } from '../requirements/SprintPicker';
 import { RelationshipManager } from '../requirements/RelationshipManager';
 import { MemberPicker } from '../team/MemberPicker';
 import { PointsPicker } from '../team/PointsPicker';
+import { BaseModal } from '../../common/components/modal/BaseModal';
 import type { TeamDocument } from '../../domain/timeline/teamTypes';
 
 interface RequirementDetailModalProps {
@@ -82,20 +83,17 @@ export function RequirementDetailModal({
 }: RequirementDetailModalProps) {
   const [isEditing, setIsEditing] = useState(false);
 
-  // Close on Escape key press
+  // Close edit mode on Escape
   useEffect(() => {
+    if (!isEditing) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (isEditing) {
-          setIsEditing(false);
-        } else {
-          onClose();
-        }
+        setIsEditing(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, isEditing]);
+  }, [isEditing]);
 
   const type = getItemType(doc, item.typeId);
   const linkedNodes = useMemo(
@@ -166,15 +164,15 @@ export function RequirementDetailModal({
   );
 
   return (
-    <div className="modal-overlay" onMouseDown={onClose}>
-      <div
-        className="requirement-detail-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="requirement-detail-title"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <div className="requirement-detail-modal__header">
+    <BaseModal
+      isOpen={true}
+      onClose={onClose}
+      ariaLabel={`Requirement ${item.id}: ${item.title || 'Details'}`}
+      className="requirement-detail-modal"
+      padding={0}
+      closeOnEscape={!isEditing}
+    >
+      <div className="requirement-detail-modal__header">
           <div className="requirement-detail-modal__tags">
             <span
               className="requirement-detail-modal__id"
@@ -472,7 +470,6 @@ export function RequirementDetailModal({
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </BaseModal>
   );
 }

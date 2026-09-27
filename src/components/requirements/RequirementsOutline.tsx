@@ -4,7 +4,7 @@ import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown } from 'lucid
 import { getItemType, getStatusMeta, isItemWorkable } from '../../domain/requirements/requirementsRegistry';
 import type { EpicTree, EpicTreeNode } from '../../domain/requirements/requirementsHierarchy';
 import type { RequirementItem, RequirementsDocument } from '../../domain/requirements/requirementsTypes';
-import { HighlightedText, HighlightedTitle } from './HighlightText';
+import { HighlightedText, HighlightedTitle } from '../../common/components/highlight/HighlightText';
 
 export interface OutlineGroup {
   key: string;

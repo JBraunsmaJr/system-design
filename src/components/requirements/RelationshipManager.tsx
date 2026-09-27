@@ -10,7 +10,7 @@ import {
 } from '../../domain/requirements/requirementsRegistry';
 import { computeFlippedPosition } from '../../domain/canvas/popoverPosition';
 import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
-import { HighlightedText, HighlightedTitle } from './HighlightText';
+import { HighlightedText, HighlightedTitle } from '../../common/components/highlight/HighlightText';
 import { useItemPeek } from './useItemPeek';
 
 interface RelationshipManagerProps {

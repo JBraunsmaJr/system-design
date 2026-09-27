@@ -17,7 +17,7 @@ import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import { resolveReferencesToMarkdownLinks } from '../../domain/requirements/requirementsRegistry';
 import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
-import { highlightInReactNode } from '../../domain/requirements/reactHighlight';
+import { highlightInReactNode } from '../../common/components/highlight/reactHighlight';
 import { useItemPeek } from './useItemPeek';
 
 interface RequirementBodyProps {

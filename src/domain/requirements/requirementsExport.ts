@@ -1,4 +1,6 @@
 import type { RequirementsDocument } from './requirementsTypes';
+import { sanitizeFileName } from '../../common/utils/string';
+import { downloadFile } from '../../common/utils/download';
 
 /**
  * Renders the full requirements document as a single markdown string,
@@ -35,18 +37,6 @@ export function toMarkdownDocument(title: string, doc: RequirementsDocument): st
 /** Triggers a browser download of the requirements document as a .md file. */
 export function downloadRequirementsMarkdown(title: string, doc: RequirementsDocument): void {
   const markdown = toMarkdownDocument(title, doc);
-  const blob = new Blob([markdown], { type: 'text/markdown' });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  const safeName = title
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '');
-  anchor.download = `${safeName || 'requirements'}.md`;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
+  const safeName = sanitizeFileName(title, 'requirements');
+  downloadFile(markdown, `${safeName}.md`, 'text/markdown');
 }

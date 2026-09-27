@@ -10,6 +10,7 @@ import { type ShapeDefinition, DEFAULT_CONNECTION_POINTS } from '../../domain/ca
 import { IconRenderer } from '../canvas/IconRenderer';
 import { SvgShapeRenderer } from '../canvas/nodes/SvgShapeRenderer';
 import { GeometryPicker } from '../canvas/GeometryPicker';
+import { BaseModal } from '../../common/components/modal/BaseModal';
 
 interface LibraryManagerModalProps {
   isOpen: boolean;
@@ -238,35 +239,24 @@ export function LibraryManagerModal({ isOpen, onClose }: LibraryManagerModalProp
   };
 
   return (
-    <div
-      className="modal-overlay"
+    <BaseModal
+      isOpen={isOpen}
+      onClose={onClose}
+      ariaLabel="Shape & Icon Libraries"
+      className="modal-content"
+      padding={0}
       style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.6)',
-        zIndex: 1000,
+        width: 860,
+        maxWidth: '95vw',
+        height: 620,
+        maxHeight: '90vh',
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+        flexDirection: 'column',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+        border: '1px solid var(--border, #2d3342)',
+        overflow: 'hidden',
       }}
     >
-      <div
-        className="modal-content"
-        style={{
-          background: 'var(--bg-panel, #1e222b)',
-          color: 'var(--text, #e7e9ee)',
-          borderRadius: 8,
-          width: 860,
-          maxWidth: '95vw',
-          height: 620,
-          maxHeight: '90vh',
-          display: 'flex',
-          flexDirection: 'column',
-          boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
-          border: '1px solid var(--border, #2d3342)',
-          overflow: 'hidden',
-        }}
-      >
         {/* Header */}
         <div
           style={{
@@ -1412,7 +1402,6 @@ export function LibraryManagerModal({ isOpen, onClose }: LibraryManagerModalProp
             )}
           </div>
         </div>
-      </div>
-    </div>
+    </BaseModal>
   );
 }

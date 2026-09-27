@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Star, Clock, Sparkles, Ban } from 'lucide-react';
 import { globalIconRegistry } from '../../domain/canvas/iconRegistry';
 import { IconRenderer } from './IconRenderer';
-import { computeFlippedPosition } from '../../domain/canvas/popoverPosition';
+import { useOutsideClick } from '../../common/hooks/useOutsideClick';
+import { usePositionedDropdown } from '../../common/hooks/usePositionedDropdown';
 import {
   addRecentIcon,
   getFavoriteIcons,
@@ -54,7 +55,10 @@ export function IconPickerPanel({
   }, []);
 
   const recentIconIds = useMemo(() => getRecentIcons(), []);
-  const favoriteIconIds = useMemo(() => new Set(getFavoriteIcons()), [version]);
+  const favoriteIconIds = useMemo(() => {
+    void version;
+    return new Set(getFavoriteIcons());
+  }, [version]);
 
   const categories = useMemo(() => {
     return ['all', ...globalIconRegistry.getCategories()];
@@ -365,7 +369,6 @@ export function IconPickerPanel({
 
 export function IconPicker({ value, defaultValue, onChange }: IconPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
 
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -374,83 +377,21 @@ export function IconPicker({ value, defaultValue, onChange }: IconPickerProps) {
   const isNone = !resolved || resolved === 'none';
   const displayLabel = isNone ? 'None' : globalIconRegistry.getIcon(resolved)?.name || resolved;
 
-  const open = () => {
-    const trigger = triggerRef.current;
-    if (!trigger) return;
-    const rect = trigger.getBoundingClientRect();
-    const pos = computeFlippedPosition(
-      rect,
-      { width: DROPDOWN_WIDTH, height: 420 },
-      { width: window.innerWidth, height: window.innerHeight },
-    );
-    setDropdownPos(pos);
-    setIsOpen(true);
-  };
+  const { position: dropdownPos } = usePositionedDropdown({
+    triggerRef,
+    dropdownRef,
+    isOpen,
+  });
 
   const close = () => {
     setIsOpen(false);
   };
 
-  useLayoutEffect(() => {
-    if (!isOpen) return;
-    const trigger = triggerRef.current;
-    const dropdown = dropdownRef.current;
-    if (!trigger || !dropdown) return;
-    const triggerRect = trigger.getBoundingClientRect();
-    const dropdownRect = dropdown.getBoundingClientRect();
-    const next = computeFlippedPosition(
-      triggerRect,
-      { width: dropdownRect.width, height: dropdownRect.height },
-      { width: window.innerWidth, height: window.innerHeight },
-    );
-    setDropdownPos((prev) =>
-      prev && prev.top === next.top && prev.left === next.left ? prev : next,
-    );
-  }, [isOpen]);
-
-  const reposition = useCallback(() => {
-    const trigger = triggerRef.current;
-    const dropdown = dropdownRef.current;
-    if (!trigger || !dropdown) return;
-    const triggerRect = trigger.getBoundingClientRect();
-    const dropdownRect = dropdown.getBoundingClientRect();
-    setDropdownPos(
-      computeFlippedPosition(
-        triggerRect,
-        { width: dropdownRect.width, height: dropdownRect.height },
-        { width: window.innerWidth, height: window.innerHeight },
-      ),
-    );
-  }, []);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleMouseDown = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (triggerRef.current?.contains(target)) return;
-      if (dropdownRef.current?.contains(target)) return;
-      close();
-    };
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close();
-    };
-    document.addEventListener('mousedown', handleMouseDown);
-    document.addEventListener('keydown', handleEscape);
-    return () => {
-      document.removeEventListener('mousedown', handleMouseDown);
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    window.addEventListener('scroll', reposition, true);
-    window.addEventListener('resize', reposition);
-    return () => {
-      window.removeEventListener('scroll', reposition, true);
-      window.removeEventListener('resize', reposition);
-    };
-  }, [isOpen, reposition]);
+  useOutsideClick({
+    refs: [triggerRef, dropdownRef],
+    isOpen,
+    onClose: close,
+  });
 
   return (
     <label className="inspector__field">
@@ -461,7 +402,7 @@ export function IconPicker({ value, defaultValue, onChange }: IconPickerProps) {
             ref={triggerRef}
             type="button"
             className="icon-picker__trigger"
-            onClick={() => (isOpen ? close() : open())}
+            onClick={() => setIsOpen((prev) => !prev)}
             aria-expanded={isOpen}
           >
             {isNone ? (
@@ -488,14 +429,13 @@ export function IconPicker({ value, defaultValue, onChange }: IconPickerProps) {
         </div>
 
         {isOpen &&
-          dropdownPos &&
           createPortal(
             <div
               ref={dropdownRef}
               style={{
                 position: 'fixed',
-                top: dropdownPos.top,
-                left: dropdownPos.left,
+                top: dropdownPos?.top ?? 0,
+                left: dropdownPos?.left ?? 0,
                 zIndex: 250,
               }}
             >

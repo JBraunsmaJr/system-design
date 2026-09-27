@@ -1,18 +1,17 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Plus } from 'lucide-react';
 import { getItemType } from '../../domain/requirements/requirementsRegistry';
-import { computeFlippedPosition } from '../../domain/canvas/popoverPosition';
 import type { RequirementItem, RequirementsDocument } from '../../domain/requirements/requirementsTypes';
-import { HighlightedText, HighlightedTitle } from '../requirements/HighlightText';
+import { HighlightedText, HighlightedTitle } from '../../common/components/highlight/HighlightText';
+import { useOutsideClick } from '../../common/hooks/useOutsideClick';
+import { usePositionedDropdown } from '../../common/hooks/usePositionedDropdown';
 
 interface SprintQuickAddProps {
   backlogItems: RequirementItem[];
   requirements: RequirementsDocument;
   onAssign: (itemId: string) => string | null;
 }
-
-const DROPDOWN_WIDTH = 240;
 
 /**
  * A small "+" trigger in each sprint column's header that opens a
@@ -30,76 +29,27 @@ export function SprintQuickAdd({ backlogItems, requirements, onAssign }: SprintQ
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const open = () => {
-    const trigger = triggerRef.current;
-    if (!trigger) return;
-    const rect = trigger.getBoundingClientRect();
-    setDropdownPos({ top: rect.bottom + 4, left: Math.max(8, rect.right - DROPDOWN_WIDTH) });
-    setIsOpen(true);
-  };
   const close = () => {
     setIsOpen(false);
     setQuery('');
     setErrorMessage(null);
   };
 
-  useLayoutEffect(() => {
-    if (!isOpen) return;
-    const trigger = triggerRef.current;
-    const dropdown = dropdownRef.current;
-    if (!trigger || !dropdown) return;
-    const triggerRect = trigger.getBoundingClientRect();
-    const dropdownRect = dropdown.getBoundingClientRect();
-    const next = computeFlippedPosition(
-      triggerRect,
-      { width: dropdownRect.width, height: dropdownRect.height },
-      { width: window.innerWidth, height: window.innerHeight },
-    );
-    setDropdownPos((prev) =>
-      prev && prev.top === next.top && prev.left === next.left ? prev : next,
-    );
-  }, [isOpen, query]);
+  const { position: dropdownPos } = usePositionedDropdown({
+    triggerRef,
+    dropdownRef,
+    isOpen,
+    dependencies: [query],
+  });
 
-  const reposition = useCallback(() => {
-    const trigger = triggerRef.current;
-    const dropdown = dropdownRef.current;
-    if (!trigger || !dropdown) return;
-    const triggerRect = trigger.getBoundingClientRect();
-    const dropdownRect = dropdown.getBoundingClientRect();
-    setDropdownPos(
-      computeFlippedPosition(
-        triggerRect,
-        { width: dropdownRect.width, height: dropdownRect.height },
-        { width: window.innerWidth, height: window.innerHeight },
-      ),
-    );
-  }, []);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handler = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (triggerRef.current?.contains(target)) return;
-      if (dropdownRef.current?.contains(target)) return;
-      close();
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    window.addEventListener('scroll', reposition, true);
-    window.addEventListener('resize', reposition);
-    return () => {
-      window.removeEventListener('scroll', reposition, true);
-      window.removeEventListener('resize', reposition);
-    };
-  }, [isOpen, reposition]);
+  useOutsideClick({
+    refs: [triggerRef, dropdownRef],
+    isOpen,
+    onClose: close,
+  });
 
   const q = query.trim().toLowerCase();
   const candidates =
@@ -117,11 +67,7 @@ export function SprintQuickAdd({ backlogItems, requirements, onAssign }: SprintQ
         className="sprint-quick-add__trigger"
         onClick={(e) => {
           e.stopPropagation();
-          if (isOpen) {
-            close();
-          } else {
-            open();
-          }
+          setIsOpen((prev) => !prev);
         }}
         title="Add an item from the backlog to this sprint"
         aria-label="Add item from backlog"

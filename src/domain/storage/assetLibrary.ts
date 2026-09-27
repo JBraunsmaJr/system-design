@@ -4,6 +4,8 @@ import {
   type ShapeDefinition,
   DEFAULT_CONNECTION_POINTS,
 } from '../canvas/shapeRegistry';
+import { sanitizeFileName } from '../../common/utils/string';
+import { downloadFile } from '../../common/utils/download';
 
 export interface LibraryMetadata {
   id: string;
@@ -349,20 +351,8 @@ export class AssetLibraryManager {
   public exportLibrary(libraryId: string): void {
     const lib = this.libraries.get(libraryId);
     if (!lib) return;
-    const blob = new Blob([JSON.stringify(lib, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    const safeName = lib.library.name
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)/g, '');
-    anchor.download = `${safeName || 'custom-library'}.library.json`;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(url);
+    const safeName = sanitizeFileName(lib.library.name, 'custom-library');
+    downloadFile(JSON.stringify(lib, null, 2), `${safeName}.library.json`, 'application/json');
   }
 }
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { splitByHighlight } from './textHighlight';
+import { splitByHighlight } from '../../../domain/requirements/textHighlight';
 
 /**
  * Recursively traverses a React node tree and highlights matching text segments.

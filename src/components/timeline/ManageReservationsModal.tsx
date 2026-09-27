@@ -23,6 +23,7 @@ import { isItemWorkable } from '../../domain/requirements/requirementsRegistry';
 import { computeSprintDateRanges } from '../../domain/timeline/programIncrements';
 import { computeSprintCapacity } from '../../domain/timeline/teamCapacity';
 import type { ProgramIncrementsStore } from '../../collab/stores/programIncrementsStore';
+import { BaseModal } from '../../common/components/modal/BaseModal';
 
 interface ManageReservationsModalProps {
   pi: ProgramIncrement;
@@ -197,14 +198,14 @@ export function ManageReservationsModal({
   };
 
   return (
-    <div className="modal-overlay" onMouseDown={onClose}>
-      <div
-        className="manage-reservations-modal"
-        role="dialog"
-        aria-modal="true"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
+    <BaseModal
+      isOpen={true}
+      onClose={onClose}
+      ariaLabel={`Capacity Reservations for ${pi.name}`}
+      className="manage-reservations-modal"
+      padding={0}
+    >
+      {/* Header */}
         <div className="manage-reservations-modal__header">
           <div className="manage-reservations-modal__title-row">
             <div className="manage-reservations-modal__icon-wrap">
@@ -588,7 +589,6 @@ export function ManageReservationsModal({
             Done
           </button>
         </div>
-      </div>
-    </div>
+    </BaseModal>
   );
 }

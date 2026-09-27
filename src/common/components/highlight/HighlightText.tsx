@@ -1,5 +1,5 @@
 import React, { useLayoutEffect, useRef, useState, useMemo } from 'react';
-import { splitByHighlight, computeTruncationWithHighlight } from '../../domain/requirements/textHighlight';
+import { splitByHighlight, computeTruncationWithHighlight } from '../../../domain/requirements/textHighlight';
 
 interface HighlightedTextProps {
   text: string;
@@ -109,20 +109,23 @@ export function HighlightedTitle({
   }, [displayText, trimmedSearch]);
 
   const truncationResult = useMemo(() => {
-    if (!trimmedSearch) return null;
+    if (!displayText) return null;
 
     if (containerWidth > 0 && computedFont) {
-      return computeTruncationWithHighlight(displayText, trimmedSearch, containerWidth, (s) =>
-        getTextWidth(s, computedFont),
-      );
-    }
-
-    if (fallbackMaxChars && fallbackMaxChars > 0 && displayText.length > fallbackMaxChars) {
       return computeTruncationWithHighlight(
         displayText,
         trimmedSearch,
-        fallbackMaxChars,
-        (s) => s.length,
+        containerWidth,
+        (s) => getTextWidth(s, computedFont),
+      );
+    }
+
+    if (fallbackMaxChars && fallbackMaxChars > 0) {
+      return computeTruncationWithHighlight(
+        displayText,
+        trimmedSearch,
+        fallbackMaxChars * 8,
+        (s) => s.length * 8,
       );
     }
 
@@ -133,82 +136,49 @@ export function HighlightedTitle({
     return (
       <span
         ref={containerRef}
-        className={className}
-        style={{
-          display: 'block',
-          width: '100%',
-          maxWidth: '100%',
-          ...style,
-        }}
-        title={placeholder}
+        className={`highlighted-title is-placeholder ${className || ''}`.trim()}
+        style={style}
       >
         {placeholder}
       </span>
     );
   }
 
-  if (!trimmedSearch) {
-    return (
-      <span
-        ref={containerRef}
-        className={className}
-        style={{
-          display: 'block',
-          width: '100%',
-          maxWidth: '100%',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-          ...style,
-        }}
-        title={displayText}
-      >
-        {displayText}
-      </span>
-    );
-  }
-
-  // If we have truncation result from DOM or fallback measurement
   if (truncationResult && truncationResult.isTruncated) {
+    const hasHighlightInside = truncationResult.hasMatchInVisible;
+    const isEllipsisHighlighted = truncationResult.hasMatchInTruncated && !hasHighlightInside;
+
     return (
       <span
         ref={containerRef}
-        className={className}
-        style={{
-          display: 'block',
-          width: '100%',
-          maxWidth: '100%',
-          overflow: 'hidden',
-          whiteSpace: 'nowrap',
-          ...style,
-        }}
+        className={`highlighted-title is-truncated ${className || ''}`.trim()}
+        style={style}
         title={displayText}
       >
         {truncationResult.leadingEllipsis && (
-          <span className="search-ellipsis">{truncationResult.ellipsis}</span>
+          <span
+            className={`search-ellipsis${isEllipsisHighlighted ? ' search-highlight--ellipsis' : ''}`}
+          >
+            {truncationResult.ellipsis}
+          </span>
         )}
         <HighlightedText text={truncationResult.visibleText} search={trimmedSearch} />
         {truncationResult.trailingEllipsis && (
-          <span className="search-ellipsis">{truncationResult.ellipsis}</span>
+          <span
+            className={`search-ellipsis${isEllipsisHighlighted ? ' search-highlight--ellipsis' : ''}`}
+          >
+            {truncationResult.ellipsis}
+          </span>
         )}
       </span>
     );
   }
 
-  // Fits within container (or not measured yet)
   return (
     <span
       ref={containerRef}
-      className={className}
-      style={{
-        display: 'block',
-        width: '100%',
-        maxWidth: '100%',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap',
-        ...style,
-      }}
+      className={`highlighted-title ${className || ''}`.trim()}
+      style={style}
       title={displayText}
     >
       <HighlightedText text={displayText} search={trimmedSearch} />

@@ -24,7 +24,8 @@ import {
 import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
 import { getItemType, isItemWorkable } from '../../domain/requirements/requirementsRegistry';
 import { computeSprintDateRanges, type ProgramIncrement } from '../../domain/timeline/programIncrements';
-import { HighlightedText, HighlightedTitle } from '../requirements/HighlightText';
+import { HighlightedText, HighlightedTitle } from '../../common/components/highlight/HighlightText';
+import { BaseModal } from '../../common/components/modal/BaseModal';
 import { RequirementBody } from '../requirements/RequirementBody';
 
 function formatTypeFilterLabel(label: string): string {
@@ -232,15 +233,15 @@ export function MilestoneDetailModal({
   };
 
   return (
-    <div
-      className="modal-overlay"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-label={`${typeLabel}: ${milestone.name}`}
+    <BaseModal
+      isOpen={true}
+      onClose={onClose}
+      ariaLabel={`${typeLabel}: ${milestone.name}`}
+      className="milestone-detail-modal"
+      padding={0}
+      closeOnEscape={!isAddingWork && !isEditing}
     >
-      <div className="milestone-detail-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="milestone-detail-modal__header" style={{ borderTopColor: effectiveColor }}>
+      <div className="milestone-detail-modal__header" style={{ borderTopColor: effectiveColor }}>
           <div className="milestone-detail-modal__title-row">
             <span
               className="milestone-detail-modal__type-badge"
@@ -642,7 +643,6 @@ export function MilestoneDetailModal({
             Close
           </button>
         </div>
-      </div>
-    </div>
+    </BaseModal>
   );
 }

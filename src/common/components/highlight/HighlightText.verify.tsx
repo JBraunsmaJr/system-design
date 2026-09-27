@@ -1,10 +1,10 @@
 /**
- * Run with: npx tsx --tsconfig tsconfig.app.json src/components/requirements/HighlightText.verify.tsx
+ * Run with: npx tsx --tsconfig tsconfig.app.json src/common/components/highlight/HighlightText.verify.tsx
  */
 import { renderToStaticMarkup } from 'react-dom/server';
 import React from 'react';
 import { HighlightedText, HighlightedTitle } from './HighlightText';
-import { highlightInReactNode } from '../../domain/requirements/reactHighlight';
+import { highlightInReactNode } from './reactHighlight';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {
@@ -155,3 +155,4 @@ console.log('\n=== highlightInReactNode ===');
 }
 
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);
+if (failures > 0) throw new Error(`${failures} test(s) failed`);
