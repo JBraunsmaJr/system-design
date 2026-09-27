@@ -33,6 +33,11 @@ import {
   wrapPrivateKeyForPublicKey,
 } from '../crypto/keys.ts';
 import type { BlobContext } from '../crypto/envelope.ts';
+import {
+  createIndexedDbPendingJoinStorage,
+  pendingUserKeySource,
+  releasePendingUserKey,
+} from './joinFlow.ts';
 
 export type EnrollmentStatus =
   /** No store configured, or not signed in. */
@@ -58,6 +63,9 @@ export interface DeviceState {
   verificationCode: string | null;
   workspaceKey: CryptoKey | null;
   message?: string;
+  /** The error behind an 'error' status, so a caller can tell a refusal
+   * it understands (such as having been removed, WS14-R31) from a fault. */
+  cause?: unknown;
 }
 
 /** Where the device keypair lives between visits. */
@@ -111,6 +119,38 @@ export interface EnrollOptions {
   api: EnrollmentApi;
   storage: DeviceKeyStorage;
   label?: string;
+  /**
+   * WS14-R2: a user key made before signing in, whose public half the
+   * sign-in committed to. Used instead of a fresh key wherever enrolment
+   * makes one, so the key published is the key the token vouches for.
+   */
+  userKeySource?: () => Promise<CryptoKeyPair | null>;
+  /** Called once that key is wrapped to this device and published, so the
+   * pending copy of its private half can be dropped. */
+  onUserKeyPublished?: () => Promise<void>;
+}
+
+/**
+ * The user key to publish: the one committed to at sign-in, if any. The
+ * browser's pending-join record is consulted by default, so every path that
+ * makes a user key - including background enrolment - publishes the key the
+ * sign-in vouched for, rather than one that would fail the check.
+ */
+/** After the user key is wrapped to this device and published. */
+async function userKeyPublished(options: EnrollOptions): Promise<void> {
+  if (options.onUserKeyPublished) return options.onUserKeyPublished().catch(() => {});
+  if (typeof indexedDB === 'undefined') return;
+  await releasePendingUserKey(createIndexedDbPendingJoinStorage()).catch(() => {});
+}
+
+async function newUserKeyPair(options: EnrollOptions): Promise<CryptoKeyPair> {
+  const source =
+    options.userKeySource ??
+    (typeof indexedDB === 'undefined'
+      ? undefined
+      : pendingUserKeySource(createIndexedDbPendingJoinStorage()));
+  const committed = await source?.().catch(() => null);
+  return committed ?? generateWrappingKeyPair('user');
 }
 
 /**
@@ -226,6 +266,7 @@ export async function enrollDevice(options: EnrollOptions): Promise<DeviceState>
       verificationCode: null,
       workspaceKey: null,
       message: String(error),
+      cause: error,
     };
   }
 }
@@ -259,7 +300,7 @@ async function publishIdentity(
   options: EnrollOptions,
   device: { deviceId: string; keyPair: CryptoKeyPair },
 ): Promise<CryptoKey> {
-  const userKeyPair = await generateWrappingKeyPair('user');
+  const userKeyPair = await newUserKeyPair(options);
   const wrapped = await wrapPrivateKeyForPublicKey(
     userKeyPair.privateKey,
     device.keyPair.publicKey,
@@ -270,6 +311,7 @@ async function publishIdentity(
     body: toBase64(wrapped.body),
   });
   await options.api.publishUserPublicKey(toBase64(await exportPublicKey(userKeyPair.publicKey)));
+  await userKeyPublished(options);
   return userKeyPair.privateKey;
 }
 
@@ -281,7 +323,7 @@ export async function bootstrapFirstDevice(options: EnrollOptions): Promise<Devi
   // key and wait to be given the existing key instead (WS7-R8).
   if (await api.workspaceExists().catch(() => false)) {
     const device = (await storage.load()) ?? (await registerHere(options));
-    const userKeyPair = await generateWrappingKeyPair('user');
+    const userKeyPair = await newUserKeyPair(options);
     const wrapped = await wrapPrivateKeyForPublicKey(
       userKeyPair.privateKey,
       device.keyPair.publicKey,
@@ -292,6 +334,7 @@ export async function bootstrapFirstDevice(options: EnrollOptions): Promise<Devi
       body: toBase64(wrapped.body),
     });
     await api.publishUserPublicKey(toBase64(await exportPublicKey(userKeyPair.publicKey)));
+    await userKeyPublished(options);
     return {
       status: 'awaiting-access',
       deviceId: device.deviceId,
@@ -318,7 +361,7 @@ export async function bootstrapFirstDevice(options: EnrollOptions): Promise<Devi
   }
 
   const device = held ?? (await registerHere(options));
-  const userKeyPair = await generateWrappingKeyPair('user');
+  const userKeyPair = await newUserKeyPair(options);
   const workspaceKey = await generateWorkspaceKey();
 
   // The user key, sealed to this device, so the next visit can reach it.
@@ -334,6 +377,7 @@ export async function bootstrapFirstDevice(options: EnrollOptions): Promise<Devi
     body: toBase64(wrapped.body),
   });
   await api.publishUserPublicKey(toBase64(await exportPublicKey(userKeyPair.publicKey)));
+  await userKeyPublished(options);
   await api.putWorkspaceKey(
     1,
     toBase64(await wrapKeyForPublicKey(workspaceKey, userKeyPair.publicKey)),

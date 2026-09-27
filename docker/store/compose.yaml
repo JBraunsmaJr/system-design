@@ -83,6 +83,10 @@ services:
       OIDC_CLIENT_ID: system-design-store
       # Must match the client secret in keycloak/system-design-realm.json.
       OIDC_CLIENT_SECRET: change-me
+      # The ID-token claim holding group membership, for automatic access
+      # (docs: deployment/group-access). The example realm's mapper emits
+      # full group paths under this name. Default: groups.
+      OIDC_GROUPS_CLAIM: groups
       # issuer#subject for each administrator: who may place legal holds and
       # purge. With none set, those actions are refused to everyone.
       ADMIN_SUBJECTS: ''

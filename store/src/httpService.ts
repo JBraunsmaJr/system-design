@@ -23,13 +23,26 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'http';
 import {
   constants as cryptoConstants,
+  createHash,
   createPublicKey,
   publicEncrypt,
   randomBytes,
   randomUUID,
 } from 'crypto';
 import { StoreError } from './documentService.ts';
-import { ProviderUnreachable, type Provider } from './auth/providers.ts';
+import { CommitmentUnsupported, ProviderUnreachable, type Provider } from './auth/providers.ts';
+import { AccessError, type AccessStore, type JoinRequestRecord } from './access.ts';
+import {
+  JOIN_COMMITMENT_PATTERN,
+  JOIN_SALT_BYTES,
+  matchesJoinCommitment,
+} from '../../src/crypto/joinCommitment.ts';
+import {
+  EVIDENCE_MAX_AGE_MAX,
+  EVIDENCE_MAX_AGE_MIN,
+  MAX_RULE_GROUPS,
+  REJECTION_REASONS,
+} from '../../src/crypto/idToken.ts';
 import { DirectoryError, verificationCodeFor, type UserDirectory } from './userDirectory.ts';
 import { IndexError, type WorkspaceIndexStore } from './workspaceIndex.ts';
 import { mintRoomToken } from './auth/roomTokens.ts';
@@ -195,7 +208,46 @@ export interface HttpServiceOptions {
   recoveryPublicKeyPem?: string | null;
   /** WS8-R8: refused before the body is read. */
   maxRequestBytes?: number;
+  /**
+   * WS14: automatic access from identity-provider groups. Absent, the
+   * feature does not exist on this store and its routes answer 404.
+   */
+  access?: AccessStore;
+  /** WS14-R36: AUTO_ACCESS. Defaults to on when `access` is given. */
+  autoAccess?: boolean;
 }
+
+/** The workspace every deployment has until multi-workspace lands. The
+ * legacy /v1/workspace/... routes act on it. */
+const DEFAULT_WORKSPACE = 'default';
+
+/** How long a browser may hold the right to rotate (WS14-R34). Rotation of
+ * a large workspace takes seconds; this only bounds a browser that closed
+ * half way. */
+const ROTATION_LEASE_MS = 5 * 60 * 1000;
+
+/**
+ * The routes a removed member is refused - everything that serves
+ * the workspace's content or keys. Signing in, health, and asking to join
+ * stay open.
+ */
+function servesWorkspace(parts: string[]): boolean {
+  switch (parts[1]) {
+    case 'docs':
+    case 'workspace':
+    case 'rooms':
+      return true;
+    case 'workspaces':
+      return parts[3] !== undefined;
+    case 'users':
+      return parts[2] === 'me' && ['devices', 'keys', 'recovery'].includes(parts[3] ?? '');
+    default:
+      return false;
+  }
+}
+
+const subjectOf = (identity: { issuer: string; subject: string }) =>
+  `${identity.issuer}#${identity.subject}`;
 
 const STATUS: Record<string, number> = {
   'not-found': 404,
@@ -279,6 +331,115 @@ export function createHttpService(options: HttpServiceOptions): Server {
     (options.allowedOrigins ?? []).some((origin) => origin !== new URL(publicUrl()).origin);
   const maxRequestBytes = options.maxRequestBytes ?? 16 * 1024 * 1024;
   const audit = options.audit;
+  /** WS14-R36: the kill switch, checked per request. */
+  const autoAccessOn = () => !!options.access && (options.autoAccess ?? true);
+
+  /** The key generation a workspace is on now (WS7-R7). */
+  async function currentGeneration(workspaceId: string): Promise<number> {
+    return (await options.workspaceIndex?.get(workspaceId))?.generation ?? 1;
+  }
+
+  /** Whether this user holds a wrap of the workspace's current key. */
+  async function holdsCurrentKey(userId: string, workspaceId: string): Promise<boolean> {
+    if (!options.directory) return false;
+    const generation = await currentGeneration(workspaceId);
+    const wraps = await options.directory.getWorkspaceKeys(userId);
+    return wraps.some((wrap) => wrap.generation === generation);
+  }
+
+  /**
+   * For joining: a removed person may still hold the current key until it is
+   * replaced, but they are not a member. Counting them as one would leave a
+   * person put back in the group unable to ask to rejoin until rotation.
+   */
+  async function isCurrentMember(userId: string, workspaceId: string): Promise<boolean> {
+    if (await options.access?.isRemoved(workspaceId, userId)) return false;
+    return holdsCurrentKey(userId, workspaceId);
+  }
+
+  /** WS14-R17: evidence, rules and rejections are for key holders only. */
+  async function requireKeyHolder(session: Session | null, workspaceId: string): Promise<string> {
+    if (!session?.userId) throw new HttpError(401, 'unauthenticated', 'Sign in first.');
+    if (!(await holdsCurrentKey(session.userId, workspaceId))) {
+      throw new HttpError(
+        403,
+        'forbidden',
+        "Only someone who holds this workspace's key can do this.",
+      );
+    }
+    return session.userId;
+  }
+
+  /**
+   * Removes one member, once, and asks for a new key. Any join request they
+   * have open is withdrawn, so it cannot be granted after the removal.
+   * Returns whether this call removed them.
+   */
+  async function removeMember(
+    workspaceId: string,
+    userId: string,
+    cause: 'sign-in' | 'rule-change' | 'by-member',
+    subject: string | null,
+    matchedGroup: string | null,
+  ): Promise<boolean> {
+    const access = options.access;
+    if (!access || !(await access.removeMembership(workspaceId, userId, cause))) return false;
+    const open = await access.getRequest(workspaceId, userId);
+    if (open?.status === 'open') await access.closeRequest(workspaceId, userId, 'withdrawn');
+    await access.setRotationRequired(workspaceId);
+    await record({
+      operation: 'membership.removed',
+      outcome: 'ok',
+      subject,
+      docId: null,
+      detail: { workspaceId, userId, cause, matchedGroup },
+    });
+    await record({
+      operation: 'workspace.rotation_required',
+      outcome: 'ok',
+      subject,
+      docId: null,
+      detail: { workspaceId, reason: 'membership.removed' },
+    });
+    return true;
+  }
+
+  /**
+   * Someone a member removed on purpose is let back in only by a person.
+   * People removed because their groups changed may rejoin automatically
+   * once a group the workspace admits lists them again.
+   */
+  async function removedByMember(workspaceId: string, userId: string): Promise<boolean> {
+    const membership = await options.access?.getMembership(workspaceId, userId);
+    return !!membership?.removedAt && membership.removedCause === 'by-member';
+  }
+
+  /**
+   * At sign-in, anyone a group let in whose groups no longer match
+   * that workspace's rule is removed. A rule that is off removes nobody
+   * and manual members are never touched.
+   */
+  async function removeNonMatching(
+    userId: string,
+    groups: string[],
+    cause: 'sign-in',
+    subject: string | null,
+  ) {
+    const access = options.access;
+    if (!access) return;
+    for (const rule of await access.listRules()) {
+      if (!rule.enabled) continue;
+      const membership = await access.getMembership(rule.workspaceId, userId);
+      if (membership?.source !== 'oidc_group' || membership.removedAt) continue;
+      if (rule.groups.some((group) => groups.includes(group))) continue;
+      await removeMember(rule.workspaceId, userId, cause, subject, membership.matchedGroup);
+    }
+  }
+
+  /** Evidence older than the rule allows cannot be granted on. */
+  function evidenceExpired(iat: number, maxAgeSeconds: number): boolean {
+    return Math.floor(Date.now() / 1000) - iat > maxAgeSeconds;
+  }
 
   async function readJson(request: IncomingMessage): Promise<Record<string, unknown>> {
     const declared = Number(request.headers['content-length'] ?? 0);
@@ -362,6 +523,23 @@ export function createHttpService(options: HttpServiceOptions): Server {
 
       if (parts[0] !== 'v1')
         throw new HttpError(404, 'unsupported', `No route for ${url.pathname}.`);
+
+      // Someone removed from the workspace gets nothing that
+      // serves it - documents, the index, keys, devices, relay tokens. They
+      // can still sign in and ask to join, so being added back to the group
+      // lets them back in once the key has been replaced.
+      if (
+        session?.userId &&
+        options.access &&
+        servesWorkspace(parts) &&
+        (await options.access.isRemoved(DEFAULT_WORKSPACE, session.userId))
+      ) {
+        throw new HttpError(
+          403,
+          'removed',
+          'You no longer have access to this workspace. Ask someone in it if this is a mistake.',
+        );
+      }
 
       if (parts[1] === 'health' && method === 'GET') {
         return send(response, 200, {
@@ -448,24 +626,174 @@ export function createHttpService(options: HttpServiceOptions): Server {
           const withAccess = [];
           for (const user of users) {
             const wraps = await options.directory.getWorkspaceKeys(user.userId);
+            // WS14-R30: how they were let in, where the store knows.
+            const membership = await options.access?.getMembership(DEFAULT_WORKSPACE, user.userId);
             withAccess.push({
               userId: user.userId,
               displayName: user.displayName,
               publicKey: user.publicKey,
               workspaceKeyGenerations: wraps.map((wrap) => wrap.generation),
+              ...(membership
+                ? {
+                    source: membership.source,
+                    matchedGroup: membership.matchedGroup,
+                    removedAt: membership.removedAt,
+                    removedCause: membership.removedCause,
+                  }
+                : {}),
             });
           }
-          return send(response, 200, { members: withAccess });
+          const rule = await options.access?.getRule(DEFAULT_WORKSPACE);
+          return send(response, 200, {
+            members: withAccess,
+            ...(rule ? { rotationRequired: rule.rotationRequired } : {}),
+          });
         }
+        // Removing one person now, whoever let them in - for
+        // someone leaving on bad terms, who may never sign in again for a
+        // group check to notice. Effective on their next request.
+        if (parts[3] && !parts[4] && method === 'DELETE') {
+          if (!options.access)
+            throw new HttpError(404, 'unsupported', 'This store cannot remove members.');
+          const remover = await requireKeyHolder(session, DEFAULT_WORKSPACE);
+          const userId = decodeURIComponent(parts[3]);
+          if (userId === remover)
+            throw new HttpError(409, 'conflict', 'You cannot remove yourself.');
+          // Anyone given a key before memberships were recorded has no row
+          // yet; record them as let in by hand, then remove them.
+          if (!(await options.access.getMembership(DEFAULT_WORKSPACE, userId))) {
+            await options.access.putMembership({
+              workspaceId: DEFAULT_WORKSPACE,
+              userId,
+              source: 'manual',
+              matchedGroup: null,
+              grantedBy: null,
+            });
+          }
+          const before = await options.access.getMembership(DEFAULT_WORKSPACE, userId);
+          const removed = await removeMember(
+            DEFAULT_WORKSPACE,
+            userId,
+            'by-member',
+            subject,
+            before?.matchedGroup ?? null,
+          );
+          // A workspace with no rule has nothing to carry the flag; give it
+          // one, off, so the next key holder's browser replaces the key. Only
+          // for a removal that happened: removing someone already removed
+          // changes nothing and asks for no new key.
+          if (removed && !(await options.access.getRule(DEFAULT_WORKSPACE))?.rotationRequired) {
+            const current = await options.access.getRule(DEFAULT_WORKSPACE);
+            if (!current) {
+              await options.access.putRule({
+                workspaceId: DEFAULT_WORKSPACE,
+                ruleVersion: 1,
+                enabled: false,
+                claim: 'groups',
+                groups: [],
+                evidenceMaxAgeSeconds: 86_400,
+              });
+            }
+            await options.access.setRotationRequired(DEFAULT_WORKSPACE);
+          }
+          operation = 'membership.remove';
+          return send(response, 204, {});
+        }
+
         if (parts[3] && parts[4] === 'key' && method === 'PUT') {
           const body = await readJson(request);
           const userId = decodeURIComponent(parts[3]);
           const generation = typeof body.generation === 'number' ? body.generation : 1;
-          await options.directory.putWorkspaceKey(
-            userId,
-            generation,
-            requireString(body.wrappedKey, 'wrappedKey'),
-          );
+          const wrappedKey = requireString(body.wrappedKey, 'wrappedKey');
+          // WS14-R26: an automatic grant names the evidence it checked, and
+          // lands only while that exact request is still open on the
+          // current key. A manual grant sends none and is unchanged.
+          const evidenceHash =
+            typeof body.joinEvidenceHash === 'string' ? body.joinEvidenceHash : null;
+          let joinRequest: JoinRequestRecord | null = null;
+          let matchedGroup: string | null = null;
+          if (evidenceHash !== null) {
+            const granter = await requireKeyHolder(session, DEFAULT_WORKSPACE);
+            joinRequest = options.access
+              ? await options.access.getRequest(DEFAULT_WORKSPACE, userId)
+              : null;
+            const current = await currentGeneration(DEFAULT_WORKSPACE);
+            const alreadyGranted =
+              joinRequest?.status === 'granted' &&
+              joinRequest.evidenceHash === evidenceHash &&
+              (await options.directory.getWorkspaceKeys(userId)).some(
+                (wrap) => wrap.generation === generation,
+              );
+            if (alreadyGranted) return send(response, 204, {}); // repeat: success
+            if (
+              !autoAccessOn() ||
+              (await removedByMember(DEFAULT_WORKSPACE, userId)) ||
+              !joinRequest ||
+              joinRequest.status !== 'open' ||
+              !joinRequest.idToken ||
+              joinRequest.evidenceHash !== evidenceHash ||
+              generation !== current
+            ) {
+              throw new HttpError(
+                409,
+                'request-closed',
+                'That join request is no longer open on the current key.',
+              );
+            }
+            // A label for the record, kept only if the rule names it: the
+            // store cannot check the claim, and must not invent one.
+            const rule = await options.access?.getRule(DEFAULT_WORKSPACE);
+            if (typeof body.matchedGroup === 'string' && rule?.groups.includes(body.matchedGroup))
+              matchedGroup = body.matchedGroup;
+            await options.directory.putWorkspaceKey(userId, generation, wrappedKey);
+            await options.access?.closeRequest(DEFAULT_WORKSPACE, userId, 'granted');
+            await options.access?.putMembership({
+              workspaceId: DEFAULT_WORKSPACE,
+              userId,
+              source: 'oidc_group',
+              matchedGroup,
+              grantedBy: granter,
+            });
+            operation = 'join.auto_grant';
+            await record({
+              operation,
+              outcome: 'ok',
+              subject,
+              docId: null,
+              detail: {
+                userId,
+                generation,
+                evidenceHash,
+                matchedGroup,
+                ruleVersion: rule?.ruleVersion ?? null,
+                device: request.headers['x-device-id'] ?? null,
+              },
+            });
+            return send(response, 204, {});
+          }
+          // Restoring someone who was removed is a decision only a member
+          // who holds the key can make - checked before anything is written.
+          const existing = await options.access?.getMembership(DEFAULT_WORKSPACE, userId);
+          if (existing?.removedAt) await requireKeyHolder(session, DEFAULT_WORKSPACE);
+          await options.directory.putWorkspaceKey(userId, generation, wrappedKey);
+          if (options.access) {
+            // Anyone let in by hand stays in whatever groups do.
+            // A re-wrap during rotation keeps the record it had.
+            // A removed member given access again by hand is a member
+            // again, and stays one whatever their groups.
+            if (!existing || existing.removedAt) {
+              await options.access.putMembership({
+                workspaceId: DEFAULT_WORKSPACE,
+                userId,
+                source: 'manual',
+                matchedGroup: null,
+                grantedBy: session?.userId ?? null,
+              });
+            }
+            const open = await options.access.getRequest(DEFAULT_WORKSPACE, userId);
+            if (open?.status === 'open')
+              await options.access.closeRequest(DEFAULT_WORKSPACE, userId, 'granted');
+          }
           operation = 'workspace-key-share';
           await record({
             operation,
@@ -479,13 +807,26 @@ export function createHttpService(options: HttpServiceOptions): Server {
         throw new HttpError(404, 'unsupported', `No route for ${url.pathname}.`);
       }
 
+      if (parts[1] === 'join-requests') {
+        return await handleJoinRequests(method, request, response, session, subject);
+      }
+
+      if (
+        parts[1] === 'workspaces' &&
+        (parts[3] === 'join-requests' ||
+          parts[3] === 'access-rule' ||
+          parts[3] === 'rotation-lease')
+      ) {
+        return await handleWorkspaceAccess(parts, method, request, response, session, subject);
+      }
+
       if (parts[1] === 'workspaces') {
         return await handleWorkspaces(parts, method, request, response, subject);
       }
 
       if (parts[1] === 'admin') {
         requireAdmin(subject);
-        // WS7-R13: an administrator restoring access for someone who has
+        // An administrator restoring access for someone who has
         // lost every device and their recovery code.
         if (parts[2] === 'users' && !parts[3] && method === 'GET') {
           if (!options.directory)
@@ -493,7 +834,7 @@ export function createHttpService(options: HttpServiceOptions): Server {
           const users = await options.directory.listUsers();
           // Which workspace key generations each member holds, so an
           // interface can show who can actually read the workspace rather
-          // than only who has an account (WS7-R8).
+          // than only who has an account.
           const withAccess = [];
           for (const user of users) {
             const wraps = await options.directory.getWorkspaceKeys(user.userId);
@@ -546,7 +887,7 @@ export function createHttpService(options: HttpServiceOptions): Server {
             throw new HttpError(404, 'unsupported', 'This store does not support purging.');
           operation = 'purge-due';
           // The sweep an operator or a timer runs: everything past its
-          // retention and not under hold (WS10-R4).
+          // retention and not under hold.
           const purged = await options.store.purgeDue();
           await record({
             operation,
@@ -798,7 +1139,16 @@ export function createHttpService(options: HttpServiceOptions): Server {
     session: Session | null,
   ) {
     if (parts[2] === 'providers' && method === 'GET') {
-      return send(response, 200, { providers: [...providers.keys()] });
+      return send(response, 200, {
+        // Unchanged shape, for editors that predate WS14 (WS14-R44).
+        providers: [...providers.keys()],
+        // What the editor pre-fills an access rule with.
+        providerDetails: [...providers.values()].map((provider) => ({
+          id: provider.id,
+          ...provider.describe(),
+        })),
+        autoAccess: autoAccessOn(),
+      });
     }
 
     if (parts[2] === 'session' && method === 'GET') {
@@ -812,6 +1162,11 @@ export function createHttpService(options: HttpServiceOptions): Server {
           subject: session.subject,
           displayName: session.displayName,
           expiresAt: session.expiresAt,
+          // WS14: whether this sign-in can back a join request. The token
+          // itself never goes back to the browser (WS14-R45).
+          hasEvidence: !!session.evidence,
+          evidenceIat: session.evidence?.iat ?? null,
+          groupsOverage: session.groupsOverage ?? false,
         },
       });
     }
@@ -834,8 +1189,20 @@ export function createHttpService(options: HttpServiceOptions): Server {
       const provider = providers.get(parts[2]);
       if (!provider || !sessions)
         throw new HttpError(404, 'unsupported', `No sign-in provider named ${parts[2]}.`);
+      // A key commitment, if the editor sent one. Ignored entirely
+      // while automatic access is off.
+      const rawCommitment = url.searchParams.get('commitment');
+      const commitment = rawCommitment !== null && autoAccessOn() ? rawCommitment : undefined;
+      if (commitment !== undefined && !JOIN_COMMITMENT_PATTERN.test(commitment)) {
+        throw new HttpError(400, 'bad-request', 'commitment must be 43 base64url characters.');
+      }
+      if (commitment !== undefined && provider.describe().kind !== 'oidc') {
+        // GitHub has no ID token, so nothing a member could check.
+        throw new HttpError(400, 'unsupported', new CommitmentUnsupported(provider.id).message);
+      }
       const { url: authorizeUrl, pending } = await provider.begin(
         `${publicUrl()}/v1/auth/callback`,
+        commitment !== undefined ? { commitment } : {},
       );
       await sessions.remember(pending);
       await record({
@@ -843,7 +1210,7 @@ export function createHttpService(options: HttpServiceOptions): Server {
         outcome: 'ok',
         subject: null,
         docId: null,
-        detail: { provider: provider.id },
+        detail: { provider: provider.id, commitment: commitment !== undefined },
       });
       response.writeHead(302, { location: authorizeUrl });
       return response.end();
@@ -903,13 +1270,26 @@ export function createHttpService(options: HttpServiceOptions): Server {
         const user = await options.directory.upsertUser(identity);
         created.userId = user.userId;
         await sessions.setUserId(created.id, user.userId);
+        // Remembered for re-evaluation when a rule changes.
+        if (options.access && identity.groups && !identity.groupsOverage) {
+          await options.access.setLastGroups(user.userId, identity.groups);
+          // Whoever a group let in leaves when they leave the
+          // group. Not on overage: groups that were not sent prove nothing.
+          await removeNonMatching(user.userId, identity.groups, 'sign-in', subjectOf(identity));
+        }
       }
       await record({
         operation: 'login',
         outcome: 'ok',
         subject: `${identity.issuer}#${identity.subject}`,
         docId: null,
-        detail: { provider: provider.id },
+        // WS14-R41. Group names are not logged here; the grant that uses
+        // one records it.
+        detail: {
+          provider: provider.id,
+          commitment: !!identity.evidence,
+          ...(identity.groupsOverage ? { groupsOverage: true } : {}),
+        },
       });
       response.writeHead(302, {
         location: options.afterLoginUrl ?? '/',
@@ -1290,6 +1670,7 @@ export function createHttpService(options: HttpServiceOptions): Server {
         );
       }
       const generation = typeof body.generation === 'number' ? body.generation : undefined;
+      const before = await index.get(workspaceId);
       const snapshot = await index.put(
         workspaceId,
         requireString(body.index, 'index'),
@@ -1303,6 +1684,23 @@ export function createHttpService(options: HttpServiceOptions): Server {
         docId: null,
         detail: { workspaceId, version: snapshot.version },
       });
+      // WS14-R34: the index moving to a newer key generation is the key
+      // having been replaced, whoever did it.
+      if (
+        options.access &&
+        snapshot.generation !== null &&
+        snapshot.generation !== undefined &&
+        snapshot.generation > (before?.generation ?? 1)
+      ) {
+        await options.access.rotationCompleted(workspaceId);
+        await record({
+          operation: 'workspace.rotated',
+          outcome: 'ok',
+          subject,
+          docId: null,
+          detail: { workspaceId, generation: snapshot.generation },
+        });
+      }
       return send(response, 200, {
         version: snapshot.version,
         updatedAt: snapshot.updatedAt,
@@ -1310,6 +1708,336 @@ export function createHttpService(options: HttpServiceOptions): Server {
       });
     }
     throw new HttpError(405, 'unsupported', `${method} is not allowed here.`);
+  }
+
+  /**
+   * WS14-R14 to R16: the newcomer's side.
+   *
+   *   POST /v1/join-requests {salt}  opens a request for every workspace
+   *                                   whose rule names one of their groups
+   *   GET  /v1/join-requests          their own requests' status, no evidence
+   */
+  async function handleJoinRequests(
+    method: string,
+    request: IncomingMessage,
+    response: ServerResponse,
+    session: Session | null,
+    subject: string | null,
+  ) {
+    if (!options.access || !options.directory)
+      throw new HttpError(404, 'unsupported', 'This store does not offer automatic access.');
+    const access = options.access;
+    if (!session?.userId) throw new HttpError(401, 'unauthenticated', 'Sign in first.');
+    const userId = session.userId;
+
+    if (method === 'GET') {
+      const rules = new Map((await access.listRules()).map((rule) => [rule.workspaceId, rule]));
+      const own = await access.listRequestsForUser(userId);
+      return send(response, 200, {
+        requests: own.map((joinRequest) => {
+          const rule = rules.get(joinRequest.workspaceId);
+          const expired =
+            joinRequest.status === 'open' &&
+            (!joinRequest.idToken ||
+              (rule && evidenceExpired(joinRequest.iat, rule.evidenceMaxAgeSeconds)));
+          return {
+            workspaceId: joinRequest.workspaceId,
+            status: expired ? 'evidence-expired' : joinRequest.status,
+            lastRejection: joinRequest.lastRejection,
+          };
+        }),
+      });
+    }
+
+    if (method !== 'POST')
+      throw new HttpError(405, 'unsupported', `${method} is not allowed here.`);
+    const body = await readJson(request);
+    const salt = fromBase64(body.salt, 'salt');
+    if (salt.length !== JOIN_SALT_BYTES)
+      throw new HttpError(400, 'bad-request', `salt must be ${JOIN_SALT_BYTES} bytes.`);
+    if (!autoAccessOn()) {
+      return send(response, 200, { requests: [], reason: 'auto-access-off' });
+    }
+    const evidence = session.evidence;
+    if (!evidence) {
+      throw new HttpError(
+        409,
+        'no-evidence',
+        'This sign-in did not commit to a key. Sign in again from the editor.',
+      );
+    }
+    const user = await options.directory.getUser(userId);
+    if (!user.publicKey) {
+      throw new HttpError(409, 'no-public-key', 'Publish your public key before asking to join.');
+    }
+    // WS14-R14: a courtesy check, saving members work. The boundary is the
+    // same check in the granting browser (WS14-R22).
+    const spki = fromBase64(user.publicKey, 'publicKey');
+    if (!(await matchesJoinCommitment(evidence.commitment, spki, salt))) {
+      await record({
+        operation: 'join.request',
+        outcome: 'denied',
+        subject,
+        docId: null,
+        detail: { reason: 'commitment-mismatch' },
+      });
+      throw new HttpError(
+        422,
+        'commitment-mismatch',
+        'This key and salt are not the ones this sign-in committed to.',
+      );
+    }
+    if (session.groupsOverage) {
+      return send(response, 200, { requests: [], reason: 'groups-overage' });
+    }
+
+    const groups = new Set(session.groups ?? []);
+    const evidenceHash = createHash('sha256').update(evidence.idToken).digest('base64url');
+    const results: { workspaceId: string; status: string }[] = [];
+    for (const rule of await access.listRules()) {
+      if (!rule.enabled || !rule.groups.some((group) => groups.has(group))) continue;
+      if (await removedByMember(rule.workspaceId, userId)) {
+        results.push({ workspaceId: rule.workspaceId, status: 'removed' });
+        continue;
+      }
+      if (await isCurrentMember(userId, rule.workspaceId)) {
+        results.push({ workspaceId: rule.workspaceId, status: 'member' });
+        continue;
+      }
+      if (evidenceExpired(evidence.iat, rule.evidenceMaxAgeSeconds)) {
+        results.push({ workspaceId: rule.workspaceId, status: 'evidence-expired' });
+        continue;
+      }
+      await access.openRequest({
+        workspaceId: rule.workspaceId,
+        userId,
+        idToken: evidence.idToken,
+        evidenceHash,
+        salt: toBase64(salt),
+        publicKey: user.publicKey,
+        iat: evidence.iat,
+      });
+      results.push({ workspaceId: rule.workspaceId, status: 'open' });
+      await record({
+        operation: 'join.request',
+        outcome: 'ok',
+        subject,
+        docId: null,
+        detail: { workspaceId: rule.workspaceId, evidenceHash },
+      });
+    }
+    return send(response, 200, {
+      requests: results,
+      // WS14-R16: they still appear in the manual waiting list.
+      ...(results.length === 0 ? { reason: 'no-matching-rule' } : {}),
+    });
+  }
+
+  /**
+   * WS14-R10, R17, R27: a workspace's key holders' side.
+   *
+   *   GET  /v1/workspaces/:ws/join-requests                      open requests, with evidence
+   *   POST /v1/workspaces/:ws/join-requests/:userId/rejections   why a check failed
+   *   GET  /v1/workspaces/:ws/access-rule                        the routing copy
+   *   PUT  /v1/workspaces/:ws/access-rule                        replace it, newer versions only
+   */
+  async function handleWorkspaceAccess(
+    parts: string[],
+    method: string,
+    request: IncomingMessage,
+    response: ServerResponse,
+    session: Session | null,
+    subject: string | null,
+  ) {
+    if (!options.access || !options.directory)
+      throw new HttpError(404, 'unsupported', 'This store does not offer automatic access.');
+    const access = options.access;
+    const directory = options.directory;
+    const workspaceId = decodeURIComponent(parts[2] ?? '');
+    if (!/^[A-Za-z0-9._~-]{1,200}$/.test(workspaceId))
+      throw new HttpError(400, 'bad-request', 'That is not a workspace id.');
+    const callerId = await requireKeyHolder(session, workspaceId);
+
+    if (parts[3] === 'access-rule' && !parts[4]) {
+      if (method === 'GET') {
+        return send(response, 200, {
+          rule: await access.getRule(workspaceId),
+          autoAccess: autoAccessOn(),
+        });
+      }
+      if (method !== 'PUT')
+        throw new HttpError(405, 'unsupported', `${method} is not allowed here.`);
+      if (!autoAccessOn())
+        throw new HttpError(403, 'forbidden', 'Automatic access is turned off on this store.');
+      const body = await readJson(request);
+      const ruleVersion = body.ruleVersion;
+      if (!Number.isSafeInteger(ruleVersion) || (ruleVersion as number) < 1)
+        throw new HttpError(400, 'bad-request', 'ruleVersion must be a positive integer.');
+      if (typeof body.enabled !== 'boolean')
+        throw new HttpError(400, 'bad-request', 'enabled must be true or false.');
+      const claim = requireString(body.claim, 'claim');
+      const groups = body.groups;
+      if (
+        !Array.isArray(groups) ||
+        groups.length < 1 ||
+        groups.length > MAX_RULE_GROUPS ||
+        !groups.every(
+          (group) => typeof group === 'string' && group.length > 0 && group.length <= 500,
+        )
+      ) {
+        throw new HttpError(
+          400,
+          'bad-request',
+          `groups must be 1 to ${MAX_RULE_GROUPS} non-empty strings.`,
+        );
+      }
+      const maxAge = body.evidenceMaxAgeSeconds;
+      if (
+        !Number.isSafeInteger(maxAge) ||
+        (maxAge as number) < EVIDENCE_MAX_AGE_MIN ||
+        (maxAge as number) > EVIDENCE_MAX_AGE_MAX
+      ) {
+        throw new HttpError(
+          400,
+          'bad-request',
+          `evidenceMaxAgeSeconds must be between ${EVIDENCE_MAX_AGE_MIN} and ${EVIDENCE_MAX_AGE_MAX}.`,
+        );
+      }
+      const stored = await access.putRule({
+        workspaceId,
+        ruleVersion: ruleVersion as number,
+        enabled: body.enabled,
+        claim,
+        groups: [...new Set(groups as string[])],
+        evidenceMaxAgeSeconds: maxAge as number,
+      });
+      await record({
+        operation: 'access_rule.update',
+        outcome: 'ok',
+        subject,
+        docId: null,
+        detail: {
+          workspaceId,
+          ruleVersion: stored.ruleVersion,
+          enabled: stored.enabled,
+          groups: stored.groups,
+        },
+      });
+      // WS14-R32: asked to act now rather than at each person's next
+      // sign-in, judged on the groups they last signed in with. Turning the
+      // rule off with this removes everyone a group let in.
+      let removed = 0;
+      if (body.removeMembers === true) {
+        for (const membership of await access.listMemberships(workspaceId)) {
+          if (membership.source !== 'oidc_group' || membership.removedAt) continue;
+          const last = (await access.getLastGroups(membership.userId)) ?? [];
+          const stillMatches =
+            stored.enabled && stored.groups.some((group) => last.includes(group));
+          if (stillMatches) continue;
+          await removeMember(
+            workspaceId,
+            membership.userId,
+            'rule-change',
+            subject,
+            membership.matchedGroup,
+          );
+          removed++;
+        }
+      }
+      return send(response, 200, {
+        rule: (await access.getRule(workspaceId)) ?? stored,
+        removed,
+      });
+    }
+
+    if (parts[3] === 'join-requests' && !parts[4] && method === 'GET') {
+      if (!autoAccessOn()) return send(response, 200, { requests: [] });
+      const rule = await access.getRule(workspaceId);
+      const listed = [];
+      for (const joinRequest of await access.listRequests(workspaceId)) {
+        if (joinRequest.status !== 'open' || !joinRequest.idToken) continue;
+        if (rule && evidenceExpired(joinRequest.iat, rule.evidenceMaxAgeSeconds)) continue;
+        if (await removedByMember(workspaceId, joinRequest.userId)) {
+          await access.closeRequest(workspaceId, joinRequest.userId, 'withdrawn');
+          continue;
+        }
+        if (await isCurrentMember(joinRequest.userId, workspaceId)) {
+          // Let in some other way meanwhile - by hand, usually.
+          await access.closeRequest(workspaceId, joinRequest.userId, 'granted');
+          continue;
+        }
+        const user = await directory.getUser(joinRequest.userId);
+        listed.push({
+          userId: joinRequest.userId,
+          displayName: user.displayName ?? null,
+          issuer: user.issuer,
+          subject: user.subject,
+          publicKey: joinRequest.publicKey,
+          salt: joinRequest.salt,
+          idToken: joinRequest.idToken,
+          evidenceHash: joinRequest.evidenceHash,
+          iat: joinRequest.iat,
+          lastRejection: joinRequest.lastRejection,
+          lastRejectionAt: joinRequest.lastRejectionAt,
+          // Why they were removed, if they were: a granter refuses anyone
+          // a member removed, whatever the store listed.
+          removedCause:
+            (await access.getMembership(workspaceId, joinRequest.userId))?.removedCause ?? null,
+        });
+      }
+      await record({
+        operation: 'join.list',
+        outcome: 'ok',
+        subject,
+        docId: null,
+        detail: { workspaceId, count: listed.length, reader: callerId },
+      });
+      return send(response, 200, { requests: listed });
+    }
+
+    if (
+      parts[3] === 'join-requests' &&
+      parts[4] &&
+      parts[5] === 'rejections' &&
+      method === 'POST'
+    ) {
+      const userId = decodeURIComponent(parts[4]);
+      const body = await readJson(request);
+      const reason = body.reason;
+      if (typeof reason !== 'string' || !(REJECTION_REASONS as readonly string[]).includes(reason))
+        throw new HttpError(
+          400,
+          'bad-request',
+          `reason must be one of: ${REJECTION_REASONS.join(', ')}.`,
+        );
+      await access.recordRejection(workspaceId, userId, reason);
+      await record({
+        operation: 'join.rejected',
+        outcome: 'ok',
+        subject,
+        docId: null,
+        detail: { workspaceId, userId, reason },
+      });
+      return send(response, 204, {});
+    }
+
+    // WS14-R34: the right to replace the key, for one browser at a time.
+    if (parts[3] === 'rotation-lease' && !parts[4] && method === 'POST') {
+      const claimed = await access.claimRotation(workspaceId, callerId, ROTATION_LEASE_MS);
+      if (!claimed) {
+        const rule = await access.getRule(workspaceId);
+        throw new HttpError(
+          409,
+          rule?.rotationRequired ? 'lease-held' : 'not-required',
+          rule?.rotationRequired
+            ? 'Another browser is replacing the key.'
+            : 'This workspace does not need a new key.',
+        );
+      }
+      return send(response, 200, { leaseMs: ROTATION_LEASE_MS });
+    }
+
+    throw new HttpError(404, 'unsupported', 'No route for that path.');
   }
 
   /** WS10-R2: a store with no administrators configured has none. */
@@ -1340,6 +2068,14 @@ export function createHttpService(options: HttpServiceOptions): Server {
         reason: error.reason,
         message: error.message,
       };
+    if (error instanceof AccessError)
+      return {
+        status: error.reason === 'stale' ? 409 : 404,
+        reason: error.reason === 'stale' ? 'stale-version' : 'not-found',
+        message: error.message,
+      };
+    if (error instanceof CommitmentUnsupported)
+      return { status: 400, reason: 'unsupported', message: error.message };
     if (error instanceof ProviderUnreachable) {
       return { status: 502, reason: 'provider-unreachable', message: error.message };
     }

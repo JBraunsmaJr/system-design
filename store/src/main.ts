@@ -13,6 +13,8 @@ import { createPostgresStore, createPostgresWorkspaceIndex } from './postgresSto
 import { createPostgresUserDirectory } from './postgresUserDirectory.ts';
 import { createMemoryUserDirectory } from './userDirectory.ts';
 import { createMemoryWorkspaceIndex } from './workspaceIndex.ts';
+import { createMemoryAccessStore, type AccessStore } from './access.ts';
+import { createPostgresAccessStore } from './postgresAccess.ts';
 import { createHttpService, createMemoryAuditSink, type StoreBackend } from './httpService.ts';
 import { createSessionStore } from './auth/sessions.ts';
 import { createPostgresSessionStore } from './auth/postgresSessions.ts';
@@ -41,6 +43,7 @@ async function main() {
   let index;
   let audit;
   let sessions;
+  let access: AccessStore;
   let close = async () => {};
 
   if (config.databaseUrl) {
@@ -60,6 +63,7 @@ async function main() {
     // Sessions in the database, so a restart or a second instance does not
     // sign everyone out (WS10-R1).
     sessions = createPostgresSessionStore(pool);
+    access = createPostgresAccessStore(pool);
     close = async () => {
       await pool.end();
       await postgres.close();
@@ -80,6 +84,7 @@ async function main() {
     index = createMemoryWorkspaceIndex();
     audit = createMemoryAuditSink();
     sessions = createSessionStore();
+    access = createMemoryAccessStore();
   }
 
   const admins = new Set(config.admins);
@@ -98,6 +103,8 @@ async function main() {
     recoveryPublicKeyPem: config.recoveryPublicKeyPem,
     relayTokenSecret: config.relayTokenSecret,
     isAdmin: (subject) => admins.has(subject),
+    access,
+    autoAccess: config.autoAccess,
   });
 
   // The purge sweep (WS10-R4). Held documents and anything still inside its
@@ -110,6 +117,13 @@ async function main() {
           console.log(`Purged ${purged.length} document(s) past their retention.`);
       })
       .catch((error) => console.error('Purge sweep failed:', error));
+    // WS14-R18: raw ID tokens are dropped once past their retention.
+    void access
+      .expireEvidence(new Date(Date.now() - config.joinEvidenceRetentionMs))
+      .then((expired) => {
+        if (expired > 0) console.log(`Dropped sign-in evidence from ${expired} join request(s).`);
+      })
+      .catch((error) => console.error('Evidence sweep failed:', error));
   }, config.purgeIntervalMs);
 
   server.listen(config.port, () => console.log(`Ready on port ${config.port}.`));

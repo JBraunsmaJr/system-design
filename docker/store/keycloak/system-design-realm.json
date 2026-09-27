@@ -18,7 +18,23 @@
       "webOrigins": ["http://localhost:8088"],
       "attributes": {
         "pkce.code.challenge.method": "S256"
-      }
+      },
+      "protocolMappers": [
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "groups",
+            "full.path": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "false",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
     }
   ],
   "users": [
@@ -30,7 +46,31 @@
       "firstName": "Demo",
       "lastName": "User",
       "requiredActions": [],
-      "credentials": [{ "type": "password", "value": "demo", "temporary": false }]
+      "credentials": [
+        {
+          "type": "password",
+          "value": "demo",
+          "temporary": false
+        }
+      ],
+      "groups": ["/design-team-a"]
+    },
+    {
+      "username": "otter",
+      "enabled": true,
+      "email": "otter@example.invalid",
+      "emailVerified": true,
+      "firstName": "Otter",
+      "lastName": "User",
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "otter",
+          "temporary": false
+        }
+      ],
+      "groups": ["/design-team-a"]
     },
     {
       "username": "Badger",
@@ -40,7 +80,22 @@
       "firstName": "Badger",
       "lastName": "2-3",
       "requiredActions": [],
-      "credentials": [{ "type": "password", "value": "badger", "temporary": false }]
+      "credentials": [
+        {
+          "type": "password",
+          "value": "badger",
+          "temporary": false
+        }
+      ],
+      "groups": ["/design-team-b"]
+    }
+  ],
+  "groups": [
+    {
+      "name": "design-team-a"
+    },
+    {
+      "name": "design-team-b"
     }
   ]
 }
