@@ -236,6 +236,13 @@ export async function captureNodeSubsetSnapshot(
     return undefined;
   }
 
+  const renderedTargetNodes = targetNodes.filter((n) =>
+    Boolean(viewportEl.querySelector(`[data-id="${n.id}"]`)),
+  );
+  if (renderedTargetNodes.length === 0) {
+    return undefined;
+  }
+
   const width = options?.width ?? 1200;
   const height = options?.height ?? 600;
   const padding = options?.padding ?? 0.06;

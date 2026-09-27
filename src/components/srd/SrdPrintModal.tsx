@@ -1,5 +1,8 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import type { Node } from '@xyflow/react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 import {
   Printer,
   FileDown,
@@ -1746,9 +1749,11 @@ export function SrdPrintModal({
                           {currentSrdData.metadata.description && (
                             <div style={{ marginBottom: '1.25rem' }}>
                               <h3 className="srd-doc__sub-title">Scope & Objectives</h3>
-                              <p style={{ lineHeight: 1.6, color: '#374151' }}>
-                                {currentSrdData.metadata.description}
-                              </p>
+                              <div style={{ lineHeight: 1.6, color: '#374151' }}>
+                                <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+                                  {currentSrdData.metadata.description}
+                                </ReactMarkdown>
+                              </div>
                             </div>
                           )}
                           <h3 className="srd-doc__sub-title">Scope & Architecture Metrics</h3>
@@ -2088,7 +2093,11 @@ export function SrdPrintModal({
 
                                           {item.body && item.body.trim() && (
                                             <div className="srd-doc__item-body">
-                                              {item.body.trim()}
+                                              <ReactMarkdown
+                                                remarkPlugins={[remarkGfm, remarkBreaks]}
+                                              >
+                                                {item.body.trim()}
+                                              </ReactMarkdown>
                                             </div>
                                           )}
 

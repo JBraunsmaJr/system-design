@@ -330,6 +330,65 @@ const mockTeam: TeamDocument = {
   console.log('✓ Test 4: Item snapshots and framings passed');
 }
 
+// --- Test 5: Sub-diagram nodes linked to requirement items ---
+{
+  const nodesWithSubDiagram: Node[] = [
+    ...mockNodes,
+    {
+      id: 'sub-node-worker',
+      type: 'typed',
+      position: { x: 50, y: 50 },
+      data: {
+        nodeType: 'worker',
+        label: 'Auth Background Worker',
+        description: 'Processes background token rotations',
+        parentPath: ['node-auth'],
+        linkedRequirementIds: ['TSK-3'],
+      },
+    },
+  ];
+
+  const srdData = aggregateSrdData({
+    title: 'Subdiagram Linkage Test',
+    nodes: nodesWithSubDiagram,
+    edges: mockEdges,
+    doc: mockDoc,
+    itemSnapshots: {
+      'TSK-3': 'data:image/png;base64,subdiagramWorkerSnap',
+    },
+  });
+
+  const coreItems = srdData.requirements.itemsByCategory['cat-core'];
+  const tsk3 = coreItems.find((i) => i.id === 'TSK-3');
+  assert(tsk3 !== undefined, 'TSK-3 found in core category');
+  assert(
+    Boolean(tsk3?.linkedNodeIds && tsk3.linkedNodeIds.includes('sub-node-worker')),
+    'TSK-3 linked to sub-diagram node ID',
+  );
+  assert(
+    Boolean(tsk3?.linkedNodeLabels && tsk3.linkedNodeLabels.includes('Auth Background Worker')),
+    'TSK-3 linked to sub-diagram node label',
+  );
+  assert(
+    tsk3?.contextSnapshotBase64 === 'data:image/png;base64,subdiagramWorkerSnap',
+    'Snapshot attached for ticket referencing sub-diagram node',
+  );
+
+  const subComp = srdData.architecture.components.find((c) => c.id === 'sub-node-worker');
+  assert(subComp !== undefined, 'Sub-diagram node included in architecture component inventory');
+  assert(
+    Boolean(subComp?.linkedRequirementIds?.includes('TSK-3')),
+    'Sub-diagram component inventory lists linked requirement TSK-3',
+  );
+
+  const subRel = srdData.traceability.find(
+    (t) => t.sourceId === 'sub-node-worker' && t.targetId === 'TSK-3',
+  );
+  assert(subRel !== undefined, 'Sub-diagram node included in traceability matrix');
+
+  console.log('✓ Test 5: Sub-diagram node links and snapshots passed');
+}
+
 if (failures > 0) {
   console.error(`\n${failures} check(s) failed`);
 } else {

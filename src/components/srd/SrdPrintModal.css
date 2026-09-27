@@ -566,13 +566,83 @@
 .srd-doc__item-body {
   font-size: 0.8125rem;
   color: #334155;
-  white-space: pre-wrap;
   line-height: 1.55;
   margin: 0.5rem 0;
   padding: 0.5rem 0.75rem;
   background-color: #f8fafc;
   border-radius: 4px;
   border-left: 2.5px solid #cbd5e1;
+}
+
+.srd-doc__item-body > :first-child {
+  margin-top: 0;
+}
+
+.srd-doc__item-body > :last-child {
+  margin-bottom: 0;
+}
+
+.srd-doc__item-body p,
+.srd-doc__item-body ul,
+.srd-doc__item-body ol,
+.srd-doc__item-body pre,
+.srd-doc__item-body blockquote,
+.srd-doc__item-body table {
+  margin: 0 0 6px;
+}
+
+.srd-doc__item-body ul,
+.srd-doc__item-body ol {
+  padding-left: 18px;
+}
+
+.srd-doc__item-body code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.75rem;
+  background-color: #f1f5f9;
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+  border: 1px solid #e2e8f0;
+}
+
+.srd-doc__item-body pre {
+  background-color: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  padding: 0.5rem;
+  overflow-x: auto;
+}
+
+.srd-doc__item-body pre code {
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.srd-doc__item-body blockquote {
+  margin: 0 0 6px;
+  padding: 2px 8px;
+  border-left: 3px solid #cbd5e1;
+  color: #64748b;
+}
+
+.srd-doc__item-body table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.75rem;
+  margin: 0.5rem 0;
+}
+
+.srd-doc__item-body th,
+.srd-doc__item-body td {
+  border: 1px solid #e2e8f0;
+  padding: 4px 8px;
+  text-align: left;
+}
+
+.srd-doc__item-body th {
+  background-color: #f8fafc;
+  font-weight: 600;
 }
 
 .srd-doc__item-dependencies {

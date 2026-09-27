@@ -127,7 +127,7 @@ import type {
   SubDiagram,
 } from './domain/types';
 import type { RequirementsDocument } from './domain/requirementsTypes';
-import { EMPTY_REQUIREMENTS_DOCUMENT } from './domain/requirementsTypes';
+import { EMPTY_REQUIREMENTS_DOCUMENT, type RequirementItem } from './domain/requirementsTypes';
 import {
   BUILT_IN_ITEM_TYPES,
   BUILT_IN_RELATIONSHIP_TYPES,
@@ -3092,41 +3092,118 @@ function App() {
     // Yield to allow the browser to immediately paint the loading overlay
     await new Promise((resolve) => setTimeout(resolve, 20));
 
+    const initialPath = path;
+    const allDocNodes = diagramSnapshot.nodes;
+    const allDocEdges = diagramSnapshot.edges;
+
+    // Group items that need snapshots by their diagram path
+    const itemLinkedNodes = new Map<
+      string,
+      { item: RequirementItem; path: DiagramPath; nodeIds: string[] }[]
+    >();
+
+    const pathSet = new Map<string, DiagramPath>();
+    // Always include root path [] and initialPath
+    pathSet.set(JSON.stringify([]), []);
+    if (initialPath.length > 0) {
+      pathSet.set(JSON.stringify(initialPath), initialPath);
+    }
+
+    for (const item of requirementsSnapshot.items) {
+      const linked = allDocNodes.filter((n) => {
+        const data = (n.data || {}) as Record<string, unknown>;
+        const reqIds = Array.isArray(data.linkedRequirementIds) ? data.linkedRequirementIds : [];
+        return reqIds.includes(item.id);
+      });
+      if (linked.length === 0) continue;
+
+      const byPath = new Map<string, { path: DiagramPath; nodeIds: string[] }>();
+      for (const node of linked) {
+        const nodePath =
+          ((node.data as ArchNodeData & { parentPath?: string[] })?.parentPath as string[]) || [];
+        const pKey = JSON.stringify(nodePath);
+        if (!byPath.has(pKey)) {
+          byPath.set(pKey, { path: nodePath, nodeIds: [] });
+          pathSet.set(pKey, nodePath);
+        }
+        byPath.get(pKey)!.nodeIds.push(node.id);
+      }
+
+      let primaryGroup: { path: DiagramPath; pathKey: string; nodeIds: string[] } | null = null;
+      for (const [pKey, group] of byPath.entries()) {
+        if (!primaryGroup || group.nodeIds.length > primaryGroup.nodeIds.length) {
+          primaryGroup = { path: group.path, pathKey: pKey, nodeIds: group.nodeIds };
+        }
+      }
+
+      if (primaryGroup) {
+        const list = itemLinkedNodes.get(primaryGroup.pathKey) || [];
+        list.push({ item, path: primaryGroup.path, nodeIds: primaryGroup.nodeIds });
+        itemLinkedNodes.set(primaryGroup.pathKey, list);
+      }
+    }
+
     let diagramImg: string | undefined;
     const itemSnapshots: Record<string, string> = {};
-    if (nodes.length > 0) {
-      diagramImg = await captureDiagramSnapshot(nodes, 'png');
 
-      for (const item of requirementsSnapshot.items) {
-        const linkedNodeIds = nodes
-          .filter((n) => {
-            const data = (n.data || {}) as Record<string, unknown>;
-            const reqIds = Array.isArray(data.linkedRequirementIds)
-              ? data.linkedRequirementIds
-              : [];
-            return reqIds.includes(item.id);
-          })
-          .map((n) => n.id);
-        if (linkedNodeIds.length === 0) continue;
-        try {
-          const snap = await captureNodeSubsetSnapshot(nodes, linkedNodeIds, {
-            width: 1200,
-            height: 600,
-            padding: 0.06,
-          });
-          if (snap) {
-            itemSnapshots[item.id] = snap;
-          }
-        } catch (err) {
-          console.warn('Failed to snapshot linked nodes for item', item.id, err);
+    const isSamePath = (a: DiagramPath, b: DiagramPath) =>
+      a.length === b.length && a.every((v, i) => v === b[i]);
+
+    try {
+      let currentActivePath = path;
+      for (const [pKey, p] of pathSet.entries()) {
+        const itemsToCapture = itemLinkedNodes.get(pKey) || [];
+        const isRoot = p.length === 0;
+
+        if (!isRoot && itemsToCapture.length === 0) continue;
+
+        if (!isSamePath(currentActivePath, p)) {
+          setPath(p);
+          currentActivePath = p;
+          await new Promise((resolve) => setTimeout(resolve, 80));
         }
+
+        const levelNodes = getNodesAtPath(allDocNodes, p);
+        if (levelNodes.length > 0) {
+          if (isRoot) {
+            try {
+              diagramImg = await captureDiagramSnapshot(levelNodes, 'png');
+            } catch (err) {
+              console.warn('Failed to capture root diagram snapshot:', err);
+            }
+          }
+
+          for (const entry of itemsToCapture) {
+            try {
+              const snap = await captureNodeSubsetSnapshot(levelNodes, entry.nodeIds, {
+                width: 1200,
+                height: 600,
+                padding: 0.06,
+              });
+              if (snap) {
+                itemSnapshots[entry.item.id] = snap;
+              }
+            } catch (err) {
+              console.warn('Failed to snapshot linked nodes for item', entry.item.id, err);
+            }
+          }
+        }
+      }
+      if (!isSamePath(currentActivePath, initialPath)) {
+        setPath(initialPath);
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+    } catch (err) {
+      console.warn('Error during SRD snapshot capture:', err);
+      if (!isSamePath(path, initialPath)) {
+        setPath(initialPath);
       }
     }
 
     return aggregateSrdData({
       title,
-      nodes,
-      edges,
+      nodes: allDocNodes,
+      edges: allDocEdges,
       doc: requirementsSnapshot,
       milestones: milestonesSnapshot,
       programIncrements: programIncrementsSnapshot,
@@ -3135,9 +3212,10 @@ function App() {
       itemSnapshots,
     });
   }, [
+    path,
     title,
-    nodes,
-    edges,
+    diagramSnapshot.nodes,
+    diagramSnapshot.edges,
     requirementsSnapshot,
     milestonesSnapshot,
     programIncrementsSnapshot,
@@ -3582,7 +3660,7 @@ function App() {
           isOpen={isSrdModalOpen}
           onClose={() => setIsSrdModalOpen(false)}
           srdData={srdModalData}
-          nodes={nodes}
+          nodes={diagramSnapshot.nodes}
           selectedNodeIds={selectedNodeIds}
         />
       )}
