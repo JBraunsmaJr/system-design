@@ -162,7 +162,17 @@ the cost that someone who leaves every group is then removed only by
 **Remove** or a rule change. A claim that is present but is not a list is
 never taken as leaving.
 
-Nothing else changes on the store. Restart it if you set this.
+#### Additional store settings for automatic access
+
+- **`AUTO_ACCESS`**: `on` (default) or `off`. Setting `AUTO_ACCESS: off` disables
+  automatic access store-wide immediately. Newcomers will not be granted entry
+  automatically even if a workspace rule matches their groups, and existing members
+  can only admit them via manual **Give access**.
+- **`JOIN_EVIDENCE_RETENTION`**: Controls how long the store keeps raw ID token
+  join evidence before discarding it: a duration (`12h`, `7d`, `2w`), default `7d`,
+  up to a maximum of `30d`.
+
+Restart the store if you change any of these settings.
 
 ### 6. Turn it on for the workspace
 
