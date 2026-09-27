@@ -237,6 +237,24 @@ console.log('\n=== WS14: automatic access ===');
     /unavailable - it needs OIDC/.test(describeConfig(github).join('\n')),
     'a GitHub-only store says automatic access is unavailable',
   );
+  assert(
+    plain.providers[0].groupsClaimAbsent === 'no-groups',
+    'a token without the groups claim means no groups by default, as Keycloak sends it',
+  );
+  assert(
+    /means no groups/.test(describeConfig(plain).join('\n')),
+    'and startup says what a missing claim means',
+  );
+  assert(
+    loadStoreConfig({ ...WORKING, OIDC_GROUPS_CLAIM_ABSENT: 'unknown' }).providers[0]
+      .groupsClaimAbsent === 'unknown',
+    'OIDC_GROUPS_CLAIM_ABSENT=unknown makes it tell nothing',
+  );
+  refuses(
+    { ...WORKING, OIDC_GROUPS_CLAIM_ABSENT: 'empty' },
+    /OIDC_GROUPS_CLAIM_ABSENT/,
+    'refuses any other value',
+  );
 }
 
 if (failures > 0) {

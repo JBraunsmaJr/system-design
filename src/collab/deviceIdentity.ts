@@ -33,7 +33,11 @@ import {
   wrapPrivateKeyForPublicKey,
 } from '../crypto/keys.ts';
 import type { BlobContext } from '../crypto/envelope.ts';
-import { createIndexedDbPendingJoinStorage, pendingUserKeySource } from './joinFlow.ts';
+import {
+  createIndexedDbPendingJoinStorage,
+  pendingUserKeySource,
+  releasePendingUserKey,
+} from './joinFlow.ts';
 
 export type EnrollmentStatus =
   /** No store configured, or not signed in. */
@@ -121,6 +125,9 @@ export interface EnrollOptions {
    * makes one, so the key published is the key the token vouches for.
    */
   userKeySource?: () => Promise<CryptoKeyPair | null>;
+  /** Called once that key is wrapped to this device and published, so the
+   * pending copy of its private half can be dropped. */
+  onUserKeyPublished?: () => Promise<void>;
 }
 
 /**
@@ -129,6 +136,13 @@ export interface EnrollOptions {
  * makes a user key - including background enrolment - publishes the key the
  * sign-in vouched for, rather than one that would fail the check.
  */
+/** After the user key is wrapped to this device and published. */
+async function userKeyPublished(options: EnrollOptions): Promise<void> {
+  if (options.onUserKeyPublished) return options.onUserKeyPublished().catch(() => {});
+  if (typeof indexedDB === 'undefined') return;
+  await releasePendingUserKey(createIndexedDbPendingJoinStorage()).catch(() => {});
+}
+
 async function newUserKeyPair(options: EnrollOptions): Promise<CryptoKeyPair> {
   const source =
     options.userKeySource ??
@@ -297,6 +311,7 @@ async function publishIdentity(
     body: toBase64(wrapped.body),
   });
   await options.api.publishUserPublicKey(toBase64(await exportPublicKey(userKeyPair.publicKey)));
+  await userKeyPublished(options);
   return userKeyPair.privateKey;
 }
 
@@ -319,6 +334,7 @@ export async function bootstrapFirstDevice(options: EnrollOptions): Promise<Devi
       body: toBase64(wrapped.body),
     });
     await api.publishUserPublicKey(toBase64(await exportPublicKey(userKeyPair.publicKey)));
+    await userKeyPublished(options);
     return {
       status: 'awaiting-access',
       deviceId: device.deviceId,
@@ -361,6 +377,7 @@ export async function bootstrapFirstDevice(options: EnrollOptions): Promise<Devi
     body: toBase64(wrapped.body),
   });
   await api.publishUserPublicKey(toBase64(await exportPublicKey(userKeyPair.publicKey)));
+  await userKeyPublished(options);
   await api.putWorkspaceKey(
     1,
     toBase64(await wrapKeyForPublicKey(workspaceKey, userKeyPair.publicKey)),

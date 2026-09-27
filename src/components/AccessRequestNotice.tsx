@@ -70,7 +70,7 @@ export function AccessRequestNotice({
       }}
     >
       {rotating && (
-        <div className="access-request access-request--rotating" role="status" style={cardStyle}>
+        <div className="access-request access-request--rotating" style={cardStyle}>
           <KeyRound size={16} aria-hidden="true" />
           <span className="access-request__text" style={{ flex: 1 }}>
             Replacing the workspace key, because someone was removed. Keep this tab open for a

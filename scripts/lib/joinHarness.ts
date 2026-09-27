@@ -133,7 +133,11 @@ export function makeBrowser(
 }
 
 /** A running store with a test provider in front of it. */
-export async function startStore(backend: Backend) {
+export async function startStore(
+  backend: Backend,
+  /** Extra provider settings, such as groupsClaimAbsent. */
+  providerOptions: { groupsClaimAbsent?: 'no-groups' | 'unknown' } = {},
+) {
   const idp = await startTestOidcProvider();
   const audit = createMemoryAuditSink();
   let origin = '';
@@ -148,6 +152,7 @@ export async function startStore(backend: Backend) {
         issuer: idp.issuer,
         clientId: idp.clientId,
         clientSecret: idp.clientSecret,
+        ...providerOptions,
       }),
     ],
     directory: backend.directory,

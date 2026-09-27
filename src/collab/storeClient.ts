@@ -100,6 +100,8 @@ export interface JoinRequestEvidence {
   iat: number;
   lastRejection: string | null;
   lastRejectionAt: string | null;
+  /** Why they were removed from the workspace, if they were. */
+  removedCause?: 'sign-in' | 'rule-change' | 'by-member' | null;
 }
 
 /** WS14-R10: the store's routing copy of a workspace's rule. */

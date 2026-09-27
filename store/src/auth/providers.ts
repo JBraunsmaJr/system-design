@@ -40,6 +40,13 @@ export interface ProviderConfig {
   scopes?: string[];
   /** OIDC only: the ID-token claim holding groups (WS14-R6). Default `groups`. */
   groupsClaim?: string;
+  /**
+   * OIDC only: what a token without the groups claim means. Keycloak leaves
+   * the claim out for someone in no groups, so by default a missing claim
+   * is no groups (`no-groups`). `unknown` treats it as no information, for
+   * providers that may omit groups for other reasons.
+   */
+  groupsClaimAbsent?: 'no-groups' | 'unknown';
 }
 
 export interface Identity {
@@ -285,9 +292,17 @@ export function createOidcProvider(config: ProviderConfig, fetcher: Fetcher = fe
         issuer,
         subject: claims.sub,
         displayName: claims.name ?? claims.preferred_username ?? undefined,
-        groups: Array.isArray(rawGroups)
-          ? rawGroups.filter((group): group is string => typeof group === 'string')
-          : [],
+        // A malformed claim tells us nothing, and must not remove anyone or
+        // overwrite the groups last seen. A missing one means whatever this
+        // provider means by it: Keycloak omits the claim for someone in no
+        // groups, so by default that is what it is.
+        ...(Array.isArray(rawGroups)
+          ? { groups: rawGroups.filter((group): group is string => typeof group === 'string') }
+          : rawGroups === undefined &&
+              !groupsOverage &&
+              (config.groupsClaimAbsent ?? 'no-groups') === 'no-groups'
+            ? { groups: [] }
+            : {}),
         groupsOverage,
         // WS14-R4: kept only for a sign-in that committed to a key.
         ...(pending.hasCommitment && typeof claims.iat === 'number'

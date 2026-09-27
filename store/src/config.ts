@@ -130,6 +130,7 @@ export function loadStoreConfig(env: Env = process.env): StoreConfig {
         scopes: list(env.OIDC_SCOPES).length ? list(env.OIDC_SCOPES) : undefined,
         // WS14-R6: the ID-token claim holding groups.
         groupsClaim: env.OIDC_GROUPS_CLAIM?.trim() || 'groups',
+        groupsClaimAbsent: parseGroupsClaimAbsent(env.OIDC_GROUPS_CLAIM_ABSENT),
       });
     } else if (id === 'github') {
       providers.push({
@@ -244,6 +245,16 @@ export function loadStoreConfig(env: Env = process.env): StoreConfig {
   };
 }
 
+/** What a token without the groups claim means; see ProviderConfig. */
+function parseGroupsClaimAbsent(raw: string | undefined): 'no-groups' | 'unknown' {
+  const value = (raw ?? 'no-groups').trim().toLowerCase();
+  if (value !== 'no-groups' && value !== 'unknown')
+    throw new ConfigError(
+      `OIDC_GROUPS_CLAIM_ABSENT must be "no-groups" or "unknown", not "${raw}".`,
+    );
+  return value;
+}
+
 const EVIDENCE_UNITS: Record<string, number> = { h: 3_600_000, d: 86_400_000, w: 604_800_000 };
 const EVIDENCE_RETENTION_MAX_MS = 30 * 86_400_000;
 
@@ -299,7 +310,7 @@ export function describeConfig(config: StoreConfig): string[] {
     !config.providers.some((provider) => provider.kind === 'oidc')
       ? 'Automatic access: unavailable - it needs OIDC sign-in'
       : config.autoAccess
-        ? `Automatic access: on - groups read from the "${config.providers.find((provider) => provider.kind === 'oidc')?.groupsClaim ?? 'groups'}" claim, sign-in evidence kept at most ${Math.round(config.joinEvidenceRetentionMs / 3_600_000)}h`
+        ? `Automatic access: on - groups read from the "${config.providers.find((provider) => provider.kind === 'oidc')?.groupsClaim ?? 'groups'}" claim (${config.providers.find((provider) => provider.kind === 'oidc')?.groupsClaimAbsent === 'unknown' ? 'a token without it tells nothing' : 'a token without it means no groups'}), sign-in evidence kept at most ${Math.round(config.joinEvidenceRetentionMs / 3_600_000)}h`
         : 'Automatic access: OFF (AUTO_ACCESS=off) - everyone is let in by hand',
   ];
 }

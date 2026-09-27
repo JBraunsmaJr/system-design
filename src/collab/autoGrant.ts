@@ -110,6 +110,10 @@ export async function runAutoGrant(options: AutoGrantOptions): Promise<AutoGrant
 
   for (const request of waiting) {
     if (!stillOpen.has(request.userId)) continue;
+    // Someone a member removed on purpose is let back in by a person, never
+    // by this loop - checked before any key is wrapped. The store refuses
+    // such a grant too; this does not rely on it.
+    if (request.removedCause === 'by-member') continue;
     const publicKey = fromBase64(request.publicKey);
     const outcome = await verifyJoinEvidence(
       {

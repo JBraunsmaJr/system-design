@@ -177,7 +177,15 @@ export function useAccessRequests(options: AccessRequestsOptions) {
           generation,
           onRotating: () => setRotating(true),
         });
-        if (rotated) announceWorkspaceChange();
+        if (rotated) {
+          // What granting holds is for the key just replaced: wrapping it
+          // for anyone now would hand them a key that opens nothing new.
+          // Cleared - with the list, so no button offers a grant that
+          // cannot work - until the next look finds the new key.
+          holding.current = null;
+          setRequests([]);
+          announceWorkspaceChange();
+        }
       } finally {
         setRotating(false);
       }

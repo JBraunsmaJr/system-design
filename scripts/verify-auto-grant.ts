@@ -17,7 +17,14 @@ import {
   type Backend,
 } from './lib/joinHarness.ts';
 import { bootstrapFirstDevice, enrollDevice } from '../src/collab/deviceIdentity.ts';
-import { pendingUserKeySource, signInUrlFor, submitJoinRequest } from '../src/collab/joinFlow.ts';
+import {
+  createMemoryPendingJoinStorage,
+  pendingUserKeySource,
+  prepareJoinSignIn,
+  releasePendingUserKey,
+  signInUrlFor,
+  submitJoinRequest,
+} from '../src/collab/joinFlow.ts';
 import { loadAccessRule, saveAccessRule } from '../src/collab/accessRule.ts';
 import { createRejectionMemory, runAutoGrant } from '../src/collab/autoGrant.ts';
 import { rotateWorkspaceKey } from '../src/collab/workspaceRotation.ts';
@@ -129,12 +136,30 @@ async function run(name: string, backend: Backend) {
       api: otter.api,
       storage: otter.devices,
       userKeySource: pendingUserKeySource(otter.pending),
+      onUserKeyPublished: () => releasePendingUserKey(otter.pending),
     });
     check(otterState.status === 'awaiting-access', 'enrolment leaves them waiting');
+    const afterPublish = await otter.pending.load();
+    check(
+      afterPublish?.userKeyPair === null && afterPublish.salt.length === 32,
+      'once published, the pending private key is dropped; the salt stays for the request',
+    );
     check(
       (await otter.client.me()).publicKey === toBase64(prepared!.publicKey),
       'and publishes the very key the sign-in committed to',
     );
+
+    console.log('\n=== A pending key has a shelf life ===');
+    {
+      const store = createMemoryPendingJoinStorage();
+      await prepareJoinSignIn(store, { now: () => Date.now() - 25 * 60 * 60 * 1000 });
+      check(
+        (await pendingUserKeySource(store)()) === null,
+        'a key prepared more than a day ago is not published',
+      );
+      await prepareJoinSignIn(store);
+      check((await pendingUserKeySource(store)()) !== null, 'a fresh one is');
+    }
 
     console.log('\n=== R14: asking to join ===');
     const submission = await submitJoinRequest(otter.client, otter.pending);
@@ -197,6 +222,7 @@ async function run(name: string, backend: Backend) {
       await enrollDevice({ api: vole.api, storage: vole.devices, userKeySource: async () => null });
       const result = await submitJoinRequest(vole.client, vole.pending);
       check(result.status === 'key-mismatch', 'is caught in the browser before the store is asked');
+      check((await vole.pending.load()) === null, 'and the unusable pending record is cleared');
       // Signing in again commits to the key actually published.
       const published = (await vole.client.me()).publicKey!;
       const retry = await signInUrlFor({

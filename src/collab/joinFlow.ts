@@ -124,11 +124,26 @@ export function defaultPendingJoinStorage(): PendingJoinStorage {
  * sign-in, so the key published is the key the token vouches for. Null when
  * there is none, and enrolment makes one as it always has.
  */
-export function pendingUserKeySource(storage: PendingJoinStorage) {
+export function pendingUserKeySource(storage: PendingJoinStorage, now: () => number = Date.now) {
   return async (): Promise<CryptoKeyPair | null> => {
     const pending = await storage.load().catch(() => null);
-    return pending?.userKeyPair ?? null;
+    if (!pending?.userKeyPair) return null;
+    // The same limit as reuse at sign-in: a key prepared long ago is not
+    // quietly published now.
+    if (now() - pending.createdAt >= PENDING_KEY_REUSE_MS) return null;
+    return pending.userKeyPair;
   };
+}
+
+/**
+ * Once enrolment has wrapped the committed key to this device and published
+ * it, the pending record no longer needs the private key: this browser holds
+ * it properly now. Drops it, keeping the salt and public key the join
+ * request still needs.
+ */
+export async function releasePendingUserKey(storage: PendingJoinStorage): Promise<void> {
+  const pending = await storage.load().catch(() => null);
+  if (pending?.userKeyPair) await storage.save({ ...pending, userKeyPair: null });
 }
 
 export type JoinSubmission =
@@ -156,14 +171,25 @@ export async function submitJoinRequest(
     const session = await client.session();
     if (!session?.hasEvidence) return { status: 'no-evidence' };
     const pending = await storage.load();
-    if (!pending) return { status: 'nothing-pending' };
+    if (!pending) {
+      await storage.clear();
+      return { status: 'nothing-pending' };
+    }
     const me = await client.me();
-    if (me.publicKey !== toBase64(pending.publicKey)) return { status: 'key-mismatch' };
+    if (me.publicKey !== toBase64(pending.publicKey)) {
+      // This record can never be used: the key it commits to is not the
+      // one published. A fresh sign-in makes a new one.
+      await storage.clear();
+      return { status: 'key-mismatch' };
+    }
     const result = await client.requestToJoin(pending.salt);
     await storage.clear();
     return { status: 'sent', ...result };
   } catch (error) {
-    if (error instanceof StoreClientError && error.status === 404) return { status: 'unsupported' };
+    if (error instanceof StoreClientError && error.status === 404) {
+      await storage.clear().catch(() => {});
+      return { status: 'unsupported' };
+    }
     throw error;
   }
 }
@@ -206,6 +232,12 @@ export function createIndexedDbPendingJoinStorage(
         const request = work(tx.objectStore('pending'));
         tx.oncomplete = () => resolve(request ? (request.result as T) : undefined);
         tx.onerror = () => reject(tx.error);
+        // A transaction aborted on its own - explicitly, or by the browser
+        // for quota or shutdown - fires only this. Without it the promise
+        // would never settle, and sign-in would hang instead of falling
+        // back to a plain sign-in. (Rejecting twice is harmless.)
+        tx.onabort = () =>
+          reject(tx.error ?? new Error('The browser storage transaction was aborted.'));
       });
     } finally {
       db.close();

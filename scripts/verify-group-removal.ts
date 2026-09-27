@@ -171,6 +171,21 @@ async function run(name: string, backend: Backend) {
       'and nobody else is affected',
     );
 
+    console.log('\n=== A malformed groups claim removes nobody ===');
+    {
+      const lastBefore = await backend.access.getLastGroups(voleId);
+      const voleBare = as('vole', { groups: 'not-a-list' });
+      await voleBare.signInAt(voleBare.client.signInUrl('oidc'));
+      check(
+        !(await backend.access.getMembership(WORKSPACE, voleId))?.removedAt,
+        'vole signs in with a groups claim that is not a list, and stays',
+      );
+      check(
+        JSON.stringify(await backend.access.getLastGroups(voleId)) === JSON.stringify(lastBefore),
+        'and the groups last seen are not overwritten with nothing',
+      );
+    }
+
     console.log('\n=== R35: manual members, and overage ===');
     const doraAgain = as('dora', ['/nothing-relevant']);
     await doraAgain.signInAt(doraAgain.client.signInUrl('oidc'));
@@ -416,6 +431,97 @@ async function run(name: string, backend: Backend) {
       !(after.find((m) => m.userId === doraId)?.workspaceKeyGenerations ?? []).includes(4),
       'and dora is not given it',
     );
+
+    console.log('\n=== Someone a member removed is let back in only by a person ===');
+    {
+      // dora is still "in" a group the rule admits: sign her in with it.
+      await saveRule(true, ['/design-team-a', '/design-team-b']);
+      const doraInGroup = as('dora', ['/design-team-a']);
+      await doraInGroup.signInAt(
+        await signInUrlFor({
+          client: doraInGroup.client,
+          provider: 'oidc',
+          storage: doraInGroup.pending,
+          publishedPublicKey: fromBase64((await dora.client.me()).publicKey!),
+        }),
+      );
+      const ask = await submitJoinRequest(doraInGroup.client, doraInGroup.pending);
+      check(
+        ask.status === 'sent' && ask.requests[0]?.status === 'removed',
+        'the store opens no request for her, and says why',
+      );
+      workspaceKey = fourth!.workspaceKey;
+      generation = 4;
+      const pass4 = await grantPass();
+      check(
+        !pass4.granted.some((g) => g.userId === doraId),
+        'so no browser lets her back in automatically',
+      );
+
+      // Restoring her is a key holder's decision.
+      const doraPublic = (await dora.client.me()).publicKey!;
+      const wrapForDora = toBase64(
+        await wrapKeyForPublicKey(workspaceKey, await importPublicKey(fromBase64(doraPublic))),
+      );
+      check(
+        (await statusOf(() => stoat.client.grantWorkspaceKey(doraId, 4, wrapForDora))) === 403,
+        'someone without the key cannot restore her',
+      );
+      check(
+        !(await backend.directory.getWorkspaceKeys(doraId)).some((w) => w.generation === 4),
+        'and nothing was written for her',
+      );
+      await demo.client.grantWorkspaceKey(doraId, 4, wrapForDora);
+      check(
+        !(await backend.access.getMembership(WORKSPACE, doraId))?.removedAt,
+        'a member who holds the key can',
+      );
+    }
+
+    console.log('\n=== Removing twice asks for one new key ===');
+    {
+      await demo.client.removeMember(doraId);
+      const leased = await rotateIfRequired({
+        client: demo.client,
+        workspaceId: WORKSPACE,
+        workspaceKey,
+        generation,
+      });
+      check(leased?.generation === 5, 'the first removal replaces the key');
+      workspaceKey = leased!.workspaceKey;
+      generation = 5;
+      await demo.client.removeMember(doraId);
+      check(
+        (await demo.client.getRoutingRule(WORKSPACE))?.rotationRequired === false,
+        'removing her again changes nothing and asks for no new key',
+      );
+    }
+
+    console.log('\n=== Removal withdraws an open request ===');
+    {
+      const mink = as('mink', ['/design-team-a']);
+      await mink.signIn();
+      await enrollDevice({
+        api: mink.api,
+        storage: mink.devices,
+        userKeySource: pendingUserKeySource(mink.pending),
+      });
+      await submitJoinRequest(mink.client, mink.pending);
+      const minkId = (await mink.client.me()).userId;
+      check(
+        (await backend.access.getRequest(WORKSPACE, minkId))?.status === 'open',
+        'mink has a request open',
+      );
+      await demo.client.removeMember(minkId);
+      check(
+        (await backend.access.getRequest(WORKSPACE, minkId))?.status === 'withdrawn',
+        'removing mink withdraws it, so it cannot be granted afterwards',
+      );
+      check(
+        !(await grantPass()).granted.some((g) => g.userId === minkId),
+        'and no browser grants it',
+      );
+    }
   } finally {
     await close();
   }
@@ -470,6 +576,76 @@ async function withoutARule(name: string, backend: Backend) {
   }
 }
 await forEachBackend(withoutARule);
+
+/**
+ * A token with no groups claim at all. Keycloak sends exactly that for
+ * someone in no groups, so by default it means no groups - and removes
+ * whoever a group let in. A provider that omits groups for other reasons
+ * sets OIDC_GROUPS_CLAIM_ABSENT=unknown, and then it removes nobody.
+ */
+async function absentClaim(name: string, backend: Backend, mode: 'no-groups' | 'unknown') {
+  {
+    console.log(`\n########## ${name}: a missing groups claim, ${mode} ##########`);
+    const { origin, idp, close } = await startStore(backend, { groupsClaimAbsent: mode });
+    try {
+      const demo = makeBrowser(origin, idp, `demo-${mode}`, ['/team']);
+      await demo.signIn();
+      let state = await enrollDevice({ api: demo.api, storage: demo.devices });
+      if (state.status === 'needs-setup')
+        state = await bootstrapFirstDevice({ api: demo.api, storage: demo.devices });
+      const key = state.workspaceKey!;
+      await demo.client.updateIndex(WORKSPACE, await indexKeyFor(key), (e) => e);
+      const oidc = (await demo.client.providerDetails()).providers[0];
+      await saveAccessRule({
+        client: demo.client,
+        workspaceId: WORKSPACE,
+        workspaceKey: key,
+        generation: 1,
+        edit: { enabled: true, groups: ['/team'], issuer: oidc.issuer!, audience: oidc.clientId },
+        updatedBy: (await demo.client.me()).userId,
+      });
+      const kit = makeBrowser(origin, idp, `kit-${mode}`, ['/team']);
+      await kit.signIn();
+      await enrollDevice({
+        api: kit.api,
+        storage: kit.devices,
+        userKeySource: pendingUserKeySource(kit.pending),
+      });
+      await submitJoinRequest(kit.client, kit.pending);
+      await runAutoGrant({
+        client: demo.client,
+        workspaceId: WORKSPACE,
+        workspaceKey: key,
+        generation: 1,
+        keySource: createJwksSource(),
+        ruleVersions: createMemoryRuleVersionStore(),
+        memory: createRejectionMemory(),
+        sleep: async () => {},
+        random: () => 0,
+      });
+      const kitId = (await kit.client.me()).userId;
+      check(
+        (await backend.access.getMembership(WORKSPACE, kitId))?.source === 'oidc_group',
+        'kit joins through /team',
+      );
+      // kit leaves their only group: the provider sends no groups claim.
+      const kitAlone = makeBrowser(origin, idp, `kit-${mode}`, {});
+      await kitAlone.signInAt(kitAlone.client.signInUrl('oidc'));
+      const removed = !!(await backend.access.getMembership(WORKSPACE, kitId))?.removedAt;
+      check(
+        mode === 'no-groups' ? removed : !removed,
+        mode === 'no-groups'
+          ? 'no groups claim means no groups: kit is removed'
+          : 'no groups claim tells nothing: kit stays',
+      );
+    } finally {
+      await close();
+    }
+  }
+}
+// A fresh store each: the scenario sets a workspace up from nothing.
+await forEachBackend((name, backend) => absentClaim(name, backend, 'no-groups'));
+await forEachBackend((name, backend) => absentClaim(name, backend, 'unknown'));
 
 if (failures > 0) {
   console.error(`\n${failures} check(s) failed`);

@@ -370,16 +370,22 @@ export function createHttpService(options: HttpServiceOptions): Server {
     return session.userId;
   }
 
-  /** Removes one member, once, and asks for a new key. */
+  /**
+   * Removes one member, once, and asks for a new key. Any join request they
+   * have open is withdrawn, so it cannot be granted after the removal.
+   * Returns whether this call removed them.
+   */
   async function removeMember(
     workspaceId: string,
     userId: string,
     cause: 'sign-in' | 'rule-change' | 'by-member',
     subject: string | null,
     matchedGroup: string | null,
-  ) {
+  ): Promise<boolean> {
     const access = options.access;
-    if (!access || !(await access.removeMembership(workspaceId, userId, cause))) return;
+    if (!access || !(await access.removeMembership(workspaceId, userId, cause))) return false;
+    const open = await access.getRequest(workspaceId, userId);
+    if (open?.status === 'open') await access.closeRequest(workspaceId, userId, 'withdrawn');
     await access.setRotationRequired(workspaceId);
     await record({
       operation: 'membership.removed',
@@ -395,6 +401,17 @@ export function createHttpService(options: HttpServiceOptions): Server {
       docId: null,
       detail: { workspaceId, reason: 'membership.removed' },
     });
+    return true;
+  }
+
+  /**
+   * Someone a member removed on purpose is let back in only by a person.
+   * People removed because their groups changed may rejoin automatically
+   * once a group the workspace admits lists them again.
+   */
+  async function removedByMember(workspaceId: string, userId: string): Promise<boolean> {
+    const membership = await options.access?.getMembership(workspaceId, userId);
+    return !!membership?.removedAt && membership.removedCause === 'by-member';
   }
 
   /**
@@ -654,7 +671,7 @@ export function createHttpService(options: HttpServiceOptions): Server {
             });
           }
           const before = await options.access.getMembership(DEFAULT_WORKSPACE, userId);
-          await removeMember(
+          const removed = await removeMember(
             DEFAULT_WORKSPACE,
             userId,
             'by-member',
@@ -662,8 +679,10 @@ export function createHttpService(options: HttpServiceOptions): Server {
             before?.matchedGroup ?? null,
           );
           // A workspace with no rule has nothing to carry the flag; give it
-          // one, off, so the next key holder's browser replaces the key.
-          if (!(await options.access.getRule(DEFAULT_WORKSPACE))?.rotationRequired) {
+          // one, off, so the next key holder's browser replaces the key. Only
+          // for a removal that happened: removing someone already removed
+          // changes nothing and asks for no new key.
+          if (removed && !(await options.access.getRule(DEFAULT_WORKSPACE))?.rotationRequired) {
             const current = await options.access.getRule(DEFAULT_WORKSPACE);
             if (!current) {
               await options.access.putRule({
@@ -708,6 +727,7 @@ export function createHttpService(options: HttpServiceOptions): Server {
             if (alreadyGranted) return send(response, 204, {}); // repeat: success
             if (
               !autoAccessOn() ||
+              (await removedByMember(DEFAULT_WORKSPACE, userId)) ||
               !joinRequest ||
               joinRequest.status !== 'open' ||
               !joinRequest.idToken ||
@@ -751,13 +771,16 @@ export function createHttpService(options: HttpServiceOptions): Server {
             });
             return send(response, 204, {});
           }
+          // Restoring someone who was removed is a decision only a member
+          // who holds the key can make - checked before anything is written.
+          const existing = await options.access?.getMembership(DEFAULT_WORKSPACE, userId);
+          if (existing?.removedAt) await requireKeyHolder(session, DEFAULT_WORKSPACE);
           await options.directory.putWorkspaceKey(userId, generation, wrappedKey);
           if (options.access) {
-            // Anyone let in by hand stays in whatever groups do
+            // Anyone let in by hand stays in whatever groups do.
             // A re-wrap during rotation keeps the record it had.
             // A removed member given access again by hand is a member
             // again, and stays one whatever their groups.
-            const existing = await options.access.getMembership(DEFAULT_WORKSPACE, userId);
             if (!existing || existing.removedAt) {
               await options.access.putMembership({
                 workspaceId: DEFAULT_WORKSPACE,
@@ -1773,6 +1796,10 @@ export function createHttpService(options: HttpServiceOptions): Server {
     const results: { workspaceId: string; status: string }[] = [];
     for (const rule of await access.listRules()) {
       if (!rule.enabled || !rule.groups.some((group) => groups.has(group))) continue;
+      if (await removedByMember(rule.workspaceId, userId)) {
+        results.push({ workspaceId: rule.workspaceId, status: 'removed' });
+        continue;
+      }
       if (await isCurrentMember(userId, rule.workspaceId)) {
         results.push({ workspaceId: rule.workspaceId, status: 'member' });
         continue;
@@ -1930,6 +1957,10 @@ export function createHttpService(options: HttpServiceOptions): Server {
       for (const joinRequest of await access.listRequests(workspaceId)) {
         if (joinRequest.status !== 'open' || !joinRequest.idToken) continue;
         if (rule && evidenceExpired(joinRequest.iat, rule.evidenceMaxAgeSeconds)) continue;
+        if (await removedByMember(workspaceId, joinRequest.userId)) {
+          await access.closeRequest(workspaceId, joinRequest.userId, 'withdrawn');
+          continue;
+        }
         if (await isCurrentMember(joinRequest.userId, workspaceId)) {
           // Let in some other way meanwhile - by hand, usually.
           await access.closeRequest(workspaceId, joinRequest.userId, 'granted');
@@ -1948,6 +1979,10 @@ export function createHttpService(options: HttpServiceOptions): Server {
           iat: joinRequest.iat,
           lastRejection: joinRequest.lastRejection,
           lastRejectionAt: joinRequest.lastRejectionAt,
+          // Why they were removed, if they were: a granter refuses anyone
+          // a member removed, whatever the store listed.
+          removedCause:
+            (await access.getMembership(workspaceId, joinRequest.userId))?.removedCause ?? null,
         });
       }
       await record({

@@ -10,27 +10,10 @@
  * DATABASE_URL is set.
  */
 import type { AddressInfo } from 'net';
-import pg from 'pg';
-import { createMemoryBlobStore, type MemoryTx } from '../store/src/blobStore.ts';
-import { createDocumentService } from '../store/src/documentService.ts';
-import {
-  createHttpService,
-  createMemoryAuditSink,
-  type StoreBackend,
-} from '../store/src/httpService.ts';
+import { createHttpService, createMemoryAuditSink } from '../store/src/httpService.ts';
 import { createProvider } from '../store/src/auth/providers.ts';
-import { createSessionStore, type SessionStore } from '../store/src/auth/sessions.ts';
-import { createPostgresSessionStore } from '../store/src/auth/postgresSessions.ts';
-import { createMemoryUserDirectory, type UserDirectory } from '../store/src/userDirectory.ts';
-import { createPostgresUserDirectory } from '../store/src/postgresUserDirectory.ts';
-import {
-  createMemoryWorkspaceIndex,
-  type WorkspaceIndexStore,
-} from '../store/src/workspaceIndex.ts';
-import { createPostgresStore, createPostgresWorkspaceIndex } from '../store/src/postgresStore.ts';
-import { createMemoryAccessStore, type AccessStore } from '../store/src/access.ts';
-import { createPostgresAccessStore } from '../store/src/postgresAccess.ts';
 import { startTestGitHub, startTestOidcProvider } from './lib/testIdentityProviders.ts';
+import { forEachBackend, type Backend } from './lib/joinHarness.ts';
 import {
   exportPublicKey,
   exportSymmetricKey,
@@ -54,30 +37,6 @@ function check(condition: boolean, message: string) {
 
 const b64 = (bytes: Uint8Array) => Buffer.from(bytes).toString('base64');
 const fromB64 = (value: string) => new Uint8Array(Buffer.from(value, 'base64'));
-
-interface Backend {
-  store: StoreBackend;
-  directory: UserDirectory;
-  index: WorkspaceIndexStore;
-  access: AccessStore;
-  sessions: SessionStore;
-}
-
-function memoryBackend(): Backend {
-  const blobs = createMemoryBlobStore();
-  return {
-    store: createDocumentService<MemoryTx>({
-      blobs,
-      begin: () => blobs.begin(),
-      commit: (tx) => blobs.commit(tx),
-      rollback: (tx) => blobs.rollback(tx),
-    }) as unknown as StoreBackend,
-    directory: createMemoryUserDirectory(),
-    index: createMemoryWorkspaceIndex(),
-    access: createMemoryAccessStore(),
-    sessions: createSessionStore(),
-  };
-}
 
 async function run(name: string, backend: Backend) {
   console.log(`\n########## ${name} ##########`);
@@ -700,32 +659,7 @@ async function run(name: string, backend: Backend) {
   }
 }
 
-await run('in memory', memoryBackend());
-
-const DATABASE_URL = process.env.DATABASE_URL ?? '';
-if (DATABASE_URL) {
-  const postgres = createPostgresStore({ connectionString: DATABASE_URL });
-  await postgres.migrate();
-  const pool = new pg.Pool({ connectionString: DATABASE_URL });
-  // A clean slate for the tables this suite reads back.
-  await pool.query(
-    `TRUNCATE join_requests, workspace_memberships, workspace_access_rules, workspace_keys, workspace_index, devices, users, sessions, pending_logins CASCADE`,
-  );
-  try {
-    await run('PostgreSQL', {
-      store: postgres as unknown as StoreBackend,
-      directory: createPostgresUserDirectory(pool),
-      index: createPostgresWorkspaceIndex(pool),
-      access: createPostgresAccessStore(pool),
-      sessions: createPostgresSessionStore(pool),
-    });
-  } finally {
-    await pool.end();
-    await postgres.close();
-  }
-} else {
-  console.log('\n(DATABASE_URL is not set: PostgreSQL is not covered by this run)');
-}
+await forEachBackend(run);
 
 if (failures > 0) {
   console.error(`\n${failures} check(s) failed`);

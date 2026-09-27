@@ -153,6 +153,15 @@ workspace. It defaults to `groups`, which matches step 3:
 OIDC_GROUPS_CLAIM: groups
 ```
 
+Keycloak leaves the claim out entirely for someone in no groups, rather than
+sending an empty list. So by default a sign-in without it means **no
+groups**: someone who leaves their only group is removed like anyone else
+who leaves. If your provider can leave groups out for other reasons, set
+`OIDC_GROUPS_CLAIM_ABSENT: unknown`, and a missing claim removes nobody - at
+the cost that someone who leaves every group is then removed only by
+**Remove** or a rule change. A claim that is present but is not a list is
+never taken as leaving.
+
 Nothing else changes on the store. Restart it if you set this.
 
 ### 6. Turn it on for the workspace
@@ -234,8 +243,9 @@ all of these hold:
 7. The groups claim lists at least one group the rule names.
 
 Only then is the workspace key wrapped to that public key. The grant is
-recorded in the store's audit log as `workspace.auto_grant`, with the
-granting device and the token's `jti` or hash.
+recorded in the store's audit log as `join.auto_grant`, with the group that
+matched in `detail.matchedGroup` and a hash of the token that was checked in
+`detail.evidenceHash`.
 
 **What each check stops.** Check 2 stops the store inventing a token. Check 6
 stops it pairing a real person's token with a key of its own - the attack
@@ -288,11 +298,16 @@ For someone leaving on bad terms, do both straight away:
 1. In the editor, open _People in this workspace_ and press **Remove** next
    to them. They are refused on their very next request, and the key is
    replaced.
-2. In Keycloak, **disable the user**, so they cannot sign in and be let back
-   in through the group.
+2. In Keycloak, **disable the user**, or take them out of the group, so the
+   group no longer vouches for them anywhere else it is used.
 
-**Remove** works on anyone, however they were let in. Group changes, on the
-other hand, never remove people who were given access by hand.
+**Remove** works on anyone, however they were let in. Someone removed this
+way is let back in only by a person pressing **Give access**: being in a
+group the workspace admits is not enough, and no browser will let them in
+automatically. People removed because their groups changed are different -
+put them back in the group and they rejoin on their own. Group changes never
+remove people who were given access by hand, and only someone who holds the
+workspace key can give a removed person access again.
 
 ## When nobody is online
 
