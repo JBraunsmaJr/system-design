@@ -1,14 +1,14 @@
 import { useMemo, useState, useSyncExternalStore } from 'react';
 import { AlertTriangle, CheckCircle2, CircleDot, Lock, Unlock } from 'lucide-react';
-import { computeSkillTree, type SkillTreeNode } from '../../domain/skillTree';
-import { getItemType } from '../../domain/requirementsRegistry';
+import { computeSkillTree, type SkillTreeNode } from '../../domain/timeline/skillTree';
+import { getItemType } from '../../domain/requirements/requirementsRegistry';
 import { RequirementDetailModal } from '../timeline/RequirementDetailModal';
-import type { RequirementItem } from '../../domain/requirementsTypes';
-import type { ProgramIncrement } from '../../domain/programIncrements';
-import type { TeamDocument } from '../../domain/teamTypes';
-import type { SubDiagram } from '../../domain/types';
-import type { DiagramPath } from '../../domain/subDiagramTree';
-import type { RequirementsStore } from '../../collab/requirementsStore';
+import type { RequirementItem } from '../../domain/requirements/requirementsTypes';
+import type { ProgramIncrement } from '../../domain/timeline/programIncrements';
+import type { TeamDocument } from '../../domain/timeline/teamTypes';
+import type { SubDiagram } from '../../domain/canvas/types';
+import type { DiagramPath } from '../../domain/canvas/subDiagramTree';
+import type { RequirementsStore } from '../../collab/stores/requirementsStore';
 
 interface SkillTreeViewProps {
   requirementsStore: RequirementsStore;

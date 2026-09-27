@@ -4,12 +4,12 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { GanttChart } from './GanttChart';
-import type { ProgramIncrement } from '../../domain/programIncrements';
-import type { RequirementsDocument } from '../../domain/requirementsTypes';
+import type { ProgramIncrement } from '../../domain/timeline/programIncrements';
+import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
 import {
   BUILT_IN_ITEM_TYPES,
   BUILT_IN_RELATIONSHIP_TYPES,
-} from '../../domain/requirementsRegistry';
+} from '../../domain/requirements/requirementsRegistry';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {

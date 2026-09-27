@@ -4,7 +4,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import React from 'react';
 import { HighlightedText, HighlightedTitle } from './HighlightText';
-import { highlightInReactNode } from '../../domain/reactHighlight';
+import { highlightInReactNode } from '../../domain/requirements/reactHighlight';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {

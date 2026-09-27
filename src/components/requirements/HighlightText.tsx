@@ -1,5 +1,5 @@
 import React, { useLayoutEffect, useRef, useState, useMemo } from 'react';
-import { splitByHighlight, computeTruncationWithHighlight } from '../../domain/textHighlight';
+import { splitByHighlight, computeTruncationWithHighlight } from '../../domain/requirements/textHighlight';
 
 interface HighlightedTextProps {
   text: string;

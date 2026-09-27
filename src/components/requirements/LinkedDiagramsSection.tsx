@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Plus, Workflow, FileText } from 'lucide-react';
-import type { LinkedNodeRef, DiagramPath } from '../../domain/subDiagramTree';
+import type { LinkedNodeRef, DiagramPath } from '../../domain/canvas/subDiagramTree';
 
 interface LinkedDiagramsSectionProps {
   itemId: string;

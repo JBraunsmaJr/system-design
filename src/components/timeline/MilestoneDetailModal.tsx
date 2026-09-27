@@ -14,16 +14,16 @@ import {
   Rocket,
   Snowflake,
 } from 'lucide-react';
-import type { Milestone } from '../../domain/milestones';
+import type { Milestone } from '../../domain/timeline/milestones';
 import {
   BUILT_IN_MILESTONE_TYPES,
   getMilestoneColor,
   getMilestoneTypeLabel,
   validateMilestone,
-} from '../../domain/milestones';
-import type { RequirementsDocument } from '../../domain/requirementsTypes';
-import { getItemType, isItemWorkable } from '../../domain/requirementsRegistry';
-import { computeSprintDateRanges, type ProgramIncrement } from '../../domain/programIncrements';
+} from '../../domain/timeline/milestones';
+import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
+import { getItemType, isItemWorkable } from '../../domain/requirements/requirementsRegistry';
+import { computeSprintDateRanges, type ProgramIncrement } from '../../domain/timeline/programIncrements';
 import { HighlightedText, HighlightedTitle } from '../requirements/HighlightText';
 import { RequirementBody } from '../requirements/RequirementBody';
 

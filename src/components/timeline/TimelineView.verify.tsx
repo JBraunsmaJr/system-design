@@ -4,16 +4,16 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { TimelineView } from './TimelineView';
-import type { ProgramIncrement } from '../../domain/programIncrements';
-import type { RequirementsDocument } from '../../domain/requirementsTypes';
+import type { ProgramIncrement } from '../../domain/timeline/programIncrements';
+import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
 import {
   BUILT_IN_ITEM_TYPES,
   BUILT_IN_RELATIONSHIP_TYPES,
-} from '../../domain/requirementsRegistry';
-import { findBlockingItemIds } from '../../domain/scheduleConflicts';
-import { createLocalProgramIncrementsStore } from '../../collab/programIncrementsStore';
-import { createLocalRequirementsStore } from '../../collab/requirementsStore';
-import { createLocalMilestonesStore } from '../../collab/milestonesStore';
+} from '../../domain/requirements/requirementsRegistry';
+import { findBlockingItemIds } from '../../domain/timeline/scheduleConflicts';
+import { createLocalProgramIncrementsStore } from '../../collab/stores/programIncrementsStore';
+import { createLocalRequirementsStore } from '../../collab/stores/requirementsStore';
+import { createLocalMilestonesStore } from '../../collab/stores/milestonesStore';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {

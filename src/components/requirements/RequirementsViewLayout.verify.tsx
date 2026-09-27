@@ -10,18 +10,18 @@ import { RequirementsView } from './RequirementsView';
 import { RequirementCard } from './RequirementCard';
 import { RelationshipManager } from './RelationshipManager';
 import { RequirementsOutline } from './RequirementsOutline';
-import { buildEpicTree } from '../../domain/requirementsHierarchy';
+import { buildEpicTree } from '../../domain/requirements/requirementsHierarchy';
 import {
   BUILT_IN_ITEM_TYPES,
   BUILT_IN_RELATIONSHIP_TYPES,
-} from '../../domain/requirementsRegistry';
-import type { RequirementsDocument } from '../../domain/requirementsTypes';
-import { createLocalRequirementsStore } from '../../collab/requirementsStore';
+} from '../../domain/requirements/requirementsRegistry';
+import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
+import { createLocalRequirementsStore } from '../../collab/stores/requirementsStore';
 import {
   loadRequirementsViewPrefs,
   saveRequirementsViewPrefs,
-} from '../../domain/requirementsViewPrefs';
-import { markdownExcerpt, markdownPreviewSource } from '../../domain/markdownExcerpt';
+} from '../../domain/requirements/requirementsViewPrefs';
+import { markdownExcerpt, markdownPreviewSource } from '../../domain/requirements/markdownExcerpt';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {

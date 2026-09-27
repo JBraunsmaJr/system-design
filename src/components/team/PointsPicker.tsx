@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Hash, X } from 'lucide-react';
-import { computeFlippedPosition } from '../../domain/popoverPosition';
+import { computeFlippedPosition } from '../../domain/canvas/popoverPosition';
 
 interface PointsPickerProps {
   points?: number;

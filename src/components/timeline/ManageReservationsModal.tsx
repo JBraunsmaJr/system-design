@@ -16,13 +16,13 @@ import type {
   ProgramIncrement,
   CapacityReservation,
   CapacityReservationUnit,
-} from '../../domain/programIncrements';
-import type { TeamDocument } from '../../domain/teamTypes';
-import type { RequirementsDocument } from '../../domain/requirementsTypes';
-import { isItemWorkable } from '../../domain/requirementsRegistry';
-import { computeSprintDateRanges } from '../../domain/programIncrements';
-import { computeSprintCapacity } from '../../domain/teamCapacity';
-import type { ProgramIncrementsStore } from '../../collab/programIncrementsStore';
+} from '../../domain/timeline/programIncrements';
+import type { TeamDocument } from '../../domain/timeline/teamTypes';
+import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
+import { isItemWorkable } from '../../domain/requirements/requirementsRegistry';
+import { computeSprintDateRanges } from '../../domain/timeline/programIncrements';
+import { computeSprintCapacity } from '../../domain/timeline/teamCapacity';
+import type { ProgramIncrementsStore } from '../../collab/stores/programIncrementsStore';
 
 interface ManageReservationsModalProps {
   pi: ProgramIncrement;

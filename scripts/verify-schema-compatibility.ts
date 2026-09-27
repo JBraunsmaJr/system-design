@@ -10,7 +10,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseDiagramFile, SCHEMA_VERSION } from '../src/domain/serialization';
+import { parseDiagramFile, SCHEMA_VERSION } from '../src/domain/canvas/serialization';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {

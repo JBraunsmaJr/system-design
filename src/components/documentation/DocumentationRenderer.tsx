@@ -5,7 +5,7 @@ import {
   formatPropertyValue,
   isMeaningfulValue,
   type DiagramDocumentation,
-} from '../../domain/diagramDocumentation';
+} from '../../domain/canvas/diagramDocumentation';
 
 export interface DocumentationRendererProps {
   documentation: DiagramDocumentation;
@@ -29,7 +29,7 @@ export function DocumentationRenderer({
   const hasProperties = validProperties.length > 0;
 
   const validTags = (documentation.tags ?? []).filter(
-    (tag) => typeof tag === 'string' && tag.trim().length > 0,
+    (tag: unknown): tag is string => typeof tag === 'string' && tag.trim().length > 0,
   );
   const hasTags = validTags.length > 0;
 
@@ -79,7 +79,7 @@ export function DocumentationRenderer({
         <div className="doc-renderer__section doc-renderer__tags">
           <div className="doc-renderer__section-label">Tags</div>
           <div className="doc-renderer__tag-list">
-            {validTags.map((tag, idx) => (
+            {validTags.map((tag: string, idx: number) => (
               <span key={`${tag}-${idx}`} className="doc-renderer__tag-chip">
                 {tag.trim()}
               </span>

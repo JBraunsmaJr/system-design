@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Plus, Search, Settings2 } from 'lucide-react';
-import type { RequirementItemType } from '../../domain/requirementsTypes';
+import type { RequirementItemType } from '../../domain/requirements/requirementsTypes';
 
 interface AddItemDropdownProps {
   itemTypes: RequirementItemType[];

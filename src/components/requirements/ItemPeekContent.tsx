@@ -6,8 +6,8 @@ import {
   getRelationshipsForItem,
   getStatusMeta,
   isItemWorkable,
-} from '../../domain/requirementsRegistry';
-import type { RequirementsDocument } from '../../domain/requirementsTypes';
+} from '../../domain/requirements/requirementsRegistry';
+import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
 import { ItemPeekBody } from './ItemPeekBody';
 
 /** The body of the hover preview - see useItemPeek. */

@@ -1,9 +1,9 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, ListPlus, Maximize2, Trash2 } from 'lucide-react';
-import { getItemType, isItemWorkable } from '../../domain/requirementsRegistry';
-import type { LinkedNodeRef, DiagramPath } from '../../domain/subDiagramTree';
+import { getItemType, isItemWorkable } from '../../domain/requirements/requirementsRegistry';
+import type { LinkedNodeRef, DiagramPath } from '../../domain/canvas/subDiagramTree';
 import { RequirementBody } from './RequirementBody';
-import { peerBadgesAreEqual } from '../../domain/presenceComparison';
+import { peerBadgesAreEqual } from '../../domain/network/presenceComparison';
 import { LinkedDiagramsSection } from './LinkedDiagramsSection';
 import { RequirementEditor } from './RequirementEditor';
 import { CategoryPicker } from './CategoryPicker';
@@ -12,15 +12,15 @@ import { TypePicker } from './TypePicker';
 import { SprintPicker } from './SprintPicker';
 import { RelationshipManager } from './RelationshipManager';
 import { ChildQuickAdd } from './ChildQuickAdd';
-import { isEpicItem } from '../../domain/requirementsHierarchy';
+import { isEpicItem } from '../../domain/requirements/requirementsHierarchy';
 import { MemberPicker } from '../team/MemberPicker';
 import { PointsPicker } from '../team/PointsPicker';
 import { HighlightedText, HighlightedTitle } from './HighlightText';
-import type { RequirementItem, RequirementsDocument } from '../../domain/requirementsTypes';
-import type { ProgramIncrement } from '../../domain/programIncrements';
-import type { TeamDocument } from '../../domain/teamTypes';
-import type { SubDiagram } from '../../domain/types';
-import type { PresenceInfo } from '../../collab/session';
+import type { RequirementItem, RequirementsDocument } from '../../domain/requirements/requirementsTypes';
+import type { ProgramIncrement } from '../../domain/timeline/programIncrements';
+import type { TeamDocument } from '../../domain/timeline/teamTypes';
+import type { SubDiagram } from '../../domain/canvas/types';
+import type { PresenceInfo } from '../../collab/sync/session';
 
 interface RequirementCardProps {
   item: RequirementItem;

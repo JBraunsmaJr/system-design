@@ -275,7 +275,7 @@ console.log('\n=== The client asking for a token ===');
   const { createMemoryBlobStore } = await import('../store/src/blobStore.ts');
   const { createDocumentService } = await import('../store/src/documentService.ts');
   const { createHttpService } = await import('../store/src/httpService.ts');
-  const { authorizeRelayUrls } = await import('../src/collab/relayAccess.ts');
+  const { authorizeRelayUrls } = await import('../src/collab/access/relayAccess.ts');
 
   const blobs = createMemoryBlobStore();
   const store = createDocumentService({

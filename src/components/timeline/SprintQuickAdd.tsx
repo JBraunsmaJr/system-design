@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Plus } from 'lucide-react';
-import { getItemType } from '../../domain/requirementsRegistry';
-import { computeFlippedPosition } from '../../domain/popoverPosition';
-import type { RequirementItem, RequirementsDocument } from '../../domain/requirementsTypes';
+import { getItemType } from '../../domain/requirements/requirementsRegistry';
+import { computeFlippedPosition } from '../../domain/canvas/popoverPosition';
+import type { RequirementItem, RequirementsDocument } from '../../domain/requirements/requirementsTypes';
 import { HighlightedText, HighlightedTitle } from '../requirements/HighlightText';
 
 interface SprintQuickAddProps {

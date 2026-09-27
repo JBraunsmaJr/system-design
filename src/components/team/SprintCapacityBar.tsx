@@ -9,8 +9,8 @@ import {
   Calendar,
   ShieldAlert,
 } from 'lucide-react';
-import type { SprintCapacitySummary } from '../../domain/teamTypes';
-import { computeFlippedPosition } from '../../domain/popoverPosition';
+import type { SprintCapacitySummary } from '../../domain/timeline/teamTypes';
+import { computeFlippedPosition } from '../../domain/canvas/popoverPosition';
 
 interface SprintCapacityBarProps {
   summary: SprintCapacitySummary;

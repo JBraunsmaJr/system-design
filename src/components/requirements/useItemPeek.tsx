@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { FocusEvent, MouseEvent as ReactMouseEvent } from 'react';
 import { createPortal } from 'react-dom';
-import type { RequirementsDocument } from '../../domain/requirementsTypes';
+import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
 import { ItemPeekContent } from './ItemPeekContent';
 
 const PEEK_WIDTH = 320;

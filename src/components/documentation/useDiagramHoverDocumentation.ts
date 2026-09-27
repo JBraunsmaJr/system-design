@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Node, Edge } from '@xyflow/react';
-import type { ArchNodeData, ArchEdgeData } from '../../domain/types';
+import type { ArchNodeData, ArchEdgeData } from '../../domain/canvas/types';
 import {
   hasDocumentation,
   extractNodeDocumentation,
@@ -8,7 +8,7 @@ import {
   DEFAULT_HOVER_DELAY,
   DEFAULT_LEAVE_DELAY,
   type DiagramDocumentation,
-} from '../../domain/diagramDocumentation';
+} from '../../domain/canvas/diagramDocumentation';
 
 export interface ActiveTarget {
   type: 'node' | 'edge';

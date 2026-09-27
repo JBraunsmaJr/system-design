@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CheckCircle2, Circle, CircleDot, ChevronDown } from 'lucide-react';
-import { REQUIREMENT_STATUSES, getStatusMeta } from '../../domain/requirementsRegistry';
-import { computeFlippedPosition } from '../../domain/popoverPosition';
-import type { RequirementStatus } from '../../domain/requirementsTypes';
+import { REQUIREMENT_STATUSES, getStatusMeta } from '../../domain/requirements/requirementsRegistry';
+import { computeFlippedPosition } from '../../domain/canvas/popoverPosition';
+import type { RequirementStatus } from '../../domain/requirements/requirementsTypes';
 
 interface StatusPickerProps {
   status: RequirementStatus | undefined;

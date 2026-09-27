@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { GitBranch, Lock, Trash2, X } from 'lucide-react';
-import type { RequirementsDocument } from '../../domain/requirementsTypes';
+import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
 
 interface ManageRelationshipTypesModalProps {
   doc: RequirementsDocument;

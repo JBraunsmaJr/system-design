@@ -15,9 +15,9 @@ import remarkGfm from 'remark-gfm';
  * blocks, tables and lists keep their own line handling.
  */
 import remarkBreaks from 'remark-breaks';
-import { resolveReferencesToMarkdownLinks } from '../../domain/requirementsRegistry';
-import type { RequirementsDocument } from '../../domain/requirementsTypes';
-import { highlightInReactNode } from '../../domain/reactHighlight';
+import { resolveReferencesToMarkdownLinks } from '../../domain/requirements/requirementsRegistry';
+import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
+import { highlightInReactNode } from '../../domain/requirements/reactHighlight';
 import { useItemPeek } from './useItemPeek';
 
 interface RequirementBodyProps {

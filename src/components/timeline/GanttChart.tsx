@@ -12,16 +12,16 @@ import {
   Diamond,
   Layers,
 } from 'lucide-react';
-import { computeSprintDateRanges, type ProgramIncrement } from '../../domain/programIncrements';
-import { getItemType, isItemWorkable } from '../../domain/requirementsRegistry';
-import { findScheduleConflicts } from '../../domain/scheduleConflicts';
-import type { RequirementsDocument, RequirementItem } from '../../domain/requirementsTypes';
-import type { Milestone } from '../../domain/milestones';
-import { getMilestoneColor, getMilestoneTypeLabel } from '../../domain/milestones';
+import { computeSprintDateRanges, type ProgramIncrement } from '../../domain/timeline/programIncrements';
+import { getItemType, isItemWorkable } from '../../domain/requirements/requirementsRegistry';
+import { findScheduleConflicts } from '../../domain/timeline/scheduleConflicts';
+import type { RequirementsDocument, RequirementItem } from '../../domain/requirements/requirementsTypes';
+import type { Milestone } from '../../domain/timeline/milestones';
+import { getMilestoneColor, getMilestoneTypeLabel } from '../../domain/timeline/milestones';
 import {
   getAllEpicsWithInferredSchedule,
   getChildItemsForParent,
-} from '../../domain/epicScheduling';
+} from '../../domain/timeline/epicScheduling';
 
 interface GanttChartProps {
   programIncrements: ProgramIncrement[];

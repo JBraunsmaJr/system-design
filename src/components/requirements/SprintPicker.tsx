@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CalendarRange, X } from 'lucide-react';
-import { computeSprintDateRanges, type ProgramIncrement } from '../../domain/programIncrements';
-import { computeFlippedPosition } from '../../domain/popoverPosition';
+import { computeSprintDateRanges, type ProgramIncrement } from '../../domain/timeline/programIncrements';
+import { computeFlippedPosition } from '../../domain/canvas/popoverPosition';
 
 interface SprintPickerProps {
   programIncrements: ProgramIncrement[];

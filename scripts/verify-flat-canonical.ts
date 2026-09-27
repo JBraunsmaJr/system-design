@@ -11,17 +11,17 @@ import 'fake-indexeddb/auto';
 import { readFileSync, readdirSync } from 'fs';
 import { join, resolve } from 'path';
 import * as Y from 'yjs';
-import { parseDiagramFile, type DiagramFile } from '../src/domain/serialization.ts';
-import { getBreadcrumbLabels } from '../src/domain/subDiagramTree.ts';
+import { parseDiagramFile, type DiagramFile } from '../src/domain/canvas/serialization.ts';
+import { getBreadcrumbLabels } from '../src/domain/canvas/subDiagramTree.ts';
 import {
   flattenSubDiagramTree,
   unflattenToSubDiagram,
   getBreadcrumbLabelsFlat,
-} from '../src/collab/diagramStore.ts';
-import { createYjsDiagramStore, seedYjsDiagramDoc } from '../src/collab/yjsDiagramStore.ts';
-import { openDocument, replaceDocumentContents } from '../src/collab/localDocument.ts';
+} from '../src/collab/stores/diagramStore.ts';
+import { createYjsDiagramStore, seedYjsDiagramDoc } from '../src/collab/stores/yjsDiagramStore.ts';
+import { openDocument, replaceDocumentContents } from '../src/collab/sync/localDocument.ts';
 import type { Node, Edge } from '@xyflow/react';
-import type { ArchNodeData, ArchEdgeData } from '../src/domain/types.ts';
+import type { ArchNodeData, ArchEdgeData } from '../src/domain/canvas/types.ts';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {
@@ -277,8 +277,8 @@ console.log('\n=== WS1-R3: flattening only at import boundaries ===');
   // The acceptance criterion, pinned. Adding a caller means deciding it is an
   // import boundary and saying so here.
   const allowed = new Set([
-    'src/collab/diagramStore.ts', // definition, and the local store's replaceAll
-    'src/collab/yjsDiagramStore.ts', // seedYjsDiagramDoc - the import boundary itself
+    'src/collab/stores/diagramStore.ts', // definition, and the local store's replaceAll
+    'src/collab/stores/yjsDiagramStore.ts', // seedYjsDiagramDoc - the import boundary itself
   ]);
   const offenders: string[] = [];
   const walk = (dir: string) => {

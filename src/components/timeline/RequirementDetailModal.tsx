@@ -13,18 +13,18 @@ import {
   Rocket,
   Snowflake,
 } from 'lucide-react';
-import { getItemType, isItemWorkable } from '../../domain/requirementsRegistry';
-import { findLinkedNodes, type DiagramPath } from '../../domain/subDiagramTree';
-import { computeSprintDateRanges, type ProgramIncrement } from '../../domain/programIncrements';
-import type { RequirementItem, RequirementsDocument } from '../../domain/requirementsTypes';
-import type { SubDiagram } from '../../domain/types';
-import type { Milestone } from '../../domain/milestones';
+import { getItemType, isItemWorkable } from '../../domain/requirements/requirementsRegistry';
+import { findLinkedNodes, type DiagramPath } from '../../domain/canvas/subDiagramTree';
+import { computeSprintDateRanges, type ProgramIncrement } from '../../domain/timeline/programIncrements';
+import type { RequirementItem, RequirementsDocument } from '../../domain/requirements/requirementsTypes';
+import type { SubDiagram } from '../../domain/canvas/types';
+import type { Milestone } from '../../domain/timeline/milestones';
 import {
   findMilestonesForItem,
   getMilestoneColor,
   getMilestoneTypeLabel,
-} from '../../domain/milestones';
-import { computeEpicInferredSchedule } from '../../domain/epicScheduling';
+} from '../../domain/timeline/milestones';
+import { computeEpicInferredSchedule } from '../../domain/timeline/epicScheduling';
 import { RequirementBody } from '../requirements/RequirementBody';
 import { LinkedDiagramsSection } from '../requirements/LinkedDiagramsSection';
 import { RequirementEditor } from '../requirements/RequirementEditor';
@@ -35,7 +35,7 @@ import { SprintPicker } from '../requirements/SprintPicker';
 import { RelationshipManager } from '../requirements/RelationshipManager';
 import { MemberPicker } from '../team/MemberPicker';
 import { PointsPicker } from '../team/PointsPicker';
-import type { TeamDocument } from '../../domain/teamTypes';
+import type { TeamDocument } from '../../domain/timeline/teamTypes';
 
 interface RequirementDetailModalProps {
   item: RequirementItem;

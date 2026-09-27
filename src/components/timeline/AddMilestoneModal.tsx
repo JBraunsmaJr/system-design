@@ -10,14 +10,14 @@ import {
   Snowflake,
   Diamond,
 } from 'lucide-react';
-import type { Milestone } from '../../domain/milestones';
+import type { Milestone } from '../../domain/timeline/milestones';
 import {
   BUILT_IN_MILESTONE_TYPES,
   getMilestoneTypeLabel,
   validateMilestone,
-} from '../../domain/milestones';
-import type { RequirementsDocument } from '../../domain/requirementsTypes';
-import { getItemType } from '../../domain/requirementsRegistry';
+} from '../../domain/timeline/milestones';
+import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
+import { getItemType } from '../../domain/requirements/requirementsRegistry';
 import { HighlightedText, HighlightedTitle } from '../requirements/HighlightText';
 
 interface AddMilestoneModalProps {

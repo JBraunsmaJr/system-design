@@ -1,4 +1,4 @@
-import { startSignIn } from './collab/joinFlow.ts';
+import { startSignIn } from './collab/access/joinFlow.ts';
 import {
   useCallback,
   useEffect,
@@ -21,20 +21,20 @@ import {
   type OnEdgesChange,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Toolbar } from './components/Toolbar';
-import { CollabPanel } from './components/CollabPanel';
-import { Palette } from './components/Palette';
-import { Canvas } from './components/Canvas';
-import { Inspector } from './components/Inspector';
-import { ScenarioPanel } from './components/ScenarioPanel';
-import { LibraryManagerModal } from './components/LibraryManagerModal';
+import { Toolbar } from './components/canvas/Toolbar';
+import { CollabPanel } from './components/workspace/CollabPanel';
+import { Palette } from './components/canvas/Palette';
+import { Canvas } from './components/canvas/Canvas';
+import { Inspector } from './components/canvas/Inspector';
+import { ScenarioPanel } from './components/canvas/ScenarioPanel';
+import { LibraryManagerModal } from './components/workspace/LibraryManagerModal';
 import { RequirementsView } from './components/requirements/RequirementsView';
 import { TimelineView } from './components/timeline/TimelineView';
 import { TeamView } from './components/team/TeamView';
 import { SkillTreeView } from './components/skilltree/SkillTreeView';
-import { NODE_TYPES } from './domain/nodeRegistry';
-import { GROUP_TYPES } from './domain/groupRegistry';
-import { SHAPE_TYPES, globalShapeRegistry } from './domain/shapeRegistry';
+import { NODE_TYPES } from './domain/canvas/nodeRegistry';
+import { GROUP_TYPES } from './domain/canvas/groupRegistry';
+import { SHAPE_TYPES, globalShapeRegistry } from './domain/canvas/shapeRegistry';
 import {
   getDescendantIds,
   isDescendantOf,
@@ -42,14 +42,14 @@ import {
   selectNodesToAdopt,
   toAbsolutePosition,
   toRelativePosition,
-} from './domain/graphUtils';
-import type { DiagramPath } from './domain/subDiagramTree';
+} from './domain/canvas/graphUtils';
+import type { DiagramPath } from './domain/canvas/subDiagramTree';
 import {
   toDiagramFile,
   downloadDiagram,
   downloadDiagramAs,
   parseDiagramFile,
-} from './domain/serialization';
+} from './domain/canvas/serialization';
 import {
   loadTimedCopies,
   saveTimedCopies,
@@ -57,66 +57,66 @@ import {
   isCopyDue,
   TIMED_COPIES_TEST_SECONDS_KEY,
   type TimedCopiesSettings,
-} from './domain/timedCopies';
+} from './domain/storage/timedCopies';
 import {
   loadAutosave,
   clearLegacyAutosave,
   hasLegacyAutosave,
   getAutosaveBlockedReason,
-} from './domain/autosave';
+} from './domain/storage/autosave';
 import {
   resolveDocumentId,
   readDocumentParam,
   withDocumentParam,
   sessionDocumentId,
   LAST_DOCUMENT_KEY,
-} from './domain/currentDocument';
+} from './domain/storage/currentDocument';
 import {
   createDocumentStore,
   newDocumentId,
   requestPersistentStorage,
   type StorageFailureReason,
-} from './domain/documentStore';
-import { createDocumentLibrary } from './collab/documentLibrary';
-import { reconciliationWindowMs } from './domain/reconciliationWindow';
-import { DocumentManager } from './components/DocumentManager';
-import { createIndexedDbBackend } from './domain/indexedDbBackend';
-import { DurabilityIndicator } from './components/DurabilityIndicator';
-import { installUnloadGuard } from './domain/unloadGuard';
-import type { DurabilitySignals } from './domain/durability';
-import { countPersistedReplicas } from './collab/session';
-import { isSoleReplicaHolder } from './domain/durability';
+} from './domain/storage/documentStore';
+import { createDocumentLibrary } from './collab/sync/documentLibrary';
+import { reconciliationWindowMs } from './domain/network/reconciliationWindow';
+import { DocumentManager } from './components/workspace/DocumentManager';
+import { createIndexedDbBackend } from './domain/storage/indexedDbBackend';
+import { DurabilityIndicator } from './components/workspace/DurabilityIndicator';
+import { installUnloadGuard } from './domain/storage/unloadGuard';
+import type { DurabilitySignals } from './domain/storage/durability';
+import { countPersistedReplicas } from './collab/sync/session';
+import { isSoleReplicaHolder } from './domain/storage/durability';
 import { useFileSaving } from './hooks/useFileSaving';
-import { LeaveGuardDialog } from './components/LeaveGuardDialog';
-import { WorkspacePanel } from './components/WorkspacePanel';
-import { getStoreUrl } from './domain/storeConfig';
-import { useWorkspaceSync } from './collab/useWorkspaceSync';
-import { useStoreAuth } from './collab/useStoreIdentity';
-import { saveDocumentToWorkspace } from './collab/workspacePersistence';
-import { createStoreClient } from './collab/storeClient';
-import { useAccessRequests } from './collab/useAccessRequests';
-import { AccessRequestNotice } from './components/AccessRequestNotice';
-import { authorizeRelayUrls } from './collab/relayAccess';
+import { LeaveGuardDialog } from './components/workspace/LeaveGuardDialog';
+import { WorkspacePanel } from './components/workspace/WorkspacePanel';
+import { getStoreUrl } from './domain/storage/storeConfig';
+import { useWorkspaceSync } from './collab/hooks/useWorkspaceSync';
+import { useStoreAuth } from './collab/hooks/useStoreIdentity';
+import { saveDocumentToWorkspace } from './collab/sync/workspacePersistence';
+import { createStoreClient } from './collab/access/storeClient';
+import { useAccessRequests } from './collab/hooks/useAccessRequests';
+import { AccessRequestNotice } from './components/workspace/AccessRequestNotice';
+import { authorizeRelayUrls } from './collab/access/relayAccess';
 import {
   acquireDocument,
   replaceDocumentContents,
   createDocumentStores,
   destroyDocumentStores,
   type OpenDocumentStores,
-} from './collab/localDocument';
-import { undoableStore, undoControllerFor, releaseUndoController } from './collab/undoManager';
-import { downloadRequirementsMarkdown } from './domain/requirementsExport';
+} from './collab/sync/localDocument';
+import { undoableStore, undoControllerFor, releaseUndoController } from './collab/stores/undoManager';
+import { downloadRequirementsMarkdown } from './domain/requirements/requirementsExport';
 import {
   exportDiagramAsPng,
   exportDiagramAsSvg,
   captureDiagramSnapshot,
   captureNodeSubsetSnapshot,
-} from './domain/imageExport';
+} from './domain/canvas/imageExport';
 import { SrdPrintModal } from './components/srd/SrdPrintModal';
-import { aggregateSrdData } from './domain/srdDataAggregator';
-import { downloadSrdMarkdown } from './domain/srdMarkdownExport';
-import { DEFAULT_SRD_TEMPLATE } from './domain/srdTemplatePresets';
-import type { SrdDataContext } from './domain/srdTypes';
+import { aggregateSrdData } from './domain/srd/srdDataAggregator';
+import { downloadSrdMarkdown } from './domain/srd/srdMarkdownExport';
+import { DEFAULT_SRD_TEMPLATE } from './domain/srd/srdTemplatePresets';
+import type { SrdDataContext } from './domain/srd/srdTypes';
 import type {
   ArchNodeData,
   ArchEdgeData,
@@ -125,18 +125,18 @@ import type {
   Scenario,
   ScenarioStep,
   SubDiagram,
-} from './domain/types';
-import type { RequirementsDocument } from './domain/requirementsTypes';
-import { EMPTY_REQUIREMENTS_DOCUMENT, type RequirementItem } from './domain/requirementsTypes';
+} from './domain/canvas/types';
+import type { RequirementsDocument } from './domain/requirements/requirementsTypes';
+import { EMPTY_REQUIREMENTS_DOCUMENT, type RequirementItem } from './domain/requirements/requirementsTypes';
 import {
   BUILT_IN_ITEM_TYPES,
   BUILT_IN_RELATIONSHIP_TYPES,
   withMissingBuiltInTypes,
   withMissingBuiltInRelationshipTypes,
-} from './domain/requirementsRegistry';
-import type { ProgramIncrement } from './domain/programIncrements';
-import type { TeamDocument } from './domain/teamTypes';
-import { EMPTY_TEAM_DOCUMENT } from './domain/teamTypes';
+} from './domain/requirements/requirementsRegistry';
+import type { ProgramIncrement } from './domain/timeline/programIncrements';
+import type { TeamDocument } from './domain/timeline/teamTypes';
+import { EMPTY_TEAM_DOCUMENT } from './domain/timeline/teamTypes';
 import * as Y from 'yjs';
 import {
   getNodesAtPath,
@@ -145,41 +145,41 @@ import {
   getBreadcrumbLabelsFlat,
   levelKey,
   populatedLevelCounts,
-} from './collab/diagramStore';
-import type { EdgeEndpoints } from './domain/edgeReconnect';
-import type { Milestone } from './domain/milestones';
+} from './collab/stores/diagramStore';
+import type { EdgeEndpoints } from './domain/canvas/edgeReconnect';
+import type { Milestone } from './domain/timeline/milestones';
 import {
   startCollabSession,
   type CollabSession,
   type PresenceInfo,
   type LocalPresenceInfo,
-} from './collab/session';
+} from './collab/sync/session';
 import {
   loadPresenceName,
   savePresenceName,
   loadShowPeerCursors,
   saveShowPeerCursors,
-} from './domain/presenceIdentity';
+} from './domain/network/presenceIdentity';
 import {
   loadSignalingUrls,
   saveSignalingUrls,
   parseSignalingUrls,
   getDefaultSignalingUrl,
-} from './domain/signalingConfig';
+} from './domain/network/signalingConfig';
 import {
   loadIceServers,
   saveIceServers,
   parseIceServers,
   getDefaultIceServers,
-} from './domain/iceServerConfig';
+} from './domain/network/iceServerConfig';
 import {
   createSessionLink,
   parseSessionLink,
   generateSessionKey,
   sanitizeCurrentUrl,
-} from './domain/sessionLink';
-import { Toast, type ToastType } from './components/Toast';
-import { applyZOrderCommand, computeEffectiveZIndices, type ZOrderCommand } from './domain/zOrder';
+} from './domain/network/sessionLink';
+import { Toast, type ToastType } from './common/components/toast/Toast';
+import { applyZOrderCommand, computeEffectiveZIndices, type ZOrderCommand } from './domain/canvas/zOrder';
 import {
   mergeInFlight,
   applyInFlight,
@@ -196,14 +196,14 @@ import {
   NO_EDGE_GESTURES,
   type EdgeGesture,
   type EdgeGestureMap,
-} from './domain/gestureGeometry';
+} from './domain/canvas/gestureGeometry';
 import {
   classifyNodeChanges,
   applySelectionChanges,
   isAutoSizedNodeType,
   type PendingNodeUpdate,
   type CurrentNodeGeometry,
-} from './domain/nodeChangeBatching';
+} from './domain/canvas/nodeChangeBatching';
 import {
   recordCommit,
   isPerfInstrumentationActive,

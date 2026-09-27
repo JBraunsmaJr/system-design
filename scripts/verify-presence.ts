@@ -37,7 +37,7 @@
 import * as Y from 'yjs';
 import { encodeAwarenessUpdate, applyAwarenessUpdate } from 'y-protocols/awareness';
 import { spawn, spawnSync, type ChildProcess } from 'child_process';
-import { startCollabSession, parsePresenceState } from '../src/collab/session';
+import { startCollabSession, parsePresenceState } from '../src/collab/sync/session';
 
 let failures = 0;
 function assert(cond: boolean, msg: string) {

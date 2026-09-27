@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { User, UserX, Check, ChevronDown } from 'lucide-react';
-import type { TeamDocument } from '../../domain/teamTypes';
-import { computeFlippedPosition } from '../../domain/popoverPosition';
+import type { TeamDocument } from '../../domain/timeline/teamTypes';
+import { computeFlippedPosition } from '../../domain/canvas/popoverPosition';
 
 interface MemberPickerProps {
   team: TeamDocument;

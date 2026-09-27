@@ -5,8 +5,8 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MilestoneDetailModal } from './MilestoneDetailModal';
 import { AddMilestoneModal } from './AddMilestoneModal';
-import type { Milestone } from '../../domain/milestones';
-import type { RequirementsDocument } from '../../domain/requirementsTypes';
+import type { Milestone } from '../../domain/timeline/milestones';
+import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {

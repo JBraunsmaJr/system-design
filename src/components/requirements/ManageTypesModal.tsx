@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ArrowRightLeft, Briefcase, Check, Lock, Pencil, Trash2, X } from 'lucide-react';
-import { countItemsUsingType, isPrefixTaken } from '../../domain/requirementsRegistry';
-import type { RequirementItemType, RequirementsDocument } from '../../domain/requirementsTypes';
+import { countItemsUsingType, isPrefixTaken } from '../../domain/requirements/requirementsRegistry';
+import type { RequirementItemType, RequirementsDocument } from '../../domain/requirements/requirementsTypes';
 
 interface ManageTypesModalProps {
   doc: RequirementsDocument;

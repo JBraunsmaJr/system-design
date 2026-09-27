@@ -65,7 +65,7 @@ console.log('\n=== WS4-R7: compaction and rebase are separate operations ===');
     both.length === 0,
     `no function calls both${both.length ? `:\n    ${both.join('\n    ')}` : ''}`,
   );
-  const library = readFileSync(join(root, 'src/collab/documentLibrary.ts'), 'utf8');
+  const library = readFileSync(join(root, 'src/collab/sync/documentLibrary.ts'), 'utf8');
   check(
     /async compact\(/.test(library) && /async rebase\(/.test(library),
     'both exist, as separate library operations',

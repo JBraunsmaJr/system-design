@@ -22,9 +22,9 @@ function check(condition: boolean, message: string) {
 
 const page = readFileSync('docs-site/docs/deployment/relay-server.md', 'utf8');
 const relay = readFileSync('scripts/relay-server.ts', 'utf8');
-const panel = readFileSync('src/components/CollabPanel.tsx', 'utf8');
-const signaling = readFileSync('src/domain/signalingConfig.ts', 'utf8');
-const ice = readFileSync('src/domain/iceServerConfig.ts', 'utf8');
+const panel = readFileSync('src/components/workspace/CollabPanel.tsx', 'utf8');
+const signaling = readFileSync('src/domain/network/signalingConfig.ts', 'utf8');
+const ice = readFileSync('src/domain/network/iceServerConfig.ts', 'utf8');
 const coreNginx = readFileSync('docs-site/docs/files/core/nginx.conf', 'utf8');
 
 console.log('=== Settings ===');
