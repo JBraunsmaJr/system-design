@@ -1406,6 +1406,8 @@ function App() {
   }, []);
 
   const [path, setPath] = useState<DiagramPath>([]);
+  const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
+  const [selectedEdgeIds, setSelectedEdgeIds] = useState<string[]>([]);
 
   // Rebroadcasts this peer's own diagram path whenever it changes, so
   // peers viewing a DIFFERENT sub-diagram level correctly know not to
@@ -1499,9 +1501,6 @@ function App() {
     () => getBreadcrumbLabelsFlat(diagramSnapshot.nodes, path),
     [diagramSnapshot, path],
   );
-
-  const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
-  const [selectedEdgeIds, setSelectedEdgeIds] = useState<string[]>([]);
 
   // Rebroadcasts this peer's own selection whenever it changes, so
   // everyone else's "someone else has this selected" indicator (see

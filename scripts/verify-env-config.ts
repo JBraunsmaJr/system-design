@@ -47,7 +47,9 @@ function runScript(env: Record<string, string>): {
   } finally {
     try {
       rmSync(targetFile, { force: true });
-    } catch {}
+    } catch {
+      // Ignore cleanup error
+    }
   }
 }
 

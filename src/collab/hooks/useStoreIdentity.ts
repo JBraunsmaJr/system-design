@@ -9,7 +9,7 @@
  * starts, rather than arriving afterwards and having to be republished.
  */
 import { useEffect, useState } from 'react';
-import { createStoreClient } from '../access/storeClient.ts';
+import { createStoreClient } from '../access/storeClient';
 
 export interface StoreIdentity {
   displayName?: string;
