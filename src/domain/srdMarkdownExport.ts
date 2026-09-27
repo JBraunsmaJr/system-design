@@ -23,7 +23,11 @@ export function interpolateTokens(
 
 function escapeTableCol(text?: string): string {
   if (!text) return '-';
-  return text.replace(/\|/g, '\\|').replace(/\r?\n/g, ' ').trim() || '-';
+  return text
+    .replace(/\\/g, '\\\\')
+    .replace(/\|/g, '\\|')
+    .replace(/\r?\n/g, ' ')
+    .trim() || '-';
 }
 
 export function generateSrdMarkdown(data: SrdDataContext, config: SrdTemplateConfig): string {
