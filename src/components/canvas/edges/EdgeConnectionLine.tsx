@@ -15,7 +15,7 @@ const OPPOSITE: Record<Side, Position> = {
 };
 
 /** Inset from each corner so the highlight reads as "this side" rather
- * than colliding with the neighbouring side's highlight at the corner. */
+ * than colliding with the neighboring side's highlight at the corner. */
 const PREVIEW_INSET = 6;
 
 function sidePreviewPath(rect: Rect, side: Side): string {
@@ -39,7 +39,7 @@ function sidePreviewPath(rect: Rect, side: Side): string {
 
 /**
  * The in-progress connection line, for both new connections and endpoint
- * reconnection. React Flow's default line starts at the centre of the
+ * reconnection. React Flow's default line starts at the center of the
  * handle that was grabbed and ends at the pointer; here it starts at the
  * anchor the edge will really use and snaps to the side it will really
  * attach to, with that side highlighted - using the exact same

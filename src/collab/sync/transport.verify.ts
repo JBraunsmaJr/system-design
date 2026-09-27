@@ -1,7 +1,7 @@
 /**
  * WS1-R9.
  *
- * The behaviour worth pinning is the defaulting and the ICE-server handling.
+ * The behavior worth pinning is the defaulting and the ICE-server handling.
  * Both have a failure mode where the wrong answer looks like the right one:
  * an empty transport list silently disabling all collaboration, and an
  * `iceServers: undefined` that overrides the browser defaults with nothing.
@@ -23,7 +23,7 @@ function assert(condition: boolean, message: string) {
   }
 }
 
-console.log('=== Defaults preserve current behaviour ===');
+console.log('=== Defaults preserve current behavior ===');
 {
   assert(
     JSON.stringify(enabledTransports()) === JSON.stringify(['webrtc']),
@@ -69,12 +69,12 @@ console.log('=== Malformed configuration falls back rather than disabling sync =
   assert(
     JSON.stringify(enabledTransports({ VITE_SYNC_TRANSPORTS: 'nonsense' })) ===
       JSON.stringify(['webrtc']),
-    'an unrecognised value falls back to the default rather than an empty list',
+    'an unrecognized value falls back to the default rather than an empty list',
   );
   assert(
     JSON.stringify(enabledTransports({ VITE_SYNC_TRANSPORTS: 'websocket,nonsense' })) ===
       JSON.stringify(['websocket']),
-    'a partly-valid list keeps what it recognises',
+    'a partly-valid list keeps what it recognizes',
   );
 }
 

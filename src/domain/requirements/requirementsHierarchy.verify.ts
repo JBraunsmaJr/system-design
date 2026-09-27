@@ -132,7 +132,7 @@ console.log('=== isEpicItem ===');
   assert(isEpicItem(custom, item('EPIC-9', 'epic')), 'the built-in Epic type is an epic');
   assert(
     isEpicItem(custom, item('SUB-1', 'custom-1')),
-    'a custom type labelled "Sub-Epic" counts as an epic',
+    'a custom type labeled "Sub-Epic" counts as an epic',
   );
   assert(!isEpicItem(custom, item('TICKET-9', 'ticket')), 'a ticket is not an epic');
 }

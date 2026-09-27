@@ -19,7 +19,7 @@ import { getEdgeType } from '../../../domain/canvas/edgeRegistry';
 import {
   createWaypointId,
   getSegmentInsertions,
-  getWaypointNeighbours,
+  getWaypointNeighbors,
   getWaypointPath,
   snapWaypoint,
   type WaypointInsertion,
@@ -257,7 +257,7 @@ export function TypedEdge({
   /**
    * The latest geometry, readable from inside a drag without the drag's
    * own listeners needing to be torn down and rebuilt on every render.
-   * A bend being dragged snaps against its CURRENT neighbours, and those
+   * A bend being dragged snaps against its CURRENT neighbors, and those
    * move - a node at either end may be dragged at the same time, and in
    * a session a collaborator may be adding or removing other bends on
    * this same edge while this gesture is still running.
@@ -303,13 +303,13 @@ export function TypedEdge({
       const list: EdgeWaypoint[] = geometry.waypoints ?? [];
       const index = list.findIndex((w) => w.id === waypointId);
       if (index === -1) return null;
-      const neighbours = getWaypointNeighbours(
+      const neighbors = getWaypointNeighbors(
         { x: geometry.sourceX, y: geometry.sourceY },
         list,
         { x: geometry.targetX, y: geometry.targetY },
         index,
       );
-      return snapWaypoint(flowPoint, neighbours);
+      return snapWaypoint(flowPoint, neighbors);
     },
     [],
   );

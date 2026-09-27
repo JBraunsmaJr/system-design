@@ -377,7 +377,7 @@ function bytesFromSymbols(symbols: string): Uint8Array {
 /**
  * Two symbols over the code, Fletcher-style, reduced modulo the alphabet
  * size. Every single wrong symbol changes the running sum, and every
- * transposed neighbouring pair changes the positional sum, which covers what
+ * transposed neighboring pair changes the positional sum, which covers what
  * mistyping actually produces. (Reducing modulo 31 instead would let symbol 0
  * and symbol 31 collide.)
  */

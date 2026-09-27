@@ -76,7 +76,7 @@ if (allTestFiles.length === 0) {
  * - browser: Playwright / Vite suites are heavy, so they get a smaller cap.
  * - postgres: these suites DELETE FROM shared tables, so against a real
  *   DATABASE_URL they must never overlap. Without one they skip in
- *   milliseconds, so serialising them costs nothing.
+ *   milliseconds, so serializing them costs nothing.
  */
 type Lane = 'browser' | 'postgres';
 const laneLimits: Record<Lane, number> = { browser: BROWSER_JOBS, postgres: 1 };

@@ -1,7 +1,7 @@
 const EXCERPT_LENGTH = 240;
 
 /** Markdown reduced to readable plain text for a short excerpt - enough to
- * recognise an item, not a faithful rendering. */
+ * recognize an item, not a faithful rendering. */
 export function markdownExcerpt(markdown: string, maxLength = EXCERPT_LENGTH): string {
   const text = markdown
     .replace(/```[\s\S]*?```/g, ' ')

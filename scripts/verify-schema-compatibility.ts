@@ -149,7 +149,7 @@ console.log('=== 5. Unknown fields from a newer minor version survive ===');
   } catch {
     preserved = false;
   }
-  assert(preserved, 'an unrecognised node field is preserved rather than dropped on load');
+  assert(preserved, 'an unrecognized node field is preserved rather than dropped on load');
 
   // The destructive case: open a file from a newer patch release in this
   // build, save it, and the newer build's data must still be there.
@@ -166,7 +166,7 @@ console.log('=== 5. Unknown fields from a newer minor version survive ===');
   } catch {
     topLevelSurvives = false;
   }
-  assert(topLevelSurvives, 'an unrecognised top-level field survives a load-and-save round trip');
+  assert(topLevelSurvives, 'an unrecognized top-level field survives a load-and-save round trip');
 }
 
 console.log('=== 6. Loading upgrades the declared version ===');

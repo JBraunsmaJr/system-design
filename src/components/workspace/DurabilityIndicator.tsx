@@ -26,7 +26,7 @@ import { computeFlippedPosition } from '../../common/utils/popoverPosition';
  * to ignore it, which is how the storage failure it exists to report gets
  * missed.
  *
- * All of the judgement lives in deriveDurability - this renders what it is
+ * All of the judgment lives in deriveDurability - this renders what it is
  * given and never softens it.
  */
 

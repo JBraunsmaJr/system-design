@@ -79,7 +79,7 @@ const EDGE_DATA_FIELDS = [
  *    what already happens for node position.
  *
  *  - A stable `id` INSIDE each map, because it gives each bend an
- *    identity that survives its neighbours being inserted or removed.
+ *    identity that survives its neighbors being inserted or removed.
  *    That's what lets moveEdgeWaypoint/removeEdgeWaypoint address a bend
  *    without using an index that a concurrent edit may already have
  *    shifted out from under them.

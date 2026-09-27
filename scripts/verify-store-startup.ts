@@ -168,7 +168,7 @@ console.log('\n=== It refuses to start badly configured ===');
         ALLOW_UNAUTHENTICATED: 'true',
         RETENTION_PERIOD: 'forever-ish',
       },
-      /Unrecognised retention period/,
+      /Unrecognized retention period/,
     ],
   ];
   for (const [description, env, expected] of cases) {

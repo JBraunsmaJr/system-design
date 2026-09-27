@@ -38,7 +38,7 @@ export function parseRetentionPeriod(raw: string | undefined | null): RetentionP
   const match = /^(\d+)\s*([dwmy])$/.exec(value);
   if (!match) {
     throw new RetentionConfigError(
-      `Unrecognised retention period "${raw}". Use "immediate", a duration such as 30d, 12w, 6m or 7y, or "indefinite".`,
+      `Unrecognized retention period "${raw}". Use "immediate", a duration such as 30d, 12w, 6m or 7y, or "indefinite".`,
     );
   }
   const amount = Number(match[1]);

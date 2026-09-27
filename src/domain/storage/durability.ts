@@ -78,7 +78,7 @@ export interface DurabilityState {
 /**
  * Worst signal wins. The order below IS the specification - a failure to write
  * outranks every reassuring signal, because the entire point of this indicator
- * is that the previous behaviour let a quota failure pass unnoticed while the
+ * is that the previous behavior let a quota failure pass unnoticed while the
  * user kept typing.
  */
 export function deriveDurability(signals: DurabilitySignals): DurabilityState {

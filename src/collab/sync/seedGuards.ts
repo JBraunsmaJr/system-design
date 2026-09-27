@@ -10,12 +10,12 @@
  * That was theoretical while seeding only ever ran against a brand-new Y.Doc.
  * It stops being theoretical the moment `y-indexeddb` restores a document
  * before the seed decision is made, which is precisely the ordering WS2-R2
- * requires. Two defences, because the cost of getting this wrong is silent
+ * requires. Two defenses, because the cost of getting this wrong is silent
  * corruption of the user's document:
  *
  *  1. `isYjsDocEmpty` lets callers avoid seeding a populated document at all.
  *  2. The seeds themselves skip ids that are already present, so a caller that
- *     forgets defence 1 still cannot corrupt anything.
+ *     forgets defense 1 still cannot corrupt anything.
  */
 import * as Y from 'yjs';
 

@@ -53,7 +53,7 @@ export async function authorizeRelayUrls(options: RelayAccessOptions): Promise<R
       error instanceof StoreClientError && error.reason === 'unauthenticated'
         ? 'This relay only admits people who have signed in. Sign in, then start the session again.'
         : error instanceof StoreClientError && error.reason === 'offline'
-          ? 'The store is unreachable, so this session could not be authorised. If the relay requires it, the connection will be refused.'
+          ? 'The store is unreachable, so this session could not be authorized. If the relay requires it, the connection will be refused.'
           : null;
     return { urls, note };
   }

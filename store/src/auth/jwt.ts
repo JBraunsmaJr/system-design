@@ -9,7 +9,7 @@
  *
  * Deliberately strict: an unsigned token (`alg: none`), a token signed with a
  * key that is not in the provider's JWKS, or one whose `kid` does not match
- * is rejected. Those are the mistakes that turn authentication into theatre.
+ * is rejected. Those are the mistakes that turn authentication into theater.
  */
 import { createPublicKey, verify as verifySignature } from 'crypto';
 

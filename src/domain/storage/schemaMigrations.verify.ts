@@ -100,7 +100,7 @@ console.log('=== 4. A missing version is treated as the oldest ===');
   );
 }
 
-console.log('=== 5. Newer and unrecognised versions are refused ===');
+console.log('=== 5. Newer and unrecognized versions are refused ===');
 {
   let caught: SchemaVersionError | undefined;
   try {
@@ -126,11 +126,11 @@ console.log('=== 5. Newer and unrecognised versions are refused ===');
   }
   assert(
     unknownOld instanceof SchemaVersionError,
-    'an unrecognised older version is refused rather than guessed at',
+    'an unrecognized older version is refused rather than guessed at',
   );
 }
 
-console.log("=== 6. Migrations preserve fields they don't recognise ===");
+console.log("=== 6. Migrations preserve fields they don't recognize ===");
 {
   const withFuture: RawDiagramFile = {
     schemaVersion: '0.6',
@@ -141,7 +141,7 @@ console.log("=== 6. Migrations preserve fields they don't recognise ===");
   const { file } = migrateToCurrent(withFuture, SCHEMA_VERSION);
   assert(
     (file.somethingFromANewerPatch as Record<string, unknown> | undefined)?.keep === true,
-    'an unrecognised top-level field survives the migration chain',
+    'an unrecognized top-level field survives the migration chain',
   );
 }
 

@@ -125,7 +125,7 @@ export interface RebaseEligibility {
  * `lastSyncedAt` is the most recent time each known client synced. A client
  * inside the reconciliation window may be offline rather than gone, and
  * rebasing would orphan whatever they have done since - the exact data loss
- * this programme exists to prevent.
+ * this program exists to prevent.
  */
 export function canRebase(options: {
   connectedPeerCount: number;

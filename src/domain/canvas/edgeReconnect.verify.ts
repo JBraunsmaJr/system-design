@@ -90,7 +90,7 @@ const original: EdgeEndpoints = {
   );
   assert(
     next.source === 'api' && next.sourceHandle === 'right',
-    'with an inverted Connection, the anchored end is still recognised as the source',
+    'with an inverted Connection, the anchored end is still recognized as the source',
   );
   assert(
     next.target === 'cache' && next.targetHandle === 'top',
@@ -136,7 +136,7 @@ const original: EdgeEndpoints = {
 // === Part 6: reconnecting onto a node's default (unnamed) handle ===
 // Handles arrive as string, null or undefined depending on who produced
 // them, and null/undefined both mean "the default handle". Matching has
-// to treat them as equal or the anchored end stops being recognised.
+// to treat them as equal or the anchored end stops being recognized.
 {
   const edge: EdgeEndpoints = {
     source: 'api',
@@ -200,7 +200,7 @@ const original: EdgeEndpoints = {
   );
 }
 
-// === Part 9: recognising a no-op ===
+// === Part 9: recognizing a no-op ===
 // A reconnect drag that ends where it started still fires onReconnect.
 // Writing that to the store would sync a change to every peer, and land
 // an entry in undo history, for a gesture that changed nothing.

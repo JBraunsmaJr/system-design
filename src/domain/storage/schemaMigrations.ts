@@ -17,7 +17,7 @@
  *  - Migrations receive and return a loose record. They run BEFORE the
  *    per-section normalizers in serialization.ts, so they see raw file shapes
  *    rather than domain types.
- *  - Migrations must not drop keys they don't recognise. A file written by a
+ *  - Migrations must not drop keys they don't recognize. A file written by a
  *    newer patch release may legitimately carry fields this build has never
  *    heard of, and preserving them is what makes a round trip through an older
  *    build non-destructive.
@@ -50,7 +50,7 @@ export interface Migration {
 /**
  * Compares dotted numeric version strings. Used only to classify versions that
  * are NOT in VERSION_ORDER, so we can tell "from the future" apart from
- * "unrecognised".
+ * "unrecognized".
  */
 export function compareVersions(a: string, b: string): number {
   const pa = a.split('.').map((n) => Number.parseInt(n, 10));
@@ -162,7 +162,7 @@ export function migrateToCurrent(
       );
     }
     throw new SchemaVersionError(
-      `Unrecognised file format version ${fileVersion} ` +
+      `Unrecognized file format version ${fileVersion} ` +
         `(this build supports ${VERSION_ORDER[0]} through ${targetVersion}).`,
       fileVersion,
       targetVersion,

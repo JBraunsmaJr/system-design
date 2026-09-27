@@ -11,7 +11,7 @@ import {
   getSegmentInsertions,
   polylineMidpoint,
   snapWaypoint,
-  getWaypointNeighbours,
+  getWaypointNeighbors,
   createWaypointId,
   type Point,
 } from './edgeRouting';
@@ -145,7 +145,7 @@ function passesThrough(points: Point[], p: Point): boolean {
   assert(allSame.length === 1, 'a run of identical points collapses to one rather than to none');
 }
 
-// === Part 4: a bend dragged almost on top of its neighbour ===
+// === Part 4: a bend dragged almost on top of its neighbor ===
 // Each corner rounds by up to 10px in BOTH directions, so a segment
 // shorter than 20px has to reduce its radius or the two curves overlap
 // and the segment turns inside out.
@@ -244,27 +244,27 @@ function passesThrough(points: Point[], p: Point): boolean {
 // === Part 8: snapping is per-axis ===
 // Lining a bend up vertically with the node above it while keeping the
 // height you chose is the normal case; snapping both axes at once would
-// drag it onto the neighbour entirely.
+// drag it onto the neighbor entirely.
 {
-  const neighbours: Point[] = [
+  const neighbors: Point[] = [
     { x: 100, y: 0 },
     { x: 300, y: 400 },
   ];
 
-  const snapped = snapWaypoint({ x: 103, y: 250 }, neighbours, 6);
+  const snapped = snapWaypoint({ x: 103, y: 250 }, neighbors, 6);
   assert(
     snapped.x === 100,
-    "a bend within the threshold of a neighbour's x snaps into line with it",
+    "a bend within the threshold of a neighbor's x snaps into line with it",
   );
   assert(snapped.y === 250, 'while its y is left exactly where it was dropped');
 
-  const untouched = snapWaypoint({ x: 150, y: 250 }, neighbours, 6);
+  const untouched = snapWaypoint({ x: 150, y: 250 }, neighbors, 6);
   assert(
     untouched.x === 150 && untouched.y === 250,
     'a bend outside the threshold on both axes is not moved at all - this is an assist, not a grid',
   );
 
-  const both = snapWaypoint({ x: 302, y: 403 }, neighbours, 6);
+  const both = snapWaypoint({ x: 302, y: 403 }, neighbors, 6);
   assert(both.x === 300 && both.y === 400, 'and a bend close on both axes can still snap on both');
 }
 
@@ -278,25 +278,25 @@ function passesThrough(points: Point[], p: Point): boolean {
     { id: 'c', x: 300, y: 300 },
   ];
 
-  const first = getWaypointNeighbours(source, waypoints, target, 0);
+  const first = getWaypointNeighbors(source, waypoints, target, 0);
   assert(
     first.length === 2 && first[0].x === 0 && first[1].x === 200,
     'the first bend snaps against the source handle and the bend after it',
   );
 
-  const middle = getWaypointNeighbours(source, waypoints, target, 1);
+  const middle = getWaypointNeighbors(source, waypoints, target, 1);
   assert(
     middle[0].x === 100 && middle[1].x === 300,
     'a middle bend snaps against the bends either side of it',
   );
 
-  const lastOne = getWaypointNeighbours(source, waypoints, target, 2);
+  const lastOne = getWaypointNeighbors(source, waypoints, target, 2);
   assert(
     lastOne[0].x === 200 && lastOne[1].x === 500,
     'and the last bend snaps against the bend before it and the target handle',
   );
 
-  const only = getWaypointNeighbours(source, [{ id: 'solo', x: 50, y: 50 }], target, 0);
+  const only = getWaypointNeighbors(source, [{ id: 'solo', x: 50, y: 50 }], target, 0);
   assert(
     only.length === 2 && only[0].x === 0 && only[1].x === 500,
     "an edge's only bend snaps against both handles",

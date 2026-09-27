@@ -134,7 +134,7 @@ export function attachPersistence(
       if (!db) return { updatesBefore: 0, updatesAfter: 0 };
       // Done here rather than with y-indexeddb's storeState, which resolves
       // before its own write has happened. One readwrite transaction: IndexedDB
-      // serialises it against the provider's own writes, and the state is
+      // serializes it against the provider's own writes, and the state is
       // encoded INSIDE it, so every update about to be deleted is already in
       // that state - the provider applies an update to the doc before storing it.
       const updatesBefore = await new Promise<number>((resolve, reject) => {

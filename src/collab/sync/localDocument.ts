@@ -14,7 +14,7 @@
  *
  * Deciding to seed before persistence has replayed means seeding on top of
  * content that is about to arrive. The seeds are individually idempotent
- * (WS1-R6) so the damage is bounded, but relying on that is defence in depth,
+ * (WS1-R6) so the damage is bounded, but relying on that is defense in depth,
  * not a design.
  */
 import * as Y from 'yjs';

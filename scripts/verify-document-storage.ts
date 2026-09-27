@@ -480,7 +480,7 @@ async function run() {
       check(
         ((await row('rebase-local').locator('.document-manager__title').textContent()) ?? '') ===
           'Rebase me (before rebase)',
-        'the original is kept, labelled',
+        'the original is kept, labeled',
       );
       await p.keyboard.press('Escape');
 

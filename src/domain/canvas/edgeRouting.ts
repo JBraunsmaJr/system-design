@@ -10,7 +10,7 @@ import type { EdgeWaypoint } from './types';
  * This module is only used once an edge actually HAS waypoints. An edge
  * with none keeps going through React Flow's own getSmoothStepPath
  * exactly as before, containment routing and click band included - the
- * existing behaviour is untouched rather than reimplemented here and
+ * existing behavior is untouched rather than reimplemented here and
  * hoped to match.
  */
 
@@ -25,7 +25,7 @@ export interface Point {
 export const CORNER_RADIUS = 10;
 
 /** How close (in flow units) a dragged waypoint has to come to lining up
- * with one of its neighbours before it snaps into alignment with it.
+ * with one of its neighbors before it snaps into alignment with it.
  * Small on purpose: this is an assist for the common case of wanting a
  * genuinely straight run, not a grid you have to fight. */
 export const WAYPOINT_SNAP_THRESHOLD = 6;
@@ -128,7 +128,7 @@ function pairAxes(
 /**
  * Drops points that don't change the shape of the line: exact
  * duplicates, and any middle point that sits on the straight run between
- * its two neighbours.
+ * its two neighbors.
  *
  * Worth doing before rounding rather than after: a corner radius applied
  * at a point that isn't actually a corner produces a visible notch in
@@ -203,7 +203,7 @@ export function buildOrthogonalRoute(
  *
  * Each corner's radius is clamped to half of the shorter of its two
  * adjacent segments, so dragging a waypoint until it nearly touches its
- * neighbour degrades into a sharp corner instead of the two rounded
+ * neighbor degrades into a sharp corner instead of the two rounded
  * corners overlapping and turning the segment inside out.
  */
 export function roundedPolylinePath(
@@ -315,30 +315,30 @@ export function polylineMidpoint(points: readonly Point[]): Point {
 }
 
 /**
- * Pulls a dragged waypoint into line with a neighbour when it comes
+ * Pulls a dragged waypoint into line with a neighbor when it comes
  * close enough, per axis independently.
  *
  * Independently matters: dropping a bend so it lines up vertically with
  * the node above it while sitting at whatever height you chose is the
  * normal case, and snapping both axes together would drag it onto the
- * neighbour entirely.
+ * neighbor entirely.
  */
 export function snapWaypoint(
   point: Point,
-  neighbours: readonly Point[],
+  neighbors: readonly Point[],
   threshold: number = WAYPOINT_SNAP_THRESHOLD,
 ): Point {
   let x = point.x;
   let y = point.y;
   let snappedX = false;
   let snappedY = false;
-  for (const neighbour of neighbours) {
-    if (!snappedX && Math.abs(point.x - neighbour.x) <= threshold) {
-      x = neighbour.x;
+  for (const neighbor of neighbors) {
+    if (!snappedX && Math.abs(point.x - neighbor.x) <= threshold) {
+      x = neighbor.x;
       snappedX = true;
     }
-    if (!snappedY && Math.abs(point.y - neighbour.y) <= threshold) {
-      y = neighbour.y;
+    if (!snappedY && Math.abs(point.y - neighbor.y) <= threshold) {
+      y = neighbor.y;
       snappedY = true;
     }
   }
@@ -347,7 +347,7 @@ export function snapWaypoint(
 
 /** The two anchors either side of the waypoint at `index` - what
  * snapWaypoint should line that waypoint up against while it's dragged. */
-export function getWaypointNeighbours(
+export function getWaypointNeighbors(
   source: Point,
   waypoints: readonly EdgeWaypoint[],
   target: Point,

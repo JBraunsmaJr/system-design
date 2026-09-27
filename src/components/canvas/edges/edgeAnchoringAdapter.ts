@@ -42,7 +42,7 @@ export function nodeRect(node: AnyInternalNode): Rect {
 /**
  * Where an edge drawn to/from this handle actually starts - the same
  * point React Flow uses for a rendered edge (the handle box's outer edge
- * on its side, not its centre), so the preview line meets the node
+ * on its side, not its center), so the preview line meets the node
  * exactly where the finished edge will.
  */
 export function handleAttachPoint(node: AnyInternalNode, handle: Handle): Point {

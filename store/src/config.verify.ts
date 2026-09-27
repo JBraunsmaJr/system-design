@@ -119,7 +119,7 @@ refuses(
     ...WORKING,
     RETENTION_PERIOD: 'thirty days',
   },
-  /Unrecognised retention period/,
+  /Unrecognized retention period/,
   'a retention period it cannot parse',
 );
 refuses({ ...WORKING, CRYPTO_MODE: 'aes' }, /CRYPTO_MODE must be/, 'an unknown crypto mode');

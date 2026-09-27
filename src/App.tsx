@@ -509,9 +509,9 @@ function App() {
   const [presencePeers, setPresencePeers] = useState<PresenceInfo[]>([]);
 
   /**
-   * The open document (WS1-R1). Created by a lazy initialiser so it exists from the
+   * The open document (WS1-R1). Created by a lazy initializer so it exists from the
    * first render - which is what lets the seams below drop their adapter
-   * fallback entirely (WS1 Step 4). The initialiser runs exactly once, so
+   * fallback entirely (WS1 Step 4). The initializer runs exactly once, so
    * `diagram` is read at boot and never again.
    */
   const [openDoc] = useState(() => {

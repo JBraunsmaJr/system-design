@@ -11,7 +11,7 @@
  * anyone having to think about it. A big rectangle is nearly always a
  * boundary drawn AROUND things, so the things inside it should be on
  * top; if it isn't, it hides and blocks whatever it covers. That
- * generalises to the nested case without a special rule: of two
+ * generalizes to the nested case without a special rule: of two
  * overlapping rectangles, the bigger one is the container, so it goes
  * behind - and it keeps working as either is resized, because the order
  * is derived from the current geometry rather than from whenever they
@@ -167,7 +167,7 @@ export function applyZOrderCommand(
     }));
   }
 
-  // forward / backward: step past the nearest overlapping neighbour.
+  // forward / backward: step past the nearest overlapping neighbor.
   const patches: { id: string; zIndex: number }[] = [];
   for (const box of selectedBoxes) {
     const myZ = effective.get(box.id)!;

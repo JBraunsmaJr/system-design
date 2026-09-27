@@ -105,7 +105,7 @@ export function createIndexedDbBackend(
     async modify(key, mutate): Promise<void> {
       const database = await db();
       // Read, compute and write inside ONE readwrite transaction. IndexedDB
-      // serialises overlapping readwrite transactions, so two tabs updating
+      // serializes overlapping readwrite transactions, so two tabs updating
       // the index cannot both read the old value.
       let failure: unknown = null;
       await new Promise<void>((resolve, reject) => {

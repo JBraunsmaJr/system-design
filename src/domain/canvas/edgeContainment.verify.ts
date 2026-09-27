@@ -30,7 +30,7 @@ function tree(parents: Record<string, string>) {
 // A boundary containing a component, plus an unrelated node outside it.
 const simple = tree({ api: 'boundary', db: 'boundary' });
 
-// === Part 1: direct containment is recognised from both directions ===
+// === Part 1: direct containment is recognized from both directions ===
 {
   assert(isInside('api', 'boundary', simple), 'a direct child is inside its boundary');
   assert(!isInside('boundary', 'api', simple), 'and the boundary is not inside its own child');
@@ -39,8 +39,8 @@ const simple = tree({ api: 'boundary', db: 'boundary' });
 
 // === Part 2: nesting to any depth ===
 // An edge from an outer boundary to a component two levels down is the
-// same modelling idea as one to a direct child, and routes just as badly
-// if only direct children are recognised.
+// same modeling idea as one to a direct child, and routes just as badly
+// if only direct children are recognized.
 {
   const nested = tree({ handler: 'service', service: 'zone', zone: 'region' });
 

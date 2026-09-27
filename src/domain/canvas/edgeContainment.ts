@@ -15,8 +15,8 @@ export type ContainmentRelation = 'none' | 'target-inside' | 'source-inside';
  *
  * Walks the parent chain rather than checking one level, because groups
  * nest: an edge from an outer boundary to a component two levels down is
- * the same modelling idea as one to a direct child, and it routes just as
- * badly if only direct children are recognised.
+ * the same modeling idea as one to a direct child, and it routes just as
+ * badly if only direct children are recognized.
  *
  * The visited set guards against a corrupted parent chain forming a
  * cycle. That should be impossible, but this runs inside edge rendering

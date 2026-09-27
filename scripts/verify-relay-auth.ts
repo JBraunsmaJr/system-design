@@ -298,13 +298,13 @@ console.log('\n=== The client asking for a token ===');
     const room = 'room-from-client';
     const urls = ['ws://relay.example:4444'];
 
-    const authorised = await authorizeRelayUrls({ storeUrl: 'http://127.0.0.1:14473', room, urls });
+    const authorized = await authorizeRelayUrls({ storeUrl: 'http://127.0.0.1:14473', room, urls });
     check(
-      authorised.urls[0].includes('token='),
+      authorized.urls[0].includes('token='),
       'a relay that requires tokens gets one on the URL',
     );
     const token =
-      new URL(authorised.urls[0].replace('ws://', 'http://')).searchParams.get('token') ?? '';
+      new URL(authorized.urls[0].replace('ws://', 'http://')).searchParams.get('token') ?? '';
     check(
       verifyRoomToken(token, { room, secret: SECRET }).room === room,
       'and it is a token for this room',

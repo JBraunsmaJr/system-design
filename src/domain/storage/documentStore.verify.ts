@@ -235,12 +235,12 @@ console.log('=== Error classification ===');
 
   const firefox = new Error('full');
   firefox.name = 'NS_ERROR_DOM_QUOTA_REACHED';
-  assert(classifyStorageError(firefox) === 'quota', "Firefox's quota error name is recognised too");
+  assert(classifyStorageError(firefox) === 'quota', "Firefox's quota error name is recognized too");
 
   const legacyCode = Object.assign(new Error('full'), { name: 'Whatever', code: 22 });
   assert(
     classifyStorageError(legacyCode) === 'quota',
-    'the legacy numeric quota code is recognised',
+    'the legacy numeric quota code is recognized',
   );
 
   const security = new Error('blocked');

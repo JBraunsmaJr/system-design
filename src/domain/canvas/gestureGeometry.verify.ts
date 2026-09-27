@@ -142,7 +142,7 @@ console.log('\n=== Peer overlays by level ===');
   );
 }
 
-console.log('\n=== Recognising the release (WS4-R2) ===');
+console.log('\n=== Recognizing the release (WS4-R2) ===');
 {
   const geometry = new Map([['a', { position: { x: 10, y: 10 }, isAutoSized: true }]]);
   const pending = new Map<string, PendingNodeUpdate>();

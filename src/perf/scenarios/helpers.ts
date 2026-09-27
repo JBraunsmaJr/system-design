@@ -66,7 +66,7 @@ export async function assertViewportTranslated(
  * browser what would actually receive the click, which catches both and stays
  * correct as the chrome moves around.
  *
- * Scans outward from the centre, since the middle of the canvas is the least
+ * Scans outward from the center, since the middle of the canvas is the least
  * likely place for overlays.
  */
 export async function findEmptyCanvasPoint(page: Page): Promise<{ x: number; y: number }> {
@@ -74,19 +74,19 @@ export async function findEmptyCanvasPoint(page: Page): Promise<{ x: number; y: 
     const pane = document.querySelector('.react-flow__pane');
     if (!pane) return null;
     const bounds = pane.getBoundingClientRect();
-    const centreX = bounds.left + bounds.width / 2;
-    const centreY = bounds.top + bounds.height / 2;
+    const centerX = bounds.left + bounds.width / 2;
+    const centerY = bounds.top + bounds.height / 2;
 
     const hitsPane = (x: number, y: number) => {
       const el = document.elementFromPoint(x, y);
       return el !== null && (el === pane || el.classList.contains('react-flow__pane'));
     };
 
-    if (hitsPane(centreX, centreY)) {
-      return { x: Math.round(centreX), y: Math.round(centreY) };
+    if (hitsPane(centerX, centerY)) {
+      return { x: Math.round(centerX), y: Math.round(centerY) };
     }
 
-    // Square rings outward from the centre.
+    // Square rings outward from the center.
     for (let radius = 20; radius < Math.max(bounds.width, bounds.height) / 2; radius += 20) {
       for (const [dx, dy] of [
         [radius, 0],
@@ -98,8 +98,8 @@ export async function findEmptyCanvasPoint(page: Page): Promise<{ x: number; y: 
         [radius, -radius],
         [-radius, -radius],
       ]) {
-        const x = centreX + dx;
-        const y = centreY + dy;
+        const x = centerX + dx;
+        const y = centerY + dy;
         if (
           x > bounds.left + 4 &&
           x < bounds.right - 4 &&
@@ -202,7 +202,7 @@ export async function frameNodes(page: Page, nodeIds: string[]): Promise<void> {
 }
 
 /**
- * The centre of the element matching `selector`, verified to be what the
+ * The center of the element matching `selector`, verified to be what the
  * browser would actually deliver a pointer event to.
  *
  * `locator.boundingBox()` happily returns coordinates for an element that is
@@ -234,8 +234,8 @@ export async function pointOnTarget(
         );
       };
       if (hits(x, y)) return { x, y };
-      // Something may cover the centre (a hub node's edge labels do). Try a grid
-      // of interior points, nearest the centre first, before giving up.
+      // Something may cover the center (a hub node's edge labels do). Try a grid
+      // of interior points, nearest the center first, before giving up.
       const candidates: { x: number; y: number }[] = [];
       // Dense along x, since some targets are thin strips (a group's edge hit
       // area) crossed by edge paths at arbitrary points.
@@ -257,7 +257,7 @@ export async function pointOnTarget(
           : 'nothing (off-screen)';
       return {
         error:
-          `${sel} is not under the pointer at its centre (${Math.round(x)},${Math.round(y)}); ` +
+          `${sel} is not under the pointer at its center (${Math.round(x)},${Math.round(y)}); ` +
           `the browser would deliver the event to ${describe(hit)}. Frame it with frameNodes first.`,
       };
     },

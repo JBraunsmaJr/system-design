@@ -78,7 +78,7 @@ Workload fixtures are generated deterministically using a seeded pseudo-random n
 
 ---
 
-## 5. Metric Catalogue
+## 5. Metric Catalog
 
 ### Counter Metrics (Gating)
 
@@ -103,7 +103,7 @@ Counter metrics count discrete operations and are 100% deterministic regardless 
 
 ---
 
-## 6. Scenario Catalogue
+## 6. Scenario Catalog
 
 The harness tests 13 core interaction scenarios:
 

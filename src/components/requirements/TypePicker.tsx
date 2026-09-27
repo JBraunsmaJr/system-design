@@ -20,7 +20,7 @@ interface TypePickerProps {
   triggerTitle?: string;
   triggerAriaLabel?: string;
   /** Called after the dropdown closes by any route (a pick, Escape or an
-   * outside click), e.g. to return focus to a neighbouring input. */
+   * outside click), e.g. to return focus to a neighboring input. */
   onClosed?: () => void;
 }
 

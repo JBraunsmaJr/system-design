@@ -4,10 +4,10 @@
  * The provider signs the nonce into the ID token, so the key the nonce
  * commits to has to exist before the browser is sent to sign in. This module
  * makes that key (or picks up the one already published), remembers it with
- * its salt across the redirect, hands the key to enrolment so the same key is
+ * its salt across the redirect, hands the key to enrollment so the same key is
  * the one published, and finally asks the store to open a join request.
  *
- * Everything here degrades to today's behaviour: a store without automatic
+ * Everything here degrades to today's behavior: a store without automatic
  * access, a GitHub sign-in, or any failure preparing a commitment simply
  * means a plain sign-in and a manual grant.
  */
@@ -120,9 +120,9 @@ export function defaultPendingJoinStorage(): PendingJoinStorage {
 }
 
 /**
- * For enrolment (EnrollOptions.userKeySource): the user key made for this
+ * For enrollment (EnrollOptions.userKeySource): the user key made for this
  * sign-in, so the key published is the key the token vouches for. Null when
- * there is none, and enrolment makes one as it always has.
+ * there is none, and enrollment makes one as it always has.
  */
 export function pendingUserKeySource(storage: PendingJoinStorage, now: () => number = Date.now) {
   return async (): Promise<CryptoKeyPair | null> => {
@@ -136,7 +136,7 @@ export function pendingUserKeySource(storage: PendingJoinStorage, now: () => num
 }
 
 /**
- * Once enrolment has wrapped the committed key to this device and published
+ * Once enrollment has wrapped the committed key to this device and published
  * it, the pending record no longer needs the private key: this browser holds
  * it properly now. Drops it, keeping the salt and public key the join
  * request still needs.
@@ -159,7 +159,7 @@ export type JoinSubmission =
   | { status: 'unsupported' };
 
 /**
- * After enrolment has published the user key: opens the join request. Clears
+ * After enrollment has published the user key: opens the join request. Clears
  * the pending record once the store has it, so no extractable private key
  * lingers in this browser's storage longer than needed.
  */
