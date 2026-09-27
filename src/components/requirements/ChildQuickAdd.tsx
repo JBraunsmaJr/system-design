@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { CornerDownLeft } from 'lucide-react';
-import type { RequirementsDocument } from '../../domain/requirementsTypes';
+import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
 import { TypePicker } from './TypePicker';
 
 interface ChildQuickAddProps {

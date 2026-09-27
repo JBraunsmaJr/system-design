@@ -1,5 +1,5 @@
 import type { Node, Edge } from '@xyflow/react';
-import type { ArchNodeData, ArchEdgeData, SubDiagram, EdgeWaypoint } from '../domain/types';
+import type { ArchNodeData, ArchEdgeData, SubDiagram, EdgeWaypoint } from '../domain/canvas/types';
 
 /**
  * Deterministic pseudo-random number generator (Mulberry32).

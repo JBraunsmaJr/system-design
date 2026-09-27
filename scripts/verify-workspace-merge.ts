@@ -13,12 +13,12 @@ import { createDocumentService } from '../store/src/documentService.ts';
 import { createHttpService, type StoreBackend } from '../store/src/httpService.ts';
 import { createMemoryWorkspaceIndex } from '../store/src/workspaceIndex.ts';
 import { createPostgresStore, createPostgresWorkspaceIndex } from '../store/src/postgresStore.ts';
-import { createStoreClient } from '../src/collab/storeClient.ts';
-import { createDocumentSync } from '../src/collab/documentSync.ts';
-import { escrowDocumentKey } from '../src/collab/workspaceDocuments.ts';
+import { createStoreClient } from '../src/collab/access/storeClient.ts';
+import { createDocumentSync } from '../src/collab/sync/documentSync.ts';
+import { escrowDocumentKey } from '../src/collab/sync/workspaceDocuments.ts';
 import { exportPublicKey, generateWrappingKeyPair } from '../src/crypto/keys.ts';
 import { toPem } from '../src/crypto/documentPackage.ts';
-import { generateSessionKey } from '../src/domain/sessionLink.ts';
+import { generateSessionKey } from '../src/domain/network/sessionLink.ts';
 
 let failures = 0;
 function check(condition: boolean, message: string) {

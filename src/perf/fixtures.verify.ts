@@ -1,5 +1,5 @@
 import { getStandardFixture, generateSubDiagram } from './fixtures';
-import { flattenSubDiagramTree } from '../collab/diagramStore';
+import { flattenSubDiagramTree } from '../collab/stores/diagramStore';
 
 let passedCount = 0;
 let failedCount = 0;

@@ -13,13 +13,13 @@ import { RequirementsView } from './RequirementsView';
 import {
   BUILT_IN_ITEM_TYPES,
   BUILT_IN_RELATIONSHIP_TYPES,
-} from '../../domain/requirementsRegistry';
-import type { RequirementsDocument } from '../../domain/requirementsTypes';
-import { createLocalRequirementsStore } from '../../collab/requirementsStore';
+} from '../../domain/requirements/requirementsRegistry';
+import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
+import { createLocalRequirementsStore } from '../../collab/stores/requirementsStore';
 import {
   createYjsRequirementsStore,
   seedYjsRequirementsDoc,
-} from '../../collab/yjsRequirementsStore';
+} from '../../collab/stores/yjsRequirementsStore';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {

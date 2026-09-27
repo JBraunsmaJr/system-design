@@ -12,15 +12,15 @@ import { createDocumentService } from '../store/src/documentService.ts';
 import { createHttpService, type StoreBackend } from '../store/src/httpService.ts';
 import { createMemoryUserDirectory } from '../store/src/userDirectory.ts';
 import { createMemoryWorkspaceIndex } from '../store/src/workspaceIndex.ts';
-import { createStoreClient } from '../src/collab/storeClient.ts';
-import { rotateWorkspaceKey } from '../src/collab/workspaceRotation.ts';
+import { createStoreClient } from '../src/collab/access/storeClient.ts';
+import { rotateWorkspaceKey } from '../src/collab/access/workspaceRotation.ts';
 import {
   documentKeyFor,
   escrowDocumentKey,
   indexKeyFor,
   newDocumentKey,
   upsertEntry,
-} from '../src/collab/workspaceDocuments.ts';
+} from '../src/collab/sync/workspaceDocuments.ts';
 import {
   exportPublicKey,
   exportSymmetricKeyHex,
@@ -28,7 +28,7 @@ import {
   generateWrappingKeyPair,
 } from '../src/crypto/keys.ts';
 import { toPem } from '../src/crypto/documentPackage.ts';
-import type { DiagramFile } from '../src/domain/serialization.ts';
+import type { DiagramFile } from '../src/domain/canvas/serialization.ts';
 
 let failures = 0;
 function check(condition: boolean, message: string) {

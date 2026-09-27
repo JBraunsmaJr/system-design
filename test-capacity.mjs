@@ -7,11 +7,11 @@ import {
   computeSprintCapacity,
   computePICapacities,
   calculateTotalPtoDays,
-} from './src/domain/teamCapacity.ts';
-import { DEFAULT_TEAM_SETTINGS } from './src/domain/teamTypes.ts';
-import { getSprintActiveReservations } from './src/domain/programIncrements.ts';
-import { toDiagramFile, parseDiagramFile } from './src/domain/serialization.ts';
-import { EMPTY_REQUIREMENTS_DOCUMENT } from './src/domain/requirementsTypes.ts';
+} from './src/domain/timeline/teamCapacity.ts';
+import { DEFAULT_TEAM_SETTINGS } from './src/domain/timeline/teamTypes.ts';
+import { getSprintActiveReservations } from './src/domain/timeline/programIncrements.ts';
+import { toDiagramFile, parseDiagramFile } from './src/domain/canvas/serialization.ts';
+import { EMPTY_REQUIREMENTS_DOCUMENT } from './src/domain/requirements/requirementsTypes.ts';
 
 let passed = 0;
 let failed = 0;

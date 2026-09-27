@@ -9,7 +9,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import React from 'react';
 import { RequirementBody } from './RequirementBody';
-import { EMPTY_REQUIREMENTS_DOCUMENT } from '../../domain/requirementsTypes';
+import { EMPTY_REQUIREMENTS_DOCUMENT } from '../../domain/requirements/requirementsTypes';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {

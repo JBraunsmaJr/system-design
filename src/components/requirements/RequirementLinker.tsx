@@ -1,10 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link2, X } from 'lucide-react';
-import { getItemType } from '../../domain/requirementsRegistry';
-import { computeFlippedPosition } from '../../domain/popoverPosition';
-import type { RequirementsDocument } from '../../domain/requirementsTypes';
-import { HighlightedText, HighlightedTitle } from './HighlightText';
+import { getItemType } from '../../domain/requirements/requirementsRegistry';
+import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
+import { HighlightedText, HighlightedTitle } from '../../common/components/highlight/HighlightText';
+import { useOutsideClick } from '../../common/hooks/useOutsideClick';
+import { usePositionedDropdown } from '../../common/hooks/usePositionedDropdown';
 
 interface RequirementLinkerProps {
   linkedIds: string[];
@@ -13,8 +14,6 @@ interface RequirementLinkerProps {
   onUnlink: (itemId: string) => void;
   onNavigate: (itemId: string) => void;
 }
-
-const DROPDOWN_WIDTH = 240;
 
 /**
  * Same portal + flip-positioning approach as CategoryPicker (see that
@@ -36,7 +35,6 @@ export function RequirementLinker({
 }: RequirementLinkerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -47,46 +45,23 @@ export function RequirementLinker({
     .map((id) => doc.items.find((i) => i.id === id))
     .filter((item): item is NonNullable<typeof item> => !!item);
 
-  const open = () => {
-    const trigger = triggerRef.current;
-    if (!trigger) return;
-    const rect = trigger.getBoundingClientRect();
-    setDropdownPos({ top: rect.bottom + 4, left: Math.max(8, rect.right - DROPDOWN_WIDTH) });
-    setIsOpen(true);
-  };
   const close = () => {
     setIsOpen(false);
     setQuery('');
   };
 
-  useLayoutEffect(() => {
-    if (!isOpen) return;
-    const trigger = triggerRef.current;
-    const dropdown = dropdownRef.current;
-    if (!trigger || !dropdown) return;
-    const triggerRect = trigger.getBoundingClientRect();
-    const dropdownRect = dropdown.getBoundingClientRect();
-    const next = computeFlippedPosition(
-      triggerRect,
-      { width: dropdownRect.width, height: dropdownRect.height },
-      { width: window.innerWidth, height: window.innerHeight },
-    );
-    setDropdownPos((prev) =>
-      prev && prev.top === next.top && prev.left === next.left ? prev : next,
-    );
-  }, [isOpen, query, linkedIds.length]);
+  const { position: dropdownPos } = usePositionedDropdown({
+    triggerRef,
+    dropdownRef,
+    isOpen,
+    dependencies: [query, linkedIds.length],
+  });
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const handler = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (triggerRef.current?.contains(target)) return;
-      if (dropdownRef.current?.contains(target)) return;
-      close();
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [isOpen]);
+  useOutsideClick({
+    refs: [triggerRef, dropdownRef],
+    isOpen,
+    onClose: close,
+  });
 
   const q = query.trim().toLowerCase();
   const candidates = doc.items
@@ -138,7 +113,7 @@ export function RequirementLinker({
         ref={triggerRef}
         type="button"
         className="requirement-linker__add"
-        onClick={() => (isOpen ? close() : open())}
+        onClick={() => setIsOpen((prev) => !prev)}
       >
         <Link2 size={11} />
         Link requirement

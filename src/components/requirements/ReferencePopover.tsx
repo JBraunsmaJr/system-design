@@ -1,7 +1,10 @@
 import { forwardRef } from 'react';
-import { getItemType } from '../../domain/requirementsRegistry';
-import type { RequirementItem, RequirementsDocument } from '../../domain/requirementsTypes';
-import { HighlightedText, HighlightedTitle } from './HighlightText';
+import { getItemType } from '../../domain/requirements/requirementsRegistry';
+import type {
+  RequirementItem,
+  RequirementsDocument,
+} from '../../domain/requirements/requirementsTypes';
+import { HighlightedText, HighlightedTitle } from '../../common/components/highlight/HighlightText';
 
 interface ReferencePopoverProps {
   doc: RequirementsDocument;

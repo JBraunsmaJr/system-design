@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import {
   X,
   Calendar,
@@ -10,15 +10,16 @@ import {
   Snowflake,
   Diamond,
 } from 'lucide-react';
-import type { Milestone } from '../../domain/milestones';
+import type { Milestone } from '../../domain/timeline/milestones';
 import {
   BUILT_IN_MILESTONE_TYPES,
   getMilestoneTypeLabel,
   validateMilestone,
-} from '../../domain/milestones';
-import type { RequirementsDocument } from '../../domain/requirementsTypes';
-import { getItemType } from '../../domain/requirementsRegistry';
-import { HighlightedText, HighlightedTitle } from '../requirements/HighlightText';
+} from '../../domain/timeline/milestones';
+import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
+import { getItemType } from '../../domain/requirements/requirementsRegistry';
+import { HighlightedText, HighlightedTitle } from '../../common/components/highlight/HighlightText';
+import { BaseModal } from '../../common/components/modal/BaseModal';
 
 interface AddMilestoneModalProps {
   initialDate?: string;
@@ -67,15 +68,6 @@ export function AddMilestoneModal({
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>('all');
   const [error, setError] = useState<string | null>(null);
 
-  // Close on Escape
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
-
   const typeLabel = getMilestoneTypeLabel(type);
   const typeDef = BUILT_IN_MILESTONE_TYPES.find((t) => t.id === type);
   const themeColor = typeDef?.color ?? '#9061f9';
@@ -86,7 +78,7 @@ export function AddMilestoneModal({
       if (!map.has(t.id)) map.set(t.id, t);
     }
     return Array.from(map.values());
-  }, [doc.itemTypes]);
+  }, [doc]);
 
   const allDocItems = useMemo(() => doc.items, [doc]);
 
@@ -147,219 +139,215 @@ export function AddMilestoneModal({
   };
 
   return (
-    <div
-      className="modal-overlay"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-label={`Add ${typeLabel}`}
+    <BaseModal
+      isOpen={true}
+      onClose={onClose}
+      ariaLabel={`Add ${typeLabel}`}
+      className="add-milestone-modal"
+      padding={0}
     >
-      <div className="add-milestone-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="add-milestone-modal__header" style={{ borderTopColor: themeColor }}>
-          <div className="add-milestone-modal__title-row">
-            <span
-              className="add-milestone-modal__type-badge"
-              style={{
-                backgroundColor: `${themeColor}20`,
-                color: themeColor,
-                borderColor: themeColor,
-              }}
-            >
-              {renderTypeIcon(type)}
-              <span>Add {typeLabel}</span>
-            </span>
+      <div className="add-milestone-modal__header" style={{ borderTopColor: themeColor }}>
+        <div className="add-milestone-modal__title-row">
+          <span
+            className="add-milestone-modal__type-badge"
+            style={{
+              backgroundColor: `${themeColor}20`,
+              color: themeColor,
+              borderColor: themeColor,
+            }}
+          >
+            {renderTypeIcon(type)}
+            <span>Add {typeLabel}</span>
+          </span>
 
-            <button
-              type="button"
-              className="add-milestone-modal__close-btn"
-              onClick={onClose}
-              aria-label="Close modal"
-            >
-              <X size={16} />
-            </button>
-          </div>
-          <p className="add-milestone-modal__subtitle">
-            Schedule a point-in-time marker on the timeline without consuming sprint capacity.
-          </p>
+          <button
+            type="button"
+            className="add-milestone-modal__close-btn"
+            onClick={onClose}
+            aria-label="Close modal"
+          >
+            <X size={16} />
+          </button>
         </div>
+        <p className="add-milestone-modal__subtitle">
+          Schedule a point-in-time marker on the timeline without consuming sprint capacity.
+        </p>
+      </div>
 
-        <form onSubmit={handleCreate} className="add-milestone-modal__form">
-          <div className="add-milestone-modal__body">
-            {error && <p className="add-milestone-modal__error-message">{error}</p>}
+      <form onSubmit={handleCreate} className="add-milestone-modal__form">
+        <div className="add-milestone-modal__body">
+          {error && <p className="add-milestone-modal__error-message">{error}</p>}
 
-            <div className="add-milestone-modal__field">
-              <label className="add-milestone-modal__label">Marker Type</label>
-              <div className="add-milestone-modal__type-selector">
-                {BUILT_IN_MILESTONE_TYPES.map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    className={`add-milestone-modal__type-btn${type === t.id ? ' is-active' : ''}`}
-                    style={type === t.id ? { borderColor: t.color, color: t.color } : {}}
-                    onClick={() => setType(t.id)}
-                  >
-                    {renderTypeIcon(t.id)}
-                    <span>{t.label}</span>
-                  </button>
-                ))}
-              </div>
+          <div className="add-milestone-modal__field">
+            <label className="add-milestone-modal__label">Marker Type</label>
+            <div className="add-milestone-modal__type-selector">
+              {BUILT_IN_MILESTONE_TYPES.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  className={`add-milestone-modal__type-btn${type === t.id ? ' is-active' : ''}`}
+                  style={type === t.id ? { borderColor: t.color, color: t.color } : {}}
+                  onClick={() => setType(t.id)}
+                >
+                  {renderTypeIcon(t.id)}
+                  <span>{t.label}</span>
+                </button>
+              ))}
             </div>
+          </div>
 
-            <div className="add-milestone-modal__field">
-              <label className="add-milestone-modal__label" htmlFor="milestone-name">
-                Title / Name *
-              </label>
+          <div className="add-milestone-modal__field">
+            <label className="add-milestone-modal__label" htmlFor="milestone-name">
+              Title / Name *
+            </label>
+            <input
+              id="milestone-name"
+              type="text"
+              className="add-milestone-modal__input"
+              placeholder={type === 'release' ? 'e.g. Release 2.4' : 'e.g. Q3 Architecture Review'}
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (error) setError(null);
+              }}
+              autoFocus
+              required
+            />
+          </div>
+
+          <div className="add-milestone-modal__field">
+            <label className="add-milestone-modal__label" htmlFor="milestone-date">
+              Scheduled Date *
+            </label>
+            <div className="add-milestone-modal__input-with-icon">
+              <Calendar size={14} className="add-milestone-modal__field-icon" />
               <input
-                id="milestone-name"
-                type="text"
+                id="milestone-date"
+                type="date"
                 className="add-milestone-modal__input"
-                placeholder={
-                  type === 'release' ? 'e.g. Release 2.4' : 'e.g. Q3 Architecture Review'
-                }
-                value={name}
-                onChange={(e) => {
-                  setName(e.target.value);
-                  if (error) setError(null);
-                }}
-                autoFocus
+                value={scheduledAt}
+                onChange={(e) => setScheduledAt(e.target.value)}
                 required
               />
             </div>
+          </div>
 
-            <div className="add-milestone-modal__field">
-              <label className="add-milestone-modal__label" htmlFor="milestone-date">
-                Scheduled Date *
-              </label>
-              <div className="add-milestone-modal__input-with-icon">
-                <Calendar size={14} className="add-milestone-modal__field-icon" />
-                <input
-                  id="milestone-date"
-                  type="date"
-                  className="add-milestone-modal__input"
-                  value={scheduledAt}
-                  onChange={(e) => setScheduledAt(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
+          <div className="add-milestone-modal__field">
+            <label className="add-milestone-modal__label" htmlFor="milestone-description">
+              Description (Optional)
+            </label>
+            <textarea
+              id="milestone-description"
+              className="add-milestone-modal__textarea"
+              rows={2}
+              placeholder="Scope, objectives, or release notes..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </div>
 
-            <div className="add-milestone-modal__field">
-              <label className="add-milestone-modal__label" htmlFor="milestone-description">
-                Description (Optional)
-              </label>
-              <textarea
-                id="milestone-description"
-                className="add-milestone-modal__textarea"
-                rows={2}
-                placeholder="Scope, objectives, or release notes..."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </div>
+          {/* Optional Related Items & Epics (FR-005, FR-007, FR-008) */}
+          <div className="add-milestone-modal__field">
+            <label className="add-milestone-modal__label">
+              Associated Requirement Items & Epics ({selectedItemIds.length} selected)
+            </label>
+            <p className="add-milestone-modal__hint">
+              Optionally link workable items, Epics, external dependencies, or goals that culminate
+              in this {typeLabel.toLowerCase()}.
+            </p>
 
-            {/* Optional Related Items & Epics (FR-005, FR-007, FR-008) */}
-            <div className="add-milestone-modal__field">
-              <label className="add-milestone-modal__label">
-                Associated Requirement Items & Epics ({selectedItemIds.length} selected)
-              </label>
-              <p className="add-milestone-modal__hint">
-                Optionally link workable items, Epics, external dependencies, or goals that
-                culminate in this {typeLabel.toLowerCase()}.
-              </p>
-
-              <div className="milestone-modal__type-filters">
+            <div className="milestone-modal__type-filters">
+              <button
+                type="button"
+                className={`milestone-modal__type-filter-btn${selectedTypeFilter === 'all' ? ' is-active' : ''}`}
+                onClick={() => setSelectedTypeFilter('all')}
+              >
+                All Types
+              </button>
+              {uniqueItemTypes.map((t) => (
                 <button
+                  key={t.id}
                   type="button"
-                  className={`milestone-modal__type-filter-btn${selectedTypeFilter === 'all' ? ' is-active' : ''}`}
-                  onClick={() => setSelectedTypeFilter('all')}
+                  className={`milestone-modal__type-filter-btn${selectedTypeFilter === t.id ? ' is-active' : ''}`}
+                  style={
+                    selectedTypeFilter === t.id
+                      ? { borderColor: t.color, color: t.color, backgroundColor: `${t.color}20` }
+                      : {}
+                  }
+                  onClick={() => setSelectedTypeFilter(t.id)}
                 >
-                  All Types
+                  {formatTypeFilterLabel(t.label)}
                 </button>
-                {uniqueItemTypes.map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    className={`milestone-modal__type-filter-btn${selectedTypeFilter === t.id ? ' is-active' : ''}`}
-                    style={
-                      selectedTypeFilter === t.id
-                        ? { borderColor: t.color, color: t.color, backgroundColor: `${t.color}20` }
-                        : {}
-                    }
-                    onClick={() => setSelectedTypeFilter(t.id)}
-                  >
-                    {formatTypeFilterLabel(t.label)}
-                  </button>
-                ))}
-              </div>
+              ))}
+            </div>
 
-              <input
-                type="text"
-                className="add-milestone-modal__search-input"
-                placeholder="Filter requirement items..."
-                value={itemSearch}
-                onChange={(e) => setItemSearch(e.target.value)}
-              />
+            <input
+              type="text"
+              className="add-milestone-modal__search-input"
+              placeholder="Filter requirement items..."
+              value={itemSearch}
+              onChange={(e) => setItemSearch(e.target.value)}
+            />
 
-              <div className="add-milestone-modal__workable-picker">
-                {filteredItems.length === 0 ? (
-                  <p className="add-milestone-modal__workable-empty">
-                    {allDocItems.length === 0
-                      ? 'No items in requirements doc.'
-                      : 'No matching items.'}
-                  </p>
-                ) : (
-                  filteredItems.map((item) => {
-                    const itemType = getItemType(doc, item.typeId);
-                    const isSelected = selectedItemIds.includes(item.id);
-                    return (
-                      <label
-                        key={item.id}
-                        className={`add-milestone-modal__workable-option${isSelected ? ' is-selected' : ''}`}
-                        title={`${item.id}: ${item.title || 'Untitled'}`}
+            <div className="add-milestone-modal__workable-picker">
+              {filteredItems.length === 0 ? (
+                <p className="add-milestone-modal__workable-empty">
+                  {allDocItems.length === 0
+                    ? 'No items in requirements doc.'
+                    : 'No matching items.'}
+                </p>
+              ) : (
+                filteredItems.map((item) => {
+                  const itemType = getItemType(doc, item.typeId);
+                  const isSelected = selectedItemIds.includes(item.id);
+                  return (
+                    <label
+                      key={item.id}
+                      className={`add-milestone-modal__workable-option${isSelected ? ' is-selected' : ''}`}
+                      title={`${item.id}: ${item.title || 'Untitled'}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleItemId(item.id)}
+                      />
+                      <span
+                        className="add-milestone-modal__item-id"
+                        style={{ color: itemType?.color ?? 'var(--accent)' }}
                       >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleItemId(item.id)}
-                        />
-                        <span
-                          className="add-milestone-modal__item-id"
-                          style={{ color: itemType?.color ?? 'var(--accent)' }}
-                        >
-                          <HighlightedText text={item.id} search={itemSearch.trim()} />
-                        </span>
-                        <HighlightedTitle
-                          className="add-milestone-modal__item-title"
-                          text={item.title || 'Untitled'}
-                          search={itemSearch.trim()}
-                        />
-                      </label>
-                    );
-                  })
-                )}
-              </div>
+                        <HighlightedText text={item.id} search={itemSearch.trim()} />
+                      </span>
+                      <HighlightedTitle
+                        className="add-milestone-modal__item-title"
+                        text={item.title || 'Untitled'}
+                        search={itemSearch.trim()}
+                      />
+                    </label>
+                  );
+                })
+              )}
             </div>
           </div>
+        </div>
 
-          <div className="add-milestone-modal__footer">
-            <button
-              type="button"
-              className="add-milestone-modal__btn add-milestone-modal__btn--cancel"
-              onClick={onClose}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="add-milestone-modal__btn add-milestone-modal__btn--primary"
-              style={{ backgroundColor: themeColor }}
-            >
-              <Plus size={14} />
-              <span>Create {typeLabel}</span>
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div className="add-milestone-modal__footer">
+          <button
+            type="button"
+            className="add-milestone-modal__btn add-milestone-modal__btn--cancel"
+            onClick={onClose}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="add-milestone-modal__btn add-milestone-modal__btn--primary"
+            style={{ backgroundColor: themeColor }}
+          >
+            <Plus size={14} />
+            <span>Create {typeLabel}</span>
+          </button>
+        </div>
+      </form>
+    </BaseModal>
   );
 }

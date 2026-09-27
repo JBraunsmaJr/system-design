@@ -8,7 +8,7 @@ import {
   EMPTY_REQUIREMENTS_DOCUMENT,
   type RequirementsDocument,
   type RequirementItem,
-} from '../../domain/requirementsTypes';
+} from '../../domain/requirements/requirementsTypes';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {

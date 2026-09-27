@@ -28,17 +28,17 @@ import {
 import { createMemoryAccessStore, type AccessStore } from '../../store/src/access.ts';
 import { createPostgresAccessStore } from '../../store/src/postgresAccess.ts';
 import { startTestOidcProvider, type TestOidcProvider } from './testIdentityProviders.ts';
-import { createStoreClient, type StoreClient } from '../../src/collab/storeClient.ts';
+import { createStoreClient, type StoreClient } from '../../src/collab/access/storeClient.ts';
 import {
   createMemoryDeviceKeyStorage,
   type DeviceKeyStorage,
   type EnrollmentApi,
-} from '../../src/collab/deviceIdentity.ts';
+} from '../../src/collab/access/deviceIdentity.ts';
 import {
   createMemoryPendingJoinStorage,
   signInUrlFor,
   type PendingJoinStorage,
-} from '../../src/collab/joinFlow.ts';
+} from '../../src/collab/access/joinFlow.ts';
 
 export const WORKSPACE = 'default';
 

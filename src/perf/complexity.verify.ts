@@ -5,12 +5,16 @@ import {
   unflattenToSubDiagram,
   getNodesAtPath,
   getEdgesAtPath,
-} from '../collab/diagramStore';
-import { createYjsDiagramStore, seedYjsDiagramDoc } from '../collab/yjsDiagramStore';
-import { computeEffectiveZIndices, type ZOrderBox } from '../domain/zOrder';
-import { computeAlignment, type AlignBox } from '../domain/alignmentGuides';
-import { buildOrthogonalRoute, getSegmentInsertions, type Point } from '../domain/edgeRouting';
-import { getContainmentRelation } from '../domain/edgeContainment';
+} from '../collab/stores/diagramStore';
+import { createYjsDiagramStore, seedYjsDiagramDoc } from '../collab/stores/yjsDiagramStore';
+import { computeEffectiveZIndices, type ZOrderBox } from '../domain/canvas/zOrder';
+import { computeAlignment, type AlignBox } from '../domain/canvas/alignmentGuides';
+import {
+  buildOrthogonalRoute,
+  getSegmentInsertions,
+  type Point,
+} from '../domain/canvas/edgeRouting';
+import { getContainmentRelation } from '../domain/canvas/edgeContainment';
 import { generateSubDiagram } from './fixtures';
 
 let passedCount = 0;

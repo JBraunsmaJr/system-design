@@ -16,15 +16,15 @@ import { createMemoryWorkspaceIndex } from '../store/src/workspaceIndex.ts';
 import { createSessionStore } from '../store/src/auth/sessions.ts';
 import { createProvider } from '../store/src/auth/providers.ts';
 import { startTestOidcProvider } from './lib/testIdentityProviders.ts';
-import { createStoreClient, type StoreClient } from '../src/collab/storeClient.ts';
+import { createStoreClient, type StoreClient } from '../src/collab/access/storeClient.ts';
 import {
   approveOtherDevice,
   bootstrapFirstDevice,
   createMemoryDeviceKeyStorage,
   enrollDevice,
   type EnrollmentApi,
-} from '../src/collab/deviceIdentity.ts';
-import { createRecoveryCode, recoverWithCode } from '../src/collab/recoveryCode.ts';
+} from '../src/collab/access/deviceIdentity.ts';
+import { createRecoveryCode, recoverWithCode } from '../src/collab/access/recoveryCode.ts';
 import {
   documentKeyFor,
   fromBase64,
@@ -32,7 +32,7 @@ import {
   newDocumentKey,
   toBase64,
   upsertEntry,
-} from '../src/collab/workspaceDocuments.ts';
+} from '../src/collab/sync/workspaceDocuments.ts';
 import {
   exportPublicKey,
   exportSymmetricKeyHex,
@@ -41,9 +41,9 @@ import {
   generateWrappingKeyPair,
   unwrapPrivateKeyWithPrivateKey,
 } from '../src/crypto/keys.ts';
-import { escrowDocumentKey } from '../src/collab/workspaceDocuments.ts';
+import { escrowDocumentKey } from '../src/collab/sync/workspaceDocuments.ts';
 import { toPem } from '../src/crypto/documentPackage.ts';
-import type { DiagramFile } from '../src/domain/serialization.ts';
+import type { DiagramFile } from '../src/domain/canvas/serialization.ts';
 
 let failures = 0;
 function check(condition: boolean, message: string) {

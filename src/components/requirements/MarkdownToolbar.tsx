@@ -1,6 +1,10 @@
 import type { RefObject } from 'react';
 import { Bold, Italic, List, ListOrdered, ListTodo, Table } from 'lucide-react';
-import { insertLinePrefix, insertTableSkeleton, wrapSelection } from '../../domain/markdownEditing';
+import {
+  insertLinePrefix,
+  insertTableSkeleton,
+  wrapSelection,
+} from '../../common/utils/markdownEditing';
 
 interface MarkdownToolbarProps {
   textareaRef: RefObject<HTMLTextAreaElement | null>;

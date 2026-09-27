@@ -4,7 +4,7 @@ import {
   hasDocumentation,
   computeDocumentationPopupPosition,
   type DiagramDocumentation,
-} from '../../domain/diagramDocumentation';
+} from '../../domain/canvas/diagramDocumentation';
 import { DocumentationRenderer } from './DocumentationRenderer';
 
 export interface DocumentationPopupProps {
@@ -78,7 +78,9 @@ export function DocumentationPopup({
       12,
     );
 
-    setPos((prev) => (prev?.top === nextPos.top && prev.left === nextPos.left ? prev : nextPos));
+    setPos((prev) =>
+      prev && prev.top === nextPos.top && prev.left === nextPos.left ? prev : nextPos,
+    );
   }, [
     shouldShow,
     anchor?.x,

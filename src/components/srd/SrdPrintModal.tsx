@@ -26,7 +26,7 @@ import type {
   RequirementItemViewModel,
   SrdDataContext,
   SrdTemplateConfig,
-} from '../../domain/srdTypes';
+} from '../../domain/srd/srdTypes';
 import {
   BUILTIN_SRD_TEMPLATES,
   DEFAULT_SRD_TEMPLATE,
@@ -34,15 +34,16 @@ import {
   serializeTemplateConfig,
   parseTemplateConfig,
   mergeTemplateWithDefaults,
-} from '../../domain/srdTemplatePresets';
-import { downloadSrdMarkdown, interpolateTokens } from '../../domain/srdMarkdownExport';
-import { downloadSrdPdf } from '../../domain/srdPdfExport';
+} from '../../domain/srd/srdTemplatePresets';
+import { downloadSrdMarkdown, interpolateTokens } from '../../domain/srd/srdMarkdownExport';
+import { downloadSrdPdf } from '../../domain/srd/srdPdfExport';
 import {
   captureDiagramSnapshot,
   captureSelectedNodesSnapshot,
   captureCurrentScreenViewport,
   captureNodeSubsetSnapshot,
-} from '../../domain/imageExport';
+} from '../../domain/canvas/imageExport';
+import { fitHeightToContent } from '../../common/utils/autoSizeTextarea';
 
 interface AutoResizeTextareaProps {
   value: string;
@@ -64,8 +65,7 @@ function AutoResizeTextarea({
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${Math.max(minHeight, el.scrollHeight + 2)}px`;
+    fitHeightToContent(el);
   }, [value, minHeight]);
 
   return (
@@ -78,8 +78,7 @@ function AutoResizeTextarea({
         onChange(e.target.value);
         const el = textareaRef.current;
         if (el) {
-          el.style.height = 'auto';
-          el.style.height = `${Math.max(minHeight, el.scrollHeight + 2)}px`;
+          fitHeightToContent(el);
         }
       }}
       style={{

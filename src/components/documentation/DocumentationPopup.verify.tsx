@@ -4,7 +4,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { DocumentationRenderer } from './DocumentationRenderer';
 import { DocumentationPopup } from './DocumentationPopup';
-import type { DiagramDocumentation } from '../../domain/diagramDocumentation';
+import type { DiagramDocumentation } from '../../domain/canvas/diagramDocumentation';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {

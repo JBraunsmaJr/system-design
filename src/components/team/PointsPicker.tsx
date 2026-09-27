@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Hash, X } from 'lucide-react';
-import { computeFlippedPosition } from '../../domain/popoverPosition';
+import { useOutsideClick } from '../../common/hooks/useOutsideClick';
+import { usePositionedDropdown } from '../../common/hooks/usePositionedDropdown';
 
 interface PointsPickerProps {
   points?: number;
@@ -13,93 +14,31 @@ const COMMON_POINTS = [0.5, 1, 2, 3, 5, 8, 13, 21];
 const POPOVER_WIDTH = 170;
 
 /**
- * Same portal + flip-positioning rewrite as MemberPicker, for the same
- * reason - this trigger lives inside a sprint board column too, and the
- * old locally-positioned popover got clipped by that column's own
- * scrolling/overflow regardless of z-index.
+ * Portals its popover to document.body with flip-positioning.
  */
 export function PointsPicker({ points, onChange, compact = false }: PointsPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [customInput, setCustomInput] = useState<string>('');
-  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
 
   const open = () => {
-    const trigger = triggerRef.current;
-    if (!trigger) return;
-    // Set directly here (a plain click handler) rather than syncing via a
-    // useEffect keyed on isOpen - this is the value at the moment the
-    // popover is opened, not something that needs to stay in sync with
-    // `points` for as long as it's open, so there's no actual need for
-    // effect-based state syncing here at all.
     setCustomInput(points !== undefined ? String(points) : '');
-    const rect = trigger.getBoundingClientRect();
-    setPopoverPos({ top: rect.bottom + 4, left: Math.max(8, rect.right - POPOVER_WIDTH) });
     setIsOpen(true);
   };
   const close = () => setIsOpen(false);
 
-  useLayoutEffect(() => {
-    if (!isOpen) return;
-    const trigger = triggerRef.current;
-    const popover = popoverRef.current;
-    if (!trigger || !popover) return;
-    const triggerRect = trigger.getBoundingClientRect();
-    const popoverRect = popover.getBoundingClientRect();
-    const next = computeFlippedPosition(
-      triggerRect,
-      { width: popoverRect.width, height: popoverRect.height },
-      { width: window.innerWidth, height: window.innerHeight },
-    );
-    setPopoverPos((prev) =>
-      prev && prev.top === next.top && prev.left === next.left ? prev : next,
-    );
-  }, [isOpen]);
+  const { position: popoverPos } = usePositionedDropdown({
+    triggerRef,
+    dropdownRef: popoverRef,
+    isOpen,
+  });
 
-  const reposition = useCallback(() => {
-    const trigger = triggerRef.current;
-    const popover = popoverRef.current;
-    if (!trigger || !popover) return;
-    const triggerRect = trigger.getBoundingClientRect();
-    const popoverRect = popover.getBoundingClientRect();
-    setPopoverPos(
-      computeFlippedPosition(
-        triggerRect,
-        { width: popoverRect.width, height: popoverRect.height },
-        { width: window.innerWidth, height: window.innerHeight },
-      ),
-    );
-  }, []);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleMouseDown = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (triggerRef.current?.contains(target)) return;
-      if (popoverRef.current?.contains(target)) return;
-      close();
-    };
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close();
-    };
-    document.addEventListener('mousedown', handleMouseDown);
-    document.addEventListener('keydown', handleEscape);
-    return () => {
-      document.removeEventListener('mousedown', handleMouseDown);
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    window.addEventListener('scroll', reposition, true);
-    window.addEventListener('resize', reposition);
-    return () => {
-      window.removeEventListener('scroll', reposition, true);
-      window.removeEventListener('resize', reposition);
-    };
-  }, [isOpen, reposition]);
+  useOutsideClick({
+    refs: [triggerRef, popoverRef],
+    isOpen,
+    onClose: close,
+  });
 
   const handleSelect = (val: number | undefined) => {
     onChange(val);
@@ -138,7 +77,6 @@ export function PointsPicker({ points, onChange, compact = false }: PointsPicker
       </button>
 
       {isOpen &&
-        popoverPos &&
         createPortal(
           <div
             ref={popoverRef}
@@ -146,8 +84,8 @@ export function PointsPicker({ points, onChange, compact = false }: PointsPicker
             role="dialog"
             style={{
               position: 'fixed',
-              top: popoverPos.top,
-              left: popoverPos.left,
+              top: popoverPos?.top ?? 0,
+              left: popoverPos?.left ?? 0,
               width: POPOVER_WIDTH,
             }}
           >

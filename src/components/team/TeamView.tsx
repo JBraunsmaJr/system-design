@@ -13,21 +13,26 @@ import {
   ChevronUp,
   CalendarRange,
 } from 'lucide-react';
-import type { TeamMember, PtoSpan, ExtraDayOff, HalfDayType } from '../../domain/teamTypes';
-import type { ProgramIncrement } from '../../domain/programIncrements';
-import type { ProgramIncrementsStore } from '../../collab/programIncrementsStore';
-import type { RequirementsDocument } from '../../domain/requirementsTypes';
-import { isItemWorkable } from '../../domain/requirementsRegistry';
-import type { TeamStore } from '../../collab/teamStore';
+import type {
+  TeamMember,
+  PtoSpan,
+  ExtraDayOff,
+  HalfDayType,
+} from '../../domain/timeline/teamTypes';
+import type { ProgramIncrement } from '../../domain/timeline/programIncrements';
+import type { ProgramIncrementsStore } from '../../collab/stores/programIncrementsStore';
+import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
+import { isItemWorkable } from '../../domain/requirements/requirementsRegistry';
+import type { TeamStore } from '../../collab/stores/teamStore';
 import {
   computeSprintDateRanges,
   getSprintActiveReservations,
-} from '../../domain/programIncrements';
+} from '../../domain/timeline/programIncrements';
 import {
   computeSprintCapacity,
   calculateTotalPtoDays,
   getUsFederalHolidays,
-} from '../../domain/teamCapacity';
+} from '../../domain/timeline/teamCapacity';
 import { ManageReservationsModal } from '../timeline/ManageReservationsModal';
 
 interface TeamViewProps {

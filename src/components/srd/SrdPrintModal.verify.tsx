@@ -3,7 +3,7 @@
  */
 import { renderToStaticMarkup } from 'react-dom/server';
 import { SrdPrintModal } from './SrdPrintModal';
-import type { SrdDataContext } from '../../domain/srdTypes';
+import type { SrdDataContext } from '../../domain/srd/srdTypes';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {

@@ -16,8 +16,8 @@ import {
   type FileBackedAutosave,
   type FileHandleLike,
   type FileHandleStore,
-} from '../domain/fileBackedAutosave';
-import type { DurabilitySignals } from '../domain/durability';
+} from '../domain/storage/fileBackedAutosave';
+import type { DurabilitySignals } from '../domain/storage/durability';
 import { isPerfInstrumentationActive } from '../perf/instrumentation';
 
 /**

@@ -28,17 +28,20 @@ import { RequirementCard } from './RequirementCard';
 import { ManageTypesModal } from './ManageTypesModal';
 import { ManageRelationshipTypesModal } from './ManageRelationshipTypesModal';
 import { AddItemDropdown } from './AddItemDropdown';
-import type { RequirementItem, RequirementItemType } from '../../domain/requirementsTypes';
-import type { ProgramIncrement } from '../../domain/programIncrements';
-import type { TeamDocument } from '../../domain/teamTypes';
-import type { SubDiagram } from '../../domain/types';
+import type {
+  RequirementItem,
+  RequirementItemType,
+} from '../../domain/requirements/requirementsTypes';
+import type { ProgramIncrement } from '../../domain/timeline/programIncrements';
+import type { TeamDocument } from '../../domain/timeline/teamTypes';
+import type { SubDiagram } from '../../domain/canvas/types';
 import {
   findAllLinkedNodes,
   type DiagramPath,
   type LinkedNodeRef,
-} from '../../domain/subDiagramTree';
-import type { RequirementsStore } from '../../collab/requirementsStore';
-import type { PresenceInfo } from '../../collab/session';
+} from '../../domain/canvas/subDiagramTree';
+import type { RequirementsStore } from '../../collab/stores/requirementsStore';
+import type { PresenceInfo } from '../../collab/sync/session';
 import plur from 'plur';
 import {
   buildEpicTree,
@@ -49,13 +52,13 @@ import {
   isEpicItem,
   type EpicTree,
   type EpicTreeNode,
-} from '../../domain/requirementsHierarchy';
+} from '../../domain/requirements/requirementsHierarchy';
 import {
   loadRequirementsViewPrefs,
   saveRequirementsViewPrefs,
   type RequirementsGroupBy,
   type RequirementsLayout,
-} from '../../domain/requirementsViewPrefs';
+} from '../../domain/requirements/requirementsViewPrefs';
 import { RequirementsOutline } from './RequirementsOutline';
 
 interface RequirementsViewProps {

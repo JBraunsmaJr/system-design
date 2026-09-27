@@ -1,0 +1,639 @@
+import type { Node, Edge } from '@xyflow/react';
+import type {
+  ArchNodeData,
+  ArchEdgeData,
+  ArchEdgeDataPatch,
+  EdgeWaypoint,
+  SubDiagram,
+} from '../../domain/canvas/types';
+import type { EdgeEndpoints } from '../../domain/canvas/edgeReconnect';
+import { recordUnflattenCall, recordStoreWrite } from '../../perf/instrumentation';
+
+/**
+ * DiagramStore is the same kind of seam TeamStore, RequirementsStore, and
+ * ProgramIncrementsStore are - a narrow, named-operation contract so a
+ * local implementation (this file) and a collaborative, Yjs-backed one
+ * (yjsDiagramStore.ts) can be swapped behind it without any consuming
+ * code needing to change.
+ *
+ * The actual model is a recursive tree, a node's own data can hold a nested
+ * SubDiagram, whose nodes can themselves hold further nested SubDiagrams, with no depth
+ * limit. Plain nested objects handle that for free; Yjs shared types don't nest
+ * as naturally to an unbound depth the way a plain object tree does.
+ *
+ * The approach taken here: Flatten the tree into one shared space. Every
+ * node and edge across the entire tree - root plus every nested sub-diagram, at any depth - lives
+ * in one flat collection, each tagged with a `parentPath: string[]` (the same
+ * shape as the app's existing DiagramPath) recording which level of the tree it
+ * belongs to. `getNodesAtPath`/`getEdgesAtPath` filter down to one level
+ * on demand - closer to how a database would model a tree (parent-reference rows
+ * in one table) than how the in-memory version does today (actual nested objects).
+ *
+ *  - Node and edge ids are already globally unique across the WHOLE
+ *    tree, not just within their own level - App.tsx's nextId draws from
+ *    one shared, module-level counter regardless of nesting depth. That
+ *    makes flattening into one id-keyed space safe with no risk of two
+ *    different levels' nodes colliding on the same id.
+ *
+ *  - There is no operation anywhere in the app that moves a node from
+ *    one tree level to another after it's created - the only way a node
+ *    ends up at a given level is by being created while that level is
+ *    the currently-viewed path. That means parentPath is effectively
+ *    IMMUTABLE once set, which is a real simplification: there's no
+ *    "reparent to a different level" operation to design for at all,
+ *    only "create at the level the person is currently viewing."
+ *
+ *  - React Flow's own `parentId` field (a node visually contained inside
+ *    a group/boundary node) is a COMPLETELY SEPARATE concept from
+ *    parentPath (which level of the sub-diagram TREE a node lives at,
+ *    unrelated to visual grouping). Both are preserved, independently.
+ *
+ *  - The app distinguishes a node that has an explicitly-opened-but-empty
+ *    sub-diagram (drilled into once, nothing added yet) from one that's
+ *    never been opened at all - see findLinkedNodes's own doc comment in
+ *    subDiagramTree.ts. Since "has any children in the flat space" can't
+ *    tell these apart (an opened-but-empty one has no children either
+ *    way), this needs its own explicit field rather than being derived.
+ *
+ *  - Deleting a node with a populated sub-diagram cascades - deleting a
+ *    node also has to delete every descendant at any deeper parentPath.
+ *    The current (non-flattened) code gets this for free, since a node's
+ *    subDiagram is nested inside its own data and removing the node
+ *    removes everything nested within it automatically; the flattened
+ *    model has to do this explicitly, since descendants are now stored
+ *    as separate, sibling entries rather than nested inside the parent.
+ *    Deleting a GROUP node (parentId containment, same level) is
+ *    different and unrelated - its children are released, not deleted,
+ *    exactly as today.
+ *
+ *  - Selection (selected nodes/edges) is deliberately NOT part of this
+ *    schema at all - it's ephemeral, per-person UI state, matching the
+ *    plan's own "presence is a separate mechanism, not shared document
+ *    state" principle. It stays local exactly as it already is today
+ *    (selectedNodeIds/selectedEdgeIds in App.tsx, independent of the
+ *    nodes/edges arrays themselves).
+ *
+ * Scenarios are deliberately out of scope for this store - they're a
+ * flat list scoped to the top-level diagram only (see SubDiagram's own
+ * doc comment: "Scenarios are intentionally NOT part of this"), so they
+ * were never part of the recursive-nesting problem this store solves.
+ */
+export interface DiagramStore {
+  /**
+   * Replaces the entire diagram, at every nesting level, in one operation
+   * (WS1 Step 3).
+   *
+   * Exists so that whole-document writes - loading a file, installing a perf
+   * fixture - go through the seam rather than around it. While the local path
+   * still wrote React state directly, those writers would silently stop
+   * affecting the canvas the moment the seam pointed at a Y.Doc: nothing
+   * throws, the canvas just stops updating. Routing them here first makes that
+   * swap a change of implementation rather than a change of behaviour.
+   */
+  replaceAll(root: SubDiagram): void;
+
+  /**
+   * Detaches every observer this store attached to the document (WS1 Step 1).
+   *
+   * The Yjs implementations register observeDeep handlers at construction and
+   * previously had no way to remove them. That was survivable while a store
+   * was built once per session, but the unified document model builds one per
+   * DOCUMENT - so opening and closing documents would accumulate live
+   * observers on documents still in memory, each rebuilding a snapshot on
+   * every change.
+   *
+   * Safe to call more than once. Implementations that hold no document
+   * resources may no-op.
+   */
+  destroy(): void;
+
+  /** Every node across the entire tree, at any depth, each carrying its
+   * own parentPath. Use getNodesAtPath to filter to one level. */
+  getSnapshot(): { nodes: Node<ArchNodeData>[]; edges: Edge<ArchEdgeData>[] };
+  subscribe(listener: () => void): () => void;
+
+  /** Creates a new node at the given tree level and returns its id. */
+  addNode(
+    parentPath: string[],
+    type: string,
+    position: { x: number; y: number },
+    data: ArchNodeData,
+  ): string;
+  updateNode(id: string, patch: Partial<ArchNodeData>): void;
+  updatePosition(id: string, position: { x: number; y: number }): void;
+  updateParentId(
+    id: string,
+    parentId: string | undefined,
+    position: { x: number; y: number },
+  ): void;
+  updateDimensions(id: string, width: number | undefined, height: number | undefined): void;
+  /** Deletes the node, every descendant at any deeper parentPath (its
+   * own sub-diagram tree, recursively), and every edge touching any of
+   * them - matching the app's existing "populated sub-diagram" cascade,
+   * just made explicit here since the flattened model doesn't get it
+   * for free the way nesting objects did. Group-child release (a
+   * DIFFERENT, same-level concern - see this file's own doc comment)
+   * stays the UI layer's responsibility, exactly as it works today,
+   * since it depends on absolute-position math this store has no
+   * reason to know about. */
+  deleteNode(id: string): void;
+
+  /** sourceHandle/targetHandle matter here: several node types define
+   * multiple named handles (see EdgeHandles.tsx), so which
+   * specific handle a connection was made from/to is real, meaningful
+   * data - not something that can be left to default to "the only
+   * handle" the way a simpler node might get away with. Only ever set
+   * at creation time (via onConnect) - nothing in the app changes them
+   * on an already-created edge afterward, so updateEdge has no
+   * equivalent need for them. */
+  addEdge(
+    parentPath: string[],
+    source: string,
+    target: string,
+    data: ArchEdgeData,
+    sourceHandle?: string | null,
+    targetHandle?: string | null,
+  ): string;
+  updateEdge(id: string, patch: ArchEdgeDataPatch): void;
+  deleteEdge(id: string): void;
+
+  /**
+   * Moves one or both of an edge's ends onto different nodes/handles -
+   * draw.io-style endpoint dragging.
+   *
+   * Its own operation rather than part of updateEdge because
+   * source/target/sourceHandle/targetHandle are top-level React Flow
+   * Edge fields, not ArchEdgeData fields, so updateEdge's
+   * ArchEdgeDataPatch can't express them at all. (The note on
+   * addEdge above, that nothing changes an edge's handles after
+   * creation, is what this operation changes.)
+   *
+   * All four fields move together in ONE transaction. Half-applied
+   * endpoints - a new target with the old source - is a state that
+   * should never be observable by a peer, and in the Yjs implementation
+   * a transaction is what guarantees that.
+   */
+  reconnectEdge(id: string, endpoints: EdgeEndpoints): void;
+
+  /** Inserts a bend at `index` in the edge's waypoint order (0 puts it
+   * between the source and the first existing bend). */
+  addEdgeWaypoint(edgeId: string, index: number, waypoint: EdgeWaypoint): void;
+
+  /**
+   * Moves an existing bend. By waypoint ID, not by index, and this is
+   * the single most important detail in the whole waypoint design.
+   *
+   * A drag is a stream of these calls, one per pointermove. If they were
+   * index-addressed and a collaborator inserted or removed a bend
+   * earlier in the same edge partway through that drag, every index
+   * after theirs shifts by one - and the rest of the drag would silently
+   * start moving a DIFFERENT bend than the one under the cursor. Ids
+   * don't shift, so the drag keeps hold of the bend it started on no
+   * matter what else arrives mid-gesture.
+   */
+  moveEdgeWaypoint(edgeId: string, waypointId: string, position: { x: number; y: number }): void;
+
+  /** Removes a single bend by id - same identity-over-index reasoning as
+   * moveEdgeWaypoint. */
+  removeEdgeWaypoint(edgeId: string, waypointId: string): void;
+
+  /** Drops every bend, returning the edge to automatic routing. */
+  clearEdgeWaypoints(edgeId: string): void;
+}
+
+/**
+ * The waypoint transforms, written once against a plain ArchEdgeData
+ * and shared by the local store and the tree adapter - the two
+ * implementations that hold waypoints as an ordinary JS array. (The Yjs
+ * store deliberately does NOT use these: its whole point is that it
+ * holds waypoints as real shared types instead, so it implements the
+ * same four operations directly against those.)
+ *
+ * All four keep one invariant that matters beyond tidiness: when no
+ * waypoints remain, the `waypoints` KEY is removed entirely rather than
+ * left as an empty array. An edge that has never been bent and an edge
+ * whose bends were all removed should be indistinguishable - both in the
+ * saved file, and in diagramStore.verify.ts's own check that the local
+ * and Yjs stores produce edge data with the identical set of keys.
+ */
+export function withWaypointAdded(
+  data: ArchEdgeData,
+  index: number,
+  waypoint: EdgeWaypoint,
+): ArchEdgeData {
+  const current = data.waypoints ?? [];
+  const clamped = Math.max(0, Math.min(index, current.length));
+  const next = [...current.slice(0, clamped), waypoint, ...current.slice(clamped)];
+  return { ...data, waypoints: next };
+}
+
+export function withWaypointMoved(
+  data: ArchEdgeData,
+  waypointId: string,
+  position: { x: number; y: number },
+): ArchEdgeData {
+  const current = data.waypoints ?? [];
+  if (!current.some((w) => w.id === waypointId)) return data;
+  return {
+    ...data,
+    waypoints: current.map((w) =>
+      w.id === waypointId ? { ...w, x: position.x, y: position.y } : w,
+    ),
+  };
+}
+
+export function withWaypointRemoved(data: ArchEdgeData, waypointId: string): ArchEdgeData {
+  const current = data.waypoints ?? [];
+  const next = current.filter((w) => w.id !== waypointId);
+  if (next.length === current.length) return data;
+  return withWaypointsOrNone(data, next);
+}
+
+export function withWaypointsCleared(data: ArchEdgeData): ArchEdgeData {
+  if (data.waypoints === undefined) return data;
+  return withWaypointsOrNone(data, []);
+}
+
+function withWaypointsOrNone(data: ArchEdgeData, waypoints: EdgeWaypoint[]): ArchEdgeData {
+  if (waypoints.length > 0) return { ...data, waypoints };
+  const rest = { ...data };
+  delete rest.waypoints;
+  return rest;
+}
+
+export function getNodesAtPath(nodes: Node<ArchNodeData>[], path: string[]): Node<ArchNodeData>[] {
+  return nodes.filter((n) =>
+    arraysEqual((n.data as ArchNodeData & { parentPath?: string[] }).parentPath ?? [], path),
+  );
+}
+
+export function getEdgesAtPath(edges: Edge<ArchEdgeData>[], path: string[]): Edge<ArchEdgeData>[] {
+  return edges.filter((e) =>
+    arraysEqual((e.data as ArchEdgeData & { parentPath?: string[] }).parentPath ?? [], path),
+  );
+}
+
+/** True if `nodeId` (itself at `parentPath`) has any node one level
+ * deeper than it - i.e. whether it has a POPULATED sub-diagram, matching
+ * the real app's own existing definition (see findLinkedNodes's
+ * `hasSubDiagram` in subDiagramTree.ts: `subDiagram?.nodes.length > 0`,
+ * not merely whether a subDiagram object exists at all). There's no
+ * separate "opened but empty" state to derive here - nothing in the app
+ * ever actually creates one, so this is the only check that's ever
+ * needed. */
+export function hasSubDiagram(
+  nodes: Node<ArchNodeData>[],
+  parentPath: string[],
+  nodeId: string,
+): boolean {
+  return getNodesAtPath(nodes, [...parentPath, nodeId]).length > 0;
+}
+
+/** A tree level as a single comparable string. NUL cannot appear in an id. */
+export function levelKey(path: readonly string[]): string {
+  return path.join('\u0000');
+}
+
+/**
+ * Every level that has at least one node, as levelKey strings - so "does node
+ * X at `path` have a populated sub-diagram" is
+ * `owners.has(levelKey([...path, X]))`.
+ *
+ * Built once per snapshot. Calling hasSubDiagram for every node on screen
+ * scans every node for each, which is quadratic per frame.
+ */
+export function populatedLevels(nodes: Node<ArchNodeData>[]): Set<string> {
+  const levels = new Set<string>();
+  for (const n of nodes) {
+    const parentPath = (n.data as ArchNodeData & { parentPath?: string[] }).parentPath ?? [];
+    if (parentPath.length > 0) levels.add(levelKey(parentPath));
+  }
+  return levels;
+}
+
+/**
+ * Node count per level, keyed by levelKey string - so the number of nodes
+ * in node X's sub-diagram at `path` is
+ * `counts.get(levelKey([...path, X])) ?? 0`.
+ *
+ * Built once per snapshot, running in O(nodes) time.
+ */
+export function populatedLevelCounts(nodes: Node<ArchNodeData>[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const n of nodes) {
+    const parentPath = (n.data as ArchNodeData & { parentPath?: string[] }).parentPath ?? [];
+    if (parentPath.length > 0) {
+      const key = levelKey(parentPath);
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+  }
+  return counts;
+}
+
+/** Flattens a recursive SubDiagram tree - root plus every nested
+ * sub-diagram, at any depth - into the flat, parentPath-tagged shape
+ * this whole module works with. Originally written inline inside
+ * createAdapterDiagramStore's own getSnapshot; extracted here once a
+ * second caller (seedYjsDiagramDoc, used when starting a collaborative
+ * session) needed the exact same logic, so the two don't drift apart by
+ * each maintaining their own copy. */
+export function flattenSubDiagramTree(root: SubDiagram): {
+  nodes: Node<ArchNodeData>[];
+  edges: Edge<ArchEdgeData>[];
+} {
+  const nodes: Node<ArchNodeData>[] = [];
+  const edges: Edge<ArchEdgeData>[] = [];
+  function walk(sd: SubDiagram, path: string[]) {
+    for (const node of sd.nodes) {
+      const { subDiagram, ...restData } = node.data;
+      const level = levelFor(path, (restData as { parentPath?: unknown }).parentPath);
+      nodes.push({ ...node, data: { ...restData, parentPath: level } as ArchNodeData });
+      if (subDiagram) walk(subDiagram, [...level, node.id]);
+    }
+    for (const edge of sd.edges) {
+      const level = levelFor(path, (edge.data as { parentPath?: unknown } | undefined)?.parentPath);
+      edges.push({
+        ...edge,
+        data: { ...(edge.data as ArchEdgeData), parentPath: level } as ArchEdgeData,
+      });
+    }
+  }
+  walk(root, []);
+  return { nodes, edges };
+}
+
+/**
+ * Which tree level an entry belongs to while flattening (WS1-R3, WS5-R9).
+ *
+ * Position in the tree is authoritative, with one exception: an entry sitting
+ * in the ROOT array that already carries a parentPath is an already-flat
+ * entry, and its own tag is the only record of where it lives. Overwriting it
+ * with `[]` - which is what this function did before - hoists every nested
+ * node to the root and silently collapses the hierarchy.
+ *
+ * That made flattening non-idempotent, so every caller had to know which of
+ * the two shapes it was holding. Two did not agree: the boot path pre-flattened
+ * and the file-load path did not, and loading any file with a sub-diagram
+ * dropped every nested node. With this rule flatten(flatten(x)) = flatten(x),
+ * so handing either shape to an import boundary is safe.
+ *
+ * Nested positions ignore a stale tag: a node inside a subDiagram is where the
+ * tree says it is, whatever it claims.
+ */
+function levelFor(treePath: string[], ownTag: unknown): string[] {
+  if (treePath.length > 0) return treePath;
+  return Array.isArray(ownTag) && ownTag.every((s) => typeof s === 'string')
+    ? (ownTag as string[])
+    : treePath;
+}
+
+/** The inverse of flattenSubDiagramTree - rebuilds a recursive
+ * SubDiagram tree from a flat, parentPath-tagged node/edge list.
+ *
+ * An EXPORT boundary (WS1-R3): the flat schema is canonical, and the tree
+ * exists only because the file format and a few read-only views are shaped
+ * that way. It walks every level of the document, so calling it per change is
+ * O(document) per remote update - which is what the perf harness's
+ * `unflattenCalls` counter watches for. Call it when saving, autosaving, or
+ * rendering a view that genuinely needs the tree; not on every snapshot.
+ *
+ * parentPath itself is dropped from each node/edge's data on the way
+ * back out - it only ever existed to support the flat representation;
+ * position in the rebuilt tree is what encodes nesting once again. */
+export function unflattenToSubDiagram(
+  nodes: Node<ArchNodeData>[],
+  edges: Edge<ArchEdgeData>[],
+): SubDiagram {
+  recordUnflattenCall();
+  function buildLevel(path: string[]): SubDiagram {
+    const levelNodes = getNodesAtPath(nodes, path).map((n) => {
+      const restData: Record<string, unknown> = { ...(n.data as Record<string, unknown>) };
+      delete restData.parentPath;
+      const childSubDiagram = hasSubDiagram(nodes, path, n.id)
+        ? buildLevel([...path, n.id])
+        : undefined;
+      return { ...n, data: { ...restData, subDiagram: childSubDiagram } as ArchNodeData };
+    });
+    const levelEdges = getEdgesAtPath(edges, path).map((e) => {
+      const restData: Record<string, unknown> = { ...(e.data as Record<string, unknown>) };
+      delete restData.parentPath;
+      return { ...e, data: restData as ArchEdgeData };
+    });
+    return { nodes: levelNodes, edges: levelEdges };
+  }
+  return buildLevel([]);
+}
+
+/**
+ * Breadcrumb labels for `path`, read straight from the flat schema.
+ *
+ * Equivalent to subDiagramTree's getBreadcrumbLabels on the unflattened tree,
+ * without building the tree: the breadcrumb is on screen permanently, so
+ * deriving it from the tree meant a full unflatten on every change, local or
+ * remote. A segment resolves only if a node with that id lives at exactly the
+ * preceding level, mirroring the tree walk, so a stale or foreign path renders
+ * "Untitled" the same way it always has.
+ */
+export function getBreadcrumbLabelsFlat(nodes: Node<ArchNodeData>[], path: string[]): string[] {
+  if (path.length === 0) return [];
+  const byId = new Map<string, Node<ArchNodeData>>();
+  for (const n of nodes) byId.set(n.id, n);
+  let resolved = true;
+  return path.map((id, i) => {
+    const node = resolved ? byId.get(id) : undefined;
+    const level =
+      (node?.data as (ArchNodeData & { parentPath?: string[] }) | undefined)?.parentPath ?? [];
+    if (!node || !arraysEqual(level, path.slice(0, i))) {
+      // Once a segment fails to resolve, the tree walk descends into an empty
+      // sub-diagram, so every later segment is unresolvable too.
+      resolved = false;
+      return 'Untitled';
+    }
+    return node.data.label ?? 'Untitled';
+  });
+}
+
+function arraysEqual(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((v, i) => v === b[i]);
+}
+
+/** True if `path` is `ancestorPath` itself, or nested at any depth
+ * beneath it - used for the delete cascade (every descendant, at any
+ * depth, of the deleted node). */
+function isPathAtOrBelow(path: string[], ancestorPrefix: string[]): boolean {
+  if (path.length < ancestorPrefix.length) return false;
+  return ancestorPrefix.every((v, i) => path[i] === v);
+}
+
+export function createLocalDiagramStore(initial?: {
+  nodes: Node<ArchNodeData>[];
+  edges: Edge<ArchEdgeData>[];
+}): DiagramStore {
+  let nodes: Node<ArchNodeData>[] = initial?.nodes ?? [];
+  let edges: Edge<ArchEdgeData>[] = initial?.edges ?? [];
+  const listeners = new Set<() => void>();
+
+  const notify = () => {
+    for (const listener of listeners) listener();
+  };
+
+  function nodeParentPath(n: Node<ArchNodeData>): string[] {
+    return (n.data as ArchNodeData & { parentPath?: string[] }).parentPath ?? [];
+  }
+
+  return {
+    getSnapshot: () => ({ nodes, edges }),
+
+    /** Holds no document resources, so there is nothing to detach. Present so
+     * every implementation of the seam has the same shape. */
+    destroy: () => {},
+    replaceAll: (next) => {
+      const flattened = flattenSubDiagramTree(next);
+      nodes = flattened.nodes;
+      edges = flattened.edges;
+      notify();
+    },
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+
+    addNode: (parentPath, type, position, data) => {
+      recordStoreWrite();
+      const id = `node-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+      const node: Node<ArchNodeData> = {
+        id,
+        type,
+        position,
+        data: { ...data, parentPath } as ArchNodeData & { parentPath: string[] },
+      };
+      nodes = [...nodes, node];
+      notify();
+      return id;
+    },
+
+    updateNode: (id, patch) => {
+      recordStoreWrite();
+      nodes = nodes.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...patch } } : n));
+      notify();
+    },
+
+    updatePosition: (id, position) => {
+      recordStoreWrite();
+      nodes = nodes.map((n) => (n.id === id ? { ...n, position } : n));
+      notify();
+    },
+
+    updateParentId: (id, parentId, position) => {
+      recordStoreWrite();
+      nodes = nodes.map((n) => (n.id === id ? { ...n, parentId, position } : n));
+      notify();
+    },
+
+    updateDimensions: (id, width, height) => {
+      recordStoreWrite();
+      nodes = nodes.map((n) => (n.id === id ? { ...n, width, height } : n));
+      notify();
+    },
+
+    deleteNode: (id) => {
+      recordStoreWrite();
+      const target = nodes.find((n) => n.id === id);
+      if (!target) return;
+      const descendantPrefix = [...nodeParentPath(target), id];
+      const removedIds = new Set(
+        nodes
+          .filter((n) => n.id === id || isPathAtOrBelow(nodeParentPath(n), descendantPrefix))
+          .map((n) => n.id),
+      );
+      nodes = nodes.filter((n) => !removedIds.has(n.id));
+      edges = edges.filter((e) => !removedIds.has(e.source) && !removedIds.has(e.target));
+      notify();
+    },
+
+    addEdge: (parentPath, source, target, data, sourceHandle, targetHandle) => {
+      recordStoreWrite();
+      const id = `edge-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+      const edge: Edge<ArchEdgeData> = {
+        id,
+        source,
+        target,
+        sourceHandle,
+        targetHandle,
+        type: 'typed',
+        data: { ...data, parentPath } as ArchEdgeData & { parentPath: string[] },
+      };
+      edges = [...edges, edge];
+      notify();
+      return id;
+    },
+
+    updateEdge: (id, patch) => {
+      recordStoreWrite();
+      edges = edges.map((e) =>
+        e.id === id ? { ...e, data: { ...(e.data as ArchEdgeData), ...patch } } : e,
+      );
+      notify();
+    },
+
+    deleteEdge: (id) => {
+      recordStoreWrite();
+      edges = edges.filter((e) => e.id !== id);
+      notify();
+    },
+
+    reconnectEdge: (id, endpoints) => {
+      recordStoreWrite();
+      edges = edges.map((e) =>
+        e.id === id
+          ? {
+              ...e,
+              source: endpoints.source,
+              target: endpoints.target,
+              sourceHandle: endpoints.sourceHandle ?? null,
+              targetHandle: endpoints.targetHandle ?? null,
+            }
+          : e,
+      );
+      notify();
+    },
+
+    addEdgeWaypoint: (edgeId, index, waypoint) => {
+      recordStoreWrite();
+      edges = edges.map((e) =>
+        e.id === edgeId
+          ? { ...e, data: withWaypointAdded(e.data as ArchEdgeData, index, waypoint) }
+          : e,
+      );
+      notify();
+    },
+
+    moveEdgeWaypoint: (edgeId, waypointId, position) => {
+      recordStoreWrite();
+      edges = edges.map((e) =>
+        e.id === edgeId
+          ? { ...e, data: withWaypointMoved(e.data as ArchEdgeData, waypointId, position) }
+          : e,
+      );
+      notify();
+    },
+
+    removeEdgeWaypoint: (edgeId, waypointId) => {
+      recordStoreWrite();
+      edges = edges.map((e) =>
+        e.id === edgeId
+          ? { ...e, data: withWaypointRemoved(e.data as ArchEdgeData, waypointId) }
+          : e,
+      );
+      notify();
+    },
+
+    clearEdgeWaypoints: (edgeId) => {
+      recordStoreWrite();
+      edges = edges.map((e) =>
+        e.id === edgeId ? { ...e, data: withWaypointsCleared(e.data as ArchEdgeData) } : e,
+      );
+      notify();
+    },
+  };
+}

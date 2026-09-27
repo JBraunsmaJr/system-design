@@ -7,9 +7,9 @@ import { RequirementsView } from './RequirementsView';
 import {
   BUILT_IN_ITEM_TYPES,
   BUILT_IN_RELATIONSHIP_TYPES,
-} from '../../domain/requirementsRegistry';
-import type { RequirementsDocument } from '../../domain/requirementsTypes';
-import type { RequirementsStore } from '../../collab/requirementsStore';
+} from '../../domain/requirements/requirementsRegistry';
+import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
+import type { RequirementsStore } from '../../collab/stores/requirementsStore';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {

@@ -13,8 +13,8 @@ import { createDocumentService } from '../store/src/documentService.ts';
 import { createHttpService, type StoreBackend } from '../store/src/httpService.ts';
 import { createMemoryWorkspaceIndex } from '../store/src/workspaceIndex.ts';
 import { createPostgresStore, createPostgresWorkspaceIndex } from '../store/src/postgresStore.ts';
-import { createStoreClient, StoreClientError } from '../src/collab/storeClient.ts';
-import { escrowDocumentKey } from '../src/collab/workspaceDocuments.ts';
+import { createStoreClient, StoreClientError } from '../src/collab/access/storeClient.ts';
+import { escrowDocumentKey } from '../src/collab/sync/workspaceDocuments.ts';
 import {
   recoverDocumentPackage,
   toPem,
@@ -33,8 +33,8 @@ import {
   generateWorkspaceKey,
   wrapKey,
 } from '../src/crypto/keys.ts';
-import { generateSessionKey } from '../src/domain/sessionLink.ts';
-import type { DiagramFile } from '../src/domain/serialization.ts';
+import { generateSessionKey } from '../src/domain/network/sessionLink.ts';
+import type { DiagramFile } from '../src/domain/canvas/serialization.ts';
 
 let failures = 0;
 function check(condition: boolean, message: string) {

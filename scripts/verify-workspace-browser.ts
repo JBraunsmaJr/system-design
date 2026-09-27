@@ -433,7 +433,7 @@ async function run() {
       const secondSees = await sawEachOther(second);
       check(firstSees && secondSees, 'each browser is in the session, with the other one in it');
       // Named as their sign-in names them, not "Guest-..." - a cursor
-      // labelled with a random string tells nobody who is editing.
+      // labeled with a random string tells nobody who is editing.
       const named = await first
         .waitForFunction(
           () =>

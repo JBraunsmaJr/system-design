@@ -16,7 +16,7 @@ import {
   startStore,
   type Backend,
 } from './lib/joinHarness.ts';
-import { bootstrapFirstDevice, enrollDevice } from '../src/collab/deviceIdentity.ts';
+import { bootstrapFirstDevice, enrollDevice } from '../src/collab/access/deviceIdentity.ts';
 import {
   createMemoryPendingJoinStorage,
   pendingUserKeySource,
@@ -24,11 +24,11 @@ import {
   releasePendingUserKey,
   signInUrlFor,
   submitJoinRequest,
-} from '../src/collab/joinFlow.ts';
-import { loadAccessRule, saveAccessRule } from '../src/collab/accessRule.ts';
-import { createRejectionMemory, runAutoGrant } from '../src/collab/autoGrant.ts';
-import { rotateWorkspaceKey } from '../src/collab/workspaceRotation.ts';
-import { indexKeyFor, toBase64 } from '../src/collab/workspaceDocuments.ts';
+} from '../src/collab/access/joinFlow.ts';
+import { loadAccessRule, saveAccessRule } from '../src/collab/access/accessRule.ts';
+import { createRejectionMemory, runAutoGrant } from '../src/collab/access/autoGrant.ts';
+import { rotateWorkspaceKey } from '../src/collab/access/workspaceRotation.ts';
+import { indexKeyFor, toBase64 } from '../src/collab/sync/workspaceDocuments.ts';
 import { createJwksSource, createMemoryRuleVersionStore } from '../src/crypto/idToken.ts';
 import { exportSymmetricKeyHex } from '../src/crypto/keys.ts';
 

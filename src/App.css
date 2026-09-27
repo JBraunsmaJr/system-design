@@ -11955,7 +11955,7 @@ mark.search-highlight--ellipsis {
   background: var(--chrome-bg-raised);
   border: 1px solid var(--chrome-border);
   border-radius: var(--radius-md, 8px);
-  width: 760px;
+  width: 75vw;
   max-width: calc(100vw - 40px);
   max-height: calc(100vh - 60px);
   display: flex;

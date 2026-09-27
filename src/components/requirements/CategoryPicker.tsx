@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Tag, Trash2, X } from 'lucide-react';
 import {
   countItemsUsingCategory,
   findCategoryByLabel,
   getCategory,
-} from '../../domain/requirementsRegistry';
-import { computeFlippedPosition } from '../../domain/popoverPosition';
-import type { RequirementsDocument } from '../../domain/requirementsTypes';
-import { HighlightedText } from './HighlightText';
+} from '../../domain/requirements/requirementsRegistry';
+import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
+import { HighlightedText } from '../../common/components/highlight/HighlightText';
+import { useOutsideClick } from '../../common/hooks/useOutsideClick';
+import { usePositionedDropdown } from '../../common/hooks/usePositionedDropdown';
 
 interface CategoryPickerProps {
   doc: RequirementsDocument;
@@ -32,20 +33,7 @@ const DROPDOWN_WIDTH = 220;
  * `overflow: hidden` for its own rounded-corner clipping, and its parent
  * scroll container has `overflow: auto` - a normally-positioned dropdown
  * would get silently clipped by either of those the moment it extended
- * past the card's or the scroll area's own bounds, which is exactly the
- * "the dropdown appears hidden" bug this replaced. A portal sidesteps
- * ancestor clipping entirely by rendering outside that DOM subtree, with
- * position computed from the trigger's actual on-screen location instead
- * of relying on CSS positioning context.
- *
- * Positioning happens in two steps: opening sets a naive "below the
- * trigger" guess so the dropdown actually renders somewhere and becomes
- * measurable, then a useLayoutEffect measures its real size and corrects
- * the position - flipping above the trigger if there isn't enough room
- * below (e.g. the trigger is near the bottom of the screen). useLayoutEffect
- * specifically (not useEffect) is what keeps this flicker-free: it runs
- * synchronously after the DOM commits but before the browser paints, so
- * any correction happens invisibly rather than as a visible jump.
+ * past the card's or the scroll area's own bounds.
  */
 export function CategoryPicker({
   doc,
@@ -58,102 +46,31 @@ export function CategoryPicker({
 }: CategoryPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
-  // Which row is showing its inline "really delete?" strip. An inline
-  // confirm rather than window.confirm because the count of affected
-  // items is the whole point of asking, and a native dialog can't show
-  // it in the same place the person is already looking.
+  // Which row is showing its inline "really delete?" strip.
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
-  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const current = getCategory(doc, categoryId);
 
-  const open = () => {
-    const trigger = triggerRef.current;
-    if (!trigger) return;
-    const rect = trigger.getBoundingClientRect();
-    setDropdownPos({ top: rect.bottom + 4, left: Math.max(8, rect.right - DROPDOWN_WIDTH) });
-    setIsOpen(true);
-  };
   const close = () => {
     setIsOpen(false);
     setQuery('');
     setPendingDeleteId(null);
   };
 
-  // Measures the dropdown's real rendered size (only possible once it's
-  // actually in the DOM, which is why `open` above uses a naive guess
-  // first) and flips it above the trigger if it doesn't fit below.
-  // Re-runs when `query` changes too, since filtering the category list
-  // changes the dropdown's height.
-  useLayoutEffect(() => {
-    if (!isOpen) return;
-    const trigger = triggerRef.current;
-    const dropdown = dropdownRef.current;
-    if (!trigger || !dropdown) return;
-    const triggerRect = trigger.getBoundingClientRect();
-    const dropdownRect = dropdown.getBoundingClientRect();
-    const next = computeFlippedPosition(
-      triggerRect,
-      { width: dropdownRect.width, height: dropdownRect.height },
-      { width: window.innerWidth, height: window.innerHeight },
-    );
-    setDropdownPos((prev) =>
-      prev && prev.top === next.top && prev.left === next.left ? prev : next,
-    );
-  }, [isOpen, query, pendingDeleteId]);
+  const { position: dropdownPos } = usePositionedDropdown({
+    triggerRef,
+    dropdownRef,
+    isOpen,
+    dependencies: [query, pendingDeleteId],
+  });
 
-  // Same measure-and-flip logic, reused for scroll/resize while open -
-  // the dropdown is already rendered by this point, so there's no need
-  // for the naive-guess step `open` uses.
-  const reposition = useCallback(() => {
-    const trigger = triggerRef.current;
-    const dropdown = dropdownRef.current;
-    if (!trigger || !dropdown) return;
-    const triggerRect = trigger.getBoundingClientRect();
-    const dropdownRect = dropdown.getBoundingClientRect();
-    setDropdownPos(
-      computeFlippedPosition(
-        triggerRect,
-        { width: dropdownRect.width, height: dropdownRect.height },
-        { width: window.innerWidth, height: window.innerHeight },
-      ),
-    );
-  }, []);
-
-  // Click-outside-to-close needs to check both the trigger AND the
-  // portaled dropdown - they're no longer DOM siblings under one wrapper
-  // the way a non-portaled version would be, so a click inside the
-  // dropdown (now living directly under <body>) would otherwise look
-  // identical to a click "outside" from this listener's perspective.
-  useEffect(() => {
-    if (!isOpen) return;
-    const handler = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (triggerRef.current?.contains(target)) return;
-      if (dropdownRef.current?.contains(target)) return;
-      close();
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [isOpen]);
-
-  // A portaled, fixed-position dropdown doesn't automatically track the
-  // trigger's on-screen position the way an in-flow absolutely-positioned
-  // one would - it has to be explicitly recomputed as the card's scroll
-  // container moves it around. Capture phase (the `true` third argument)
-  // is what catches scroll events from the nested scrollable content
-  // area, since scroll events don't bubble the way most DOM events do.
-  useEffect(() => {
-    if (!isOpen) return;
-    window.addEventListener('scroll', reposition, true);
-    window.addEventListener('resize', reposition);
-    return () => {
-      window.removeEventListener('scroll', reposition, true);
-      window.removeEventListener('resize', reposition);
-    };
-  }, [isOpen, reposition]);
+  useOutsideClick({
+    refs: [triggerRef, dropdownRef],
+    isOpen,
+    onClose: close,
+  });
 
   const uniqueCategories = useMemo(() => {
     const seen = new Set<string>();
@@ -177,7 +94,7 @@ export function CategoryPicker({
         type="button"
         className={`category-picker__trigger${current ? '' : ' is-empty'}`}
         style={current ? { borderColor: `${current.color}66`, color: current.color } : undefined}
-        onClick={() => (isOpen ? close() : open())}
+        onClick={() => (isOpen ? close() : setIsOpen(true))}
       >
         <Tag size={11} />
         {current ? <HighlightedText text={current.label} search={searchQuery} /> : 'Category'}
@@ -189,7 +106,12 @@ export function CategoryPicker({
           <div
             ref={dropdownRef}
             className="category-picker__dropdown"
-            style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left }}
+            style={{
+              position: 'fixed',
+              top: dropdownPos.top,
+              left: dropdownPos.left,
+              width: DROPDOWN_WIDTH,
+            }}
           >
             <input
               autoFocus

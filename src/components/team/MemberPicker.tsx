@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { User, UserX, Check, ChevronDown } from 'lucide-react';
-import type { TeamDocument } from '../../domain/teamTypes';
-import { computeFlippedPosition } from '../../domain/popoverPosition';
+import type { TeamDocument } from '../../domain/timeline/teamTypes';
+import { useOutsideClick } from '../../common/hooks/useOutsideClick';
+import { usePositionedDropdown } from '../../common/hooks/usePositionedDropdown';
 
 interface MemberPickerProps {
   team: TeamDocument;
@@ -15,16 +16,7 @@ interface MemberPickerProps {
 const MENU_WIDTH = 210;
 
 /**
- * Portals its dropdown to document.body with flip-positioning, same
- * pattern as every other picker in this app (see CategoryPicker for the
- * full reasoning). This trigger commonly sits inside a sprint board
- * column - a scrolling, overflow-clipped container - so a locally
- * position:absolute dropdown gets cut off there regardless of its own
- * z-index; z-index only resolves stacking order *within* a clipping
- * context, it can't escape one. Confirmed this was actually happening
- * (not just a z-index number too low) before rewriting: the old version
- * had z-index:300, already higher than its siblings, and was still
- * getting clipped.
+ * Portals its dropdown to document.body with flip-positioning.
  */
 export function MemberPicker({
   team,
@@ -34,79 +26,26 @@ export function MemberPicker({
   compact = false,
 }: MemberPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const assignedMember = assigneeId ? team.members.find((m) => m.id === assigneeId) : undefined;
 
-  const open = () => {
-    const trigger = triggerRef.current;
-    if (!trigger) return;
-    const rect = trigger.getBoundingClientRect();
-    setMenuPos({ top: rect.bottom + 4, left: Math.max(8, rect.right - MENU_WIDTH) });
-    setIsOpen(true);
+  const { position: menuPos } = usePositionedDropdown({
+    triggerRef,
+    dropdownRef: menuRef,
+    isOpen,
+  });
+
+  const close = () => {
+    setIsOpen(false);
   };
-  const close = () => setIsOpen(false);
 
-  useLayoutEffect(() => {
-    if (!isOpen) return;
-    const trigger = triggerRef.current;
-    const menu = menuRef.current;
-    if (!trigger || !menu) return;
-    const triggerRect = trigger.getBoundingClientRect();
-    const menuRect = menu.getBoundingClientRect();
-    const next = computeFlippedPosition(
-      triggerRect,
-      { width: menuRect.width, height: menuRect.height },
-      { width: window.innerWidth, height: window.innerHeight },
-    );
-    setMenuPos((prev) => (prev && prev.top === next.top && prev.left === next.left ? prev : next));
-  }, [isOpen]);
-
-  const reposition = useCallback(() => {
-    const trigger = triggerRef.current;
-    const menu = menuRef.current;
-    if (!trigger || !menu) return;
-    const triggerRect = trigger.getBoundingClientRect();
-    const menuRect = menu.getBoundingClientRect();
-    setMenuPos(
-      computeFlippedPosition(
-        triggerRect,
-        { width: menuRect.width, height: menuRect.height },
-        { width: window.innerWidth, height: window.innerHeight },
-      ),
-    );
-  }, []);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleMouseDown = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (triggerRef.current?.contains(target)) return;
-      if (menuRef.current?.contains(target)) return;
-      close();
-    };
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close();
-    };
-    document.addEventListener('mousedown', handleMouseDown);
-    document.addEventListener('keydown', handleEscape);
-    return () => {
-      document.removeEventListener('mousedown', handleMouseDown);
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    window.addEventListener('scroll', reposition, true);
-    window.addEventListener('resize', reposition);
-    return () => {
-      window.removeEventListener('scroll', reposition, true);
-      window.removeEventListener('resize', reposition);
-    };
-  }, [isOpen, reposition]);
+  useOutsideClick({
+    refs: [triggerRef, menuRef],
+    isOpen,
+    onClose: close,
+  });
 
   const getInitials = (name: string) => {
     return name
@@ -126,7 +65,7 @@ export function MemberPicker({
         className={`member-picker__trigger${compact ? ' member-picker__trigger--compact' : ''}${
           assignedMember ? ' is-assigned' : ''
         }`}
-        onClick={() => (isOpen ? close() : open())}
+        onClick={() => setIsOpen((prev) => !prev)}
         title={assignedMember ? `Assigned to ${assignedMember.name}` : 'Assign team member'}
         aria-label={assignedMember ? `Assigned to ${assignedMember.name}` : 'Assign team member'}
       >

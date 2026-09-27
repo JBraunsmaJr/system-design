@@ -2,14 +2,14 @@
  * Run with: npx tsx --tsconfig tsconfig.app.json src/components/documentation/useDiagramHoverDocumentation.verify.ts
  */
 import type { Node, Edge } from '@xyflow/react';
-import type { ArchNodeData, ArchEdgeData } from '../../domain/types';
+import type { ArchNodeData, ArchEdgeData } from '../../domain/canvas/types';
 import {
   hasDocumentation,
   extractNodeDocumentation,
   extractEdgeDocumentation,
   DEFAULT_HOVER_DELAY,
   DEFAULT_LEAVE_DELAY,
-} from '../../domain/diagramDocumentation';
+} from '../../domain/canvas/diagramDocumentation';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {

@@ -7,10 +7,10 @@ import {
   getRelationshipsForItem,
   getOtherItemId,
   getRelationshipLabelForItem,
-} from '../../domain/requirementsRegistry';
-import { computeFlippedPosition } from '../../domain/popoverPosition';
-import type { RequirementsDocument } from '../../domain/requirementsTypes';
-import { HighlightedText, HighlightedTitle } from './HighlightText';
+} from '../../domain/requirements/requirementsRegistry';
+import { computeFlippedPosition } from '../../common/utils/popoverPosition';
+import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
+import { HighlightedText, HighlightedTitle } from '../../common/components/highlight/HighlightText';
 import { useItemPeek } from './useItemPeek';
 
 interface RelationshipManagerProps {

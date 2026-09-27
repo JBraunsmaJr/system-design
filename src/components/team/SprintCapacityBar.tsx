@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Users,
@@ -9,8 +9,9 @@ import {
   Calendar,
   ShieldAlert,
 } from 'lucide-react';
-import type { SprintCapacitySummary } from '../../domain/teamTypes';
-import { computeFlippedPosition } from '../../domain/popoverPosition';
+import { useOutsideClick } from '../../common/hooks/useOutsideClick';
+import { usePositionedDropdown } from '../../common/hooks/usePositionedDropdown';
+import type { SprintCapacitySummary } from '../../domain/timeline/teamTypes';
 
 interface SprintCapacityBarProps {
   summary: SprintCapacitySummary;
@@ -36,13 +37,22 @@ interface SprintCapacityBarProps {
  */
 export function SprintCapacityBar({ summary, compact = false }: SprintCapacityBarProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [breakdownPos, setBreakdownPos] = useState<{
-    top: number;
-    left: number;
-    width: number;
-  } | null>(null);
   const triggerRef = useRef<HTMLDivElement>(null);
   const breakdownRef = useRef<HTMLDivElement>(null);
+
+  const close = () => setIsExpanded(false);
+
+  const { position: breakdownPos } = usePositionedDropdown({
+    triggerRef,
+    dropdownRef: breakdownRef,
+    isOpen: isExpanded,
+  });
+
+  useOutsideClick({
+    refs: [triggerRef, breakdownRef],
+    isOpen: isExpanded,
+    onClose: close,
+  });
 
   const {
     grossCapacityPoints = summary.totalCapacityPoints,
@@ -77,86 +87,18 @@ export function SprintCapacityBar({ summary, compact = false }: SprintCapacityBa
       .slice(0, 2);
   };
 
-  const open = () => {
-    const trigger = triggerRef.current;
-    if (!trigger) return;
-    const rect = trigger.getBoundingClientRect();
-    setBreakdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
-    setIsExpanded(true);
-  };
-  const close = () => setIsExpanded(false);
-
-  useLayoutEffect(() => {
-    if (!isExpanded) return;
-    const trigger = triggerRef.current;
-    const breakdown = breakdownRef.current;
-    if (!trigger || !breakdown) return;
-    const triggerRect = trigger.getBoundingClientRect();
-    const breakdownRect = breakdown.getBoundingClientRect();
-    const next = computeFlippedPosition(
-      triggerRect,
-      { width: breakdownRect.width, height: breakdownRect.height },
-      { width: window.innerWidth, height: window.innerHeight },
-    );
-    setBreakdownPos((prev) =>
-      prev && prev.top === next.top && prev.left === next.left
-        ? prev
-        : { ...next, width: triggerRect.width },
-    );
-  }, [isExpanded]);
-
-  const reposition = useCallback(() => {
-    const trigger = triggerRef.current;
-    if (!trigger) return;
-    const rect = trigger.getBoundingClientRect();
-    setBreakdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
-  }, []);
-
-  useEffect(() => {
-    if (!isExpanded) return;
-    const handleMouseDown = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (triggerRef.current?.contains(target)) return;
-      if (breakdownRef.current?.contains(target)) return;
-      close();
-    };
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close();
-    };
-    document.addEventListener('mousedown', handleMouseDown);
-    document.addEventListener('keydown', handleEscape);
-    return () => {
-      document.removeEventListener('mousedown', handleMouseDown);
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [isExpanded]);
-
-  useEffect(() => {
-    if (!isExpanded) return;
-    window.addEventListener('scroll', reposition, true);
-    window.addEventListener('resize', reposition);
-    return () => {
-      window.removeEventListener('scroll', reposition, true);
-      window.removeEventListener('resize', reposition);
-    };
-  }, [isExpanded, reposition]);
-
   return (
     <div className={`sprint-capacity-bar${compact ? ' sprint-capacity-bar--compact' : ''}`}>
       <div
         ref={triggerRef}
         className="sprint-capacity-bar__header"
-        onClick={() => (isExpanded ? close() : open())}
+        onClick={() => setIsExpanded((prev) => !prev)}
         role="button"
         tabIndex={0}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
-            if (isExpanded) {
-              close();
-            } else {
-              open();
-            }
+            setIsExpanded((prev) => !prev);
           }
         }}
         title="Click to toggle team capacity breakdown"
@@ -218,16 +160,15 @@ export function SprintCapacityBar({ summary, compact = false }: SprintCapacityBa
       </div>
 
       {isExpanded &&
-        breakdownPos &&
         createPortal(
           <div
             ref={breakdownRef}
             className="sprint-capacity-bar__breakdown"
             style={{
               position: 'fixed',
-              top: breakdownPos.top,
-              left: breakdownPos.left,
-              width: breakdownPos.width,
+              top: breakdownPos?.top ?? 0,
+              left: breakdownPos?.left ?? 0,
+              width: breakdownPos?.width,
             }}
           >
             <div className="sprint-capacity-bar__breakdown-title">Sprint Capacity Breakdown</div>

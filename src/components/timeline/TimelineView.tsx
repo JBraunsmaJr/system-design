@@ -18,31 +18,34 @@ import {
   type ProgramIncrement,
   type Sprint,
   type CapacityReservation,
-} from '../../domain/programIncrements';
-import { getItemType, isItemWorkable } from '../../domain/requirementsRegistry';
+} from '../../domain/timeline/programIncrements';
+import { getItemType, isItemWorkable } from '../../domain/requirements/requirementsRegistry';
 import {
   findScheduleConflicts,
   checkScheduleConflict,
   findBlockingItemIds,
   type ScheduleConflictSeverity,
-} from '../../domain/scheduleConflicts';
-import type { RequirementItem, RequirementsDocument } from '../../domain/requirementsTypes';
-import type { RequirementsStore } from '../../collab/requirementsStore';
-import type { ProgramIncrementsStore } from '../../collab/programIncrementsStore';
-import type { MilestonesStore } from '../../collab/milestonesStore';
-import { createLocalMilestonesStore } from '../../collab/milestonesStore';
-import type { Milestone } from '../../domain/milestones';
-import { getMilestoneColor, getMilestoneTypeLabel } from '../../domain/milestones';
-import { computeSprintMilestoneSummary } from '../../domain/sprintSummaries';
+} from '../../domain/timeline/scheduleConflicts';
+import type {
+  RequirementItem,
+  RequirementsDocument,
+} from '../../domain/requirements/requirementsTypes';
+import type { RequirementsStore } from '../../collab/stores/requirementsStore';
+import type { ProgramIncrementsStore } from '../../collab/stores/programIncrementsStore';
+import type { MilestonesStore } from '../../collab/stores/milestonesStore';
+import { createLocalMilestonesStore } from '../../collab/stores/milestonesStore';
+import type { Milestone } from '../../domain/timeline/milestones';
+import { getMilestoneColor, getMilestoneTypeLabel } from '../../domain/timeline/milestones';
+import { computeSprintMilestoneSummary } from '../../domain/timeline/sprintSummaries';
 import {
   getAllEpicsWithInferredSchedule,
   getChildItemsForParent,
-} from '../../domain/epicScheduling';
-import type { TeamDocument } from '../../domain/teamTypes';
-import type { SubDiagram } from '../../domain/types';
-import type { DiagramPath } from '../../domain/subDiagramTree';
-import type { PresenceInfo } from '../../collab/session';
-import { computeSprintCapacity, computePICapacities } from '../../domain/teamCapacity';
+} from '../../domain/timeline/epicScheduling';
+import type { TeamDocument } from '../../domain/timeline/teamTypes';
+import type { SubDiagram } from '../../domain/canvas/types';
+import type { DiagramPath } from '../../domain/canvas/subDiagramTree';
+import type { PresenceInfo } from '../../collab/sync/session';
+import { computeSprintCapacity, computePICapacities } from '../../domain/timeline/teamCapacity';
 import { SprintCapacityBar } from '../team/SprintCapacityBar';
 import { MemberPicker } from '../team/MemberPicker';
 import { PointsPicker } from '../team/PointsPicker';

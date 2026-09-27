@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Plus, Search, Settings2 } from 'lucide-react';
-import type { RequirementItemType } from '../../domain/requirementsTypes';
+import { useOutsideClick } from '../../common/hooks/useOutsideClick';
+import { usePositionedDropdown } from '../../common/hooks/usePositionedDropdown';
+import type { RequirementItemType } from '../../domain/requirements/requirementsTypes';
 
 interface AddItemDropdownProps {
   itemTypes: RequirementItemType[];
@@ -21,7 +23,6 @@ export function AddItemDropdown({
   const [isOpen, setIsOpen] = useState(false);
   const [filterQuery, setFilterQuery] = useState('');
   const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null);
-  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -42,37 +43,19 @@ export function AddItemDropdown({
   const close = useCallback(() => {
     setIsOpen(false);
     setFilterQuery('');
-    setDropdownPos(null);
   }, []);
 
-  const open = useCallback(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const rect = container.getBoundingClientRect();
-    // Initial guess
-    setDropdownPos({ top: rect.bottom + 4, left: Math.max(8, rect.left) });
-    setIsOpen(true);
-  }, []);
+  const { position: dropdownPos } = usePositionedDropdown({
+    triggerRef: containerRef,
+    dropdownRef,
+    isOpen,
+  });
 
-  // Sync position using popover flip logic
-  useLayoutEffect(() => {
-    if (!isOpen || !containerRef.current || !dropdownRef.current) return;
-    const container = containerRef.current.getBoundingClientRect();
-    const dropdown = dropdownRef.current.getBoundingClientRect();
-
-    const left = Math.max(8, Math.min(container.left, window.innerWidth - dropdown.width - 8));
-    const spaceBelow = window.innerHeight - container.bottom;
-    const spaceAbove = container.top;
-
-    let top: number;
-    if (spaceBelow >= dropdown.height + 4 || spaceBelow >= spaceAbove) {
-      top = container.bottom + 4;
-    } else {
-      top = Math.max(8, container.top - dropdown.height - 4);
-    }
-
-    setDropdownPos({ top, left });
-  }, [isOpen, filterQuery]);
+  useOutsideClick({
+    refs: [containerRef, dropdownRef],
+    isOpen,
+    onClose: close,
+  });
 
   // Focus search when dropdown opens if there are many types
   useEffect(() => {
@@ -80,32 +63,6 @@ export function AddItemDropdown({
       searchInputRef.current?.focus();
     }
   }, [isOpen, uniqueItemTypes.length]);
-
-  // Handle outside click & escape key
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const onMouseDown = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (containerRef.current?.contains(target) || dropdownRef.current?.contains(target)) {
-        return;
-      }
-      close();
-    };
-
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        close();
-      }
-    };
-
-    window.addEventListener('mousedown', onMouseDown);
-    window.addEventListener('keydown', onKeyDown);
-    return () => {
-      window.removeEventListener('mousedown', onMouseDown);
-      window.removeEventListener('keydown', onKeyDown);
-    };
-  }, [isOpen, close]);
 
   const handleQuickAdd = () => {
     if (activeType) {
@@ -146,7 +103,7 @@ export function AddItemDropdown({
         <button
           type="button"
           className={`add-item-dropdown__toggle-btn ${isOpen ? 'is-open' : ''}`}
-          onClick={() => (isOpen ? close() : open())}
+          onClick={() => setIsOpen((prev) => !prev)}
           aria-expanded={isOpen}
           aria-label="Choose requirement type to add"
           title="Choose requirement type to add"
@@ -156,15 +113,14 @@ export function AddItemDropdown({
       </div>
 
       {isOpen &&
-        dropdownPos &&
         createPortal(
           <div
             ref={dropdownRef}
             className="add-item-dropdown__menu"
             style={{
               position: 'fixed',
-              top: `${dropdownPos.top}px`,
-              left: `${dropdownPos.left}px`,
+              top: `${dropdownPos?.top ?? 0}px`,
+              left: `${dropdownPos?.left ?? 0}px`,
               width: `${DROPDOWN_WIDTH}px`,
             }}
           >

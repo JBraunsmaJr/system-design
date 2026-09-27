@@ -241,7 +241,7 @@ console.log('\n=== Recovery code (WS7-R12) ===');
     const swapped = symbols.slice(0, i) + symbols[i + 1] + symbols[i] + symbols.slice(i + 2);
     if (parseRecoveryCode(swapped).ok) transposed++;
   }
-  assert(transposed === 0, 'and so are transposed neighbours');
+  assert(transposed === 0, 'and so are transposed neighbors');
 
   const empty = parseRecoveryCode('');
   assert(!empty.ok && empty.problem === 'empty', 'an empty entry says so');
