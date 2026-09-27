@@ -5,7 +5,10 @@ import { computeEpicInferredSchedule, getChildItemsForParent } from './epicSched
 import type { RequirementsDocument } from '../requirements/requirementsTypes';
 import type { ProgramIncrement } from './programIncrements';
 import type { Milestone } from './milestones';
-import { BUILT_IN_ITEM_TYPES, BUILT_IN_RELATIONSHIP_TYPES } from '../requirements/requirementsRegistry';
+import {
+  BUILT_IN_ITEM_TYPES,
+  BUILT_IN_RELATIONSHIP_TYPES,
+} from '../requirements/requirementsRegistry';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {

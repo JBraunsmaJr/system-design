@@ -64,7 +64,11 @@ import { IconPickerPanel } from './IconPicker';
 import { getNodeType, NODE_TYPES } from '../../domain/canvas/nodeRegistry';
 import { getGroupType, GROUP_TYPES } from '../../domain/canvas/groupRegistry';
 import { SHAPE_TYPES, globalShapeRegistry } from '../../domain/canvas/shapeRegistry';
-import { computeAlignment, type AlignBox, type AlignmentGuide } from '../../domain/canvas/alignmentGuides';
+import {
+  computeAlignment,
+  type AlignBox,
+  type AlignmentGuide,
+} from '../../domain/canvas/alignmentGuides';
 import type { ZOrderCommand } from '../../domain/canvas/zOrder';
 import {
   getDescendantIds,

@@ -1,6 +1,11 @@
 import { Handle, Position } from '@xyflow/react';
 import type { ConnectionPoint } from '../../../domain/canvas/shapeRegistry';
-import { SIDES, grabHandleId, sourceHandleId, targetHandleId } from '../../../domain/canvas/edgeAnchoring';
+import {
+  SIDES,
+  grabHandleId,
+  sourceHandleId,
+  targetHandleId,
+} from '../../../domain/canvas/edgeAnchoring';
 
 const SIDE_TO_POSITION = {
   top: Position.Top,

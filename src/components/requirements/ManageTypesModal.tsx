@@ -1,7 +1,10 @@
 import { useMemo, useState } from 'react';
 import { ArrowRightLeft, Briefcase, Check, Lock, Pencil, Trash2, X } from 'lucide-react';
 import { countItemsUsingType, isPrefixTaken } from '../../domain/requirements/requirementsRegistry';
-import type { RequirementItemType, RequirementsDocument } from '../../domain/requirements/requirementsTypes';
+import type {
+  RequirementItemType,
+  RequirementsDocument,
+} from '../../domain/requirements/requirementsTypes';
 import { BaseModal } from '../../common/components/modal/BaseModal';
 
 interface ManageTypesModalProps {
@@ -131,220 +134,220 @@ export function ManageTypesModal({
       className="manage-types-modal"
     >
       <div className="manage-types-modal__list">
-          {uniqueItemTypes.map((type) => {
-            if (editingTypeId === type.id) {
-              return (
-                <div
-                  key={type.id}
-                  className="manage-types-modal__row manage-types-modal__row--editing"
-                >
-                  <input
-                    type="color"
-                    value={editColor}
-                    onChange={(e) => setEditColor(e.target.value)}
-                    aria-label="Edit type color"
-                    className="manage-types-modal__edit-color"
-                  />
-                  <input
-                    value={editLabel}
-                    onChange={(e) => setEditLabel(e.target.value)}
-                    aria-label="Edit type label"
-                    className="manage-types-modal__edit-label"
-                    autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') saveEditing();
-                      if (e.key === 'Escape') cancelEditing();
-                    }}
-                  />
-                  <span className="manage-types-modal__prefix">{type.prefix}-</span>
-                  <label className="manage-types-modal__workable-toggle">
-                    <input
-                      type="checkbox"
-                      checked={editWorkable}
-                      onChange={(e) => setEditWorkable(e.target.checked)}
-                    />
-                    Workable
-                  </label>
-                  <button
-                    type="button"
-                    className="manage-types-modal__save"
-                    onClick={saveEditing}
-                    disabled={!editLabel.trim()}
-                    aria-label="Save changes"
-                    title="Save"
-                  >
-                    <Check size={13} />
-                  </button>
-                  <button
-                    type="button"
-                    className="manage-types-modal__cancel"
-                    onClick={cancelEditing}
-                    aria-label="Cancel editing"
-                    title="Cancel"
-                  >
-                    <X size={13} />
-                  </button>
-                </div>
-              );
-            }
-
-            if (transferringTypeId === type.id) {
-              const inUseCount = countItemsUsingType(doc, type.id);
-              return (
-                <div
-                  key={type.id}
-                  className="manage-types-modal__row manage-types-modal__row--transferring"
-                >
-                  <span className="manage-types-modal__swatch" style={{ background: type.color }} />
-                  <span className="manage-types-modal__transfer-label">
-                    Transfer {inUseCount} item{inUseCount === 1 ? '' : 's'} to:
-                  </span>
-                  <select
-                    value={transferTargetTypeId}
-                    onChange={(e) => setTransferTargetTypeId(e.target.value)}
-                    className="manage-types-modal__transfer-select"
-                  >
-                    {uniqueItemTypes
-                      .filter((t) => t.id !== type.id)
-                      .map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.label} ({t.prefix}) {t.isWorkable ? '• Workable' : '• Non-workable'}
-                        </option>
-                      ))}
-                  </select>
-                  <button
-                    type="button"
-                    className="manage-types-modal__save"
-                    onClick={() => executeTransfer(type.id)}
-                    disabled={!transferTargetTypeId}
-                    aria-label="Confirm Transfer"
-                    title="Transfer items"
-                  >
-                    <Check size={13} />
-                  </button>
-                  <button
-                    type="button"
-                    className="manage-types-modal__cancel"
-                    onClick={cancelTransfer}
-                    aria-label="Cancel transfer"
-                    title="Cancel"
-                  >
-                    <X size={13} />
-                  </button>
-                </div>
-              );
-            }
-
-            const inUse = countItemsUsingType(doc, type.id);
+        {uniqueItemTypes.map((type) => {
+          if (editingTypeId === type.id) {
             return (
-              <div key={type.id} className="manage-types-modal__row">
-                <span className="manage-types-modal__swatch" style={{ background: type.color }} />
-                <span className="manage-types-modal__label">{type.label}</span>
+              <div
+                key={type.id}
+                className="manage-types-modal__row manage-types-modal__row--editing"
+              >
+                <input
+                  type="color"
+                  value={editColor}
+                  onChange={(e) => setEditColor(e.target.value)}
+                  aria-label="Edit type color"
+                  className="manage-types-modal__edit-color"
+                />
+                <input
+                  value={editLabel}
+                  onChange={(e) => setEditLabel(e.target.value)}
+                  aria-label="Edit type label"
+                  className="manage-types-modal__edit-label"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') saveEditing();
+                    if (e.key === 'Escape') cancelEditing();
+                  }}
+                />
                 <span className="manage-types-modal__prefix">{type.prefix}-</span>
-                {type.isWorkable && (
-                  <Briefcase
-                    size={12}
-                    className="manage-types-modal__workable"
-                    aria-label="Represents workable tasks"
+                <label className="manage-types-modal__workable-toggle">
+                  <input
+                    type="checkbox"
+                    checked={editWorkable}
+                    onChange={(e) => setEditWorkable(e.target.checked)}
                   />
-                )}
-                {inUse > 0 && <span className="manage-types-modal__in-use">{inUse} in use</span>}
-                {inUse > 0 && onConvertAllItemsOfType && (
-                  <button
-                    type="button"
-                    className="manage-types-modal__transfer"
-                    onClick={() => startTransfer(type.id)}
-                    aria-label={`Transfer ${inUse} item(s) to another type`}
-                    title={`Transfer / convert all items of type ${type.label} to another type (e.g. Epic, Dependency, Ticket)`}
-                  >
-                    <ArrowRightLeft size={12} />
-                  </button>
-                )}
+                  Workable
+                </label>
                 <button
                   type="button"
-                  className="manage-types-modal__edit"
-                  onClick={() => startEditing(type)}
-                  aria-label={`Edit ${type.label} type`}
-                  title="Edit label, color, and workable status"
+                  className="manage-types-modal__save"
+                  onClick={saveEditing}
+                  disabled={!editLabel.trim()}
+                  aria-label="Save changes"
+                  title="Save"
                 >
-                  <Pencil size={12} />
+                  <Check size={13} />
                 </button>
-                {type.isBuiltIn ? (
-                  <Lock
-                    size={12}
-                    className="manage-types-modal__lock"
-                    aria-label="Built-in type - prefix is locked"
-                  />
-                ) : (
-                  <button
-                    type="button"
-                    className="manage-types-modal__delete"
-                    disabled={inUse > 0}
-                    onClick={() => {
-                      if (!onDeleteCustomType(type.id)) {
-                        setError(`"${type.label}" is now in use and can no longer be deleted.`);
-                      }
-                    }}
-                    aria-label={`Delete ${type.label} type`}
-                    title={
-                      inUse > 0
-                        ? `In use by ${inUse} item${inUse === 1 ? '' : 's'} - transfer or delete ${inUse === 1 ? 'it' : 'them'} first`
-                        : 'Delete this type'
-                    }
-                  >
-                    <Trash2 size={12} />
-                  </button>
-                )}
+                <button
+                  type="button"
+                  className="manage-types-modal__cancel"
+                  onClick={cancelEditing}
+                  aria-label="Cancel editing"
+                  title="Cancel"
+                >
+                  <X size={13} />
+                </button>
               </div>
             );
-          })}
-        </div>
+          }
 
-        <div className="manage-types-modal__form">
+          if (transferringTypeId === type.id) {
+            const inUseCount = countItemsUsingType(doc, type.id);
+            return (
+              <div
+                key={type.id}
+                className="manage-types-modal__row manage-types-modal__row--transferring"
+              >
+                <span className="manage-types-modal__swatch" style={{ background: type.color }} />
+                <span className="manage-types-modal__transfer-label">
+                  Transfer {inUseCount} item{inUseCount === 1 ? '' : 's'} to:
+                </span>
+                <select
+                  value={transferTargetTypeId}
+                  onChange={(e) => setTransferTargetTypeId(e.target.value)}
+                  className="manage-types-modal__transfer-select"
+                >
+                  {uniqueItemTypes
+                    .filter((t) => t.id !== type.id)
+                    .map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.label} ({t.prefix}) {t.isWorkable ? '• Workable' : '• Non-workable'}
+                      </option>
+                    ))}
+                </select>
+                <button
+                  type="button"
+                  className="manage-types-modal__save"
+                  onClick={() => executeTransfer(type.id)}
+                  disabled={!transferTargetTypeId}
+                  aria-label="Confirm Transfer"
+                  title="Transfer items"
+                >
+                  <Check size={13} />
+                </button>
+                <button
+                  type="button"
+                  className="manage-types-modal__cancel"
+                  onClick={cancelTransfer}
+                  aria-label="Cancel transfer"
+                  title="Cancel"
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            );
+          }
+
+          const inUse = countItemsUsingType(doc, type.id);
+          return (
+            <div key={type.id} className="manage-types-modal__row">
+              <span className="manage-types-modal__swatch" style={{ background: type.color }} />
+              <span className="manage-types-modal__label">{type.label}</span>
+              <span className="manage-types-modal__prefix">{type.prefix}-</span>
+              {type.isWorkable && (
+                <Briefcase
+                  size={12}
+                  className="manage-types-modal__workable"
+                  aria-label="Represents workable tasks"
+                />
+              )}
+              {inUse > 0 && <span className="manage-types-modal__in-use">{inUse} in use</span>}
+              {inUse > 0 && onConvertAllItemsOfType && (
+                <button
+                  type="button"
+                  className="manage-types-modal__transfer"
+                  onClick={() => startTransfer(type.id)}
+                  aria-label={`Transfer ${inUse} item(s) to another type`}
+                  title={`Transfer / convert all items of type ${type.label} to another type (e.g. Epic, Dependency, Ticket)`}
+                >
+                  <ArrowRightLeft size={12} />
+                </button>
+              )}
+              <button
+                type="button"
+                className="manage-types-modal__edit"
+                onClick={() => startEditing(type)}
+                aria-label={`Edit ${type.label} type`}
+                title="Edit label, color, and workable status"
+              >
+                <Pencil size={12} />
+              </button>
+              {type.isBuiltIn ? (
+                <Lock
+                  size={12}
+                  className="manage-types-modal__lock"
+                  aria-label="Built-in type - prefix is locked"
+                />
+              ) : (
+                <button
+                  type="button"
+                  className="manage-types-modal__delete"
+                  disabled={inUse > 0}
+                  onClick={() => {
+                    if (!onDeleteCustomType(type.id)) {
+                      setError(`"${type.label}" is now in use and can no longer be deleted.`);
+                    }
+                  }}
+                  aria-label={`Delete ${type.label} type`}
+                  title={
+                    inUse > 0
+                      ? `In use by ${inUse} item${inUse === 1 ? '' : 's'} - transfer or delete ${inUse === 1 ? 'it' : 'them'} first`
+                      : 'Delete this type'
+                  }
+                >
+                  <Trash2 size={12} />
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="manage-types-modal__form">
+        <input
+          placeholder="Label, e.g. Constraint"
+          value={label}
+          onChange={(e) => {
+            setLabel(e.target.value);
+            setError(null);
+          }}
+        />
+        <input
+          placeholder="Prefix, e.g. CON"
+          value={prefix}
+          onChange={(e) => {
+            setPrefix(e.target.value);
+            setError(null);
+          }}
+          style={{ width: 90 }}
+        />
+        <input
+          type="color"
+          value={color}
+          onChange={(e) => setColor(e.target.value)}
+          aria-label="Type color"
+        />
+        <label className="manage-types-modal__workable-toggle">
           <input
-            placeholder="Label, e.g. Constraint"
-            value={label}
-            onChange={(e) => {
-              setLabel(e.target.value);
-              setError(null);
-            }}
+            type="checkbox"
+            checked={isWorkable}
+            onChange={(e) => setIsWorkable(e.target.checked)}
           />
-          <input
-            placeholder="Prefix, e.g. CON"
-            value={prefix}
-            onChange={(e) => {
-              setPrefix(e.target.value);
-              setError(null);
-            }}
-            style={{ width: 90 }}
-          />
-          <input
-            type="color"
-            value={color}
-            onChange={(e) => setColor(e.target.value)}
-            aria-label="Type color"
-          />
-          <label className="manage-types-modal__workable-toggle">
-            <input
-              type="checkbox"
-              checked={isWorkable}
-              onChange={(e) => setIsWorkable(e.target.checked)}
-            />
-            Workable
-          </label>
-          <button type="button" className="primary" onClick={onSubmit}>
-            Add type
-          </button>
-        </div>
-        {error && <p className="manage-types-modal__error">{error}</p>}
-        {success && (
-          <p
-            className="manage-types-modal__success"
-            style={{ color: '#38bd7d', margin: '8px 0 0', fontSize: '12px' }}
-          >
-            {success}
-          </p>
-        )}
+          Workable
+        </label>
+        <button type="button" className="primary" onClick={onSubmit}>
+          Add type
+        </button>
+      </div>
+      {error && <p className="manage-types-modal__error">{error}</p>}
+      {success && (
+        <p
+          className="manage-types-modal__success"
+          style={{ color: '#38bd7d', margin: '8px 0 0', fontSize: '12px' }}
+        >
+          {success}
+        </p>
+      )}
     </BaseModal>
   );
 }

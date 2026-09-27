@@ -16,7 +16,10 @@ import {
   getMilestoneCapacityWorkload,
   type Milestone,
 } from './milestones';
-import { BUILT_IN_ITEM_TYPES, BUILT_IN_RELATIONSHIP_TYPES } from '../requirements/requirementsRegistry';
+import {
+  BUILT_IN_ITEM_TYPES,
+  BUILT_IN_RELATIONSHIP_TYPES,
+} from '../requirements/requirementsRegistry';
 import type { RequirementsDocument } from '../requirements/requirementsTypes';
 import { parseDiagramFile } from '../canvas/serialization';
 

@@ -17,7 +17,11 @@ import {
   type Browser,
 } from './lib/joinHarness.ts';
 import { bootstrapFirstDevice, enrollDevice } from '../src/collab/access/deviceIdentity.ts';
-import { pendingUserKeySource, signInUrlFor, submitJoinRequest } from '../src/collab/access/joinFlow.ts';
+import {
+  pendingUserKeySource,
+  signInUrlFor,
+  submitJoinRequest,
+} from '../src/collab/access/joinFlow.ts';
 import { loadAccessRule, saveAccessRule } from '../src/collab/access/accessRule.ts';
 import { createRejectionMemory, runAutoGrant } from '../src/collab/access/autoGrant.ts';
 import { rotateIfRequired } from '../src/collab/access/autoRotation.ts';

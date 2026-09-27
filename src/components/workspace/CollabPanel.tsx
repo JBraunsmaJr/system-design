@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Users,
@@ -14,7 +14,8 @@ import {
   ExternalLink,
   Clipboard,
 } from 'lucide-react';
-import { computeFlippedPosition } from '../../domain/canvas/popoverPosition';
+import { useOutsideClick } from '../../common/hooks/useOutsideClick';
+import { usePositionedDropdown } from '../../common/hooks/usePositionedDropdown';
 import { createSessionLink, parseSessionLink } from '../../domain/network/sessionLink';
 import type { PresenceInfo } from '../../collab/sync/session';
 
@@ -127,86 +128,22 @@ export function CollabPanel({
   // here. Otherwise collapsed: these are set once and rarely revisited.
   const [showSettings, setShowSettings] = useState(() => !signalingConfigured);
   const [copied, setCopied] = useState(false);
-  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const open = () => {
-    const trigger = triggerRef.current;
-    if (!trigger) return;
-    const rect = trigger.getBoundingClientRect();
-    setDropdownPos({ top: rect.bottom + 4, left: Math.max(8, rect.right - DROPDOWN_WIDTH) });
-    setIsOpen(true);
-  };
   const close = () => setIsOpen(false);
 
-  // Refines the rough position set in open() once the dropdown has
-  // actually been measured - its height varies a lot depending on
-  // whether a session is active and how many peers are in it, so it
-  // can't be known ahead of the first paint.
-  useLayoutEffect(() => {
-    if (!isOpen) return;
-    const trigger = triggerRef.current;
-    const dropdown = dropdownRef.current;
-    if (!trigger || !dropdown) return;
-    const triggerRect = trigger.getBoundingClientRect();
-    const dropdownRect = dropdown.getBoundingClientRect();
-    const next = computeFlippedPosition(
-      triggerRect,
-      { width: dropdownRect.width, height: dropdownRect.height },
-      { width: window.innerWidth, height: window.innerHeight },
-    );
-    setDropdownPos((prev) =>
-      prev && prev.top === next.top && prev.left === next.left ? prev : next,
-    );
-  }, [isOpen]);
+  const { position: dropdownPos } = usePositionedDropdown({
+    triggerRef,
+    dropdownRef,
+    isOpen,
+  });
 
-  const reposition = useCallback(() => {
-    const trigger = triggerRef.current;
-    const dropdown = dropdownRef.current;
-    if (!trigger || !dropdown) return;
-    const triggerRect = trigger.getBoundingClientRect();
-    const dropdownRect = dropdown.getBoundingClientRect();
-    setDropdownPos(
-      computeFlippedPosition(
-        triggerRect,
-        { width: dropdownRect.width, height: dropdownRect.height },
-        { width: window.innerWidth, height: window.innerHeight },
-      ),
-    );
-  }, []);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleMouseDown = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (triggerRef.current?.contains(target)) return;
-      if (dropdownRef.current?.contains(target)) return;
-      close();
-    };
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close();
-    };
-    document.addEventListener('mousedown', handleMouseDown);
-    document.addEventListener('keydown', handleEscape);
-    return () => {
-      document.removeEventListener('mousedown', handleMouseDown);
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [isOpen]);
-
-  // Capture-phase scroll specifically so the toolbar row's OWN
-  // horizontal scrolling moves the dropdown with its trigger, not just
-  // window-level scrolling.
-  useEffect(() => {
-    if (!isOpen) return;
-    window.addEventListener('scroll', reposition, true);
-    window.addEventListener('resize', reposition);
-    return () => {
-      window.removeEventListener('scroll', reposition, true);
-      window.removeEventListener('resize', reposition);
-    };
-  }, [isOpen, reposition]);
+  useOutsideClick({
+    refs: [triggerRef, dropdownRef],
+    isOpen,
+    onClose: close,
+  });
 
   const handleCopy = () => {
     if (!activeSession) return;
@@ -296,7 +233,7 @@ export function CollabPanel({
         ref={triggerRef}
         type="button"
         className={`collab-panel__trigger${activeSession ? ' is-active' : ''}`}
-        onClick={() => (isOpen ? close() : open())}
+        onClick={() => setIsOpen((prev) => !prev)}
         title={activeSession ? `In session: ${activeSession.roomName}` : 'Collaborate'}
       >
         <Users size={14} />
@@ -304,7 +241,6 @@ export function CollabPanel({
       </button>
 
       {isOpen &&
-        dropdownPos &&
         createPortal(
           <div
             ref={dropdownRef}
@@ -313,8 +249,8 @@ export function CollabPanel({
             aria-modal="false"
             style={{
               position: 'fixed',
-              top: dropdownPos.top,
-              left: dropdownPos.left,
+              top: dropdownPos?.top ?? 0,
+              left: dropdownPos?.left ?? 0,
               width: DROPDOWN_WIDTH,
             }}
           >

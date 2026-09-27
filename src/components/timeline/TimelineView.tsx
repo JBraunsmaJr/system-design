@@ -26,7 +26,10 @@ import {
   findBlockingItemIds,
   type ScheduleConflictSeverity,
 } from '../../domain/timeline/scheduleConflicts';
-import type { RequirementItem, RequirementsDocument } from '../../domain/requirements/requirementsTypes';
+import type {
+  RequirementItem,
+  RequirementsDocument,
+} from '../../domain/requirements/requirementsTypes';
 import type { RequirementsStore } from '../../collab/stores/requirementsStore';
 import type { ProgramIncrementsStore } from '../../collab/stores/programIncrementsStore';
 import type { MilestonesStore } from '../../collab/stores/milestonesStore';

@@ -17,7 +17,12 @@ import * as Y from 'yjs';
 import { createLocalDiagramStore } from '../stores/diagramStore';
 import { createYjsDiagramStore, seedYjsDiagramDoc } from '../stores/yjsDiagramStore';
 import type { DiagramStore } from '../stores/diagramStore';
-import type { ArchNodeData, ArchEdgeData, EdgeWaypoint, SubDiagram } from '../../domain/canvas/types';
+import type {
+  ArchNodeData,
+  ArchEdgeData,
+  EdgeWaypoint,
+  SubDiagram,
+} from '../../domain/canvas/types';
 
 let failures = 0;
 function assert(cond: boolean, msg: string) {

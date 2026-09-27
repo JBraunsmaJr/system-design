@@ -45,12 +45,7 @@ function assert(condition: boolean, message: string) {
 // 3. BaseModal supports alertdialog role and ariaLabel
 {
   const html = renderToStaticMarkup(
-    <BaseModal
-      isOpen={true}
-      onClose={() => {}}
-      role="alertdialog"
-      ariaLabel="Warning Notice"
-    >
+    <BaseModal isOpen={true} onClose={() => {}} role="alertdialog" ariaLabel="Warning Notice">
       <p>Alert Message</p>
     </BaseModal>,
   );

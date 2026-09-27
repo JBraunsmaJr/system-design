@@ -1,7 +1,10 @@
 import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CheckCircle2, Circle, CircleDot, ChevronDown } from 'lucide-react';
-import { REQUIREMENT_STATUSES, getStatusMeta } from '../../domain/requirements/requirementsRegistry';
+import {
+  REQUIREMENT_STATUSES,
+  getStatusMeta,
+} from '../../domain/requirements/requirementsRegistry';
 import type { RequirementStatus } from '../../domain/requirements/requirementsTypes';
 import { useOutsideClick } from '../../common/hooks/useOutsideClick';
 import { usePositionedDropdown } from '../../common/hooks/usePositionedDropdown';

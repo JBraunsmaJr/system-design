@@ -1,5 +1,10 @@
 import * as Y from 'yjs';
-import type { TeamDocument, TeamMember, PtoSpan, ExtraDayOff } from '../../domain/timeline/teamTypes';
+import type {
+  TeamDocument,
+  TeamMember,
+  PtoSpan,
+  ExtraDayOff,
+} from '../../domain/timeline/teamTypes';
 import { DEFAULT_TEAM_SETTINGS } from '../../domain/timeline/teamTypes';
 import type { TeamStore } from './teamStore';
 

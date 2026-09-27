@@ -1,6 +1,10 @@
 import * as Y from 'yjs';
 import { orderIdSet, pushIfAbsent } from '../sync/seedGuards.ts';
-import type { ProgramIncrement, Sprint, CapacityReservation } from '../../domain/timeline/programIncrements';
+import type {
+  ProgramIncrement,
+  Sprint,
+  CapacityReservation,
+} from '../../domain/timeline/programIncrements';
 import {
   updateSprintEndDate,
   getNextPIStartDate,

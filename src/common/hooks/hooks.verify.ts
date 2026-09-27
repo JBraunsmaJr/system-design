@@ -25,9 +25,15 @@ function assert(condition: boolean, message: string) {
   const anchorNearRightEdge = { top: 100, bottom: 130, right: 1180 };
 
   const pos = computeFlippedPosition(anchorNearRightEdge, popover, viewport);
-  assert(pos.left + popover.width <= viewport.width, 'popover does not overflow right edge of viewport');
+  assert(
+    pos.left + popover.width <= viewport.width,
+    'popover does not overflow right edge of viewport',
+  );
   assert(pos.left >= 8, 'popover stays within left boundary');
-  assert(pos.left === 1200 - 340 - 8 || pos.left === 1180 - 340, 'popover right-aligns with anchor or clamps to viewport');
+  assert(
+    pos.left === 1200 - 340 - 8 || pos.left === 1180 - 340,
+    'popover right-aligns with anchor or clamps to viewport',
+  );
 }
 
 // 3. Dropdown flips vertically when constrained below

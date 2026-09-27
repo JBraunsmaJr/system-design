@@ -9,7 +9,11 @@ import {
 import { createYjsDiagramStore, seedYjsDiagramDoc } from '../collab/stores/yjsDiagramStore';
 import { computeEffectiveZIndices, type ZOrderBox } from '../domain/canvas/zOrder';
 import { computeAlignment, type AlignBox } from '../domain/canvas/alignmentGuides';
-import { buildOrthogonalRoute, getSegmentInsertions, type Point } from '../domain/canvas/edgeRouting';
+import {
+  buildOrthogonalRoute,
+  getSegmentInsertions,
+  type Point,
+} from '../domain/canvas/edgeRouting';
 import { getContainmentRelation } from '../domain/canvas/edgeContainment';
 import { generateSubDiagram } from './fixtures';
 

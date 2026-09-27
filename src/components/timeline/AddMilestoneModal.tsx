@@ -204,9 +204,7 @@ export function AddMilestoneModal({
               id="milestone-name"
               type="text"
               className="add-milestone-modal__input"
-              placeholder={
-                type === 'release' ? 'e.g. Release 2.4' : 'e.g. Q3 Architecture Review'
-              }
+              placeholder={type === 'release' ? 'e.g. Release 2.4' : 'e.g. Q3 Architecture Review'}
               value={name}
               onChange={(e) => {
                 setName(e.target.value);
@@ -254,8 +252,8 @@ export function AddMilestoneModal({
               Associated Requirement Items & Epics ({selectedItemIds.length} selected)
             </label>
             <p className="add-milestone-modal__hint">
-              Optionally link workable items, Epics, external dependencies, or goals that
-              culminate in this {typeLabel.toLowerCase()}.
+              Optionally link workable items, Epics, external dependencies, or goals that culminate
+              in this {typeLabel.toLowerCase()}.
             </p>
 
             <div className="milestone-modal__type-filters">

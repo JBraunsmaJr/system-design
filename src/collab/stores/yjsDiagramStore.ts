@@ -1,7 +1,12 @@
 import * as Y from 'yjs';
 import { orderIdSet, pushIfAbsent } from '../sync/seedGuards.ts';
 import type { Node, Edge } from '@xyflow/react';
-import type { ArchNodeData, ArchEdgeData, EdgeWaypoint, SubDiagram } from '../../domain/canvas/types';
+import type {
+  ArchNodeData,
+  ArchEdgeData,
+  EdgeWaypoint,
+  SubDiagram,
+} from '../../domain/canvas/types';
 import type { DiagramStore } from './diagramStore';
 import { flattenSubDiagramTree } from './diagramStore';
 import { recordSnapshotBuild, recordStoreWrite } from '../../perf/instrumentation';

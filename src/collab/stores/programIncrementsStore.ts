@@ -1,4 +1,7 @@
-import type { ProgramIncrement, CapacityReservation } from '../../domain/timeline/programIncrements';
+import type {
+  ProgramIncrement,
+  CapacityReservation,
+} from '../../domain/timeline/programIncrements';
 import {
   updateSprintEndDate,
   updatePIStartDate,

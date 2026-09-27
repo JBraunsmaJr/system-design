@@ -12,10 +12,16 @@ import {
   Diamond,
   Layers,
 } from 'lucide-react';
-import { computeSprintDateRanges, type ProgramIncrement } from '../../domain/timeline/programIncrements';
+import {
+  computeSprintDateRanges,
+  type ProgramIncrement,
+} from '../../domain/timeline/programIncrements';
 import { getItemType, isItemWorkable } from '../../domain/requirements/requirementsRegistry';
 import { findScheduleConflicts } from '../../domain/timeline/scheduleConflicts';
-import type { RequirementsDocument, RequirementItem } from '../../domain/requirements/requirementsTypes';
+import type {
+  RequirementsDocument,
+  RequirementItem,
+} from '../../domain/requirements/requirementsTypes';
 import type { Milestone } from '../../domain/timeline/milestones';
 import { getMilestoneColor, getMilestoneTypeLabel } from '../../domain/timeline/milestones';
 import {

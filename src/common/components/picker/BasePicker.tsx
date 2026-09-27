@@ -43,11 +43,10 @@ export function BasePicker<T>({
 
   const selectedOption = options.find((opt) => opt.value === selectedValue);
 
-  const filteredOptions = searchable && searchTerm.trim()
-    ? options.filter((opt) =>
-        opt.label.toLowerCase().includes(searchTerm.toLowerCase().trim()),
-      )
-    : options;
+  const filteredOptions =
+    searchable && searchTerm.trim()
+      ? options.filter((opt) => opt.label.toLowerCase().includes(searchTerm.toLowerCase().trim()))
+      : options;
 
   const handleOpenToggle = () => {
     if (disabled) return;

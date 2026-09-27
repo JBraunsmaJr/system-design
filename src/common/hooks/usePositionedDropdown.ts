@@ -19,10 +19,12 @@ export function usePositionedDropdown({
   isOpen,
   offsetY = 4,
 }: UsePositionedDropdownOptions): {
-  position: { top: number; left: number } | null;
+  position: { top: number; left: number; width?: number } | null;
   updatePosition: () => void;
 } {
-  const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
+  const [position, setPosition] = useState<{ top: number; left: number; width?: number } | null>(
+    null,
+  );
 
   const updatePosition = useCallback(() => {
     const trigger = triggerRef.current;
@@ -35,7 +37,11 @@ export function usePositionedDropdown({
         8,
         Math.min(triggerRect.right - 240, window.innerWidth - 248),
       );
-      setPosition({ top: triggerRect.bottom + offsetY, left: estimatedLeft });
+      setPosition({
+        top: triggerRect.bottom + offsetY,
+        left: estimatedLeft,
+        width: triggerRect.width,
+      });
       return;
     }
 
@@ -47,7 +53,12 @@ export function usePositionedDropdown({
       offsetY,
     );
     setPosition((prev) =>
-      prev && prev.top === next.top && prev.left === next.left ? prev : next,
+      prev &&
+      prev.top === next.top &&
+      prev.left === next.left &&
+      prev.width === triggerRect.width
+        ? prev
+        : { ...next, width: triggerRect.width },
     );
   }, [triggerRef, dropdownRef, offsetY]);
 

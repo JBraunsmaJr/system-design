@@ -105,7 +105,7 @@ names without a leading `/`, **Full group path** is off.
 
 :::warning
 This is assuming that Keycloak is hosted elsewhere.
-::: 
+:::
 
 The granting browser fetches the provider's discovery document and signing
 keys from the editor's page. Check both answer with a CORS header for the

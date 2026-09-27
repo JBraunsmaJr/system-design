@@ -257,263 +257,317 @@ export function LibraryManagerModal({ isOpen, onClose }: LibraryManagerModalProp
         overflow: 'hidden',
       }}
     >
-        {/* Header */}
-        <div
+      {/* Header */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '12px 18px',
+          borderBottom: '1px solid var(--border, #2d3342)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Package size={18} style={{ color: 'var(--accent, #5B7CFA)' }} />
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Shape & Icon Libraries</h3>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '12px 18px',
-            borderBottom: '1px solid var(--border, #2d3342)',
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--text-muted)',
+            cursor: 'pointer',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Package size={18} style={{ color: 'var(--accent, #5B7CFA)' }} />
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Shape & Icon Libraries</h3>
+          <X size={18} />
+        </button>
+      </div>
+
+      {/* Validation result banner */}
+      {validationResult && (
+        <div
+          style={{
+            padding: '10px 16px',
+            background: validationResult.valid
+              ? 'rgba(15, 163, 107, 0.15)'
+              : 'rgba(240, 87, 140, 0.15)',
+            borderBottom: '1px solid var(--border, #2d3342)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            fontSize: 13,
+          }}
+        >
+          <div>
+            <strong>{validationResult.valid ? 'Import Successful' : 'Import Failed'}</strong>:{' '}
+            {validationResult.importedShapesCount} shape(s), {validationResult.importedIconsCount}{' '}
+            icon(s) imported.
+            {validationResult.errors.length > 0 && (
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                {validationResult.errors.join('; ')}
+              </div>
+            )}
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => setValidationResult(null)}
             style={{
               background: 'transparent',
               border: 'none',
-              color: 'var(--text-muted)',
+              color: 'var(--text)',
               cursor: 'pointer',
+              fontSize: 12,
             }}
           >
-            <X size={18} />
+            Dismiss
           </button>
         </div>
+      )}
 
-        {/* Validation result banner */}
-        {validationResult && (
+      {/* Main Body */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+        {/* Left Sidebar: Library List */}
+        <div
+          style={{
+            width: 260,
+            borderRight: '1px solid var(--border, #2d3342)',
+            display: 'flex',
+            flexDirection: 'column',
+            background: 'rgba(0,0,0,0.1)',
+          }}
+        >
           <div
             style={{
-              padding: '10px 16px',
-              background: validationResult.valid
-                ? 'rgba(15, 163, 107, 0.15)'
-                : 'rgba(240, 87, 140, 0.15)',
-              borderBottom: '1px solid var(--border, #2d3342)',
+              padding: '10px 12px',
               display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              fontSize: 13,
+              gap: 6,
+              borderBottom: '1px solid var(--border, #2d3342)',
             }}
           >
-            <div>
-              <strong>{validationResult.valid ? 'Import Successful' : 'Import Failed'}</strong>:{' '}
-              {validationResult.importedShapesCount} shape(s), {validationResult.importedIconsCount}{' '}
-              icon(s) imported.
-              {validationResult.errors.length > 0 && (
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                  {validationResult.errors.join('; ')}
-                </div>
-              )}
-            </div>
             <button
               type="button"
-              onClick={() => setValidationResult(null)}
+              className="btn-primary"
               style={{
-                background: 'transparent',
-                border: 'none',
-                color: 'var(--text)',
-                cursor: 'pointer',
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 4,
                 fontSize: 12,
+                padding: '6px 8px',
+                borderRadius: 4,
+                background: 'var(--accent, #5B7CFA)',
+                color: '#fff',
+                border: 'none',
+                cursor: 'pointer',
+              }}
+              onClick={() => {
+                setIsCreatingLib(true);
+                setIsAddingIcon(false);
+                setIsAddingShape(false);
               }}
             >
-              Dismiss
+              <Plus size={14} /> New Library
             </button>
+            <button
+              type="button"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '6px 10px',
+                fontSize: 12,
+                borderRadius: 4,
+                background: 'var(--bg-field, #252a36)',
+                color: 'var(--text)',
+                border: '1px solid var(--border, #2d3342)',
+                cursor: 'pointer',
+              }}
+              title="Import Library (.json)"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload size={14} />
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json"
+              style={{ display: 'none' }}
+              onChange={handleImportFile}
+            />
           </div>
-        )}
 
-        {/* Main Body */}
-        <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-          {/* Left Sidebar: Library List */}
-          <div
-            style={{
-              width: 260,
-              borderRight: '1px solid var(--border, #2d3342)',
-              display: 'flex',
-              flexDirection: 'column',
-              background: 'rgba(0,0,0,0.1)',
-            }}
-          >
+          <div style={{ flex: 1, overflowY: 'auto', padding: '6px' }}>
             <div
               style={{
-                padding: '10px 12px',
-                display: 'flex',
-                gap: 6,
-                borderBottom: '1px solid var(--border, #2d3342)',
+                fontSize: 11,
+                fontWeight: 600,
+                color: 'var(--text-muted)',
+                padding: '4px 6px',
               }}
             >
-              <button
-                type="button"
-                className="btn-primary"
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 4,
-                  fontSize: 12,
-                  padding: '6px 8px',
-                  borderRadius: 4,
-                  background: 'var(--accent, #5B7CFA)',
-                  color: '#fff',
-                  border: 'none',
-                  cursor: 'pointer',
-                }}
-                onClick={() => {
-                  setIsCreatingLib(true);
-                  setIsAddingIcon(false);
-                  setIsAddingShape(false);
-                }}
-              >
-                <Plus size={14} /> New Library
-              </button>
-              <button
-                type="button"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: '6px 10px',
-                  fontSize: 12,
-                  borderRadius: 4,
-                  background: 'var(--bg-field, #252a36)',
-                  color: 'var(--text)',
-                  border: '1px solid var(--border, #2d3342)',
-                  cursor: 'pointer',
-                }}
-                title="Import Library (.json)"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <Upload size={14} />
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".json"
-                style={{ display: 'none' }}
-                onChange={handleImportFile}
-              />
+              Built-in Taxonomy
+            </div>
+            <div
+              style={{
+                padding: '6px 8px',
+                borderRadius: 4,
+                fontSize: 13,
+                color: 'var(--text-muted)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <span>Core System Design</span>
+              <span style={{ fontSize: 11 }}>18 shapes / 1000+ icons</span>
             </div>
 
-            <div style={{ flex: 1, overflowY: 'auto', padding: '6px' }}>
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: 'var(--text-muted)',
-                  padding: '4px 6px',
-                }}
-              >
-                Built-in Taxonomy
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                color: 'var(--text-muted)',
+                padding: '8px 6px 4px 6px',
+              }}
+            >
+              Custom Libraries ({libraries.length})
+            </div>
+            {libraries.length === 0 ? (
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '6px 8px' }}>
+                No custom libraries installed. Click "New Library" or "Import" to add one.
               </div>
-              <div
-                style={{
-                  padding: '6px 8px',
-                  borderRadius: 4,
-                  fontSize: 13,
-                  color: 'var(--text-muted)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                }}
-              >
-                <span>Core System Design</span>
-                <span style={{ fontSize: 11 }}>18 shapes / 1000+ icons</span>
-              </div>
-
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: 'var(--text-muted)',
-                  padding: '8px 6px 4px 6px',
-                }}
-              >
-                Custom Libraries ({libraries.length})
-              </div>
-              {libraries.length === 0 ? (
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '6px 8px' }}>
-                  No custom libraries installed. Click "New Library" or "Import" to add one.
-                </div>
-              ) : (
-                libraries.map((lib) => {
-                  const isSelected = lib.library.id === selectedLibId;
-                  return (
+            ) : (
+              libraries.map((lib) => {
+                const isSelected = lib.library.id === selectedLibId;
+                return (
+                  <div
+                    key={lib.library.id}
+                    style={{
+                      padding: '6px 8px',
+                      borderRadius: 4,
+                      fontSize: 13,
+                      cursor: 'pointer',
+                      background: isSelected ? 'var(--bg-active, #313848)' : 'transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      marginBottom: 2,
+                    }}
+                    onClick={() => {
+                      setSelectedLibId(lib.library.id);
+                      setIsCreatingLib(false);
+                      setIsAddingIcon(false);
+                      setIsAddingShape(false);
+                    }}
+                  >
                     <div
-                      key={lib.library.id}
                       style={{
-                        padding: '6px 8px',
-                        borderRadius: 4,
-                        fontSize: 13,
-                        cursor: 'pointer',
-                        background: isSelected ? 'var(--bg-active, #313848)' : 'transparent',
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'space-between',
-                        marginBottom: 2,
-                      }}
-                      onClick={() => {
-                        setSelectedLibId(lib.library.id);
-                        setIsCreatingLib(false);
-                        setIsAddingIcon(false);
-                        setIsAddingShape(false);
+                        gap: 6,
+                        overflow: 'hidden',
                       }}
                     >
-                      <div
+                      <input
+                        type="checkbox"
+                        checked={lib.enabled !== false}
+                        onChange={() => handleToggleLibrary(lib.library.id, lib.enabled)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <span
                         style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 6,
                           overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
                         }}
                       >
-                        <input
-                          type="checkbox"
-                          checked={lib.enabled !== false}
-                          onChange={() => handleToggleLibrary(lib.library.id, lib.enabled)}
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                        <span
-                          style={{
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {lib.library.name}
-                        </span>
-                      </div>
-                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                        {lib.shapes.length}s / {lib.icons.length}i
+                        {lib.library.name}
                       </span>
                     </div>
-                  );
-                })
-              )}
-            </div>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                      {lib.shapes.length}s / {lib.icons.length}i
+                    </span>
+                  </div>
+                );
+              })
+            )}
           </div>
+        </div>
 
-          {/* Right Content View */}
-          <div
-            style={{
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              overflowY: 'auto',
-              padding: 18,
-            }}
-          >
-            {isCreatingLib ? (
-              <form
-                onSubmit={handleCreateLibrary}
-                style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
-              >
-                <h4 style={{ margin: '0 0 8px 0' }}>Create New Custom Library</h4>
-                <div>
+        {/* Right Content View */}
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            overflowY: 'auto',
+            padding: 18,
+          }}
+        >
+          {isCreatingLib ? (
+            <form
+              onSubmit={handleCreateLibrary}
+              style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+            >
+              <h4 style={{ margin: '0 0 8px 0' }}>Create New Custom Library</h4>
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: 12,
+                    marginBottom: 4,
+                    color: 'var(--text-muted)',
+                  }}
+                >
+                  Library Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '6px 8px',
+                    background: 'var(--bg-field)',
+                    border: '1px solid var(--border)',
+                    color: '#fff',
+                    borderRadius: 4,
+                  }}
+                  value={newLibName}
+                  onChange={(e) => setNewLibName(e.target.value)}
+                  placeholder="e.g. Company Architecture"
+                />
+              </div>
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: 12,
+                    marginBottom: 4,
+                    color: 'var(--text-muted)',
+                  }}
+                >
+                  Description
+                </label>
+                <textarea
+                  rows={2}
+                  style={{
+                    width: '100%',
+                    padding: '6px 8px',
+                    background: 'var(--bg-field)',
+                    border: '1px solid var(--border)',
+                    color: '#fff',
+                    borderRadius: 4,
+                  }}
+                  value={newLibDesc}
+                  onChange={(e) => setNewLibDesc(e.target.value)}
+                  placeholder="Describe the library contents..."
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <div style={{ flex: 1 }}>
                   <label
                     style={{
                       display: 'block',
@@ -522,7 +576,97 @@ export function LibraryManagerModal({ isOpen, onClose }: LibraryManagerModalProp
                       color: 'var(--text-muted)',
                     }}
                   >
-                    Library Name *
+                    Author / Team
+                  </label>
+                  <input
+                    type="text"
+                    style={{
+                      width: '100%',
+                      padding: '6px 8px',
+                      background: 'var(--bg-field)',
+                      border: '1px solid var(--border)',
+                      color: '#fff',
+                      borderRadius: 4,
+                    }}
+                    value={newLibAuthor}
+                    onChange={(e) => setNewLibAuthor(e.target.value)}
+                    placeholder="e.g. Core Engineering"
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: 12,
+                      marginBottom: 4,
+                      color: 'var(--text-muted)',
+                    }}
+                  >
+                    License
+                  </label>
+                  <input
+                    type="text"
+                    style={{
+                      width: '100%',
+                      padding: '6px 8px',
+                      background: 'var(--bg-field)',
+                      border: '1px solid var(--border)',
+                      color: '#fff',
+                      borderRadius: 4,
+                    }}
+                    value={newLibLicense}
+                    onChange={(e) => setNewLibLicense(e.target.value)}
+                    placeholder="e.g. MIT, Internal"
+                  />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                <button
+                  type="submit"
+                  style={{
+                    padding: '6px 14px',
+                    background: 'var(--accent)',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 4,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Create Library
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsCreatingLib(false)}
+                  style={{
+                    padding: '6px 14px',
+                    background: 'transparent',
+                    border: '1px solid var(--border)',
+                    color: 'var(--text-muted)',
+                    borderRadius: 4,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          ) : isAddingIcon ? (
+            <form
+              onSubmit={handleCreateIcon}
+              style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+            >
+              <h4 style={{ margin: '0 0 8px 0' }}>Add Custom SVG Icon</h4>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: 12,
+                      marginBottom: 4,
+                      color: 'var(--text-muted)',
+                    }}
+                  >
+                    Icon Name *
                   </label>
                   <input
                     type="text"
@@ -535,12 +679,12 @@ export function LibraryManagerModal({ isOpen, onClose }: LibraryManagerModalProp
                       color: '#fff',
                       borderRadius: 4,
                     }}
-                    value={newLibName}
-                    onChange={(e) => setNewLibName(e.target.value)}
-                    placeholder="e.g. Company Architecture"
+                    value={newIconName}
+                    onChange={(e) => setNewIconName(e.target.value)}
+                    placeholder="e.g. Auth Gateway"
                   />
                 </div>
-                <div>
+                <div style={{ flex: 1 }}>
                   <label
                     style={{
                       display: 'block',
@@ -549,178 +693,7 @@ export function LibraryManagerModal({ isOpen, onClose }: LibraryManagerModalProp
                       color: 'var(--text-muted)',
                     }}
                   >
-                    Description
-                  </label>
-                  <textarea
-                    rows={2}
-                    style={{
-                      width: '100%',
-                      padding: '6px 8px',
-                      background: 'var(--bg-field)',
-                      border: '1px solid var(--border)',
-                      color: '#fff',
-                      borderRadius: 4,
-                    }}
-                    value={newLibDesc}
-                    onChange={(e) => setNewLibDesc(e.target.value)}
-                    placeholder="Describe the library contents..."
-                  />
-                </div>
-                <div style={{ display: 'flex', gap: 12 }}>
-                  <div style={{ flex: 1 }}>
-                    <label
-                      style={{
-                        display: 'block',
-                        fontSize: 12,
-                        marginBottom: 4,
-                        color: 'var(--text-muted)',
-                      }}
-                    >
-                      Author / Team
-                    </label>
-                    <input
-                      type="text"
-                      style={{
-                        width: '100%',
-                        padding: '6px 8px',
-                        background: 'var(--bg-field)',
-                        border: '1px solid var(--border)',
-                        color: '#fff',
-                        borderRadius: 4,
-                      }}
-                      value={newLibAuthor}
-                      onChange={(e) => setNewLibAuthor(e.target.value)}
-                      placeholder="e.g. Core Engineering"
-                    />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <label
-                      style={{
-                        display: 'block',
-                        fontSize: 12,
-                        marginBottom: 4,
-                        color: 'var(--text-muted)',
-                      }}
-                    >
-                      License
-                    </label>
-                    <input
-                      type="text"
-                      style={{
-                        width: '100%',
-                        padding: '6px 8px',
-                        background: 'var(--bg-field)',
-                        border: '1px solid var(--border)',
-                        color: '#fff',
-                        borderRadius: 4,
-                      }}
-                      value={newLibLicense}
-                      onChange={(e) => setNewLibLicense(e.target.value)}
-                      placeholder="e.g. MIT, Internal"
-                    />
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                  <button
-                    type="submit"
-                    style={{
-                      padding: '6px 14px',
-                      background: 'var(--accent)',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: 4,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Create Library
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsCreatingLib(false)}
-                    style={{
-                      padding: '6px 14px',
-                      background: 'transparent',
-                      border: '1px solid var(--border)',
-                      color: 'var(--text-muted)',
-                      borderRadius: 4,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            ) : isAddingIcon ? (
-              <form
-                onSubmit={handleCreateIcon}
-                style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
-              >
-                <h4 style={{ margin: '0 0 8px 0' }}>Add Custom SVG Icon</h4>
-                <div style={{ display: 'flex', gap: 12 }}>
-                  <div style={{ flex: 1 }}>
-                    <label
-                      style={{
-                        display: 'block',
-                        fontSize: 12,
-                        marginBottom: 4,
-                        color: 'var(--text-muted)',
-                      }}
-                    >
-                      Icon Name *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '6px 8px',
-                        background: 'var(--bg-field)',
-                        border: '1px solid var(--border)',
-                        color: '#fff',
-                        borderRadius: 4,
-                      }}
-                      value={newIconName}
-                      onChange={(e) => setNewIconName(e.target.value)}
-                      placeholder="e.g. Auth Gateway"
-                    />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <label
-                      style={{
-                        display: 'block',
-                        fontSize: 12,
-                        marginBottom: 4,
-                        color: 'var(--text-muted)',
-                      }}
-                    >
-                      Category
-                    </label>
-                    <input
-                      type="text"
-                      style={{
-                        width: '100%',
-                        padding: '6px 8px',
-                        background: 'var(--bg-field)',
-                        border: '1px solid var(--border)',
-                        color: '#fff',
-                        borderRadius: 4,
-                      }}
-                      value={newIconCategory}
-                      onChange={(e) => setNewIconCategory(e.target.value)}
-                      placeholder="e.g. Security"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: 12,
-                      marginBottom: 4,
-                      color: 'var(--text-muted)',
-                    }}
-                  >
-                    Search Tags (comma separated)
+                    Category
                   </label>
                   <input
                     type="text"
@@ -732,11 +705,236 @@ export function LibraryManagerModal({ isOpen, onClose }: LibraryManagerModalProp
                       color: '#fff',
                       borderRadius: 4,
                     }}
-                    value={newIconTags}
-                    onChange={(e) => setNewIconTags(e.target.value)}
-                    placeholder="e.g. auth, security, lock, login"
+                    value={newIconCategory}
+                    onChange={(e) => setNewIconCategory(e.target.value)}
+                    placeholder="e.g. Security"
                   />
                 </div>
+              </div>
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: 12,
+                    marginBottom: 4,
+                    color: 'var(--text-muted)',
+                  }}
+                >
+                  Search Tags (comma separated)
+                </label>
+                <input
+                  type="text"
+                  style={{
+                    width: '100%',
+                    padding: '6px 8px',
+                    background: 'var(--bg-field)',
+                    border: '1px solid var(--border)',
+                    color: '#fff',
+                    borderRadius: 4,
+                  }}
+                  value={newIconTags}
+                  onChange={(e) => setNewIconTags(e.target.value)}
+                  placeholder="e.g. auth, security, lock, login"
+                />
+              </div>
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: 12,
+                    marginBottom: 4,
+                    color: 'var(--text-muted)',
+                  }}
+                >
+                  SVG Code *
+                </label>
+                <textarea
+                  rows={4}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '6px 8px',
+                    background: 'var(--bg-field)',
+                    border: '1px solid var(--border)',
+                    color: '#fff',
+                    borderRadius: 4,
+                    fontFamily: 'monospace',
+                    fontSize: 12,
+                  }}
+                  value={newIconSvg}
+                  onChange={(e) => setNewIconSvg(e.target.value)}
+                />
+              </div>
+              {/* Preview */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '8px 12px',
+                  background: 'var(--bg-field)',
+                  borderRadius: 4,
+                }}
+              >
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Preview:</span>
+                <div
+                  style={{
+                    width: 24,
+                    height: 24,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <IconRenderer
+                    iconDefinition={{
+                      id: 'preview-new-icon',
+                      name: newIconName || 'Preview',
+                      version: 1,
+                      source: {
+                        type: 'svg',
+                        data: sanitizeSvg(newIconSvg),
+                      },
+                    }}
+                    size={24}
+                  />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <button
+                  type="submit"
+                  style={{
+                    padding: '6px 14px',
+                    background: 'var(--accent)',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 4,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Save Icon
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsAddingIcon(false)}
+                  style={{
+                    padding: '6px 14px',
+                    background: 'transparent',
+                    border: '1px solid var(--border)',
+                    color: 'var(--text-muted)',
+                    borderRadius: 4,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          ) : isAddingShape ? (
+            <form
+              onSubmit={handleCreateShape}
+              style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+            >
+              <h4 style={{ margin: '0 0 8px 0' }}>Add Custom Shape</h4>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: 12,
+                      marginBottom: 4,
+                      color: 'var(--text-muted)',
+                    }}
+                  >
+                    Shape Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '6px 8px',
+                      background: 'var(--bg-field)',
+                      border: '1px solid var(--border)',
+                      color: '#fff',
+                      borderRadius: 4,
+                    }}
+                    value={newShapeName}
+                    onChange={(e) => setNewShapeName(e.target.value)}
+                    placeholder="e.g. Edge Node"
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: 12,
+                      marginBottom: 4,
+                      color: 'var(--text-muted)',
+                    }}
+                  >
+                    Category
+                  </label>
+                  <input
+                    type="text"
+                    style={{
+                      width: '100%',
+                      padding: '6px 8px',
+                      background: 'var(--bg-field)',
+                      border: '1px solid var(--border)',
+                      color: '#fff',
+                      borderRadius: 4,
+                    }}
+                    value={newShapeCategory}
+                    onChange={(e) => setNewShapeCategory(e.target.value)}
+                    placeholder="e.g. Infrastructure"
+                  />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: 12,
+                      marginBottom: 4,
+                      color: 'var(--text-muted)',
+                    }}
+                  >
+                    Geometry Type
+                  </label>
+                  <GeometryPicker
+                    value={newShapeGeomType}
+                    onChange={(type) => setNewShapeGeomType(type)}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: 12,
+                      marginBottom: 4,
+                      color: 'var(--text-muted)',
+                    }}
+                  >
+                    Shape Color
+                  </label>
+                  <input
+                    type="color"
+                    style={{
+                      width: '100%',
+                      height: 34,
+                      padding: '2px 4px',
+                      background: 'var(--bg-field)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 4,
+                    }}
+                    value={newShapeColor}
+                    onChange={(e) => setNewShapeColor(e.target.value)}
+                  />
+                </div>
+              </div>
+              {newShapeGeomType === 'path' && (
                 <div>
                   <label
                     style={{
@@ -746,11 +944,10 @@ export function LibraryManagerModal({ isOpen, onClose }: LibraryManagerModalProp
                       color: 'var(--text-muted)',
                     }}
                   >
-                    SVG Code *
+                    SVG Path Data (d attribute)
                   </label>
-                  <textarea
-                    rows={4}
-                    required
+                  <input
+                    type="text"
                     style={{
                       width: '100%',
                       padding: '6px 8px',
@@ -759,649 +956,446 @@ export function LibraryManagerModal({ isOpen, onClose }: LibraryManagerModalProp
                       color: '#fff',
                       borderRadius: 4,
                       fontFamily: 'monospace',
-                      fontSize: 12,
                     }}
-                    value={newIconSvg}
-                    onChange={(e) => setNewIconSvg(e.target.value)}
+                    value={newShapeSvgPath}
+                    onChange={(e) => setNewShapeSvgPath(e.target.value)}
                   />
                 </div>
-                {/* Preview */}
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 12,
-                    padding: '8px 12px',
-                    background: 'var(--bg-field)',
-                    borderRadius: 4,
-                  }}
-                >
-                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Preview:</span>
+              )}
+              <div style={{ display: 'flex', gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: 12,
+                      marginBottom: 4,
+                      color: 'var(--text-muted)',
+                    }}
+                  >
+                    Default Width
+                  </label>
+                  <input
+                    type="number"
+                    style={{
+                      width: '100%',
+                      padding: '6px 8px',
+                      background: 'var(--bg-field)',
+                      border: '1px solid var(--border)',
+                      color: '#fff',
+                      borderRadius: 4,
+                    }}
+                    value={newShapeWidth}
+                    onChange={(e) => setNewShapeWidth(Number(e.target.value))}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: 12,
+                      marginBottom: 4,
+                      color: 'var(--text-muted)',
+                    }}
+                  >
+                    Default Height
+                  </label>
+                  <input
+                    type="number"
+                    style={{
+                      width: '100%',
+                      padding: '6px 8px',
+                      background: 'var(--bg-field)',
+                      border: '1px solid var(--border)',
+                      color: '#fff',
+                      borderRadius: 4,
+                    }}
+                    value={newShapeHeight}
+                    onChange={(e) => setNewShapeHeight(Number(e.target.value))}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: 12,
+                      marginBottom: 4,
+                      color: 'var(--text-muted)',
+                    }}
+                  >
+                    Icon ID (optional)
+                  </label>
+                  <input
+                    type="text"
+                    style={{
+                      width: '100%',
+                      padding: '6px 8px',
+                      background: 'var(--bg-field)',
+                      border: '1px solid var(--border)',
+                      color: '#fff',
+                      borderRadius: 4,
+                    }}
+                    value={newShapeIconId}
+                    onChange={(e) => setNewShapeIconId(e.target.value)}
+                    placeholder="e.g. Server"
+                  />
+                </div>
+              </div>
+              {/* Live Preview */}
+              <div
+                style={{
+                  padding: '12px',
+                  background: 'var(--bg-field)',
+                  borderRadius: 4,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                }}
+              >
+                <span style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
+                  Shape Preview:
+                </span>
+                <div style={{ position: 'relative', width: newShapeWidth, height: newShapeHeight }}>
+                  <SvgShapeRenderer
+                    geometry={
+                      newShapeGeomType === 'circle'
+                        ? { type: 'circle' }
+                        : newShapeGeomType === 'rectangle'
+                          ? { type: 'rectangle' }
+                          : newShapeGeomType === 'diamond'
+                            ? { type: 'diamond' }
+                            : newShapeGeomType === 'cylinder'
+                              ? { type: 'cylinder' }
+                              : newShapeGeomType === 'cloud'
+                                ? { type: 'cloud' }
+                                : newShapeGeomType === 'actor'
+                                  ? { type: 'actor' }
+                                  : newShapeGeomType === 'document'
+                                    ? { type: 'document' }
+                                    : newShapeGeomType === 'hexagon'
+                                      ? { type: 'hexagon' }
+                                      : newShapeGeomType === 'parallelogram'
+                                        ? { type: 'parallelogram' }
+                                        : newShapeGeomType === 'path'
+                                          ? { type: 'path', d: newShapeSvgPath }
+                                          : { type: 'rounded-rectangle', radius: 8 }
+                    }
+                    width={newShapeWidth}
+                    height={newShapeHeight}
+                    color={newShapeColor}
+                    iconId={newShapeIconId || undefined}
+                  />
                   <div
                     style={{
-                      width: 24,
-                      height: 24,
+                      position: 'absolute',
+                      inset: 0,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
+                      fontSize: 13,
+                      color: 'var(--text)',
                     }}
                   >
-                    <IconRenderer
-                      iconDefinition={{
-                        id: 'preview-new-icon',
-                        name: newIconName || 'Preview',
-                        version: 1,
-                        source: {
-                          type: 'svg',
-                          data: sanitizeSvg(newIconSvg),
-                        },
-                      }}
-                      size={24}
-                    />
+                    {newShapeName || 'Preview'}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                  <button
-                    type="submit"
-                    style={{
-                      padding: '6px 14px',
-                      background: 'var(--accent)',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: 4,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Save Icon
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsAddingIcon(false)}
-                    style={{
-                      padding: '6px 14px',
-                      background: 'transparent',
-                      border: '1px solid var(--border)',
-                      color: 'var(--text-muted)',
-                      borderRadius: 4,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            ) : isAddingShape ? (
-              <form
-                onSubmit={handleCreateShape}
-                style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
-              >
-                <h4 style={{ margin: '0 0 8px 0' }}>Add Custom Shape</h4>
-                <div style={{ display: 'flex', gap: 12 }}>
-                  <div style={{ flex: 1 }}>
-                    <label
-                      style={{
-                        display: 'block',
-                        fontSize: 12,
-                        marginBottom: 4,
-                        color: 'var(--text-muted)',
-                      }}
-                    >
-                      Shape Name *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '6px 8px',
-                        background: 'var(--bg-field)',
-                        border: '1px solid var(--border)',
-                        color: '#fff',
-                        borderRadius: 4,
-                      }}
-                      value={newShapeName}
-                      onChange={(e) => setNewShapeName(e.target.value)}
-                      placeholder="e.g. Edge Node"
-                    />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <label
-                      style={{
-                        display: 'block',
-                        fontSize: 12,
-                        marginBottom: 4,
-                        color: 'var(--text-muted)',
-                      }}
-                    >
-                      Category
-                    </label>
-                    <input
-                      type="text"
-                      style={{
-                        width: '100%',
-                        padding: '6px 8px',
-                        background: 'var(--bg-field)',
-                        border: '1px solid var(--border)',
-                        color: '#fff',
-                        borderRadius: 4,
-                      }}
-                      value={newShapeCategory}
-                      onChange={(e) => setNewShapeCategory(e.target.value)}
-                      placeholder="e.g. Infrastructure"
-                    />
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: 12 }}>
-                  <div style={{ flex: 1 }}>
-                    <label
-                      style={{
-                        display: 'block',
-                        fontSize: 12,
-                        marginBottom: 4,
-                        color: 'var(--text-muted)',
-                      }}
-                    >
-                      Geometry Type
-                    </label>
-                    <GeometryPicker
-                      value={newShapeGeomType}
-                      onChange={(type) => setNewShapeGeomType(type)}
-                    />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <label
-                      style={{
-                        display: 'block',
-                        fontSize: 12,
-                        marginBottom: 4,
-                        color: 'var(--text-muted)',
-                      }}
-                    >
-                      Shape Color
-                    </label>
-                    <input
-                      type="color"
-                      style={{
-                        width: '100%',
-                        height: 34,
-                        padding: '2px 4px',
-                        background: 'var(--bg-field)',
-                        border: '1px solid var(--border)',
-                        borderRadius: 4,
-                      }}
-                      value={newShapeColor}
-                      onChange={(e) => setNewShapeColor(e.target.value)}
-                    />
-                  </div>
-                </div>
-                {newShapeGeomType === 'path' && (
-                  <div>
-                    <label
-                      style={{
-                        display: 'block',
-                        fontSize: 12,
-                        marginBottom: 4,
-                        color: 'var(--text-muted)',
-                      }}
-                    >
-                      SVG Path Data (d attribute)
-                    </label>
-                    <input
-                      type="text"
-                      style={{
-                        width: '100%',
-                        padding: '6px 8px',
-                        background: 'var(--bg-field)',
-                        border: '1px solid var(--border)',
-                        color: '#fff',
-                        borderRadius: 4,
-                        fontFamily: 'monospace',
-                      }}
-                      value={newShapeSvgPath}
-                      onChange={(e) => setNewShapeSvgPath(e.target.value)}
-                    />
-                  </div>
-                )}
-                <div style={{ display: 'flex', gap: 12 }}>
-                  <div style={{ flex: 1 }}>
-                    <label
-                      style={{
-                        display: 'block',
-                        fontSize: 12,
-                        marginBottom: 4,
-                        color: 'var(--text-muted)',
-                      }}
-                    >
-                      Default Width
-                    </label>
-                    <input
-                      type="number"
-                      style={{
-                        width: '100%',
-                        padding: '6px 8px',
-                        background: 'var(--bg-field)',
-                        border: '1px solid var(--border)',
-                        color: '#fff',
-                        borderRadius: 4,
-                      }}
-                      value={newShapeWidth}
-                      onChange={(e) => setNewShapeWidth(Number(e.target.value))}
-                    />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <label
-                      style={{
-                        display: 'block',
-                        fontSize: 12,
-                        marginBottom: 4,
-                        color: 'var(--text-muted)',
-                      }}
-                    >
-                      Default Height
-                    </label>
-                    <input
-                      type="number"
-                      style={{
-                        width: '100%',
-                        padding: '6px 8px',
-                        background: 'var(--bg-field)',
-                        border: '1px solid var(--border)',
-                        color: '#fff',
-                        borderRadius: 4,
-                      }}
-                      value={newShapeHeight}
-                      onChange={(e) => setNewShapeHeight(Number(e.target.value))}
-                    />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <label
-                      style={{
-                        display: 'block',
-                        fontSize: 12,
-                        marginBottom: 4,
-                        color: 'var(--text-muted)',
-                      }}
-                    >
-                      Icon ID (optional)
-                    </label>
-                    <input
-                      type="text"
-                      style={{
-                        width: '100%',
-                        padding: '6px 8px',
-                        background: 'var(--bg-field)',
-                        border: '1px solid var(--border)',
-                        color: '#fff',
-                        borderRadius: 4,
-                      }}
-                      value={newShapeIconId}
-                      onChange={(e) => setNewShapeIconId(e.target.value)}
-                      placeholder="e.g. Server"
-                    />
-                  </div>
-                </div>
-                {/* Live Preview */}
-                <div
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <button
+                  type="submit"
                   style={{
-                    padding: '12px',
-                    background: 'var(--bg-field)',
+                    padding: '6px 14px',
+                    background: 'var(--accent)',
+                    color: '#fff',
+                    border: 'none',
                     borderRadius: 4,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
+                    cursor: 'pointer',
                   }}
                 >
-                  <span style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
-                    Shape Preview:
-                  </span>
-                  <div
-                    style={{ position: 'relative', width: newShapeWidth, height: newShapeHeight }}
-                  >
-                    <SvgShapeRenderer
-                      geometry={
-                        newShapeGeomType === 'circle'
-                          ? { type: 'circle' }
-                          : newShapeGeomType === 'rectangle'
-                            ? { type: 'rectangle' }
-                            : newShapeGeomType === 'diamond'
-                              ? { type: 'diamond' }
-                              : newShapeGeomType === 'cylinder'
-                                ? { type: 'cylinder' }
-                                : newShapeGeomType === 'cloud'
-                                  ? { type: 'cloud' }
-                                  : newShapeGeomType === 'actor'
-                                    ? { type: 'actor' }
-                                    : newShapeGeomType === 'document'
-                                      ? { type: 'document' }
-                                      : newShapeGeomType === 'hexagon'
-                                        ? { type: 'hexagon' }
-                                        : newShapeGeomType === 'parallelogram'
-                                          ? { type: 'parallelogram' }
-                                          : newShapeGeomType === 'path'
-                                            ? { type: 'path', d: newShapeSvgPath }
-                                            : { type: 'rounded-rectangle', radius: 8 }
-                      }
-                      width={newShapeWidth}
-                      height={newShapeHeight}
-                      color={newShapeColor}
-                      iconId={newShapeIconId || undefined}
-                    />
-                    <div
-                      style={{
-                        position: 'absolute',
-                        inset: 0,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: 13,
-                        color: 'var(--text)',
-                      }}
-                    >
-                      {newShapeName || 'Preview'}
-                    </div>
+                  Save Shape
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsAddingShape(false)}
+                  style={{
+                    padding: '6px 14px',
+                    background: 'transparent',
+                    border: '1px solid var(--border)',
+                    color: 'var(--text-muted)',
+                    borderRadius: 4,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          ) : selectedLib ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Library details header */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  borderBottom: '1px solid var(--border)',
+                  paddingBottom: 12,
+                }}
+              >
+                <div>
+                  <h3 style={{ margin: '0 0 4px 0', fontSize: 18 }}>{selectedLib.library.name}</h3>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    {selectedLib.library.description || 'No description provided.'}
                   </div>
+                  {(selectedLib.library.author || selectedLib.library.license) && (
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                      {selectedLib.library.author && (
+                        <span>Author: {selectedLib.library.author} • </span>
+                      )}
+                      {selectedLib.library.license && (
+                        <span>License: {selectedLib.library.license}</span>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <div style={{ display: 'flex', gap: 6 }}>
                   <button
-                    type="submit"
+                    type="button"
                     style={{
-                      padding: '6px 14px',
-                      background: 'var(--accent)',
-                      color: '#fff',
-                      border: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      padding: '5px 10px',
+                      fontSize: 12,
+                      background: 'var(--bg-field)',
+                      color: 'var(--text)',
+                      border: '1px solid var(--border)',
                       borderRadius: 4,
                       cursor: 'pointer',
                     }}
+                    onClick={() => globalAssetLibraryManager.exportLibrary(selectedLib.library.id)}
+                    title="Export Library"
                   >
-                    Save Shape
+                    <Download size={13} /> Export
                   </button>
                   <button
                     type="button"
-                    onClick={() => setIsAddingShape(false)}
                     style={{
-                      padding: '6px 14px',
-                      background: 'transparent',
-                      border: '1px solid var(--border)',
-                      color: 'var(--text-muted)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      padding: '5px 10px',
+                      fontSize: 12,
+                      background: 'rgba(240, 87, 140, 0.2)',
+                      color: '#f0578c',
+                      border: '1px solid rgba(240, 87, 140, 0.4)',
                       borderRadius: 4,
                       cursor: 'pointer',
                     }}
+                    onClick={() => handleDeleteLibrary(selectedLib.library.id)}
+                    title="Delete Library"
                   >
-                    Cancel
+                    <Trash2 size={13} /> Delete
                   </button>
                 </div>
-              </form>
-            ) : selectedLib ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                {/* Library details header */}
+              </div>
+
+              {/* Library Shapes Section */}
+              <div>
                 <div
                   style={{
                     display: 'flex',
                     justifyContent: 'space-between',
-                    alignItems: 'flex-start',
-                    borderBottom: '1px solid var(--border)',
-                    paddingBottom: 12,
+                    alignItems: 'center',
+                    marginBottom: 8,
                   }}
                 >
-                  <div>
-                    <h3 style={{ margin: '0 0 4px 0', fontSize: 18 }}>
-                      {selectedLib.library.name}
-                    </h3>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                      {selectedLib.library.description || 'No description provided.'}
-                    </div>
-                    {(selectedLib.library.author || selectedLib.library.license) && (
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-                        {selectedLib.library.author && (
-                          <span>Author: {selectedLib.library.author} • </span>
-                        )}
-                        {selectedLib.library.license && (
-                          <span>License: {selectedLib.library.license}</span>
-                        )}
+                  <span style={{ fontSize: 14, fontWeight: 600 }}>
+                    Shapes ({selectedLib.shapes.length})
+                  </span>
+                  <button
+                    type="button"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      padding: '3px 8px',
+                      fontSize: 11,
+                      background: 'var(--accent)',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 4,
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => setIsAddingShape(true)}
+                  >
+                    <Plus size={12} /> Add Shape
+                  </button>
+                </div>
+                {selectedLib.shapes.length === 0 ? (
+                  <div
+                    style={{
+                      padding: 12,
+                      background: 'rgba(0,0,0,0.1)',
+                      borderRadius: 4,
+                      fontSize: 12,
+                      color: 'var(--text-muted)',
+                    }}
+                  >
+                    No custom shapes in this library yet. Click "Add Shape" to create one.
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
+                      gap: 8,
+                    }}
+                  >
+                    {selectedLib.shapes.map((s) => (
+                      <div
+                        key={s.id}
+                        style={{
+                          padding: 8,
+                          background: 'var(--bg-field)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 4,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                      >
+                        <div style={{ width: 60, height: 40, position: 'relative' }}>
+                          <SvgShapeRenderer
+                            geometry={s.geometry}
+                            width={60}
+                            height={40}
+                            color={s.defaults.color || '#5B7CFA'}
+                            iconId={s.iconId}
+                          />
+                        </div>
+                        <span
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 500,
+                            textAlign: 'center',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            width: '100%',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {s.name}
+                        </span>
                       </div>
-                    )}
+                    ))}
                   </div>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <button
-                      type="button"
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 4,
-                        padding: '5px 10px',
-                        fontSize: 12,
-                        background: 'var(--bg-field)',
-                        color: 'var(--text)',
-                        border: '1px solid var(--border)',
-                        borderRadius: 4,
-                        cursor: 'pointer',
-                      }}
-                      onClick={() =>
-                        globalAssetLibraryManager.exportLibrary(selectedLib.library.id)
-                      }
-                      title="Export Library"
-                    >
-                      <Download size={13} /> Export
-                    </button>
-                    <button
-                      type="button"
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 4,
-                        padding: '5px 10px',
-                        fontSize: 12,
-                        background: 'rgba(240, 87, 140, 0.2)',
-                        color: '#f0578c',
-                        border: '1px solid rgba(240, 87, 140, 0.4)',
-                        borderRadius: 4,
-                        cursor: 'pointer',
-                      }}
-                      onClick={() => handleDeleteLibrary(selectedLib.library.id)}
-                      title="Delete Library"
-                    >
-                      <Trash2 size={13} /> Delete
-                    </button>
-                  </div>
-                </div>
+                )}
+              </div>
 
-                {/* Library Shapes Section */}
-                <div>
-                  <div
+              {/* Library Icons Section */}
+              <div>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: 8,
+                  }}
+                >
+                  <span style={{ fontSize: 14, fontWeight: 600 }}>
+                    Icons ({selectedLib.icons.length})
+                  </span>
+                  <button
+                    type="button"
                     style={{
                       display: 'flex',
-                      justifyContent: 'space-between',
                       alignItems: 'center',
-                      marginBottom: 8,
+                      gap: 4,
+                      padding: '3px 8px',
+                      fontSize: 11,
+                      background: 'var(--accent)',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 4,
+                      cursor: 'pointer',
                     }}
+                    onClick={() => setIsAddingIcon(true)}
                   >
-                    <span style={{ fontSize: 14, fontWeight: 600 }}>
-                      Shapes ({selectedLib.shapes.length})
-                    </span>
-                    <button
-                      type="button"
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 4,
-                        padding: '3px 8px',
-                        fontSize: 11,
-                        background: 'var(--accent)',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: 4,
-                        cursor: 'pointer',
-                      }}
-                      onClick={() => setIsAddingShape(true)}
-                    >
-                      <Plus size={12} /> Add Shape
-                    </button>
-                  </div>
-                  {selectedLib.shapes.length === 0 ? (
-                    <div
-                      style={{
-                        padding: 12,
-                        background: 'rgba(0,0,0,0.1)',
-                        borderRadius: 4,
-                        fontSize: 12,
-                        color: 'var(--text-muted)',
-                      }}
-                    >
-                      No custom shapes in this library yet. Click "Add Shape" to create one.
-                    </div>
-                  ) : (
-                    <div
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
-                        gap: 8,
-                      }}
-                    >
-                      {selectedLib.shapes.map((s) => (
-                        <div
-                          key={s.id}
-                          style={{
-                            padding: 8,
-                            background: 'var(--bg-field)',
-                            border: '1px solid var(--border)',
-                            borderRadius: 4,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            gap: 4,
-                          }}
-                        >
-                          <div style={{ width: 60, height: 40, position: 'relative' }}>
-                            <SvgShapeRenderer
-                              geometry={s.geometry}
-                              width={60}
-                              height={40}
-                              color={s.defaults.color || '#5B7CFA'}
-                              iconId={s.iconId}
-                            />
-                          </div>
-                          <span
-                            style={{
-                              fontSize: 12,
-                              fontWeight: 500,
-                              textAlign: 'center',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              width: '100%',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {s.name}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                    <Plus size={12} /> Add Icon
+                  </button>
                 </div>
-
-                {/* Library Icons Section */}
-                <div>
+                {selectedLib.icons.length === 0 ? (
                   <div
                     style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      marginBottom: 8,
+                      padding: 12,
+                      background: 'rgba(0,0,0,0.1)',
+                      borderRadius: 4,
+                      fontSize: 12,
+                      color: 'var(--text-muted)',
                     }}
                   >
-                    <span style={{ fontSize: 14, fontWeight: 600 }}>
-                      Icons ({selectedLib.icons.length})
-                    </span>
-                    <button
-                      type="button"
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 4,
-                        padding: '3px 8px',
-                        fontSize: 11,
-                        background: 'var(--accent)',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: 4,
-                        cursor: 'pointer',
-                      }}
-                      onClick={() => setIsAddingIcon(true)}
-                    >
-                      <Plus size={12} /> Add Icon
-                    </button>
+                    No custom icons in this library yet. Click "Add Icon" to create one.
                   </div>
-                  {selectedLib.icons.length === 0 ? (
-                    <div
-                      style={{
-                        padding: 12,
-                        background: 'rgba(0,0,0,0.1)',
-                        borderRadius: 4,
-                        fontSize: 12,
-                        color: 'var(--text-muted)',
-                      }}
-                    >
-                      No custom icons in this library yet. Click "Add Icon" to create one.
-                    </div>
-                  ) : (
-                    <div
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(64px, 1fr))',
-                        gap: 6,
-                      }}
-                    >
-                      {selectedLib.icons.map((icon) => (
-                        <div
-                          key={icon.id}
+                ) : (
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(64px, 1fr))',
+                      gap: 6,
+                    }}
+                  >
+                    {selectedLib.icons.map((icon) => (
+                      <div
+                        key={icon.id}
+                        style={{
+                          padding: 6,
+                          background: 'var(--bg-field)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 4,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                        title={icon.name}
+                      >
+                        <IconRenderer iconDefinition={icon} size={22} />
+                        <span
                           style={{
-                            padding: 6,
-                            background: 'var(--bg-field)',
-                            border: '1px solid var(--border)',
-                            borderRadius: 4,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            gap: 4,
+                            fontSize: 10,
+                            textAlign: 'center',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            width: '100%',
+                            whiteSpace: 'nowrap',
                           }}
-                          title={icon.name}
                         >
-                          <IconRenderer iconDefinition={icon} size={22} />
-                          <span
-                            style={{
-                              fontSize: 10,
-                              textAlign: 'center',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              width: '100%',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {icon.name}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                          {icon.name}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            ) : (
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  height: '100%',
-                  color: 'var(--text-muted)',
-                }}
-              >
-                <Package size={36} style={{ marginBottom: 12, opacity: 0.4 }} />
-                <p>Select a library from the left sidebar or create a new one.</p>
-              </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '100%',
+                color: 'var(--text-muted)',
+              }}
+            >
+              <Package size={36} style={{ marginBottom: 12, opacity: 0.4 }} />
+              <p>Select a library from the left sidebar or create a new one.</p>
+            </div>
+          )}
         </div>
+      </div>
     </BaseModal>
   );
 }

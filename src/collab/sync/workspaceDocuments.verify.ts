@@ -6,7 +6,11 @@ import {
   removeEntry,
   upsertEntry,
 } from './workspaceDocuments.ts';
-import { generateWorkspaceKey, exportSymmetricKeyHex, deriveStorageKey } from '../../crypto/keys.ts';
+import {
+  generateWorkspaceKey,
+  exportSymmetricKeyHex,
+  deriveStorageKey,
+} from '../../crypto/keys.ts';
 import { createWebCryptoStorage } from '../../crypto/storageCrypto.ts';
 import type { IndexEntry } from '../access/storeClient.ts';
 

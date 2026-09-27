@@ -7,7 +7,10 @@ import type { Sprint, SprintDateRange, ProgramIncrement } from './programIncreme
 import type { Milestone } from './milestones';
 import type { RequirementsDocument } from '../requirements/requirementsTypes';
 import type { TeamDocument } from './teamTypes';
-import { BUILT_IN_ITEM_TYPES, BUILT_IN_RELATIONSHIP_TYPES } from '../requirements/requirementsRegistry';
+import {
+  BUILT_IN_ITEM_TYPES,
+  BUILT_IN_RELATIONSHIP_TYPES,
+} from '../requirements/requirementsRegistry';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {

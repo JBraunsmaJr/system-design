@@ -11,7 +11,11 @@
  * database as well as the index entry.
  */
 import * as Y from 'yjs';
-import type { DocumentIndexEntry, DocumentStore, StorageResult } from '../../domain/storage/documentStore.ts';
+import type {
+  DocumentIndexEntry,
+  DocumentStore,
+  StorageResult,
+} from '../../domain/storage/documentStore.ts';
 import { newDocumentId } from '../../domain/storage/documentStore.ts';
 import { toDiagramFile, type DiagramFile } from '../../domain/canvas/serialization.ts';
 import { openDocument, storageKeyForDocument, type OpenDocument } from './localDocument.ts';

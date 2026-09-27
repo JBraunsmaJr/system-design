@@ -15,8 +15,14 @@ import {
 } from 'lucide-react';
 import { getItemType, isItemWorkable } from '../../domain/requirements/requirementsRegistry';
 import { findLinkedNodes, type DiagramPath } from '../../domain/canvas/subDiagramTree';
-import { computeSprintDateRanges, type ProgramIncrement } from '../../domain/timeline/programIncrements';
-import type { RequirementItem, RequirementsDocument } from '../../domain/requirements/requirementsTypes';
+import {
+  computeSprintDateRanges,
+  type ProgramIncrement,
+} from '../../domain/timeline/programIncrements';
+import type {
+  RequirementItem,
+  RequirementsDocument,
+} from '../../domain/requirements/requirementsTypes';
 import type { SubDiagram } from '../../domain/canvas/types';
 import type { Milestone } from '../../domain/timeline/milestones';
 import {
@@ -173,303 +179,303 @@ export function RequirementDetailModal({
       closeOnEscape={!isEditing}
     >
       <div className="requirement-detail-modal__header">
-          <div className="requirement-detail-modal__tags">
-            <span
-              className="requirement-detail-modal__id"
-              style={{
-                color: type?.color ?? 'var(--chrome-text)',
-                borderColor: `${type?.color ?? 'var(--chrome-border)'}88`,
-                background: `${type?.color ?? 'var(--chrome-border)'}15`,
+        <div className="requirement-detail-modal__tags">
+          <span
+            className="requirement-detail-modal__id"
+            style={{
+              color: type?.color ?? 'var(--chrome-text)',
+              borderColor: `${type?.color ?? 'var(--chrome-border)'}88`,
+              background: `${type?.color ?? 'var(--chrome-border)'}15`,
+            }}
+          >
+            {item.id}
+          </span>
+          {onUpdateItem ? (
+            <TypePicker
+              doc={doc}
+              typeId={item.typeId}
+              onChange={(newTypeId) => {
+                if (onConvertItemType) {
+                  onConvertItemType(item.id, newTypeId);
+                } else {
+                  onUpdateItem(item.id, { typeId: newTypeId } as any);
+                }
               }}
-            >
-              {item.id}
-            </span>
-            {onUpdateItem ? (
-              <TypePicker
-                doc={doc}
-                typeId={item.typeId}
-                onChange={(newTypeId) => {
-                  if (onConvertItemType) {
-                    onConvertItemType(item.id, newTypeId);
-                  } else {
-                    onUpdateItem(item.id, { typeId: newTypeId } as any);
-                  }
+            />
+          ) : (
+            type && <span className="requirement-detail-modal__type-label">{type.label}</span>
+          )}
+          {onUpdateItem && isItemWorkable(doc, item) && (
+            <StatusPicker
+              status={item.status}
+              onChange={(status) => onUpdateItem(item.id, { status })}
+            />
+          )}
+
+          {onUpdateItem ? (
+            <CategoryPicker
+              doc={doc}
+              categoryId={item.categoryId}
+              onAssign={(categoryId) => onUpdateItem(item.id, { categoryId })}
+              onCreateAndAssign={(label) => onCreateAndAssignCategory?.(item.id, label)}
+              onClear={() => onUpdateItem(item.id, { categoryId: undefined })}
+              onDelete={onDeleteCategory}
+            />
+          ) : (
+            category && (
+              <span
+                className="pi-board-item__category"
+                style={{
+                  color: category.color,
+                  borderColor: `${category.color}44`,
+                  background: `${category.color}18`,
                 }}
-              />
-            ) : (
-              type && <span className="requirement-detail-modal__type-label">{type.label}</span>
-            )}
-            {onUpdateItem && isItemWorkable(doc, item) && (
-              <StatusPicker
-                status={item.status}
-                onChange={(status) => onUpdateItem(item.id, { status })}
-              />
-            )}
-
-            {onUpdateItem ? (
-              <CategoryPicker
-                doc={doc}
-                categoryId={item.categoryId}
-                onAssign={(categoryId) => onUpdateItem(item.id, { categoryId })}
-                onCreateAndAssign={(label) => onCreateAndAssignCategory?.(item.id, label)}
-                onClear={() => onUpdateItem(item.id, { categoryId: undefined })}
-                onDelete={onDeleteCategory}
-              />
-            ) : (
-              category && (
-                <span
-                  className="pi-board-item__category"
-                  style={{
-                    color: category.color,
-                    borderColor: `${category.color}44`,
-                    background: `${category.color}18`,
-                  }}
-                >
-                  {category.label}
-                </span>
-              )
-            )}
-
-            {onUpdateItem && isItemWorkable(doc, item) && (
-              <SprintPicker
-                programIncrements={programIncrements}
-                sprintId={item.sprintId}
-                onAssign={(sprintId) => onUpdateItem(item.id, { sprintId })}
-                onClear={() => onUpdateItem(item.id, { sprintId: undefined })}
-              />
-            )}
-
-            {team && onUpdateItem && isItemWorkable(doc, item) && (
-              <MemberPicker
-                team={team}
-                assigneeId={item.assigneeId}
-                onAssign={(assigneeId) => onUpdateItem(item.id, { assigneeId })}
-                onClear={() => onUpdateItem(item.id, { assigneeId: undefined })}
-              />
-            )}
-
-            {onUpdateItem && isItemWorkable(doc, item) && (
-              <PointsPicker
-                points={item.points}
-                onChange={(points) => onUpdateItem(item.id, { points })}
-              />
-            )}
-          </div>
-
-          <div className="requirement-detail-modal__actions">
-            {onNavigateToRequirement && (
-              <button
-                type="button"
-                className="requirement-detail-modal__action-btn"
-                onClick={() => {
-                  onClose();
-                  onNavigateToRequirement(item.id);
-                }}
-                title="Open in Requirements view"
-                aria-label="Open in Requirements view"
               >
-                <ExternalLink size={14} />
-              </button>
-            )}
-            {onDeleteItem && (
-              <button
-                type="button"
-                className="requirement-detail-modal__action-btn requirement-detail-modal__action-btn--delete"
-                onClick={() => {
-                  onDeleteItem(item.id);
-                  onClose();
-                }}
-                title={`Delete ${item.id}`}
-                aria-label={`Delete ${item.id}`}
-              >
-                <Trash2 size={14} />
-              </button>
-            )}
+                {category.label}
+              </span>
+            )
+          )}
+
+          {onUpdateItem && isItemWorkable(doc, item) && (
+            <SprintPicker
+              programIncrements={programIncrements}
+              sprintId={item.sprintId}
+              onAssign={(sprintId) => onUpdateItem(item.id, { sprintId })}
+              onClear={() => onUpdateItem(item.id, { sprintId: undefined })}
+            />
+          )}
+
+          {team && onUpdateItem && isItemWorkable(doc, item) && (
+            <MemberPicker
+              team={team}
+              assigneeId={item.assigneeId}
+              onAssign={(assigneeId) => onUpdateItem(item.id, { assigneeId })}
+              onClear={() => onUpdateItem(item.id, { assigneeId: undefined })}
+            />
+          )}
+
+          {onUpdateItem && isItemWorkable(doc, item) && (
+            <PointsPicker
+              points={item.points}
+              onChange={(points) => onUpdateItem(item.id, { points })}
+            />
+          )}
+        </div>
+
+        <div className="requirement-detail-modal__actions">
+          {onNavigateToRequirement && (
             <button
               type="button"
               className="requirement-detail-modal__action-btn"
-              onClick={onClose}
-              title="Close modal (Esc)"
-              aria-label="Close modal"
+              onClick={() => {
+                onClose();
+                onNavigateToRequirement(item.id);
+              }}
+              title="Open in Requirements view"
+              aria-label="Open in Requirements view"
             >
-              <X size={16} />
+              <ExternalLink size={14} />
             </button>
-          </div>
+          )}
+          {onDeleteItem && (
+            <button
+              type="button"
+              className="requirement-detail-modal__action-btn requirement-detail-modal__action-btn--delete"
+              onClick={() => {
+                onDeleteItem(item.id);
+                onClose();
+              }}
+              title={`Delete ${item.id}`}
+              aria-label={`Delete ${item.id}`}
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
+          <button
+            type="button"
+            className="requirement-detail-modal__action-btn"
+            onClick={onClose}
+            title="Close modal (Esc)"
+            aria-label="Close modal"
+          >
+            <X size={16} />
+          </button>
         </div>
+      </div>
 
-        {sprintInfo && !onUpdateItem && (
-          <div className="requirement-detail-modal__sprint-info">
-            <Calendar size={13} />
-            <span>
-              <strong>{sprintInfo.piName}</strong> › {sprintInfo.sprintName}
-              {sprintInfo.startDate && sprintInfo.endDate && (
-                <span className="requirement-detail-modal__dates">
-                  {' '}
-                  ({sprintInfo.startDate} → {sprintInfo.endDate})
-                </span>
-              )}
-            </span>
-          </div>
+      {sprintInfo && !onUpdateItem && (
+        <div className="requirement-detail-modal__sprint-info">
+          <Calendar size={13} />
+          <span>
+            <strong>{sprintInfo.piName}</strong> › {sprintInfo.sprintName}
+            {sprintInfo.startDate && sprintInfo.endDate && (
+              <span className="requirement-detail-modal__dates">
+                {' '}
+                ({sprintInfo.startDate} → {sprintInfo.endDate})
+              </span>
+            )}
+          </span>
+        </div>
+      )}
+
+      {isEpic && (
+        <div
+          className="requirement-detail-modal__sprint-info"
+          style={{
+            backgroundColor: 'rgba(139, 92, 246, 0.1)',
+            borderColor: 'rgba(139, 92, 246, 0.3)',
+          }}
+        >
+          <Calendar size={13} style={{ color: '#8b5cf6' }} />
+          <span>
+            <strong style={{ color: '#8b5cf6' }}>Inferred Schedule:</strong>{' '}
+            {epicSchedule.startDate ? (
+              <>
+                {epicSchedule.startDate} →{' '}
+                {epicSchedule.endDate ? (
+                  epicSchedule.endDate
+                ) : (
+                  <span style={{ color: '#f59e0b' }}>
+                    Open-ended ({epicSchedule.unscheduledChildrenCount} unscheduled)
+                  </span>
+                )}
+              </>
+            ) : (
+              <span style={{ color: 'var(--chrome-text-dim)' }}>
+                Unscheduled (0 child items scheduled)
+              </span>
+            )}
+            {' • '}
+            <strong>
+              {epicSchedule.scheduledChildrenCount}/{epicSchedule.totalChildrenCount}
+            </strong>{' '}
+            scheduled
+            {' • '}
+            <strong>{epicSchedule.completedChildrenCount}</strong> done
+            {' • '}
+            <strong>{epicSchedule.totalPoints}</strong> pts
+          </span>
+        </div>
+      )}
+
+      <div className="requirement-detail-modal__body">
+        {onUpdateItem ? (
+          <input
+            id="requirement-detail-title"
+            className="requirement-detail-modal__title-input"
+            value={item.title}
+            placeholder="Requirement Title"
+            onChange={(e) => onUpdateItem(item.id, { title: e.target.value })}
+          />
+        ) : (
+          <h2 id="requirement-detail-title" className="requirement-detail-modal__title">
+            {item.title || 'Untitled Requirement'}
+          </h2>
         )}
 
-        {isEpic && (
-          <div
-            className="requirement-detail-modal__sprint-info"
-            style={{
-              backgroundColor: 'rgba(139, 92, 246, 0.1)',
-              borderColor: 'rgba(139, 92, 246, 0.3)',
-            }}
-          >
-            <Calendar size={13} style={{ color: '#8b5cf6' }} />
-            <span>
-              <strong style={{ color: '#8b5cf6' }}>Inferred Schedule:</strong>{' '}
-              {epicSchedule.startDate ? (
+        <div className="requirement-detail-modal__desc-header">
+          <span className="requirement-detail-modal__desc-label">Description</span>
+          {onUpdateItem && (
+            <button
+              type="button"
+              className="requirement-detail-modal__edit-toggle"
+              onClick={() => setIsEditing(!isEditing)}
+            >
+              {isEditing ? (
                 <>
-                  {epicSchedule.startDate} →{' '}
-                  {epicSchedule.endDate ? (
-                    epicSchedule.endDate
-                  ) : (
-                    <span style={{ color: '#f59e0b' }}>
-                      Open-ended ({epicSchedule.unscheduledChildrenCount} unscheduled)
-                    </span>
-                  )}
+                  <Check size={12} />
+                  <span>Done</span>
                 </>
               ) : (
-                <span style={{ color: 'var(--chrome-text-dim)' }}>
-                  Unscheduled (0 child items scheduled)
-                </span>
+                <>
+                  <Edit3 size={12} />
+                  <span>Edit</span>
+                </>
               )}
-              {' • '}
-              <strong>
-                {epicSchedule.scheduledChildrenCount}/{epicSchedule.totalChildrenCount}
-              </strong>{' '}
-              scheduled
-              {' • '}
-              <strong>{epicSchedule.completedChildrenCount}</strong> done
-              {' • '}
-              <strong>{epicSchedule.totalPoints}</strong> pts
-            </span>
-          </div>
-        )}
+            </button>
+          )}
+        </div>
 
-        <div className="requirement-detail-modal__body">
-          {onUpdateItem ? (
-            <input
-              id="requirement-detail-title"
-              className="requirement-detail-modal__title-input"
-              value={item.title}
-              placeholder="Requirement Title"
-              onChange={(e) => onUpdateItem(item.id, { title: e.target.value })}
+        <div className="requirement-detail-modal__desc-content">
+          {isEditing && onUpdateItem ? (
+            <RequirementEditor
+              value={item.body}
+              onChange={(body) => onUpdateItem(item.id, { body })}
+              onDone={() => setIsEditing(false)}
+              doc={doc}
+              autoFocus
+              placeholder="Write a description... type # to reference another item"
             />
           ) : (
-            <h2 id="requirement-detail-title" className="requirement-detail-modal__title">
-              {item.title || 'Untitled Requirement'}
-            </h2>
-          )}
-
-          <div className="requirement-detail-modal__desc-header">
-            <span className="requirement-detail-modal__desc-label">Description</span>
-            {onUpdateItem && (
-              <button
-                type="button"
-                className="requirement-detail-modal__edit-toggle"
-                onClick={() => setIsEditing(!isEditing)}
-              >
-                {isEditing ? (
-                  <>
-                    <Check size={12} />
-                    <span>Done</span>
-                  </>
-                ) : (
-                  <>
-                    <Edit3 size={12} />
-                    <span>Edit</span>
-                  </>
-                )}
-              </button>
-            )}
-          </div>
-
-          <div className="requirement-detail-modal__desc-content">
-            {isEditing && onUpdateItem ? (
-              <RequirementEditor
-                value={item.body}
-                onChange={(body) => onUpdateItem(item.id, { body })}
-                onDone={() => setIsEditing(false)}
-                doc={doc}
-                autoFocus
-                placeholder="Write a description... type # to reference another item"
-              />
-            ) : (
-              <div
-                className="requirement-detail-modal__body-wrap"
-                onDoubleClick={() => onUpdateItem && setIsEditing(true)}
-              >
-                <RequirementBody text={item.body} doc={doc} onNavigateToItem={handleNavigateRef} />
-              </div>
-            )}
-          </div>
-
-          {onUpdateItem && onAddRelationship && onDeleteRelationship && (
-            <div className="requirement-detail-modal__relationships">
-              <span className="requirement-detail-modal__desc-label">Relationships</span>
-              <RelationshipManager
-                itemId={item.id}
-                doc={doc}
-                onAddRelationship={onAddRelationship}
-                onDeleteRelationship={onDeleteRelationship}
-                onNavigateToItem={handleNavigateRef}
-              />
-            </div>
-          )}
-          {diagramRoot && (
-            <LinkedDiagramsSection
-              itemId={item.id}
-              itemTitle={item.title}
-              linkedNodes={linkedNodes}
-              onNavigateToNode={(nodePath, nodeId) => {
-                onClose();
-                onNavigateToNode?.(nodePath, nodeId);
-              }}
-              onCreateLinkedNode={(itemId, label) => {
-                onClose();
-                onCreateLinkedNode?.(itemId, label);
-              }}
-            />
-          )}
-
-          {linkedMilestones.length > 0 && (
-            <div className="requirement-detail-modal__section" style={{ marginTop: '16px' }}>
-              <span className="requirement-detail-modal__desc-label">Linked Markers</span>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
-                {linkedMilestones.map((m) => {
-                  const mColor = getMilestoneColor(m);
-                  const mLabel = getMilestoneTypeLabel(m.type);
-                  return (
-                    <button
-                      key={m.id}
-                      type="button"
-                      className="pi-board-column__milestone-pill"
-                      style={{ borderColor: mColor, color: mColor }}
-                      onClick={() => {
-                        if (onSelectMilestone) {
-                          onClose();
-                          onSelectMilestone(m.id);
-                        }
-                      }}
-                      title={`${mLabel}: ${m.name} • Scheduled: ${m.scheduledAt}`}
-                    >
-                      <span className="pi-board-column__milestone-shape">◆</span>
-                      <span>{renderMilestoneIcon(m.type)}</span>
-                      <span className="pi-board-column__milestone-name">{m.name}</span>
-                      <span style={{ opacity: 0.8, fontSize: '11px' }}>({m.scheduledAt})</span>
-                    </button>
-                  );
-                })}
-              </div>
+            <div
+              className="requirement-detail-modal__body-wrap"
+              onDoubleClick={() => onUpdateItem && setIsEditing(true)}
+            >
+              <RequirementBody text={item.body} doc={doc} onNavigateToItem={handleNavigateRef} />
             </div>
           )}
         </div>
+
+        {onUpdateItem && onAddRelationship && onDeleteRelationship && (
+          <div className="requirement-detail-modal__relationships">
+            <span className="requirement-detail-modal__desc-label">Relationships</span>
+            <RelationshipManager
+              itemId={item.id}
+              doc={doc}
+              onAddRelationship={onAddRelationship}
+              onDeleteRelationship={onDeleteRelationship}
+              onNavigateToItem={handleNavigateRef}
+            />
+          </div>
+        )}
+        {diagramRoot && (
+          <LinkedDiagramsSection
+            itemId={item.id}
+            itemTitle={item.title}
+            linkedNodes={linkedNodes}
+            onNavigateToNode={(nodePath, nodeId) => {
+              onClose();
+              onNavigateToNode?.(nodePath, nodeId);
+            }}
+            onCreateLinkedNode={(itemId, label) => {
+              onClose();
+              onCreateLinkedNode?.(itemId, label);
+            }}
+          />
+        )}
+
+        {linkedMilestones.length > 0 && (
+          <div className="requirement-detail-modal__section" style={{ marginTop: '16px' }}>
+            <span className="requirement-detail-modal__desc-label">Linked Markers</span>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
+              {linkedMilestones.map((m) => {
+                const mColor = getMilestoneColor(m);
+                const mLabel = getMilestoneTypeLabel(m.type);
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    className="pi-board-column__milestone-pill"
+                    style={{ borderColor: mColor, color: mColor }}
+                    onClick={() => {
+                      if (onSelectMilestone) {
+                        onClose();
+                        onSelectMilestone(m.id);
+                      }
+                    }}
+                    title={`${mLabel}: ${m.name} • Scheduled: ${m.scheduledAt}`}
+                  >
+                    <span className="pi-board-column__milestone-shape">◆</span>
+                    <span>{renderMilestoneIcon(m.type)}</span>
+                    <span className="pi-board-column__milestone-name">{m.name}</span>
+                    <span style={{ opacity: 0.8, fontSize: '11px' }}>({m.scheduledAt})</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
     </BaseModal>
   );
 }

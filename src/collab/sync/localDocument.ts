@@ -27,7 +27,10 @@ import {
 } from './persistence.ts';
 import { isYjsDocEmpty } from './seedGuards.ts';
 import { seedYjsDiagramDoc, createYjsDiagramStore } from '../stores/yjsDiagramStore.ts';
-import { seedYjsRequirementsDoc, createYjsRequirementsStore } from '../stores/yjsRequirementsStore.ts';
+import {
+  seedYjsRequirementsDoc,
+  createYjsRequirementsStore,
+} from '../stores/yjsRequirementsStore.ts';
 import {
   seedYjsProgramIncrementsDoc,
   createYjsProgramIncrementsStore,

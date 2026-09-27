@@ -1,9 +1,16 @@
 import { useEffect, useRef } from 'react';
 import type { CSSProperties, KeyboardEvent } from 'react';
 import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown } from 'lucide-react';
-import { getItemType, getStatusMeta, isItemWorkable } from '../../domain/requirements/requirementsRegistry';
+import {
+  getItemType,
+  getStatusMeta,
+  isItemWorkable,
+} from '../../domain/requirements/requirementsRegistry';
 import type { EpicTree, EpicTreeNode } from '../../domain/requirements/requirementsHierarchy';
-import type { RequirementItem, RequirementsDocument } from '../../domain/requirements/requirementsTypes';
+import type {
+  RequirementItem,
+  RequirementsDocument,
+} from '../../domain/requirements/requirementsTypes';
 import { HighlightedText, HighlightedTitle } from '../../common/components/highlight/HighlightText';
 
 export interface OutlineGroup {

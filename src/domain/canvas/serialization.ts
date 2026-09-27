@@ -2,7 +2,10 @@ import type { Node, Edge } from '@xyflow/react';
 import type { ArchNodeData, ArchEdgeData, Scenario } from './types.ts';
 import type { RequirementsDocument } from '../requirements/requirementsTypes.ts';
 import { EMPTY_REQUIREMENTS_DOCUMENT } from '../requirements/requirementsTypes.ts';
-import { BUILT_IN_ITEM_TYPES, BUILT_IN_RELATIONSHIP_TYPES } from '../requirements/requirementsRegistry.ts';
+import {
+  BUILT_IN_ITEM_TYPES,
+  BUILT_IN_RELATIONSHIP_TYPES,
+} from '../requirements/requirementsRegistry.ts';
 import type { ProgramIncrement } from '../timeline/programIncrements.ts';
 import { DEFAULT_SPRINT_DURATION_DAYS } from '../timeline/programIncrements.ts';
 import type { TeamDocument } from '../timeline/teamTypes.ts';

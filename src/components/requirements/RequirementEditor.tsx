@@ -16,7 +16,10 @@ import {
   getListIndentBehavior,
 } from '../../domain/requirements/markdownEditing';
 import { fitHeightToContent } from '../../domain/requirements/autoSizeTextarea';
-import type { RequirementItem, RequirementsDocument } from '../../domain/requirements/requirementsTypes';
+import type {
+  RequirementItem,
+  RequirementsDocument,
+} from '../../domain/requirements/requirementsTypes';
 import { ReferencePopover } from './ReferencePopover';
 import { MarkdownToolbar } from './MarkdownToolbar';
 

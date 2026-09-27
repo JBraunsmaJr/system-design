@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type DragEvent } from 'react';
+import { useEffect, useRef, useState, type DragEvent } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Boxes,
@@ -10,6 +10,8 @@ import {
   Check,
   type LucideIcon,
 } from 'lucide-react';
+import { useOutsideClick } from '../../common/hooks/useOutsideClick';
+import { usePositionedDropdown } from '../../common/hooks/usePositionedDropdown';
 import {
   NODE_TYPES,
   CATEGORY_LABELS,
@@ -62,8 +64,6 @@ export function Palette() {
   const [mode, setMode] = useState<PaletteMode>('system');
   const [, setVersion] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
-  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
-  const [dropdownWidth, setDropdownWidth] = useState<number>(220);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -73,89 +73,21 @@ export function Palette() {
     });
   }, []);
 
-  const open = () => {
-    const trigger = triggerRef.current;
-    if (!trigger) return;
-    const rect = trigger.getBoundingClientRect();
-    setDropdownWidth(rect.width);
-    setDropdownPos({ top: rect.bottom + 4, left: rect.left });
-    setIsOpen(true);
-  };
-
   const close = () => {
     setIsOpen(false);
   };
 
-  useLayoutEffect(() => {
-    if (!isOpen) return;
-    const trigger = triggerRef.current;
-    const dropdown = dropdownRef.current;
-    if (!trigger || !dropdown) return;
-    const triggerRect = trigger.getBoundingClientRect();
-    const dropdownRect = dropdown.getBoundingClientRect();
+  const { position: dropdownPos } = usePositionedDropdown({
+    triggerRef,
+    dropdownRef,
+    isOpen,
+  });
 
-    const left = Math.max(
-      8,
-      Math.min(triggerRect.left, window.innerWidth - dropdownRect.width - 8),
-    );
-    const spaceBelow = window.innerHeight - triggerRect.bottom;
-    const spaceAbove = triggerRect.top;
-    const top =
-      spaceBelow >= dropdownRect.height + 4 || spaceBelow >= spaceAbove
-        ? triggerRect.bottom + 4
-        : Math.max(8, triggerRect.top - dropdownRect.height - 4);
-
-    setDropdownPos((prev) =>
-      prev && prev.top === top && prev.left === left ? prev : { top, left },
-    );
-  }, [isOpen]);
-
-  const reposition = useCallback(() => {
-    const trigger = triggerRef.current;
-    const dropdown = dropdownRef.current;
-    if (!trigger || !dropdown) return;
-    const triggerRect = trigger.getBoundingClientRect();
-    const dropdownRect = dropdown.getBoundingClientRect();
-
-    const left = Math.max(
-      8,
-      Math.min(triggerRect.left, window.innerWidth - dropdownRect.width - 8),
-    );
-    const spaceBelow = window.innerHeight - triggerRect.bottom;
-    const spaceAbove = triggerRect.top;
-    const top =
-      spaceBelow >= dropdownRect.height + 4 || spaceBelow >= spaceAbove
-        ? triggerRect.bottom + 4
-        : Math.max(8, triggerRect.top - dropdownRect.height - 4);
-
-    setDropdownPos({ top, left });
-  }, []);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleMouseDown = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (triggerRef.current?.contains(target)) return;
-      if (dropdownRef.current?.contains(target)) return;
-      close();
-    };
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        close();
-        triggerRef.current?.focus();
-      }
-    };
-    document.addEventListener('mousedown', handleMouseDown);
-    document.addEventListener('keydown', handleEscape);
-    window.addEventListener('scroll', reposition, true);
-    window.addEventListener('resize', reposition);
-    return () => {
-      document.removeEventListener('mousedown', handleMouseDown);
-      document.removeEventListener('keydown', handleEscape);
-      window.removeEventListener('scroll', reposition, true);
-      window.removeEventListener('resize', reposition);
-    };
-  }, [isOpen, reposition]);
+  useOutsideClick({
+    refs: [triggerRef, dropdownRef],
+    isOpen,
+    onClose: close,
+  });
 
   const shapeCategories = globalShapeRegistry.getCategories();
   const currentTab = PALETTE_TABS.find((t) => t.id === mode) || PALETTE_TABS[0];
@@ -168,7 +100,7 @@ export function Palette() {
           ref={triggerRef}
           type="button"
           className={`palette__mode-trigger${isOpen ? ' is-open' : ''}`}
-          onClick={() => (isOpen ? close() : open())}
+          onClick={() => setIsOpen((prev) => !prev)}
           aria-expanded={isOpen}
           aria-haspopup="listbox"
           aria-label="Select shape category"
@@ -181,7 +113,6 @@ export function Palette() {
         </button>
 
         {isOpen &&
-          dropdownPos &&
           createPortal(
             <div
               ref={dropdownRef}
@@ -190,9 +121,9 @@ export function Palette() {
               aria-label="Shape category options"
               style={{
                 position: 'fixed',
-                top: dropdownPos.top,
-                left: dropdownPos.left,
-                width: dropdownWidth,
+                top: dropdownPos?.top ?? 0,
+                left: dropdownPos?.left ?? 0,
+                width: dropdownPos?.width ?? 220,
               }}
             >
               {PALETTE_TABS.map(({ id, label, icon: Icon }) => {

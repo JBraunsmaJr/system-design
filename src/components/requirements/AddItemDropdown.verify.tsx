@@ -12,7 +12,10 @@ import {
   BUILT_IN_ITEM_TYPES,
   BUILT_IN_RELATIONSHIP_TYPES,
 } from '../../domain/requirements/requirementsRegistry';
-import type { RequirementItemType, RequirementsDocument } from '../../domain/requirements/requirementsTypes';
+import type {
+  RequirementItemType,
+  RequirementsDocument,
+} from '../../domain/requirements/requirementsTypes';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {

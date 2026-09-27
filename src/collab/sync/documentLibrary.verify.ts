@@ -2,7 +2,10 @@
  * WS2-R3 / WS2-R6 - operating on stored documents that are not open.
  */
 import 'fake-indexeddb/auto';
-import { createDocumentStore, type DocumentIndexEntry } from '../../domain/storage/documentStore.ts';
+import {
+  createDocumentStore,
+  type DocumentIndexEntry,
+} from '../../domain/storage/documentStore.ts';
 import { createIndexedDbBackend } from '../../domain/storage/indexedDbBackend.ts';
 import { SCHEMA_VERSION, type DiagramFile } from '../../domain/canvas/serialization.ts';
 import { EMPTY_REQUIREMENTS_DOCUMENT } from '../../domain/requirements/requirementsTypes.ts';

@@ -78,7 +78,9 @@ export function DocumentationPopup({
       12,
     );
 
-    setPos((prev) => (prev && prev.top === nextPos.top && prev.left === nextPos.left ? prev : nextPos));
+    setPos((prev) =>
+      prev && prev.top === nextPos.top && prev.left === nextPos.left ? prev : nextPos,
+    );
   }, [
     shouldShow,
     anchor?.x,

@@ -17,7 +17,10 @@ import {
   seedYjsProgramIncrementsDoc,
   createYjsProgramIncrementsStore,
 } from '../stores/yjsProgramIncrementsStore.ts';
-import { seedYjsRequirementsDoc, createYjsRequirementsStore } from '../stores/yjsRequirementsStore.ts';
+import {
+  seedYjsRequirementsDoc,
+  createYjsRequirementsStore,
+} from '../stores/yjsRequirementsStore.ts';
 import { createYjsTeamStore } from '../stores/yjsTeamStore.ts';
 import { seedTeamStore } from '../stores/teamStore.ts';
 import { isYjsDocEmpty, orderIdSet, pushIfAbsent } from './seedGuards.ts';

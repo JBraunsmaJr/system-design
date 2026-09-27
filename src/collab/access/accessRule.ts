@@ -7,7 +7,11 @@
  * store whom to list as waiting; a store that alters it can mislist people,
  * but cannot get anyone a key.
  */
-import { EVIDENCE_MAX_AGE_DEFAULT, parseAccessRule, type AccessRule } from '../../crypto/idToken.ts';
+import {
+  EVIDENCE_MAX_AGE_DEFAULT,
+  parseAccessRule,
+  type AccessRule,
+} from '../../crypto/idToken.ts';
 import { StoreClientError, type StoreClient } from './storeClient.ts';
 import { indexKeyFor } from '../sync/workspaceDocuments.ts';
 

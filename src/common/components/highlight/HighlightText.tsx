@@ -1,5 +1,8 @@
 import React, { useLayoutEffect, useRef, useState, useMemo } from 'react';
-import { splitByHighlight, computeTruncationWithHighlight } from '../../../domain/requirements/textHighlight';
+import {
+  splitByHighlight,
+  computeTruncationWithHighlight,
+} from '../../../domain/requirements/textHighlight';
 
 interface HighlightedTextProps {
   text: string;
@@ -112,11 +115,8 @@ export function HighlightedTitle({
     if (!displayText) return null;
 
     if (containerWidth > 0 && computedFont) {
-      return computeTruncationWithHighlight(
-        displayText,
-        trimmedSearch,
-        containerWidth,
-        (s) => getTextWidth(s, computedFont),
+      return computeTruncationWithHighlight(displayText, trimmedSearch, containerWidth, (s) =>
+        getTextWidth(s, computedFont),
       );
     }
 

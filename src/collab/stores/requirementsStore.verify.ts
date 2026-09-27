@@ -13,7 +13,10 @@ import {
 } from './yjsRequirementsStore';
 import type { RequirementsStore } from './requirementsStore';
 import { EMPTY_REQUIREMENTS_DOCUMENT } from '../../domain/requirements/requirementsTypes';
-import { BUILT_IN_ITEM_TYPES, BUILT_IN_RELATIONSHIP_TYPES } from '../../domain/requirements/requirementsRegistry';
+import {
+  BUILT_IN_ITEM_TYPES,
+  BUILT_IN_RELATIONSHIP_TYPES,
+} from '../../domain/requirements/requirementsRegistry';
 
 let failures = 0;
 function assert(cond: boolean, msg: string) {

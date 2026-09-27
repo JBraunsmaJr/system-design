@@ -104,7 +104,11 @@ import {
   destroyDocumentStores,
   type OpenDocumentStores,
 } from './collab/sync/localDocument';
-import { undoableStore, undoControllerFor, releaseUndoController } from './collab/stores/undoManager';
+import {
+  undoableStore,
+  undoControllerFor,
+  releaseUndoController,
+} from './collab/stores/undoManager';
 import { downloadRequirementsMarkdown } from './domain/requirements/requirementsExport';
 import {
   exportDiagramAsPng,
@@ -127,7 +131,10 @@ import type {
   SubDiagram,
 } from './domain/canvas/types';
 import type { RequirementsDocument } from './domain/requirements/requirementsTypes';
-import { EMPTY_REQUIREMENTS_DOCUMENT, type RequirementItem } from './domain/requirements/requirementsTypes';
+import {
+  EMPTY_REQUIREMENTS_DOCUMENT,
+  type RequirementItem,
+} from './domain/requirements/requirementsTypes';
 import {
   BUILT_IN_ITEM_TYPES,
   BUILT_IN_RELATIONSHIP_TYPES,
@@ -179,7 +186,11 @@ import {
   sanitizeCurrentUrl,
 } from './domain/network/sessionLink';
 import { Toast, type ToastType } from './common/components/toast/Toast';
-import { applyZOrderCommand, computeEffectiveZIndices, type ZOrderCommand } from './domain/canvas/zOrder';
+import {
+  applyZOrderCommand,
+  computeEffectiveZIndices,
+  type ZOrderCommand,
+} from './domain/canvas/zOrder';
 import {
   mergeInFlight,
   applyInFlight,

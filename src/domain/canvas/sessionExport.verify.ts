@@ -1,6 +1,9 @@
 import * as Y from 'yjs';
 import { createYjsDiagramStore, seedYjsDiagramDoc } from '../../collab/stores/yjsDiagramStore';
-import { createYjsRequirementsStore, seedYjsRequirementsDoc } from '../../collab/stores/yjsRequirementsStore';
+import {
+  createYjsRequirementsStore,
+  seedYjsRequirementsDoc,
+} from '../../collab/stores/yjsRequirementsStore';
 import { unflattenToSubDiagram } from '../../collab/stores/diagramStore';
 import { toDiagramFile } from './serialization';
 import { toMarkdownDocument } from '../requirements/requirementsExport';
@@ -8,7 +11,10 @@ import { EMPTY_TEAM_DOCUMENT } from '../timeline/teamTypes';
 import type { SubDiagram } from './types';
 import type { RequirementsDocument } from '../requirements/requirementsTypes';
 
-import { BUILT_IN_ITEM_TYPES, BUILT_IN_RELATIONSHIP_TYPES } from '../requirements/requirementsRegistry';
+import {
+  BUILT_IN_ITEM_TYPES,
+  BUILT_IN_RELATIONSHIP_TYPES,
+} from '../requirements/requirementsRegistry';
 
 function assert(condition: boolean, message: string) {
   if (!condition) {

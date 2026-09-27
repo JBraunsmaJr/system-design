@@ -2,7 +2,10 @@ import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Plus } from 'lucide-react';
 import { getItemType } from '../../domain/requirements/requirementsRegistry';
-import type { RequirementItem, RequirementsDocument } from '../../domain/requirements/requirementsTypes';
+import type {
+  RequirementItem,
+  RequirementsDocument,
+} from '../../domain/requirements/requirementsTypes';
 import { HighlightedText, HighlightedTitle } from '../../common/components/highlight/HighlightText';
 import { useOutsideClick } from '../../common/hooks/useOutsideClick';
 import { usePositionedDropdown } from '../../common/hooks/usePositionedDropdown';

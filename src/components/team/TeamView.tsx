@@ -13,7 +13,12 @@ import {
   ChevronUp,
   CalendarRange,
 } from 'lucide-react';
-import type { TeamMember, PtoSpan, ExtraDayOff, HalfDayType } from '../../domain/timeline/teamTypes';
+import type {
+  TeamMember,
+  PtoSpan,
+  ExtraDayOff,
+  HalfDayType,
+} from '../../domain/timeline/teamTypes';
 import type { ProgramIncrement } from '../../domain/timeline/programIncrements';
 import type { ProgramIncrementsStore } from '../../collab/stores/programIncrementsStore';
 import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';

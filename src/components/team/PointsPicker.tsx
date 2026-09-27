@@ -77,7 +77,6 @@ export function PointsPicker({ points, onChange, compact = false }: PointsPicker
       </button>
 
       {isOpen &&
-        popoverPos &&
         createPortal(
           <div
             ref={popoverRef}
@@ -85,8 +84,8 @@ export function PointsPicker({ points, onChange, compact = false }: PointsPicker
             role="dialog"
             style={{
               position: 'fixed',
-              top: popoverPos.top,
-              left: popoverPos.left,
+              top: popoverPos?.top ?? 0,
+              left: popoverPos?.left ?? 0,
               width: POPOVER_WIDTH,
             }}
           >

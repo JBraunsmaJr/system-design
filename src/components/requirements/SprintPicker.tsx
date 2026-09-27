@@ -1,7 +1,10 @@
 import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CalendarRange, X } from 'lucide-react';
-import { computeSprintDateRanges, type ProgramIncrement } from '../../domain/timeline/programIncrements';
+import {
+  computeSprintDateRanges,
+  type ProgramIncrement,
+} from '../../domain/timeline/programIncrements';
 import { useOutsideClick } from '../../common/hooks/useOutsideClick';
 import { usePositionedDropdown } from '../../common/hooks/usePositionedDropdown';
 

@@ -28,7 +28,10 @@ import { RequirementCard } from './RequirementCard';
 import { ManageTypesModal } from './ManageTypesModal';
 import { ManageRelationshipTypesModal } from './ManageRelationshipTypesModal';
 import { AddItemDropdown } from './AddItemDropdown';
-import type { RequirementItem, RequirementItemType } from '../../domain/requirements/requirementsTypes';
+import type {
+  RequirementItem,
+  RequirementItemType,
+} from '../../domain/requirements/requirementsTypes';
 import type { ProgramIncrement } from '../../domain/timeline/programIncrements';
 import type { TeamDocument } from '../../domain/timeline/teamTypes';
 import type { SubDiagram } from '../../domain/canvas/types';

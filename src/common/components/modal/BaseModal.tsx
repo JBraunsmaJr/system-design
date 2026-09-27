@@ -94,14 +94,8 @@ export function BaseModal({
           ...style,
         }}
       >
-        {title && (
-          <div style={{ margin: '0 0 14px', fontSize: 16, fontWeight: 600 }}>
-            {title}
-          </div>
-        )}
-        <div style={{ flex: 1, overflowY: 'auto', ...bodyStyle }}>
-          {children}
-        </div>
+        {title && <div style={{ margin: '0 0 14px', fontSize: 16, fontWeight: 600 }}>{title}</div>}
+        <div style={{ flex: 1, overflowY: 'auto', ...bodyStyle }}>{children}</div>
         {footer && (
           <div
             style={{

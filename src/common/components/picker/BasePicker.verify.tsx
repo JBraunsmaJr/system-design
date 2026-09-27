@@ -20,11 +20,7 @@ const testOptions: PickerOption<string>[] = [
 // 1. BasePicker renders trigger with selected label
 {
   const html = renderToStaticMarkup(
-    <BasePicker
-      options={testOptions}
-      selectedValue="opt-1"
-      onSelect={() => {}}
-    />,
+    <BasePicker options={testOptions} selectedValue="opt-1" onSelect={() => {}} />,
   );
   assert(html.includes('base-picker'), 'BasePicker renders root container');
   assert(html.includes('base-picker__trigger'), 'BasePicker renders trigger');
