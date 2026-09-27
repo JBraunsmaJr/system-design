@@ -63,6 +63,7 @@ import { startSignIn } from '../../collab/access/joinFlow';
 import { useJoinStatus } from '../../collab/hooks/useJoinStatus';
 import { describeRejection } from '../../collab/access/autoGrant';
 import { AccessRuleSettings } from './AccessRuleSettings';
+import { Button } from '../../common/components/button/Button';
 
 const WORKSPACE_ID = 'default';
 
@@ -644,7 +645,7 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
       data-phase={phase}
       style={{
         padding: '10px 18px',
-        borderBottom: '1px solid var(--border, #2d3342)',
+        borderBottom: '1px solid var(--chrome-border)',
         display: 'grid',
         gap: 8,
         fontSize: 12,
@@ -655,7 +656,7 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
         <strong>Workspace</strong>
         {busy && <Loader2 size={12} className="workspace-panel__busy" />}
         {session && (
-          <span className="workspace-panel__who" style={{ color: 'var(--text-muted, #9aa3b2)' }}>
+          <span className="workspace-panel__who" style={{ color: 'var(--chrome-text-dim)' }}>
             {session.displayName ?? session.subject}
           </span>
         )}
@@ -689,15 +690,16 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <span>Sign in to use the workspace:</span>
           {providers.map((provider) => (
-            <button
+            <Button
               key={provider}
-              type="button"
+              variant="secondary"
+              size="sm"
               className="workspace-panel__sign-in"
               // WS14-R2: commits to a key first where automatic access can use it.
               onClick={() => void startSignIn(props.storeUrl, provider)}
             >
               {provider}
-            </button>
+            </Button>
           ))}
         </div>
       )}
@@ -705,14 +707,15 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
       {phase === 'enrolling' && (
         <div style={{ display: 'grid', gap: 6 }}>
           <p style={{ margin: 0 }}>This browser has no workspace keys yet.</p>
-          <button
-            type="button"
+          <Button
+            variant="primary"
+            size="sm"
             className="workspace-panel__bootstrap"
             onClick={() => void setUpKeys()}
             disabled={busy}
           >
             Set up this browser
-          </button>
+          </Button>
         </div>
       )}
 
@@ -729,15 +732,16 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
             </p>
           )}
           {join.view !== 'waiting' && join.view !== 'manual' && (
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="sm"
               className="workspace-panel__sign-in-again"
               onClick={() => void join.signInAgain()}
               disabled={busy}
               style={{ justifySelf: 'start' }}
             >
               Back in the group? Sign in again
-            </button>
+            </Button>
           )}
         </div>
       )}
@@ -770,8 +774,9 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
             </p>
           )}
           {(join.view === 'expired' || join.view === 'can-retry' || join.view === 'needs-oidc') && (
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="sm"
               className="workspace-panel__sign-in-again"
               onClick={() => void join.signInAgain()}
               disabled={busy}
@@ -780,16 +785,17 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
               {join.view === 'can-retry'
                 ? 'Sign in again to be let in automatically'
                 : 'Sign in again'}
-            </button>
+            </Button>
           )}
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="sm"
             className="workspace-panel__recheck"
             onClick={() => void run(refresh)}
             disabled={busy}
           >
             Check again
-          </button>
+          </Button>
         </div>
       )}
 
@@ -802,14 +808,15 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
           <code className="workspace-panel__code" style={{ fontSize: 16, letterSpacing: 1 }}>
             {device?.verificationCode}
           </code>
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="sm"
             className="workspace-panel__recheck"
             onClick={() => void run(refresh)}
             disabled={busy}
           >
             Check again
-          </button>
+          </Button>
           <details className="workspace-panel__recover" style={{ marginTop: 4 }}>
             <summary style={{ cursor: 'pointer' }}>
               No other browser? Use your recovery code
@@ -825,14 +832,15 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
                 spellCheck={false}
                 style={{ fontFamily: 'monospace', letterSpacing: 1 }}
               />
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="sm"
                 className="workspace-panel__recover-submit"
                 onClick={() => void redeemRecoveryCode()}
                 disabled={busy || typedCode.trim().length === 0}
               >
                 Recover this browser
-              </button>
+              </Button>
             </div>
           </details>
         </div>
@@ -849,17 +857,19 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
                   style={{ display: 'flex', gap: 8, alignItems: 'center' }}
                 >
                   <code>{target.verificationCode}</code>
-                  <span style={{ color: 'var(--text-muted, #9aa3b2)' }}>
+                  <span style={{ color: 'var(--chrome-text-dim)' }}>
                     {target.label ?? 'another browser'}
                   </span>
-                  <button
-                    type="button"
+                  <Button
+                    variant="primary"
+                    size="sm"
                     className="workspace-panel__approve"
                     onClick={() => void approve(target)}
                     disabled={busy}
+                    icon={<Check size={14} />}
                   >
-                    <Check size={12} /> Codes match, approve
-                  </button>
+                    Codes match, approve
+                  </Button>
                 </div>
               ))}
             </div>
@@ -884,13 +894,14 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
                 down, or in a password manager. Nobody can look it up for you, including an
                 administrator.
               </span>
-              <button
-                type="button"
+              <Button
+                variant="primary"
+                size="sm"
                 className="workspace-panel__recovery-saved"
                 onClick={() => setNewCode(null)}
               >
                 I have saved it
-              </button>
+              </Button>
             </div>
           )}
 
@@ -900,20 +911,23 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
                 You have no recovery code. If you lose every browser, it is the only way back in
                 without an administrator.
               </span>
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="sm"
+                fullWidth
                 className="workspace-panel__recovery-create"
                 onClick={() => void makeRecoveryCode()}
                 disabled={busy}
               >
                 Create a recovery code
-              </button>
+              </Button>
             </div>
           )}
 
           {!newCode && hasRecoveryCode === true && (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="sm"
               className="workspace-panel__recovery-replace"
               onClick={() => {
                 if (window.confirm('Make a new recovery code? The old one will stop working.'))
@@ -923,7 +937,7 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
               style={{ justifySelf: 'start' }}
             >
               Make a new recovery code
-            </button>
+            </Button>
           )}
 
           {canGrant && members.length > 0 && (
@@ -945,7 +959,7 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
                   <span style={{ flex: 1 }}>{member.displayName ?? member.userId}</span>
                   {member.removedAt ? (
                     <span
-                      style={{ color: 'var(--text-muted, #9aa3b2)' }}
+                      style={{ color: 'var(--chrome-text-dim)' }}
                       className="workspace-panel__removed"
                     >
                       removed {new Date(member.removedAt).toLocaleDateString()}
@@ -953,24 +967,26 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
                     </span>
                   ) : member.hasAccess ? (
                     <>
-                      <span style={{ color: 'var(--text-muted, #9aa3b2)' }}>
+                      <span style={{ color: 'var(--chrome-text-dim)' }}>
                         {member.matchedGroup
                           ? `joined through ${member.matchedGroup}`
                           : 'has access'}
                       </span>
-                      <button
-                        type="button"
+                      <Button
+                        variant="secondary"
+                        size="sm"
                         className="workspace-panel__remove"
                         onClick={() => void removeAccess(member)}
                         disabled={busy}
                         title="Take away their access now, and replace the workspace key"
                       >
                         Remove
-                      </button>
+                      </Button>
                     </>
                   ) : (
-                    <button
-                      type="button"
+                    <Button
+                      variant="primary"
+                      size="sm"
                       className="workspace-panel__grant"
                       onClick={() => void grantAccess(member)}
                       disabled={busy || !member.publicKey}
@@ -981,7 +997,7 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
                       }
                     >
                       Give access
-                    </button>
+                    </Button>
                   )}
                 </div>
               ))}
@@ -998,16 +1014,19 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
           )}
 
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="sm"
               className="workspace-panel__save"
               onClick={() => void saveHere()}
               disabled={busy}
+              icon={<Upload size={14} />}
             >
-              <Upload size={12} /> Save this document to the workspace
-            </button>
-            <button
-              type="button"
+              Save this document to the workspace
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
               className="workspace-panel__rotate"
               onClick={() => {
                 if (
@@ -1020,12 +1039,13 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
               }}
               disabled={busy}
               title="Replace the workspace key, for example after losing a device"
+              icon={<KeyRound size={14} />}
             >
-              <KeyRound size={12} /> Rotate key
-            </button>
+              Rotate key
+            </Button>
             <span
               className="workspace-panel__generation"
-              style={{ color: 'var(--text-muted, #9aa3b2)' }}
+              style={{ color: 'var(--chrome-text-dim)' }}
             >
               key {generation}
             </span>
@@ -1056,21 +1076,22 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
                   >
                     <Laptop size={12} />
                     <span style={{ flex: 1 }}>{device.label ?? device.deviceId}</span>
-                    <button
-                      type="button"
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       className="workspace-panel__revoke"
                       onClick={() => void revoke(device.deviceId)}
                       disabled={busy}
                     >
                       Revoke
-                    </button>
+                    </Button>
                   </div>
                 ))}
             </div>
           )}
 
           {entries.length === 0 ? (
-            <p style={{ margin: 0, color: 'var(--text-muted, #9aa3b2)' }}>
+            <p style={{ margin: 0, color: 'var(--chrome-text-dim)' }}>
               No documents in the workspace yet.
             </p>
           ) : (
@@ -1088,22 +1109,26 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
                   <span className="workspace-panel__title" style={{ flex: 1 }}>
                     {entry.title}
                   </span>
-                  <button
-                    type="button"
+                  <Button
+                    variant="secondary"
+                    size="sm"
                     className="workspace-panel__open"
                     onClick={() => void openEntry(entry)}
                     disabled={busy}
+                    icon={<FolderOpen size={14} />}
                   >
-                    <FolderOpen size={12} /> Open
-                  </button>
-                  <button
-                    type="button"
+                    Open
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
                     className="workspace-panel__remove"
                     onClick={() => void removeEntryFromWorkspace(entry)}
                     disabled={busy}
-                  >
-                    <Trash2 size={12} />
-                  </button>
+                    title="Remove from workspace"
+                    icon={<Trash2 size={14} />}
+                  />
                 </li>
               ))}
             </ul>

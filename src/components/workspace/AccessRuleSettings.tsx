@@ -12,6 +12,7 @@ import { loadAccessRule, saveAccessRule } from '../../collab/access/accessRule';
 import { autoGrantEnabledHere, setAutoGrantEnabledHere } from '../../collab/access/autoGrant';
 import type { StoreClient } from '../../collab/access/storeClient';
 import { indexKeyFor } from '../../collab/sync/workspaceDocuments';
+import { Button } from '../../common/components/button/Button';
 
 const VALIDITY = [
   { seconds: 3_600, label: '1 hour' },
@@ -198,8 +199,9 @@ export function AccessRuleSettings(props: AccessRuleSettingsProps) {
               </label>
             )}
             <div>
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="sm"
                 className="workspace-panel__auto-access-save"
                 onClick={() => void save()}
                 disabled={
@@ -207,7 +209,7 @@ export function AccessRuleSettings(props: AccessRuleSettingsProps) {
                 }
               >
                 {busy ? 'Saving…' : 'Save automatic access'}
-              </button>
+              </Button>
             </div>
             {message && (
               <p role="status" style={{ margin: 0 }}>
