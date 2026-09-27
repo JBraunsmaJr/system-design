@@ -34,7 +34,9 @@ function assert(condition: boolean, message: string) {
   const danger = renderToStaticMarkup(<Button variant="danger">Danger</Button>);
   assert(danger.includes('btn--danger'), 'Danger variant class is set');
 
-  const dangerOutline = renderToStaticMarkup(<Button variant="danger-outline">Danger Outline</Button>);
+  const dangerOutline = renderToStaticMarkup(
+    <Button variant="danger-outline">Danger Outline</Button>,
+  );
   assert(dangerOutline.includes('btn--danger-outline'), 'Danger outline variant class is set');
 }
 
@@ -71,11 +73,17 @@ function assert(condition: boolean, message: string) {
 // 5. Disabled and loading states
 {
   const disabled = renderToStaticMarkup(<Button disabled>Disabled</Button>);
-  assert(disabled.includes('disabled=""') || disabled.includes('disabled'), 'disabled attribute is present');
+  assert(
+    disabled.includes('disabled=""') || disabled.includes('disabled'),
+    'disabled attribute is present',
+  );
 
   const loading = renderToStaticMarkup(<Button loading>Loading</Button>);
   assert(loading.includes('btn--loading'), 'btn--loading class is applied');
-  assert(loading.includes('disabled=""') || loading.includes('disabled'), 'loading disables the button');
+  assert(
+    loading.includes('disabled=""') || loading.includes('disabled'),
+    'loading disables the button',
+  );
 }
 
 // 6. fullWidth and custom className / attributes

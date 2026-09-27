@@ -107,7 +107,16 @@ export function BaseModal({
             {title}
           </div>
         )}
-        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', minHeight: 0, ...bodyStyle }}>
+        <div
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            minHeight: 0,
+            ...bodyStyle,
+          }}
+        >
           {children}
         </div>
         {footer && (

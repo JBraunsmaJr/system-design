@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import {
   Copy,
   FileText,
@@ -31,7 +31,7 @@ interface DocumentManagerProps {
   onOpenDocument: (docId: string) => void;
   onNewDocument: () => void;
   /** The workspace section, where a store is configured (WS9-R4). */
-  workspace?: React.ReactNode;
+  workspace?: ReactNode;
   /** WS13-R6: timed downloads, a browser-wide preference. */
   timedCopies?: TimedCopiesSettings;
   onTimedCopiesChange?: (next: TimedCopiesSettings) => void;
@@ -336,9 +336,7 @@ export function DocumentManager({
               variant="secondary"
               size="sm"
               className="document-manager__timed-copies-toggle"
-              onClick={() =>
-                onTimedCopiesChange({ ...timedCopies, enabled: !timedCopies.enabled })
-              }
+              onClick={() => onTimedCopiesChange({ ...timedCopies, enabled: !timedCopies.enabled })}
             >
               {timedCopies.enabled ? 'Turn off' : 'Turn on'}
             </Button>
@@ -397,9 +395,7 @@ export function DocumentManager({
                       onBlur={() => commitRename(entry)}
                     />
                   ) : (
-                    <div className="document-manager__title">
-                      {entry.title}
-                    </div>
+                    <div className="document-manager__title">{entry.title}</div>
                   )}
                   <div className="document-manager__meta">
                     {isCurrent && (

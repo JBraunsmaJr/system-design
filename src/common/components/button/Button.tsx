@@ -1,9 +1,4 @@
-import {
-  forwardRef,
-  type ButtonHTMLAttributes,
-  type CSSProperties,
-  type ReactNode,
-} from 'react';
+import { forwardRef, type ButtonHTMLAttributes, type CSSProperties, type ReactNode } from 'react';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'danger-outline';
 export type ButtonSize = 'sm' | 'md' | 'lg';
@@ -150,7 +145,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     fontWeight: 500,
     cursor: isEffectivelyDisabled ? 'not-allowed' : 'pointer',
     opacity: isEffectivelyDisabled ? 0.45 : 1,
-    transition: 'background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease',
+    transition:
+      'background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease',
     textDecoration: 'none',
     whiteSpace: 'nowrap',
     width: fullWidth ? '100%' : undefined,
@@ -169,9 +165,23 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       style={mergedStyles}
       {...restProps}
     >
-      {icon && <span className="btn__icon btn__icon--left" style={{ display: 'inline-flex', alignItems: 'center' }}>{icon}</span>}
+      {icon && (
+        <span
+          className="btn__icon btn__icon--left"
+          style={{ display: 'inline-flex', alignItems: 'center' }}
+        >
+          {icon}
+        </span>
+      )}
       {children}
-      {iconRight && <span className="btn__icon btn__icon--right" style={{ display: 'inline-flex', alignItems: 'center' }}>{iconRight}</span>}
+      {iconRight && (
+        <span
+          className="btn__icon btn__icon--right"
+          style={{ display: 'inline-flex', alignItems: 'center' }}
+        >
+          {iconRight}
+        </span>
+      )}
     </button>
   );
 });
