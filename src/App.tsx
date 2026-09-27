@@ -3347,6 +3347,15 @@ function App() {
     />
   );
 
+  const getDocumentState = useCallback(() => Y.encodeStateAsUpdate(openDoc.doc), [openDoc.doc]);
+  const handleOpenWorkspaceDocument = useCallback(
+    (docId: string) => {
+      setIsDocumentManagerOpen(false);
+      openDocumentInTab(docId);
+    },
+    [openDocumentInTab],
+  );
+
   return (
     <div className="app">
       {appVersion && <div className="app-version">{appVersion}</div>}
@@ -3640,11 +3649,8 @@ function App() {
               // What a workspace document holds: this document's CRDT
               // state, so the workspace copy merges with everyone else's
               // rather than replacing it (WS8-R2).
-              getDocumentState={() => Y.encodeStateAsUpdate(openDoc.doc)}
-              onOpenDocument={(docId) => {
-                setIsDocumentManagerOpen(false);
-                openDocumentInTab(docId);
-              }}
+              getDocumentState={getDocumentState}
+              onOpenDocument={handleOpenWorkspaceDocument}
             />
           ) : undefined
         }

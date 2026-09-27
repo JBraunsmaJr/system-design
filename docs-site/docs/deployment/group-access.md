@@ -5,11 +5,6 @@ With it, a workspace can say "anyone in this group may join", and members'
 browsers let those people in on their own - usually within seconds of them
 signing in.
 
-::: warning Status
-This page documents a feature in development. Setting names and screens may
-change before release.
-:::
-
 ::: tip The short version
 Your identity provider puts the person's groups in their sign-in token. The
 workspace keeps a rule naming which groups may join. A member's browser -
@@ -107,6 +102,10 @@ If `groups` is missing, the mapper is not adding to the ID token. If it holds
 names without a leading `/`, **Full group path** is off.
 
 ### 4. Check the browser can reach the signing keys
+
+:::warning
+This is assuming that Keycloak is hosted elsewhere.
+::: 
 
 The granting browser fetches the provider's discovery document and signing
 keys from the editor's page. Check both answer with a CORS header for the

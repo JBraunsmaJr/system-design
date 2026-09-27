@@ -188,8 +188,25 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
   const loadEntries = useCallback(
     async (key: CryptoKey) => {
       const listed = await client.readIndex(WORKSPACE_ID, await indexKeyFor(key));
-      setEntries(listed.entries);
-      if (listed.generation) setGeneration(listed.generation);
+      setEntries((prev) => {
+        if (!prev) return listed.entries;
+        if (
+          prev.length === listed.entries.length &&
+          prev.every(
+            (e, i) =>
+              e.docId === listed.entries[i].docId &&
+              e.title === listed.entries[i].title &&
+              e.wrappedDocKey === listed.entries[i].wrappedDocKey &&
+              e.updatedAt === listed.entries[i].updatedAt,
+          )
+        ) {
+          return prev;
+        }
+        return listed.entries;
+      });
+      if (listed.generation) {
+        setGeneration((prev) => (prev === listed.generation ? prev : listed.generation!));
+      }
     },
     [client],
   );
@@ -204,7 +221,6 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
   });
 
   const refresh = useCallback(async () => {
-    setBusy(true);
     try {
       const health = await client.health();
       setServerReadsContent(health.cryptoMode === 'passthrough');
@@ -224,17 +240,33 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
         await loadEntries(state.workspaceKey);
         // Devices of this person still waiting for approval (WS7-R11).
         const listed = await client.listDevices();
-        setDevices(
-          listed.map((d) => ({
-            deviceId: d.deviceId,
-            label: d.label,
-            approvedAt: d.approvedAt,
-            revokedAt: d.revokedAt,
-          })),
-        );
+        const nextDevices = listed.map((d) => ({
+          deviceId: d.deviceId,
+          label: d.label,
+          approvedAt: d.approvedAt,
+          revokedAt: d.revokedAt,
+        }));
+        setDevices((prev) => {
+          if (
+            prev.length === nextDevices.length &&
+            prev.every(
+              (d, i) =>
+                d.deviceId === nextDevices[i].deviceId &&
+                d.label === nextDevices[i].label &&
+                d.approvedAt === nextDevices[i].approvedAt &&
+                d.revokedAt === nextDevices[i].revokedAt,
+            )
+          ) {
+            return prev;
+          }
+          return nextDevices;
+        });
         client.getRecovery().then(
-          (recovery) => setHasRecoveryCode(recovery !== null),
-          () => setHasRecoveryCode(null),
+          (recovery) => {
+            const hasRec = recovery !== null;
+            setHasRecoveryCode((prev) => (prev === hasRec ? prev : hasRec));
+          },
+          () => setHasRecoveryCode((prev) => (prev === null ? prev : null)),
         );
         // Who else is in this workspace, and whether they can read it.
         // Only an administrator may ask, so a refusal is not an error -
@@ -242,35 +274,64 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
         try {
           const listedMembers = await client.listMembers();
           const me = await client.me();
-          setMyUserId(me.userId);
-          setMembers(
-            listedMembers
-              .filter((member) => member.userId !== me.userId)
-              .map((member) => ({
-                userId: member.userId,
-                displayName: member.displayName,
-                publicKey: member.publicKey,
-                hasAccess: (member.workspaceKeyGenerations ?? []).includes(generation),
-                matchedGroup: member.source === 'oidc_group' ? member.matchedGroup : null,
-                removedAt: member.removedAt ?? null,
-                removedCause: member.removedCause ?? null,
-              })),
-          );
-          setCanGrant(true);
+          setMyUserId((prev) => (prev === me.userId ? prev : me.userId));
+          const nextMembers = listedMembers
+            .filter((member) => member.userId !== me.userId)
+            .map((member) => ({
+              userId: member.userId,
+              displayName: member.displayName,
+              publicKey: member.publicKey,
+              hasAccess: (member.workspaceKeyGenerations ?? []).includes(generation),
+              matchedGroup: member.source === 'oidc_group' ? member.matchedGroup : null,
+              removedAt: member.removedAt ?? null,
+              removedCause: member.removedCause ?? null,
+            }));
+          setMembers((prev) => {
+            if (
+              prev.length === nextMembers.length &&
+              prev.every(
+                (m, i) =>
+                  m.userId === nextMembers[i].userId &&
+                  m.displayName === nextMembers[i].displayName &&
+                  m.publicKey === nextMembers[i].publicKey &&
+                  m.hasAccess === nextMembers[i].hasAccess &&
+                  m.matchedGroup === nextMembers[i].matchedGroup &&
+                  m.removedAt === nextMembers[i].removedAt &&
+                  m.removedCause === nextMembers[i].removedCause,
+              )
+            ) {
+              return prev;
+            }
+            return nextMembers;
+          });
+          setCanGrant((prev) => (prev === true ? prev : true));
         } catch {
-          setMembers([]);
-          setCanGrant(false);
+          setMembers((prev) => (prev.length === 0 ? prev : []));
+          setCanGrant((prev) => (prev === false ? prev : false));
         }
-        setPending(
-          listed
-            .filter((d) => !d.approvedAt && !d.revokedAt)
-            .map((d) => ({
-              deviceId: d.deviceId,
-              publicKey: d.publicKey,
-              verificationCode: d.verificationCode,
-              label: d.label,
-            })),
-        );
+        const nextPending = listed
+          .filter((d) => !d.approvedAt && !d.revokedAt)
+          .map((d) => ({
+            deviceId: d.deviceId,
+            publicKey: d.publicKey,
+            verificationCode: d.verificationCode,
+            label: d.label,
+          }));
+        setPending((prev) => {
+          if (
+            prev.length === nextPending.length &&
+            prev.every(
+              (p, i) =>
+                p.deviceId === nextPending[i].deviceId &&
+                p.publicKey === nextPending[i].publicKey &&
+                p.verificationCode === nextPending[i].verificationCode &&
+                p.label === nextPending[i].label,
+            )
+          ) {
+            return prev;
+          }
+          return nextPending;
+        });
       } else if (state.status === 'awaiting-approval') {
         setPhase('awaiting-approval');
       } else if (state.status === 'awaiting-access') {
@@ -298,8 +359,6 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
       );
       // The removed screen says it in its own words.
       setMessage(removed ? null : say(error));
-    } finally {
-      setBusy(false);
     }
     // api and storage are stable for the life of the panel.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -726,7 +785,7 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
           <button
             type="button"
             className="workspace-panel__recheck"
-            onClick={() => void refresh()}
+            onClick={() => void run(refresh)}
             disabled={busy}
           >
             Check again
@@ -746,7 +805,7 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
           <button
             type="button"
             className="workspace-panel__recheck"
-            onClick={() => void refresh()}
+            onClick={() => void run(refresh)}
             disabled={busy}
           >
             Check again

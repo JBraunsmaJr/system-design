@@ -103,7 +103,7 @@ export function useAccessRequests(options: AccessRequestsOptions) {
       const device = await attachExistingDevice({ api, storage });
       if (device.status !== 'ready' || !device.workspaceKey) {
         holding.current = null;
-        setRequests([]);
+        setRequests((prev) => (prev.length === 0 ? prev : []));
         return;
       }
       const index = await client.readIndex(WORKSPACE_ID, await indexKeyFor(device.workspaceKey));
@@ -124,16 +124,29 @@ export function useAccessRequests(options: AccessRequestsOptions) {
         generation,
         publicKeys: new Map(waiting.map((member) => [member.userId, member.publicKey!])),
       };
-      const show = (list: typeof waiting) =>
-        setRequests(
-          list.map((member) => ({
-            userId: member.userId,
-            displayName: member.displayName ?? 'Someone',
-            ...(rejections.current.has(member.userId)
-              ? { rejection: rejections.current.get(member.userId) }
-              : {}),
-          })),
-        );
+      const show = (list: typeof waiting) => {
+        const next = list.map((member) => ({
+          userId: member.userId,
+          displayName: member.displayName ?? 'Someone',
+          ...(rejections.current.has(member.userId)
+            ? { rejection: rejections.current.get(member.userId) }
+            : {}),
+        }));
+        setRequests((prev) => {
+          if (
+            prev.length === next.length &&
+            prev.every(
+              (r, i) =>
+                r.userId === next[i].userId &&
+                r.displayName === next[i].displayName &&
+                r.rejection === next[i].rejection,
+            )
+          ) {
+            return prev;
+          }
+          return next;
+        });
+      };
       show(waiting);
 
       // WS14-R26 to R28: let in, without a click, anyone the workspace's
@@ -183,7 +196,7 @@ export function useAccessRequests(options: AccessRequestsOptions) {
           // Cleared - with the list, so no button offers a grant that
           // cannot work - until the next look finds the new key.
           holding.current = null;
-          setRequests([]);
+          setRequests((prev) => (prev.length === 0 ? prev : []));
           announceWorkspaceChange();
         }
       } finally {
