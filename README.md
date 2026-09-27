@@ -36,11 +36,11 @@ flowchart LR
     S --> IdP[OIDC provider<br/>Keycloak, Entra ID, Okta, GitHub…]
 ```
 
-| Component  | Needed for                  | What it sees                                                                     |
-| ---------- | --------------------------- | -------------------------------------------------------------------------------- |
-| **Editor** | Everything                  | Your documents, in your browser only                                             |
-| **Relay**  | Real-time collaboration     | Only the initial handshake between browsers; it is out of the path once connected |
-| **Store**  | Shared, persistent workspaces | Encrypted blobs it cannot read, plus who is signed in                          |
+| Component  | Needed for                    | What it sees                                                                      |
+| ---------- | ----------------------------- | --------------------------------------------------------------------------------- |
+| **Editor** | Everything                    | Your documents, in your browser only                                              |
+| **Relay**  | Real-time collaboration       | Only the initial handshake between browsers; it is out of the path once connected |
+| **Store**  | Shared, persistent workspaces | Encrypted blobs it cannot read, plus who is signed in                             |
 
 With no relay configured, collaboration is disabled. With no store configured, nothing leaves the browser.
 
@@ -95,11 +95,11 @@ Open <http://localhost:8088> and sign in as `demo` / `demo`.
 
 ## Published images
 
-| Image                                          | Purpose                     |
-| ---------------------------------------------- | --------------------------- |
-| `ghcr.io/jbraunsmajr/system-design`            | The editor (nginx, static)  |
-| `ghcr.io/jbraunsmajr/system-design-relay`      | Collaboration relay         |
-| `ghcr.io/jbraunsmajr/system-design-store`      | Encrypted workspace store   |
+| Image                                     | Purpose                    |
+| ----------------------------------------- | -------------------------- |
+| `ghcr.io/jbraunsmajr/system-design`       | The editor (nginx, static) |
+| `ghcr.io/jbraunsmajr/system-design-relay` | Collaboration relay        |
+| `ghcr.io/jbraunsmajr/system-design-store` | Encrypted workspace store  |
 
 ## Development
 
@@ -124,15 +124,15 @@ Pushing to `main` builds and deploys to GitHub Pages. For a first-time setup on 
 
 ### Repository layout
 
-| Path          | Contents                                                        |
-| ------------- | --------------------------------------------------------------- |
-| `src/`        | The editor                                                      |
-| `store/`      | The optional store: service, schema (`schema.sql`), `openapi.yaml` |
-| `docker/`     | Images, nginx config, and the full-stack Compose example        |
-| `docs/`       | Operator docs kept in the repo                                  |
-| `docs-site/`  | The published documentation site                                |
-| `scripts/`    | Test runner, verification suites, and operational tools         |
-| `fixtures/`, `baselines/` | Performance test workloads and their baselines      |
+| Path                      | Contents                                                           |
+| ------------------------- | ------------------------------------------------------------------ |
+| `src/`                    | The editor                                                         |
+| `store/`                  | The optional store: service, schema (`schema.sql`), `openapi.yaml` |
+| `docker/`                 | Images, nginx config, and the full-stack Compose example           |
+| `docs/`                   | Operator docs kept in the repo                                     |
+| `docs-site/`              | The published documentation site                                   |
+| `scripts/`                | Test runner, verification suites, and operational tools            |
+| `fixtures/`, `baselines/` | Performance test workloads and their baselines                     |
 
 ## Testing
 
