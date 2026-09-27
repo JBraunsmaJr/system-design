@@ -1,8 +1,9 @@
-# Engineers Notebook - core deployment: the editor and its relay.
+# Engineers Notebook - core deployment: the editor, relay, and coturn services.
 #
 # One domain, one TLS proxy:
 #   https://<DOMAIN>/        the editor (and its documentation at /docs/)
 #   wss://<DOMAIN>/relay/    the relay, for live sessions
+#   turn:<DOMAIN>:3478       coturn, TURN fallback for restrictive networks
 #
 # Nothing here stores documents: they live in each person's browser.
 
@@ -20,6 +21,14 @@ services:
 
   relay:
     image: ghcr.io/jbraunsmajr/system-design-relay:${VERSION:-latest}
+    restart: unless-stopped
+
+  coturn:
+    image: coturn/coturn:latest
+    container_name: coturn
+    network_mode: host
+    volumes:
+      - ./turnserver.conf:/etc/coturn/turnserver.conf:ro
     restart: unless-stopped
 
   proxy:

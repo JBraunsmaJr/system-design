@@ -1,7 +1,9 @@
 # Core Deployment
 
-The editor and its relay - everything needed for people to draw, save to
-their browsers and files, and edit together in live sessions. Nothing is
+The editor, relay, and coturn services - everything needed for people to draw, save to
+their browsers and files, and edit together in live sessions. Coturn provides a
+TURN/STUN fallback mechanism required for any user operating out of restrictive networks
+such as convention centers or hotel wifi. Nothing is
 stored on your server: documents live in each person's browser.
 
 If you want shared team storage and sign-in as well, follow
@@ -14,6 +16,7 @@ start here and move to that later without losing anything.
 https://design.example.gov/          the editor
 https://design.example.gov/docs/     this documentation, served by the editor
 wss://design.example.gov/relay/      the relay, for live sessions
+turn:design.example.gov:3478         coturn, TURN fallback for restrictive networks
 ```
 
 ## 1. Before you start
@@ -25,9 +28,10 @@ You need:
 - **A name for it** in DNS, such as `design.example.gov`, pointing at the host.
 - **A TLS certificate and key** for that name. Browsers only allow live
   sessions over HTTPS. Your organization's CA, or Let's Encrypt, both work.
-- Ports **80** and **443** open to the people who will use it.
+- Ports **80** and **443** open for web traffic and live sessions.
+- Port **3478** (TCP and UDP) and the relay range (UDP **49160–49200**) open on the host for coturn (TURN/STUN fallback).
 
-## 2. Create a folder with three files
+## 2. Create a folder with four files
 
 ```bash
 mkdir system-design && cd system-design
@@ -50,6 +54,10 @@ Create each of these files in that folder, exactly as shown.
 <!--@include: @/files/core/core.env -->
 ```
 
+```ini [turnserver.conf]
+<!--@include: @/files/core/turnserver.conf -->
+```
+
 :::
 
 ::: tip The file is named `.env`
@@ -57,7 +65,7 @@ With the leading dot. Docker Compose reads it automatically from the folder
 you run it in.
 :::
 
-## 3. Set your domain
+## 3. Set your domain and TURN secret
 
 Edit `.env` and set `DOMAIN` to your name:
 
@@ -65,8 +73,21 @@ Edit `.env` and set `DOMAIN` to your name:
 DOMAIN=design.example.gov
 ```
 
-That is the only required change. Leave `VERSION=latest` to follow releases,
-or set a release date such as `2026-09-21` to pin one.
+Leave `VERSION=latest` to follow releases, or set a release date such as `2026-09-21` to pin one.
+
+Then replace `CHANGEME-long-random-string` with a strong random secret in both `.env` and `turnserver.conf`:
+
+```ini
+# in .env
+ICE_SERVERS=turn:design.example.gov:3478|webrtc|CHANGEME-long-random-string
+```
+
+```ini
+# in turnserver.conf
+user=webrtc:CHANGEME-long-random-string
+```
+
+This ensures that users behind restrictive networks (such as hotel Wi-Fi, convention centers, or strict corporate firewalls) can seamlessly establish WebRTC connections via the coturn fallback relay.
 
 ## 4. Add your certificate
 

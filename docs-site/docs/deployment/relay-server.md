@@ -309,9 +309,7 @@ There are three meaningful states:
 everyone shares a LAN. It makes those sessions connect promptly rather
 than after a timeout.
 
-For topologies that genuinely need TURN, run something like
-[coturn](https://github.com/coturn/coturn) internally and point
-`ICE_SERVERS` at it. [Networks without direct paths](/deployment/self-host#networks-without-direct-paths)
+For topologies that genuinely need TURN, such as users operating out of restrictive networks (such as convention centers or hotel wifi) or isolated networks without direct routing, coturn acts as a fallback mechanism and is included in the [core deployment](/deployment/core). [Networks without direct paths](/deployment/self-host#networks-without-direct-paths)
 has a ready-to-copy coturn setup.
 
 ### A checklist for an isolated deployment

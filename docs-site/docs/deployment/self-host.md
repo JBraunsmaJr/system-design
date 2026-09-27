@@ -11,7 +11,7 @@ with no database at all. Choose the path that fits.
 | Sign in with your identity provider            |                          | ✓                                                      |
 | Live sessions only for people who signed in    |                          | ✓                                                      |
 | Documents open from any browser you sign in on |                          | ✓                                                      |
-| Services                                       | editor, relay            | editor, relay, store, PostgreSQL                       |
+| Services                                       | editor, relay, coturn    | editor, relay, coturn, store, PostgreSQL               |
 | Stores documents on your server                | No                       | Yes, encrypted - the server cannot read them           |
 | You look after                                 | a TLS certificate        | a certificate, a database, backups, and a recovery key |
 | Setup time                                     | ~10 minutes              | ~30 minutes                                            |
@@ -26,20 +26,24 @@ there are fewer settings to get wrong.
 
 ## Container images
 
-| Image                                     | Service                                         |
-| :---------------------------------------- | :---------------------------------------------- |
-| `ghcr.io/jbraunsmajr/system-design`       | The editor, with this documentation at `/docs/` |
-| `ghcr.io/jbraunsmajr/system-design-relay` | The relay, for live sessions                    |
-| `ghcr.io/jbraunsmajr/system-design-store` | The workspace store - with workspaces only      |
+| Image                                     | Service                                                                                      |
+| :---------------------------------------- | :------------------------------------------------------------------------------------------- |
+| `ghcr.io/jbraunsmajr/system-design`       | The editor, with this documentation at `/docs/`                                              |
+| `ghcr.io/jbraunsmajr/system-design-relay` | The relay, for live sessions                                                                 |
+| `ghcr.io/jbraunsmajr/system-design-store` | The workspace store - with workspaces only                                                   |
+| `coturn/coturn`                           | TURN/STUN server - fallback relay for restrictive networks (hotel Wi-Fi, convention centers) |
 
-Each is tagged `latest` and with its release date. The three are released
+Each is tagged `latest` and with its release date. The three system-design images are released
 together; pin the same date on all of them.
 
 ## Networks without direct paths
 
 Live sessions connect browsers directly to each other. On air-gapped
-networks, or where firewalls block that, they need a **TURN server** to relay
-through. Add one beside either deployment:
+networks, or where firewalls and restrictive networks (such as hotel Wi-Fi
+or convention centers) block direct peer connections, browsers need a **TURN server** as a fallback
+mechanism to relay traffic through.
+
+Coturn is included in the [core deployment](/deployment/core) by default. If you are adding or configuring coturn:
 
 ::: code-group
 
