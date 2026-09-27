@@ -210,6 +210,7 @@ import {
 } from './perf/instrumentation';
 import { getStandardFixture, type FixtureName } from './perf/fixtures';
 import './App.css';
+import './components/srd/SrdPrintModal.css';
 
 /**
  * The objects the canvas was last handed for each store node/edge, reused

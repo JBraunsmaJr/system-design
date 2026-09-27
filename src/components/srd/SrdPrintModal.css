@@ -228,6 +228,18 @@
   max-width: 1120px;
 }
 
+.srd-doc__running-header-container {
+  width: 100%;
+}
+
+.srd-doc__content-container {
+  width: 100%;
+}
+
+.srd-doc__footer-container {
+  width: 100%;
+}
+
 /* Document Running Header */
 .srd-doc__running-header {
   display: flex;
@@ -744,6 +756,10 @@
   animation: srd-spin 0.75s linear infinite;
 }
 
+.srd-spin {
+  animation: srd-spin 0.75s linear infinite;
+}
+
 @keyframes srd-spin {
   to {
     transform: rotate(360deg);
@@ -776,7 +792,7 @@
 @media print {
   @page {
     size: auto;
-    margin: 18mm 16mm 18mm 16mm;
+    margin: 16mm 14mm 16mm 14mm;
   }
 
   html,
@@ -855,6 +871,46 @@
     color-scheme: light !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+
+  .srd-doc__running-header-container {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .srd-doc__content-container {
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+    width: 100% !important;
+  }
+
+  .srd-doc__running-header {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    margin-bottom: 1rem !important;
+  }
+
+  .srd-doc__banner {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    margin-bottom: 0.75rem !important;
+  }
+
+  .srd-doc__header {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .srd-doc__footer-container {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .srd-doc__footer {
+    margin-top: 1.5rem !important;
+    padding-top: 0.75rem !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
   .srd-doc__section {

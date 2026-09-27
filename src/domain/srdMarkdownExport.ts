@@ -1,6 +1,10 @@
 import type { SrdDataContext, SrdTemplateConfig } from './srdTypes';
 
-export function interpolateTokens(text: string, data: SrdDataContext): string {
+export function interpolateTokens(
+  text: string,
+  data: SrdDataContext,
+  pageContext?: { pageNumber?: number | string; totalPages?: number | string },
+): string {
   if (!text) return '';
   const currentYear = new Date().getFullYear().toString();
   return text
@@ -12,7 +16,9 @@ export function interpolateTokens(text: string, data: SrdDataContext): string {
     .replace(/\{\{generatedAt\}\}/g, data.metadata.generatedAt)
     .replace(/\{\{metadata\.organization\}\}/g, data.metadata.organization || '')
     .replace(/\{\{organization\}\}/g, data.metadata.organization || '')
-    .replace(/\{\{year\}\}/g, currentYear);
+    .replace(/\{\{year\}\}/g, currentYear)
+    .replace(/\{\{pageNumber\}\}/g, String(pageContext?.pageNumber ?? 1))
+    .replace(/\{\{totalPages\}\}/g, String(pageContext?.totalPages ?? 1));
 }
 
 function escapeTableCol(text?: string): string {

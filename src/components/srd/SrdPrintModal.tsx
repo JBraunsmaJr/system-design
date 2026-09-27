@@ -32,13 +32,13 @@ import {
   parseTemplateConfig,
 } from '../../domain/srdTemplatePresets';
 import { downloadSrdMarkdown, interpolateTokens } from '../../domain/srdMarkdownExport';
+import { downloadSrdPdf } from '../../domain/srdPdfExport';
 import {
   captureDiagramSnapshot,
   captureSelectedNodesSnapshot,
   captureCurrentScreenViewport,
   captureNodeSubsetSnapshot,
 } from '../../domain/imageExport';
-import './SrdPrintModal.css';
 
 interface AutoResizeTextareaProps {
   value: string;
@@ -114,6 +114,8 @@ export function SrdPrintModal({
   const [activeTab, setActiveTab] = useState<'doc' | 'theme' | 'sections' | 'snapshots' | 'headers'>('doc');
   const [snapshotScope, setSnapshotScope] = useState<'all' | 'selected' | 'viewport'>('all');
   const [isCapturingSnapshot, setIsCapturingSnapshot] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [pdfStatus, setPdfStatus] = useState('');
 
   // Snapshot Framing State for Requirement Items
   const [selectedFramingItemId, setSelectedFramingItemId] = useState<string>('');
@@ -126,6 +128,7 @@ export function SrdPrintModal({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const diagramUploadInputRef = useRef<HTMLInputElement>(null);
+  const paperRef = useRef<HTMLDivElement>(null);
 
   const allRequirementItems = useMemo(() => {
     const items: RequirementItemViewModel[] = [];
@@ -401,6 +404,23 @@ export function SrdPrintModal({
         diagramImageBase64: undefined,
       },
     }));
+  };
+
+  const handleExportPdf = async () => {
+    if (isExportingPdf) return;
+    setIsExportingPdf(true);
+    setPdfStatus('Generating PDF...');
+    try {
+      await downloadSrdPdf(currentSrdData, templateConfig, undefined, (status) => {
+        setPdfStatus(status);
+      });
+    } catch (err) {
+      console.error('PDF export error:', err);
+      alert('Failed to generate PDF: ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setIsExportingPdf(false);
+      setPdfStatus('');
+    }
   };
 
   const handlePrint = () => {
@@ -699,18 +719,40 @@ export function SrdPrintModal({
             <button
               type="button"
               className="srd-btn-icon"
-              onClick={handlePrint}
-              title="Print / Save as PDF (Ctrl+P)"
+              onClick={handleExportPdf}
+              disabled={isExportingPdf}
+              title="Generate and download vector PDF with dynamic page numbering"
               style={{
-                backgroundColor: '#2563eb',
+                backgroundColor: isExportingPdf ? '#1d4ed8' : '#2563eb',
                 color: '#ffffff',
                 padding: '0.4rem 0.8rem',
                 gap: '0.4rem',
                 fontWeight: 600,
+                opacity: isExportingPdf ? 0.85 : 1,
+                cursor: isExportingPdf ? 'wait' : 'pointer',
               }}
             >
+              {isExportingPdf ? (
+                <>
+                  <RefreshCw size={16} className="srd-spin" />
+                  <span>{pdfStatus || 'Compiling PDF...'}</span>
+                </>
+              ) : (
+                <>
+                  <Download size={16} />
+                  <span>Export PDF</span>
+                </>
+              )}
+            </button>
+            <button
+              type="button"
+              className="srd-btn-icon"
+              onClick={handlePrint}
+              title="Print document via browser (Ctrl+P)"
+              style={{ padding: '0.4rem 0.8rem', gap: '0.4rem', fontWeight: 500 }}
+            >
               <Printer size={16} />
-              <span>Print / PDF</span>
+              <span>Print</span>
             </button>
             <button
               type="button"
@@ -1468,6 +1510,7 @@ export function SrdPrintModal({
           {/* Document Preview Paper */}
           <div className="srd-preview-container">
             <div
+              ref={paperRef}
               className={`srd-preview-paper ${
                 templateConfig.theme.pageOrientation === 'landscape'
                   ? 'srd-preview-paper--landscape'
@@ -1481,56 +1524,61 @@ export function SrdPrintModal({
                 } as React.CSSProperties
               }
             >
-              {/* Classification Banner */}
-              {templateConfig.headersAndFooters.classificationBanner && (
-                <div className="srd-doc__banner">
-                  {interpolateTokens(
-                    templateConfig.headersAndFooters.classificationBanner,
-                    currentSrdData,
-                  )}
-                </div>
-              )}
+              {/* Running Header Container (for preview) */}
+              <div className="srd-doc__running-header-container">
+                {/* Classification Banner */}
+                {templateConfig.headersAndFooters.classificationBanner && (
+                  <div className="srd-doc__banner">
+                    {interpolateTokens(
+                      templateConfig.headersAndFooters.classificationBanner,
+                      currentSrdData,
+                    )}
+                  </div>
+                )}
 
-              {/* Document Running Header */}
-              {(templateConfig.headersAndFooters.headerLeft ||
-                templateConfig.headersAndFooters.headerRight) && (
-                <div className="srd-doc__running-header">
-                  <div>
-                    {templateConfig.headersAndFooters.headerLeft &&
-                      interpolateTokens(templateConfig.headersAndFooters.headerLeft, currentSrdData)}
-                  </div>
-                  <div>
-                    {templateConfig.headersAndFooters.headerRight &&
-                      interpolateTokens(templateConfig.headersAndFooters.headerRight, currentSrdData)}
-                  </div>
-                </div>
-              )}
-
-              {/* Document Header */}
-              <div className="srd-doc__header">
-                <h1 className="srd-doc__title">{currentSrdData.metadata.title}</h1>
-                <div className="srd-doc__meta-grid">
-                  <div className="srd-doc__meta-item">
-                    <strong>Version:</strong> {currentSrdData.metadata.version}
-                  </div>
-                  <div className="srd-doc__meta-item">
-                    <strong>Date:</strong> {currentSrdData.metadata.generatedAt}
-                  </div>
-                  {currentSrdData.metadata.organization && (
-                    <div className="srd-doc__meta-item">
-                      <strong>Organization:</strong> {currentSrdData.metadata.organization}
+                {/* Document Running Header */}
+                {(templateConfig.headersAndFooters.headerLeft ||
+                  templateConfig.headersAndFooters.headerRight) && (
+                  <div className="srd-doc__running-header">
+                    <div>
+                      {templateConfig.headersAndFooters.headerLeft &&
+                        interpolateTokens(templateConfig.headersAndFooters.headerLeft, currentSrdData)}
                     </div>
-                  )}
-                  {currentSrdData.metadata.authors.length > 0 && (
-                    <div className="srd-doc__meta-item">
-                      <strong>Authors:</strong>{' '}
-                      {currentSrdData.metadata.authors
-                        .map((a) => (a.role ? `${a.name} (${a.role})` : a.name))
-                        .join(', ')}
+                    <div>
+                      {templateConfig.headersAndFooters.headerRight &&
+                        interpolateTokens(templateConfig.headersAndFooters.headerRight, currentSrdData)}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
+
+              {/* Main Document Content */}
+              <div className="srd-doc__content-container">
+                {/* Document Header */}
+                <div className="srd-doc__header">
+                  <h1 className="srd-doc__title">{currentSrdData.metadata.title}</h1>
+                  <div className="srd-doc__meta-grid">
+                    <div className="srd-doc__meta-item">
+                      <strong>Version:</strong> {currentSrdData.metadata.version}
+                    </div>
+                    <div className="srd-doc__meta-item">
+                      <strong>Date:</strong> {currentSrdData.metadata.generatedAt}
+                    </div>
+                    {currentSrdData.metadata.organization && (
+                      <div className="srd-doc__meta-item">
+                        <strong>Organization:</strong> {currentSrdData.metadata.organization}
+                      </div>
+                    )}
+                    {currentSrdData.metadata.authors.length > 0 && (
+                      <div className="srd-doc__meta-item">
+                        <strong>Authors:</strong>{' '}
+                        {currentSrdData.metadata.authors
+                          .map((a) => (a.role ? `${a.name} (${a.role})` : a.name))
+                          .join(', ')}
+                      </div>
+                    )}
+                  </div>
+                </div>
 
               {/* Dynamic Sections */}
               {activeSortedSections.map((section) => {
@@ -1969,17 +2017,26 @@ export function SrdPrintModal({
                   </div>
                 );
               })}
+              </div>
 
-              {/* Document Footer */}
-              <div className="srd-doc__footer">
-                <div>
-                  {templateConfig.headersAndFooters.footerLeft &&
-                    interpolateTokens(templateConfig.headersAndFooters.footerLeft, currentSrdData)}
-                </div>
-                <div>
-                  {templateConfig.headersAndFooters.footerRight &&
-                    interpolateTokens(templateConfig.headersAndFooters.footerRight, currentSrdData)}
-                </div>
+              {/* Running Footer Container (for preview) */}
+              <div className="srd-doc__footer-container">
+                {(templateConfig.headersAndFooters.footerLeft ||
+                  templateConfig.headersAndFooters.footerRight) && (
+                  <div className="srd-doc__footer">
+                    <div>
+                      {templateConfig.headersAndFooters.footerLeft &&
+                        interpolateTokens(templateConfig.headersAndFooters.footerLeft, currentSrdData)}
+                    </div>
+                    <div>
+                      {templateConfig.headersAndFooters.footerRight &&
+                        interpolateTokens(templateConfig.headersAndFooters.footerRight, currentSrdData, {
+                          pageNumber: 1,
+                          totalPages: 1,
+                        })}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
