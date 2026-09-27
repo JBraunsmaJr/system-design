@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { GitBranch, Lock, Trash2 } from 'lucide-react';
 import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
 import { BaseModal } from '../../common/components/modal/BaseModal';
+import { Button } from '../../common/components/button/Button';
 
 interface ManageRelationshipTypesModalProps {
   doc: RequirementsDocument;
@@ -71,15 +72,16 @@ export function ManageRelationshipTypesModal({
             {type.isBuiltIn ? (
               <Lock size={12} className="manage-types-modal__lock" aria-label="Built-in type" />
             ) : (
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
                 className="manage-types-modal__delete"
                 onClick={() => onDeleteCustomType(type.id)}
                 aria-label={`Delete ${type.label} relationship type`}
                 title="Delete this type (and any relationships using it)"
-              >
-                <Trash2 size={12} />
-              </button>
+                icon={<Trash2 size={12} />}
+              />
             )}
           </div>
         ))}
@@ -119,9 +121,9 @@ export function ManageRelationshipTypesModal({
           />
           Blocking
         </label>
-        <button type="button" className="primary" onClick={onSubmit}>
+        <Button variant="primary" size="sm" onClick={onSubmit}>
           Add type
-        </button>
+        </Button>
       </div>
       {error && <p className="manage-types-modal__error">{error}</p>}
     </BaseModal>

@@ -6,6 +6,7 @@ import type {
   RequirementsDocument,
 } from '../../domain/requirements/requirementsTypes';
 import { BaseModal } from '../../common/components/modal/BaseModal';
+import { Button } from '../../common/components/button/Button';
 
 interface ManageTypesModalProps {
   doc: RequirementsDocument;
@@ -168,25 +169,27 @@ export function ManageTypesModal({
                   />
                   Workable
                 </label>
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
                   className="manage-types-modal__save"
                   onClick={saveEditing}
                   disabled={!editLabel.trim()}
                   aria-label="Save changes"
                   title="Save"
-                >
-                  <Check size={13} />
-                </button>
-                <button
-                  type="button"
+                  icon={<Check size={13} />}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
                   className="manage-types-modal__cancel"
                   onClick={cancelEditing}
                   aria-label="Cancel editing"
                   title="Cancel"
-                >
-                  <X size={13} />
-                </button>
+                  icon={<X size={13} />}
+                />
               </div>
             );
           }
@@ -215,25 +218,27 @@ export function ManageTypesModal({
                       </option>
                     ))}
                 </select>
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
                   className="manage-types-modal__save"
                   onClick={() => executeTransfer(type.id)}
                   disabled={!transferTargetTypeId}
                   aria-label="Confirm Transfer"
                   title="Transfer items"
-                >
-                  <Check size={13} />
-                </button>
-                <button
-                  type="button"
+                  icon={<Check size={13} />}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
                   className="manage-types-modal__cancel"
                   onClick={cancelTransfer}
                   aria-label="Cancel transfer"
                   title="Cancel"
-                >
-                  <X size={13} />
-                </button>
+                  icon={<X size={13} />}
+                />
               </div>
             );
           }
@@ -253,25 +258,27 @@ export function ManageTypesModal({
               )}
               {inUse > 0 && <span className="manage-types-modal__in-use">{inUse} in use</span>}
               {inUse > 0 && onConvertAllItemsOfType && (
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
                   className="manage-types-modal__transfer"
                   onClick={() => startTransfer(type.id)}
                   aria-label={`Transfer ${inUse} item(s) to another type`}
                   title={`Transfer / convert all items of type ${type.label} to another type (e.g. Epic, Dependency, Ticket)`}
-                >
-                  <ArrowRightLeft size={12} />
-                </button>
+                  icon={<ArrowRightLeft size={12} />}
+                />
               )}
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
                 className="manage-types-modal__edit"
                 onClick={() => startEditing(type)}
                 aria-label={`Edit ${type.label} type`}
                 title="Edit label, color, and workable status"
-              >
-                <Pencil size={12} />
-              </button>
+                icon={<Pencil size={12} />}
+              />
               {type.isBuiltIn ? (
                 <Lock
                   size={12}
@@ -279,8 +286,10 @@ export function ManageTypesModal({
                   aria-label="Built-in type - prefix is locked"
                 />
               ) : (
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
                   className="manage-types-modal__delete"
                   disabled={inUse > 0}
                   onClick={() => {
@@ -294,9 +303,8 @@ export function ManageTypesModal({
                       ? `In use by ${inUse} item${inUse === 1 ? '' : 's'} - transfer or delete ${inUse === 1 ? 'it' : 'them'} first`
                       : 'Delete this type'
                   }
-                >
-                  <Trash2 size={12} />
-                </button>
+                  icon={<Trash2 size={12} />}
+                />
               )}
             </div>
           );
@@ -335,9 +343,9 @@ export function ManageTypesModal({
           />
           Workable
         </label>
-        <button type="button" className="primary" onClick={onSubmit}>
+        <Button variant="primary" size="sm" onClick={onSubmit}>
           Add type
-        </button>
+        </Button>
       </div>
       {error && <p className="manage-types-modal__error">{error}</p>}
       {success && (

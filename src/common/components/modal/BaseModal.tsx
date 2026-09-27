@@ -20,7 +20,7 @@ export interface BaseModalProps {
 
 /**
  * Reusable zero-dependency Modal dialog wrapper.
- * Handles backdrop overlay, Escape key listener, and accessibility attributes.
+ * Handles backdrop overlay, Escape key listener, standard theme tokens, and accessibility attributes.
  */
 export function BaseModal({
   isOpen,
@@ -57,7 +57,7 @@ export function BaseModal({
   return (
     <div
       className="modal-overlay"
-      onClick={(e) => {
+      onMouseDown={(e) => {
         if (closeOnBackdropClick && e.target === e.currentTarget) {
           onClose();
         }
@@ -79,23 +79,37 @@ export function BaseModal({
         aria-modal="true"
         aria-label={ariaLabel}
         style={{
-          background: 'var(--bg-panel, #1e222b)',
-          color: 'var(--text, #e7e9ee)',
-          borderRadius: 8,
+          background: 'var(--chrome-bg-raised, #1e222b)',
+          color: 'var(--chrome-text, #e7e9ee)',
+          borderRadius: 'var(--radius-md, 8px)',
           width,
           maxWidth,
           padding: padding !== undefined ? padding : '18px 20px',
-          border: '1px solid var(--border, #2d3342)',
-          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)',
+          border: '1px solid var(--chrome-border, #2d3342)',
+          boxShadow: '0 16px 48px rgba(0, 0, 0, 0.5)',
           display: 'flex',
           flexDirection: 'column',
           maxHeight: '90vh',
           boxSizing: 'border-box',
+          overflow: 'hidden',
           ...style,
         }}
       >
-        {title && <div style={{ margin: '0 0 14px', fontSize: 16, fontWeight: 600 }}>{title}</div>}
-        <div style={{ flex: 1, overflowY: 'auto', ...bodyStyle }}>{children}</div>
+        {title && (
+          <div
+            style={{
+              margin: '0 0 14px',
+              fontSize: 16,
+              fontWeight: 600,
+              color: 'var(--chrome-text, #e7e9ee)',
+            }}
+          >
+            {title}
+          </div>
+        )}
+        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', minHeight: 0, ...bodyStyle }}>
+          {children}
+        </div>
         {footer && (
           <div
             style={{

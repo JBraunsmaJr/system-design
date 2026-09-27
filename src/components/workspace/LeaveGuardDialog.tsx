@@ -1,5 +1,6 @@
 import { TriangleAlert } from 'lucide-react';
 import { BaseModal } from '../../common/components/modal/BaseModal';
+import { Button } from '../../common/components/button/Button';
 
 interface LeaveGuardDialogProps {
   isOpen: boolean;
@@ -44,15 +45,15 @@ export function LeaveGuardDialog({
       }
       footer={
         <>
-          <button type="button" className="leave-guard__stay" onClick={onStay} autoFocus>
+          <Button variant="ghost" className="leave-guard__stay" onClick={onStay} autoFocus>
             Stay in session
-          </button>
-          <button type="button" className="leave-guard__leave" onClick={onLeave}>
+          </Button>
+          <Button variant="danger-outline" className="leave-guard__leave" onClick={onLeave}>
             Leave without exporting
-          </button>
-          <button type="button" className="primary leave-guard__export" onClick={onExportAndLeave}>
+          </Button>
+          <Button variant="primary" className="leave-guard__export" onClick={onExportAndLeave}>
             Export a copy and leave
-          </button>
+          </Button>
         </>
       }
     >

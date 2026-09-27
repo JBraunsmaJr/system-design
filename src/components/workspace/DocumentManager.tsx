@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Copy,
   FileText,
@@ -15,6 +15,8 @@ import type { DocumentIndexEntry, StorageHealth } from '../../domain/storage/doc
 import { requestPersistentStorage } from '../../domain/storage/documentStore';
 import type { DocumentLibrary } from '../../collab/sync/documentLibrary';
 import { TIMED_COPY_INTERVALS, type TimedCopiesSettings } from '../../domain/storage/timedCopies';
+import { BaseModal } from '../../common/components/modal/BaseModal';
+import { Button } from '../../common/components/button/Button';
 
 interface DocumentManagerProps {
   isOpen: boolean;
@@ -235,308 +237,246 @@ export function DocumentManager({
   if (!isOpen) return null;
 
   return (
-    <div
-      className="modal-overlay"
+    <BaseModal
+      isOpen={isOpen}
+      onClose={onClose}
+      className="document-manager"
+      ariaLabel="Documents"
+      width={760}
+      maxWidth="95vw"
+      padding={0}
       style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.6)',
-        zIndex: 1000,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        maxHeight: '85vh',
+        background: 'var(--chrome-bg-raised, #1e222b)',
+        color: 'var(--chrome-text, #e7e9ee)',
+        border: '1px solid var(--chrome-border, #2d3342)',
       }}
     >
-      <div
-        className="modal-content document-manager"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Documents"
-        style={{
-          background: 'var(--bg-panel, #1e222b)',
-          color: 'var(--text, #e7e9ee)',
-          borderRadius: 8,
-          width: 760,
-          maxWidth: '95vw',
-          maxHeight: '85vh',
-          display: 'flex',
-          flexDirection: 'column',
-          boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
-          border: '1px solid var(--border, #2d3342)',
-          overflow: 'hidden',
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '12px 18px',
-            borderBottom: '1px solid var(--border, #2d3342)',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <FileText size={18} style={{ color: 'var(--accent, #5B7CFA)' }} />
-            <strong>Documents in this browser</strong>
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              type="button"
-              className="primary document-manager__new"
-              onClick={onNewDocument}
-              disabled={busy}
-            >
-              <Plus size={14} /> New document
-            </button>
-            <button type="button" aria-label="Close" onClick={onClose}>
-              <X size={16} />
-            </button>
-          </div>
+      <div className="document-manager__header">
+        <div className="document-manager__title-wrap">
+          <FileText size={18} style={{ color: 'var(--accent, #5B7CFA)' }} />
+          <strong>Documents in this browser</strong>
         </div>
-
-        <div
-          className="document-manager__storage"
-          style={{
-            padding: '8px 18px',
-            fontSize: 12,
-            color: 'var(--text-muted, #9aa3b2)',
-            borderBottom: '1px solid var(--border, #2d3342)',
-          }}
-        >
-          {health ? (
-            <>
-              Using {formatBytes(health.usageBytes)} of {formatBytes(health.quotaBytes)} available.{' '}
-              {health.persisted ? (
-                <span className="document-manager__persisted">
-                  The browser will keep this storage.
-                </span>
-              ) : (
-                <span
-                  className="document-manager__not-persisted"
-                  style={{ color: 'var(--warning, #e0a84a)' }}
-                >
-                  The browser may clear this storage when space runs low. Export anything important.
-                </span>
-              )}
-            </>
-          ) : (
-            'Checking storage...'
-          )}
-        </div>
-
-        {workspace}
-
-        {timedCopies && onTimedCopiesChange && (
-          <div
-            className="document-manager__timed-copies"
-            style={{
-              padding: '8px 18px',
-              fontSize: 12,
-              borderBottom: '1px solid var(--border, #2d3342)',
-              display: 'grid',
-              gap: 6,
-            }}
+        <div className="document-manager__header-actions">
+          <Button
+            variant="primary"
+            size="sm"
+            className="document-manager__new"
+            onClick={onNewDocument}
+            disabled={busy}
+            icon={<Plus size={14} />}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <strong>Timed copies</strong>
-              <span className="document-manager__timed-copies-state">
-                {timedCopies.enabled ? 'On' : 'Off'}
+            New document
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            aria-label="Close"
+            onClick={onClose}
+            icon={<X size={16} />}
+          />
+        </div>
+      </div>
+
+      <div className="document-manager__storage">
+        {health ? (
+          <>
+            Using {formatBytes(health.usageBytes)} of {formatBytes(health.quotaBytes)} available.{' '}
+            {health.persisted ? (
+              <span className="document-manager__persisted">
+                The browser will keep this storage.
               </span>
-              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                every
-                <select
-                  aria-label="Minutes between copies"
-                  value={timedCopies.minutes}
-                  onChange={(e) =>
-                    onTimedCopiesChange({ ...timedCopies, minutes: Number(e.target.value) })
-                  }
-                >
-                  {(TIMED_COPY_INTERVALS as readonly number[]).includes(
-                    timedCopies.minutes,
-                  ) ? null : (
-                    <option value={timedCopies.minutes}>{timedCopies.minutes}</option>
-                  )}
-                  {TIMED_COPY_INTERVALS.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
-                minutes
-              </label>
-              <button
-                type="button"
-                className="document-manager__timed-copies-toggle"
-                onClick={() =>
-                  onTimedCopiesChange({ ...timedCopies, enabled: !timedCopies.enabled })
+            ) : (
+              <span
+                className="document-manager__not-persisted"
+                style={{ color: 'var(--warning, #e0a84a)' }}
+              >
+                The browser may clear this storage when space runs low. Export anything important.
+              </span>
+            )}
+          </>
+        ) : (
+          'Checking storage...'
+        )}
+      </div>
+
+      {workspace}
+
+      {timedCopies && onTimedCopiesChange && (
+        <div className="document-manager__timed-copies">
+          <div className="document-manager__timed-copies-row">
+            <strong>Timed copies</strong>
+            <span className="document-manager__timed-copies-state">
+              {timedCopies.enabled ? 'On' : 'Off'}
+            </span>
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              every
+              <select
+                aria-label="Minutes between copies"
+                value={timedCopies.minutes}
+                onChange={(e) =>
+                  onTimedCopiesChange({ ...timedCopies, minutes: Number(e.target.value) })
                 }
               >
-                {timedCopies.enabled ? 'Turn off' : 'Turn on'}
-              </button>
-            </div>
-            <p
-              className="document-manager__timed-copies-explain"
-              style={{ margin: 0, color: 'var(--text-muted, #9aa3b2)' }}
+                {(TIMED_COPY_INTERVALS as readonly number[]).includes(
+                  timedCopies.minutes,
+                ) ? null : (
+                  <option value={timedCopies.minutes}>{timedCopies.minutes}</option>
+                )}
+                {TIMED_COPY_INTERVALS.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+              minutes
+            </label>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="document-manager__timed-copies-toggle"
+              onClick={() =>
+                onTimedCopiesChange({ ...timedCopies, enabled: !timedCopies.enabled })
+              }
             >
-              When on, this browser downloads a copy of the open document at that interval, but only
-              if it changed since the last copy. Copies go to your download folder with the date and
-              time in the name. If your browser asks where to save each download, set it to save
-              downloads automatically, or it will ask every time.
-            </p>
+              {timedCopies.enabled ? 'Turn off' : 'Turn on'}
+            </Button>
           </div>
-        )}
+          <p className="document-manager__timed-copies-explain">
+            When on, this browser downloads a copy of the open document at that interval, but only
+            if it changed since the last copy. Copies go to your download folder with the date and
+            time in the name. If your browser asks where to save each download, set it to save
+            downloads automatically, or it will ask every time.
+          </p>
+        </div>
+      )}
 
-        {error && (
-          <div
-            role="alert"
-            style={{ padding: '8px 18px', color: 'var(--danger, #e5534b)', fontSize: 13 }}
-          >
-            {error}
-          </div>
-        )}
-        {notice && (
-          <div
-            role="status"
-            className="document-manager__notice"
-            style={{ padding: '8px 18px', fontSize: 13 }}
-          >
-            {notice}
-          </div>
-        )}
+      {error && (
+        <div role="alert" className="document-manager__error">
+          {error}
+        </div>
+      )}
+      {notice && (
+        <div role="status" className="document-manager__notice">
+          {notice}
+        </div>
+      )}
 
-        <div style={{ overflowY: 'auto', padding: '6px 10px 12px' }}>
-          {entries === null ? (
-            <div style={{ padding: 12 }}>Loading...</div>
-          ) : entries.length === 0 ? (
-            <div style={{ padding: 12 }}>No stored documents yet.</div>
-          ) : (
-            entries.map((entry) => {
-              const isCurrent = entry.docId === currentDocId;
-              const fromSession = entry.origin === 'session' && !!entry.sessionRoom;
-              const isRenaming = renaming?.docId === entry.docId;
-              return (
-                <div
-                  key={entry.docId}
-                  className="document-manager__row"
-                  data-doc-id={entry.docId}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    padding: '8px',
-                    borderRadius: 6,
-                    background: isCurrent ? 'var(--bg-active, #313848)' : 'transparent',
-                  }}
-                >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    {isRenaming ? (
-                      <input
-                        className="document-manager__rename-input"
-                        aria-label={`New name for ${entry.title}`}
-                        autoFocus
-                        value={renaming.title}
-                        onChange={(e) => setRenaming({ docId: entry.docId, title: e.target.value })}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') commitRename(entry);
-                          if (e.key === 'Escape') {
-                            e.stopPropagation();
-                            setRenaming(null);
-                          }
-                        }}
-                        onBlur={() => commitRename(entry)}
-                        style={{ width: '100%' }}
-                      />
-                    ) : (
-                      <div
-                        className="document-manager__title"
-                        style={{
-                          fontWeight: 600,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {entry.title}
-                      </div>
-                    )}
-                    <div
-                      style={{
-                        fontSize: 11,
-                        color: 'var(--text-muted, #9aa3b2)',
-                        display: 'flex',
-                        gap: 10,
-                        flexWrap: 'wrap',
+      <div className="document-manager__list">
+        {entries === null ? (
+          <div style={{ padding: 12 }}>Loading...</div>
+        ) : entries.length === 0 ? (
+          <div style={{ padding: 12 }}>No stored documents yet.</div>
+        ) : (
+          entries.map((entry) => {
+            const isCurrent = entry.docId === currentDocId;
+            const fromSession = entry.origin === 'session' && !!entry.sessionRoom;
+            const isRenaming = renaming?.docId === entry.docId;
+            return (
+              <div
+                key={entry.docId}
+                className={`document-manager__row ${isCurrent ? 'is-current' : ''}`}
+                data-doc-id={entry.docId}
+              >
+                <div className="document-manager__doc-info">
+                  {isRenaming ? (
+                    <input
+                      className="document-manager__rename-input"
+                      aria-label={`New name for ${entry.title}`}
+                      autoFocus
+                      value={renaming.title}
+                      onChange={(e) => setRenaming({ docId: entry.docId, title: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') commitRename(entry);
+                        if (e.key === 'Escape') {
+                          e.stopPropagation();
+                          setRenaming(null);
+                        }
                       }}
-                    >
-                      {isCurrent && (
-                        <span className="document-manager__current">Open in this tab</span>
-                      )}
-                      {fromSession && (
-                        <span
-                          className="document-manager__session"
-                          title="Shared in a session. Open it to resume hosting that session, so others can rejoin with the original link."
-                        >
-                          <Users size={10} /> From a session
-                        </span>
-                      )}
-                      <span>Saved {formatWhen(entry.updatedAt)}</span>
-                      <span>{formatBytes(entry.sizeBytes)}</span>
+                      onBlur={() => commitRename(entry)}
+                    />
+                  ) : (
+                    <div className="document-manager__title">
+                      {entry.title}
                     </div>
+                  )}
+                  <div className="document-manager__meta">
+                    {isCurrent && (
+                      <span className="document-manager__current">Open in this tab</span>
+                    )}
+                    {fromSession && (
+                      <span
+                        className="document-manager__session"
+                        title="Shared in a session. Open it to resume hosting that session, so others can rejoin with the original link."
+                      >
+                        <Users size={10} /> From a session
+                      </span>
+                    )}
+                    <span>Saved {formatWhen(entry.updatedAt)}</span>
+                    <span>{formatBytes(entry.sizeBytes)}</span>
                   </div>
-                  <button
-                    type="button"
+                </div>
+                <div className="document-manager__actions">
+                  <Button
+                    variant="secondary"
+                    size="sm"
                     className="document-manager__open"
                     disabled={isCurrent || busy}
                     onClick={() => onOpenDocument(entry.docId)}
                     aria-label={`Open ${entry.title}`}
+                    icon={<FolderOpen size={14} />}
                   >
-                    <FolderOpen size={14} /> Open
-                  </button>
-                  <button
-                    type="button"
+                    Open
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
                     className="document-manager__rename"
                     disabled={busy}
                     onClick={() => setRenaming({ docId: entry.docId, title: entry.title })}
                     aria-label={`Rename ${entry.title}`}
                     title="Rename"
-                  >
-                    <Pencil size={14} />
-                  </button>
-                  <button
-                    type="button"
+                    icon={<Pencil size={14} />}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
                     className="document-manager__duplicate"
                     disabled={busy}
                     onClick={() => void duplicate(entry, false)}
                     aria-label={`Duplicate ${entry.title}`}
                     title="Duplicate"
-                  >
-                    <Copy size={14} />
-                  </button>
-                  <button
-                    type="button"
+                    icon={<Copy size={14} />}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
                     className="document-manager__compact"
                     disabled={busy}
                     onClick={() => void compact(entry)}
                     aria-label={`Compact ${entry.title}`}
                     title="Compact storage (safe at any time)"
-                  >
-                    <Minimize2 size={14} />
-                  </button>
-                  <button
-                    type="button"
+                    icon={<Minimize2 size={14} />}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
                     className="document-manager__rebase"
                     disabled={busy}
                     onClick={() => rebase(entry)}
                     aria-label={`Rebase ${entry.title}`}
                     title="Rebase - a new document without editing history"
-                  >
-                    <RefreshCcw size={14} />
-                  </button>
-                  <button
-                    type="button"
+                    icon={<RefreshCcw size={14} />}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
                     className="document-manager__forget"
                     disabled={isCurrent || busy}
                     onClick={() => forget(entry)}
@@ -546,15 +486,14 @@ export function DocumentManager({
                         ? 'Open another document to forget this one'
                         : 'Forget - permanently delete from this browser'
                     }
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                    icon={<Trash2 size={14} />}
+                  />
                 </div>
-              );
-            })
-          )}
-        </div>
+              </div>
+            );
+          })
+        )}
       </div>
-    </div>
+    </BaseModal>
   );
 }
