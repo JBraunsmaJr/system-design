@@ -171,3 +171,49 @@ To ensure the harness remains sensitive and effective, four reference anti-patte
 4. **Uncoalesced Waypoint Drag**: Emitting store writes on raw pointer events during waypoint drags (spikes `storeWrites`).
 
 Automated reference checks verify that the gating engine flags these anti-patterns deterministically.
+
+## 9. Render Census for the Non-Canvas Views
+
+The harness above drives the diagram canvas only. The Requirements and
+Timeline views are covered by a separate tool,
+`scripts/measure-view-renders.ts`, built for proving that a refactor of those
+views changes nothing.
+
+For each of 14 interactions (opening each view, typing in search, stepping
+through matches, collapsing and expanding cards, switching the timeline
+between board and Gantt, filtering by epic, searching the backlog, opening
+and closing an item) it records the number of React commits and, per
+component name, how many times that component's render function ran.
+
+```bash
+# Measure two checkouts with the same measuring code, then compare.
+git worktree add /tmp/base main
+npx tsx scripts/measure-view-renders.ts --repo /tmp/base --out /tmp/before.json
+npx tsx scripts/measure-view-renders.ts --repo .         --out /tmp/after.json
+npx tsx scripts/measure-view-renders.ts --compare /tmp/before.json /tmp/after.json
+```
+
+A pure refactor must produce an identical census; `--compare` exits non-zero
+on any difference.
+
+How it works, and why each choice matters:
+
+- **No application changes.** It installs a minimal
+  `__REACT_DEVTOOLS_GLOBAL_HOOK__`, which production React calls after every
+  commit, and counts the component fibers React visited that carry the
+  `PerformedWork` flag (set exactly when a render function ran).
+- **Production build, unminified.** The development build double-renders
+  under StrictMode; minification would erase component names. The PWA plugin
+  is dropped so a service worker cannot cache the page being measured.
+- **Quiet windows.** Each window starts and ends only once the app has made
+  no commit for 2.5 s, so commits from timers (the Requirements search
+  highlight, autosave) are counted against the action that caused them. With
+  fixed delays, identical builds reported different per-scenario counts.
+
+Reference regression: making `onUpdateItem` (now in
+`src/components/requirements/useRequirementStoreActions.ts`) a plain
+function instead of a `useCallback` re-renders every `RequirementCard` on
+each search step; the census reports it.
+
+The census is not part of `npm test`: like the perf suite, it builds the app
+and drives a browser.
