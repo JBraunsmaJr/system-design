@@ -184,11 +184,11 @@ class MockDOMNode {
       };
     }
 
-    const path: MockDOMNode[] = [];
-    let curr: MockDOMNode | null = this;
-    while (curr) {
-      path.push(curr);
-      curr = curr.parentNode;
+    const path: MockDOMNode[] = [this];
+    let parent = this.parentNode;
+    while (parent) {
+      path.push(parent);
+      parent = parent.parentNode;
     }
 
     // Capture phase

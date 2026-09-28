@@ -25,10 +25,7 @@ export function useStoreAuth(storeUrl: string | null): StoreAuthInfo {
   const [auth, setAuth] = useState<StoreAuthInfo>({ identity: null, providers: [] });
 
   useEffect(() => {
-    if (!storeUrl) {
-      setAuth({ identity: null, providers: [] });
-      return;
-    }
+    if (!storeUrl) return;
     let cancelled = false;
     const client = createStoreClient({ baseUrl: storeUrl });
     const ask = async () => {
@@ -64,7 +61,7 @@ export function useStoreAuth(storeUrl: string | null): StoreAuthInfo {
     };
   }, [storeUrl]);
 
-  return auth;
+  return storeUrl ? auth : { identity: null, providers: [] };
 }
 
 export function useStoreIdentity(storeUrl: string | null): StoreIdentity | null {

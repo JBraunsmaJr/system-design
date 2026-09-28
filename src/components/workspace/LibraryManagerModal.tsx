@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type ChangeEvent } from 'react';
+import { useState, useRef, type ChangeEvent, type FormEvent } from 'react';
 import { X, Upload, Download, Plus, Trash2, Package } from 'lucide-react';
 import {
   globalAssetLibraryManager,
@@ -18,9 +18,26 @@ interface LibraryManagerModalProps {
 }
 
 export function LibraryManagerModal({ isOpen, onClose }: LibraryManagerModalProps) {
-  const [libraries, setLibraries] = useState<AssetLibrary[]>([]);
-  const [selectedLibId, setSelectedLibId] = useState<string | null>(null);
+  const [libraries, setLibraries] = useState<AssetLibrary[]>(() =>
+    globalAssetLibraryManager.getLibraries(),
+  );
+  const [selectedLibId, setSelectedLibId] = useState<string | null>(() => {
+    const initialLibs = globalAssetLibraryManager.getLibraries();
+    return initialLibs.length > 0 ? initialLibs[0].library.id : null;
+  });
   const [validationResult, setValidationResult] = useState<LibraryValidationResult | null>(null);
+
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  if (isOpen && !prevIsOpen) {
+    setPrevIsOpen(true);
+    const libs = globalAssetLibraryManager.getLibraries();
+    setLibraries(libs);
+    if (!selectedLibId && libs.length > 0) {
+      setSelectedLibId(libs[0].library.id);
+    }
+  } else if (!isOpen && prevIsOpen) {
+    setPrevIsOpen(false);
+  }
 
   // New Library form state
   const [isCreatingLib, setIsCreatingLib] = useState(false);
@@ -62,12 +79,6 @@ export function LibraryManagerModal({ isOpen, onClose }: LibraryManagerModalProp
     }
   };
 
-  useEffect(() => {
-    if (isOpen) {
-      refreshLibraries();
-    }
-  }, [isOpen]);
-
   if (!isOpen) return null;
 
   const selectedLib = libraries.find((l) => l.library.id === selectedLibId);
@@ -105,7 +116,7 @@ export function LibraryManagerModal({ isOpen, onClose }: LibraryManagerModalProp
     e.target.value = '';
   };
 
-  const handleCreateLibrary = (e: React.FormEvent) => {
+  const handleCreateLibrary = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!newLibName.trim()) return;
 
@@ -136,7 +147,7 @@ export function LibraryManagerModal({ isOpen, onClose }: LibraryManagerModalProp
     refreshLibraries();
   };
 
-  const handleCreateIcon = (e: React.FormEvent) => {
+  const handleCreateIcon = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedLib || !newIconName.trim()) return;
 
@@ -182,7 +193,7 @@ export function LibraryManagerModal({ isOpen, onClose }: LibraryManagerModalProp
     refreshLibraries();
   };
 
-  const handleCreateShape = (e: React.FormEvent) => {
+  const handleCreateShape = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedLib || !newShapeName.trim()) return;
 

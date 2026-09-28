@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import {
   AlertTriangle,
   ChevronDown,
@@ -109,23 +109,19 @@ function useGanttLayout(
     }
 
     const startCandidates: number[] = [];
-    const endCandidates: number[] = [];
 
     for (const b of bands) {
       startCandidates.push(parseISODate(b.startDate));
-      endCandidates.push(parseISODate(b.endDate));
     }
     for (const m of milestones) {
       if (m.scheduledAt && /^\d{4}-\d{2}-\d{2}$/.test(m.scheduledAt)) {
         const day = parseISODate(m.scheduledAt);
         startCandidates.push(day);
-        endCandidates.push(day);
       }
     }
     for (const { schedule } of epicsWithSchedule) {
       if (schedule.startDate) {
         startCandidates.push(parseISODate(schedule.startDate));
-        endCandidates.push(parseISODate(schedule.endDate ?? schedule.startDate));
       }
     }
 
@@ -192,13 +188,9 @@ function useGanttLayout(
       .map(({ epic, schedule }) => {
         const startDays = parseISODate(schedule.startDate!);
         const left = (startDays - originDays) * DAY_WIDTH;
-        let width = 0;
-        if (schedule.endDate) {
-          const endDays = parseISODate(schedule.endDate);
-          width = Math.max(DAY_WIDTH, (endDays - startDays + 1) * DAY_WIDTH);
-        } else {
-          width = Math.max(DAY_WIDTH * 4, 80);
-        }
+        const width = schedule.endDate
+          ? Math.max(DAY_WIDTH, (parseISODate(schedule.endDate) - startDays + 1) * DAY_WIDTH)
+          : Math.max(DAY_WIDTH * 4, 80);
         maxRight = Math.max(maxRight, left + width);
         return {
           epic,
@@ -286,7 +278,7 @@ export function GanttChart({
     return new Set(getChildItemsForParent(filterEpicId, requirements).map((i) => i.id));
   }, [filteredChildItemIds, filterEpicId, requirements]);
 
-  const handleResizerMouseDown = (e: React.MouseEvent) => {
+  const handleResizerMouseDown = (e: ReactMouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDraggingResizer(true);
@@ -342,14 +334,11 @@ export function GanttChart({
     ) {
       return false;
     }
-    if (
-      effectiveFilteredChildItemIds &&
-      !effectiveFilteredChildItemIds.has(item.id) &&
-      item.id !== filterEpicId
-    ) {
-      return false;
-    }
-    return true;
+    return (
+      !effectiveFilteredChildItemIds ||
+      effectiveFilteredChildItemIds.has(item.id) ||
+      item.id === filterEpicId
+    );
   });
 
   const sprintRangesByItemId = useMemo(() => {

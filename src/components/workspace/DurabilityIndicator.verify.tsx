@@ -89,9 +89,7 @@ console.log('=== DurabilityIndicator OIDC and Workspace Persistence ===');
 
 if (failures > 0) {
   console.error(`\n${failures} test(s) failed`);
-  (globalThis as unknown as { process: { exitCode: number } }).process?.exitCode
-    ? ((globalThis as unknown as { process: { exitCode: number } }).process.exitCode = 1)
-    : undefined;
+  (globalThis as unknown as { process: { exitCode: number } }).process.exitCode = 1;
   throw new Error(`${failures} test(s) failed`);
 } else {
   console.log('\nAll DurabilityIndicator verification checks passed.');

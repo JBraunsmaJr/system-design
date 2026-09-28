@@ -103,7 +103,9 @@ export function DurabilityIndicator({
     state.action === 'export'
       ? 'Export a copy'
       : state.action === 'choose-file'
-        ? 'Save to a file'
+        ? fileName
+          ? 'Resume saving to file'
+          : 'Save to a file'
         : state.action === 'retry'
           ? 'Try again'
           : state.action === 'resume-file'
@@ -231,7 +233,7 @@ export function DurabilityIndicator({
                 if (!state.persistent) closeDropdown();
               }}
             >
-              {ActionIcon && <ActionIcon size={12} />}
+              {ActionIcon && <ActionIcon size={14} />}
               <span>{actionLabel}</span>
             </button>
           )}
@@ -308,7 +310,7 @@ export function DurabilityIndicator({
       <button
         ref={triggerRef}
         type="button"
-        className="durability__chip"
+        className="durability__chip durability-chip"
         aria-expanded={expanded}
         aria-describedby={expanded ? detailId : undefined}
         title={state.label}
@@ -331,7 +333,7 @@ export function DurabilityIndicator({
       {expanded &&
         (typeof document === 'undefined' || !document.body
           ? detailNode
-          : dropdownPos && createPortal(detailNode, document.body))}
+          : createPortal(detailNode, document.body))}
     </div>
   );
 }

@@ -63,7 +63,7 @@ export function AccessRequestNotice({
         position: 'absolute',
         top: 12,
         right: 12,
-        zIndex: 20,
+        zIndex: 1000,
         display: 'grid',
         gap: 8,
         maxWidth: 360,

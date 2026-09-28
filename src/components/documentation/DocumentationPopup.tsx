@@ -56,7 +56,6 @@ export function DocumentationPopup({
   // Compute position dynamically when anchor, documentation, or size changes (FR-009)
   useLayoutEffect(() => {
     if (!shouldShow || !anchor) {
-      setPos(null);
       return;
     }
 
@@ -83,8 +82,7 @@ export function DocumentationPopup({
     );
   }, [
     shouldShow,
-    anchor?.x,
-    anchor?.y,
+    anchor,
     documentation.description,
     documentation.properties,
     documentation.tags,

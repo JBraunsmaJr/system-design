@@ -6,6 +6,7 @@ import type {
   MemberSprintCapacity,
   SprintCapacitySummary,
 } from './teamTypes.ts';
+export type { SprintCapacitySummary, MemberSprintCapacity };
 import type { Sprint, ProgramIncrement, CapacityReservation } from './programIncrements.ts';
 import { getSprintActiveReservations } from './programIncrements.ts';
 import type { RequirementItem } from '../requirements/requirementsTypes.ts';

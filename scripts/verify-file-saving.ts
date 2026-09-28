@@ -82,12 +82,15 @@ const FAKE_FILE_ACCESS = `(() => {
 
 const readFile = (p: Page, name: string) =>
   p.evaluate(async (n) => {
-    try {
-      const h = await (await navigator.storage.getDirectory()).getFileHandle(n);
-      return await (await h.getFile()).text();
-    } catch {
-      return null;
+    for (let i = 0; i < 20; i++) {
+      try {
+        const h = await (await navigator.storage.getDirectory()).getFileHandle(n);
+        return await (await h.getFile()).text();
+      } catch {
+        await new Promise((r) => setTimeout(r, 50));
+      }
     }
+    return null;
   }, name);
 const fileTitle = async (p: Page, name: string) => {
   const text = await readFile(p, name);
@@ -100,13 +103,32 @@ const fileTitle = async (p: Page, name: string) => {
 const writeExternal = (p: Page, name: string, mutate: (title: string) => string) =>
   p.evaluate(
     async ([n, newTitle]) => {
-      const h = await (await navigator.storage.getDirectory()).getFileHandle(n);
-      const file = JSON.parse(await (await h.getFile()).text());
+      const dir = await navigator.storage.getDirectory();
+      const h = await dir.getFileHandle(n);
+      let file: { title?: string } | null = null;
+      for (let i = 0; i < 30; i++) {
+        try {
+          const f = await h.getFile();
+          file = JSON.parse(await f.text());
+          break;
+        } catch {
+          await new Promise((r) => setTimeout(r, 50));
+        }
+      }
+      if (!file) throw new Error(`Could not read ${n} externally`);
       file.title = newTitle;
-      await new Promise((r) => setTimeout(r, 20)); // a distinct lastModified
-      const w = await h.createWritable();
-      await w.write(JSON.stringify(file, null, 2));
-      await w.close();
+      await new Promise((r) => setTimeout(r, 50)); // a distinct lastModified
+      for (let i = 0; i < 30; i++) {
+        try {
+          const w = await h.createWritable();
+          await w.write(JSON.stringify(file, null, 2));
+          await w.close();
+          break;
+        } catch (e) {
+          if (i === 29) throw e;
+          await new Promise((r) => setTimeout(r, 50));
+        }
+      }
     },
     [name, mutate('')] as const,
   );

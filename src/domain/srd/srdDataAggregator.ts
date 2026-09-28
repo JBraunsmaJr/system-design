@@ -10,7 +10,8 @@ import { computeSprintDateRanges } from '../timeline/programIncrements';
 import type { TeamDocument } from '../timeline/teamTypes';
 import { isItemWorkable } from '../requirements/requirementsRegistry';
 import { getAllEpicsWithInferredSchedule } from '../timeline/epicScheduling';
-import type {
+import type {RequirementItemViewModel, SrdArchitectureComponent, SrdArchitectureConnection, SrdDataContext } from "./srdTypes";
+export type {
   SrdArchitectureComponent,
   SrdArchitectureConnection,
   SrdDataContext,
@@ -19,8 +20,8 @@ import type {
 
 export interface AggregateSrdDataParams {
   title: string;
-  nodes?: Array<Node<Record<string, unknown>>>;
-  edges?: Array<Edge<Record<string, unknown>>>;
+  nodes?: Array<Node>;
+  edges?: Array<Edge>;
   doc: RequirementsDocument;
   milestones?: Milestone[];
   programIncrements?: ProgramIncrement[];
@@ -94,7 +95,7 @@ export function aggregateSrdData(params: AggregateSrdDataParams): SrdDataContext
   };
 
   // 5. Architecture: Components & Connections
-  const nodeMap = new Map<string, Node<Record<string, unknown>>>();
+  const nodeMap = new Map<string, Node>();
   const components: SrdArchitectureComponent[] = [];
 
   for (const node of nodes) {

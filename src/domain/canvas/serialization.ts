@@ -1,5 +1,5 @@
 import type { Node, Edge } from '@xyflow/react';
-import type { ArchNodeData, ArchEdgeData, Scenario } from './types.ts';
+import type { ArchNodeData, ArchEdgeData, Scenario, SubDiagram } from './types.ts';
 import type { RequirementsDocument } from '../requirements/requirementsTypes.ts';
 import { EMPTY_REQUIREMENTS_DOCUMENT } from '../requirements/requirementsTypes.ts';
 import {
@@ -78,6 +78,12 @@ function collectAssetFallbacks(nodes: Node<ArchNodeData>[]): {
   return { shapeFallbacks, iconFallbacks };
 }
 
+export interface DiagramSnapshot {
+  title: string;
+  diagram: SubDiagram;
+  scenarios: Scenario[];
+}
+
 export function toDiagramFile(
   title: string,
   nodes: Node<ArchNodeData>[],
@@ -104,6 +110,19 @@ export function toDiagramFile(
     ...(Object.keys(iconFallbacks).length > 0 ? { iconFallbacks } : {}),
     metadata: { updatedAt: new Date().toISOString() },
   };
+}
+
+export function snapshotToDiagramFile(snapshot: DiagramSnapshot): DiagramFile {
+  return toDiagramFile(
+    snapshot.title,
+    snapshot.diagram.nodes,
+    snapshot.diagram.edges,
+    snapshot.scenarios,
+    EMPTY_REQUIREMENTS_DOCUMENT,
+    [],
+    EMPTY_TEAM_DOCUMENT,
+    [],
+  );
 }
 
 /** Triggers a browser download of the diagram as a .json file. */

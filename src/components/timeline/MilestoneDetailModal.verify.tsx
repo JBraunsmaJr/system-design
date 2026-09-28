@@ -174,7 +174,7 @@ const mockDoc: RequirementsDocument = {
       onClose: () => {},
       onUpdateMilestone: () => {},
       onDeleteMilestone: () => {},
-      onSelectItem: (_id) => {},
+      onSelectItem: () => {},
     }),
   );
 

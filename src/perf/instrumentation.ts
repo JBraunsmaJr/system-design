@@ -182,5 +182,20 @@ if (typeof window !== 'undefined') {
     recordUnflattenCall,
     frameNodes,
     suppressAutosave,
+    get storeWrites() {
+      return counters.storeWrites;
+    },
+    get nodeRenders() {
+      return counters.nodeRenders;
+    },
+    get edgeRenders() {
+      return counters.edgeRenders;
+    },
+    get canvasRenders() {
+      return counters.canvasRenders;
+    },
+    get commits() {
+      return counters.commits;
+    },
   };
 }

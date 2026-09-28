@@ -473,7 +473,7 @@ export function DocumentManager({
                     variant="ghost"
                     size="sm"
                     iconOnly
-                    className="document-manager__forget"
+                    className="document-manager__forget document-manager__delete"
                     disabled={isCurrent || busy}
                     onClick={() => forget(entry)}
                     aria-label={`Forget ${entry.title}`}

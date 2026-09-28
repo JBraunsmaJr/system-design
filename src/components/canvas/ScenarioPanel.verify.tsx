@@ -142,17 +142,15 @@ const sampleScenarios: Scenario[] = [
     currentActiveStep: string | null,
     scenario: Scenario,
   ) => {
-    let nextStepId: string | null = null;
     if (currentActiveStep === stepId) {
-      nextStepId = null;
+      activeStepResult = null;
     } else {
       const step = scenario.steps.find((s) => s.id === stepId);
       if (step && step.path) {
         navigatedPath = step.path;
       }
-      nextStepId = stepId;
+      activeStepResult = stepId;
     }
-    activeStepResult = nextStepId;
   };
 
   // Clicking step-2 (which is in subdiagram ["node-service-a"])

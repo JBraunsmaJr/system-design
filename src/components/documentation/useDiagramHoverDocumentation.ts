@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import type { Node, Edge } from '@xyflow/react';
 import type { ArchNodeData, ArchEdgeData } from '../../domain/canvas/types';
 import {
@@ -60,14 +60,14 @@ export function useDiagramHoverDocumentation({
     setActiveTarget(null);
   }, [clearHoverTimer, clearLeaveTimer]);
 
-  // Close documentation and clear timers when disabled (e.g. presentation starts)
+  // Clean up timers on unmount or when disabled
   useEffect(() => {
     if (disabled) {
-      closeDocumentation();
+      clearHoverTimer();
+      clearLeaveTimer();
     }
-  }, [disabled, closeDocumentation]);
+  }, [disabled, clearHoverTimer, clearLeaveTimer]);
 
-  // Clean up timers on unmount
   useEffect(() => {
     return () => {
       clearHoverTimer();
@@ -104,17 +104,9 @@ export function useDiagramHoverDocumentation({
     }
   }
 
-  // If active target no longer has documentation, hide popup
-  useEffect(() => {
-    if (isOpen && activeTarget && !currentDoc) {
-      setIsOpen(false);
-      setActiveTarget(null);
-    }
-  }, [isOpen, activeTarget, currentDoc]);
-
   // Mouse handlers for Nodes
   const handleNodeMouseEnter = useCallback(
-    (event: React.MouseEvent, node: Node<ArchNodeData>) => {
+    (event: ReactMouseEvent, node: Node<ArchNodeData>) => {
       if (disabled) return;
       clearLeaveTimer();
       const extracted = extractNodeDocumentation(node);
@@ -151,7 +143,7 @@ export function useDiagramHoverDocumentation({
   );
 
   const handleNodeMouseMove = useCallback(
-    (event: React.MouseEvent, node: Node<ArchNodeData>) => {
+    (event: ReactMouseEvent, node: Node<ArchNodeData>) => {
       if (disabled) return;
       const anchor = { x: event.clientX, y: event.clientY };
       if (pendingTargetRef.current && pendingTargetRef.current.id === node.id) {
@@ -164,23 +156,20 @@ export function useDiagramHoverDocumentation({
     [disabled, isOpen, activeTarget?.id],
   );
 
-  const handleNodeMouseLeave = useCallback(
-    (_event: React.MouseEvent, _node: Node<ArchNodeData>) => {
-      if (disabled) return;
-      clearHoverTimer();
-      if (isOpen) {
-        clearLeaveTimer();
-        leaveTimerRef.current = setTimeout(() => {
-          closeDocumentation();
-        }, leaveDelay);
-      }
-    },
-    [disabled, isOpen, leaveDelay, clearHoverTimer, clearLeaveTimer, closeDocumentation],
-  );
+  const handleNodeMouseLeave = useCallback(() => {
+    if (disabled) return;
+    clearHoverTimer();
+    if (isOpen) {
+      clearLeaveTimer();
+      leaveTimerRef.current = setTimeout(() => {
+        closeDocumentation();
+      }, leaveDelay);
+    }
+  }, [disabled, isOpen, leaveDelay, clearHoverTimer, clearLeaveTimer, closeDocumentation]);
 
   // Mouse handlers for Edges
   const handleEdgeMouseEnter = useCallback(
-    (event: React.MouseEvent, edge: Edge<ArchEdgeData>) => {
+    (event: ReactMouseEvent, edge: Edge<ArchEdgeData>) => {
       if (disabled) return;
       clearLeaveTimer();
       const extracted = extractEdgeDocumentation(edge);
@@ -216,7 +205,7 @@ export function useDiagramHoverDocumentation({
   );
 
   const handleEdgeMouseMove = useCallback(
-    (event: React.MouseEvent, edge: Edge<ArchEdgeData>) => {
+    (event: ReactMouseEvent, edge: Edge<ArchEdgeData>) => {
       if (disabled) return;
       const anchor = { x: event.clientX, y: event.clientY };
       if (pendingTargetRef.current && pendingTargetRef.current.id === edge.id) {
@@ -229,23 +218,20 @@ export function useDiagramHoverDocumentation({
     [disabled, isOpen, activeTarget?.id],
   );
 
-  const handleEdgeMouseLeave = useCallback(
-    (_event: React.MouseEvent, _edge: Edge<ArchEdgeData>) => {
-      if (disabled) return;
-      clearHoverTimer();
-      if (isOpen) {
-        clearLeaveTimer();
-        leaveTimerRef.current = setTimeout(() => {
-          closeDocumentation();
-        }, leaveDelay);
-      }
-    },
-    [disabled, isOpen, leaveDelay, clearHoverTimer, clearLeaveTimer, closeDocumentation],
-  );
+  const handleEdgeMouseLeave = useCallback(() => {
+    if (disabled) return;
+    clearHoverTimer();
+    if (isOpen) {
+      clearLeaveTimer();
+      leaveTimerRef.current = setTimeout(() => {
+        closeDocumentation();
+      }, leaveDelay);
+    }
+  }, [disabled, isOpen, leaveDelay, clearHoverTimer, clearLeaveTimer, closeDocumentation]);
 
   // Touch handlers (FR-013, 6.3) & Click handlers
   const handleNodeClick = useCallback(
-    (event: React.MouseEvent, node: Node<ArchNodeData>) => {
+    (event: ReactMouseEvent, node: Node<ArchNodeData>) => {
       if (disabled) return;
       const extracted = extractNodeDocumentation(node);
       if (hasDocumentation(extracted.documentation)) {
@@ -265,7 +251,7 @@ export function useDiagramHoverDocumentation({
   );
 
   const handleEdgeClick = useCallback(
-    (event: React.MouseEvent, edge: Edge<ArchEdgeData>) => {
+    (event: ReactMouseEvent, edge: Edge<ArchEdgeData>) => {
       if (disabled) return;
       const extracted = extractEdgeDocumentation(edge);
       if (hasDocumentation(extracted.documentation)) {

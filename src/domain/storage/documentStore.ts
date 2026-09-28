@@ -93,6 +93,7 @@ export interface DocumentIndexEntry {
    * participant can rehost an empty room later (WS13-R12). */
   origin: 'local' | 'session';
   sessionRoom?: string;
+  sessionRelay?: string;
   /** The session's encryption key, kept with the local copy so a former
    * participant can host the same room again and the original link still
    * works (WS13-R12). Local storage only, like the content it protects. */
@@ -189,7 +190,12 @@ export interface DocumentStore {
   writeDocument(
     docId: string,
     file: DiagramFile,
-    options?: { origin?: 'local' | 'session'; sessionRoom?: string; sessionKey?: string },
+    options?: {
+      origin?: 'local' | 'session';
+      sessionRoom?: string;
+      sessionKey?: string;
+      sessionRelay?: string;
+    },
   ): Promise<StorageResult<DocumentIndexEntry>>;
   renameDocument(docId: string, title: string): Promise<StorageResult<DocumentIndexEntry>>;
   /** WS2-R6: deletes content AND index entry. Distinct from disconnecting. */
@@ -313,6 +319,9 @@ export function createDocumentStore(backend: DocumentBackend): DocumentStore {
               : {}),
             ...((options?.sessionKey ?? existing?.sessionKey)
               ? { sessionKey: options?.sessionKey ?? existing?.sessionKey }
+              : {}),
+            ...((options?.sessionRelay ?? existing?.sessionRelay)
+              ? { sessionRelay: options?.sessionRelay ?? existing?.sessionRelay }
               : {}),
             ...(options?.origin === 'session'
               ? { lastSessionAt: now }
