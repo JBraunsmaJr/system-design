@@ -31,6 +31,7 @@
 import { spawn, type ChildProcess } from 'child_process';
 import { build, loadConfigFromFile, type PluginOption } from 'vite';
 import { mkdtempSync, readFileSync, writeFileSync } from 'fs';
+import { fileURLToPath } from 'url';
 import { tmpdir } from 'os';
 import { join, resolve } from 'path';
 import { chromium, type Page } from 'playwright';
@@ -60,12 +61,12 @@ export interface Census {
   commits: number;
   renders: number;
   byComponent: Record<string, number>;
+  /** Normalised outerHTML of the scenario's `dom` root after it settled,
+   * for scenarios that declare one (the modals, whose markup is the
+   * product - the SRD preview is what becomes the PDF). */
+  dom?: string;
 }
 type Results = Record<string, Census>;
-
-if (argv[0] === '--compare') {
-  process.exit(compare(argv[1], argv[2]));
-}
 
 const repoDir = resolve(arg('--repo', '.'));
 const outFile = resolve(arg('--out', join(repoDir, 'dist', 'view-renders.json')));
@@ -141,10 +142,18 @@ function buildDocument() {
     { id: 'ms-1', type: 'release', name: 'Beta', scheduledAt: '2026-04-01' } as Milestone,
     { id: 'ms-2', type: 'release', name: 'GA', scheduledAt: '2026-08-01' } as Milestone,
   ];
+  // Real diagram content (5 nodes, nested sub-diagrams, 2 edges) so the SRD
+  // preview's component and connection tables are populated.
+  const diagram = JSON.parse(
+    readFileSync(
+      join(fileURLToPath(new URL('.', import.meta.url)), '../fixtures/schema-0.7.json'),
+      'utf8',
+    ),
+  );
   return toDiagramFile(
     'Render census fixture',
-    [],
-    [],
+    diagram.nodes,
+    diagram.edges,
     [],
     {
       itemTypes: BUILT_IN_ITEM_TYPES,
@@ -268,16 +277,35 @@ async function settle(page: Page) {
   }
 }
 
-async function measure(page: Page, action: () => Promise<void>): Promise<Census> {
+async function measure(
+  page: Page,
+  action: () => Promise<void>,
+  domSelector?: string,
+): Promise<Census> {
   await settle(page);
   await page.evaluate(() =>
     (window as never as { __RENDER_CENSUS__: { reset(): void } }).__RENDER_CENSUS__.reset(),
   );
   await action();
   await settle(page);
-  return page.evaluate(() =>
+  const census = await page.evaluate(() =>
     (window as never as { __RENDER_CENSUS__: { read(): Census } }).__RENDER_CENSUS__.read(),
   );
+  if (domSelector) {
+    census.dom = await page.evaluate((sel) => {
+      const el = document.querySelector(sel);
+      if (!el) return `<missing ${sel}>`;
+      return (
+        el.outerHTML
+          // Captured diagram images are pixels, not markup.
+          .replace(/(src|href)="(data|blob):[^"]*"/g, '$1="$2:..."')
+          .replace(/url\((&quot;|")?data:[^)]*\)/g, 'url(data:...)')
+          // Library ids embed Date.now().
+          .replace(/custom-lib-\d+/g, 'custom-lib-N')
+      );
+    }, domSelector);
+  }
+  return census;
 }
 
 async function typeSlowly(page: Page, selector: string, text: string) {
@@ -289,7 +317,24 @@ async function typeSlowly(page: Page, selector: string, text: string) {
   }
 }
 
-type Scenario = { id: string; run: (page: Page) => Promise<void> };
+const SRD = '.srd-modal-backdrop';
+const LIB = '.modal-overlay';
+/** The SRD sidebar's tabs, in order: Doc, Layout, Snapshots, Theme, Headers. */
+const srdTab = (p: Page, index: number) =>
+  p.click(`.srd-sidebar button.srd-btn-icon >> nth=${index}`);
+const srdField = (label: string) =>
+  `.srd-sidebar__field:has(label:text-is("${label}")) input >> nth=0`;
+
+type Scenario = {
+  id: string;
+  run: (page: Page) => Promise<void>;
+  dom?: string;
+  /** Navigation between measured steps, not itself a measurement. Its
+   * counts are recorded but not compared: they depend on timing (see
+   * srd/to-diagram). The steps after it are stable, so the state it leaves
+   * is deterministic. */
+  setup?: true;
+};
 
 const SCENARIOS: Scenario[] = [
   // --- Requirements view -------------------------------------------------
@@ -326,6 +371,72 @@ const SCENARIOS: Scenario[] = [
   },
   { id: 'timeline/open-item', run: (p) => p.getByText('Ticket 5 auth token work').first().click() },
   { id: 'timeline/close-item', run: (p) => p.keyboard.press('Escape') },
+  // --- SRD modal (DOM compared: the preview is what becomes the PDF) ----
+  // Remounting the canvas lets React Flow measure its nodes through
+  // ResizeObserver, so this step's commit count varies from run to run.
+  { id: 'srd/to-diagram', setup: true, run: (p) => p.click('button[title="Diagram"]') },
+  {
+    id: 'srd/open',
+    dom: SRD,
+    run: async (p) => {
+      await p.click('button[title="Export"]');
+      await p.click('button:has-text("Export SRD (PDF / Print)")');
+      await p.waitForSelector('.srd-modal');
+    },
+  },
+  { id: 'srd/type-title', dom: SRD, run: (p) => typeSlowly(p, srdField('Document Title'), ' v2') },
+  { id: 'srd/tab-layout', dom: SRD, run: (p) => srdTab(p, 1) },
+  { id: 'srd/component-table', dom: SRD, run: (p) => p.check('#includeComponentTableCheckbox') },
+  {
+    id: 'srd/connections-table',
+    dom: SRD,
+    run: (p) => p.check('#includeConnectionsTableCheckbox'),
+  },
+  { id: 'srd/tab-snapshots', dom: SRD, run: (p) => srdTab(p, 2) },
+  { id: 'srd/tab-theme', dom: SRD, run: (p) => srdTab(p, 3) },
+  {
+    id: 'srd/theme-color',
+    dom: SRD,
+    run: (p) => p.fill('.srd-sidebar__color-picker-row input[type="text"] >> nth=0', '#10b981'),
+  },
+  { id: 'srd/tab-headers', dom: SRD, run: (p) => srdTab(p, 4) },
+  { id: 'srd/header-left', dom: SRD, run: (p) => typeSlowly(p, srdField('Header Left'), 'DRAFT') },
+  {
+    id: 'srd/preset',
+    dom: SRD,
+    run: (p) =>
+      p.selectOption('.srd-sidebar__select >> nth=0', 'agile_engineering').then(() => undefined),
+  },
+  { id: 'srd/tab-doc', dom: SRD, run: (p) => srdTab(p, 0) },
+  { id: 'srd/close', run: (p) => p.keyboard.press('Escape') },
+  // --- Library manager modal ---------------------------------------------
+  {
+    id: 'lib/open',
+    dom: LIB,
+    run: (p) => p.click('button[title="Manage Shape & Icon Libraries"]'),
+  },
+  { id: 'lib/new-library', dom: LIB, run: (p) => p.click(`${LIB} button:has-text("New Library")`) },
+  {
+    id: 'lib/type-name',
+    dom: LIB,
+    run: (p) => typeSlowly(p, 'input[placeholder="e.g. Company Architecture"]', 'Census'),
+  },
+  { id: 'lib/create', dom: LIB, run: (p) => p.click(`${LIB} button:has-text("Create Library")`) },
+  { id: 'lib/add-icon', dom: LIB, run: (p) => p.click(`${LIB} button:has-text("Add Icon")`) },
+  {
+    id: 'lib/type-icon',
+    dom: LIB,
+    run: (p) => typeSlowly(p, 'input[placeholder="e.g. Auth Gateway"]', 'Gate'),
+  },
+  { id: 'lib/save-icon', dom: LIB, run: (p) => p.click(`${LIB} button:has-text("Save Icon")`) },
+  { id: 'lib/add-shape', dom: LIB, run: (p) => p.click(`${LIB} button:has-text("Add Shape")`) },
+  {
+    id: 'lib/type-shape',
+    dom: LIB,
+    run: (p) => typeSlowly(p, 'input[placeholder="e.g. Edge Node"]', 'Edge'),
+  },
+  { id: 'lib/save-shape', dom: LIB, run: (p) => p.click(`${LIB} button:has-text("Save Shape")`) },
+  { id: 'lib/close', run: (p) => p.keyboard.press('Escape') },
 ];
 
 async function runOnce(appUrl: string, docJson: string): Promise<Results> {
@@ -350,7 +461,7 @@ async function runOnce(appUrl: string, docJson: string): Promise<Results> {
     await settle(page);
     const results: Results = {};
     for (const s of SCENARIOS) {
-      results[s.id] = await measure(page, () => s.run(page));
+      results[s.id] = await measure(page, () => s.run(page), s.dom);
     }
     return results;
   } finally {
@@ -436,6 +547,7 @@ async function main() {
         commits: median(runs.map((r) => r[s.id].commits)),
         renders: median(runs.map((r) => r[s.id].renders)),
         byComponent,
+        ...(runs[0][s.id].dom !== undefined ? { dom: runs[0][s.id].dom } : {}),
       };
       const varied = new Set(runs.map((r) => JSON.stringify(r[s.id]))).size > 1;
       console.log(
@@ -459,9 +571,14 @@ function compare(beforePath: string, afterPath: string): number {
   const before: Results = JSON.parse(readFileSync(beforePath, 'utf8'));
   const after: Results = JSON.parse(readFileSync(afterPath, 'utf8'));
   let differences = 0;
+  const setupIds = new Set(SCENARIOS.filter((s) => s.setup).map((s) => s.id));
   for (const id of new Set([...Object.keys(before), ...Object.keys(after)])) {
     const a = before[id];
     const b = after[id];
+    if (setupIds.has(id)) {
+      console.log(`${id.padEnd(24)} setup step, not compared (timing-dependent)`);
+      continue;
+    }
     if (!a || !b) {
       console.log(`${id}: only in ${a ? 'before' : 'after'}`);
       differences++;
@@ -474,8 +591,18 @@ function compare(beforePath: string, afterPath: string): number {
       const y = b.byComponent[n] ?? 0;
       if (x !== y) lines.push(`${n} ${x} -> ${y}`);
     }
+    if (a.dom !== b.dom) {
+      const x = a.dom ?? '';
+      const y = b.dom ?? '';
+      let i = 0;
+      while (i < x.length && i < y.length && x[i] === y[i]) i++;
+      lines.push(
+        `DOM differs at char ${i}: before "...${x.slice(Math.max(0, i - 60), i + 60)}..." after "...${y.slice(Math.max(0, i - 60), i + 60)}..."`,
+      );
+    }
+    const domNote = b.dom !== undefined ? `, DOM identical (${b.dom.length} chars)` : '';
     console.log(
-      `${id.padEnd(24)} ${lines.length ? 'DIFFERS: ' + lines.join(', ') : `identical (${b.commits} commits, ${b.renders} renders)`}`,
+      `${id.padEnd(24)} ${lines.length ? 'DIFFERS: ' + lines.join(', ') : `identical (${b.commits} commits, ${b.renders} renders${domNote})`}`,
     );
     differences += lines.length;
   }
@@ -483,7 +610,12 @@ function compare(beforePath: string, afterPath: string): number {
   return differences ? 1 : 0;
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+// Dispatched here, after every declaration: compare() reads SCENARIOS.
+if (argv[0] === '--compare') {
+  process.exit(compare(argv[1], argv[2]));
+} else {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

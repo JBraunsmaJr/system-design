@@ -175,15 +175,25 @@ Automated reference checks verify that the gating engine flags these anti-patter
 ## 9. Render Census for the Non-Canvas Views
 
 The harness above drives the diagram canvas only. The Requirements and
-Timeline views are covered by a separate tool,
+Timeline views and the SRD and library modals are covered by a separate
+tool,
 `scripts/measure-view-renders.ts`, built for proving that a refactor of those
 views changes nothing.
 
-For each of 14 interactions (opening each view, typing in search, stepping
-through matches, collapsing and expanding cards, switching the timeline
-between board and Gantt, filtering by epic, searching the backlog, opening
-and closing an item) it records the number of React commits and, per
-component name, how many times that component's render function ran.
+For each of 38 interactions (plus one setup step, below) it records the
+number of React commits and, per component name, how many times that
+component's render function ran:
+
+- Requirements and Timeline (14): opening each view, typing in search,
+  stepping through matches, collapsing and expanding cards, board and
+  Gantt, filtering by epic, searching the backlog, opening an item.
+- SRD modal (13): every tab, typing in fields, theme colour, preset, the
+  component and connection tables.
+- Library manager (11): creating a library, adding an icon and a shape.
+
+For the modal interactions it also records the modal's rendered HTML, and
+`--compare` reports the first differing character. For the SRD the markup
+is the product: the preview is what becomes the PDF.
 
 ```bash
 # Measure two checkouts with the same measuring code, then compare.
@@ -196,6 +206,16 @@ npx tsx scripts/measure-view-renders.ts --compare /tmp/before.json /tmp/after.js
 A pure refactor must produce an identical census; `--compare` exits non-zero
 on any difference.
 
+A split that adds components (a section of markup becoming its own
+component) cannot be identical: the new components appear in the census.
+For those, the bar is that commits and every pre-existing component's count
+are identical, the HTML is byte-identical, and each new component renders
+exactly once per render of its parent, and only while it is shown.
+
+One step is marked `setup` and never compared: returning to the diagram
+view before the SRD scenarios. Remounting the canvas lets React Flow measure
+nodes through `ResizeObserver`, so its commit count varies even on `main`.
+
 How it works, and why each choice matters:
 
 - **No application changes.** It installs a minimal
@@ -205,6 +225,9 @@ How it works, and why each choice matters:
 - **Production build, unminified.** The development build double-renders
   under StrictMode; minification would erase component names. The PWA plugin
   is dropped so a service worker cannot cache the page being measured.
+- **Normalised HTML.** Only what is not markup is normalised: captured
+  diagram images (`data:` and `blob:` URLs) and library ids built from
+  `Date.now()`.
 - **Quiet windows.** Each window starts and ends only once the app has made
   no commit for 2.5 s, so commits from timers (the Requirements search
   highlight, autosave) are counted against the action that caused them. With
