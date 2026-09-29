@@ -48,8 +48,8 @@ export function GeometryPicker({ value, onChange }: GeometryPickerProps) {
           justifyContent: 'space-between',
           gap: 8,
           padding: '6px 10px',
-          background: 'var(--bg-field, #1b1e27)',
-          border: '1px solid var(--border, #2a2e3a)',
+          background: 'var(--chrome-bg)',
+          border: '1px solid var(--chrome-border)',
           borderRadius: 4,
           color: '#fff',
           fontSize: 13,
@@ -58,7 +58,7 @@ export function GeometryPicker({ value, onChange }: GeometryPickerProps) {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
-          <span style={{ display: 'flex', alignItems: 'center', color: 'var(--accent, #5b7cfa)' }}>
+          <span style={{ display: 'flex', alignItems: 'center', color: 'var(--accent)' }}>
             {selectedOption.renderIcon()}
           </span>
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -79,8 +79,8 @@ export function GeometryPicker({ value, onChange }: GeometryPickerProps) {
               minWidth: 220,
               maxHeight: 280,
               overflowY: 'auto',
-              background: 'var(--chrome-bg-raised, #1b1e27)',
-              border: '1px solid var(--chrome-border, #2a2e3a)',
+              background: 'var(--chrome-bg-raised)',
+              border: '1px solid var(--chrome-border)',
               borderRadius: 6,
               boxShadow: '0 6px 20px rgba(0, 0, 0, 0.45)',
               zIndex: 9999,
@@ -105,10 +105,8 @@ export function GeometryPicker({ value, onChange }: GeometryPickerProps) {
                     justifyContent: 'space-between',
                     gap: 8,
                     padding: '7px 10px',
-                    background: isSelected
-                      ? 'var(--bg-active, rgba(91, 124, 250, 0.15))'
-                      : 'transparent',
-                    color: isSelected ? 'var(--accent, #5b7cfa)' : 'var(--chrome-text, #e7e9ee)',
+                    background: isSelected ? 'var(--chrome-bg-active)' : 'transparent',
+                    color: isSelected ? 'var(--accent)' : 'var(--chrome-text)',
                     border: 'none',
                     borderRadius: 0,
                     fontSize: 12.5,

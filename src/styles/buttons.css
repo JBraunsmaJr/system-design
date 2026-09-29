@@ -37,21 +37,21 @@
 .btn--sm {
   height: 26px;
   padding: 3px 8px;
-  font-size: 12px;
+  font-size: var(--text-xs);
   gap: 4px;
 }
 
 .btn--md {
   height: 32px;
   padding: 6px 12px;
-  font-size: 13px;
+  font-size: var(--text-sm);
   gap: 6px;
 }
 
 .btn--lg {
   height: 38px;
   padding: 8px 16px;
-  font-size: 14px;
+  font-size: var(--text-base);
   gap: 8px;
 }
 
@@ -127,7 +127,7 @@
 .btn--danger {
   background: var(--danger);
   border-color: var(--danger);
-  color: #ffffff;
+  color: var(--white);
 }
 
 .btn--danger:hover:not(:disabled) {
@@ -145,10 +145,10 @@
 }
 
 .btn--danger-outline:hover:not(:disabled) {
-  background: rgba(240, 87, 140, 0.1);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
   color: var(--danger);
 }
 
 .btn--danger-outline:active:not(:disabled) {
-  background: rgba(240, 87, 140, 0.18);
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
 }

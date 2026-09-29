@@ -76,8 +76,8 @@ export function ColorPickerPanel({
         flexDirection: 'column',
         gap: 8,
         padding: 8,
-        background: 'var(--chrome-bg-raised, #1b1e27)',
-        border: '1px solid var(--chrome-border, #2a2e3a)',
+        background: 'var(--chrome-bg-raised)',
+        border: '1px solid var(--chrome-border)',
         borderRadius: 6,
         boxShadow: '0 12px 32px rgba(0, 0, 0, 0.45)',
         width: 176,
@@ -109,7 +109,7 @@ export function ColorPickerPanel({
                 height: 32,
                 borderRadius: 4,
                 border: isSelected
-                  ? '2px solid var(--accent, #5B7CFA)'
+                  ? '2px solid var(--accent)'
                   : '1px solid rgba(255, 255, 255, 0.12)',
                 background: color,
                 cursor: 'pointer',
@@ -126,7 +126,7 @@ export function ColorPickerPanel({
         })}
       </div>
 
-      <div style={{ height: 1, background: 'var(--chrome-border, #2a2e3a)', margin: '2px 0' }} />
+      <div style={{ height: 1, background: 'var(--chrome-border)', margin: '2px 0' }} />
 
       <label
         className="color-picker-panel__custom"
@@ -136,11 +136,11 @@ export function ColorPickerPanel({
           gap: 8,
           padding: '4px 6px',
           borderRadius: 4,
-          background: 'var(--chrome-bg, #14161d)',
-          border: '1px solid var(--chrome-border, #2a2e3a)',
+          background: 'var(--chrome-bg)',
+          border: '1px solid var(--chrome-border)',
           cursor: 'pointer',
           fontSize: 12,
-          color: 'var(--chrome-text, #e7e9ee)',
+          color: 'var(--chrome-text)',
         }}
       >
         <input
@@ -181,10 +181,10 @@ export function ColorPickerPanel({
             padding: '5px 8px',
             borderRadius: 4,
             background: 'transparent',
-            border: '1px dashed var(--chrome-border, #2a2e3a)',
+            border: '1px dashed var(--chrome-border)',
             cursor: 'pointer',
             fontSize: 12,
-            color: 'var(--chrome-text-dim, #7c8598)',
+            color: 'var(--chrome-text-dim)',
             width: '100%',
           }}
         >

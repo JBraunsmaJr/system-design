@@ -17,7 +17,7 @@
 
 .palette__group-label {
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: var(--text-2xs-plus);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   margin: 16px 0 6px;
@@ -33,13 +33,13 @@
   gap: 8px;
   padding: 6px 8px;
   border-radius: var(--radius-sm);
-  font-size: 13.5px;
+  font-size: var(--text-sm-plus);
   color: var(--chrome-text);
   cursor: grab;
 }
 
 .palette__item:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--white) 6%, transparent);
 }
 
 .palette__item:active {
@@ -47,7 +47,7 @@
 }
 
 .palette__hint {
-  font-size: 13px;
+  font-size: var(--text-sm);
   line-height: 1.5;
   color: var(--chrome-text-dim);
   padding-top: 12px;
@@ -102,13 +102,13 @@
 }
 
 .peer-cursor__label {
-  font-size: 11px;
+  font-size: var(--text-2xs);
   font-weight: 600;
-  color: white;
+  color: var(--white);
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   white-space: nowrap;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--black) 30%, transparent);
 }
 
 .peer-selection-outline {
@@ -124,11 +124,11 @@
   position: absolute;
   top: -20px;
   left: -2px;
-  font-size: 10px;
+  font-size: var(--text-3xs);
   font-weight: 600;
-  color: white;
+  color: var(--white);
   padding: 1px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   white-space: nowrap;
 }
 
@@ -164,7 +164,7 @@
 
 .react-flow__controls-button.is-active {
   background: var(--accent);
-  color: white;
+  color: var(--white);
 }
 
 .react-flow__controls-button.is-active:hover {
@@ -182,8 +182,8 @@
   border: 1px solid var(--chrome-border);
   border-radius: var(--radius-md);
   padding: 6px 10px;
-  font-size: 12px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  font-size: var(--text-xs);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--black) 35%, transparent);
   max-width: min(70vw, 520px);
 }
 
@@ -191,9 +191,9 @@
   background: transparent;
   border: none;
   color: var(--chrome-text-dim);
-  font-size: 12px;
+  font-size: var(--text-xs);
   padding: 2px 4px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -202,7 +202,7 @@
 
 .breadcrumb button:hover {
   color: var(--accent);
-  background: rgba(91, 124, 250, 0.12);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 .breadcrumb__segment {
@@ -244,7 +244,7 @@
   border: 1px solid var(--chrome-border);
   border-radius: var(--radius-sm);
   padding: 6px 10px;
-  font-size: 12.5px;
+  font-size: var(--text-xs-plus);
   font-weight: 500;
   color: var(--chrome-text);
   cursor: pointer;
@@ -257,7 +257,7 @@
 
 .palette__mode-trigger:hover {
   background: var(--chrome-bg-raised);
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: color-mix(in srgb, var(--white) 20%, transparent);
 }
 
 .palette__mode-trigger.is-open {
@@ -299,7 +299,7 @@
   background: var(--chrome-bg-raised);
   border: 1px solid var(--chrome-border);
   border-radius: var(--radius-sm);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--black) 45%, transparent);
   padding: 4px;
   color-scheme: dark;
 }
@@ -312,9 +312,9 @@
   gap: 8px;
   background: transparent;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   padding: 6px 8px;
-  font-size: 12.5px;
+  font-size: var(--text-xs-plus);
   font-weight: 500;
   color: var(--chrome-text);
   cursor: pointer;
@@ -330,7 +330,7 @@
 }
 
 .palette__mode-option.is-selected {
-  background: rgba(91, 124, 250, 0.15);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
   color: var(--accent);
   font-weight: 600;
 }
@@ -364,9 +364,9 @@
   gap: 6px;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   padding: 7px 8px;
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: 500;
   color: var(--chrome-text-dim);
   cursor: pointer;
@@ -379,7 +379,7 @@
 
 .palette__tabs button:hover {
   color: var(--chrome-text);
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--white) 4%, transparent);
 }
 
 .palette__tabs button.is-active {
@@ -387,7 +387,7 @@
   color: var(--accent);
   border-color: var(--chrome-border);
   font-weight: 600;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--black) 25%, transparent);
 }
 
 .palette__tab-icon {
@@ -400,7 +400,7 @@
 }
 
 .palette__mode-hint {
-  font-size: 11px;
+  font-size: var(--text-2xs);
   line-height: 1.5;
   color: var(--chrome-text-dim);
   margin: 0 0 12px;

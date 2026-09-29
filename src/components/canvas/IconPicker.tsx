@@ -157,7 +157,7 @@ export function IconPickerPanel({
           display: 'flex',
           gap: 4,
           padding: '0 8px 6px 8px',
-          borderBottom: '1px solid var(--border)',
+          borderBottom: '1px solid var(--chrome-border)',
         }}
       >
         <button
@@ -167,8 +167,8 @@ export function IconPickerPanel({
             fontSize: 12,
             padding: '3px 8px',
             borderRadius: 4,
-            background: activeTab === 'all' ? 'var(--bg-active)' : 'transparent',
-            color: activeTab === 'all' ? 'var(--accent)' : 'var(--text-muted)',
+            background: activeTab === 'all' ? 'var(--chrome-bg-active)' : 'transparent',
+            color: activeTab === 'all' ? 'var(--accent)' : 'var(--chrome-text-dim)',
             border: 'none',
             cursor: 'pointer',
             display: 'flex',
@@ -186,8 +186,8 @@ export function IconPickerPanel({
             fontSize: 12,
             padding: '3px 8px',
             borderRadius: 4,
-            background: activeTab === 'recent' ? 'var(--bg-active)' : 'transparent',
-            color: activeTab === 'recent' ? 'var(--accent)' : 'var(--text-muted)',
+            background: activeTab === 'recent' ? 'var(--chrome-bg-active)' : 'transparent',
+            color: activeTab === 'recent' ? 'var(--accent)' : 'var(--chrome-text-dim)',
             border: 'none',
             cursor: 'pointer',
             display: 'flex',
@@ -205,8 +205,8 @@ export function IconPickerPanel({
             fontSize: 12,
             padding: '3px 8px',
             borderRadius: 4,
-            background: activeTab === 'favorites' ? 'var(--bg-active)' : 'transparent',
-            color: activeTab === 'favorites' ? 'var(--accent)' : 'var(--text-muted)',
+            background: activeTab === 'favorites' ? 'var(--chrome-bg-active)' : 'transparent',
+            color: activeTab === 'favorites' ? 'var(--accent)' : 'var(--chrome-text-dim)',
             border: 'none',
             cursor: 'pointer',
             display: 'flex',
@@ -229,9 +229,9 @@ export function IconPickerPanel({
             gap: 6,
             padding: '5px 8px',
             borderRadius: 4,
-            background: isNone ? 'var(--bg-active)' : 'var(--bg-field)',
-            border: isNone ? '1px solid var(--accent)' : '1px solid var(--border)',
-            color: isNone ? 'var(--accent)' : 'var(--text-muted)',
+            background: isNone ? 'var(--chrome-bg-active)' : 'var(--chrome-bg)',
+            border: isNone ? '1px solid var(--accent)' : '1px solid var(--chrome-border)',
+            color: isNone ? 'var(--accent)' : 'var(--chrome-text-dim)',
             fontSize: 12,
             cursor: 'pointer',
           }}
@@ -253,9 +253,9 @@ export function IconPickerPanel({
             onChange={(e) => setSelectedCategory(e.target.value)}
             style={{
               width: '100%',
-              background: 'var(--bg-field, var(--chrome-bg, #1a1b23))',
-              color: 'var(--chrome-text, #e7e9ee)',
-              border: '1px solid var(--border, var(--chrome-border, #2d3139))',
+              background: 'var(--chrome-bg)',
+              color: 'var(--chrome-text)',
+              border: '1px solid var(--chrome-border)',
               borderRadius: 4,
               padding: '4px 8px',
               fontSize: 12,
@@ -312,7 +312,8 @@ export function IconPickerPanel({
                       borderRadius: 4,
                       border:
                         item.id === resolved ? '1px solid var(--accent)' : '1px solid transparent',
-                      background: item.id === resolved ? 'var(--bg-active)' : 'var(--bg-field)',
+                      background:
+                        item.id === resolved ? 'var(--chrome-bg-active)' : 'var(--chrome-bg)',
                       cursor: 'pointer',
                     }}
                     onClick={() => handleSelectIcon(item.id)}
@@ -345,7 +346,7 @@ export function IconPickerPanel({
         ) : (
           <p
             className="icon-picker__empty"
-            style={{ padding: 16, textAlign: 'center', color: 'var(--text-muted)' }}
+            style={{ padding: 16, textAlign: 'center', color: 'var(--chrome-text-dim)' }}
           >
             No icons found.
           </p>
@@ -356,8 +357,8 @@ export function IconPickerPanel({
         style={{
           padding: '4px 8px',
           fontSize: 11,
-          color: 'var(--text-muted)',
-          borderTop: '1px solid var(--border)',
+          color: 'var(--chrome-text-dim)',
+          borderTop: '1px solid var(--chrome-border)',
           textAlign: 'center',
         }}
       >

@@ -63,7 +63,7 @@ export function LibraryShapeForm({
               display: 'block',
               fontSize: 12,
               marginBottom: 4,
-              color: 'var(--text-muted)',
+              color: 'var(--chrome-text-dim)',
             }}
           >
             Shape Name *
@@ -74,8 +74,8 @@ export function LibraryShapeForm({
             style={{
               width: '100%',
               padding: '6px 8px',
-              background: 'var(--bg-field)',
-              border: '1px solid var(--border)',
+              background: 'var(--chrome-bg)',
+              border: '1px solid var(--chrome-border)',
               color: '#fff',
               borderRadius: 4,
             }}
@@ -90,7 +90,7 @@ export function LibraryShapeForm({
               display: 'block',
               fontSize: 12,
               marginBottom: 4,
-              color: 'var(--text-muted)',
+              color: 'var(--chrome-text-dim)',
             }}
           >
             Category
@@ -100,8 +100,8 @@ export function LibraryShapeForm({
             style={{
               width: '100%',
               padding: '6px 8px',
-              background: 'var(--bg-field)',
-              border: '1px solid var(--border)',
+              background: 'var(--chrome-bg)',
+              border: '1px solid var(--chrome-border)',
               color: '#fff',
               borderRadius: 4,
             }}
@@ -118,7 +118,7 @@ export function LibraryShapeForm({
               display: 'block',
               fontSize: 12,
               marginBottom: 4,
-              color: 'var(--text-muted)',
+              color: 'var(--chrome-text-dim)',
             }}
           >
             Geometry Type
@@ -131,7 +131,7 @@ export function LibraryShapeForm({
               display: 'block',
               fontSize: 12,
               marginBottom: 4,
-              color: 'var(--text-muted)',
+              color: 'var(--chrome-text-dim)',
             }}
           >
             Shape Color
@@ -142,8 +142,8 @@ export function LibraryShapeForm({
               width: '100%',
               height: 34,
               padding: '2px 4px',
-              background: 'var(--bg-field)',
-              border: '1px solid var(--border)',
+              background: 'var(--chrome-bg)',
+              border: '1px solid var(--chrome-border)',
               borderRadius: 4,
             }}
             value={newShapeColor}
@@ -158,7 +158,7 @@ export function LibraryShapeForm({
               display: 'block',
               fontSize: 12,
               marginBottom: 4,
-              color: 'var(--text-muted)',
+              color: 'var(--chrome-text-dim)',
             }}
           >
             SVG Path Data (d attribute)
@@ -168,8 +168,8 @@ export function LibraryShapeForm({
             style={{
               width: '100%',
               padding: '6px 8px',
-              background: 'var(--bg-field)',
-              border: '1px solid var(--border)',
+              background: 'var(--chrome-bg)',
+              border: '1px solid var(--chrome-border)',
               color: '#fff',
               borderRadius: 4,
               fontFamily: 'monospace',
@@ -186,7 +186,7 @@ export function LibraryShapeForm({
               display: 'block',
               fontSize: 12,
               marginBottom: 4,
-              color: 'var(--text-muted)',
+              color: 'var(--chrome-text-dim)',
             }}
           >
             Default Width
@@ -196,8 +196,8 @@ export function LibraryShapeForm({
             style={{
               width: '100%',
               padding: '6px 8px',
-              background: 'var(--bg-field)',
-              border: '1px solid var(--border)',
+              background: 'var(--chrome-bg)',
+              border: '1px solid var(--chrome-border)',
               color: '#fff',
               borderRadius: 4,
             }}
@@ -211,7 +211,7 @@ export function LibraryShapeForm({
               display: 'block',
               fontSize: 12,
               marginBottom: 4,
-              color: 'var(--text-muted)',
+              color: 'var(--chrome-text-dim)',
             }}
           >
             Default Height
@@ -221,8 +221,8 @@ export function LibraryShapeForm({
             style={{
               width: '100%',
               padding: '6px 8px',
-              background: 'var(--bg-field)',
-              border: '1px solid var(--border)',
+              background: 'var(--chrome-bg)',
+              border: '1px solid var(--chrome-border)',
               color: '#fff',
               borderRadius: 4,
             }}
@@ -236,7 +236,7 @@ export function LibraryShapeForm({
               display: 'block',
               fontSize: 12,
               marginBottom: 4,
-              color: 'var(--text-muted)',
+              color: 'var(--chrome-text-dim)',
             }}
           >
             Icon ID (optional)
@@ -246,8 +246,8 @@ export function LibraryShapeForm({
             style={{
               width: '100%',
               padding: '6px 8px',
-              background: 'var(--bg-field)',
-              border: '1px solid var(--border)',
+              background: 'var(--chrome-bg)',
+              border: '1px solid var(--chrome-border)',
               color: '#fff',
               borderRadius: 4,
             }}
@@ -261,14 +261,14 @@ export function LibraryShapeForm({
       <div
         style={{
           padding: '12px',
-          background: 'var(--bg-field)',
+          background: 'var(--chrome-bg)',
           borderRadius: 4,
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
         }}
       >
-        <span style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
+        <span style={{ fontSize: 12, color: 'var(--chrome-text-dim)', marginBottom: 8 }}>
           Shape Preview:
         </span>
         <div style={{ position: 'relative', width: newShapeWidth, height: newShapeHeight }}>
@@ -309,7 +309,7 @@ export function LibraryShapeForm({
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: 13,
-              color: 'var(--text)',
+              color: 'var(--chrome-text)',
             }}
           >
             {newShapeName || 'Preview'}
@@ -336,8 +336,8 @@ export function LibraryShapeForm({
           style={{
             padding: '6px 14px',
             background: 'transparent',
-            border: '1px solid var(--border)',
-            color: 'var(--text-muted)',
+            border: '1px solid var(--chrome-border)',
+            color: 'var(--chrome-text-dim)',
             borderRadius: 4,
             cursor: 'pointer',
           }}

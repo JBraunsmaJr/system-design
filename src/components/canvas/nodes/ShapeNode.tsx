@@ -128,7 +128,7 @@ export function ShapeNode({
                 outline: 'none',
                 textAlign: 'center',
                 resize: 'none',
-                color: 'var(--text)',
+                color: 'var(--chrome-text)',
               }}
               value={data.label}
               onChange={(e) => onChangeText?.(id, e.target.value)}

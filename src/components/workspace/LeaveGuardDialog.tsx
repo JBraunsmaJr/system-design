@@ -39,7 +39,7 @@ export function LeaveGuardDialog({
             alignItems: 'center',
           }}
         >
-          <TriangleAlert size={18} style={{ color: 'var(--warning, #e0a84a)' }} />
+          <TriangleAlert size={18} style={{ color: 'var(--warning)' }} />
           You are the only one here with a saved copy
         </span>
       }

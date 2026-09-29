@@ -44,7 +44,7 @@ export function LibraryCreateForm({
             display: 'block',
             fontSize: 12,
             marginBottom: 4,
-            color: 'var(--text-muted)',
+            color: 'var(--chrome-text-dim)',
           }}
         >
           Library Name *
@@ -55,8 +55,8 @@ export function LibraryCreateForm({
           style={{
             width: '100%',
             padding: '6px 8px',
-            background: 'var(--bg-field)',
-            border: '1px solid var(--border)',
+            background: 'var(--chrome-bg)',
+            border: '1px solid var(--chrome-border)',
             color: '#fff',
             borderRadius: 4,
           }}
@@ -71,7 +71,7 @@ export function LibraryCreateForm({
             display: 'block',
             fontSize: 12,
             marginBottom: 4,
-            color: 'var(--text-muted)',
+            color: 'var(--chrome-text-dim)',
           }}
         >
           Description
@@ -81,8 +81,8 @@ export function LibraryCreateForm({
           style={{
             width: '100%',
             padding: '6px 8px',
-            background: 'var(--bg-field)',
-            border: '1px solid var(--border)',
+            background: 'var(--chrome-bg)',
+            border: '1px solid var(--chrome-border)',
             color: '#fff',
             borderRadius: 4,
           }}
@@ -98,7 +98,7 @@ export function LibraryCreateForm({
               display: 'block',
               fontSize: 12,
               marginBottom: 4,
-              color: 'var(--text-muted)',
+              color: 'var(--chrome-text-dim)',
             }}
           >
             Author / Team
@@ -108,8 +108,8 @@ export function LibraryCreateForm({
             style={{
               width: '100%',
               padding: '6px 8px',
-              background: 'var(--bg-field)',
-              border: '1px solid var(--border)',
+              background: 'var(--chrome-bg)',
+              border: '1px solid var(--chrome-border)',
               color: '#fff',
               borderRadius: 4,
             }}
@@ -124,7 +124,7 @@ export function LibraryCreateForm({
               display: 'block',
               fontSize: 12,
               marginBottom: 4,
-              color: 'var(--text-muted)',
+              color: 'var(--chrome-text-dim)',
             }}
           >
             License
@@ -134,8 +134,8 @@ export function LibraryCreateForm({
             style={{
               width: '100%',
               padding: '6px 8px',
-              background: 'var(--bg-field)',
-              border: '1px solid var(--border)',
+              background: 'var(--chrome-bg)',
+              border: '1px solid var(--chrome-border)',
               color: '#fff',
               borderRadius: 4,
             }}
@@ -165,8 +165,8 @@ export function LibraryCreateForm({
           style={{
             padding: '6px 14px',
             background: 'transparent',
-            border: '1px solid var(--border)',
-            color: 'var(--text-muted)',
+            border: '1px solid var(--chrome-border)',
+            color: 'var(--chrome-text-dim)',
             borderRadius: 4,
             cursor: 'pointer',
           }}

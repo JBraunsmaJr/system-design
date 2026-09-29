@@ -97,7 +97,7 @@ export function LibraryManagerModal({ isOpen, onClose }: LibraryManagerModalProp
         display: 'flex',
         flexDirection: 'column',
         boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
-        border: '1px solid var(--border, #2d3342)',
+        border: '1px solid var(--chrome-border)',
         overflow: 'hidden',
       }}
     >
@@ -108,11 +108,11 @@ export function LibraryManagerModal({ isOpen, onClose }: LibraryManagerModalProp
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '12px 18px',
-          borderBottom: '1px solid var(--border, #2d3342)',
+          borderBottom: '1px solid var(--chrome-border)',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Package size={18} style={{ color: 'var(--accent, #5B7CFA)' }} />
+          <Package size={18} style={{ color: 'var(--accent)' }} />
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Shape & Icon Libraries</h3>
         </div>
         <button
@@ -121,7 +121,7 @@ export function LibraryManagerModal({ isOpen, onClose }: LibraryManagerModalProp
           style={{
             background: 'transparent',
             border: 'none',
-            color: 'var(--text-muted)',
+            color: 'var(--chrome-text-dim)',
             cursor: 'pointer',
           }}
         >
@@ -137,7 +137,7 @@ export function LibraryManagerModal({ isOpen, onClose }: LibraryManagerModalProp
             background: validationResult.valid
               ? 'rgba(15, 163, 107, 0.15)'
               : 'rgba(240, 87, 140, 0.15)',
-            borderBottom: '1px solid var(--border, #2d3342)',
+            borderBottom: '1px solid var(--chrome-border)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
@@ -149,7 +149,7 @@ export function LibraryManagerModal({ isOpen, onClose }: LibraryManagerModalProp
             {validationResult.importedShapesCount} shape(s), {validationResult.importedIconsCount}{' '}
             icon(s) imported.
             {validationResult.errors.length > 0 && (
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+              <div style={{ fontSize: 11, color: 'var(--chrome-text-dim)', marginTop: 2 }}>
                 {validationResult.errors.join('; ')}
               </div>
             )}
@@ -160,7 +160,7 @@ export function LibraryManagerModal({ isOpen, onClose }: LibraryManagerModalProp
             style={{
               background: 'transparent',
               border: 'none',
-              color: 'var(--text)',
+              color: 'var(--chrome-text)',
               cursor: 'pointer',
               fontSize: 12,
             }}
@@ -257,7 +257,7 @@ export function LibraryManagerModal({ isOpen, onClose }: LibraryManagerModalProp
                 alignItems: 'center',
                 justifyContent: 'center',
                 height: '100%',
-                color: 'var(--text-muted)',
+                color: 'var(--chrome-text-dim)',
               }}
             >
               <Package size={36} style={{ marginBottom: 12, opacity: 0.4 }} />

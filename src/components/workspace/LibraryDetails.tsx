@@ -29,17 +29,17 @@ export function LibraryDetails({
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'flex-start',
-          borderBottom: '1px solid var(--border)',
+          borderBottom: '1px solid var(--chrome-border)',
           paddingBottom: 12,
         }}
       >
         <div>
           <h3 style={{ margin: '0 0 4px 0', fontSize: 18 }}>{selectedLib.library.name}</h3>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+          <div style={{ fontSize: 12, color: 'var(--chrome-text-dim)' }}>
             {selectedLib.library.description || 'No description provided.'}
           </div>
           {(selectedLib.library.author || selectedLib.library.license) && (
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+            <div style={{ fontSize: 11, color: 'var(--chrome-text-dim)', marginTop: 4 }}>
               {selectedLib.library.author && <span>Author: {selectedLib.library.author} • </span>}
               {selectedLib.library.license && <span>License: {selectedLib.library.license}</span>}
             </div>
@@ -54,9 +54,9 @@ export function LibraryDetails({
               gap: 4,
               padding: '5px 10px',
               fontSize: 12,
-              background: 'var(--bg-field)',
-              color: 'var(--text)',
-              border: '1px solid var(--border)',
+              background: 'var(--chrome-bg)',
+              color: 'var(--chrome-text)',
+              border: '1px solid var(--chrome-border)',
               borderRadius: 4,
               cursor: 'pointer',
             }}
@@ -126,7 +126,7 @@ export function LibraryDetails({
               background: 'rgba(0,0,0,0.1)',
               borderRadius: 4,
               fontSize: 12,
-              color: 'var(--text-muted)',
+              color: 'var(--chrome-text-dim)',
             }}
           >
             No custom shapes in this library yet. Click "Add Shape" to create one.
@@ -144,8 +144,8 @@ export function LibraryDetails({
                 key={s.id}
                 style={{
                   padding: 8,
-                  background: 'var(--bg-field)',
-                  border: '1px solid var(--border)',
+                  background: 'var(--chrome-bg)',
+                  border: '1px solid var(--chrome-border)',
                   borderRadius: 4,
                   display: 'flex',
                   flexDirection: 'column',
@@ -218,7 +218,7 @@ export function LibraryDetails({
               background: 'rgba(0,0,0,0.1)',
               borderRadius: 4,
               fontSize: 12,
-              color: 'var(--text-muted)',
+              color: 'var(--chrome-text-dim)',
             }}
           >
             No custom icons in this library yet. Click "Add Icon" to create one.
@@ -236,8 +236,8 @@ export function LibraryDetails({
                 key={icon.id}
                 style={{
                   padding: 6,
-                  background: 'var(--bg-field)',
-                  border: '1px solid var(--border)',
+                  background: 'var(--chrome-bg)',
+                  border: '1px solid var(--chrome-border)',
                   borderRadius: 4,
                   display: 'flex',
                   flexDirection: 'column',

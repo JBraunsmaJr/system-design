@@ -5,7 +5,7 @@
   background: var(--node-bg);
   border: 1px solid var(--chrome-border);
   border-radius: var(--radius-md);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--black) 40%, transparent);
   color: var(--chrome-text);
 }
 
@@ -14,7 +14,7 @@
   align-items: center;
   gap: 14px;
   padding: 8px 14px;
-  font-size: 13.5px;
+  font-size: var(--text-sm-plus);
 }
 
 .presentation-topbar__scenario {
@@ -23,7 +23,7 @@
 
 .presentation-topbar__progress {
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--chrome-text-dim);
 }
 
@@ -34,7 +34,7 @@
   color: var(--chrome-text);
   border-radius: var(--radius-sm);
   padding: 5px 12px;
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 
 .presentation-topbar button:hover {
@@ -56,11 +56,11 @@
 
 .presentation-bottombar__title {
   font-weight: 700;
-  font-size: 16px;
+  font-size: var(--text-lg);
 }
 
 .presentation-bottombar__narration {
-  font-size: 14px;
+  font-size: var(--text-base);
   color: var(--chrome-text);
   margin-top: 8px;
   line-height: 1.6;
@@ -82,10 +82,10 @@
 .presentation-bottombar__nav button {
   background: var(--accent);
   border: none;
-  color: white;
+  color: var(--white);
   border-radius: var(--radius-sm);
   padding: 8px 16px;
-  font-size: 13.5px;
+  font-size: var(--text-sm-plus);
   font-weight: 600;
   flex-shrink: 0;
 }
@@ -97,7 +97,7 @@
 
 .presentation-bottombar__counter {
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--chrome-text-dim);
   min-width: 40px;
   text-align: center;

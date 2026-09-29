@@ -51,7 +51,7 @@
 }
 
 .durability--alert .durability__chip:hover {
-  background: rgba(240, 87, 140, 0.1);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
   color: var(--danger);
 }
 
@@ -70,7 +70,7 @@
   color: var(--chrome-text);
   font-size: var(--text-sm);
   line-height: 1.45;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--black) 40%, transparent);
 }
 
 .durability--alert.durability__detail,
@@ -81,7 +81,7 @@
 .durability__detail p,
 .durability__message {
   margin: 0;
-  font-size: 12.5px;
+  font-size: var(--text-xs-plus);
   line-height: 1.45;
   color: var(--chrome-text);
 }
@@ -100,9 +100,9 @@
   border: 0;
   border-radius: var(--radius-sm);
   background: var(--accent);
-  color: #fff;
+  color: var(--white);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: 500;
   cursor: pointer;
   display: inline-flex;
@@ -163,7 +163,7 @@
   padding: 4px 0;
   border: 0;
   background: none;
-  color: var(--text-muted);
+  color: var(--chrome-text-dim);
   font: inherit;
   font-size: var(--text-xs);
   text-align: center;

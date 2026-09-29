@@ -247,14 +247,14 @@ export function DocumentManager({
       padding={0}
       style={{
         maxHeight: '85vh',
-        background: 'var(--chrome-bg-raised, #1e222b)',
-        color: 'var(--chrome-text, #e7e9ee)',
-        border: '1px solid var(--chrome-border, #2d3342)',
+        background: 'var(--chrome-bg-raised)',
+        color: 'var(--chrome-text)',
+        border: '1px solid var(--chrome-border)',
       }}
     >
       <div className="document-manager__header">
         <div className="document-manager__title-wrap">
-          <FileText size={18} style={{ color: 'var(--accent, #5B7CFA)' }} />
+          <FileText size={18} style={{ color: 'var(--accent)' }} />
           <strong>Documents in this browser</strong>
         </div>
         <div className="document-manager__header-actions">
@@ -288,10 +288,7 @@ export function DocumentManager({
                 The browser will keep this storage.
               </span>
             ) : (
-              <span
-                className="document-manager__not-persisted"
-                style={{ color: 'var(--warning, #e0a84a)' }}
-              >
+              <span className="document-manager__not-persisted" style={{ color: 'var(--warning)' }}>
                 The browser may clear this storage when space runs low. Export anything important.
               </span>
             )}

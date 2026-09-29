@@ -28,29 +28,29 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantStyles: Record<ButtonVariant, CSSProperties> = {
   primary: {
-    background: 'var(--accent, #5b7cfa)',
-    color: 'var(--accent-text, #ffffff)',
-    borderColor: 'var(--accent, #5b7cfa)',
+    background: 'var(--accent)',
+    color: 'var(--accent-text)',
+    borderColor: 'var(--accent)',
   },
   secondary: {
-    background: 'var(--chrome-bg, #14161c)',
-    color: 'var(--chrome-text, #e7e9ee)',
-    borderColor: 'var(--chrome-border, #2a2e3a)',
+    background: 'var(--chrome-bg)',
+    color: 'var(--chrome-text)',
+    borderColor: 'var(--chrome-border)',
   },
   ghost: {
     background: 'transparent',
-    color: 'var(--chrome-text-dim, #8b90a0)',
+    color: 'var(--chrome-text-dim)',
     borderColor: 'transparent',
   },
   danger: {
-    background: 'var(--danger, #f0578c)',
+    background: 'var(--danger)',
     color: '#ffffff',
-    borderColor: 'var(--danger, #f0578c)',
+    borderColor: 'var(--danger)',
   },
   'danger-outline': {
     background: 'transparent',
-    color: 'var(--danger, #f0578c)',
-    borderColor: 'var(--danger, #f0578c)',
+    color: 'var(--danger)',
+    borderColor: 'var(--danger)',
   },
 };
 
@@ -139,7 +139,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     alignItems: 'center',
     justifyContent: iconOnly ? 'center' : 'center',
     boxSizing: 'border-box',
-    borderRadius: 'var(--radius-sm, 6px)',
+    borderRadius: 'var(--radius-sm)',
     borderWidth: 1,
     borderStyle: 'solid',
     fontWeight: 500,

@@ -36,7 +36,7 @@ export function LibraryListSidebar({
     <div
       style={{
         width: 260,
-        borderRight: '1px solid var(--border, #2d3342)',
+        borderRight: '1px solid var(--chrome-border)',
         display: 'flex',
         flexDirection: 'column',
         background: 'rgba(0,0,0,0.1)',
@@ -47,7 +47,7 @@ export function LibraryListSidebar({
           padding: '10px 12px',
           display: 'flex',
           gap: 6,
-          borderBottom: '1px solid var(--border, #2d3342)',
+          borderBottom: '1px solid var(--chrome-border)',
         }}
       >
         <button
@@ -62,7 +62,7 @@ export function LibraryListSidebar({
             fontSize: 12,
             padding: '6px 8px',
             borderRadius: 4,
-            background: 'var(--accent, #5B7CFA)',
+            background: 'var(--accent)',
             color: '#fff',
             border: 'none',
             cursor: 'pointer',
@@ -84,9 +84,9 @@ export function LibraryListSidebar({
             padding: '6px 10px',
             fontSize: 12,
             borderRadius: 4,
-            background: 'var(--bg-field, #252a36)',
-            color: 'var(--text)',
-            border: '1px solid var(--border, #2d3342)',
+            background: 'var(--chrome-bg)',
+            color: 'var(--chrome-text)',
+            border: '1px solid var(--chrome-border)',
             cursor: 'pointer',
           }}
           title="Import Library (.json)"
@@ -108,7 +108,7 @@ export function LibraryListSidebar({
           style={{
             fontSize: 11,
             fontWeight: 600,
-            color: 'var(--text-muted)',
+            color: 'var(--chrome-text-dim)',
             padding: '4px 6px',
           }}
         >
@@ -119,7 +119,7 @@ export function LibraryListSidebar({
             padding: '6px 8px',
             borderRadius: 4,
             fontSize: 13,
-            color: 'var(--text-muted)',
+            color: 'var(--chrome-text-dim)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -133,14 +133,14 @@ export function LibraryListSidebar({
           style={{
             fontSize: 11,
             fontWeight: 600,
-            color: 'var(--text-muted)',
+            color: 'var(--chrome-text-dim)',
             padding: '8px 6px 4px 6px',
           }}
         >
           Custom Libraries ({libraries.length})
         </div>
         {libraries.length === 0 ? (
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '6px 8px' }}>
+          <div style={{ fontSize: 12, color: 'var(--chrome-text-dim)', padding: '6px 8px' }}>
             No custom libraries installed. Click "New Library" or "Import" to add one.
           </div>
         ) : (
@@ -154,7 +154,7 @@ export function LibraryListSidebar({
                   borderRadius: 4,
                   fontSize: 13,
                   cursor: 'pointer',
-                  background: isSelected ? 'var(--bg-active, #313848)' : 'transparent',
+                  background: isSelected ? 'var(--chrome-bg-active)' : 'transparent',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
@@ -191,7 +191,7 @@ export function LibraryListSidebar({
                     {lib.library.name}
                   </span>
                 </div>
-                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                <span style={{ fontSize: 11, color: 'var(--chrome-text-dim)' }}>
                   {lib.shapes.length}s / {lib.icons.length}i
                 </span>
               </div>
