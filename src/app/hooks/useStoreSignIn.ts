@@ -8,7 +8,7 @@ import { useStoreAuth } from '../../collab/hooks/useStoreIdentity';
  *
  * Performance contract (see src/app/README.md): this hook runs inside App's
  * render, so it adds no component, no render and no commit. Every value it
- * returns is either React state, a ref, or memoised with the same
+ * returns is either React state, a ref, or memoized with the same
  * dependencies it had in App.tsx. Callers destructure the result and depend
  * on the individual members - never on the returned object, which is new on
  * every render.

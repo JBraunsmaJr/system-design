@@ -65,6 +65,10 @@ export interface Census {
    * for scenarios that declare one (the modals, whose markup is the
    * product - the SRD preview is what becomes the PDF). */
   dom?: string;
+  /** Every run's commit and render totals, in run order. Not compared -
+   * kept so a scenario whose runs vary can be judged on its whole
+   * distribution rather than on its median. */
+  perRun?: { commits: number[]; renders: number[]; canvas: number[] };
 }
 type Results = Record<string, Census>;
 
@@ -72,6 +76,8 @@ const repoDir = resolve(arg('--repo', '.'));
 const outFile = resolve(arg('--out', join(repoDir, 'dist', 'view-renders.json')));
 const repeats = Math.max(1, Number(arg('--repeats', '3')));
 const port = Number(arg('--port', '4191'));
+/** Run only scenarios whose id starts with this prefix, e.g. `canvas/`. */
+const only = arg('--only', '');
 
 // ---------------------------------------------------------------------------
 // A deterministic document large enough to be representative
@@ -134,7 +140,7 @@ function buildDocument() {
     items.push({
       id: `REQ-${r}`,
       typeId: r % 5 === 0 ? 'risk' : 'requirement',
-      title: `Requirement ${r} ${r % 2 ? 'authentication' : 'audit'} behaviour`,
+      title: `Requirement ${r} ${r % 2 ? 'authentication' : 'audit'} behavior`,
       body: `The system shall do thing ${r}.`,
     });
   }
@@ -257,7 +263,7 @@ function installRenderHook() {
  * later (RequirementsView clears a search-match highlight after 2 s; autosave
  * is debounced by 1 s). With a short fixed delay that commit lands in
  * whichever scenario's window it happens to reach, so two builds with the
- * same behaviour report different per-scenario counts. Waiting for quiet
+ * same behavior report different per-scenario counts. Waiting for quiet
  * before AND after each action attributes every commit to the action that
  * caused it.
  */
@@ -293,10 +299,15 @@ async function measure(
   );
   if (domSelector) {
     census.dom = await page.evaluate((sel) => {
-      const el = document.querySelector(sel);
-      if (!el) return `<missing ${sel}>`;
+      // Every match, in document order: the canvas menu and its submenu are
+      // sibling portals. A single-element selector gives the same output as
+      // before.
+      const els = [...document.querySelectorAll(sel)];
+      if (els.length === 0) return `<missing ${sel}>`;
       return (
-        el.outerHTML
+        els
+          .map((el) => el.outerHTML)
+          .join('\n')
           // Captured diagram images are pixels, not markup.
           .replace(/(src|href)="(data|blob):[^"]*"/g, '$1="$2:..."')
           .replace(/url\((&quot;|")?data:[^)]*\)/g, 'url(data:...)')
@@ -319,6 +330,42 @@ async function typeSlowly(page: Page, selector: string, text: string) {
 
 const SRD = '.srd-modal-backdrop';
 const LIB = '.modal-overlay';
+const MENU = '.canvas-context-menu, .color-picker-panel, .icon-picker__panel';
+const menuItem = (label: string) => `.canvas-context-menu button:has-text("${label}")`;
+/*
+ * Right-clicking a node hovers it first, which opens its documentation
+ * popup, and the popup can sit over the menu. A real mouse hover then lands
+ * on the popup, so the menu is driven with dispatched events instead: React
+ * derives onMouseEnter from `mouseover`, and a dispatched `click` bubbles to
+ * the document listener that dismisses the menu exactly like a real one.
+ */
+const enterMenuItem = (p: Page, label: string) => p.dispatchEvent(menuItem(label), 'mouseover');
+const pointerToEmptyCanvas = async (p: Page) => {
+  const pane = await p.locator('.react-flow__pane').boundingBox();
+  if (!pane) throw new Error('no canvas pane');
+  await p.mouse.move(pane.x + pane.width - 40, pane.y + 40);
+};
+const gatewayCentre = async (p: Page) => {
+  const box = await p.locator('.react-flow__node:has-text("API Gateway")').boundingBox();
+  if (!box) throw new Error('API Gateway node not found');
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+};
+/*
+ * Hovering and right-clicking are separate steps. Done together, the hover's
+ * mousemove (a low-priority update for the documentation popup) and the
+ * contextmenu event (flushed immediately) raced: depending on scheduling
+ * they committed together or apart, so the same build reported 3 or 5
+ * commits. The hover is a setup step that settles first; the measured step
+ * right-clicks at the same point, so no mousemove is involved.
+ */
+const hoverGateway = async (p: Page) => {
+  const c = await gatewayCentre(p);
+  await p.mouse.move(c.x, c.y);
+};
+const rightClickGateway = async (p: Page) => {
+  const c = await gatewayCentre(p);
+  await p.mouse.click(c.x, c.y, { button: 'right' });
+};
 /** The SRD sidebar's tabs, in order: Doc, Layout, Snapshots, Theme, Headers. */
 const srdTab = (p: Page, index: number) =>
   p.click(`.srd-sidebar button.srd-btn-icon >> nth=${index}`);
@@ -329,10 +376,11 @@ type Scenario = {
   id: string;
   run: (page: Page) => Promise<void>;
   dom?: string;
-  /** Navigation between measured steps, not itself a measurement. Its
-   * counts are recorded but not compared: they depend on timing (see
-   * srd/to-diagram). The steps after it are stable, so the state it leaves
-   * is deterministic. */
+  /** Preparation between measured steps, not itself a measurement:
+   * recorded but never compared. Most only put the app into a known state
+   * (pointer on empty canvas, hovering a node); two are timing-dependent
+   * even on main (srd/to-diagram, canvas/menu-reopen - see each). The
+   * steps after every one of them are stable. */
   setup?: true;
 };
 
@@ -437,6 +485,29 @@ const SCENARIOS: Scenario[] = [
   },
   { id: 'lib/save-shape', dom: LIB, run: (p) => p.click(`${LIB} button:has-text("Save Shape")`) },
   { id: 'lib/close', run: (p) => p.keyboard.press('Escape') },
+  // --- Canvas right-click menu (DOM compared) ----------------------------
+  // Each right-click starts from the same state: pointer on empty canvas,
+  // documentation popup closed. Otherwise whether the popup is open when
+  // the menu opens depends on the previous step's hover timers.
+  { id: 'canvas/pointer-away', setup: true, run: pointerToEmptyCanvas },
+  { id: 'canvas/hover-gateway', setup: true, run: hoverGateway },
+  { id: 'canvas/menu-open', dom: MENU, run: rightClickGateway },
+  { id: 'canvas/color-submenu', dom: MENU, run: (p) => enterMenuItem(p, 'Change color') },
+  { id: 'canvas/icon-submenu', dom: MENU, run: (p) => enterMenuItem(p, 'Change icon') },
+  { id: 'canvas/back-to-color', dom: MENU, run: (p) => enterMenuItem(p, 'Change color') },
+  {
+    id: 'canvas/apply-color',
+    dom: MENU,
+    run: (p) => p.dispatchEvent('.color-picker-panel__grid button >> nth=2', 'click'),
+  },
+  { id: 'canvas/pointer-away-again', setup: true, run: pointerToEmptyCanvas },
+  { id: 'canvas/hover-gateway-again', setup: true, run: hoverGateway },
+  // Reopening only sets up menu-escape. It is not compared: even with the
+  // hover settled first, leftover documentation-popup timers from the
+  // steps before make its commit count vary on main (1 or 3 across 9
+  // runs). Opening the menu is measured, deterministically, by menu-open.
+  { id: 'canvas/menu-reopen', setup: true, run: rightClickGateway },
+  { id: 'canvas/menu-escape', dom: MENU, run: (p) => p.keyboard.press('Escape') },
 ];
 
 async function runOnce(appUrl: string, docJson: string): Promise<Results> {
@@ -461,6 +532,7 @@ async function runOnce(appUrl: string, docJson: string): Promise<Results> {
     await settle(page);
     const results: Results = {};
     for (const s of SCENARIOS) {
+      if (only && !s.id.startsWith(only)) continue;
       results[s.id] = await measure(page, () => s.run(page), s.dom);
     }
     return results;
@@ -537,6 +609,7 @@ async function main() {
     // Median per counter, per scenario; flag any scenario whose runs disagree.
     const results: Results = {};
     for (const s of SCENARIOS) {
+      if (only && !s.id.startsWith(only)) continue;
       const names = new Set(runs.flatMap((r) => Object.keys(r[s.id].byComponent)));
       const byComponent: Record<string, number> = {};
       for (const n of [...names].sort()) {
@@ -548,6 +621,11 @@ async function main() {
         renders: median(runs.map((r) => r[s.id].renders)),
         byComponent,
         ...(runs[0][s.id].dom !== undefined ? { dom: runs[0][s.id].dom } : {}),
+        perRun: {
+          commits: runs.map((r) => r[s.id].commits),
+          renders: runs.map((r) => r[s.id].renders),
+          canvas: runs.map((r) => r[s.id].byComponent.Canvas ?? 0),
+        },
       };
       const varied = new Set(runs.map((r) => JSON.stringify(r[s.id]))).size > 1;
       console.log(
@@ -576,7 +654,7 @@ function compare(beforePath: string, afterPath: string): number {
     const a = before[id];
     const b = after[id];
     if (setupIds.has(id)) {
-      console.log(`${id.padEnd(24)} setup step, not compared (timing-dependent)`);
+      console.log(`${id.padEnd(24)} setup step, not compared`);
       continue;
     }
     if (!a || !b) {

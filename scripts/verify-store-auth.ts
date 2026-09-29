@@ -28,7 +28,7 @@ import { verifyIdToken, TokenError } from '../store/src/auth/jwt.ts';
 import {
   startTestGitHub,
   startTestOidcProvider,
-  type Misbehaviour,
+  type Misbehavior,
 } from './lib/testIdentityProviders.ts';
 
 let failures = 0;
@@ -232,7 +232,7 @@ try {
       'and replaying the same callback is refused: state is single use',
     );
 
-    const misbehaviours: [Misbehaviour, string][] = [
+    const misbehaviors: [Misbehavior, string][] = [
       ['bad-signature', 'a token signed with the wrong key'],
       ['alg-none', 'an unsigned token (alg: none)'],
       ['wrong-audience', 'a token issued for another application'],
@@ -240,7 +240,7 @@ try {
       ['wrong-nonce', 'a token from a different sign-in'],
       ['no-id-token', 'a response with no ID token at all'],
     ];
-    for (const [mode, description] of misbehaviours) {
+    for (const [mode, description] of misbehaviors) {
       idp.misbehave(mode);
       const attempt = await signIn('oidc');
       check(attempt.cookie === null, `${description} is refused, with no session created`);

@@ -34,15 +34,15 @@ export interface SrdPrintModalProps {
 export type SrdModalState = ReturnType<typeof useSrdPrintModal>;
 
 /**
- * The SRD modal's state and behaviour: template and metadata editing,
+ * The SRD modal's state and behavior: template and metadata editing,
  * diagram and per-requirement snapshot capture, PDF and markdown export.
  * Moved unchanged from SrdPrintModal.tsx.
  *
  * Performance contract: this hook runs inside SrdPrintModal's render, so it
  * adds no component and no render. Everything it returns is state, a ref,
- * a memoised value, or a plain handler exactly as it was in the component.
+ * a memoized value, or a plain handler exactly as it was in the component.
  * The handlers are recreated every render, as before; none of the sections
- * receiving them is memoised, so that costs nothing extra.
+ * receiving them is memoized, so that costs nothing extra.
  */
 export function useSrdPrintModal({
   isOpen,

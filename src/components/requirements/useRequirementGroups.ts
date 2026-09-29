@@ -56,7 +56,7 @@ export interface UseRequirementGroupsOptions {
  *
  * Performance contract: this hook runs inside RequirementsView's render,
  * so it adds no component and no render. Everything it returns is state, a
- * ref, or memoised with the dependencies it had in RequirementsView.tsx.
+ * ref, or memoized with the dependencies it had in RequirementsView.tsx.
  * Destructure the result and depend on its members - never on the returned
  * object, which is new on every render.
  */

@@ -15,7 +15,7 @@ import { createServer, type Server } from 'http';
 import { createHash, createSign, generateKeyPairSync, randomBytes } from 'crypto';
 import type { AddressInfo } from 'net';
 
-export type Misbehaviour =
+export type Misbehavior =
   | 'none'
   | 'bad-signature'
   | 'wrong-audience'
@@ -32,7 +32,7 @@ export interface TestOidcProvider {
   clientId: string;
   clientSecret: string;
   /** What the next token exchange should do wrong. */
-  misbehave(mode: Misbehaviour): void;
+  misbehave(mode: Misbehavior): void;
   /** Who the provider says signed in. */
   setSubject(subject: string, name?: string): void;
   /** Extra claims for the next tokens - `groups` for WS14, or `_claim_names`
@@ -79,12 +79,12 @@ export async function startTestOidcProvider(
   const codes = new Map<string, PendingCode>();
   let subject = options.subject ?? 'user-1';
   let displayName = 'Test User';
-  let misbehaviour: Misbehaviour = 'none';
+  let misbehavior: Misbehavior = 'none';
   let extraClaims: Record<string, unknown> = {};
   let profileCompleted = false;
   let issuer = '';
 
-  const sign = (payload: Record<string, unknown>, mode: Misbehaviour): string => {
+  const sign = (payload: Record<string, unknown>, mode: Misbehavior): string => {
     const header =
       mode === 'alg-none' ? { alg: 'none', typ: 'JWT' } : { alg: 'RS256', typ: 'JWT', kid };
     const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
@@ -236,8 +236,8 @@ export async function startTestOidcProvider(
       if (computed !== pending.challenge)
         return json(400, { error: 'invalid_grant', error_description: 'PKCE mismatch' });
 
-      const mode = misbehaviour;
-      misbehaviour = 'none';
+      const mode = misbehavior;
+      misbehavior = 'none';
       if (mode === 'no-id-token') return json(200, { access_token: 'x', token_type: 'Bearer' });
       const nowSeconds = Math.floor(Date.now() / 1000);
       const payload = {
@@ -265,7 +265,7 @@ export async function startTestOidcProvider(
     clientId,
     clientSecret,
     misbehave(mode) {
-      misbehaviour = mode;
+      misbehavior = mode;
     },
     setSubject(next, name) {
       subject = next;

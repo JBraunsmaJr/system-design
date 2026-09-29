@@ -48,7 +48,7 @@ interface BacklogSectionProps {
 /**
  * Unscheduled items: searchable, and a drop target for unassigning.
  *
- * Moved unchanged from TimelineView.tsx. Not memoised, as before: it
+ * Moved unchanged from TimelineView.tsx. Not memoized, as before: it
  * re-renders with its parent exactly as it did when it lived there.
  */
 export function BacklogSection({

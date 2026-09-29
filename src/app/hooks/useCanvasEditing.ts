@@ -88,7 +88,7 @@ export interface UseCanvasEditingOptions {
  * projection memo, whose body moved to canvasProjection.ts.
  *
  * PERFORMANCE: every callback here reaches the canvas, and several go on to
- * every node and edge through CanvasContext or React Flow's memoised
+ * every node and edge through CanvasContext or React Flow's memoized
  * wrappers. A callback that changes identity on each render re-renders all
  * of them - on the techdebt/deconstruction branch a single-node drag went
  * from 23 node renders to 8,421 that way. Before adding a dependency to any
@@ -98,7 +98,7 @@ export interface UseCanvasEditingOptions {
  *
  * Performance contract (see src/app/README.md): this hook runs inside App's
  * render, so it adds no component, no render and no commit. Every value it
- * returns is either React state, a ref, or memoised with the same
+ * returns is either React state, a ref, or memoized with the same
  * dependencies it had in App.tsx. Callers destructure the result and depend
  * on the individual members - never on the returned object, which is new on
  * every render.

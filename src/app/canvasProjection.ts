@@ -17,7 +17,7 @@ import type { ArchNodeData, ArchEdgeData, EdgeWaypoint } from '../domain/canvas/
  * PERFORMANCE: these caches are module-level WeakMaps on purpose, and must
  * stay that way. They are what keeps an unchanged node the SAME object from
  * one render to the next, which is the only reason React Flow and the
- * memoised node components skip it (WS1-R8). Moving them into component
+ * memoized node components skip it (WS1-R8). Moving them into component
  * state or a ref would give each mounted App its own cache - harmless - but
  * moving them into a useMemo, or recreating them per call, would hand every
  * node a new object on every change and re-render all of them.

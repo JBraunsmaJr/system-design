@@ -4,7 +4,7 @@
  * The case that matters most is peer isolation: two documents syncing, one
  * user presses undo, and the other user's work must be untouched. That is
  * simulated here by exchanging Yjs updates directly rather than over WebRTC -
- * the merge behaviour is identical, and it runs in Node.
+ * the merge behavior is identical, and it runs in Node.
  */
 import * as Y from 'yjs';
 import { createUndoController } from './undoManager.ts';

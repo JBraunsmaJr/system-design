@@ -169,7 +169,7 @@ export interface ArchEdgeData extends Record<string, unknown> {
   /**
    * Bends the person has dragged into this edge's route, in order from
    * source to target. Undefined or empty both mean "route this edge
-   * automatically", which is the only behaviour that existed before
+   * automatically", which is the only behavior that existed before
    * waypoints did - so every diagram saved without them keeps rendering
    * exactly as it always has.
    *

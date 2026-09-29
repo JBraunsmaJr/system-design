@@ -23,7 +23,7 @@ interface SprintRowProps {
 /**
  * One sprint in a PI's sprint list: name, dates, reorder and delete.
  *
- * Moved unchanged from TimelineView.tsx. Not memoised, as before: it
+ * Moved unchanged from TimelineView.tsx. Not memoized, as before: it
  * re-renders with its parent exactly as it did when it lived there.
  */
 export function SprintRow({

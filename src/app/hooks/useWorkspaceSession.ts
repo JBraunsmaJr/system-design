@@ -28,7 +28,7 @@ export interface UseWorkspaceSessionOptions {
  *
  * Performance contract (see src/app/README.md): this hook runs inside App's
  * render, so it adds no component, no render and no commit. Every value it
- * returns is either React state, a ref, or memoised with the same
+ * returns is either React state, a ref, or memoized with the same
  * dependencies it had in App.tsx. Callers destructure the result and depend
  * on the individual members - never on the returned object, which is new on
  * every render.
@@ -90,7 +90,7 @@ export function useWorkspaceSession({
     if (!room || !key) return;
     // A deployment with no relay has no live sessions at all. The
     // document still saves to the workspace; people just do not see each
-    // other, which is the behaviour before any of this existed.
+    // other, which is the behavior before any of this existed.
     if (signalingUrls.length === 0) return;
     // Someone in a session they chose - started, or joined by link - is
     // left in it.

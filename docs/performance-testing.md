@@ -165,7 +165,7 @@ Output clearly identifies the failing scenario, the affected counter, the baseli
 
 To ensure the harness remains sensitive and effective, four reference anti-patterns are validated:
 
-1. **Unmemoized Context Menu**: Removing `useCallback` on `onNodeContextMenu` in `Canvas.tsx` (spikes `nodeRenders`).
+1. **Unmemoized Context Menu**: Removing `useCallback` on `onNodeContextMenu` in `src/components/canvas/useCanvasContextMenu.ts` (spikes `nodeRenders`).
 2. **Uncoalesced Node Drag**: Removing animation frame coalescing in node drags (spikes `storeWrites` and `snapshotBuilds`).
 3. **Unmemoized Edge Selector**: Changing `TypedEdge` to select entire node objects rather than position strings (spikes `edgeRenders`).
 4. **Uncoalesced Waypoint Drag**: Emitting store writes on raw pointer events during waypoint drags (spikes `storeWrites`).
@@ -180,18 +180,20 @@ tool,
 `scripts/measure-view-renders.ts`, built for proving that a refactor of those
 views changes nothing.
 
-For each of 38 interactions (plus one setup step, below) it records the
+For each of 44 interactions (plus six setup steps, below) it records the
 number of React commits and, per component name, how many times that
 component's render function ran:
 
 - Requirements and Timeline (14): opening each view, typing in search,
   stepping through matches, collapsing and expanding cards, board and
   Gantt, filtering by epic, searching the backlog, opening an item.
-- SRD modal (13): every tab, typing in fields, theme colour, preset, the
+- SRD modal (13): every tab, typing in fields, theme color, preset, the
   component and connection tables.
 - Library manager (11): creating a library, adding an icon and a shape.
+- Canvas right-click menu (6): opening it on a node, both submenus,
+  applying a color, dismissing it with Escape.
 
-For the modal interactions it also records the modal's rendered HTML, and
+For the modal and menu interactions it also records the rendered HTML, and
 `--compare` reports the first differing character. For the SRD the markup
 is the product: the preview is what becomes the PDF.
 
@@ -212,9 +214,14 @@ For those, the bar is that commits and every pre-existing component's count
 are identical, the HTML is byte-identical, and each new component renders
 exactly once per render of its parent, and only while it is shown.
 
-One step is marked `setup` and never compared: returning to the diagram
-view before the SRD scenarios. Remounting the canvas lets React Flow measure
-nodes through `ResizeObserver`, so its commit count varies even on `main`.
+Six steps are marked `setup` and never compared: they only prepare the
+next measured step. Four put the app into a known state (pointer on empty
+canvas, then hovering a node, before each right-click - hovering and
+right-clicking in one step raced, committing together or apart). Two vary
+even on `main` and are kept only for the state they leave: returning to the
+diagram view (React Flow measures nodes through `ResizeObserver`), and
+reopening the right-click menu (leftover documentation-popup timers). The
+steps after every setup step are stable.
 
 How it works, and why each choice matters:
 

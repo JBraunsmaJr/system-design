@@ -38,7 +38,7 @@ refactor.
 ### 2. Destructure hook results; never depend on the returned object
 
 Every hook here returns a fresh object on every render. Its _members_ are
-stable (state, refs, memoised values, `useCallback`s); the object is not.
+stable (state, refs, memoized values, `useCallback`s); the object is not.
 
 ```ts
 // Right: depends on a stable member.
@@ -67,8 +67,8 @@ repo's harness on the same machine:
 
 ### 3. Callbacks that reach the canvas must not change during a drag
 
-`Canvas` is not memoised, so every App render is a Canvas render. Callbacks
-it receives go on to React Flow's memoised node and edge wrappers and to
+`Canvas` is not memoized, so every App render is a Canvas render. Callbacks
+it receives go on to React Flow's memoized node and edge wrappers and to
 `CanvasContext`; a new identity there re-renders every node and edge. If a
 callback needs a value that changes during a drag (`nodes`, `path`,
 in-flight geometry), read it through a ref at call time, as

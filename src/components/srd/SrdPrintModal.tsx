@@ -21,10 +21,10 @@ import { SrdDocumentPreview } from './SrdDocumentPreview';
 import { useSrdPrintModal, type SrdPrintModalProps } from './useSrdPrintModal';
 
 /**
- * The Solution Requirement Document generator: a customisation sidebar and a
+ * The Solution Requirement Document generator: a customization sidebar and a
  * live preview of the document it will print or export.
  *
- * The state and behaviour live in useSrdPrintModal; each sidebar tab and
+ * The state and behavior live in useSrdPrintModal; each sidebar tab and
  * the preview are their own components, each receiving exactly the state
  * it reads.
  */

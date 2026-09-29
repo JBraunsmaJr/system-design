@@ -21,7 +21,7 @@ export interface UseDocumentStoresOptions {
  *
  * Performance contract (see src/app/README.md): this hook runs inside App's
  * render, so it adds no component, no render and no commit. Every value it
- * returns is either React state, a ref, or memoised with the same
+ * returns is either React state, a ref, or memoized with the same
  * dependencies it had in App.tsx. Callers destructure the result and depend
  * on the individual members - never on the returned object, which is new on
  * every render.
@@ -56,7 +56,7 @@ export function useDocumentStores({ activeSession, openDoc }: UseDocumentStoresO
    * The seams everything reads and writes through. Every mutating method runs
    * under the undo origin (undoableStore), so no call site can make an edit
    * that silently falls outside history. Memoised on the underlying store set,
-   * so identities are stable for useSyncExternalStore and memoised children.
+   * so identities are stable for useSyncExternalStore and memoized children.
    */
   const teamStore = useMemo(() => undoableStore(rawStores.team, undo), [rawStores, undo]);
   const requirementsStore = useMemo(

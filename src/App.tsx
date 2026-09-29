@@ -54,14 +54,14 @@ import './components/srd/SrdPrintModal.css';
  *   logic lives in hooks rather than in child components.
  * - Always destructure a hook's result, and depend on its members. Its
  *   returned object is new on every render: a callback or effect that lists
- *   it re-runs on every render, and anything memoised that receives it
+ *   it re-runs on every render, and anything memoized that receives it
  *   re-renders. That is what took techdebt/deconstruction from 23 node
  *   renders per drag to 8,421.
  * - Hook order is significant: effects run in declaration order, and some
  *   hooks read values only an earlier one produces. The order below keeps
  *   every effect in the same relative order it had when all of this lived in
  *   one function.
- * - Canvas is not memoised, so every render here is a Canvas render (the
+ * - Canvas is not memoized, so every render here is a Canvas render (the
  *   perf harness's canvasRenders counter). Never add state here that
  *   changes during a drag unless the canvas needs it.
  */

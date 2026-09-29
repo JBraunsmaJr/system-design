@@ -88,7 +88,7 @@ export interface DiagramStore {
    * still wrote React state directly, those writers would silently stop
    * affecting the canvas the moment the seam pointed at a Y.Doc: nothing
    * throws, the canvas just stops updating. Routing them here first makes that
-   * swap a change of implementation rather than a change of behaviour.
+   * swap a change of implementation rather than a change of behavior.
    */
   replaceAll(root: SubDiagram): void;
 

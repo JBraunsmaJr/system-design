@@ -6,7 +6,7 @@ import type { SrdModalState, SrdPrintModalProps } from './useSrdPrintModal';
  * The Doc tab: document metadata and the architecture snapshot controls.
  *
  * Moved unchanged from SrdPrintModal.tsx; its props are exactly the modal
- * state it reads. Not memoised: it re-renders whenever the modal does, as
+ * state it reads. Not memoized: it re-renders whenever the modal does, as
  * this markup did when it was inline, at the cost of one extra function
  * call per modal render.
  */

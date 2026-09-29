@@ -54,7 +54,7 @@ interface ProgramIncrementCardProps {
 /**
  * One Program Increment: its sprints, capacity and reservations.
  *
- * Moved unchanged from TimelineView.tsx. Not memoised, as before: it
+ * Moved unchanged from TimelineView.tsx. Not memoized, as before: it
  * re-renders with its parent exactly as it did when it lived there.
  */
 export function ProgramIncrementCard({

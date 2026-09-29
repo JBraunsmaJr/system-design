@@ -53,7 +53,7 @@ interface SprintBoardColumnProps {
 /**
  * One sprint on the board: its items, capacity, and drop handling.
  *
- * Moved unchanged from TimelineView.tsx. Not memoised, as before: it
+ * Moved unchanged from TimelineView.tsx. Not memoized, as before: it
  * re-renders with its parent exactly as it did when it lived there.
  */
 export function SprintBoardColumn({

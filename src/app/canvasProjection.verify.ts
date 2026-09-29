@@ -5,7 +5,7 @@
  *   npx tsx src/app/canvasProjection.verify.ts
  *
  * What this protects is object IDENTITY, not values. React Flow and the
- * memoised node and edge components skip anything whose object is the same
+ * memoized node and edge components skip anything whose object is the same
  * as last render (WS1-R8), so a projection that returns equal-but-new
  * objects looks correct on screen and silently re-renders every node on
  * every change. The browser perf harness catches that too, but only after a
@@ -117,7 +117,7 @@ const first = projectCanvasElements(input());
   assert(byId(selected.nodes, 'c') === byId(first.nodes, 'c'), 'so is every other one');
   assert(
     byId(selected.nodes, 'b').data === byId(first.nodes, 'b').data,
-    "selection alone keeps the node's data object, so memoised node bodies skip it",
+    "selection alone keeps the node's data object, so memoized node bodies skip it",
   );
   assert(
     selected.edges.every((e, i) => e === first.edges[i]),
