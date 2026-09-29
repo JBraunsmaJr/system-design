@@ -1,0 +1,702 @@
+/* ---------- Gantt chart ---------- */
+
+.gantt-chart {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.gantt-chart__empty {
+  padding: 40px;
+  text-align: center;
+  color: var(--chrome-text-dim);
+  font-size: 13px;
+}
+
+.gantt-conflicts {
+  flex-shrink: 0;
+  background: rgba(240, 87, 140, 0.06);
+  border-bottom: 1px solid rgba(240, 87, 140, 0.3);
+}
+
+.gantt-conflicts__header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  padding: 10px 16px;
+  color: var(--danger);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.gantt-conflicts__header span {
+  flex: 1;
+}
+
+.gantt-conflicts__list {
+  list-style: none;
+  margin: 0;
+  padding: 0 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gantt-conflicts__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: var(--chrome-bg-raised);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+}
+
+.gantt-conflicts__text {
+  flex: 1;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--chrome-text);
+}
+
+.gantt-conflicts__action {
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  border-radius: var(--radius-sm);
+  padding: 5px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.gantt-conflicts__action:hover {
+  background: rgba(240, 87, 140, 0.12);
+}
+
+.gantt-chart__scroll {
+  flex: 1;
+  overflow: auto;
+}
+
+.gantt-chart__inner {
+  position: relative;
+  min-height: 100%;
+}
+
+.gantt-chart__milestone-lines-layer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.gantt-chart__header-row {
+  display: flex;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--chrome-bg-raised);
+  border-bottom: 1px solid var(--chrome-border);
+}
+
+.gantt-chart__label-header {
+  flex-shrink: 0;
+  position: sticky;
+  left: 0;
+  z-index: 12;
+  background: var(--chrome-bg-raised);
+  border-right: 1px solid var(--chrome-border);
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--chrome-text-dim);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+}
+
+.gantt-chart__resizer {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  bottom: 0;
+  width: 7px;
+  cursor: col-resize;
+  z-index: 20;
+  background: transparent;
+  transition: background 0.15s ease;
+}
+
+.gantt-chart__resizer:hover,
+.gantt-chart__resizer.is-dragging {
+  background: var(--accent);
+}
+
+.gantt-chart__bands {
+  position: relative;
+  height: 40px;
+  flex-shrink: 0;
+}
+
+.gantt-chart__band {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 8px;
+  border-left: 1px solid var(--chrome-border);
+  overflow: hidden;
+}
+
+.gantt-chart__band-sprint {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--chrome-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gantt-chart__band-pi {
+  font-size: 11.5px;
+  color: var(--chrome-text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gantt-chart__rows {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+}
+
+.gantt-chart__no-items {
+  padding: 16px;
+  color: var(--chrome-text-dim);
+  font-size: 13.5px;
+}
+
+.gantt-chart__row {
+  display: flex;
+  border-bottom: 1px solid var(--chrome-border);
+}
+
+.gantt-chart__label {
+  flex-shrink: 0;
+  position: sticky;
+  left: 0;
+  z-index: 6;
+  background: var(--chrome-bg);
+  border-right: 1px solid var(--chrome-border);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  overflow: hidden;
+}
+
+.gantt-chart__label-id {
+  flex-shrink: 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.gantt-chart__label-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--chrome-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gantt-chart__label-warning {
+  flex-shrink: 0;
+  color: var(--danger);
+}
+
+.gantt-chart__track {
+  position: relative;
+  min-height: 34px;
+}
+
+.gantt-chart__bar {
+  position: absolute;
+  top: 5px;
+  height: 24px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  background: var(--chrome-bg-raised);
+  border: 1px solid var(--chrome-border);
+  border-left-width: 3px;
+  border-radius: 4px;
+  font-size: 12.5px;
+  color: var(--chrome-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+
+.gantt-chart__bar:hover {
+  background: var(--chrome-bg);
+}
+
+.gantt-chart__bar.is-conflicted {
+  border-color: var(--danger);
+  border-left-width: 3px;
+  box-shadow: 0 0 0 1px rgba(240, 87, 140, 0.4);
+}
+
+/* ---------- Sprint board & Gantt: same-sprint "risk" (distinct from a hard "blocked") ---------- */
+
+.pi-board-column.is-at-risk {
+  border-color: rgba(242, 153, 74, 0.45);
+  background: rgba(242, 153, 74, 0.05);
+}
+
+.pi-board-column.is-at-risk .pi-board-column__header {
+  background: rgba(242, 153, 74, 0.08);
+  border-bottom-color: rgba(242, 153, 74, 0.25);
+}
+
+.pi-board-column.is-drag-over-risk,
+.pi-board-column.is-at-risk.is-drag-over {
+  border-color: #f2994a;
+  background: rgba(242, 153, 74, 0.15);
+  box-shadow:
+    0 0 0 1px #f2994a,
+    inset 0 0 16px rgba(242, 153, 74, 0.12);
+}
+
+.pi-board-column__blocked-banner.is-risk {
+  background: rgba(242, 153, 74, 0.15);
+  border-bottom-color: rgba(242, 153, 74, 0.35);
+  color: #f5b06e;
+}
+
+.pi-board-column__blocked-banner.is-risk .pi-board-column__blocked-icon {
+  color: #f2994a;
+}
+
+.pi-board-item.is-at-risk {
+  border-color: #f2994a;
+  box-shadow: 0 0 0 1px rgba(242, 153, 74, 0.35);
+}
+
+.pi-board-item__risk-warning {
+  color: #f2994a;
+  flex-shrink: 0;
+}
+
+.gantt-conflicts.is-risk-only {
+  background: rgba(242, 153, 74, 0.06);
+  border-bottom-color: rgba(242, 153, 74, 0.3);
+}
+
+.gantt-conflicts.is-risk-only .gantt-conflicts__header {
+  color: #f2994a;
+}
+
+.gantt-conflicts__item.is-risk {
+  border-left: 2px solid #f2994a;
+}
+
+.gantt-chart__label-risk {
+  flex-shrink: 0;
+  color: #f2994a;
+}
+
+.gantt-chart__bar.is-at-risk {
+  border-color: #f2994a;
+  border-left-width: 3px;
+  box-shadow: 0 0 0 1px rgba(242, 153, 74, 0.4);
+}
+
+/* ---------- Gantt Chart Milestones Track ---------- */
+
+.gantt-chart__top-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--chrome-bg-raised);
+}
+
+.gantt-chart__milestones-row {
+  display: flex;
+  border-bottom: 1px solid var(--chrome-border);
+  background: var(--chrome-bg-raised);
+  position: relative;
+}
+
+.gantt-chart__milestones-label {
+  flex-shrink: 0;
+  position: sticky;
+  left: 0;
+  z-index: 12;
+  background: var(--chrome-bg-raised);
+  border-right: 1px solid var(--chrome-border);
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #9061f9;
+}
+
+.gantt-chart__milestone-header-icon {
+  color: #9061f9;
+  flex-shrink: 0;
+}
+
+.gantt-chart__milestones-track {
+  position: relative;
+}
+
+.gantt-chart__milestone-anchor {
+  position: absolute;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.gantt-chart__milestone-marker {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--chrome-bg-raised);
+  border: 1.5px solid;
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  transition: all 0.15s ease;
+}
+
+.gantt-chart__milestone-marker:hover,
+.gantt-chart__milestone-marker:focus-visible {
+  transform: scale(1.05);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
+  outline: 2px solid var(--accent);
+}
+
+.gantt-chart__milestone-shape {
+  color: #fff;
+  border-radius: 50%;
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.gantt-chart__milestone-icon {
+  display: flex;
+  align-items: center;
+}
+
+.gantt-chart__milestone-name {
+  color: var(--chrome-text);
+  font-weight: 600;
+}
+
+.gantt-chart__milestone-version {
+  font-size: 11px;
+  color: var(--chrome-text-dim);
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  padding: 0 4px;
+  font-family: var(--mono);
+}
+
+.gantt-chart__milestone-badge {
+  background: rgba(91, 124, 250, 0.2);
+  color: var(--accent);
+  border-radius: 999px;
+  padding: 0 5px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.gantt-chart__milestone-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  opacity: 0.75;
+  border-left: 1.5px dashed;
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* ---------- Gantt Chart Epics & Non-Workable Section ---------- */
+
+.gantt-chart__epics-section {
+  border-bottom: 1px solid var(--chrome-border);
+  background: transparent;
+}
+
+.gantt-chart__epics-header-row {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--chrome-border);
+  background: transparent;
+}
+
+.gantt-chart__epics-toggle-label {
+  flex-shrink: 0;
+  position: sticky;
+  left: 0;
+  z-index: 12;
+  background: var(--chrome-bg-raised);
+  border-right: 1px solid var(--chrome-border);
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #8b5cf6;
+  cursor: pointer;
+  border: none;
+  text-align: left;
+}
+
+.gantt-chart__epics-toggle-label:hover {
+  background: var(--chrome-bg);
+}
+
+.gantt-chart__epic-row {
+  display: flex;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  min-height: 36px;
+  align-items: center;
+  background: transparent;
+}
+
+.gantt-chart__epic-label {
+  flex-shrink: 0;
+  position: sticky;
+  left: 0;
+  z-index: 8;
+  background: var(--chrome-bg-raised);
+  border-right: 1px solid var(--chrome-border);
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gantt-chart__epic-bar {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  z-index: 3;
+}
+
+.gantt-chart__epic-bar--solid {
+  background: rgba(139, 92, 246, 0.25);
+  border: 1.5px solid #8b5cf6;
+  color: #ddd6fe;
+}
+
+.gantt-chart__epic-bar--solid:hover {
+  background: rgba(139, 92, 246, 0.38);
+}
+
+.gantt-chart__epic-bar--open-ended {
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.25) 0%, rgba(139, 92, 246, 0.05) 100%);
+  border: 1.5px dashed #8b5cf6;
+  border-right: none;
+  color: #ddd6fe;
+}
+
+.gantt-chart__epic-bar--open-ended:hover {
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.35) 0%, rgba(139, 92, 246, 0.12) 100%);
+}
+
+.gantt-chart__epic-status-badge {
+  font-size: 10px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: var(--mono);
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* ---------- Gantt Chart Grouping Controls & Rows ---------- */
+
+.gantt-chart__controls-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: var(--chrome-bg-raised);
+  border-bottom: 1px solid var(--chrome-border);
+  gap: 12px;
+}
+
+.gantt-chart__grouping-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gantt-chart__control-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--chrome-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.gantt-chart__group-btn-group {
+  display: inline-flex;
+  align-items: center;
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  gap: 2px;
+}
+
+.gantt-chart__group-btn {
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 3px;
+  border: none;
+  background: transparent;
+  color: var(--chrome-text-dim);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.gantt-chart__group-btn:hover {
+  color: var(--chrome-text);
+}
+
+.gantt-chart__group-btn.is-active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.gantt-chart__group-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.gantt-chart__group-header-row {
+  display: flex;
+  border-bottom: 1px solid var(--chrome-border);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.gantt-chart__group-toggle-label {
+  flex-shrink: 0;
+  position: sticky;
+  left: 0;
+  z-index: 6;
+  background: var(--chrome-bg-raised);
+  border-right: 1px solid var(--chrome-border);
+  border-top: none;
+  border-bottom: none;
+  border-left: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  overflow: hidden;
+  text-align: left;
+  cursor: pointer;
+  color: var(--chrome-text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.gantt-chart__group-toggle-label:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.gantt-chart__group-color-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.gantt-chart__group-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gantt-chart__group-badge {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--chrome-text-dim);
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  padding: 1px 5px;
+  flex-shrink: 0;
+}
+
+.gantt-chart__group-track {
+  background: rgba(255, 255, 255, 0.015);
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.06);
+}

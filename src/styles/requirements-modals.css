@@ -1,0 +1,756 @@
+/* ---------- Requirement linker (Inspector) ---------- */
+
+.requirement-linker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.requirement-linker__pills {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.requirement-linker__pill {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  padding: 4px 4px 4px 8px;
+  background: var(--chrome-bg);
+}
+
+.requirement-linker__pill-label {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  text-align: left;
+  font-size: 12.5px;
+  font-family: var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.requirement-linker__pill-label:hover {
+  text-decoration: underline;
+}
+
+.requirement-linker__pill-remove {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--chrome-text-dim);
+}
+
+.requirement-linker__pill-remove:hover {
+  color: var(--danger);
+  background: rgba(240, 87, 140, 0.1);
+}
+
+.requirement-linker__add {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  background: transparent;
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  padding: 5px 9px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--chrome-text-dim);
+}
+
+.requirement-linker__add:hover {
+  background: var(--chrome-bg);
+  color: var(--chrome-text);
+}
+
+.requirement-linker__dropdown {
+  z-index: 200;
+  width: 240px;
+  max-height: 280px;
+  display: flex;
+  flex-direction: column;
+  background: var(--chrome-bg-raised);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  padding: 6px;
+}
+
+.requirement-linker__search {
+  width: 100%;
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  color: var(--chrome-text);
+  font-size: 13px;
+  margin-bottom: 6px;
+  flex-shrink: 0;
+}
+
+.requirement-linker__list {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.requirement-linker__option {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 8px;
+  text-align: left;
+  width: 100%;
+}
+
+.requirement-linker__option:hover {
+  background: var(--chrome-bg);
+}
+
+.requirement-linker__option-id {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.requirement-linker__option-title {
+  font-size: 13px;
+  color: var(--chrome-text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.requirement-linker__empty {
+  padding: 8px;
+  margin: 0;
+  color: var(--chrome-text-dim);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* ---------- Requirement detail modal ---------- */
+
+.requirement-detail-modal {
+  width: 620px;
+  max-width: calc(100vw - 40px);
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--chrome-bg-raised);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+  animation: modal-pop 0.15s ease-out;
+}
+
+@keyframes modal-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.requirement-detail-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--chrome-border);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.requirement-detail-modal__tags {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.requirement-detail-modal__id {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  border: 1px solid;
+  border-radius: 5px;
+  padding: 2px 7px;
+  line-height: 1.2;
+}
+
+.requirement-detail-modal__type-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--chrome-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.requirement-detail-modal__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.requirement-detail-modal__action-btn {
+  background: transparent;
+  border: none;
+  color: var(--chrome-text-dim);
+  padding: 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    color 0.12s ease,
+    background 0.12s ease;
+}
+
+.requirement-detail-modal__action-btn:hover {
+  color: var(--chrome-text);
+  background: var(--chrome-bg);
+}
+
+.requirement-detail-modal__action-btn--delete:hover {
+  color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.12);
+}
+
+.requirement-detail-modal__sprint-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-size: 13px;
+  color: var(--chrome-text-dim);
+  background: rgba(0, 0, 0, 0.12);
+  border-bottom: 1px solid var(--chrome-border);
+}
+
+.requirement-detail-modal__dates {
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+
+/* The body is a scrolling column, so its children must not be shrinkable.
+   Flex items default to flex-shrink: 1, so once the content exceeded the
+   modal's 85vh the browser compressed them to fit instead of letting the
+   body scroll. That alone would only look cramped - what made it spill
+   is that the compressed item is .requirement-editor, whose textarea
+   carries an explicit inline height from its auto-sizing. The textarea
+   isn't a flex item, so it kept that height while its parent shrank
+   underneath it, and rendered straight over the relationships below.
+
+   flex-shrink: 0 makes every child keep its natural height and hands the
+   overflow to the body's own overflow-y: auto, which is what should have
+   been absorbing it all along. The same squashing affected the read-only
+   view too - .requirement-detail-modal__body-wrap has a min-height but no
+   max, so long markdown overflowed it identically. */
+.requirement-detail-modal__body > * {
+  flex-shrink: 0;
+}
+
+.requirement-detail-modal__body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.requirement-detail-modal__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--chrome-text);
+  line-height: 1.35;
+}
+
+.requirement-detail-modal__title-input {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--chrome-text);
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm, 4px);
+  padding: 8px 10px;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.12s ease;
+}
+
+.requirement-detail-modal__title-input:focus {
+  border-color: var(--accent);
+}
+
+.requirement-detail-modal__desc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.requirement-detail-modal__desc-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--chrome-text-dim);
+}
+
+.requirement-detail-modal__edit-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 1px solid var(--chrome-border);
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 12.5px;
+  color: var(--chrome-text-dim);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.requirement-detail-modal__edit-toggle:hover {
+  color: var(--chrome-text);
+  border-color: var(--chrome-text-dim);
+  background: var(--chrome-bg);
+}
+
+.requirement-detail-modal__desc-content {
+  min-height: 100px;
+}
+
+.requirement-detail-modal__body-wrap {
+  padding: 10px 12px;
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm, 4px);
+  min-height: 120px;
+  cursor: text;
+}
+
+/* ---------- Relationship manager (Requirements) ---------- */
+
+/* ---------- Relationships section (requirement detail modal) ---------- */
+
+.requirement-detail-modal__relationships {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ---------- Relationship manager (Requirements) ---------- */
+
+.relationship-manager {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+/* Grouped layout: one row per verb, with that verb's targets wrapping
+   inside it. The previous layout was one full-width row per relationship,
+   so ten relationships meant ten rows of mostly-repeated verb labels. */
+.relationship-manager__groups {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.relationship-manager__group {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-left: 8px;
+  border-bottom: 1px solid var(--chrome-border);
+  padding: 4px 0px;
+}
+
+/* Fixed-ish column so the verbs line up down the left edge and the target
+   chips all start at the same x, which is what makes the grouped version
+   scannable rather than just denser. max-width keeps an unusually long
+   custom verb from eating the row. */
+.relationship-manager__group-verb {
+  flex: 0 0 auto;
+  min-width: 84px;
+  max-width: 140px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.relationship-manager__group-targets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+  padding-bottom: 8px;
+}
+
+.relationship-manager__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  padding: 1px 2px 1px 6px;
+  background: var(--chrome-bg);
+}
+
+/* Truncated rather than wrapped: a single long requirement title would
+   otherwise force the chip to full width and undo the grouping. The full
+   text is still available via the title attribute and on the item itself. */
+.relationship-manager__chip-target {
+  min-width: 0;
+  max-width: 260px;
+  background: transparent;
+  border: none;
+  padding: 1px 0;
+  font-size: 12px;
+  color: var(--chrome-text);
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.relationship-manager__chip-target:hover {
+  color: var(--accent);
+}
+
+.relationship-manager__chip-remove {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  padding: 2px;
+  color: var(--chrome-text-dim);
+}
+
+.relationship-manager__chip-remove:hover {
+  color: var(--danger);
+  background: rgba(240, 87, 140, 0.1);
+}
+
+.relationship-manager__add {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  background: transparent;
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  padding: 5px 9px;
+  margin-left: 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--chrome-text-dim);
+}
+
+.relationship-manager__add:hover {
+  background: var(--chrome-bg);
+  color: var(--chrome-text);
+}
+
+.relationship-manager__dropdown {
+  z-index: 200;
+  width: 320px;
+  max-height: 380px;
+  display: flex;
+  flex-direction: column;
+  background: var(--chrome-bg-raised);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-md, 8px);
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.45),
+    0 2px 6px rgba(0, 0, 0, 0.2);
+  padding: 8px;
+}
+
+.relationship-manager__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--chrome-border);
+}
+
+.relationship-manager__header-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--chrome-text-dim);
+  flex-shrink: 0;
+}
+
+.relationship-manager__type-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--chrome-text);
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background-color 0.15s;
+}
+
+.relationship-manager__type-btn:hover {
+  border-color: var(--accent);
+}
+
+.relationship-manager__type-btn.is-open {
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.relationship-manager__verb-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.relationship-manager__verb-name {
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.relationship-manager__type-chevron {
+  color: var(--chrome-text-dim);
+  flex-shrink: 0;
+}
+
+.relationship-manager__verb-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.relationship-manager__section-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--chrome-text-dim);
+  padding: 2px 4px 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.relationship-manager__verb-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.relationship-manager__verb-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  font-size: 12.5px;
+  color: var(--chrome-text);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 0.12s,
+    border-color 0.12s;
+}
+
+.relationship-manager__verb-option:hover {
+  background: var(--chrome-bg);
+  border-color: var(--chrome-border);
+}
+
+.relationship-manager__verb-option.is-selected {
+  background: rgba(255, 255, 255, 0.06);
+  font-weight: 600;
+}
+
+.relationship-manager__verb-option-label {
+  flex: 1;
+}
+
+.relationship-manager__check-icon {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.relationship-manager__search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.relationship-manager__search-icon {
+  position: absolute;
+  left: 8px;
+  color: var(--chrome-text-dim);
+  pointer-events: none;
+}
+
+.relationship-manager__search-input {
+  width: 100%;
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 26px 6px 26px;
+  color: var(--chrome-text);
+  font-size: 12.5px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.relationship-manager__search-input:focus {
+  border-color: var(--accent);
+}
+
+.relationship-manager__search-clear {
+  position: absolute;
+  right: 6px;
+  background: transparent;
+  border: none;
+  color: var(--chrome-text-dim);
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.relationship-manager__search-clear:hover {
+  color: var(--chrome-text);
+}
+
+.relationship-manager__error {
+  margin: 0 0 6px;
+  padding: 4px 6px;
+  background: rgba(240, 87, 140, 0.1);
+  border: 1px solid rgba(240, 87, 140, 0.3);
+  border-radius: var(--radius-sm);
+  color: var(--danger);
+  font-size: 11.5px;
+}
+
+.relationship-manager__list {
+  overflow-y: auto;
+  max-height: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.relationship-manager__option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 5px 6px;
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+  transition:
+    background-color 0.12s,
+    border-color 0.12s;
+}
+
+.relationship-manager__option:hover {
+  background: var(--chrome-bg);
+  border-color: var(--chrome-border);
+}
+
+.relationship-manager__option-id {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--chrome-text-dim);
+  border: 1px solid var(--chrome-border);
+  border-radius: 3px;
+  padding: 1px 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.relationship-manager__option-title {
+  font-size: 12.5px;
+  color: var(--chrome-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.relationship-manager__option-add {
+  color: var(--chrome-text-dim);
+  opacity: 0;
+  transition:
+    opacity 0.12s,
+    color 0.12s;
+  flex-shrink: 0;
+}
+
+.relationship-manager__option:hover .relationship-manager__option-add {
+  opacity: 1;
+  color: var(--accent);
+}
+
+.relationship-manager__empty {
+  padding: 12px 8px;
+  margin: 0;
+  color: var(--chrome-text-dim);
+  font-size: 12px;
+  text-align: center;
+}

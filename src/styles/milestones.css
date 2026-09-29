@@ -1,0 +1,835 @@
+/* ==========================================================================
+   Scheduled Releases and Timeline Milestones (Issue #32)
+   ========================================================================== */
+
+/* ---------- Milestones Board Section ---------- */
+
+.milestones-section {
+  flex-shrink: 0;
+  background: var(--chrome-bg-raised);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-md, 8px);
+  margin-bottom: 0;
+  overflow: hidden;
+}
+
+.milestones-section__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(144, 97, 249, 0.05);
+  border-bottom: 1px solid var(--chrome-border);
+}
+
+.milestones-section__collapse-toggle {
+  background: none;
+  border: none;
+  color: var(--chrome-text-dim);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+}
+
+.milestones-section__icon {
+  color: #9061f9;
+}
+
+.milestones-section__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--chrome-text);
+}
+
+.milestones-section__count {
+  background: rgba(144, 97, 249, 0.15);
+  color: #9061f9;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 999px;
+  min-width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.milestones-section__add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 1px dashed rgba(144, 97, 249, 0.4);
+  color: #9061f9;
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  margin-left: auto;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.milestones-section__add-btn:hover {
+  background: rgba(144, 97, 249, 0.15);
+  border-color: #9061f9;
+}
+
+.milestones-section__items {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  min-height: 56px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.milestones-section__empty {
+  font-size: 13px;
+  color: var(--chrome-text-dim);
+  margin: 4px 0;
+}
+
+.milestones-section__card {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-left-width: 4px;
+  border-radius: var(--radius-sm, 6px);
+  padding: 8px 10px;
+  min-width: 170px;
+  max-width: 260px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.milestones-section__card:hover {
+  background: var(--chrome-bg-hover, rgba(255, 255, 255, 0.04));
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.milestones-section__card-header {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.milestones-section__card-shape {
+  font-size: 10px;
+}
+
+.milestones-section__card-type {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 11px;
+}
+
+.milestones-section__card-version {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--chrome-border);
+  border-radius: 3px;
+  padding: 0 4px;
+  font-size: 11.5px;
+  color: var(--chrome-text-dim);
+  margin-left: auto;
+  font-family: var(--mono);
+}
+
+.milestones-section__card-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--chrome-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.milestones-section__card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--chrome-text-dim);
+  margin-top: 2px;
+}
+
+.milestones-section__card-date {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.milestones-section__card-work-badge {
+  background: rgba(91, 124, 250, 0.12);
+  color: var(--accent);
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+/* ---------- Milestone Detail Modal & Add Milestone Modal ---------- */
+
+.milestone-detail-modal,
+.add-milestone-modal {
+  background: var(--chrome-bg-raised);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-md, 8px);
+  width: 75vw;
+  max-width: calc(100vw - 40px);
+  max-height: calc(100vh - 60px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  animation: modalEnter 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.milestone-detail-modal__header,
+.add-milestone-modal__header {
+  padding: 16px 20px;
+  border-top: 4px solid #9061f9;
+  border-bottom: 1px solid var(--chrome-border);
+  background: var(--chrome-bg);
+}
+
+.milestone-detail-modal__title-row,
+.add-milestone-modal__title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.milestone-detail-modal__type-badge,
+.add-milestone-modal__type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.milestone-detail-modal__version-badge {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--chrome-border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 12px;
+  font-family: var(--mono);
+  color: var(--chrome-text-dim);
+}
+
+.milestone-detail-modal__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.milestone-detail-modal__close-btn,
+.add-milestone-modal__close-btn {
+  background: none;
+  border: none;
+  color: var(--chrome-text-dim);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  transition: color 0.15s ease;
+}
+
+.milestone-detail-modal__close-btn:hover,
+.add-milestone-modal__close-btn:hover {
+  color: var(--chrome-text);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.milestone-detail-modal__name {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--chrome-text);
+}
+
+.add-milestone-modal__subtitle {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--chrome-text-dim);
+}
+
+.milestone-detail-modal__meta-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--chrome-text-dim);
+}
+
+.milestone-detail-modal__meta-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.milestone-detail-modal__inline-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--chrome-text-dim);
+}
+
+.milestone-detail-modal__meta-icon,
+.add-milestone-modal__field-icon {
+  color: var(--chrome-text-dim);
+  flex-shrink: 0;
+}
+
+.milestone-detail-modal__input,
+.add-milestone-modal__input,
+.milestone-detail-modal__select,
+.milestone-detail-modal__date-input {
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm, 6px);
+  padding: 6px 10px;
+  color: var(--chrome-text);
+  font-size: 13.5px;
+  box-sizing: border-box;
+  color-scheme: dark;
+}
+
+.milestone-detail-modal__date-input::-webkit-calendar-picker-indicator,
+.add-milestone-modal__input::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.75;
+  filter: invert(48%) sepia(79%) saturate(2476%) hue-rotate(209deg) brightness(98%) contrast(97%);
+  transition:
+    opacity 0.15s ease,
+    filter 0.15s ease;
+}
+
+.milestone-detail-modal__date-input::-webkit-calendar-picker-indicator:hover,
+.add-milestone-modal__input::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+  filter: invert(65%) sepia(85%) saturate(3000%) hue-rotate(209deg) brightness(110%) contrast(100%);
+}
+
+.milestone-detail-modal__input--sm {
+  width: 90px;
+  padding: 4px 8px;
+  font-size: 12.5px;
+}
+
+.milestone-detail-modal__color-input {
+  width: 28px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--chrome-border);
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+}
+
+.milestone-detail-modal__body,
+.add-milestone-modal__body {
+  padding: 18px 20px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.milestone-detail-modal__section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.milestone-detail-modal__section-title {
+  margin: 0 0 6px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--chrome-text);
+}
+
+.milestone-detail-modal__desc {
+  font-size: 13.5px;
+  color: var(--chrome-text);
+  line-height: 1.5;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.milestone-detail-modal__desc-wrap {
+  min-height: 38px;
+  cursor: text;
+}
+
+.milestone-detail-modal__desc-empty {
+  font-size: 13px;
+  color: var(--chrome-text-dim);
+  font-style: italic;
+  margin: 0;
+}
+
+.milestone-detail-modal__textarea,
+.add-milestone-modal__textarea {
+  width: 100%;
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm, 6px);
+  padding: 8px 10px;
+  color: var(--chrome-text);
+  font-size: 13.5px;
+  font-family: inherit;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.milestone-detail-modal__add-work-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(91, 124, 250, 0.1);
+  border: 1px solid rgba(91, 124, 250, 0.3);
+  color: var(--accent);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.milestone-detail-modal__add-work-btn:hover,
+.milestone-detail-modal__add-work-btn.is-active {
+  background: rgba(91, 124, 250, 0.2);
+  border-color: var(--accent);
+}
+
+.milestone-detail-modal__info-hint {
+  font-size: 12.5px;
+  color: var(--chrome-text-dim);
+  margin: 2px 0 10px;
+}
+
+.milestone-detail-modal__picker-box {
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  padding: 8px;
+  margin-bottom: 10px;
+}
+
+.milestone-detail-modal__picker-search,
+.add-milestone-modal__search-input {
+  width: 100%;
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  color: var(--chrome-text);
+  font-size: 13px;
+  box-sizing: border-box;
+  margin-bottom: 6px;
+}
+
+.milestone-detail-modal__picker-list {
+  max-height: 140px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.milestone-detail-modal__picker-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  text-align: left;
+  cursor: pointer;
+  color: var(--chrome-text);
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.milestone-detail-modal__picker-item:hover {
+  background: var(--chrome-bg-hover, rgba(255, 255, 255, 0.05));
+  border-color: var(--accent);
+}
+
+.milestone-detail-modal__picker-empty,
+.add-milestone-modal__workable-empty {
+  font-size: 13px;
+  color: var(--chrome-text-dim);
+  margin: 6px 0;
+  text-align: center;
+}
+
+.milestone-detail-modal__work-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.milestone-detail-modal__work-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+}
+
+.milestone-detail-modal__work-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.milestone-detail-modal__item-id,
+.add-milestone-modal__item-id {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.milestone-detail-modal__work-title,
+.milestone-detail-modal__item-title,
+.add-milestone-modal__item-title {
+  font-size: 13.5px;
+  color: var(--chrome-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.milestone-detail-modal__item-pts {
+  font-size: 12px;
+  color: var(--chrome-text-dim);
+  margin-left: auto;
+  font-family: var(--mono);
+}
+
+.milestone-detail-modal__status-pill {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--chrome-text-dim);
+}
+
+.milestone-detail-modal__status-pill--done {
+  background: rgba(15, 163, 107, 0.15);
+  color: #0fa36b;
+}
+
+.milestone-detail-modal__status-pill--in_progress {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+.milestone-detail-modal__sprint-info {
+  font-size: 12px;
+  font-family: var(--mono);
+  color: var(--chrome-text-dim);
+  margin-left: auto;
+}
+
+.milestone-detail-modal__work-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+}
+
+.milestone-detail-modal__link-action {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.milestone-detail-modal__remove-work-btn {
+  background: none;
+  border: none;
+  color: var(--chrome-text-dim);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  border-radius: 3px;
+}
+
+.milestone-detail-modal__remove-work-btn:hover {
+  color: var(--danger);
+  background: rgba(240, 87, 140, 0.1);
+}
+
+.milestone-detail-modal__work-empty {
+  font-size: 13px;
+  color: var(--chrome-text-dim);
+  font-style: italic;
+  margin: 4px 0;
+}
+
+.milestone-detail-modal__footer,
+.add-milestone-modal__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: var(--chrome-bg);
+  border-top: 1px solid var(--chrome-border);
+}
+
+.milestone-detail-modal__delete-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.milestone-detail-modal__delete-btn:hover {
+  background: rgba(240, 87, 140, 0.1);
+}
+
+.milestone-detail-modal__confirm-delete {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--danger);
+}
+
+.milestone-detail-modal__btn,
+.add-milestone-modal__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.milestone-detail-modal__btn--edit {
+  background: var(--chrome-bg);
+  border-color: var(--chrome-border);
+  color: var(--chrome-text);
+}
+
+.milestone-detail-modal__btn--save {
+  background: var(--accent);
+  color: #fff;
+}
+
+.milestone-detail-modal__btn--danger {
+  background: var(--danger);
+  color: #fff;
+}
+
+.milestone-detail-modal__btn--cancel,
+.add-milestone-modal__btn--cancel {
+  background: transparent;
+  border-color: var(--chrome-border);
+  color: var(--chrome-text-dim);
+}
+
+.milestone-detail-modal__btn--close {
+  background: var(--chrome-bg);
+  border-color: var(--chrome-border);
+  color: var(--chrome-text);
+  margin-left: auto;
+}
+
+.add-milestone-modal__btn--primary {
+  color: #fff;
+}
+
+.add-milestone-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.add-milestone-modal__row {
+  display: flex;
+  gap: 12px;
+}
+
+.add-milestone-modal__field--half {
+  flex: 1;
+}
+
+.add-milestone-modal__label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--chrome-text-dim);
+}
+
+.add-milestone-modal__type-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.add-milestone-modal__type-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  padding: 5px 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--chrome-text-dim);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.add-milestone-modal__type-btn.is-active {
+  background: rgba(144, 97, 249, 0.12);
+  border-width: 1.5px;
+}
+
+.add-milestone-modal__input-with-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.add-milestone-modal__field-icon {
+  position: absolute;
+  left: 10px;
+  color: var(--chrome-text-dim);
+  pointer-events: none;
+}
+
+.add-milestone-modal__input-with-icon .add-milestone-modal__input {
+  padding-left: 30px;
+  width: 100%;
+}
+
+.add-milestone-modal__hint {
+  font-size: 12.5px;
+  color: var(--chrome-text-dim);
+  margin: 0 0 6px;
+}
+
+.add-milestone-modal__workable-picker {
+  max-height: 140px;
+  overflow-y: auto;
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  background: var(--chrome-bg);
+  display: flex;
+  flex-direction: column;
+}
+
+.add-milestone-modal__workable-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  color: var(--chrome-text);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.add-milestone-modal__workable-option:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.add-milestone-modal__workable-option.is-selected {
+  background: rgba(91, 124, 250, 0.08);
+}
+
+.milestone-detail-modal__error-message,
+.add-milestone-modal__error-message {
+  color: var(--danger);
+  font-size: 12.5px;
+  margin: 0;
+  font-weight: 500;
+}
+
+/* ---------- Milestone modal type filters ---------- */
+
+.milestone-modal__type-filters {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.milestone-modal__type-filter-btn {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  color: var(--chrome-text-dim);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.milestone-modal__type-filter-btn:hover {
+  background: var(--chrome-bg-hover, rgba(255, 255, 255, 0.05));
+  color: var(--chrome-text);
+}
+
+.milestone-modal__type-filter-btn.is-active {
+  background: rgba(91, 124, 250, 0.15);
+  border-color: var(--accent);
+  color: var(--accent);
+}

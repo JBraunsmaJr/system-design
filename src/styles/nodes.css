@@ -1,0 +1,888 @@
+/* ---------- Typed node ---------- */
+
+.typed-node {
+  background: var(--node-bg);
+  border: 1px solid var(--node-border);
+  border-left: 4px solid #98a2b3;
+  border-radius: var(--radius-md);
+  padding: 9px 12px;
+  min-width: 168px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+.typed-node.is-selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(91, 124, 250, 0.35);
+}
+
+.typed-node__body {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.typed-node__icon {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.typed-node__label {
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--chrome-text);
+  line-height: 1.25;
+}
+
+.typed-node__type {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--chrome-text-dim);
+  margin-top: 2px;
+}
+
+.typed-node__description {
+  font-family: var(--sans);
+  font-size: 12.5px;
+  color: var(--chrome-text-dim);
+  margin-top: 2px;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ---------- Connection handles (see nodes/EdgeHandles.tsx) ----------
+
+   No visible connector dots. Two kinds of handle, both invisible:
+
+   .edge-anchor - where edges attach. Kept at the exact size the old
+   visible dots were (8px + 2px border, centred on the border) because an
+   edge's endpoint is derived from its handle's box - changing the size
+   would shift every existing edge's endpoint. React Flow's base CSS
+   already gives non-connectable handles pointer-events: none.
+
+   .edge-grab - a strip along each full side, straddling the border.
+   Pressing here and dragging starts a connection. React Flow only makes
+   a handle hit-testable while it's a valid START point
+   (.connectionindicator), so these switch themselves off during an
+   in-progress drag, in presentation mode, and anywhere else nodes aren't
+   connectable - nothing extra needed for any of those. */
+:root {
+  --edge-grab-outside: 6px;
+  --edge-grab-inside: 4px;
+}
+
+.react-flow__handle.edge-anchor {
+  width: 8px;
+  height: 8px;
+  border: 2px solid transparent;
+  background: transparent;
+  opacity: 0;
+}
+
+.react-flow__handle.edge-grab {
+  min-width: 0;
+  min-height: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  transform: none;
+  /* Above the node's own content, below NodeResizer's controls (z-index 2,
+     below) so resizing a selected node from a corner still works. */
+  z-index: 1;
+}
+
+.react-flow__handle.edge-grab.connectionindicator {
+  cursor: crosshair;
+}
+
+.react-flow__handle.edge-grab--top,
+.react-flow__handle.edge-grab--bottom {
+  left: 0;
+  right: 0;
+  width: auto;
+  height: calc(var(--edge-grab-outside) + var(--edge-grab-inside));
+}
+
+.react-flow__handle.edge-grab--top {
+  top: calc(-1 * var(--edge-grab-outside));
+}
+
+.react-flow__handle.edge-grab--bottom {
+  top: auto;
+  bottom: calc(-1 * var(--edge-grab-outside));
+}
+
+.react-flow__handle.edge-grab--left,
+.react-flow__handle.edge-grab--right {
+  top: 0;
+  bottom: 0;
+  height: auto;
+  width: calc(var(--edge-grab-outside) + var(--edge-grab-inside));
+}
+
+.react-flow__handle.edge-grab--left {
+  left: calc(-1 * var(--edge-grab-outside));
+}
+
+.react-flow__handle.edge-grab--right {
+  left: auto;
+  right: calc(-1 * var(--edge-grab-outside));
+}
+
+/* Hover affordance: a thin accent line along the side you're about to
+   drag from - the only visual hint that a border is connectable. */
+.react-flow__handle.edge-grab::after {
+  content: '';
+  position: absolute;
+  background: var(--accent);
+  border-radius: 1px;
+  opacity: 0;
+  transition: opacity 80ms ease-out;
+  pointer-events: none;
+}
+
+.react-flow__handle.edge-grab.connectionindicator:hover::after {
+  opacity: 0.85;
+}
+
+.react-flow__handle.edge-grab--top::after,
+.react-flow__handle.edge-grab--bottom::after {
+  left: 0;
+  right: 0;
+  height: 2px;
+}
+
+.react-flow__handle.edge-grab--top::after {
+  top: calc(var(--edge-grab-outside) - 1px);
+}
+
+.react-flow__handle.edge-grab--bottom::after {
+  bottom: calc(var(--edge-grab-outside) - 1px);
+}
+
+.react-flow__handle.edge-grab--left::after,
+.react-flow__handle.edge-grab--right::after {
+  top: 0;
+  bottom: 0;
+  width: 2px;
+}
+
+.react-flow__handle.edge-grab--left::after {
+  left: calc(var(--edge-grab-outside) - 1px);
+}
+
+.react-flow__handle.edge-grab--right::after {
+  right: calc(var(--edge-grab-outside) - 1px);
+}
+
+.react-flow__resize-control {
+  z-index: 2;
+}
+
+/* Drop preview drawn by EdgeConnectionLine while a connection or
+   reconnection is in progress: which side of which node the release
+   would attach to. */
+.edge-drop-preview {
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-linecap: round;
+  fill: none;
+  pointer-events: none;
+}
+
+/* ---------- Group / boundary node ---------- */
+
+.group-node {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-md);
+  /* border-color/style/width and background are set per-instance inline
+     (see GroupNode.tsx) based on the boundary's kind (Region, VPC, Trust
+     Boundary, etc.) so different kinds are visually distinguishable. */
+  pointer-events: none;
+}
+
+/* The actual fix for click-through lives here, not on .group-node above.
+   React Flow's own base CSS sets `.react-flow__node { pointer-events: all }`
+   on the OUTER WRAPPER IT renders around this component - an ancestor of
+   everything above, completely unaffected by pointer-events set on my own
+   inner div. That wrapper (not my div) is what was still capturing every
+   click across the boundary's full area, including edge labels rendered
+   underneath it (EdgeLabelRenderer's own container sits earlier in the DOM
+   than the nodes layer, so nodes normally paint - and hit-test - on top of
+   labels). `react-flow__node-group` is the per-type class React Flow adds
+   to that same wrapper, giving a way to target it directly. Two class
+   selectors combined for specificity, to reliably beat the single-class
+   base rule regardless of CSS load order. */
+.react-flow__node.react-flow__node-group {
+  /* !important is required here, confirmed by reading React Flow's own
+     source (NodeWrapper): it sets `pointerEvents: hasPointerEvents ? 'all'
+     : 'none'` as an INLINE style on this exact wrapper, and a group node is
+     both selectable and draggable so that always evaluates to 'all'. An
+     inline style beats a class-based rule regardless of specificity - the
+     one exception is !important, which is what actually makes this work
+     (a plain, non-!important version of this same selector, despite
+     correctly beating React Flow's OTHER class-based rules like
+     `.draggable`, was still silently losing to this inline style every
+     time - which is exactly why the previous version of this fix visibly
+     changed nothing). */
+  pointer-events: none !important;
+}
+
+/* NodeResizer's own handles/lines don't set pointer-events themselves, so
+   they'd otherwise inherit `none` from the wrapper rule above - putting
+   this back explicitly is what keeps resizing working. */
+.react-flow__resize-control {
+  pointer-events: auto;
+}
+
+/* A second, more direct line of defense for edge labels specifically,
+   on top of the pointer-events fix above - that fix (and the same
+   reasoning) should be sufficient on its own, but it visibly wasn't:
+   edge label dragging inside a boundary remained broken even with it
+   correctly in place, confirmed via the built CSS output, so something
+   about the interaction wasn't fully understood. This takes a completely
+   different, more direct approach that doesn't depend on that nuance:
+   `.react-flow__viewport` (React Flow's own pan/zoom container) has both
+   z-index and a transform, which means it establishes its own stacking
+   context - and everything inside it, including `.react-flow__edgelabel-
+   renderer` (the shared container ALL edge labels portal into) and every
+   individual node, stacks RELATIVE TO EACH OTHER within that one context.
+   Nodes each get their own z-index (small, incrementing values) via their
+   own inline style; the labels container has none at all, so it silently
+   loses that comparison and ends up stacked BELOW nodes by default -
+   independent of pointer-events, which only controls whether an element
+   is eligible to be a hit-test target in the first place, not where it
+   sits in the stacking order once it is. Explicitly giving the labels
+   container a high z-index puts it above every node outright, so a label
+   is always the topmost, hit-testable thing at its own position - which
+   should make it unreachable for ANY node, not just boundaries, to ever
+   sit on top of again. 1000 is comfortably above typical node z-index
+   values while staying below React Flow's own in-progress connection
+   line (z-index 1001), which should stay on top of everything while
+   you're actively drawing a new connection. */
+.react-flow__edgelabel-renderer {
+  z-index: 1000;
+}
+
+/* Thin invisible strips along each side, thicker than the visible border
+   for an easier click target - these are the ONLY parts of the boundary's
+   interior area that are actually clickable, so selecting/dragging the
+   boundary requires grabbing an edge (or the label below), not the middle. */
+.group-node__edge-hit {
+  position: absolute;
+  pointer-events: auto;
+}
+
+/* A boundary's border does two jobs, split across its thickness: the
+   OUTER half (a grab strip, see EdgeHandles.tsx) starts a connection, the
+   INNER half (these strips) selects/drags the boundary. They used to
+   overlap - both centred on the border - and whichever painted last won
+   every press. Cursors differ (crosshair vs. move) so the split is
+   discoverable. */
+.react-flow__node-group {
+  --edge-grab-outside: 8px;
+  --edge-grab-inside: 2px;
+}
+
+.group-node__edge-hit {
+  cursor: move;
+}
+
+.group-node__edge-hit--top,
+.group-node__edge-hit--bottom {
+  left: 0;
+  right: 0;
+  height: 10px;
+}
+
+.group-node__edge-hit--top {
+  top: 0;
+}
+
+.group-node__edge-hit--bottom {
+  bottom: 0;
+}
+
+.group-node__edge-hit--left,
+.group-node__edge-hit--right {
+  top: 0;
+  bottom: 0;
+  width: 10px;
+}
+
+.group-node__edge-hit--left {
+  left: 0;
+}
+
+.group-node__edge-hit--right {
+  right: 0;
+}
+
+.group-node__edge-hit--left {
+  left: -5px;
+}
+
+.group-node__edge-hit--right {
+  right: -5px;
+}
+
+.group-node__label {
+  position: absolute;
+  /* Above the boundary's connection grab strips (z-index 1), which run
+     along the same top border the label sits on - the label should
+     still select/drag the boundary, not start a connection. */
+  z-index: 2;
+  top: -11px;
+  left: 14px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--chrome-bg-raised);
+  border: 1px solid;
+  border-radius: 999px;
+  padding: 2px 10px 2px 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: auto;
+}
+
+.node-resize-line {
+  border-color: var(--accent) !important;
+}
+
+.node-resize-handle {
+  background: var(--accent) !important;
+  border: 1.5px solid var(--chrome-bg) !important;
+  width: 8px !important;
+  height: 8px !important;
+}
+
+/* ---------- Typed edge ---------- */
+
+.typed-edge__label {
+  background: var(--node-bg);
+  border: 1px solid var(--node-border);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: all;
+  cursor: grab;
+  touch-action: none;
+}
+
+.typed-edge__label:active {
+  cursor: grabbing;
+}
+
+.typed-edge__label.is-selected {
+  box-shadow: 0 0 0 2px rgba(91, 124, 250, 0.3);
+}
+
+/* The small marker showing where the label is anchored ON the line -
+   matches draw.io's convention of a yellow anchor point, only visible
+   while the edge is selected (i.e. "while editing the line"). */
+.typed-edge__anchor-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #fbbf24;
+  border: 1.5px solid #78350f;
+  pointer-events: none;
+  z-index: 4;
+}
+
+/* Bend handles, shown only while an edge is selected - same "only while
+   editing the line" convention as the anchor dot above.
+
+   Two deliberately different shapes, because they do different things
+   and one of them creates something that wasn't there before: a solid
+   square is a bend that exists and can be dragged or removed, a faint
+   hollow circle is a place where a new one can be pulled out of the
+   line. Sizes are a little generous relative to the dots themselves -
+   these are drag targets on a line that may be only 2px wide. */
+.typed-edge__waypoint {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--accent, #5b7cfa);
+  border: 1.5px solid #1e2333;
+  pointer-events: all;
+  cursor: grab;
+  touch-action: none;
+  z-index: 5;
+}
+
+.typed-edge__waypoint:active {
+  cursor: grabbing;
+}
+
+.typed-edge__insert-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: rgba(15, 17, 23, 0.6);
+  border: 1.5px solid var(--accent, #5b7cfa);
+  opacity: 0.45;
+  pointer-events: all;
+  cursor: grab;
+  touch-action: none;
+  z-index: 5;
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
+}
+
+.typed-edge__insert-dot:hover {
+  opacity: 1;
+}
+
+/* ---------- Drill-in button (on typed nodes) ---------- */
+
+.typed-node__drill {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--node-bg);
+  border: 1px solid var(--node-border);
+  border-radius: 50%;
+  color: var(--chrome-text-dim);
+  opacity: 0.55;
+  padding: 0;
+}
+
+.typed-node:hover .typed-node__drill {
+  opacity: 1;
+}
+
+.typed-node__drill.has-content {
+  color: var(--accent);
+  border-color: var(--accent);
+  opacity: 0.9;
+}
+
+.typed-node__drill:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+/* ---------- Text annotation node ---------- */
+
+.text-node {
+  padding: 4px 8px;
+  font-family: var(--sans);
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  border: 1px dashed transparent;
+  border-radius: 4px;
+  min-width: 40px;
+  min-height: 24px;
+  cursor: move;
+}
+
+.text-node.is-selected {
+  border-color: var(--accent);
+  background: rgba(91, 124, 250, 0.08);
+}
+
+.text-node__placeholder {
+  opacity: 0.4;
+  font-weight: 400;
+  font-style: italic;
+}
+
+/* Editing mode swaps the div for a textarea. Height auto-grows to fit
+   content (see TextNode.tsx), but width stays fixed - a truly auto-width
+   textarea needs a hidden-mirror-element trick that isn't worth the
+   complexity here, so the box may visibly snap to a tighter width once you
+   finish editing if your text is narrower than this. */
+.text-node--editing {
+  display: block;
+  width: 220px;
+  min-height: 24px;
+  background: var(--chrome-bg-raised);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  resize: none;
+  overflow: hidden;
+  font-family: var(--sans);
+  font-weight: 600;
+  line-height: 1.35;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(91, 124, 250, 0.2);
+}
+
+/* ---------- Presentation / preview focus glow ---------- */
+
+.is-presentation-focus .typed-node,
+.is-presentation-focus .group-node,
+.is-presentation-focus .text-node,
+.is-presentation-focus .shape-node,
+.is-presentation-focus .code-node {
+  box-shadow:
+    0 0 0 2px rgba(91, 124, 250, 0.55),
+    0 0 24px rgba(91, 124, 250, 0.35);
+}
+
+/* Scenario panel's step-editing preview - distinct from the glow above.
+   Everything stays at normal opacity/visibility (nothing dimmed) so
+   candidates are still easy to see and click while adding/removing them;
+   only members get a highlight, an accent outline rather than a glow, so
+   the two states read as visually distinct at a glance. Group nodes get an
+   inset ring instead, since .group-node fills its entire parent - a
+   regular ring would sit oddly relative to the boundary's own border. */
+.react-flow__node.is-step-member .typed-node,
+.react-flow__node.is-step-member .text-node,
+.react-flow__node.is-step-member .shape-node,
+.react-flow__node.is-step-member .code-node {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.react-flow__node.is-step-member .group-node {
+  box-shadow: 0 0 0 2px var(--accent) inset;
+}
+
+/* Selected while a step is being edited, but not (yet) part of it - a
+   distinct (dashed, amber) look from is-step-member's solid accent ring,
+   so "you could add this" reads differently at a glance from "this is
+   already in the step". Matches the same amber TypedEdge uses for the
+   equivalent edge case. */
+.react-flow__node.is-step-candidate .typed-node,
+.react-flow__node.is-step-candidate .text-node,
+.react-flow__node.is-step-candidate .shape-node,
+.react-flow__node.is-step-candidate .code-node {
+  outline: 2px dashed #fbbf24;
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
+}
+
+.react-flow__node.is-step-candidate .group-node {
+  outline: 2px dashed #fbbf24;
+  outline-offset: -2px;
+}
+
+/* ---------- Node property chips ---------- */
+
+.typed-node__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 7px;
+}
+
+.prop-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: var(--chrome-bg);
+  border: 1px solid var(--node-border);
+  border-radius: 999px;
+  padding: 2px 7px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  color: var(--chrome-text-dim);
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prop-chip__key {
+  color: var(--chrome-text-dim);
+  flex-shrink: 0;
+}
+
+.prop-chip__val {
+  color: var(--chrome-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.prop-chip--more {
+  position: relative;
+  color: var(--chrome-text);
+  font-weight: 600;
+  cursor: default;
+  max-width: none;
+  flex-shrink: 0;
+}
+
+.prop-chip__tooltip {
+  display: none;
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  z-index: 50;
+  min-width: 150px;
+  max-width: 280px;
+  background: var(--node-bg);
+  border: 1px solid var(--node-border);
+  border-radius: 6px;
+  padding: 7px 9px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  cursor: default;
+}
+
+.prop-chip--more:hover .prop-chip__tooltip {
+  display: block;
+}
+
+.prop-chip__tooltip-row {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--chrome-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 2px 0;
+}
+
+.prop-chip__tooltip-row strong {
+  color: var(--chrome-text-dim);
+  font-weight: 500;
+  margin-right: 3px;
+}
+
+/* ---------- Drawn shapes (Circle/Square/Rectangle) ---------- */
+
+.shape-node {
+  width: 100%;
+  height: 100%;
+  border: 2px solid;
+  border-radius: 4px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+}
+
+.shape-node.is-circle {
+  border-radius: 50%;
+  /* Extra padding keeps text within the circle's inscribed "safe" area
+     rather than right up against the curved edge. */
+  padding: 18px;
+}
+
+.shape-node.is-selected {
+  box-shadow: 0 0 0 2px rgba(91, 124, 250, 0.3);
+}
+
+.shape-node__text {
+  color: var(--chrome-text);
+  font-family: var(--sans);
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.3;
+  word-break: break-word;
+  pointer-events: none;
+}
+
+.shape-node__text-input {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: none;
+  color: var(--chrome-text);
+  font-family: var(--sans);
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.3;
+}
+
+/* ---------- Code snippet node ---------- */
+
+.code-node {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--node-bg);
+  border: 1.5px solid;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.code-node.is-selected {
+  box-shadow: 0 0 0 3px rgba(91, 124, 250, 0.2);
+}
+
+.code-node__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--chrome-bg);
+  border-bottom: 1px solid var(--chrome-border);
+  flex-shrink: 0;
+}
+
+.code-node__lang {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--chrome-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.code-node__title {
+  font-family: var(--sans);
+  font-size: 11px;
+  color: var(--chrome-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-left: 6px;
+  margin-left: 2px;
+  border-left: 1px solid var(--chrome-border);
+}
+
+.code-node__display {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 10px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.55;
+  overflow: auto;
+  color: var(--chrome-text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  cursor: text;
+}
+
+/* react-simple-code-editor renders its own textarea+<pre> pair inside this
+   wrapper (see textareaClassName/preClassName below for those two layers
+   specifically) - padding is handled by the `padding` prop passed to
+   <Editor>, not set here, so it isn't applied twice. */
+/* The wrap is a relative-positioned container; the highlight <pre> and the
+   textarea are both absolutely positioned to fill it exactly, stacked on
+   top of each other. Font/padding/line-height/white-space must match
+   between the two EXACTLY, or the invisible textarea's caret and selection
+   won't line up with the highlighted character underneath it. */
+.code-node__editor-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.code-node__editor-highlight,
+.code-node__editor-textarea {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 10px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow: auto;
+  border: none;
+}
+
+.code-node__editor-highlight {
+  color: var(--chrome-text);
+  pointer-events: none;
+}
+
+.code-node__editor-textarea {
+  background: transparent;
+  color: transparent;
+  caret-color: var(--chrome-text);
+  resize: none;
+  outline: none;
+}
+
+.code-node__display code {
+  font-family: inherit;
+}
+
+.code-node__placeholder {
+  color: var(--chrome-text-dim);
+  font-style: italic;
+}
+
+/* Syntax highlighting (Prism) - themed to match the app's own palette
+   rather than importing a generic third-party theme, so a code node's
+   colors feel consistent with everything else rather than visually
+   bolted-on. Scoped to .code-node broadly (not just .code-node__display)
+   so the same colors apply whether you're looking at the read-only view
+   or actively typing - react-simple-code-editor's own highlighted layer
+   lives inside .code-node__editor-highlight, nested within .code-node either
+   way. */
+.code-node .token.comment {
+  color: var(--chrome-text-dim);
+  font-style: italic;
+}
+
+.code-node .token.property,
+.code-node .token.literal-property,
+.code-node .token.attr-name,
+.code-node .token.parameter {
+  color: #7dd3fc;
+}
+
+.code-node .token.string,
+.code-node .token.string-property,
+.code-node .token.template-string,
+.code-node .token.attr-value {
+  color: #86efac;
+}
+
+.code-node .token.number {
+  color: #fbbf24;
+}
+
+.code-node .token.boolean,
+.code-node .token.null,
+.code-node .token.keyword,
+.code-node .token.operator {
+  color: #c4b5fd;
+}
+
+.code-node .token.punctuation {
+  color: var(--chrome-text-dim);
+}
+
+.code-node .token.function,
+.code-node .token.tag {
+  color: #93c5fd;
+}
+
+.code-node .token.class-name {
+  color: #f9a8d4;
+}
+
+.code-node .token.constant,
+.code-node .token.regex {
+  color: #fca5a5;
+}

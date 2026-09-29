@@ -1,0 +1,464 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.app-version {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  padding: 4px;
+  margin-right: 4px;
+  opacity: 0.6;
+  z-index: 9999;
+}
+
+/* ---------- Toolbar ---------- */
+
+.toolbar {
+  display: flex;
+  flex-direction: column;
+  background: var(--chrome-bg-raised);
+  border-bottom: 1px solid var(--chrome-border);
+  flex-shrink: 0;
+}
+
+.toolbar__row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  /* Last-resort safety net: even after the responsive rules below kick
+     in, an unusually narrow window (or enough simultaneously-visible
+     buttons) can still not fit everything. Scrolling means those
+     controls are always reachable rather than silently clipped past the
+     viewport edge with no way to get to them - which was the actual bug
+     report this whole section addresses. Applies to both rows: the
+     tabs row can overflow on its own at a narrow enough width too, even
+     though it's a much shorter list than the primary row's. */
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.toolbar__row--primary {
+  height: 52px;
+  padding: 0 16px;
+}
+
+.toolbar__row--tabs {
+  height: 40px;
+  padding: 0 16px;
+  gap: 0;
+  border-top: 1px solid var(--chrome-border);
+}
+
+.toolbar__brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 13.5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.toolbar__brand-mark {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #5b7cfa, #9061f9);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: white;
+}
+
+.toolbar__view-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 30px;
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.toolbar__view-tabs button {
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  padding: 0 10px;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--chrome-text-dim);
+  box-sizing: border-box;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.toolbar__view-tabs button:hover {
+  color: var(--chrome-text);
+}
+
+.toolbar__view-tabs button.active {
+  background: var(--chrome-bg-raised);
+  color: var(--chrome-text);
+  box-shadow: 0 0 0 1px var(--chrome-border);
+}
+
+.toolbar__title {
+  height: 32px;
+  flex: 1;
+  min-width: 120px;
+  max-width: 480px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 0 10px;
+  color: var(--chrome-text);
+  font-size: 13.5px;
+  font-weight: 500;
+  box-sizing: border-box;
+}
+
+.toolbar__title:hover,
+.toolbar__title:focus {
+  border-color: var(--chrome-border);
+  background: var(--chrome-bg);
+  outline: none;
+}
+
+.toolbar__autosave-indicator {
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--chrome-text-dim);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding: 0 4px;
+  box-sizing: border-box;
+}
+
+.toolbar__autosave-indicator svg {
+  color: #38bd7d;
+  flex-shrink: 0;
+}
+
+.toolbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.toolbar__actions button,
+.toolbar__actions a {
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid var(--chrome-border);
+  color: var(--chrome-text);
+  border-radius: var(--radius-sm);
+  padding: 0 12px;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  box-sizing: border-box;
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.toolbar__actions button:hover,
+.toolbar__actions a:hover {
+  background: var(--chrome-bg);
+  border-color: var(--chrome-border);
+  color: var(--chrome-text);
+}
+
+.toolbar__actions button:focus-visible,
+.toolbar__actions a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.toolbar__actions button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.toolbar__actions button:disabled:hover {
+  background: transparent;
+}
+
+.toolbar__actions button.toolbar__icon-button,
+.toolbar__actions a.toolbar__icon-button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.toolbar__actions button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.toolbar__actions button.primary:hover {
+  filter: brightness(1.08);
+  background: var(--accent);
+}
+
+.toolbar__actions button.active {
+  background: var(--chrome-bg);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ---------- Body layout ---------- */
+
+.app__body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+/* Collapsible sidebar wrapper for Palette (left) and Inspector (right) -
+   the toggle sits at the edge bordering the canvas either way, and the
+   wrapper's width is just whatever its flex children need: full sidebar
+   width when expanded, or the toggle's own ~18px when collapsed (the
+   sidebar itself isn't rendered at all in that case, so there's nothing
+   else to size around). */
+.app__sidebar-wrap {
+  flex-shrink: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+.app__sidebar-toggle {
+  flex-shrink: 0;
+  width: 16px;
+  background: var(--chrome-bg-raised);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--chrome-text-dim);
+  padding: 0;
+}
+
+.app__sidebar-wrap--left .app__sidebar-toggle {
+  border-left: 1px solid var(--chrome-border);
+}
+
+.app__sidebar-wrap--right .app__sidebar-toggle {
+  border-right: 1px solid var(--chrome-border);
+}
+
+.app__sidebar-toggle:hover {
+  color: var(--chrome-text);
+  background: var(--chrome-bg);
+}
+
+.app__canvas-column {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.panel-header {
+  font-weight: 600;
+  font-size: 12.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--chrome-text-dim);
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--chrome-border);
+}
+
+select,
+option {
+  color-scheme: dark;
+  background: var(--chrome-bg-raised);
+  color: var(--chrome-text);
+}
+
+/* ---------- Export menu ---------- */
+
+.export-menu {
+  position: relative;
+}
+
+.export-menu__dropdown {
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  min-width: 150px;
+  background: var(--node-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  padding: 4px;
+}
+
+.export-menu__dropdown button {
+  background: transparent;
+  border: none;
+  color: var(--chrome-text);
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 13.5px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.export-menu__dropdown button:hover {
+  background: var(--chrome-bg-raised);
+}
+
+.export-menu__dropdown button:disabled {
+  color: var(--chrome-text-dim);
+  cursor: not-allowed;
+}
+
+.export-menu__dropdown button:disabled:hover {
+  background: transparent;
+}
+
+/* ---------- Toolbar responsive breakpoints ----------
+   Investigated the actual bug before writing these: the toolbar is one
+   unwrapped flex row with no overflow handling and no responsive rules
+   anywhere in the app, so on a narrow viewport its content (brand + 3
+   view tabs + title input + autosave badge + up to 7 action buttons)
+   simply extends past the right edge with nothing to scroll to it -
+   exactly "buttons appear offscreen". The overflow-x:auto safety net
+   above means nothing is ever truly unreachable even at the narrowest
+   widths; these breakpoints exist so reaching that fallback is the
+   exception rather than the normal experience on a smaller screen. */
+
+@media (max-width: 1100px) {
+  /* Icon-only mode: every button in the toolbar has an icon plus this
+     shared label class now, so hiding the class once here covers the
+     view tabs, the autosave indicator, and every action button
+     (File/Save/Scenarios/Export/Export Markdown) in a single rule.
+     Goes straight from full labels to icon-only at this one threshold
+     rather than through an intermediate "brand text hidden, button
+     labels still shown" step - that middle ground still didn't leave
+     enough room in the 900-760px range to be worth a separate tier. */
+  .toolbar__row {
+    gap: 10px;
+  }
+
+  .toolbar__row--primary {
+    padding: 0 12px;
+  }
+
+  .toolbar__row--tabs {
+    padding: 0 12px;
+  }
+
+  .toolbar__brand-name {
+    display: none;
+  }
+
+  .toolbar__label {
+    display: none;
+  }
+
+  .toolbar__view-tabs button {
+    padding: 0 8px;
+  }
+
+  .toolbar__actions button,
+  .toolbar__actions a,
+  .collab-panel__trigger,
+  .durability__chip {
+    padding: 0 8px;
+  }
+
+  .toolbar__actions button.toolbar__icon-button,
+  .toolbar__actions a.toolbar__icon-button {
+    padding: 0;
+  }
+
+  .toolbar__title {
+    max-width: 220px;
+    min-width: 60px;
+  }
+}
+
+@media (max-width: 520px) {
+  .toolbar__row {
+    gap: 6px;
+  }
+
+  .toolbar__row--primary {
+    padding: 0 8px;
+  }
+
+  .toolbar__row--tabs {
+    padding: 0 8px;
+  }
+
+  .toolbar__brand-mark {
+    width: 20px;
+    height: 20px;
+  }
+
+  .toolbar__view-tabs {
+    padding: 1px;
+  }
+
+  .toolbar__view-tabs button {
+    padding: 0 6px;
+  }
+
+  .toolbar__actions {
+    gap: 5px;
+  }
+
+  .toolbar__actions button,
+  .toolbar__actions a,
+  .collab-panel__trigger,
+  .durability__chip {
+    padding: 0 6px;
+  }
+
+  .toolbar__actions button.toolbar__icon-button,
+  .toolbar__actions a.toolbar__icon-button {
+    padding: 0;
+  }
+
+  .toolbar__title {
+    max-width: 130px;
+    min-width: 50px;
+  }
+}
