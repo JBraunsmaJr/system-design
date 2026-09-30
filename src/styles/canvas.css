@@ -1,0 +1,413 @@
+/* ---------- Palette ---------- */
+
+.palette {
+  width: 248px;
+  flex-shrink: 0;
+  background: var(--chrome-bg-raised);
+  border-right: 1px solid var(--chrome-border);
+  padding: 14px 12px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.palette__list {
+  flex: 1;
+}
+
+.palette__group-label {
+  font-family: var(--mono);
+  font-size: var(--text-2xs-plus);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 16px 0 6px;
+}
+
+.palette__group:first-child .palette__group-label {
+  margin-top: 0;
+}
+
+.palette__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm-plus);
+  color: var(--chrome-text);
+  cursor: grab;
+}
+
+.palette__item:hover {
+  background: color-mix(in srgb, var(--white) 6%, transparent);
+}
+
+.palette__item:active {
+  cursor: grabbing;
+}
+
+.palette__hint {
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--chrome-text-dim);
+  padding-top: 12px;
+  margin-top: 12px;
+  border-top: 1px solid var(--chrome-border);
+}
+
+/* ---------- Canvas ---------- */
+
+.canvas {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  background: var(--canvas-bg);
+}
+
+.canvas .react-flow__attribution {
+  display: none;
+}
+
+/* Alignment guide lines (draw.io/Excalidraw-style smart guides) - each
+   guide's own zero width (vertical) or zero height (horizontal) means only
+   the relevant border actually renders as a visible line, so one shared
+   class covers both orientations rather than needing two. Positioned via
+   inline style in flow coordinates - see Canvas.tsx's ViewportPortal usage. */
+.alignment-guide {
+  position: absolute;
+  pointer-events: none;
+  border-left: 1px dashed var(--accent);
+  border-top: 1px dashed var(--accent);
+  z-index: 999;
+}
+
+.peer-cursor {
+  position: absolute;
+  pointer-events: none;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  /* Offsets the icon so its tip - not its bounding-box center - lands
+     on the actual reported cursor position, matching where a real
+     cursor's own hotspot sits. */
+  transform: translate(-2px, -2px);
+  /* Smooths out the visual jump between discrete position updates -
+     these arrive at whatever rate the network delivers them, not a
+     guaranteed steady stream, so a short transition reads as fluid
+     movement rather than the cursor teleporting between points. */
+  transition:
+    left 0.08s linear,
+    top 0.08s linear;
+}
+
+.peer-cursor__label {
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  color: var(--white);
+  padding: 2px 6px;
+  border-radius: var(--radius-xs);
+  white-space: nowrap;
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--black) 30%, transparent);
+}
+
+.peer-selection-outline {
+  position: absolute;
+  pointer-events: none;
+  z-index: 998;
+  border: 2px solid;
+  border-radius: var(--radius-sm);
+  box-sizing: border-box;
+}
+
+.peer-selection-outline__label {
+  position: absolute;
+  top: -20px;
+  left: -2px;
+  font-size: var(--text-3xs);
+  font-weight: 600;
+  color: var(--white);
+  padding: 1px 6px;
+  border-radius: var(--radius-xs);
+  white-space: nowrap;
+}
+
+.canvas__minimap {
+  background-color: var(--node-bg) !important;
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+}
+
+.react-flow__controls {
+  background: var(--node-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  box-shadow: none;
+}
+
+.react-flow__controls-button {
+  background: var(--node-bg);
+  border: none;
+  border-bottom: 1px solid var(--chrome-border);
+  fill: var(--chrome-text);
+  color: var(--chrome-text);
+}
+
+.react-flow__controls-button:hover {
+  background: var(--chrome-bg-raised);
+}
+
+.react-flow__controls-button svg {
+  fill: var(--chrome-text);
+}
+
+.react-flow__controls-button.is-active {
+  background: var(--accent);
+  color: var(--white);
+}
+
+.react-flow__controls-button.is-active:hover {
+  filter: brightness(1.08);
+}
+
+/* ---------- Breadcrumb ---------- */
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  background: var(--node-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-md);
+  padding: 6px 10px;
+  font-size: var(--text-xs);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--black) 35%, transparent);
+  max-width: min(70vw, 520px);
+}
+
+.breadcrumb button {
+  background: transparent;
+  border: none;
+  color: var(--chrome-text-dim);
+  font-size: var(--text-xs);
+  padding: 2px 4px;
+  border-radius: var(--radius-xs);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+
+.breadcrumb button:hover {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.breadcrumb__segment {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.breadcrumb__sep {
+  color: var(--chrome-text-dim);
+  opacity: 0.6;
+  padding: 0 1px;
+}
+
+.breadcrumb__current {
+  color: var(--chrome-text);
+  font-weight: 600;
+  padding: 2px 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+/* ---------- Palette mode selector dropdown & tabs ---------- */
+
+.palette__mode-selector {
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.palette__mode-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  font-size: var(--text-xs-plus);
+  font-weight: 500;
+  color: var(--chrome-text);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+  user-select: none;
+}
+
+.palette__mode-trigger:hover {
+  background: var(--chrome-bg-raised);
+  border-color: color-mix(in srgb, var(--white) 20%, transparent);
+}
+
+.palette__mode-trigger.is-open {
+  border-color: var(--accent);
+  background: var(--chrome-bg-raised);
+}
+
+.palette__mode-trigger-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.palette__mode-trigger-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.palette__mode-trigger-chevron {
+  flex-shrink: 0;
+  opacity: 0.6;
+  color: var(--chrome-text-dim);
+  transition: transform 0.15s ease;
+}
+
+.palette__mode-trigger.is-open .palette__mode-trigger-chevron {
+  opacity: 1;
+  color: var(--accent);
+  transform: rotate(180deg);
+}
+
+.palette__mode-dropdown {
+  z-index: 250;
+  display: flex;
+  flex-direction: column;
+  background: var(--chrome-bg-raised);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--black) 45%, transparent);
+  padding: 4px;
+  color-scheme: dark;
+}
+
+.palette__mode-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-xs);
+  padding: 6px 8px;
+  font-size: var(--text-xs-plus);
+  font-weight: 500;
+  color: var(--chrome-text);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
+}
+
+.palette__mode-option:hover {
+  background: var(--chrome-bg);
+  color: var(--chrome-text);
+}
+
+.palette__mode-option.is-selected {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.palette__mode-option-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.palette__mode-option-check {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.palette__tabs {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  margin-bottom: 14px;
+  padding: 4px;
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+}
+
+.palette__tabs button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 7px 8px;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--chrome-text-dim);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+  user-select: none;
+}
+
+.palette__tabs button:hover {
+  color: var(--chrome-text);
+  background: color-mix(in srgb, var(--white) 4%, transparent);
+}
+
+.palette__tabs button.is-active {
+  background: var(--chrome-bg-raised);
+  color: var(--accent);
+  border-color: var(--chrome-border);
+  font-weight: 600;
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--black) 25%, transparent);
+}
+
+.palette__tab-icon {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.palette__tabs button.is-active .palette__tab-icon {
+  opacity: 1;
+}
+
+.palette__mode-hint {
+  font-size: var(--text-2xs);
+  line-height: 1.5;
+  color: var(--chrome-text-dim);
+  margin: 0 0 12px;
+}
+
+/* ---------- Select mode cursor ---------- */
+
+.canvas.is-select-mode .react-flow__pane {
+  cursor: crosshair;
+}

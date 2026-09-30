@@ -113,9 +113,9 @@ export function BasePicker<T>({
               gap: 6,
               padding: '6px 10px',
               borderRadius: 4,
-              border: '1px solid var(--border, #2d3342)',
-              background: 'var(--bg-input, #15181e)',
-              color: 'var(--text, #e7e9ee)',
+              border: '1px solid var(--chrome-border)',
+              background: 'var(--chrome-bg)',
+              color: 'var(--chrome-text)',
               fontSize: 13,
             }}
           >
@@ -137,15 +137,15 @@ export function BasePicker<T>({
             minWidth: 160,
             maxHeight: 240,
             overflowY: 'auto',
-            background: 'var(--bg-panel, #1e222b)',
-            border: '1px solid var(--border, #2d3342)',
+            background: 'var(--chrome-bg-raised)',
+            border: '1px solid var(--chrome-border)',
             borderRadius: 6,
             boxShadow: '0 6px 16px rgba(0,0,0,0.4)',
             padding: 4,
           }}
         >
           {searchable && (
-            <div style={{ padding: '4px 6px', borderBottom: '1px solid var(--border, #2d3342)' }}>
+            <div style={{ padding: '4px 6px', borderBottom: '1px solid var(--chrome-border)' }}>
               <input
                 type="text"
                 value={searchTerm}
@@ -157,9 +157,9 @@ export function BasePicker<T>({
                   padding: '4px 6px',
                   fontSize: 12,
                   borderRadius: 4,
-                  border: '1px solid var(--border, #2d3342)',
-                  background: 'var(--bg-input, #15181e)',
-                  color: 'var(--text, #e7e9ee)',
+                  border: '1px solid var(--chrome-border)',
+                  background: 'var(--chrome-bg)',
+                  color: 'var(--chrome-text)',
                   boxSizing: 'border-box',
                 }}
               />
@@ -167,7 +167,7 @@ export function BasePicker<T>({
           )}
           <div style={{ padding: '2px 0' }}>
             {filteredOptions.length === 0 ? (
-              <div style={{ padding: '8px 10px', fontSize: 12, color: 'var(--text-dim, #8a919e)' }}>
+              <div style={{ padding: '8px 10px', fontSize: 12, color: 'var(--chrome-text-dim)' }}>
                 No options found
               </div>
             ) : (
@@ -186,12 +186,12 @@ export function BasePicker<T>({
                       borderRadius: 4,
                       cursor: opt.disabled ? 'not-allowed' : 'pointer',
                       opacity: opt.disabled ? 0.5 : 1,
-                      background: isSelected ? 'var(--bg-active, #2a303c)' : 'transparent',
-                      color: isSelected ? 'var(--accent, #63a4ff)' : 'var(--text, #e7e9ee)',
+                      background: isSelected ? 'var(--chrome-bg-active)' : 'transparent',
+                      color: isSelected ? 'var(--accent)' : 'var(--chrome-text)',
                     }}
                     onMouseEnter={(e) => {
                       if (!opt.disabled && !isSelected) {
-                        e.currentTarget.style.background = 'var(--bg-hover, #242934)';
+                        e.currentTarget.style.background = 'var(--chrome-bg-hover)';
                       }
                     }}
                     onMouseLeave={(e) => {
@@ -204,7 +204,7 @@ export function BasePicker<T>({
                     <div style={{ flex: 1 }}>
                       <div>{opt.label}</div>
                       {opt.description && (
-                        <div style={{ fontSize: 11, color: 'var(--text-dim, #8a919e)' }}>
+                        <div style={{ fontSize: 11, color: 'var(--chrome-text-dim)' }}>
                           {opt.description}
                         </div>
                       )}

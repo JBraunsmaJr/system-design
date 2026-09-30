@@ -25,7 +25,7 @@ interface RegressionSimulation {
 const REFERENCE_REGRESSIONS: RegressionSimulation[] = [
   {
     id: 'REG-1-unmemoized-context-menu',
-    name: 'Unmemoized Context Menu in Canvas.tsx',
+    name: 'Unmemoized Context Menu in useCanvasContextMenu.ts',
     targetScenario: 'idle',
     metric: 'nodeRenders',
     expectedSpikeDelta: 400, // spikes node renders across the 400-node graph
@@ -33,7 +33,7 @@ const REFERENCE_REGRESSIONS: RegressionSimulation[] = [
   },
   {
     id: 'REG-2-uncoalesced-node-drag',
-    name: 'Uncoalesced Node Drag in App.tsx',
+    name: 'Uncoalesced Node Drag in src/app/hooks/useCanvasEditing.ts',
     targetScenario: 'drag-node',
     metric: 'storeWrites',
     expectedSpikeDelta: 20, // fires store write on every raw pointermove instead of 1

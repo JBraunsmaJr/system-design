@@ -79,13 +79,13 @@ export function BaseModal({
         aria-modal="true"
         aria-label={ariaLabel}
         style={{
-          background: 'var(--chrome-bg-raised, #1e222b)',
-          color: 'var(--chrome-text, #e7e9ee)',
-          borderRadius: 'var(--radius-md, 8px)',
+          background: 'var(--chrome-bg-raised)',
+          color: 'var(--chrome-text)',
+          borderRadius: 'var(--radius-md)',
           width,
           maxWidth,
           padding: padding !== undefined ? padding : '18px 20px',
-          border: '1px solid var(--chrome-border, #2d3342)',
+          border: '1px solid var(--chrome-border)',
           boxShadow: '0 16px 48px rgba(0, 0, 0, 0.5)',
           display: 'flex',
           flexDirection: 'column',
@@ -101,7 +101,7 @@ export function BaseModal({
               margin: '0 0 14px',
               fontSize: 16,
               fontWeight: 600,
-              color: 'var(--chrome-text, #e7e9ee)',
+              color: 'var(--chrome-text)',
             }}
           >
             {title}

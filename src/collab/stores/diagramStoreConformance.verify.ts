@@ -4,7 +4,7 @@
  *
  * This file began as the adapter store's own verification. The adapter is gone
  * (WS1 Step 4), but the sequences it exercised were never really about that
- * implementation - they pin behaviour any DiagramStore has to satisfy, which
+ * implementation - they pin behavior any DiagramStore has to satisfy, which
  * is worth more now that the Yjs store is the only one the app uses.
  *
  * Originally: proving the

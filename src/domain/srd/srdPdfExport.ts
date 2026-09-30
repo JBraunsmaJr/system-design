@@ -462,47 +462,165 @@ export async function buildSrdPdf(
           } else {
             // Card / List Layout
             for (const item of items) {
-              let itemBodyLines: string[] = [];
-              if (item.body && item.body.trim()) {
-                doc.setFont('helvetica', 'normal');
-                doc.setFontSize(8);
-                itemBodyLines = doc.splitTextToSize(item.body.trim(), contentWidth - 12);
+              const relatedLinks = (srdData.traceability || []).filter(
+                (t) => t.sourceId === item.id || t.targetId === item.id,
+              );
+
+              // 1. Calculate ID badge dimensions
+              doc.setFont('courier', 'bold');
+              doc.setFontSize(8.5);
+              const idText = item.id;
+              const idBadgePaddingX = 5;
+              const idBadgeWidth = doc.getTextWidth(idText) + idBadgePaddingX * 2;
+              const idBadgeHeight = 14;
+
+              // 2. Calculate Title wrapping & dimensions
+              const titlePaddingLeft = idBadgeWidth + 6;
+              const maxTitleWidth = contentWidth - 16 - titlePaddingLeft;
+              doc.setFont('helvetica', 'bold');
+              doc.setFontSize(10);
+              const titleText = item.title || '(Untitled Requirement)';
+              const titleLines: string[] = doc.splitTextToSize(titleText, maxTitleWidth);
+              const titleLineHeight = 12;
+              const headerBlockHeight = Math.max(
+                idBadgeHeight,
+                titleLines.length * titleLineHeight,
+              );
+
+              // 3. Prepare Pills
+              interface PillInfo {
+                text: string;
+                bg: [number, number, number];
+                textColor: [number, number, number];
+                border?: [number, number, number];
+              }
+              const pills: PillInfo[] = [];
+
+              // Type pill
+              pills.push({
+                text: item.typeLabel,
+                bg: [224, 242, 254],
+                textColor: [3, 105, 161],
+                border: [186, 230, 253],
+              });
+
+              // Status pill
+              if (item.status) {
+                const s = item.status.toLowerCase();
+                if (s === 'done' || s === 'resolved' || s === 'closed') {
+                  pills.push({
+                    text: item.status.toUpperCase(),
+                    bg: [220, 252, 231],
+                    textColor: [21, 128, 61],
+                    border: [187, 247, 208],
+                  });
+                } else if (s === 'in-progress' || s === 'in_progress' || s === 'doing') {
+                  pills.push({
+                    text: item.status.toUpperCase(),
+                    bg: [254, 243, 199],
+                    textColor: [180, 83, 9],
+                    border: [253, 230, 138],
+                  });
+                } else {
+                  pills.push({
+                    text: item.status.toUpperCase(),
+                    bg: [241, 245, 249],
+                    textColor: [71, 85, 105],
+                    border: [226, 232, 240],
+                  });
+                }
               }
 
+              // Points pill
+              if (item.points != null) {
+                pills.push({
+                  text: `${item.points} pts`,
+                  bg: [243, 232, 255],
+                  textColor: [126, 34, 206],
+                  border: [233, 213, 255],
+                });
+              }
+
+              // Sprint pill
+              if (item.sprintName) {
+                pills.push({
+                  text: item.sprintName,
+                  bg: [252, 231, 243],
+                  textColor: [190, 24, 93],
+                  border: [251, 207, 232],
+                });
+              }
+
+              // Assignee pill
+              if (item.assigneeName) {
+                pills.push({
+                  text: item.assigneeName,
+                  bg: [241, 245, 249],
+                  textColor: [51, 65, 85],
+                  border: [226, 232, 240],
+                });
+              }
+
+              // Calculate pills layout (lines)
+              doc.setFont('helvetica', 'bold');
+              doc.setFontSize(7.5);
+              const pillHeight = 13;
+              const pillGap = 4;
+              const pillPaddingX = 4.5;
+              const maxPillsWidth = contentWidth - 16;
+
+              const pillLines: Array<Array<{ pill: PillInfo; width: number }>> = [];
+              let currentPillLine: Array<{ pill: PillInfo; width: number }> = [];
+              let currentPillLineWidth = 0;
+
+              for (const p of pills) {
+                const w = doc.getTextWidth(p.text) + pillPaddingX * 2;
+                if (
+                  currentPillLine.length > 0 &&
+                  currentPillLineWidth + pillGap + w > maxPillsWidth
+                ) {
+                  pillLines.push(currentPillLine);
+                  currentPillLine = [{ pill: p, width: w }];
+                  currentPillLineWidth = w;
+                } else {
+                  currentPillLine.push({ pill: p, width: w });
+                  currentPillLineWidth += (currentPillLine.length > 1 ? pillGap : 0) + w;
+                }
+              }
+              if (currentPillLine.length > 0) {
+                pillLines.push(currentPillLine);
+              }
+              const pillsBlockHeight =
+                pillLines.length * pillHeight + Math.max(0, pillLines.length - 1) * 3;
+
+              // 4. Calculate Snapshot dimensions
               let snapshotHeight = 0;
-              let snapshotWidth = contentWidth - 12;
+              let snapshotWidth = contentWidth - 16;
               if (item.contextSnapshotBase64) {
                 try {
                   const sProps = doc.getImageProperties(item.contextSnapshotBase64);
                   if (sProps && sProps.width && sProps.height) {
                     const ratio = sProps.height / sProps.width;
-                    snapshotHeight = Math.min(150, (contentWidth - 12) * ratio);
+                    snapshotHeight = Math.min(150, (contentWidth - 16) * ratio);
                     snapshotWidth = snapshotHeight / ratio;
-                    if (snapshotWidth > contentWidth - 12) {
-                      snapshotWidth = contentWidth - 12;
+                    if (snapshotWidth > contentWidth - 16) {
+                      snapshotWidth = contentWidth - 16;
                       snapshotHeight = snapshotWidth * ratio;
                     }
                   } else {
-                    snapshotHeight = Math.min(130, (contentWidth - 12) * 0.45);
+                    snapshotHeight = Math.min(130, (contentWidth - 16) * 0.45);
                   }
                 } catch {
-                  snapshotHeight = Math.min(130, (contentWidth - 12) * 0.45);
+                  snapshotHeight = Math.min(130, (contentWidth - 16) * 0.45);
                 }
               }
+              const snapshotContainerHeight = snapshotHeight > 0 ? 14 + snapshotHeight + 4 : 0;
 
-              // Wrap the card header to the available width
-              const HEADER_LINE_HEIGHT = 11.5;
-              const headerText = `[${item.id}] ${item.title || '(Untitled Requirement)'}`;
-              doc.setFont('helvetica', 'bold');
-              doc.setFontSize(9.5);
-              const headerLines: string[] = doc.splitTextToSize(headerText, contentWidth - 12);
-              const headerExtraHeight = Math.max(0, headerLines.length - 1) * HEADER_LINE_HEIGHT;
-
-              // Wrap linked component labels to the width remaining after the label
-              const LINKED_LINE_HEIGHT = 10;
+              // 5. Linked Components
+              let linkedLines: string[] = [];
+              const LINKED_LINE_HEIGHT = 11;
               const linkedLabelText = 'Linked Components: ';
               let linkedLabelWidth = 0;
-              let linkedLines: string[] = [];
               if (item.linkedNodeLabels && item.linkedNodeLabels.length > 0) {
                 doc.setFont('helvetica', 'bold');
                 doc.setFontSize(8);
@@ -510,96 +628,226 @@ export async function buildSrdPdf(
                 doc.setFont('helvetica', 'normal');
                 linkedLines = doc.splitTextToSize(
                   item.linkedNodeLabels.join(', '),
-                  Math.max(40, contentWidth - 12 - linkedLabelWidth),
+                  Math.max(40, contentWidth - 16 - linkedLabelWidth),
                 );
               }
               const linkedBlockHeight =
-                linkedLines.length > 0 ? 12 + (linkedLines.length - 1) * LINKED_LINE_HEIGHT : 0;
+                linkedLines.length > 0 ? 4 + linkedLines.length * LINKED_LINE_HEIGHT : 0;
 
-              const estimatedCardHeight =
-                34 +
-                headerExtraHeight +
-                (snapshotHeight > 0 ? snapshotHeight + 8 : 0) +
-                (linkedBlockHeight > 0 ? linkedBlockHeight + 2 : 0) +
-                (itemBodyLines.length > 0 ? itemBodyLines.length * 10 + 6 : 0) +
-                10;
+              // 6. Body text in box
+              let itemBodyLines: string[] = [];
+              if (item.body && item.body.trim()) {
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(8);
+                itemBodyLines = doc.splitTextToSize(item.body.trim(), contentWidth - 16 - 16);
+              }
+              const bodyBoxHeight = itemBodyLines.length > 0 ? itemBodyLines.length * 11 + 10 : 0;
 
-              // Ensure entire card fits without breaking midway or overlapping footer
-              ensureSpace(Math.min(estimatedCardHeight, maxContentY - topMargin - 20));
+              // 7. Dependencies & Links
+              let depLines: string[] = [];
+              if (relatedLinks.length > 0) {
+                const depsText = relatedLinks
+                  .map((l) =>
+                    l.sourceId === item.id
+                      ? `${l.relation} ${l.targetId} (${l.targetTitle})`
+                      : `Linked from ${l.sourceId} (${l.sourceTitle}) via ${l.relation}`,
+                  )
+                  .join('  •  ');
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(7.5);
+                const depLabelWidth = doc.getTextWidth('Dependencies & Links: ');
+                depLines = doc.splitTextToSize(
+                  depsText,
+                  Math.max(40, contentWidth - 16 - depLabelWidth),
+                );
+              }
+              const depsBlockHeight = depLines.length > 0 ? 8 + depLines.length * 10 : 0;
 
-              // Item Card Container Background & Border
+              // 8. Total Card Height
+              const cardPaddingTop = 9;
+              const cardPaddingBottom = 9;
+              const totalCardHeight =
+                cardPaddingTop +
+                headerBlockHeight +
+                6 +
+                pillsBlockHeight +
+                (snapshotContainerHeight > 0 ? 6 + snapshotContainerHeight : 0) +
+                (linkedBlockHeight > 0 ? 6 + linkedBlockHeight : 0) +
+                (bodyBoxHeight > 0 ? 6 + bodyBoxHeight : 0) +
+                (depsBlockHeight > 0 ? 6 + depsBlockHeight : 0) +
+                cardPaddingBottom;
+
+              ensureSpace(Math.min(totalCardHeight, maxContentY - topMargin - 20));
+
               const cardStartY = currentY;
-              doc.setFont('helvetica', 'bold');
-              doc.setFontSize(9.5);
-              doc.setTextColor(30, 41, 59);
 
-              doc.text(headerLines, marginLeft + 6, currentY + 12, {
-                lineHeightFactor: HEADER_LINE_HEIGHT / 9.5,
+              // Draw Card Background & Outer Border
+              doc.setFillColor(255, 255, 255);
+              doc.setDrawColor(226, 232, 240);
+              doc.setLineWidth(0.8);
+              doc.roundedRect(marginLeft, cardStartY, contentWidth, totalCardHeight, 3, 3, 'FD');
+
+              // Left primary accent bar
+              doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]);
+              doc.rect(marginLeft, cardStartY + 1, 3.5, totalCardHeight - 2, 'F');
+
+              let innerY = cardStartY + cardPaddingTop;
+
+              // Draw ID Badge
+              const idBadgeX = marginLeft + 8;
+              const idBadgeY = innerY;
+              doc.setFillColor(241, 245, 249);
+              doc.setDrawColor(203, 213, 225);
+              doc.setLineWidth(0.6);
+              doc.roundedRect(idBadgeX, idBadgeY, idBadgeWidth, idBadgeHeight, 2, 2, 'FD');
+
+              doc.setFont('courier', 'bold');
+              doc.setFontSize(8.5);
+              doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]);
+              doc.text(idText, idBadgeX + idBadgePaddingX, idBadgeY + 10);
+
+              // Draw Title
+              doc.setFont('helvetica', 'bold');
+              doc.setFontSize(10);
+              doc.setTextColor(15, 23, 42);
+              const titleY = innerY + 10;
+              doc.text(titleLines, idBadgeX + titlePaddingLeft, titleY, {
+                lineHeightFactor: titleLineHeight / 10,
               });
 
-              // Pills (Type, Status, Effort, Assignee)
-              const pills: string[] = [item.typeLabel];
-              if (item.status) pills.push(item.status);
-              if (item.points != null) pills.push(`${item.points} pts`);
-              if (item.sprintName) pills.push(item.sprintName);
-              if (item.assigneeName) pills.push(item.assigneeName);
+              innerY += headerBlockHeight + 6;
 
-              doc.setFont('helvetica', 'normal');
-              doc.setFontSize(7.5);
-              doc.setTextColor(71, 85, 105);
-              doc.text(pills.join('  •  '), marginLeft + 6, currentY + 24 + headerExtraHeight);
+              // Draw Pills
+              for (const line of pillLines) {
+                let pillX = marginLeft + 8;
+                for (const itemPill of line) {
+                  const p = itemPill.pill;
+                  const w = itemPill.width;
+                  doc.setFillColor(p.bg[0], p.bg[1], p.bg[2]);
+                  if (p.border) {
+                    doc.setDrawColor(p.border[0], p.border[1], p.border[2]);
+                    doc.setLineWidth(0.5);
+                    doc.roundedRect(pillX, innerY, w, pillHeight, 2, 2, 'FD');
+                  } else {
+                    doc.roundedRect(pillX, innerY, w, pillHeight, 2, 2, 'F');
+                  }
+                  doc.setFont('helvetica', 'bold');
+                  doc.setFontSize(7.5);
+                  doc.setTextColor(p.textColor[0], p.textColor[1], p.textColor[2]);
+                  doc.text(p.text, pillX + pillPaddingX, innerY + 9.2);
 
-              currentY += 32 + headerExtraHeight;
+                  pillX += w + pillGap;
+                }
+                innerY += pillHeight + 3;
+              }
+              innerY += 3;
 
-              // Context Snapshot if present
+              // Draw Snapshot Container (if present)
               if (item.contextSnapshotBase64 && snapshotHeight > 0) {
+                const snapBoxX = marginLeft + 8;
+                const snapBoxW = contentWidth - 16;
+                const snapBoxY = innerY;
+                const captionH = 14;
+
+                // Container border & fill
+                doc.setFillColor(248, 250, 252);
+                doc.setDrawColor(203, 213, 225);
+                doc.setLineWidth(0.6);
+                doc.roundedRect(snapBoxX, snapBoxY, snapBoxW, snapshotContainerHeight, 2, 2, 'FD');
+
+                // Caption header
+                doc.setFillColor(30, 41, 59);
+                doc.rect(snapBoxX, snapBoxY, snapBoxW, captionH, 'F');
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(7);
+                doc.setTextColor(203, 213, 225);
+                doc.text('ARCHITECTURE CONTEXT SNAPSHOT', snapBoxX + 6, snapBoxY + 9.5);
+
+                // Image inside
                 try {
-                  const snapX = marginLeft + 6 + (contentWidth - 12 - snapshotWidth) / 2;
+                  const snapImgX = snapBoxX + (snapBoxW - snapshotWidth) / 2;
                   doc.addImage(
                     item.contextSnapshotBase64,
                     'PNG',
-                    snapX,
-                    currentY,
+                    snapImgX,
+                    snapBoxY + captionH + 2,
                     snapshotWidth,
                     snapshotHeight,
                     undefined,
                     'FAST',
                   );
-                  currentY += snapshotHeight + 8;
                 } catch {
-                  // ignore image error
+                  // ignore
                 }
+
+                innerY += snapshotContainerHeight + 6;
               }
 
-              // Linked Components
+              // Draw Linked Components (if present)
               if (linkedLines.length > 0) {
                 doc.setFont('helvetica', 'bold');
                 doc.setFontSize(8);
                 doc.setTextColor(71, 85, 105);
-                doc.text(linkedLabelText, marginLeft + 6, currentY);
+                doc.text(linkedLabelText, marginLeft + 8, innerY + 8);
                 doc.setFont('helvetica', 'normal');
-                doc.text(linkedLines, marginLeft + 6 + linkedLabelWidth, currentY, {
+                doc.setTextColor(30, 58, 138);
+                doc.text(linkedLines, marginLeft + 8 + linkedLabelWidth, innerY + 8, {
                   lineHeightFactor: LINKED_LINE_HEIGHT / 8,
                 });
-                currentY += linkedBlockHeight;
+
+                innerY += linkedBlockHeight + 6;
               }
 
-              // Body text
+              // Draw Body text box (if present)
               if (itemBodyLines.length > 0) {
+                const bodyBoxX = marginLeft + 8;
+                const bodyBoxW = contentWidth - 16;
+                const bodyBoxY = innerY;
+
+                // Light grey background
+                doc.setFillColor(248, 250, 252);
+                doc.setDrawColor(226, 232, 240);
+                doc.setLineWidth(0.5);
+                doc.roundedRect(bodyBoxX, bodyBoxY, bodyBoxW, bodyBoxHeight, 2, 2, 'FD');
+
+                // Left grey accent bar
+                doc.setFillColor(203, 213, 225);
+                doc.rect(bodyBoxX, bodyBoxY, 2.5, bodyBoxHeight, 'F');
+
                 doc.setFont('helvetica', 'normal');
                 doc.setFontSize(8);
                 doc.setTextColor(51, 65, 85);
-                doc.text(itemBodyLines, marginLeft + 6, currentY);
-                currentY += itemBodyLines.length * 10 + 6;
+                doc.text(itemBodyLines, bodyBoxX + 8, bodyBoxY + 9, {
+                  lineHeightFactor: 11 / 8,
+                });
+
+                innerY += bodyBoxHeight + 6;
               }
 
-              // Card Border
-              const cardEndY = currentY + 4;
-              doc.setDrawColor(226, 232, 240);
-              doc.setLineWidth(0.8);
-              doc.rect(marginLeft, cardStartY, contentWidth, cardEndY - cardStartY, 'S');
+              // Draw Dependencies & Links (if present)
+              if (depLines.length > 0) {
+                // Dashed separator line
+                doc.setDrawColor(226, 232, 240);
+                doc.setLineWidth(0.6);
+                doc.line(marginLeft + 8, innerY + 2, marginLeft + contentWidth - 8, innerY + 2);
 
-              currentY = cardEndY + 10;
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(7.5);
+                doc.setTextColor(100, 116, 139);
+                const depLabel = 'Dependencies & Links: ';
+                const depLabelW = doc.getTextWidth(depLabel);
+                doc.text(depLabel, marginLeft + 8, innerY + 10);
+
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(71, 85, 105);
+                doc.text(depLines, marginLeft + 8 + depLabelW, innerY + 10, {
+                  lineHeightFactor: 10 / 7.5,
+                });
+
+                innerY += depsBlockHeight + 6;
+              }
+
+              currentY = cardStartY + totalCardHeight + 10;
             }
           }
         }

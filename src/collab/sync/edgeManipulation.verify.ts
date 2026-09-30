@@ -74,7 +74,7 @@ function ids(waypoints: EdgeWaypoint[]): string {
  * that actually ships (WS1 Step 4).
  *
  * This slot used to hold the tree adapter. That implementation is gone, but
- * the sequences below are not about it - they pin edge and waypoint behaviour
+ * the sequences below are not about it - they pin edge and waypoint behavior
  * that must hold identically whichever store is underneath, which is exactly
  * the property worth keeping now that one of the two has been retired.
  */

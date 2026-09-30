@@ -28,29 +28,16 @@ import { RequirementCard } from './RequirementCard';
 import { ManageTypesModal } from './ManageTypesModal';
 import { ManageRelationshipTypesModal } from './ManageRelationshipTypesModal';
 import { AddItemDropdown } from './AddItemDropdown';
-import type {
-  RequirementItem,
-  RequirementItemType,
-} from '../../domain/requirements/requirementsTypes';
+import type { RequirementItem } from '../../domain/requirements/requirementsTypes';
 import type { ProgramIncrement } from '../../domain/timeline/programIncrements';
 import type { TeamDocument } from '../../domain/timeline/teamTypes';
 import type { SubDiagram } from '../../domain/canvas/types';
-import {
-  findAllLinkedNodes,
-  type DiagramPath,
-  type LinkedNodeRef,
-} from '../../domain/canvas/subDiagramTree';
+import type { DiagramPath, LinkedNodeRef } from '../../domain/canvas/subDiagramTree';
 import type { RequirementsStore } from '../../collab/stores/requirementsStore';
 import type { PresenceInfo } from '../../collab/sync/session';
-import plur from 'plur';
 import {
-  buildEpicTree,
-  buildHierarchyIndex,
   countDescendants,
-  filterEpicTree,
-  flattenEpicTreeMatches,
   isEpicItem,
-  type EpicTree,
   type EpicTreeNode,
 } from '../../domain/requirements/requirementsHierarchy';
 import {
@@ -60,6 +47,8 @@ import {
   type RequirementsLayout,
 } from '../../domain/requirements/requirementsViewPrefs';
 import { RequirementsOutline } from './RequirementsOutline';
+import { NO_EPIC_KEY, useRequirementGroups } from './useRequirementGroups';
+import { useRequirementStoreActions } from './useRequirementStoreActions';
 
 interface RequirementsViewProps {
   requirementsStore: RequirementsStore;
@@ -115,8 +104,6 @@ const EMPTY_LINKED_NODES: LinkedNodeRef[] = [];
  * RequirementCard's own React.memo comparison just as surely.
  */
 const EMPTY_PEERS: PresenceInfo[] = [];
-const UNCATEGORIZED_KEY = '__uncategorized__';
-const NO_EPIC_KEY = '__no-epic__';
 const DETAIL_KEY = '__detail__';
 const DETAIL_CHILDREN_KEY = '__detail-children__';
 const MAX_NAV_HISTORY = 20;
@@ -139,7 +126,6 @@ function toggled(set: ReadonlySet<string>, id: string): ReadonlySet<string> {
   else next.add(id);
   return next;
 }
-const EMPTY_EPIC_TREE: EpicTree = { roots: [], unparented: [] };
 
 type GroupBy = RequirementsGroupBy;
 
@@ -163,23 +149,6 @@ function findCardElement(itemId: string, preferSectionKey?: string): HTMLElement
     if (inSection) return inSection;
   }
   return copies[0];
-}
-
-/** The type a new child defaults to: Ticket if it exists, otherwise the
- * first workable type, otherwise the first type of all. */
-function pickDefaultChildTypeId(itemTypes: RequirementItemType[]): string | undefined {
-  return (
-    itemTypes.find((t) => t.id === 'ticket')?.id ??
-    itemTypes.find((t) => t.isWorkable)?.id ??
-    itemTypes[0]?.id
-  );
-}
-
-interface ItemGroup {
-  key: string;
-  label: string;
-  color: string;
-  items: RequirementItem[];
 }
 
 export function RequirementsView({
@@ -248,23 +217,31 @@ export function RequirementsView({
   const [isManagingRelationshipTypes, setIsManagingRelationshipTypes] = useState(false);
   const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  /**
-   * Keep in sync on every render so useCallback-stabilized handlers can
-   * always call the CURRENT store without needing requirementsStore in
-   * their own dependency arrays - requirementsStore itself is recreated
-   * on every requirements change (see App.tsx), unlike the plain
-   * onUpdateDoc callback this replaces, which was already stable. Same
-   * reasoning as the old docRef this replaces, generalized from just
-   * onAddRelationship (the only handler that previously needed to read
-   * doc directly) to every handler below, since all of them now go
-   * through the store rather than a stable setter.
-   */
-  const requirementsStoreRef = useRef(requirementsStore);
+  const {
+    requirementsStoreRef,
+    onAddChildItem,
+    onUpdateItem,
+    onConvertItemType,
+    onConvertAllItemsOfType,
+    onDeleteItem,
+    onCreateAndAssignCategory,
+    onDeleteCategory,
+    onEditingChange,
+    onAddRelationship,
+    onDeleteRelationship,
+    onAddCustomType,
+    onUpdateType,
+    onDeleteCustomType,
+    onAddCustomRelationshipType,
+    onDeleteCustomRelationshipType,
+  } = useRequirementStoreActions({ requirementsStore, onFocusedItemChange });
   const onFocusHandledRef = useRef(onFocusHandled);
+  // Was one layout effect together with requirementsStoreRef's, which now
+  // lives in useRequirementStoreActions. Each ref is still set in the layout
+  // phase, before any effect or handler reads it.
   useLayoutEffect(() => {
-    requirementsStoreRef.current = requirementsStore;
     onFocusHandledRef.current = onFocusHandled;
-  }, [requirementsStore, onFocusHandled]);
+  }, [onFocusHandled]);
 
   useEffect(() => {
     saveRequirementsViewPrefs(documentId, {
@@ -309,120 +286,17 @@ export function RequirementsView({
     );
   }, []);
 
-  /**
-   * Computed once for every item here, rather than each RequirementCard
-   * independently walking the whole diagram tree for just its own item -
-   * see findAllLinkedNodes's own doc comment for why that per-card
-   * approach doesn't scale with the number of items in this list.
-   */
-  const linkedNodesByItemId = useMemo(
-    () => (diagramRoot ? findAllLinkedNodes(diagramRoot) : new Map()),
-    [diagramRoot],
-  );
-
-  const { items: docItems, itemTypes: docItemTypes, relationships: docRelationships } = doc;
-  const hierarchyIndex = useMemo(
-    () => buildHierarchyIndex({ items: docItems, relationships: docRelationships }),
-    [docItems, docRelationships],
-  );
-
-  const filteredItems = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return doc.items;
-    return doc.items.filter((item) => {
-      if (item.id.toLowerCase().includes(q)) return true;
-      if (item.title.toLowerCase().includes(q)) return true;
-      if (item.body.toLowerCase().includes(q)) return true;
-      const category = doc.categories.find((c) => c.id === item.categoryId);
-      return category ? category.label.toLowerCase().includes(q) : false;
-    });
-  }, [doc.items, doc.categories, search]);
-
-  /**
-   * Grouping is computed generically for both modes into the same shape,
-   * so the render below is a single loop rather than duplicated markup per
-   * mode - "group by category" is just a different recipe for the same
-   * {key, label, color, items} structure "group by type" already produces.
-   */
-  /**
-   * The epic grouping's tree, narrowed to the search when there is one
-   * (keeping the ancestors of every match, dimmed, for context). Only
-   * built in that mode.
-   */
-  const epicTree = useMemo<EpicTree>(() => {
-    if (groupBy !== 'epic') return EMPTY_EPIC_TREE;
-    const tree = buildEpicTree(
-      { items: docItems, itemTypes: docItemTypes, relationships: docRelationships },
-      hierarchyIndex,
-    );
-    if (!search.trim()) return tree;
-    return filterEpicTree(tree, new Set(filteredItems.map((i) => i.id)));
-  }, [groupBy, docItems, docItemTypes, docRelationships, hierarchyIndex, filteredItems, search]);
-
-  /** A distinct DOM id for every copy of every item in the epic tree: the
-   * first copy keeps the plain `requirement-<id>`, later copies get a
-   * numbered suffix. */
-  const domIdByNodeKey = useMemo(() => {
-    const map = new Map<string, string>();
-    const seen = new Map<string, number>();
-    const visit = (node: EpicTreeNode) => {
-      const n = seen.get(node.item.id) ?? 0;
-      seen.set(node.item.id, n + 1);
-      map.set(
-        node.key,
-        n === 0 ? `requirement-${node.item.id}` : `requirement-${node.item.id}--${n + 1}`,
-      );
-      node.children.forEach(visit);
-    };
-    epicTree.roots.forEach(visit);
-    return map;
-  }, [epicTree]);
-
-  const groups = useMemo<ItemGroup[]>(() => {
-    if (groupBy === 'epic') return [];
-    if (groupBy === 'type') {
-      const seenTypeKeys = new Set<string>();
-      return doc.itemTypes
-        .filter((type) => {
-          if (seenTypeKeys.has(type.id)) return false;
-          seenTypeKeys.add(type.id);
-          return true;
-        })
-        .map((type) => ({
-          key: type.id,
-          label: plur(type.label, 2),
-          color: type.color,
-          items: filteredItems.filter((i) => i.typeId === type.id),
-        }))
-        .filter((g) => g.items.length > 0);
-    }
-    const seenCategoryKeys = new Set<string>();
-    const categoryGroups = doc.categories
-      .filter((cat) => {
-        if (seenCategoryKeys.has(cat.id)) return false;
-        seenCategoryKeys.add(cat.id);
-        return true;
-      })
-      .map((cat) => ({
-        key: cat.id,
-        label: cat.label,
-        color: cat.color,
-        items: filteredItems.filter((i) => i.categoryId === cat.id),
-      }))
-      .filter((g) => g.items.length > 0);
-    const uncategorized = filteredItems.filter(
-      (i) => !i.categoryId || !doc.categories.some((c) => c.id === i.categoryId),
-    );
-    if (uncategorized.length > 0) {
-      categoryGroups.push({
-        key: UNCATEGORIZED_KEY,
-        label: 'Uncategorized',
-        color: 'var(--chrome-text-dim)',
-        items: uncategorized,
-      });
-    }
-    return categoryGroups;
-  }, [groupBy, doc.itemTypes, doc.categories, filteredItems]);
+  const {
+    linkedNodesByItemId,
+    hierarchyIndex,
+    epicTree,
+    domIdByNodeKey,
+    groups,
+    defaultChildTypeId,
+    visibleItems,
+    outlineSectionOf,
+    itemCountsByType,
+  } = useRequirementGroups({ doc, search, groupBy, diagramRoot });
 
   const onAddItem = (typeId: string) => {
     const id = requirementsStoreRef.current.addItem(typeId);
@@ -440,76 +314,6 @@ export function RequirementsView({
       findCardElement(id)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
   };
-
-  /**
-   * Unlike onAddItem, deliberately doesn't scroll or clear the search:
-   * the quick-add row is for staying on the parent and adding several
-   * children in a row.
-   */
-  const onAddChildItem = useCallback(
-    (parentId: string, typeId: string, title: string): string | null =>
-      requirementsStoreRef.current.addChildItem(parentId, typeId, title),
-    [],
-  );
-
-  const defaultChildTypeId = useMemo(() => pickDefaultChildTypeId(doc.itemTypes), [doc.itemTypes]);
-
-  const onUpdateItem = useCallback((id: string, patch: Partial<RequirementItem>) => {
-    requirementsStoreRef.current.updateItem(id, patch);
-  }, []);
-
-  const onConvertItemType = useCallback((id: string, newTypeId: string) => {
-    requirementsStoreRef.current.convertItemType(id, newTypeId);
-  }, []);
-
-  const onConvertAllItemsOfType = useCallback((fromTypeId: string, toTypeId: string) => {
-    return requirementsStoreRef.current.convertAllItemsOfType(fromTypeId, toTypeId);
-  }, []);
-
-  const onDeleteItem = useCallback((id: string) => {
-    requirementsStoreRef.current.deleteItem(id);
-  }, []);
-
-  /**
-   * Creating a category and assigning it to an item happen as one combined
-   * store operation (not two separate calls) so they land as a single
-   * undo step, and so the item is never left referencing a categoryId that
-   * doesn't exist yet in an intermediate state.
-   */
-  const onCreateAndAssignCategory = useCallback((itemId: string, label: string) => {
-    requirementsStoreRef.current.createAndAssignCategory(itemId, label);
-  }, []);
-
-  /**
-   * Categories are created ad hoc from any card's picker, so they're
-   * deleted from there too. The store clears categoryId on every item
-   * that referenced it, so nothing is left dangling
-   */
-  const onDeleteCategory = useCallback((categoryId: string) => {
-    requirementsStoreRef.current.deleteCategory(categoryId);
-  }, []);
-
-  // One instance shared by every card, rather than a fresh arrow per
-  // card per render. RequirementCard compares this by identity in its
-  // memo comparator, so a per-card closure would make that comparison
-  // always fail and defeat memoization for the whole list.
-  // onFocusedItemChange is a useState setter from App, so it's stable
-  // and this callback is too.
-  const onEditingChange = useCallback(
-    (itemId: string, isEditing: boolean) => onFocusedItemChange?.(isEditing ? itemId : null),
-    [onFocusedItemChange],
-  );
-
-  const onAddRelationship = useCallback(
-    (typeId: string, fromItemId: string, toItemId: string): string | null => {
-      return requirementsStoreRef.current.addRelationship(typeId, fromItemId, toItemId);
-    },
-    [],
-  );
-
-  const onDeleteRelationship = useCallback((relationshipId: string) => {
-    requirementsStoreRef.current.deleteRelationship(relationshipId);
-  }, []);
 
   /** Read by the stable callbacks below, which must not change identity
    * (every card compares them in its memo check). Updated after render. */
@@ -633,32 +437,12 @@ export function RequirementsView({
     [onNavigateToItem],
   );
 
-  const visibleItems = useMemo(
-    () => (groupBy === 'epic' ? flattenEpicTreeMatches(epicTree) : groups.flatMap((g) => g.items)),
-    [groupBy, epicTree, groups],
-  );
-
   /** The split view's open item: the chosen one while it still exists,
    * otherwise the first visible item. */
   const selectedItemId = useMemo(() => {
     if (splitSelectedId && doc.items.some((i) => i.id === splitSelectedId)) return splitSelectedId;
     return visibleItems[0]?.id ?? null;
   }, [splitSelectedId, doc.items, visibleItems]);
-
-  /** Which outline section each item sits in (e.g. "type:ticket"), so
-   * navigation can unfold the right one. Top-level epics and everything
-   * nested under them have no section header, so they aren't listed. */
-  const outlineSectionOf = useMemo(() => {
-    const map = new Map<string, string>();
-    if (groupBy === 'epic') {
-      for (const item of epicTree.unparented) map.set(item.id, `epic:${NO_EPIC_KEY}`);
-    } else {
-      for (const group of groups) {
-        for (const item of group.items) map.set(item.id, `${groupBy}:${group.key}`);
-      }
-    }
-    return map;
-  }, [groupBy, epicTree, groups]);
 
   useLayoutEffect(() => {
     navStateRef.current = {
@@ -771,58 +555,6 @@ export function RequirementsView({
     });
     return () => cancelAnimationFrame(frame);
   }, [focusItemId, onNavigateToItem]);
-
-  const onAddCustomType = (
-    label: string,
-    prefix: string,
-    color: string,
-    isWorkable: boolean,
-  ): boolean => {
-    return requirementsStoreRef.current.addCustomType(label, prefix, color, isWorkable);
-  };
-
-  /**
-   * Label, color, and isWorkable are all safe to edit after the fact for
-   * ANY type, including built-in ones - none of them are baked into
-   * already-generated item ids the way prefix is, so changing them can't create
-   * a mismatch between an item's stored id and its type's current definition.
-   * This intentionally never accepts a prefix patch (the
-   * caller can only pass these three fields, not arbitrary ones) - prefix
-   * is what actually needs to stay stable once items exist under it.
-   * @param typeId
-   * @param patch
-   */
-  const onUpdateType = (
-    typeId: string,
-    patch: Partial<Pick<RequirementItemType, 'label' | 'color' | 'isWorkable'>>,
-  ) => {
-    requirementsStoreRef.current.updateType(typeId, patch);
-  };
-
-  const onDeleteCustomType = (typeId: string): boolean => {
-    return requirementsStoreRef.current.deleteCustomType(typeId);
-  };
-
-  const itemCountsByType = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const item of doc.items) {
-      counts[item.typeId] = (counts[item.typeId] ?? 0) + 1;
-    }
-    return counts;
-  }, [doc.items]);
-
-  const onAddCustomRelationshipType = (
-    label: string,
-    inverseLabel: string,
-    color: string,
-    isBlocking: boolean,
-  ) => {
-    requirementsStoreRef.current.addCustomRelationshipType(label, inverseLabel, color, isBlocking);
-  };
-
-  const onDeleteCustomRelationshipType = (typeId: string) => {
-    requirementsStoreRef.current.deleteCustomRelationshipType(typeId);
-  };
 
   const trimmedSearch = search.trim();
 

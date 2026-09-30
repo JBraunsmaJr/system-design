@@ -669,7 +669,7 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
           role="alert"
           style={{
             margin: 0,
-            color: 'var(--warning, #e0a84a)',
+            color: 'var(--warning)',
             display: 'flex',
             gap: 6,
             alignItems: 'center',
@@ -884,7 +884,7 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
                 gap: 6,
                 padding: 10,
                 borderRadius: 8,
-                border: '1px solid var(--warning, #e0a84a)',
+                border: '1px solid var(--warning)',
               }}
             >
               <strong>Your recovery code</strong>
@@ -1055,7 +1055,7 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
             <p
               className="workspace-panel__rotation-advice"
               role="alert"
-              style={{ margin: 0, color: 'var(--warning, #e0a84a)' }}
+              style={{ margin: 0, color: 'var(--warning)' }}
             >
               That browser can no longer reach the workspace, but it still holds the key it already
               had. Rotate the key so it cannot open anything saved from now on.
@@ -1140,7 +1140,7 @@ export function WorkspacePanel(props: WorkspacePanelProps) {
         <p
           className="workspace-panel__message"
           role="alert"
-          style={{ margin: 0, color: 'var(--danger, #e06c75)' }}
+          style={{ margin: 0, color: 'var(--danger)' }}
         >
           {message}
         </p>

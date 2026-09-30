@@ -206,7 +206,7 @@ export function Inspector({
             <div className="inspector__custom-properties" style={{ marginTop: 12 }}>
               <span
                 className="inspector__section-title"
-                style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}
+                style={{ fontSize: 12, fontWeight: 600, color: 'var(--chrome-text-dim)' }}
               >
                 Shape Properties
               </span>

@@ -28,8 +28,8 @@ const cardStyle = {
   alignItems: 'center',
   padding: '10px 12px',
   borderRadius: 8,
-  background: 'var(--surface-raised, #1f2430)',
-  border: '1px solid var(--border, #2d3342)',
+  background: 'var(--chrome-bg-raised)',
+  border: '1px solid var(--chrome-border)',
   boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
   fontSize: 13,
 } as const;
@@ -111,8 +111,8 @@ export function AccessRequestNotice({
             alignItems: 'center',
             padding: '10px 12px',
             borderRadius: 8,
-            background: 'var(--surface-raised, #1f2430)',
-            border: '1px solid var(--border, #2d3342)',
+            background: 'var(--chrome-bg-raised)',
+            border: '1px solid var(--chrome-border)',
             boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
             fontSize: 13,
           }}

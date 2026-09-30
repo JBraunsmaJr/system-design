@@ -58,7 +58,7 @@ async function runSuite(label: string, store: DocumentStore) {
   const listed = await store.listDocuments();
   assert(
     listed.ok && listed.value.length === 2,
-    'both appear in the index - the old single-slot behaviour would have lost one',
+    'both appear in the index - the old single-slot behavior would have lost one',
   );
   assert(
     listed.ok && listed.value.every((e) => e.sizeBytes > 0),

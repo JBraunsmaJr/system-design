@@ -1,0 +1,479 @@
+/* ---------- Collaborative session panel ---------- */
+
+.collab-panel {
+  position: relative;
+}
+
+.collab-panel__trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  background: transparent;
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  color: var(--chrome-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  box-sizing: border-box;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.collab-panel__trigger:hover {
+  background: var(--chrome-bg);
+  border-color: var(--chrome-border);
+  color: var(--chrome-text);
+}
+
+.collab-panel__trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.collab-panel__trigger.is-active {
+  border-color: var(--success);
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 8%, transparent);
+}
+
+/* Rendered through a portal onto document.body, with top/left/width set
+   inline from the trigger's own rect - the toolbar row it lives in is a
+   horizontal scroll container (overflow-y: hidden), so an absolutely
+   positioned dropdown got clipped to that row's 52px height and was
+   never visible. Matches ExportMenu/FileMenu's own established pattern.
+   The max-height keeps the taller in-session variant (peer list, cursor
+   toggle) scrollable rather than running off a short viewport. */
+.collab-panel__dropdown {
+  background: var(--chrome-bg-raised);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--black) 40%, transparent);
+  padding: 14px;
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  z-index: 200;
+}
+
+.collab-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--text-xs-plus);
+  font-weight: 600;
+  color: var(--chrome-text);
+  margin-bottom: 10px;
+}
+
+.collab-panel__close {
+  background: none;
+  border: none;
+  color: var(--chrome-text-dim);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+}
+
+.collab-panel__close:hover {
+  color: var(--chrome-text);
+}
+
+.collab-panel__notice,
+.collab-panel__hint {
+  margin: 0 0 12px;
+  font-size: var(--text-2xs-plus);
+  line-height: 1.5;
+  color: var(--chrome-text-dim);
+}
+
+.collab-panel__primary-action {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--white);
+  font-size: var(--text-xs-plus);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.collab-panel__primary-action:hover {
+  filter: brightness(1.1);
+}
+
+.collab-panel__primary-action.is-disabled {
+  opacity: 0.6;
+  background: var(--chrome-bg);
+  color: var(--chrome-text-dim);
+  border: 1px dashed var(--chrome-border);
+  cursor: pointer;
+}
+
+.collab-panel__primary-action.is-disabled:hover {
+  border-color: var(--accent);
+  color: var(--chrome-text);
+  filter: none;
+}
+
+.collab-panel__divider {
+  text-align: center;
+  font-size: var(--text-3xs-plus);
+  color: var(--chrome-text-dim);
+  margin: 12px 0;
+  position: relative;
+}
+
+.collab-panel__divider::before,
+.collab-panel__divider::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 38%;
+  border-top: 1px solid var(--chrome-border);
+}
+
+.collab-panel__divider::before {
+  left: 0;
+}
+
+.collab-panel__divider::after {
+  right: 0;
+}
+
+.collab-panel__join-form {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+}
+
+.collab-panel__join-input-wrap {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.collab-panel__join-input {
+  width: 100%;
+  padding: 7px 28px 7px 10px;
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  color: var(--chrome-text);
+  font-size: var(--text-xs);
+}
+
+.collab-panel__join-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.collab-panel__paste-button {
+  position: absolute;
+  right: 4px;
+  background: transparent;
+  border: none;
+  color: var(--chrome-text-dim);
+  padding: 4px;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.collab-panel__paste-button:hover {
+  color: var(--chrome-text);
+  background: var(--chrome-bg-hover);
+}
+
+.collab-panel__extracted-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 6px 8px;
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-2xs);
+}
+
+.collab-panel__extracted-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--chrome-text-dim);
+}
+
+.collab-panel__extracted-pill strong {
+  color: var(--accent);
+  font-weight: 600;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.collab-panel__join-button {
+  padding: 7px 12px;
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  color: var(--chrome-text);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.collab-panel__join-button:not(:disabled):hover {
+  border-color: var(--accent);
+}
+
+.collab-panel__join-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Inline code in the hint text - the ICE server field's format is
+   fiddly enough that showing a literal example beats describing it. */
+.collab-panel__hint code {
+  font-family: var(--mono);
+  font-size: var(--text-3xs-plus);
+  padding: 1px 4px;
+  border-radius: var(--radius-xs);
+  background: var(--chrome-bg-raised);
+  color: var(--chrome-text);
+  white-space: nowrap;
+}
+
+/* Inline code in the hint text - the ICE server field's format is
+   fiddly enough that showing a literal example beats describing it. */
+.collab-panel__hint code {
+  font-family: var(--mono);
+  font-size: var(--text-3xs-plus);
+  padding: 1px 4px;
+  border-radius: var(--radius-xs);
+  background: var(--chrome-bg-raised);
+  color: var(--chrome-text);
+  white-space: nowrap;
+}
+
+/* Settings disclosure. Separated from the actions above by a rule so the
+   panel reads as "what you do here" then "how it's configured", rather
+   than one undifferentiated column of fields. */
+.collab-panel__settings {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--chrome-border);
+}
+
+.collab-panel__settings-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 4px 2px;
+  font-size: var(--text-2xs-plus);
+  font-weight: 600;
+  color: var(--chrome-text-dim);
+  text-align: left;
+}
+
+.collab-panel__settings-toggle:hover {
+  color: var(--chrome-text);
+}
+
+.collab-panel__settings-body {
+  padding-top: 4px;
+}
+
+.collab-panel__docs-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 10px;
+  font-size: var(--text-2xs);
+  color: var(--chrome-text-dim);
+  text-decoration: none;
+}
+
+.collab-panel__docs-link:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.collab-panel__label-optional {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--chrome-text-dim);
+}
+
+/* Reports whether a signaling relay is reachable, which is deliberately
+   not the same signal as "synced" - a session nobody has joined yet is
+   unsynced and perfectly healthy, whereas an unreachable relay means
+   something is genuinely misconfigured. */
+.collab-panel__relay-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 2px 0 8px;
+  font-size: var(--text-2xs-plus);
+  line-height: 1.45;
+  color: var(--chrome-text-dim);
+}
+
+.collab-panel__relay-status svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.collab-panel__relay-status.is-disconnected {
+  color: var(--danger);
+}
+
+.collab-panel__room-code {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 12px;
+}
+
+.collab-panel__room-code code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--text-xs);
+  color: var(--chrome-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.collab-panel__copy-button {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--chrome-text-dim);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+}
+
+.collab-panel__copy-button:hover {
+  color: var(--accent);
+}
+
+.collab-panel__leave-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-sm);
+  color: var(--danger);
+  font-size: var(--text-xs-plus);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.collab-panel__leave-button:hover {
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+
+.collab-panel__field-label {
+  display: block;
+  font-size: var(--text-3xs-plus);
+  font-weight: 600;
+  color: var(--chrome-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 5px;
+}
+
+.collab-panel__name-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  color: var(--chrome-text);
+  font-size: var(--text-xs);
+  margin-bottom: 10px;
+}
+
+.collab-panel__reset-signaling {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: -6px 0 10px;
+  color: var(--accent);
+  font-size: var(--text-2xs);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.collab-panel__peers {
+  margin-bottom: 12px;
+}
+
+.collab-panel__peers-label {
+  font-size: var(--text-3xs-plus);
+  font-weight: 600;
+  color: var(--chrome-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 6px;
+}
+
+.collab-panel__peer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 2px;
+}
+
+.collab-panel__peer-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-round);
+}
+
+.collab-panel__peer-name {
+  font-size: var(--text-xs-plus);
+  color: var(--chrome-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.collab-panel__cursor-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-xs-plus);
+  color: var(--chrome-text-dim);
+  margin-bottom: 12px;
+  cursor: pointer;
+}
