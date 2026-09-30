@@ -803,6 +803,8 @@ function App() {
           srdData={srdModalData}
           nodes={diagramSnapshot.nodes}
           selectedNodeIds={selectedNodeIds}
+          currentPath={path}
+          setPath={setPath}
         />
       )}
       {isGeneratingSrd && (

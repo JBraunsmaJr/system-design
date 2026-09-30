@@ -34,6 +34,8 @@ export function SrdPrintModal({
   srdData,
   nodes = [],
   selectedNodeIds = [],
+  currentPath,
+  setPath,
 }: SrdPrintModalProps) {
   const {
     activePresetId,
@@ -91,7 +93,15 @@ export function SrdPrintModal({
     handleBatchCaptureAllSnapshots,
     sortedSections,
     activeSortedSections,
-  } = useSrdPrintModal({ isOpen, onClose, srdData, nodes, selectedNodeIds });
+  } = useSrdPrintModal({
+    isOpen,
+    onClose,
+    srdData,
+    nodes,
+    selectedNodeIds,
+    currentPath,
+    setPath,
+  });
 
   if (!isOpen) return null;
 

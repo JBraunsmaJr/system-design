@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import type { Node } from '@xyflow/react';
+import type { DiagramPath } from '../../domain/canvas/subDiagramTree';
+import type { ArchNodeData } from '../../domain/canvas/types';
 import type {
   RequirementItemViewModel,
   SrdDataContext,
@@ -28,6 +30,35 @@ export interface SrdPrintModalProps {
   srdData: SrdDataContext;
   nodes?: Array<Node<Record<string, unknown>>>;
   selectedNodeIds?: string[];
+  currentPath?: DiagramPath;
+  setPath?: (path: DiagramPath) => void;
+}
+
+const isSamePath = (a: DiagramPath = [], b: DiagramPath = []) =>
+  a.length === b.length && a.every((v, i) => v === b[i]);
+
+function getPrimaryPathForNodes(
+  allNodes: Array<Node<Record<string, unknown>>>,
+  nodeIds: string[],
+): DiagramPath {
+  const linked = allNodes.filter((n) => nodeIds.includes(n.id));
+  const byPath = new Map<string, { path: DiagramPath; nodeIds: string[] }>();
+  for (const node of linked) {
+    const nodePath =
+      ((node.data as ArchNodeData & { parentPath?: string[] })?.parentPath as string[]) || [];
+    const pKey = JSON.stringify(nodePath);
+    if (!byPath.has(pKey)) {
+      byPath.set(pKey, { path: nodePath, nodeIds: [] });
+    }
+    byPath.get(pKey)!.nodeIds.push(node.id);
+  }
+  let primaryGroup: { path: DiagramPath; pathKey: string; nodeIds: string[] } | null = null;
+  for (const [pKey, group] of byPath.entries()) {
+    if (!primaryGroup || group.nodeIds.length > primaryGroup.nodeIds.length) {
+      primaryGroup = { path: group.path, pathKey: pKey, nodeIds: group.nodeIds };
+    }
+  }
+  return primaryGroup?.path || [];
 }
 
 /** Everything the SRD modal's sections read; each section picks its part. */
@@ -48,9 +79,28 @@ export function useSrdPrintModal({
   isOpen,
   onClose,
   srdData,
-  nodes,
-  selectedNodeIds,
-}: Required<SrdPrintModalProps>) {
+  nodes = [],
+  selectedNodeIds = [],
+  currentPath,
+  setPath,
+}: SrdPrintModalProps) {
+  const initialPathRef = useRef<DiagramPath>(currentPath || []);
+  const activeCanvasPathRef = useRef<DiagramPath>(currentPath || []);
+
+  useEffect(() => {
+    if (currentPath) {
+      activeCanvasPathRef.current = currentPath;
+    }
+  }, [currentPath]);
+
+  // Restore initial diagram path when modal unmounts
+  useEffect(() => {
+    return () => {
+      if (setPath && initialPathRef.current) {
+        setPath(initialPathRef.current);
+      }
+    };
+  }, [setPath]);
   const [activePresetId, setActivePresetId] = useState<string>('enterprise_formal');
   const [templateConfig, setTemplateConfig] = useState<SrdTemplateConfig>(() =>
     cloneTemplateConfig(DEFAULT_SRD_TEMPLATE),
@@ -303,6 +353,12 @@ export function useSrdPrintModal({
     setIsCapturingSnapshot(true);
     await new Promise((resolve) => setTimeout(resolve, 20));
     try {
+      if (setPath && snapshotScope === 'all' && !isSamePath(activeCanvasPathRef.current, [])) {
+        setPath([]);
+        activeCanvasPathRef.current = [];
+        await new Promise((resolve) => setTimeout(resolve, 80));
+      }
+
       let dataUrl: string | undefined;
       if (snapshotScope === 'selected' && selectedNodeIds.length > 0) {
         dataUrl = await captureSelectedNodesSnapshot(nodes, selectedNodeIds, 'png');
@@ -451,6 +507,13 @@ export function useSrdPrintModal({
       setIsCapturingItemSnapshot(true);
       await new Promise((resolve) => setTimeout(resolve, 20));
       try {
+        const targetPath = getPrimaryPathForNodes(nodes, item.linkedNodeIds);
+        if (setPath && !isSamePath(activeCanvasPathRef.current, targetPath)) {
+          setPath(targetPath);
+          activeCanvasPathRef.current = targetPath;
+          await new Promise((resolve) => setTimeout(resolve, 80));
+        }
+
         const pan = panOverride || framingPanOffset;
         const zoom = zoomOverride != null ? zoomOverride : framingZoom;
         const dataUrl = await captureNodeSubsetSnapshot(nodes, item.linkedNodeIds, {
@@ -498,7 +561,7 @@ export function useSrdPrintModal({
         }
       }
     },
-    [currentFramingItem, framingPanOffset, framingZoom, nodes],
+    [currentFramingItem, framingPanOffset, framingZoom, nodes, setPath],
   );
 
   // Global pointer release listeners to ensure we detect when the user stops dragging/holding a slider
@@ -606,6 +669,14 @@ export function useSrdPrintModal({
         count++;
         setBatchProgress({ current: count, total: linkedRequirementItems.length });
         if (!it.linkedNodeIds || it.linkedNodeIds.length === 0) continue;
+
+        const targetPath = getPrimaryPathForNodes(nodes, it.linkedNodeIds);
+        if (setPath && !isSamePath(activeCanvasPathRef.current, targetPath)) {
+          setPath(targetPath);
+          activeCanvasPathRef.current = targetPath;
+          await new Promise((resolve) => setTimeout(resolve, 80));
+        }
+
         const pan = it.snapshotFraming
           ? { x: it.snapshotFraming.offsetX, y: it.snapshotFraming.offsetY }
           : { x: 0, y: 0 };

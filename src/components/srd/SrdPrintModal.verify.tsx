@@ -121,5 +121,26 @@ const mockSrdData: SrdDataContext = {
   assert(html.includes('Acme Technologies'), 'Renders organization metadata');
 }
 
+// 2. SrdPrintModal accepts currentPath and setPath navigation props
+{
+  let navigatedPath: string[] | null = null;
+  const mockSetPath = (p: string[]) => {
+    navigatedPath = p;
+  };
+
+  const html = renderToStaticMarkup(
+    <SrdPrintModal
+      isOpen={true}
+      onClose={() => {}}
+      srdData={mockSrdData}
+      currentPath={['service-a']}
+      setPath={mockSetPath}
+    />,
+  );
+
+  assert(html.includes('srd-preview-paper'), 'Renders preview with custom diagram path props');
+  assert(navigatedPath === null, 'setPath is not called during initial static render');
+}
+
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);
 if (failures > 0) throw new Error(`${failures} test(s) failed`);
