@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import type {
   RequirementItemViewModel,
   SrdDataContext,
@@ -20,6 +20,8 @@ import {
 } from '../../domain/srd/srdSettings';
 import { downloadSrdMarkdown } from '../../domain/srd/srdMarkdownExport';
 import { downloadSrdPdf } from '../../domain/srd/srdPdfExport';
+import { srdPdfFileName } from '../../domain/srd/srdFileNames';
+import { downloadFile } from '../../common/utils/download';
 import type { SrdStore } from '../../collab/stores/yjsSrdStore';
 import type { SrdSnapshots } from './capture/useSrdSnapshots';
 
@@ -62,6 +64,15 @@ export function useSrdView({ srdStore, srd, currentSrdData, snapshots }: UseSrdV
   >('doc');
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [pdfStatus, setPdfStatus] = useState('');
+  // The react-pdf renderer (Phase 2), opted into per person and session:
+  // it is how this person previews and exports, not part of the document.
+  const [useNewRenderer, setUseNewRenderer] = useState(false);
+  // The PDF the new renderer's preview last finished drawing - exactly what
+  // the user sees, so exporting it needs no second render.
+  const newRendererPdfRef = useRef<Blob | null>(null);
+  const handleNewRendererPdf = useCallback((blob: Blob) => {
+    newRendererPdfRef.current = blob;
+  }, []);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const paperRef = useRef<HTMLDivElement>(null);
@@ -314,11 +325,29 @@ export function useSrdView({ srdStore, srd, currentSrdData, snapshots }: UseSrdV
 
   // --- Export -----------------------------------------------------------------------
 
+  /** The new renderer's PDF of the current document: the one on screen
+   * when it is current, else a fresh render. */
+  const newRendererPdf = async (): Promise<Blob> => {
+    const shown = newRendererPdfRef.current;
+    if (shown) return shown;
+    const { renderSrdPdfBlob } = await import('./pdf/srdPdfBrowser');
+    return renderSrdPdfBlob(currentSrdData, templateConfig);
+  };
+
+  // Whatever the preview showed is stale once the document changes.
+  useEffect(() => {
+    newRendererPdfRef.current = null;
+  }, [currentSrdData, templateConfig]);
+
   const handleExportPdf = async () => {
     if (isExportingPdf) return;
     setIsExportingPdf(true);
     setPdfStatus('Generating PDF...');
     try {
+      if (useNewRenderer) {
+        downloadFile(await newRendererPdf(), srdPdfFileName(currentSrdData));
+        return;
+      }
       await downloadSrdPdf(currentSrdData, templateConfig, undefined, (status) => {
         setPdfStatus(status);
       });
@@ -331,8 +360,19 @@ export function useSrdView({ srdStore, srd, currentSrdData, snapshots }: UseSrdV
     }
   };
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = async () => {
+    if (!useNewRenderer) {
+      window.print();
+      return;
+    }
+    // The preview is canvases, not printable markup: print the PDF itself
+    // from the browser's PDF viewer. The window is opened before awaiting,
+    // so popup blockers see it as part of the click.
+    const viewer = window.open('', '_blank');
+    const url = URL.createObjectURL(await newRendererPdf());
+    if (viewer) viewer.location.href = url;
+    else window.location.assign(url);
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
   };
 
   const handleDownloadMarkdown = () => {
@@ -387,6 +427,9 @@ export function useSrdView({ srdStore, srd, currentSrdData, snapshots }: UseSrdV
     isDiagramHidden,
     isExportingPdf,
     pdfStatus,
+    useNewRenderer,
+    setUseNewRenderer,
+    handleNewRendererPdf,
     selectedFramingItemId,
     setSelectedFramingItemId,
     isCapturingItemSnapshot,

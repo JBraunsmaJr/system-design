@@ -8,6 +8,7 @@
  */
 import { chromium, type Browser, type Page } from 'playwright';
 import { mkdtempSync, readFileSync, writeFileSync } from 'fs';
+import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { tmpdir } from 'os';
 import { join, resolve } from 'path';
 import { startDevServers, type DevServers } from './lib/devServers';
@@ -73,6 +74,12 @@ async function run() {
     p.on('pageerror', (e) => {
       failures++;
       console.error(`  FAIL: page threw: ${e.message}`);
+    });
+    // Every request for the new renderer's libraries, to prove they load
+    // only when it is turned on.
+    const pdfLibraryRequests: string[] = [];
+    p.on('request', (r) => {
+      if (/react-pdf|pdfjs/.test(r.url())) pdfLibraryRequests.push(r.url());
     });
 
     await p.goto(servers.appUrl);
@@ -152,6 +159,34 @@ async function run() {
     check(
       (await p.$$(ITEM_IMG)).length === 1,
       'after a reload the snapshot is still removed, and the reframed one is shown',
+    );
+
+    console.log('=== The new PDF engine previews and exports the actual PDF ===');
+    check(pdfLibraryRequests.length === 0, 'react-pdf and pdf.js are not loaded until asked for');
+    await p.check('.srd-view__renderer-toggle input');
+    await p.waitForSelector('.srd-pdf-preview__pages canvas', { timeout: 60000 });
+    check(pdfLibraryRequests.length > 0, 'turning the engine on loads them');
+    const status = await p.textContent('.srd-pdf-preview__status');
+    const shownPages = await p.$$eval('.srd-pdf-preview__pages canvas', (els) => els.length);
+    check(/PDF · \d+ pages?/.test(status ?? ''), `the preview reports the PDF (${status})`);
+
+    const [download] = await Promise.all([
+      p.waitForEvent('download'),
+      p.click('button:has-text("Export PDF")'),
+    ]);
+    const bytes = new Uint8Array(readFileSync((await download.path())!));
+    check(
+      new TextDecoder().decode(bytes.slice(0, 5)) === '%PDF-',
+      `the export is a PDF (${download.suggestedFilename()})`,
+    );
+    const exported = await getDocument({ data: bytes.slice(), verbosity: 0 }).promise;
+    check(
+      exported.numPages === shownPages,
+      `the export is the previewed PDF (${exported.numPages} pages, ${shownPages} shown)`,
+    );
+    check(
+      /\/BaseFont\s*\/[A-Z]{6}\+Inter/.test(new TextDecoder('latin1').decode(bytes)),
+      "the SRD's fonts are embedded",
     );
   } catch (err) {
     failures++;

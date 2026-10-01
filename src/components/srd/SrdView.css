@@ -215,6 +215,55 @@
   justify-content: center;
 }
 
+/* The new renderer's preview: the PDF's own pages, drawn by pdf.js. */
+.srd-pdf-preview {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem 2rem 2.5rem;
+  background-color: var(--canvas-bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  color: var(--chrome-text-dim);
+  font-size: var(--text-sm);
+}
+
+.srd-pdf-preview__status {
+  align-self: stretch;
+  text-align: center;
+  font-size: var(--text-xs);
+  color: var(--chrome-text-dim);
+}
+
+.srd-pdf-preview__pages {
+  width: 100%;
+  max-width: 860px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.srd-pdf-preview__pages canvas {
+  max-width: 100%;
+  height: auto;
+  background-color: var(--print-paper);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--black) 45%, transparent);
+}
+
+.srd-view__renderer-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-right: 0.5rem;
+  font-size: var(--text-sm);
+  color: var(--chrome-text-dim);
+  cursor: pointer;
+  user-select: none;
+}
+
 .srd-preview-paper {
   color-scheme: light;
   background-color: var(--print-paper);
@@ -902,6 +951,7 @@
 
   .srd-view__header,
   .srd-capture-surface,
+  .srd-pdf-preview,
   .srd-sidebar {
     display: none !important;
   }

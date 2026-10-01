@@ -1,4 +1,4 @@
-import { useMemo, useSyncExternalStore } from 'react';
+import { lazy, Suspense, useMemo, useSyncExternalStore } from 'react';
 import type { Edge, Node } from '@xyflow/react';
 import {
   Printer,
@@ -28,6 +28,10 @@ import { SrdDocumentPreview } from './SrdDocumentPreview';
 import { useSrdSnapshots } from './capture/useSrdSnapshots';
 import { useSrdDocumentData } from './useSrdDocumentData';
 import { useSrdView } from './useSrdView';
+
+// Loaded only when someone turns the new renderer on: react-pdf and pdf.js
+// stay out of the view's own chunk.
+const SrdPdfPreview = lazy(() => import('./pdf/SrdPdfPreview'));
 
 export interface SrdViewProps {
   /** The document's SRD settings, metadata and framing. */
@@ -88,6 +92,9 @@ export default function SrdView({
     isDiagramHidden,
     isExportingPdf,
     pdfStatus,
+    useNewRenderer,
+    setUseNewRenderer,
+    handleNewRendererPdf,
     selectedFramingItemId,
     setSelectedFramingItemId,
     isCapturingItemSnapshot,
@@ -148,6 +155,17 @@ export default function SrdView({
           </div>
         </div>
         <div className="srd-view__header-actions">
+          <label
+            className="srd-view__renderer-toggle"
+            title="Preview and export with the new PDF engine. Section content is still being added."
+          >
+            <input
+              type="checkbox"
+              checked={useNewRenderer}
+              onChange={(e) => setUseNewRenderer(e.target.checked)}
+            />
+            <span>New PDF engine (beta)</span>
+          </label>
           <button
             type="button"
             className="srd-btn-icon"
@@ -390,12 +408,22 @@ export default function SrdView({
         </div>
 
         {/* Document Preview Paper */}
-        <SrdDocumentPreview
-          templateConfig={templateConfig}
-          currentSrdData={currentSrdData}
-          paperRef={paperRef}
-          activeSortedSections={activeSortedSections}
-        />
+        {useNewRenderer ? (
+          <Suspense fallback={<div className="srd-pdf-preview">Loading PDF renderer…</div>}>
+            <SrdPdfPreview
+              data={currentSrdData}
+              config={templateConfig}
+              onRendered={handleNewRendererPdf}
+            />
+          </Suspense>
+        ) : (
+          <SrdDocumentPreview
+            templateConfig={templateConfig}
+            currentSrdData={currentSrdData}
+            paperRef={paperRef}
+            activeSortedSections={activeSortedSections}
+          />
+        )}
       </div>
     </div>
   );

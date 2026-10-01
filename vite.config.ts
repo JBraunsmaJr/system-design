@@ -10,6 +10,12 @@ const isPerfBuild = process.env.VITE_PERF_INSTRUMENTATION === '1';
 
 export default defineConfig({
   base: '/system-design/',
+  // The SRD's PDF engine is imported lazily, so the dev server would only
+  // discover these when it is first turned on - then re-bundle and reload
+  // the page mid-session. Pre-bundling them at startup avoids that.
+  optimizeDeps: {
+    include: ['@react-pdf/renderer', 'pdfjs-dist/legacy/build/pdf.mjs'],
+  },
   resolve: isPerfBuild
     ? {
         alias: {

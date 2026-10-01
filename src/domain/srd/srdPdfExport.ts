@@ -2,6 +2,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { SrdDataContext, SrdTemplateConfig, RequirementItemViewModel } from './srdTypes';
 import { interpolateTokens } from './srdMarkdownExport';
+import { srdPdfFileName } from './srdFileNames';
 
 function hexToRgb(hex: string): [number, number, number] {
   const cleanHex = hex.replace('#', '').trim();
@@ -1111,19 +1112,5 @@ export async function downloadSrdPdf(
   onProgress?: (status: string) => void,
 ): Promise<void> {
   const doc = await buildSrdPdf(srdData, templateConfig, { onProgress });
-  doc.save(filename || buildDefaultPdfFilename(srdData));
-}
-
-/** Lowercases, collapses non-alphanumerics to '-', and trims leading/trailing dashes. */
-function slugifyFilenamePart(value: string | undefined): string {
-  return (value ?? '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
-
-function buildDefaultPdfFilename(srdData: SrdDataContext): string {
-  const safeTitle = slugifyFilenamePart(srdData.metadata.title) || 'document';
-  const safeVersion = slugifyFilenamePart(srdData.metadata.version);
-  return safeVersion ? `srd-${safeTitle}-v${safeVersion}.pdf` : `srd-${safeTitle}.pdf`;
+  doc.save(filename || srdPdfFileName(srdData));
 }
