@@ -44,6 +44,8 @@ import {
   seedYjsDocumentMeta,
   type DocumentMeta,
 } from '../stores/yjsDocumentMetaStore.ts';
+import { createYjsSrdStore, seedYjsSrd } from '../stores/yjsSrdStore.ts';
+import type { SrdDocumentState } from '../../domain/srd/srdTypes.ts';
 
 export interface DocumentContents {
   root: SubDiagram;
@@ -52,6 +54,7 @@ export interface DocumentContents {
   team: TeamDocument;
   milestones: Milestone[];
   meta: DocumentMeta;
+  srd: SrdDocumentState;
 }
 
 /** Reads every collection as plain values, with no CRDT metadata attached. */
@@ -73,6 +76,7 @@ export function readDocumentContents(doc: Y.Doc): DocumentContents {
     team: read(createYjsTeamStore(doc)),
     milestones: read(createYjsMilestonesStore(doc)),
     meta: read(createYjsDocumentMetaStore(doc)),
+    srd: read(createYjsSrdStore(doc)),
   };
 }
 
@@ -106,6 +110,7 @@ export function rebaseDocument(source: Y.Doc): RebaseResult {
   seedTeamStore(team, contents.team);
   team.destroy();
   seedYjsDocumentMeta(doc, contents.meta);
+  seedYjsSrd(doc, contents.srd);
 
   return {
     doc,

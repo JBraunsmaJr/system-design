@@ -39,6 +39,7 @@ import type { RequirementsDocument } from '../../domain/requirements/requirement
 import type { ProgramIncrement } from '../../domain/timeline/programIncrements';
 import type { TeamDocument } from '../../domain/timeline/teamTypes';
 import type { Milestone } from '../../domain/timeline/milestones';
+import type { SrdDocumentState } from '../../domain/srd/srdTypes';
 import { diagramFileToSnapshot, snapshotToDiagramFile } from '../documentSnapshot';
 
 export interface UseFileActionsOptions {
@@ -56,6 +57,7 @@ export interface UseFileActionsOptions {
   programIncrementsSnapshot: ProgramIncrement[];
   teamSnapshot: TeamDocument;
   milestonesSnapshot: Milestone[];
+  srdSnapshot: SrdDocumentState;
   setPath: Dispatch<SetStateAction<DiagramPath>>;
   setActiveScenarioId: Dispatch<SetStateAction<string | null>>;
   setActiveStepIndex: Dispatch<SetStateAction<number>>;
@@ -89,6 +91,7 @@ export function useFileActions({
   programIncrementsSnapshot,
   teamSnapshot,
   milestonesSnapshot,
+  srdSnapshot,
   setPath,
   setActiveScenarioId,
   setActiveStepIndex,
@@ -122,6 +125,7 @@ export function useFileActions({
       programIncrementsSnapshot,
       teamSnapshot,
       milestonesSnapshot,
+      srdSnapshot,
     );
   }, [
     title,
@@ -131,6 +135,7 @@ export function useFileActions({
     programIncrementsSnapshot,
     teamSnapshot,
     milestonesSnapshot,
+    srdSnapshot,
   ]);
 
   const onSave = useCallback(() => {

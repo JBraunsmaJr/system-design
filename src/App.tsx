@@ -140,6 +140,8 @@ function App() {
     programIncrementsStore,
     milestonesStore,
     diagramStore,
+    srdStore,
+    srdSnapshot,
     title,
     scenarios,
     setTitle,
@@ -177,6 +179,7 @@ function App() {
       programIncrementsSnapshot,
       teamSnapshot,
       milestonesSnapshot,
+      srdSnapshot,
       sessionPersistence,
       presencePeers,
     },
@@ -373,6 +376,7 @@ function App() {
     programIncrementsSnapshot,
     teamSnapshot,
     milestonesSnapshot,
+    srdSnapshot,
     setPath,
     setActiveScenarioId,
     setActiveStepIndex,
@@ -405,6 +409,7 @@ function App() {
     milestonesSnapshot,
     programIncrementsSnapshot,
     teamSnapshot,
+    srdSnapshot,
     showToast,
   });
 
@@ -801,6 +806,7 @@ function App() {
           isOpen={isSrdModalOpen}
           onClose={() => setIsSrdModalOpen(false)}
           srdData={srdModalData}
+          srdStore={srdStore}
           nodes={diagramSnapshot.nodes}
           selectedNodeIds={selectedNodeIds}
           currentPath={path}

@@ -2,8 +2,10 @@
  * Run with: npx tsx --tsconfig tsconfig.app.json src/components/srd/SrdPrintModal.verify.tsx
  */
 import { renderToStaticMarkup } from 'react-dom/server';
+import * as Y from 'yjs';
 import { SrdPrintModal } from './SrdPrintModal';
 import type { SrdDataContext } from '../../domain/srd/srdTypes';
+import { createYjsSrdStore } from '../../collab/stores/yjsSrdStore';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {
@@ -109,7 +111,12 @@ const mockSrdData: SrdDataContext = {
 // 1. SrdPrintModal renders preview containers for running header, document content, and footer
 {
   const html = renderToStaticMarkup(
-    <SrdPrintModal isOpen={true} onClose={() => {}} srdData={mockSrdData} />,
+    <SrdPrintModal
+      isOpen={true}
+      onClose={() => {}}
+      srdData={mockSrdData}
+      srdStore={createYjsSrdStore(new Y.Doc())}
+    />,
   );
 
   assert(html.includes('srd-preview-paper'), 'Renders preview paper wrapper');
@@ -133,6 +140,7 @@ const mockSrdData: SrdDataContext = {
       isOpen={true}
       onClose={() => {}}
       srdData={mockSrdData}
+      srdStore={createYjsSrdStore(new Y.Doc())}
       currentPath={['service-a']}
       setPath={mockSetPath}
     />,
@@ -140,6 +148,23 @@ const mockSrdData: SrdDataContext = {
 
   assert(html.includes('srd-preview-paper'), 'Renders preview with custom diagram path props');
   assert(navigatedPath === null, 'setPath is not called during initial static render');
+}
+
+// 3. The modal renders the document's SRD state, not its own defaults
+{
+  const store = createYjsSrdStore(new Y.Doc());
+  store.setMetadata({ organization: 'Shared Org From The Document' });
+  store.updateSettings({
+    theme: { ...store.getSnapshot().settings.theme, primaryColor: '#abcdef' },
+  });
+
+  const html = renderToStaticMarkup(
+    <SrdPrintModal isOpen={true} onClose={() => {}} srdData={mockSrdData} srdStore={store} />,
+  );
+
+  assert(html.includes('Shared Org From The Document'), "Renders the document's metadata");
+  assert(!html.includes('Acme Technologies'), 'The override replaces the derived value');
+  assert(html.includes('#abcdef'), "Renders the document's theme");
 }
 
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);

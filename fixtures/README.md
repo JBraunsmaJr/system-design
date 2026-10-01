@@ -25,7 +25,8 @@ without a code change should produce no diff.
 | --------- | ----------------------------- | --------------------------------------------------------------------- |
 | 0.1 – 0.5 | never tagged                  | development only; files unlikely to exist outside a developer machine |
 | 0.6       | v0.9, v0.91, v0.91.2, v0.91.3 | in users' hands                                                       |
-| 0.7       | v0.92, v0.92.1                | current                                                               |
+| 0.7       | v0.92, v0.92.1                | in users' hands                                                       |
+| 0.8       | unreleased                    | current; adds `srd` (SRD template, settings and snapshot framing)     |
 
 ## Adding a version
 

@@ -5,8 +5,12 @@ import type { ToastType } from '../../common/components/toast/Toast';
 import { captureDiagramSnapshot, captureNodeSubsetSnapshot } from '../../domain/canvas/imageExport';
 import { aggregateSrdData } from '../../domain/srd/srdDataAggregator';
 import { downloadSrdMarkdown } from '../../domain/srd/srdMarkdownExport';
-import { DEFAULT_SRD_TEMPLATE } from '../../domain/srd/srdTemplatePresets';
-import type { SrdDataContext } from '../../domain/srd/srdTypes';
+import { applyDocumentState, framingFor, toRenderConfig } from '../../domain/srd/srdSettings';
+import type {
+  SrdDataContext,
+  SrdDocumentState,
+  SrdSnapshotFraming,
+} from '../../domain/srd/srdTypes';
 import type { DiagramPath } from '../../domain/canvas/subDiagramTree';
 import type { ArchNodeData, ArchEdgeData } from '../../domain/canvas/types';
 import type {
@@ -26,6 +30,9 @@ export interface UseSrdExportOptions {
   milestonesSnapshot: Milestone[];
   programIncrementsSnapshot: ProgramIncrement[];
   teamSnapshot: TeamDocument;
+  /** The document's SRD: its framing drives the initial snapshot capture,
+   * and its settings and metadata drive the markdown export. */
+  srdSnapshot: SrdDocumentState;
   showToast: (message: string, type?: ToastType, description?: string) => void;
 }
 
@@ -50,6 +57,7 @@ export function useSrdExport({
   milestonesSnapshot,
   programIncrementsSnapshot,
   teamSnapshot,
+  srdSnapshot,
   showToast,
 }: UseSrdExportOptions) {
   const [isSrdModalOpen, setIsSrdModalOpen] = useState(false);
@@ -84,6 +92,8 @@ export function useSrdExport({
     }
 
     for (const item of requirementsSnapshot.items) {
+      // A snapshot removed from the document is not captured at all.
+      if (framingFor(srdSnapshot, item.id).hidden) continue;
       const linked = allDocNodes.filter((n) => {
         const data = (n.data || {}) as Record<string, unknown>;
         const reqIds = Array.isArray(data.linkedRequirementIds) ? data.linkedRequirementIds : [];
@@ -119,6 +129,7 @@ export function useSrdExport({
 
     let diagramImg: string | undefined;
     const itemSnapshots: Record<string, string> = {};
+    const itemFramings: Record<string, SrdSnapshotFraming> = {};
 
     const isSamePath = (a: DiagramPath, b: DiagramPath) =>
       a.length === b.length && a.every((v, i) => v === b[i]);
@@ -149,13 +160,23 @@ export function useSrdExport({
 
           for (const entry of itemsToCapture) {
             try {
+              // Captured with the document's framing, so everyone opening
+              // the SRD renders the same snapshot.
+              const framing = framingFor(srdSnapshot, entry.item.id);
               const snap = await captureNodeSubsetSnapshot(levelNodes, entry.nodeIds, {
+                panOffset: { x: framing.offsetX, y: framing.offsetY },
+                zoomMultiplier: framing.zoom,
                 width: 1200,
                 height: 600,
                 padding: 0.06,
               });
               if (snap) {
                 itemSnapshots[entry.item.id] = snap;
+                itemFramings[entry.item.id] = {
+                  offsetX: framing.offsetX,
+                  offsetY: framing.offsetY,
+                  zoom: framing.zoom,
+                };
               }
             } catch (err) {
               console.warn('Failed to snapshot linked nodes for item', entry.item.id, err);
@@ -184,6 +205,7 @@ export function useSrdExport({
       teamDoc: teamSnapshot,
       diagramImageBase64: diagramImg,
       itemSnapshots,
+      itemFramings,
     });
   }, [
     path,
@@ -195,6 +217,7 @@ export function useSrdExport({
     milestonesSnapshot,
     programIncrementsSnapshot,
     teamSnapshot,
+    srdSnapshot,
   ]);
 
   const openSrdModal = useCallback(async () => {
@@ -215,7 +238,8 @@ export function useSrdExport({
     setIsGeneratingSrd(true);
     try {
       const data = await prepareSrdData();
-      downloadSrdMarkdown(data, DEFAULT_SRD_TEMPLATE);
+      // The document's own settings and metadata, as the modal would export.
+      downloadSrdMarkdown(applyDocumentState(data, srdSnapshot), toRenderConfig(srdSnapshot));
     } catch (err) {
       console.warn('Failed to export SRD markdown:', err);
       showToast(
@@ -226,7 +250,7 @@ export function useSrdExport({
     } finally {
       setIsGeneratingSrd(false);
     }
-  }, [prepareSrdData, showToast]);
+  }, [prepareSrdData, srdSnapshot, showToast]);
 
   return {
     isSrdModalOpen,

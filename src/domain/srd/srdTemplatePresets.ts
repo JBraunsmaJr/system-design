@@ -1,4 +1,11 @@
-import type { SrdSectionConfig, SrdSectionId, SrdTemplateConfig } from './srdTypes';
+import type { SrdSectionConfig, SrdTemplateConfig } from './srdTypes';
+import {
+  isFiniteNumber,
+  isPlainObject,
+  isSafeFontFamily,
+  isSafeHexColor,
+  isSrdSectionId,
+} from './srdValidation';
 
 export const DEFAULT_SRD_SECTIONS: SrdSectionConfig[] = [
   {
@@ -248,26 +255,19 @@ export function cloneTemplateConfig(template: SrdTemplateConfig): SrdTemplateCon
   return JSON.parse(JSON.stringify(template));
 }
 
+/**
+ * Version of the template JSON format. 1 is every file written before this
+ * field existed; 2 added `templateId`. Bump when the shape changes, and keep
+ * parseTemplateConfig able to read every earlier version.
+ */
+export const TEMPLATE_JSON_VERSION = 2;
+
 export function serializeTemplateConfig(template: SrdTemplateConfig): string {
-  return JSON.stringify(template, null, 2);
-}
-
-const VALID_SECTION_IDS: ReadonlySet<SrdSectionId> = new Set<SrdSectionId>([
-  'executive_summary',
-  'architecture',
-  'requirements',
-  'traceability',
-  'roadmap',
-]);
-
-// Values that end up in CSS custom properties must be tightly constrained so an
-// imported template cannot inject arbitrary declarations.
-const HEX_COLOR_PATTERN = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
-const FONT_FAMILY_PATTERN = /^[A-Za-z0-9 ,'"_.-]+$/;
-const MAX_FONT_FAMILY_LENGTH = 200;
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
+  return JSON.stringify(
+    { version: TEMPLATE_JSON_VERSION, templateId: 'classic', ...template },
+    null,
+    2,
+  );
 }
 
 function assertOptionalType(
@@ -288,20 +288,12 @@ function validateTheme(theme: unknown): void {
   for (const key of ['primaryColor', 'secondaryColor', 'accentColor'] as const) {
     const value = theme[key];
     if (value === undefined) continue;
-    if (typeof value !== 'string' || !HEX_COLOR_PATTERN.test(value)) {
+    if (!isSafeHexColor(value)) {
       throw new Error(`Invalid template schema: theme.${key} must be a hex color (e.g. #1e3a8a).`);
     }
   }
-  if (theme.fontFamily !== undefined) {
-    const font = theme.fontFamily;
-    if (
-      typeof font !== 'string' ||
-      font.trim().length === 0 ||
-      font.length > MAX_FONT_FAMILY_LENGTH ||
-      !FONT_FAMILY_PATTERN.test(font)
-    ) {
-      throw new Error('Invalid template schema: theme.fontFamily contains unsupported characters.');
-    }
+  if (theme.fontFamily !== undefined && !isSafeFontFamily(theme.fontFamily)) {
+    throw new Error('Invalid template schema: theme.fontFamily contains unsupported characters.');
   }
   assertOptionalType(theme, 'tableDense', 'boolean', 'theme');
   if (
@@ -339,7 +331,7 @@ function validateSections(sections: unknown[]): void {
     if (!isPlainObject(section)) {
       throw new Error(`Invalid template schema: ${context} must be an object.`);
     }
-    if (typeof section.id !== 'string' || !VALID_SECTION_IDS.has(section.id as SrdSectionId)) {
+    if (!isSrdSectionId(section.id)) {
       throw new Error(`Invalid template schema: ${context}.id is not a known section id.`);
     }
     if (seen.has(section.id)) {
@@ -352,10 +344,7 @@ function validateSections(sections: unknown[]): void {
     // enabled/order may be absent in older templates (filled in by
     // mergeTemplateWithDefaults), but must have the right type when present.
     assertOptionalType(section, 'enabled', 'boolean', context);
-    if (
-      section.order !== undefined &&
-      (typeof section.order !== 'number' || !Number.isFinite(section.order))
-    ) {
+    if (section.order !== undefined && !isFiniteNumber(section.order)) {
       throw new Error(`Invalid template schema: ${context}.order must be a finite number.`);
     }
     assertOptionalType(section, 'customIntroText', 'string', context);
@@ -367,6 +356,20 @@ export function parseTemplateConfig(jsonString: string): SrdTemplateConfig {
   if (!isPlainObject(parsed)) {
     throw new Error('Invalid template JSON format: expected an object.');
   }
+  // Files from before versioning carry no version and are version 1.
+  const version = parsed.version ?? 1;
+  if (!isFiniteNumber(version) || version < 1) {
+    throw new Error('Invalid template schema: version must be a positive number.');
+  }
+  if (version > TEMPLATE_JSON_VERSION) {
+    throw new Error(
+      'This template was exported by a newer version of the application. ' +
+        'Update the application to import it.',
+    );
+  }
+  // An unknown template id is not an error: the template may come from a
+  // newer build. The document reader falls back to the default template.
+  assertOptionalType(parsed, 'templateId', 'string', 'template');
   if (
     typeof parsed.id !== 'string' ||
     !parsed.id ||
@@ -390,7 +393,10 @@ export function parseTemplateConfig(jsonString: string): SrdTemplateConfig {
   validateTheme(parsed.theme);
   validateHeadersAndFooters(parsed.headersAndFooters);
   validateSections(parsed.sections);
-  return parsed as unknown as SrdTemplateConfig;
+  // The version describes the file, not the template, so it is not kept.
+  const template: Record<string, unknown> = { ...parsed };
+  delete template.version;
+  return template as unknown as SrdTemplateConfig;
 }
 
 /**

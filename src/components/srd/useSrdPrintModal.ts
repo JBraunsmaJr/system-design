@@ -1,20 +1,35 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import React, {
+  useState,
+  useMemo,
+  useRef,
+  useEffect,
+  useCallback,
+  useSyncExternalStore,
+} from 'react';
 import type { Node } from '@xyflow/react';
 import type { DiagramPath } from '../../domain/canvas/subDiagramTree';
 import type { ArchNodeData } from '../../domain/canvas/types';
 import type {
   RequirementItemViewModel,
   SrdDataContext,
+  SrdDocumentSettings,
+  SrdSnapshotFraming,
   SrdTemplateConfig,
 } from '../../domain/srd/srdTypes';
 import {
-  BUILTIN_SRD_TEMPLATES,
-  DEFAULT_SRD_TEMPLATE,
-  cloneTemplateConfig,
   serializeTemplateConfig,
   parseTemplateConfig,
   mergeTemplateWithDefaults,
 } from '../../domain/srd/srdTemplatePresets';
+import {
+  CUSTOM_PRESET_ID,
+  applyDocumentState,
+  findBuiltinPreset,
+  framingFor,
+  isCapturedWith,
+  toRenderConfig,
+} from '../../domain/srd/srdSettings';
+import type { SrdStore } from '../../collab/stores/yjsSrdStore';
 import { downloadSrdMarkdown } from '../../domain/srd/srdMarkdownExport';
 import { downloadSrdPdf } from '../../domain/srd/srdPdfExport';
 import {
@@ -28,6 +43,9 @@ export interface SrdPrintModalProps {
   isOpen: boolean;
   onClose: () => void;
   srdData: SrdDataContext;
+  /** The document's SRD settings, metadata and framing. Every edit made in
+   * the modal is written here, so collaborators see the same document. */
+  srdStore: SrdStore;
   nodes?: Array<Node<Record<string, unknown>>>;
   selectedNodeIds?: string[];
   currentPath?: DiagramPath;
@@ -79,6 +97,7 @@ export function useSrdPrintModal({
   isOpen,
   onClose,
   srdData,
+  srdStore,
   nodes = [],
   selectedNodeIds = [],
   currentPath,
@@ -101,11 +120,23 @@ export function useSrdPrintModal({
       }
     };
   }, [setPath]);
-  const [activePresetId, setActivePresetId] = useState<string>('enterprise_formal');
-  const [templateConfig, setTemplateConfig] = useState<SrdTemplateConfig>(() =>
-    cloneTemplateConfig(DEFAULT_SRD_TEMPLATE),
+  // The document's SRD. Settings, metadata and framing are read from and
+  // written to the shared document; only captured images are local.
+  // getSnapshot doubles as the server snapshot: the store is a plain object
+  // over the document, identical wherever it is rendered.
+  const srd = useSyncExternalStore(srdStore.subscribe, srdStore.getSnapshot, srdStore.getSnapshot);
+  const { presetId: activePresetId, templateId, settings, metadata, framing } = srd;
+  const templateConfig = useMemo(
+    () => toRenderConfig({ presetId: activePresetId, templateId, settings }),
+    [activePresetId, templateId, settings],
   );
-  const [currentSrdData, setCurrentSrdData] = useState<SrdDataContext>(srdData);
+  // What was captured locally; `currentSrdData` is that data as the document
+  // says it should print.
+  const [capturedData, setCurrentSrdData] = useState<SrdDataContext>(srdData);
+  const currentSrdData = useMemo(
+    () => applyDocumentState(capturedData, { metadata, framing }),
+    [capturedData, metadata, framing],
+  );
   const [activeTab, setActiveTab] = useState<
     'doc' | 'theme' | 'sections' | 'snapshots' | 'headers'
   >('doc');
@@ -114,7 +145,9 @@ export function useSrdPrintModal({
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [pdfStatus, setPdfStatus] = useState('');
 
-  // Snapshot Framing State for Requirement Items
+  // Snapshot framing. The document holds each item's committed framing;
+  // `framingAdjustments` holds only values still being dragged, and is
+  // committed to the document when the slider is released.
   const [selectedFramingItemId, setSelectedFramingItemId] = useState<string>('');
   const [framingAdjustments, setFramingAdjustments] = useState<
     Record<string, { pan: { x: number; y: number }; zoom: number }>
@@ -126,6 +159,12 @@ export function useSrdPrintModal({
   );
   // Per-item capture request sequence so results from superseded captures are ignored.
   const itemCaptureSeqRef = useRef<Record<string, number>>({});
+  // The framing each item was last captured (or attempted) with, so a failed
+  // capture is not retried until the framing changes.
+  const attemptedFramingRef = useRef<Record<string, string>>({});
+  // Bumped when a capture settles, so reconciliation moves on to the next
+  // stale item even when a capture failed and changed no state.
+  const [captureSettledCount, setCaptureSettledCount] = useState(0);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const diagramUploadInputRef = useRef<HTMLInputElement>(null);
@@ -149,28 +188,21 @@ export function useSrdPrintModal({
     return allRequirementItems.find((i) => i.id === effectiveFramingItemId);
   }, [allRequirementItems, effectiveFramingItemId]);
 
+  const storedFraming = framingFor(srd, effectiveFramingItemId);
+
   const framingPanOffset = useMemo(() => {
     if (effectiveFramingItemId && framingAdjustments[effectiveFramingItemId]?.pan) {
       return framingAdjustments[effectiveFramingItemId].pan;
     }
-    if (currentFramingItem?.snapshotFraming) {
-      return {
-        x: currentFramingItem.snapshotFraming.offsetX,
-        y: currentFramingItem.snapshotFraming.offsetY,
-      };
-    }
-    return { x: 0, y: 0 };
-  }, [effectiveFramingItemId, framingAdjustments, currentFramingItem]);
+    return { x: storedFraming.offsetX, y: storedFraming.offsetY };
+  }, [effectiveFramingItemId, framingAdjustments, storedFraming]);
 
   const framingZoom = useMemo(() => {
     if (effectiveFramingItemId && framingAdjustments[effectiveFramingItemId]?.zoom != null) {
       return framingAdjustments[effectiveFramingItemId].zoom;
     }
-    if (currentFramingItem?.snapshotFraming) {
-      return currentFramingItem.snapshotFraming.zoom;
-    }
-    return 1.0;
-  }, [effectiveFramingItemId, framingAdjustments, currentFramingItem]);
+    return storedFraming.zoom;
+  }, [effectiveFramingItemId, framingAdjustments, storedFraming]);
 
   // Live CSS transform calculations for 0ms visual preview response while adjusting sliders
   const framingBaseline = useMemo(() => {
@@ -221,15 +253,19 @@ export function useSrdPrintModal({
     }));
   };
 
+  const clearFramingAdjustment = (itemId: string) => {
+    setFramingAdjustments((prev) => {
+      if (!(itemId in prev)) return prev;
+      const copy = { ...prev };
+      delete copy[itemId];
+      return copy;
+    });
+  };
+
   const resetFraming = () => {
     if (!effectiveFramingItemId) return;
-    setFramingAdjustments((prev) => ({
-      ...prev,
-      [effectiveFramingItemId]: {
-        pan: { x: 0, y: 0 },
-        zoom: 1.0,
-      },
-    }));
+    clearFramingAdjustment(effectiveFramingItemId);
+    srdStore.setFraming(effectiveFramingItemId, null);
   };
 
   // Close on Escape key
@@ -245,24 +281,20 @@ export function useSrdPrintModal({
   }, [isOpen, onClose]);
 
   const handleSelectPreset = (presetId: string) => {
-    setActivePresetId(presetId);
-    const found = BUILTIN_SRD_TEMPLATES.find((t) => t.id === presetId);
-    if (found) {
-      setTemplateConfig(cloneTemplateConfig(found));
-    }
+    const found = findBuiltinPreset(presetId);
+    if (found) srdStore.applyPreset(found);
   };
+
+  // Read from the store at write time rather than from the render's
+  // snapshot, so rapid edits (typing) never build on a stale value.
+  const updateSettings = (update: (current: SrdDocumentSettings) => Partial<SrdDocumentSettings>) =>
+    srdStore.updateSettings(update(srdStore.getSnapshot().settings));
 
   const handleMetadataChange = <K extends keyof SrdDataContext['metadata']>(
     key: K,
     value: SrdDataContext['metadata'][K],
   ) => {
-    setCurrentSrdData((prev) => ({
-      ...prev,
-      metadata: {
-        ...prev.metadata,
-        [key]: value,
-      },
-    }));
+    srdStore.setMetadata({ ...srdStore.getSnapshot().metadata, [key]: value });
   };
 
   const handleAuthorsStringChange = (str: string) => {
@@ -290,63 +322,43 @@ export function useSrdPrintModal({
     key: K,
     value: SrdTemplateConfig['theme'][K],
   ) => {
-    setTemplateConfig((prev) => ({
-      ...prev,
-      theme: {
-        ...prev.theme,
-        [key]: value,
-      },
-    }));
-    setActivePresetId('custom');
+    updateSettings((current) => ({ theme: { ...current.theme, [key]: value } }));
   };
 
   const handleHeadersChange = <K extends keyof SrdTemplateConfig['headersAndFooters']>(
     key: K,
     value: SrdTemplateConfig['headersAndFooters'][K],
   ) => {
-    setTemplateConfig((prev) => ({
-      ...prev,
-      headersAndFooters: {
-        ...prev.headersAndFooters,
-        [key]: value,
-      },
+    updateSettings((current) => ({
+      headersAndFooters: { ...current.headersAndFooters, [key]: value },
     }));
-    setActivePresetId('custom');
   };
 
   const handleToggleSection = (sectionId: string, enabled: boolean) => {
-    setTemplateConfig((prev) => ({
-      ...prev,
-      sections: prev.sections.map((s) => (s.id === sectionId ? { ...s, enabled } : s)),
+    updateSettings((current) => ({
+      sections: current.sections.map((s) => (s.id === sectionId ? { ...s, enabled } : s)),
     }));
-    setActivePresetId('custom');
   };
 
   const handleMoveSection = (index: number, direction: 'up' | 'down') => {
-    const sorted = [...templateConfig.sections].sort((a, b) => a.order - b.order);
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= sorted.length) return;
-
-    const item = sorted[index];
-    const targetItem = sorted[targetIndex];
-
-    const newOrder = targetItem.order;
-    targetItem.order = item.order;
-    item.order = newOrder;
-
-    setTemplateConfig((prev) => ({
-      ...prev,
-      sections: sorted,
-    }));
-    setActivePresetId('custom');
+    updateSettings((current) => {
+      const sorted = [...current.sections].sort((a, b) => a.order - b.order);
+      const targetIndex = direction === 'up' ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= sorted.length) return {};
+      // Swapped as new objects: settings from the store are shared and
+      // must never be mutated.
+      const item = sorted[index];
+      const target = sorted[targetIndex];
+      sorted[index] = { ...item, order: target.order };
+      sorted[targetIndex] = { ...target, order: item.order };
+      return { sections: sorted };
+    });
   };
 
   const handleSectionIntroChange = (sectionId: string, customIntroText: string) => {
-    setTemplateConfig((prev) => ({
-      ...prev,
-      sections: prev.sections.map((s) => (s.id === sectionId ? { ...s, customIntroText } : s)),
+    updateSettings((current) => ({
+      sections: current.sections.map((s) => (s.id === sectionId ? { ...s, customIntroText } : s)),
     }));
-    setActivePresetId('custom');
   };
 
   const handleCaptureSnapshot = async () => {
@@ -459,8 +471,7 @@ export function useSrdPrintModal({
     reader.onload = (event) => {
       try {
         const parsed = parseTemplateConfig(event.target?.result as string);
-        setTemplateConfig(mergeTemplateWithDefaults(parsed));
-        setActivePresetId('custom');
+        srdStore.applyPreset(mergeTemplateWithDefaults(parsed), CUSTOM_PRESET_ID);
       } catch (err) {
         alert((err as Error).message);
       }
@@ -470,27 +481,15 @@ export function useSrdPrintModal({
   };
 
   const handleLayoutChange = (layout: 'table' | 'list') => {
-    setTemplateConfig((prev) => ({
-      ...prev,
-      requirementsLayout: layout,
-    }));
-    setActivePresetId('custom');
+    srdStore.updateSettings({ requirementsLayout: layout });
   };
 
   const handleToggleComponentTable = (enabled: boolean) => {
-    setTemplateConfig((prev) => ({
-      ...prev,
-      includeComponentTable: enabled,
-    }));
-    setActivePresetId('custom');
+    srdStore.updateSettings({ includeComponentTable: enabled });
   };
 
   const handleToggleConnectionsTable = (enabled: boolean) => {
-    setTemplateConfig((prev) => ({
-      ...prev,
-      includeConnectionsTable: enabled,
-    }));
-    setActivePresetId('custom');
+    srdStore.updateSettings({ includeConnectionsTable: enabled });
   };
 
   const handleCaptureItemSnapshot = useCallback(
@@ -558,6 +557,7 @@ export function useSrdPrintModal({
       } finally {
         if (isLatestRequest()) {
           setIsCapturingItemSnapshot(false);
+          setCaptureSettledCount((n) => n + 1);
         }
       }
     },
@@ -585,73 +585,67 @@ export function useSrdPrintModal({
     };
   }, [isInteractingWithSlider]);
 
-  // Debounced auto-capture when user finishes adjusting framing sliders
+  // Commit: once the user stops dragging, write the adjusted framing to the
+  // document - one write per adjustment, not one per slider tick. Debounced
+  // so keyboard-driven slider changes are batched the same way.
   useEffect(() => {
-    if (isInteractingWithSlider) {
-      return;
-    }
-    if (
-      !effectiveFramingItemId ||
-      !currentFramingItem ||
-      !currentFramingItem.linkedNodeIds?.length
-    ) {
-      return;
-    }
-    const adj = framingAdjustments[effectiveFramingItemId];
-    if (!adj) return;
-
-    const currentFraming = currentFramingItem.snapshotFraming;
-    if (
-      currentFraming &&
-      currentFraming.offsetX === adj.pan.x &&
-      currentFraming.offsetY === adj.pan.y &&
-      currentFraming.zoom === adj.zoom &&
-      currentFramingItem.contextSnapshotBase64
-    ) {
-      return;
-    }
-
+    if (isInteractingWithSlider) return;
+    const pending = Object.entries(framingAdjustments);
+    if (pending.length === 0) return;
     const timer = setTimeout(() => {
-      handleCaptureItemSnapshot(currentFramingItem, adj.pan, adj.zoom);
+      for (const [itemId, adjustment] of pending) {
+        // Framing a snapshot shows it again if it had been removed.
+        srdStore.setFraming(itemId, {
+          offsetX: adjustment.pan.x,
+          offsetY: adjustment.pan.y,
+          zoom: adjustment.zoom,
+        });
+      }
+      setFramingAdjustments({});
     }, 200);
-
     return () => clearTimeout(timer);
+  }, [isInteractingWithSlider, framingAdjustments, srdStore]);
+
+  // Reconcile: recapture any snapshot whose image no longer matches the
+  // document's framing - after a local commit, an undo, or a collaborator's
+  // edit alike. One capture at a time, the selected item first.
+  useEffect(() => {
+    if (isInteractingWithSlider || isCapturingItemSnapshot) return;
+    const capturedById = new Map<string, RequirementItemViewModel>();
+    for (const items of Object.values(capturedData.requirements.itemsByCategory)) {
+      for (const item of items) capturedById.set(item.id, item);
+    }
+    const keyOf = (f: SrdSnapshotFraming) => `${f.offsetX}|${f.offsetY}|${f.zoom}`;
+    const isStale = (item: RequirementItemViewModel) => {
+      if (!item.linkedNodeIds?.length || framingAdjustments[item.id]) return false;
+      const target = framingFor(srd, item.id);
+      if (target.hidden) return false;
+      const captured = capturedById.get(item.id);
+      if (captured && isCapturedWith(captured, target)) return false;
+      return attemptedFramingRef.current[item.id] !== keyOf(target);
+    };
+    const next =
+      (currentFramingItem && isStale(currentFramingItem) ? currentFramingItem : undefined) ??
+      linkedRequirementItems.find(isStale);
+    if (!next) return;
+    const target = framingFor(srd, next.id);
+    attemptedFramingRef.current[next.id] = keyOf(target);
+    void handleCaptureItemSnapshot(next, { x: target.offsetX, y: target.offsetY }, target.zoom);
   }, [
     isInteractingWithSlider,
+    isCapturingItemSnapshot,
+    capturedData,
     framingAdjustments,
-    effectiveFramingItemId,
+    srd,
     currentFramingItem,
+    linkedRequirementItems,
     handleCaptureItemSnapshot,
+    captureSettledCount,
   ]);
 
   const handleRemoveItemSnapshot = (itemId: string) => {
-    setFramingAdjustments((prev) => {
-      const copy = { ...prev };
-      delete copy[itemId];
-      return copy;
-    });
-    setCurrentSrdData((prev) => {
-      const nextItemsByCategory = { ...prev.requirements.itemsByCategory };
-      for (const catId in nextItemsByCategory) {
-        nextItemsByCategory[catId] = nextItemsByCategory[catId].map((it) => {
-          if (it.id === itemId) {
-            return {
-              ...it,
-              contextSnapshotBase64: undefined,
-              snapshotFraming: undefined,
-            };
-          }
-          return it;
-        });
-      }
-      return {
-        ...prev,
-        requirements: {
-          ...prev.requirements,
-          itemsByCategory: nextItemsByCategory,
-        },
-      };
-    });
+    clearFramingAdjustment(itemId);
+    srdStore.setFraming(itemId, { ...framingFor(srdStore.getSnapshot(), itemId), hidden: true });
   };
 
   const handleBatchCaptureAllSnapshots = async () => {
@@ -669,6 +663,8 @@ export function useSrdPrintModal({
         count++;
         setBatchProgress({ current: count, total: linkedRequirementItems.length });
         if (!it.linkedNodeIds || it.linkedNodeIds.length === 0) continue;
+        const target = framingFor(srdStore.getSnapshot(), it.id);
+        if (target.hidden) continue;
 
         const targetPath = getPrimaryPathForNodes(nodes, it.linkedNodeIds);
         if (setPath && !isSamePath(activeCanvasPathRef.current, targetPath)) {
@@ -677,10 +673,8 @@ export function useSrdPrintModal({
           await new Promise((resolve) => setTimeout(resolve, 80));
         }
 
-        const pan = it.snapshotFraming
-          ? { x: it.snapshotFraming.offsetX, y: it.snapshotFraming.offsetY }
-          : { x: 0, y: 0 };
-        const zoom = it.snapshotFraming?.zoom ?? 1.0;
+        const pan = { x: target.offsetX, y: target.offsetY };
+        const zoom = target.zoom;
         const dataUrl = await captureNodeSubsetSnapshot(nodes, it.linkedNodeIds, {
           panOffset: pan,
           zoomMultiplier: zoom,
@@ -720,6 +714,7 @@ export function useSrdPrintModal({
     } finally {
       setIsCapturingItemSnapshot(false);
       setBatchProgress(null);
+      setCaptureSettledCount((n) => n + 1);
     }
   };
 

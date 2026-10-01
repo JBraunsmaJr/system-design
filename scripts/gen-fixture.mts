@@ -9,7 +9,19 @@
  * actually wrote, not what we currently believe it wrote.
  */
 import { writeFileSync, mkdirSync } from 'node:fs';
-import * as serialization from './src/domain/serialization';
+
+// Serialization moved from src/domain/ to src/domain/canvas/; historical
+// commits have it at the old path, newer ones at the new path.
+const serialization: Record<string, unknown> =
+  await import('./src/domain/canvas/serialization').catch(
+    () => import('./src/domain/serialization'),
+  );
+
+// Commits from before the SRD was document content have no srdSettings; for
+// them `srd` is undefined and the trailing argument is ignored.
+const srdSettings = (await import('./src/domain/srd/srdSettings').catch(() => null)) as {
+  expandSrdFileValue(raw: unknown): unknown;
+} | null;
 
 const FIXED_DATE = '2026-01-01T00:00:00.000Z';
 
@@ -257,7 +269,26 @@ const milestones = [
   },
 ];
 
-const toDiagramFile = (serialization as Record<string, unknown>).toDiagramFile as (
+// Non-default in every stored category, so the fixture exercises each one.
+const srd = srdSettings?.expandSrdFileValue({
+  presetId: 'custom',
+  requirementsLayout: 'list',
+  theme: {
+    primaryColor: '#0f766e',
+    secondaryColor: '#334155',
+    accentColor: '#0d9488',
+    fontFamily: 'Inter, system-ui, sans-serif',
+    tableDense: true,
+    pageOrientation: 'landscape',
+  },
+  metadata: { organization: 'Fixture Org', version: '2.1.0' },
+  framing: {
+    'TICKET-1': { offsetX: 12, offsetY: -8, zoom: 1.25 },
+    'REQ-1': { offsetX: 0, offsetY: 0, zoom: 1, hidden: true },
+  },
+});
+
+const toDiagramFile = serialization.toDiagramFile as (
   ...args: unknown[]
 ) => Record<string, unknown>;
 
@@ -270,6 +301,7 @@ const file = toDiagramFile(
   programIncrements,
   team,
   milestones,
+  srd,
 );
 
 // Pin the timestamp so fixtures are byte-stable across regeneration.

@@ -74,6 +74,11 @@ export function useDocumentStores({ activeSession, openDoc }: UseDocumentStoresO
   const diagramStore = useMemo(() => undoableStore(rawStores.diagram, undo), [rawStores, undo]);
   const metaStore = useMemo(() => undoableStore(rawStores.meta, undo), [rawStores, undo]);
   const metaSnapshot = useSyncExternalStore(metaStore.subscribe, metaStore.getSnapshot);
+  // Subscribed here like every other domain, so autosave and file saves see
+  // SRD edits. Edits are infrequent and the snapshot keeps unchanged parts'
+  // identity, so this costs App a render only when the SRD actually changes.
+  const srdStore = useMemo(() => undoableStore(rawStores.srd, undo), [rawStores, undo]);
+  const srdSnapshot = useSyncExternalStore(srdStore.subscribe, srdStore.getSnapshot);
   const { title, scenarios } = metaSnapshot;
 
   // Same value-or-updater shape as the useState setters these replaced, so
@@ -134,6 +139,8 @@ export function useDocumentStores({ activeSession, openDoc }: UseDocumentStoresO
     programIncrementsStore,
     milestonesStore,
     diagramStore,
+    srdStore,
+    srdSnapshot,
     title,
     scenarios,
     setTitle,
