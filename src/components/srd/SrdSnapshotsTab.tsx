@@ -1,13 +1,11 @@
 import { RotateCcw, Camera, Trash2, RefreshCw } from 'lucide-react';
-import type { SrdModalState, SrdPrintModalProps } from './useSrdPrintModal';
+import type { SrdViewState } from './useSrdView';
 
 /**
  * The Snapshots tab: per-requirement diagram snapshots and their framing.
  *
- * Moved unchanged from SrdPrintModal.tsx; its props are exactly the modal
- * state it reads. Not memoized: it re-renders whenever the modal does, as
- * this markup did when it was inline, at the cost of one extra function
- * call per modal render.
+ * Its props are exactly the SRD view state it reads. Not memoized: it
+ * re-renders whenever the view does, at the cost of one function call.
  */
 export function SrdSnapshotsTab({
   selectedFramingItemId,
@@ -31,7 +29,7 @@ export function SrdSnapshotsTab({
   handleRemoveItemSnapshot,
   handleBatchCaptureAllSnapshots,
 }: Pick<
-  SrdModalState,
+  SrdViewState,
   | 'selectedFramingItemId'
   | 'setSelectedFramingItemId'
   | 'isCapturingItemSnapshot'
@@ -52,8 +50,7 @@ export function SrdSnapshotsTab({
   | 'handleCaptureItemSnapshot'
   | 'handleRemoveItemSnapshot'
   | 'handleBatchCaptureAllSnapshots'
-> &
-  Required<Pick<SrdPrintModalProps, 'nodes'>>) {
+>) {
   return (
     <div className="srd-sidebar__field-group">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

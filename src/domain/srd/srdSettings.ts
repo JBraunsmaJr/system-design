@@ -99,6 +99,13 @@ export function toRenderConfig(
 
 // --- Defaults -----------------------------------------------------------------
 
+/**
+ * The framing key of the architecture diagram, alongside requirement items'
+ * keys. Requirement ids never start with '@' (they are a type prefix and a
+ * sequence number), so it cannot collide with one.
+ */
+export const SRD_DIAGRAM_FRAMING_KEY = '@diagram';
+
 export const DEFAULT_SNAPSHOT_FRAMING: Readonly<SrdSnapshotFraming> = Object.freeze({
   offsetX: 0,
   offsetY: 0,
@@ -442,6 +449,9 @@ export function applyDocumentState(
   const withMetadata = applyMetadataOverrides(data, state.metadata);
   const hasHidden = Object.values(state.framing).some((f) => f.hidden);
   if (!hasHidden) return withMetadata;
+  const diagramHidden =
+    state.framing[SRD_DIAGRAM_FRAMING_KEY]?.hidden === true &&
+    withMetadata.architecture.diagramImageBase64 !== undefined;
   const itemsByCategory: SrdDataContext['requirements']['itemsByCategory'] = {};
   for (const [categoryId, items] of Object.entries(withMetadata.requirements.itemsByCategory)) {
     itemsByCategory[categoryId] = items.map((item) =>
@@ -452,13 +462,19 @@ export function applyDocumentState(
   }
   return {
     ...withMetadata,
+    architecture: diagramHidden
+      ? { ...withMetadata.architecture, diagramImageBase64: undefined }
+      : withMetadata.architecture,
     requirements: { ...withMetadata.requirements, itemsByCategory },
   };
 }
 
 /** The framing to render `item`'s snapshot with: the document's, or the
  * default when it has none. */
-export function framingFor(state: SrdDocumentState, itemId: string): SrdSnapshotFraming {
+export function framingFor(
+  state: Pick<SrdDocumentState, 'framing'>,
+  itemId: string,
+): SrdSnapshotFraming {
   return state.framing[itemId] ?? DEFAULT_SNAPSHOT_FRAMING;
 }
 

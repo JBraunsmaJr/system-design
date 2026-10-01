@@ -13,6 +13,8 @@ import {
 import type { ProgramIncrement } from '../domain/timeline/programIncrements';
 import { EMPTY_TEAM_DOCUMENT, type TeamDocument } from '../domain/timeline/teamTypes';
 import type { Milestone } from '../domain/timeline/milestones';
+import { expandSrdFileValue } from '../domain/srd/srdSettings';
+import type { SrdDocumentState } from '../domain/srd/srdTypes';
 
 /*
  * Moved unchanged from App.tsx. Pure functions and constants: nothing here
@@ -32,6 +34,10 @@ export interface DiagramSnapshot {
   programIncrements: ProgramIncrement[];
   team: TeamDocument;
   milestones: Milestone[];
+  /** Absent for files from before the SRD was document content, and for a
+   * new document; both read as the defaults. Carried through so opening a
+   * file or restoring an autosave keeps the file's SRD. */
+  srd?: SrdDocumentState;
 }
 
 /**
@@ -69,6 +75,7 @@ export function diagramFileToSnapshot(file: ReturnType<typeof parseDiagramFile>)
     programIncrements: file.programIncrements,
     team: file.team ?? EMPTY_TEAM_DOCUMENT,
     milestones: file.milestones ?? [],
+    srd: file.srd === undefined ? undefined : expandSrdFileValue(file.srd),
   };
 }
 
@@ -98,5 +105,6 @@ export function snapshotToDiagramFile(snapshot: DiagramSnapshot) {
     snapshot.programIncrements,
     snapshot.team,
     snapshot.milestones,
+    snapshot.srd,
   );
 }

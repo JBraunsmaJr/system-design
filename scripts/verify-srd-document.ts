@@ -15,6 +15,7 @@ import { undoableStore, createUndoController } from '../src/collab/stores/undoMa
 import { parseDiagramFile, toDiagramFile } from '../src/domain/canvas/serialization.ts';
 import { AGILE_ENGINEERING_TEMPLATE } from '../src/domain/srd/srdTemplatePresets.ts';
 import { DEFAULT_SRD_DOCUMENT_STATE } from '../src/domain/srd/srdSettings.ts';
+import { diagramFileToSnapshot, snapshotToDiagramFile } from '../src/app/documentSnapshot.ts';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {
@@ -104,6 +105,21 @@ console.log('=== 3. Save and reload round trip ===');
 
   const untouched = new Y.Doc();
   assert(fileFrom(untouched).srd === undefined, 'an untouched SRD adds nothing to the file');
+}
+
+console.log('=== 3b. Opening a file and restoring an autosave keep the SRD ===');
+{
+  // Both go file -> snapshot -> file before reaching the document.
+  const roundTripped = snapshotToDiagramFile(
+    diagramFileToSnapshot(parseDiagramFile(fixture('0.8'))),
+  );
+  const opened = await openDocument({ docId: 'srd-open', persist: false, initial: roundTripped });
+  const srd = opened.stores.srd.getSnapshot();
+  assert(srd.metadata.organization === 'Fixture Org', "the file's SRD survives the snapshot path");
+  assert(srd.framing['TICKET-1']?.zoom === 1.25, 'framing survives the snapshot path');
+  await opened.close();
+  const old = diagramFileToSnapshot(parseDiagramFile(fixture('0.7')));
+  assert(old.srd === undefined, 'a file without an SRD still has none');
 }
 
 console.log('=== 4. Loading a file replaces the SRD too ===');

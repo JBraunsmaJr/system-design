@@ -13,7 +13,9 @@ import {
   FileDown,
   Package,
   BookOpen,
+  FileText,
 } from 'lucide-react';
+import type { ViewMode } from '../../app/hooks/useViewNavigation';
 import { ExportMenu } from '../workspace/ExportMenu';
 import { getDocsUrl } from '../../domain/network/docsLocation';
 import { FileMenu } from '../workspace/FileMenu';
@@ -31,15 +33,14 @@ interface ToolbarProps {
   onToggleScenarioPanel: () => void;
   onExportPng: () => void;
   onExportSvg: () => void;
-  onExportSrdMarkdown?: () => void;
-  onExportSrdPrint?: () => void;
+  onOpenSrd?: () => void;
   canExport: boolean;
   onUndo: () => void;
   onRedo: () => void;
   canUndo: boolean;
   canRedo: boolean;
-  viewMode: 'diagram' | 'requirements' | 'timeline' | 'team' | 'skill-tree';
-  onSetViewMode: (mode: 'diagram' | 'requirements' | 'timeline' | 'team' | 'skill-tree') => void;
+  viewMode: ViewMode;
+  onSetViewMode: (mode: ViewMode) => void;
   onExportRequirementsMarkdown: () => void;
   canExportRequirements: boolean;
   onManageLibraries?: () => void;
@@ -80,8 +81,7 @@ export function Toolbar({
   onToggleScenarioPanel,
   onExportPng,
   onExportSvg,
-  onExportSrdMarkdown,
-  onExportSrdPrint,
+  onOpenSrd,
   canExport,
   onUndo,
   onRedo,
@@ -160,8 +160,7 @@ export function Toolbar({
             <ExportMenu
               onExportPng={onExportPng}
               onExportSvg={onExportSvg}
-              onExportSrdMarkdown={onExportSrdMarkdown}
-              onExportSrdPrint={onExportSrdPrint}
+              onOpenSrd={onOpenSrd}
               disabled={!canExport}
             />
           )}
@@ -259,6 +258,15 @@ export function Toolbar({
           >
             <Network size={13} />
             <span className="toolbar__label">Skill Tree</span>
+          </button>
+          <button
+            type="button"
+            className={viewMode === 'srd' ? 'active' : undefined}
+            onClick={() => onSetViewMode('srd')}
+            title="Solution Requirement Document - customize, preview and export"
+          >
+            <FileText size={13} />
+            <span className="toolbar__label">SRD</span>
           </button>
         </div>
       </div>

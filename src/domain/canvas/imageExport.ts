@@ -29,17 +29,37 @@ function downloadDataUrl(dataUrl: string, filename: string): void {
 }
 
 /**
+ * Where and how to capture. Defaults capture the editor's own canvas at the
+ * device's pixel ratio, which is what the PNG/SVG exports want. A caller
+ * rendering its own canvas (the SRD capture surface) passes that canvas as
+ * `root`, and pins `pixelRatio` so the result does not depend on the screen.
+ */
+export interface CaptureTarget {
+  /** The element containing the React Flow canvas to capture. */
+  root?: ParentNode;
+  pixelRatio?: number;
+}
+
+function findViewport(root: ParentNode = document): HTMLElement | null {
+  return root.querySelector<HTMLElement>('.react-flow__viewport');
+}
+
+/**
  * Renders the current diagram (all nodes, not just what's currently in
  * view/zoomed to) by temporarily transforming a clone of React Flow's
  * `.react-flow__viewport` element - this is the standard html-to-image +
  * React Flow recipe. Background/MiniMap/Controls live outside that element,
  * so they're excluded from the export automatically.
  */
-async function captureViewport(format: 'png' | 'svg', nodes: Node[]): Promise<string> {
+async function captureViewport(
+  format: 'png' | 'svg',
+  nodes: Node[],
+  target: CaptureTarget = {},
+): Promise<string> {
   if (nodes.length === 0) {
     throw new Error('Nothing to export yet - add some nodes first.');
   }
-  const viewportEl = document.querySelector<HTMLElement>('.react-flow__viewport');
+  const viewportEl = findViewport(target.root);
   if (!viewportEl) {
     throw new Error("Couldn't find the canvas to export.");
   }
@@ -58,6 +78,7 @@ async function captureViewport(format: 'png' | 'svg', nodes: Node[]): Promise<st
     backgroundColor: EXPORT_BACKGROUND,
     width: EXPORT_WIDTH,
     height: EXPORT_HEIGHT,
+    pixelRatio: target.pixelRatio,
     style: {
       width: `${EXPORT_WIDTH}px`,
       height: `${EXPORT_HEIGHT}px`,
@@ -83,10 +104,11 @@ export async function exportDiagramAsPng(nodes: Node[], title: string): Promise<
 export async function captureDiagramSnapshot(
   nodes: Node[],
   format: 'png' | 'svg' = 'png',
+  target?: CaptureTarget,
 ): Promise<string | undefined> {
   if (!nodes || nodes.length === 0) return undefined;
   try {
-    return await captureViewport(format, nodes);
+    return await captureViewport(format, nodes, target);
   } catch (err) {
     console.warn('Could not capture diagram snapshot:', err);
     return undefined;
@@ -109,7 +131,7 @@ export async function captureSelectedNodesSnapshot(
   return captureDiagramSnapshot(targetNodes, format);
 }
 
-export interface SubsetSnapshotOptions {
+export interface SubsetSnapshotOptions extends CaptureTarget {
   padding?: number;
   width?: number;
   height?: number;
@@ -230,7 +252,7 @@ export async function captureNodeSubsetSnapshot(
     return undefined;
   }
 
-  const viewportEl = document.querySelector<HTMLElement>('.react-flow__viewport');
+  const viewportEl = findViewport(options?.root);
   if (!viewportEl) {
     console.warn("Couldn't find .react-flow__viewport to export node subset.");
     return undefined;
@@ -277,6 +299,7 @@ export async function captureNodeSubsetSnapshot(
       backgroundColor: bgColor,
       width,
       height,
+      pixelRatio: options?.pixelRatio,
       style: {
         width: `${width}px`,
         height: `${height}px`,

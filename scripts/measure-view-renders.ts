@@ -328,7 +328,7 @@ async function typeSlowly(page: Page, selector: string, text: string) {
   }
 }
 
-const SRD = '.srd-modal-backdrop';
+const SRD = '.srd-view';
 const LIB = '.modal-overlay';
 const MENU = '.canvas-context-menu, .color-picker-panel, .icon-picker__panel';
 const menuItem = (label: string) => `.canvas-context-menu button:has-text("${label}")`;
@@ -419,7 +419,7 @@ const SCENARIOS: Scenario[] = [
   },
   { id: 'timeline/open-item', run: (p) => p.getByText('Ticket 5 auth token work').first().click() },
   { id: 'timeline/close-item', run: (p) => p.keyboard.press('Escape') },
-  // --- SRD modal (DOM compared: the preview is what becomes the PDF) ----
+  // --- SRD view (DOM compared: the preview is what becomes the PDF) -----
   // Remounting the canvas lets React Flow measure its nodes through
   // ResizeObserver, so this step's commit count varies from run to run.
   { id: 'srd/to-diagram', setup: true, run: (p) => p.click('button[title="Diagram"]') },
@@ -427,9 +427,8 @@ const SCENARIOS: Scenario[] = [
     id: 'srd/open',
     dom: SRD,
     run: async (p) => {
-      await p.click('button[title="Export"]');
-      await p.click('button:has-text("Export SRD (PDF / Print)")');
-      await p.waitForSelector('.srd-modal');
+      await p.click('button[title^="Solution Requirement Document"]');
+      await p.waitForSelector(SRD);
     },
   },
   { id: 'srd/type-title', dom: SRD, run: (p) => typeSlowly(p, srdField('Document Title'), ' v2') },
@@ -456,7 +455,7 @@ const SCENARIOS: Scenario[] = [
       p.selectOption('.srd-sidebar__select >> nth=0', 'agile_engineering').then(() => undefined),
   },
   { id: 'srd/tab-doc', dom: SRD, run: (p) => srdTab(p, 0) },
-  { id: 'srd/close', run: (p) => p.keyboard.press('Escape') },
+  { id: 'srd/close', run: (p) => p.click('button[title="Diagram"]') },
   // --- Library manager modal ---------------------------------------------
   {
     id: 'lib/open',

@@ -1,14 +1,12 @@
 import { ArrowUp, ArrowDown, List, Table as TableIcon } from 'lucide-react';
 import { AutoResizeTextarea } from './AutoResizeTextarea';
-import type { SrdModalState } from './useSrdPrintModal';
+import type { SrdViewState } from './useSrdView';
 
 /**
  * The Layout tab: which sections appear, their order and table options.
  *
- * Moved unchanged from SrdPrintModal.tsx; its props are exactly the modal
- * state it reads. Not memoized: it re-renders whenever the modal does, as
- * this markup did when it was inline, at the cost of one extra function
- * call per modal render.
+ * Its props are exactly the SRD view state it reads. Not memoized: it
+ * re-renders whenever the view does, at the cost of one function call.
  */
 export function SrdLayoutTab({
   templateConfig,
@@ -20,7 +18,7 @@ export function SrdLayoutTab({
   handleToggleConnectionsTable,
   sortedSections,
 }: Pick<
-  SrdModalState,
+  SrdViewState,
   | 'templateConfig'
   | 'handleToggleSection'
   | 'handleMoveSection'

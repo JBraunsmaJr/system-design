@@ -13,7 +13,7 @@ import { EMPTY_DIAGRAM } from '../documentSnapshot';
 import type { DiagramPath } from '../../domain/canvas/subDiagramTree';
 import type { ArchNodeData, ArchEdgeData } from '../../domain/canvas/types';
 
-export type ViewMode = 'diagram' | 'requirements' | 'timeline' | 'team' | 'skill-tree';
+export type ViewMode = 'diagram' | 'requirements' | 'timeline' | 'team' | 'skill-tree' | 'srd';
 
 export interface UseViewNavigationOptions {
   activeSession: object | null;
@@ -52,9 +52,7 @@ export function useViewNavigation({
   // Which top-level page is showing - the diagram canvas or the
   // requirements document. Deliberately NOT part of the undoable
   // DiagramSnapshot: switching pages isn't an edit to the content itself.
-  const [viewMode, setViewModeRaw] = useState<
-    'diagram' | 'requirements' | 'timeline' | 'team' | 'skill-tree'
-  >('diagram');
+  const [viewMode, setViewModeRaw] = useState<ViewMode>('diagram');
   /**
    * The recursive tree, for the views still written against it
    * (requirements, timeline, skill tree - all to find linked nodes).

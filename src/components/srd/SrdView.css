@@ -1,32 +1,31 @@
 /* SRD Export & Print Modal Styling */
 
-.srd-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background-color: color-mix(in srgb, var(--black) 75%, transparent);
-  backdrop-filter: blur(4px);
-  z-index: 10000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1.5rem;
-}
-
-.srd-modal {
+.srd-view {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
   background-color: var(--chrome-bg);
   color: var(--chrome-text);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--chrome-border);
-  width: 100%;
-  max-width: 1280px;
-  height: 92vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 25px 50px -12px color-mix(in srgb, var(--black) 50%, transparent);
   overflow: hidden;
 }
 
-.srd-modal__header {
+/* The offscreen canvas SRD snapshots are rendered from (SrdCaptureSurface).
+   Offscreen rather than hidden: html-to-image copies computed styles, so
+   display: none or visibility: hidden would capture nothing. Sized to the
+   largest capture. */
+.srd-capture-surface {
+  position: fixed;
+  top: 0;
+  left: -100000px;
+  width: 1600px;
+  height: 1000px;
+  pointer-events: none;
+  contain: strict;
+}
+
+.srd-view__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -35,38 +34,45 @@
   background-color: var(--chrome-bg-raised);
 }
 
-.srd-modal__title-group {
+.srd-view__title-group {
   display: flex;
   align-items: center;
   gap: 0.75rem;
 }
 
-.srd-modal__title {
+.srd-view__title {
   font-size: var(--text-xl);
   font-weight: 600;
   color: var(--white);
   margin: 0;
 }
 
-.srd-modal__subtitle {
+.srd-view__subtitle {
   font-size: var(--text-sm);
   color: var(--chrome-text-dim);
   margin: 0;
 }
 
-.srd-modal__header-actions {
+.srd-view__header-actions {
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
 
-.srd-modal__body {
+.srd-view__body {
   display: flex;
   flex: 1;
   overflow: hidden;
 }
 
 /* Customization Sidebar */
+.srd-sidebar__hint {
+  margin: 0 0 0.5rem;
+  font-size: var(--text-xs);
+  line-height: 1.45;
+  color: var(--chrome-text-dim);
+}
+
 .srd-sidebar {
   width: 380px;
   min-width: 380px;
@@ -817,21 +823,6 @@
   width: 100%;
 }
 
-/* Loading Overlay */
-.srd-loading-overlay {
-  position: fixed;
-  inset: 0;
-  background-color: color-mix(in srgb, var(--canvas-bg) 85%, transparent);
-  backdrop-filter: blur(4px);
-  z-index: 10005;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-  color: var(--chrome-text);
-}
-
 .srd-loading-spinner {
   width: 44px;
   height: 44px;
@@ -849,17 +840,6 @@
   to {
     transform: rotate(360deg);
   }
-}
-
-.srd-loading-title {
-  font-size: var(--text-lg-plus);
-  font-weight: 600;
-  color: var(--white);
-}
-
-.srd-loading-desc {
-  font-size: var(--text-sm);
-  color: var(--chrome-text-dim);
 }
 
 /* Footer / Classification */
@@ -897,39 +877,31 @@
     visibility: hidden;
   }
 
-  .srd-modal-backdrop,
-  .srd-modal,
+  .srd-view,
   .srd-preview-container,
   .srd-preview-paper,
   .srd-preview-paper * {
     visibility: visible !important;
   }
 
-  .srd-modal-backdrop {
+  .srd-view {
     position: absolute !important;
     top: 0 !important;
     left: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
     background-color: var(--print-paper) !important;
     background: var(--print-paper) !important;
     padding: 0 !important;
     margin: 0 !important;
     display: block !important;
     width: 100% !important;
-  }
-
-  .srd-modal {
-    border: none !important;
-    box-shadow: none !important;
-    max-width: 100% !important;
     height: auto !important;
-    background-color: var(--print-paper) !important;
-    background: var(--print-paper) !important;
-    display: block !important;
-    margin: 0 !important;
-    padding: 0 !important;
+    overflow: visible !important;
   }
 
-  .srd-modal__header,
+  .srd-view__header,
+  .srd-capture-surface,
   .srd-sidebar {
     display: none !important;
   }

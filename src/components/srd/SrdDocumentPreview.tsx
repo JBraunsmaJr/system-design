@@ -3,44 +3,23 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import { interpolateTokens } from '../../domain/srd/srdMarkdownExport';
-import type { SrdModalState, SrdPrintModalProps } from './useSrdPrintModal';
+import type { SrdViewState } from './useSrdView';
 
 /**
- * The live document preview. Its DOM is what the PDF export and printing
- * capture, so its markup must not change without intent.
+ * The live document preview. Its DOM is what printing captures, so its
+ * markup must not change without intent.
  *
- * Moved unchanged from SrdPrintModal.tsx; its props are exactly the modal
- * state it reads. Not memoized: it re-renders whenever the modal does, as
- * this markup did when it was inline, at the cost of one extra function
- * call per modal render.
+ * A pure function of the document's data and settings: it shows exactly what
+ * would print, never editor state. Capture progress and live framing
+ * feedback belong to the editing panel, so a collaborator's in-progress
+ * adjustment can never leak into what this renders.
  */
-export function SrdDocumentPreview({
+export const SrdDocumentPreview = React.memo(function SrdDocumentPreview({
   templateConfig,
   currentSrdData,
-  isCapturingSnapshot,
-  isCapturingItemSnapshot,
   paperRef,
-  currentFramingItem,
-  framingRelZoom,
-  framingDxPercent,
-  framingDyPercent,
-  isFramingTransformed,
   activeSortedSections,
-}: Pick<
-  SrdModalState,
-  | 'templateConfig'
-  | 'currentSrdData'
-  | 'isCapturingSnapshot'
-  | 'isCapturingItemSnapshot'
-  | 'paperRef'
-  | 'currentFramingItem'
-  | 'framingRelZoom'
-  | 'framingDxPercent'
-  | 'framingDyPercent'
-  | 'isFramingTransformed'
-  | 'activeSortedSections'
-> &
-  Required<Pick<SrdPrintModalProps, 'nodes'>>) {
+}: Pick<SrdViewState, 'templateConfig' | 'currentSrdData' | 'paperRef' | 'activeSortedSections'>) {
   return (
     <div className="srd-preview-container">
       <div
@@ -197,43 +176,15 @@ export function SrdDocumentPreview({
 
                 {section.id === 'architecture' && (
                   <div>
-                    {currentSrdData.architecture.diagramImageBase64 ? (
-                      <div className="srd-doc__diagram-container" style={{ position: 'relative' }}>
-                        {isCapturingSnapshot && (
-                          <div className="srd-doc__snapshot-loading-overlay">
-                            <div
-                              className="srd-loading-spinner"
-                              style={{ width: 28, height: 28, borderWidth: 2.5 }}
-                            />
-                            <span>Refreshing architecture snapshot...</span>
-                          </div>
-                        )}
+                    {currentSrdData.architecture.diagramImageBase64 && (
+                      <div className="srd-doc__diagram-container">
                         <img
                           src={currentSrdData.architecture.diagramImageBase64}
                           alt="System Architecture Diagram"
                           className="srd-doc__diagram-img"
                         />
                       </div>
-                    ) : isCapturingSnapshot ? (
-                      <div
-                        className="srd-doc__diagram-container"
-                        style={{
-                          position: 'relative',
-                          minHeight: 140,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        <div className="srd-doc__snapshot-loading-overlay">
-                          <div
-                            className="srd-loading-spinner"
-                            style={{ width: 28, height: 28, borderWidth: 2.5 }}
-                          />
-                          <span>Capturing architecture snapshot...</span>
-                        </div>
-                      </div>
-                    ) : null}
+                    )}
 
                     {templateConfig.includeComponentTable && (
                       <>
@@ -411,11 +362,8 @@ export function SrdDocumentPreview({
                                       </div>
                                     </div>
 
-                                    {item.contextSnapshotBase64 ? (
-                                      <div
-                                        className="srd-doc__item-snapshot-container"
-                                        style={{ position: 'relative' }}
-                                      >
+                                    {item.contextSnapshotBase64 && (
+                                      <div className="srd-doc__item-snapshot-container">
                                         <div className="srd-doc__item-snapshot-caption">
                                           Architecture Context Snapshot
                                         </div>
@@ -423,37 +371,9 @@ export function SrdDocumentPreview({
                                           src={item.contextSnapshotBase64}
                                           alt={`Context snapshot for ${item.id}`}
                                           className="srd-doc__item-snapshot-img"
-                                          style={{
-                                            transform:
-                                              currentFramingItem?.id === item.id &&
-                                              isFramingTransformed
-                                                ? `translate(${framingDxPercent}%, ${framingDyPercent}%) scale(${framingRelZoom})`
-                                                : undefined,
-                                            transformOrigin: 'center center',
-                                          }}
                                         />
                                       </div>
-                                    ) : isCapturingItemSnapshot &&
-                                      currentFramingItem?.id === item.id ? (
-                                      <div
-                                        className="srd-doc__item-snapshot-container"
-                                        style={{
-                                          position: 'relative',
-                                          minHeight: 120,
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                        }}
-                                      >
-                                        <div className="srd-doc__snapshot-loading-overlay">
-                                          <div
-                                            className="srd-loading-spinner"
-                                            style={{ width: 22, height: 22, borderWidth: 2 }}
-                                          />
-                                          <span>Capturing context snapshot...</span>
-                                        </div>
-                                      </div>
-                                    ) : null}
+                                    )}
 
                                     {item.linkedNodeLabels && item.linkedNodeLabels.length > 0 && (
                                       <div className="srd-doc__item-linked-nodes">
@@ -643,4 +563,4 @@ export function SrdDocumentPreview({
       </div>
     </div>
   );
-}
+});
