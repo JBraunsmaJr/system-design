@@ -101,7 +101,7 @@ export function Toolbar({
     <header className="toolbar">
       <div className="toolbar__row toolbar__row--primary">
         <div className="toolbar__brand">
-          <span className="toolbar__brand-mark">SD</span>
+          <span className="toolbar__brand-mark">EN</span>
           <span className="toolbar__brand-name">Engineers Notebook</span>
         </div>
         <input
