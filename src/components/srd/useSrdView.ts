@@ -64,9 +64,11 @@ export function useSrdView({ srdStore, srd, currentSrdData, snapshots }: UseSrdV
   >('doc');
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [pdfStatus, setPdfStatus] = useState('');
-  // The react-pdf renderer (Phase 2), opted into per person and session:
-  // it is how this person previews and exports, not part of the document.
-  const [useNewRenderer, setUseNewRenderer] = useState(false);
+  // Which engine previews and exports: the react-pdf one, by default, or the
+  // previous jsPDF one as a fallback while it is retired. Per person and
+  // session - how this person works, not part of the document.
+  const [usePreviousEngine, setUsePreviousEngine] = useState(false);
+  const useNewRenderer = !usePreviousEngine;
   // The PDF the new renderer's preview last finished drawing - exactly what
   // the user sees, so exporting it needs no second render.
   const newRendererPdfRef = useRef<Blob | null>(null);
@@ -428,7 +430,8 @@ export function useSrdView({ srdStore, srd, currentSrdData, snapshots }: UseSrdV
     isExportingPdf,
     pdfStatus,
     useNewRenderer,
-    setUseNewRenderer,
+    usePreviousEngine,
+    setUsePreviousEngine,
     handleNewRendererPdf,
     selectedFramingItemId,
     setSelectedFramingItemId,

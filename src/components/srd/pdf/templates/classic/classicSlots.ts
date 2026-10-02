@@ -148,15 +148,14 @@ export function createClassicSlots(
     },
     emptyNote: { fontStyle: 'italic', color: P.ink500, marginBottom: 8 },
     // Tighter than body text: rows are short and many.
-    table: {
-      marginBottom: 10,
-      borderTopWidth: 1,
-      borderColor: P.ink200,
-      ...type(9, 1.3),
-    },
+    // No top border here: a table may carry its heading inside it (see
+    // PdfTable), so the top rule belongs to the header row.
+    table: { marginBottom: 10, ...type(9, 1.3) },
     tableHeaderRow: {
       flexDirection: 'row',
       backgroundColor: P.ink100,
+      borderTopWidth: 1,
+      borderTopColor: P.ink200,
       borderBottomWidth: 1,
       borderColor: P.ink300,
     },
@@ -167,12 +166,12 @@ export function createClassicSlots(
     strong: { fontWeight: 700, color: P.ink900 },
     code: { ...mono, ...type(8.5, 1.3), color: P.ink800 },
     // Framed on the image itself, as one node (see IMAGES_IN_THE_BROWSER in
-    // SrdPdfSections). A fixed box,
-    // within one page's content height since an image never splits: Letter
-    // landscape leaves about 428pt, portrait about 616pt.
+    // SrdPdfSections). A fixed box, the size the previous export drew it,
+    // which fits one page's content height in either orientation (Letter
+    // landscape leaves about 428pt) - an image never splits.
     diagramImage: {
       width: '100%',
-      height: theme.pageOrientation === 'landscape' ? 300 : 420,
+      height: 240,
       objectFit: 'contain',
       marginVertical: 8,
       padding: 6,
@@ -231,7 +230,8 @@ export function createClassicSlots(
     },
     // A fixed height (see IMAGES_IN_THE_BROWSER in SrdPdfSections), which
     // also bounds the unsplittable card head to fit on one page.
-    snapshotImage: { width: '100%', height: 220, objectFit: 'contain' },
+    // 150pt, as the previous export drew snapshots.
+    snapshotImage: { width: '100%', height: 150, objectFit: 'contain' },
     cardDetail: { ...type(8.5, 1.45), color: P.ink600, marginTop: 3 },
     nodeTag: { ...mono, ...type(8, 1.2), color: P.ink700 },
     cardBody: { marginTop: 4 },

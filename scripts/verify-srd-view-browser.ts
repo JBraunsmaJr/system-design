@@ -48,9 +48,15 @@ const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
 const ITEM_IMG = '.srd-doc__item-snapshot-img';
 const DIAGRAM_IMG = '.srd-doc__diagram-img';
 
-async function openSrd(p: Page) {
+/**
+ * Opens the SRD view. The new PDF engine is the default; the steps that
+ * inspect snapshots through the HTML preview select the previous engine,
+ * whose preview is plain markup (`engine: 'previous'`).
+ */
+async function openSrd(p: Page, engine: 'new' | 'previous' = 'previous') {
   await p.click('button[title^="Solution Requirement Document"]');
   await p.waitForSelector('.srd-view');
+  if (engine === 'previous') await p.check('.srd-view__renderer-toggle input');
 }
 
 const imageSizes = (p: Page, selector: string) =>
@@ -86,6 +92,10 @@ async function run() {
     await p.goto(servers.appUrl);
     await p.waitForSelector('.collab-panel__trigger');
     await p.setInputFiles('input[type="file"][accept="application/json"]', FILE);
+    check(
+      pdfLibraryRequests.length === 0,
+      'react-pdf and pdf.js are not loaded until the SRD view opens',
+    );
     await sleep(300);
     const rootNodes = await p.$$eval('.react-flow__node', (els) => els.length);
 
@@ -129,13 +139,13 @@ async function run() {
     check(true, 'snapshots are shown again without re-rendering');
 
     console.log('=== The new PDF engine previews and exports the actual PDF ===');
-    check(pdfLibraryRequests.length === 0, 'react-pdf and pdf.js are not loaded until asked for');
     // The images the document shows, by the HTML preview: the PDF must carry
     // exactly these.
     const shownImages = (await p.$$(`${DIAGRAM_IMG}, ${ITEM_IMG}`)).length;
-    await p.check('.srd-view__renderer-toggle input');
+    // Back to the default engine: the new one.
+    await p.uncheck('.srd-view__renderer-toggle input');
     await p.waitForSelector('.srd-pdf-preview__pages canvas', { timeout: 60000 });
-    check(pdfLibraryRequests.length > 0, 'turning the engine on loads them');
+    check(pdfLibraryRequests.length > 0, 'opening the SRD view loaded them');
     const status = await p.textContent('.srd-pdf-preview__status');
     const shownPages = await p.$$eval('.srd-pdf-preview__pages canvas', (els) => els.length);
     check(/PDF · \d+ pages?/.test(status ?? ''), `the preview reports the PDF (${status})`);
@@ -184,7 +194,7 @@ async function run() {
     check(strayText === 0, `no content collapses into the footer band (${strayText} stray)`);
 
     // Back to the HTML preview, which the steps below inspect.
-    await p.uncheck('.srd-view__renderer-toggle input');
+    await p.check('.srd-view__renderer-toggle input');
     await p.waitForSelector(ITEM_IMG);
 
     console.log('=== Reframing renders that snapshot again ===');

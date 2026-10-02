@@ -5,6 +5,21 @@ import { SrdPdfTemplateContext } from './template/context';
 import { pdfTemplateFor } from './templates';
 import { stripSoftHyphens } from './srdPdfText';
 
+/**
+ * The PDF's creation and modification dates: the document's own date, so the
+ * same document renders to the same bytes for everyone, on any day - PDFs
+ * otherwise embed the moment they were made. Read as a calendar date in UTC,
+ * so no time zone moves it. A free-text date that is not one falls back to
+ * the render time.
+ */
+function documentDate(generatedAt: string): Date | undefined {
+  const calendar = /^(\d{4})-(\d{2})-(\d{2})/.exec(generatedAt.trim());
+  const time = calendar
+    ? Date.UTC(Number(calendar[1]), Number(calendar[2]) - 1, Number(calendar[3]))
+    : Date.parse(generatedAt);
+  return Number.isNaN(time) ? undefined : new Date(time);
+}
+
 export interface SrdPdfDocumentProps {
   data: SrdDataContext;
   config: SrdTemplateConfig;
@@ -36,6 +51,7 @@ export function SrdPdfDocument({
     [config.sections],
   );
   const { Layout } = template;
+  const date = useMemo(() => documentDate(data.metadata.generatedAt), [data.metadata.generatedAt]);
 
   return (
     <Document
@@ -44,6 +60,8 @@ export function SrdPdfDocument({
       subject="Solution Requirement Document"
       creator="System Design"
       producer="System Design"
+      creationDate={date}
+      modificationDate={date}
     >
       <SrdPdfTemplateContext.Provider value={context}>
         <Layout data={data} config={config} sections={sections} />

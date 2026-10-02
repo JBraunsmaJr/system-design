@@ -13,11 +13,8 @@ import { SrdDocumentPreview } from '../../SrdDocumentPreview';
 import { SRD_PDF_TEMPLATES, pdfTemplateFor } from '../templates';
 import { PDF_FONT_MONO } from '../srdPdfFonts';
 import { DEFAULT_SRD_TEMPLATE } from '../../../../domain/srd/srdTemplatePresets';
-import type {
-  RequirementItemViewModel,
-  SrdDataContext,
-  SrdTemplateConfig,
-} from '../../../../domain/srd/srdTypes';
+import type { SrdDataContext, SrdTemplateConfig } from '../../../../domain/srd/srdTypes';
+import { config, richData } from '../srdPdfTestData';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {
@@ -29,9 +26,6 @@ function assert(condition: boolean, message: string) {
 }
 
 const squash = (text: string) => text.replace(/\s+/g, '');
-const PNG =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGP8z8DAwMDAxMDAwMDAAAANHQEDasKb6QAAAABJRU5ErkJggg==';
-
 // react-pdf reports an unwrappable element taller than a page with a
 // warning, then draws it cut off; any such warning fails the run.
 const oversized: string[] = [];
@@ -40,132 +34,6 @@ console.warn = (...args: unknown[]) => {
   if (String(args[0]).includes("can't wrap between pages")) oversized.push(String(args[0]));
   else warn(...args);
 };
-
-function item(
-  n: number,
-  overrides: Partial<RequirementItemViewModel> = {},
-): RequirementItemViewModel {
-  return {
-    id: `REQ-${n}`,
-    typeId: 'req',
-    typeLabel: 'Requirement',
-    // Unique markers: no title is a prefix of another or used elsewhere.
-    title: `Requirement title ${n} end`,
-    body: `Body of requirement ${n} with **bold** text.`,
-    status: (['todo', 'in-progress', 'done'] as const)[n % 3],
-    points: n,
-    sprintName: `SPRINT-${n}-end`,
-    assigneeName: `Owner ${n}`,
-    linkedNodeIds: [`node-${n}`],
-    linkedNodeLabels: [`Service ${n}`],
-    contextSnapshotBase64: PNG,
-    ...overrides,
-  };
-}
-
-function richData(counts = { components: 6, items: 8 }): SrdDataContext {
-  const items = Array.from({ length: counts.items }, (_, i) => item(i + 1));
-  return {
-    metadata: {
-      title: 'Payments Platform',
-      description: 'Handles **card payments** and refunds.\n\n- Fraud checks\n- Settlement',
-      generatedAt: '2026-10-01',
-      version: '4.2.0',
-      authors: [{ name: 'Dana Lee', role: 'Architect' }],
-      organization: 'Acme Corp',
-    },
-    branding: {
-      primaryColor: '#1e3a8a',
-      secondaryColor: '#475569',
-      accentColor: '#0ea5e9',
-      fontFamily: 'Inter',
-    },
-    headersAndFooters: {},
-    architecture: {
-      diagramImageBase64: PNG,
-      components: Array.from({ length: counts.components }, (_, i) => ({
-        id: `c${i}`,
-        name: `Component ${i}`,
-        type: i % 2 ? 'service' : 'database',
-        description: `Responsibility of component ${i}`,
-        linkedRequirementIds: [`REQ-${i + 1}`],
-      })),
-      connections: [
-        {
-          from: 'c0',
-          fromName: 'Component 0',
-          to: 'c1',
-          toName: 'Component 1',
-          label: 'Reads ledger',
-          protocol: 'gRPC',
-        },
-        { from: 'c1', to: 'c2', label: 'Publishes events', edgeType: 'async' },
-      ],
-    },
-    requirements: {
-      categories: [
-        { id: 'sec', label: 'Security', color: '#10b981' },
-        { id: 'perf', label: 'Performance', color: '#f59e0b' },
-        { id: 'empty', label: 'Unused', color: '#000000' },
-      ],
-      itemsByCategory: {
-        sec: items.slice(0, Math.ceil(items.length / 2)),
-        perf: items.slice(Math.ceil(items.length / 2)),
-      },
-      summaryStats: {
-        total: items.length,
-        completed: 2,
-        inProgress: 3,
-        totalPoints: 36,
-        completedPoints: 9,
-      },
-    },
-    traceability: [
-      {
-        sourceId: 'REQ-1',
-        sourceTitle: 'Login flow',
-        relation: 'depends-on',
-        targetId: 'REQ-2',
-        targetTitle: 'Session store',
-      },
-    ],
-    roadmap: {
-      milestones: [
-        {
-          id: 'm1',
-          title: 'Beta Launch',
-          targetDate: '2026-12-01',
-          status: 'planned',
-          type: 'release',
-          description: 'First customers',
-        },
-      ],
-      sprints: [
-        {
-          id: 's1',
-          piName: 'PI-7',
-          name: 'Sprint 1',
-          startDate: '2026-10-05',
-          endDate: '2026-10-18',
-          totalPoints: 21,
-          assignedItems: ['REQ-1', 'REQ-2'],
-        },
-      ],
-      epicSchedules: [],
-    },
-  };
-}
-
-function config(overrides: Partial<SrdTemplateConfig> = {}): SrdTemplateConfig {
-  const base = structuredClone(DEFAULT_SRD_TEMPLATE);
-  return {
-    ...base,
-    includeComponentTable: true,
-    includeConnectionsTable: true,
-    sections: base.sections.map((s) => ({ ...s, enabled: true })),
-    ...overrides,
-  };
-}
 
 async function pdfPages(data: SrdDataContext, cfg: SrdTemplateConfig): Promise<string[]> {
   const blob = await pdf(<SrdPdfDocument data={data} config={cfg} />).toBlob();
@@ -310,6 +178,75 @@ console.log('=== 2b. A category heading stays with its first card ===');
     }
   }
   assert(true, 'category headings stay with their first card at every position tried');
+}
+
+console.log('=== 2c. A short table starts with its heading and first row ===');
+{
+  // A table of up to REPEAT_HEADER_AFTER_ROWS rows keeps its heading, header
+  // row and first row together, so none is ever left at a page's bottom.
+  const cfg = config({
+    requirementsLayout: 'table',
+    theme: { ...DEFAULT_SRD_TEMPLATE.theme, pageOrientation: 'landscape' },
+  });
+  let separated = 0;
+  for (const filler of [0, 10, 20, 30, 40, 50, 60]) {
+    const data = richData({ components: 2, items: 8 });
+    data.metadata.description = 'Filler line.\n\n'.repeat(filler + 1);
+    const pages = await pdfPages(data, cfg);
+    for (const category of data.requirements.categories) {
+      const first = data.requirements.itemsByCategory[category.id]?.[0];
+      if (!first) continue;
+      const heading = pages.findIndex((t) =>
+        squash(t).includes(squash(`Category: ${category.label}`)),
+      );
+      const page = heading === -1 ? '' : squash(pages[heading]);
+      if (
+        !page.includes('IDTitleTypeStatusEffortAssignee') ||
+        !page.includes(squash(first.title))
+      ) {
+        separated++;
+        console.error(
+          `  "Category: ${category.label}" starts apart from its rows (filler ${filler})`,
+        );
+      }
+    }
+  }
+  assert(separated === 0, 'short tables start with heading, header row and first row together');
+}
+
+console.log('=== 2d. A section heading stays with its first block ===');
+{
+  // A section's heading and introduction travel inside its first block, so
+  // they are never left at a page's bottom when that block moves on.
+  const firstBlock: Record<string, string> = {
+    executive_summary: 'Scope & Objectives',
+    architecture: 'System Architecture Diagram',
+    requirements: 'Category: Security',
+    traceability: 'Source Entity',
+    roadmap: 'Target Date',
+  };
+  let separated = 0;
+  for (const layout of ['list', 'table'] as const) {
+    const cfg = config({
+      requirementsLayout: layout,
+      theme: { ...DEFAULT_SRD_TEMPLATE.theme, pageOrientation: 'landscape' },
+    });
+    for (const filler of [0, 15, 30, 45]) {
+      const data = richData({ components: 3, items: 4 });
+      data.metadata.description = 'Filler line.\n\n'.repeat(filler + 1);
+      const pages = await pdfPages(data, cfg);
+      for (const section of cfg.sections.filter((x) => x.enabled)) {
+        const at = pages.findIndex((t) => squash(t).includes(squash(section.title)));
+        if (at === -1 || !squash(pages[at]).includes(squash(firstBlock[section.id]))) {
+          separated++;
+          console.error(
+            `  "${section.title}" is apart from its first block (${layout}, filler ${filler})`,
+          );
+        }
+      }
+    }
+  }
+  assert(separated === 0, 'every section heading shares a page with its first block');
 }
 
 console.log('=== 3. Empty states and settings ===');

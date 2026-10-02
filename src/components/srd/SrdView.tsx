@@ -93,7 +93,8 @@ export default function SrdView({
     isExportingPdf,
     pdfStatus,
     useNewRenderer,
-    setUseNewRenderer,
+    usePreviousEngine,
+    setUsePreviousEngine,
     handleNewRendererPdf,
     selectedFramingItemId,
     setSelectedFramingItemId,
@@ -157,14 +158,14 @@ export default function SrdView({
         <div className="srd-view__header-actions">
           <label
             className="srd-view__renderer-toggle"
-            title="Preview and export with the new PDF engine, which draws the document with templates."
+            title="Preview and export with the previous PDF engine instead, while it is retired."
           >
             <input
               type="checkbox"
-              checked={useNewRenderer}
-              onChange={(e) => setUseNewRenderer(e.target.checked)}
+              checked={usePreviousEngine}
+              onChange={(e) => setUsePreviousEngine(e.target.checked)}
             />
-            <span>New PDF engine (beta)</span>
+            <span>Previous PDF engine</span>
           </label>
           <button
             type="button"
