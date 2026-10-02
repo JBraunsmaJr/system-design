@@ -13,6 +13,7 @@ import {
   pdfMonoFamily,
 } from './srdPdfFonts';
 import { parseMarkdown } from './srdPdfMarkdownTree';
+import { stripSoftHyphens } from './srdPdfText';
 import { aggregateSrdData } from '../../../domain/srd/srdDataAggregator';
 import { DEFAULT_SNAPSHOT } from '../../../app/documentSnapshot';
 import { DEFAULT_SRD_TEMPLATE } from '../../../domain/srd/srdTemplatePresets';
@@ -283,6 +284,68 @@ console.log('=== 6. Settings ===');
     defaultNumbers.pages.every((t, i) => has(t, `Page ${i + 1} of ${defaultNumbers.pages.length}`)),
     'without a right footer, page numbers default to "Page n of N"',
   );
+}
+
+console.log('=== 7. Text that once crashed the engine ===');
+{
+  // Both crashed the whole PDF: JetBrains Mono's ligatures (--, //, ::) and a
+  // text made only of a soft hyphen. Rendered here with the real fonts, in
+  // every place code text appears.
+  const LIG = 'https://api.example.com // a -- b :: c && d .. e';
+  const data = sampleData();
+  data.metadata.title = '\u00ad';
+  data.metadata.description = 'Calls `' + LIG + '`.\n\n```\n' + LIG + '\n```';
+  data.architecture.components = [
+    { id: 'c1', name: 'Gateway', type: 'api--gw//v2', description: 'Routes ' + LIG },
+  ];
+  data.architecture.connections = [{ from: 'c1', to: 'c1', label: 'self', protocol: 'https://' }];
+  data.requirements.categories = [{ id: 'k', label: 'Security', color: '#000000' }];
+  data.requirements.itemsByCategory = {
+    k: [
+      {
+        id: 'REQ--1',
+        typeId: 't',
+        typeLabel: 'Requirement',
+        title: '\u00ad',
+        body: 'Uses `a::b` and ' + LIG,
+        linkedNodeIds: ['c1'],
+        linkedNodeLabels: ['svc--a//b'],
+      },
+    ],
+  };
+  const base = config();
+  let error = '';
+  let text = '';
+  try {
+    const result = await render(
+      data,
+      config({
+        includeComponentTable: true,
+        includeConnectionsTable: true,
+        requirementsLayout: 'list',
+        sections: base.sections.map((s) => ({ ...s, enabled: true, title: s.title + '\u00ad' })),
+      }),
+      true,
+    );
+    text = result.pages.join(' ');
+  } catch (err) {
+    error = (err as Error).message;
+  }
+  assert(error === '', `ligature sequences and lone soft hyphens render (${error || 'ok'})`);
+  assert(
+    ['api--gw//v2', 'REQ--1', 'svc--a//b', 'a::b'].every((t) => has(text, t)),
+    'code text is drawn as typed, character for character',
+  );
+
+  const clean = { a: ['x', { b: 'y' }] };
+  assert(stripSoftHyphens(clean) === clean, 'text without soft hyphens keeps its identity');
+  const dirty = { a: ['x', { b: 'y\u00adz' }], c: 'kept' };
+  const stripped = stripSoftHyphens(dirty);
+  assert(
+    stripped.a[1] !== dirty.a[1] && (stripped.a[1] as { b: string }).b === 'yz',
+    'soft hyphens are removed',
+  );
+  assert(stripped.c === dirty.c && stripped.a[0] === dirty.a[0], 'unchanged parts are shared');
 }
 
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);

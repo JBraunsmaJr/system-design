@@ -11,6 +11,7 @@ import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { SrdPdfDocument } from '../SrdPdfDocument';
 import { SrdDocumentPreview } from '../../SrdDocumentPreview';
 import { SRD_PDF_TEMPLATES, pdfTemplateFor } from '../templates';
+import { PDF_FONT_MONO } from '../srdPdfFonts';
 import { DEFAULT_SRD_TEMPLATE } from '../../../../domain/srd/srdTemplatePresets';
 import type {
   RequirementItemViewModel,
@@ -371,6 +372,37 @@ console.log('=== 4. Template registry ===');
   assert(
     variants.every((v) => slots.pill(v).backgroundColor),
     'every pill variant has colors',
+  );
+}
+
+console.log('=== 5. Every template draws code without ligatures ===');
+{
+  // JetBrains Mono's ligatures (--, //, ::) crash react-pdf's font engine,
+  // so any slot in any template that uses it must turn them off - which
+  // pdfMonoStyle() does. Scans every slot, so new slots are covered too.
+  const offenders: string[] = [];
+  for (const [id, template] of Object.entries(SRD_PDF_TEMPLATES)) {
+    const slots = template.createSlots(config(), true);
+    for (const placement of ['body', 'sidebar'] as const) {
+      const resolved = slots(placement);
+      const styles: Array<[string, unknown]> = [
+        ...Object.entries(resolved).filter(([key]) => key !== 'markdown' && key !== 'pill'),
+        ...Object.entries(resolved.markdown).map(
+          ([k, v]) => [`markdown.${k}`, v] as [string, unknown],
+        ),
+      ];
+      for (const [name, style] of styles) {
+        const s = style as { fontFamily?: string; fontFeatureSettings?: Record<string, boolean> };
+        if (s?.fontFamily !== PDF_FONT_MONO) continue;
+        if (s.fontFeatureSettings?.liga !== false || s.fontFeatureSettings?.calt !== false) {
+          offenders.push(`${id}/${placement}/${name}`);
+        }
+      }
+    }
+  }
+  assert(
+    offenders.length === 0,
+    `every monospace slot has ligatures off (${offenders.join(', ')})`,
   );
 }
 

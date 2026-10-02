@@ -3,6 +3,7 @@ import { Document } from '@react-pdf/renderer';
 import type { SrdDataContext, SrdTemplateConfig } from '../../../domain/srd/srdTypes';
 import { SrdPdfTemplateContext } from './template/context';
 import { pdfTemplateFor } from './templates';
+import { stripSoftHyphens } from './srdPdfText';
 
 export interface SrdPdfDocumentProps {
   data: SrdDataContext;
@@ -16,7 +17,15 @@ export interface SrdPdfDocumentProps {
  * (slots) and the page structure (layout); every section's content comes
  * from the shared renderers, so all templates carry the same document.
  */
-export function SrdPdfDocument({ data, config, fontsRegistered = false }: SrdPdfDocumentProps) {
+export function SrdPdfDocument({
+  data: rawData,
+  config: rawConfig,
+  fontsRegistered = false,
+}: SrdPdfDocumentProps) {
+  // Text that react-pdf cannot lay out is cleaned once, here, for every
+  // template (see stripSoftHyphens).
+  const data = useMemo(() => stripSoftHyphens(rawData), [rawData]);
+  const config = useMemo(() => stripSoftHyphens(rawConfig), [rawConfig]);
   const template = pdfTemplateFor(config.templateId);
   const context = useMemo(
     () => ({ slotsFor: template.createSlots(config, fontsRegistered), placement: 'body' as const }),

@@ -2,7 +2,7 @@ import { StyleSheet } from '@react-pdf/renderer';
 import type { SrdTemplateConfig } from '../../../../../domain/srd/srdTypes';
 import type { PdfMarkdownStyles, PdfStyle } from '../../srdPdfMarkdown';
 import { PDF_PALETTE as P, mixColors } from '../../srdPdfPalette';
-import { pdfMonoFamily, resolvePdfFontFamily } from '../../srdPdfFonts';
+import { pdfMonoStyle, resolvePdfFontFamily } from '../../srdPdfFonts';
 import type { PillVariant, SrdPdfSlots, SrdPdfSlotsByPlacement } from '../../template/types';
 
 export const PAGE_MARGIN = 48;
@@ -28,7 +28,7 @@ export function createClassicSlots(
 ): SrdPdfSlotsByPlacement {
   const { theme } = config;
   const fontFamily = resolvePdfFontFamily(theme.fontFamily, fontsRegistered);
-  const mono = pdfMonoFamily(fontsRegistered);
+  const mono = pdfMonoStyle(fontsRegistered);
   // PDF's built-in fonts have only regular and bold.
   const semibold = fontsRegistered ? 600 : 700;
   const hasBanner = Boolean(config.headersAndFooters.classificationBanner);
@@ -151,7 +151,7 @@ export function createClassicSlots(
     tableRowAlt: { backgroundColor: P.ink50 },
     tableCell: { padding: cellPadding },
     strong: { fontWeight: 700, color: P.ink900 },
-    code: { fontFamily: mono, fontSize: 8.5, color: P.ink800 },
+    code: { ...mono, fontSize: 8.5, color: P.ink800 },
     // Framed on the image itself, as one node (see IMAGES_IN_THE_BROWSER in
     // SrdPdfSections). A fixed box,
     // within one page's content height since an image never splits: Letter
@@ -190,7 +190,7 @@ export function createClassicSlots(
     },
     cardTitleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 5 },
     cardId: {
-      fontFamily: mono,
+      ...mono,
       fontSize: 8.5,
       fontWeight: 700,
       color: theme.primaryColor,
@@ -219,7 +219,7 @@ export function createClassicSlots(
     // also bounds the unsplittable card head to fit on one page.
     snapshotImage: { width: '100%', height: 220, objectFit: 'contain' },
     cardDetail: { fontSize: 8.5, color: P.ink600, marginTop: 3 },
-    nodeTag: { fontFamily: mono, fontSize: 8, color: P.ink700 },
+    nodeTag: { ...mono, fontSize: 8, color: P.ink700 },
     cardBody: { marginTop: 4 },
   });
 
@@ -252,9 +252,9 @@ export function createClassicSlots(
     strong: { fontWeight: 700, color: P.ink900 },
     emphasis: { fontStyle: 'italic' },
     strikethrough: { textDecoration: 'line-through' },
-    inlineCode: { fontFamily: mono, fontSize: 9, backgroundColor: P.ink100 },
+    inlineCode: { ...mono, fontSize: 9, backgroundColor: P.ink100 },
     codeBlock: {
-      fontFamily: mono,
+      ...mono,
       fontSize: 8.5,
       lineHeight: 1.4,
       padding: 8,

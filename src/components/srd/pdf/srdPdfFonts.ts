@@ -112,3 +112,20 @@ export function resolvePdfFontFamily(cssStack: string, fontsRegistered = registe
 export function pdfMonoFamily(fontsRegistered = registered): string {
   return fontsRegistered ? PDF_FONT_MONO : BUILTIN_MONO;
 }
+
+/**
+ * The style for code text: the monospace family with its ligatures off.
+ *
+ * JetBrains Mono draws `--`, `//`, `::`, `&&`, `..` and the like as combined
+ * glyphs (its `calt` and `liga` features). react-pdf's font engine crashes
+ * building them - "Offset is outside the bounds of the DataView" - so one URL
+ * or comment in code broke the whole PDF. Code in a requirements document
+ * should show its characters as typed anyway. Every monospace style must come
+ * from here; SrdPdfSections.verify.tsx checks that every template's do.
+ */
+export function pdfMonoStyle(fontsRegistered = registered) {
+  return {
+    fontFamily: pdfMonoFamily(fontsRegistered),
+    fontFeatureSettings: { liga: false, calt: false },
+  };
+}
