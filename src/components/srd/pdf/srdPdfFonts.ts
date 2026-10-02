@@ -73,10 +73,22 @@ export function registerSrdPdfFonts(srcFor: (file: string) => string): void {
       })),
     });
   }
-  // react-pdf hyphenates English by default, which splits identifiers such
-  // as REQ-12 or service names mid-word. Words wrap whole instead.
-  Font.registerHyphenationCallback((word) => [word]);
+  disableHyphenation();
   registered = true;
+}
+
+let hyphenationDisabled = false;
+
+/**
+ * Words wrap whole: react-pdf hyphenates English by default, which splits
+ * identifiers such as REQ-12, service names and URLs mid-word. A document
+ * rule, not a font one - SrdPdfDocument applies it whether or not the SRD's
+ * fonts are registered, so every render (and every test) wraps the same way.
+ */
+export function disableHyphenation(): void {
+  if (hyphenationDisabled) return;
+  Font.registerHyphenationCallback((word) => [word]);
+  hyphenationDisabled = true;
 }
 
 export function areSrdPdfFontsRegistered(): boolean {

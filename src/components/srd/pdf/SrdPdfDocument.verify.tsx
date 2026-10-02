@@ -35,7 +35,7 @@ function assert(condition: boolean, message: string) {
 
 // A 2x2 PNG, standing in for a captured snapshot.
 const PNG =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGP8z8DAwMDAxMDAwMDAAAANHQEDasKb6QAAAABJRU5ErkJggg==';
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEElEQVR4nGM4ffUhEDFAKABF0goFRG3BqgAAAABJRU5ErkJggg==';
 
 const DESCRIPTION = [
   'This system handles **PAYMENTS-BOLD** and _refunds_.',

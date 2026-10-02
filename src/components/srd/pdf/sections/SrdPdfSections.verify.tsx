@@ -69,20 +69,23 @@ function previewWords(data: SrdDataContext, cfg: SrdTemplateConfig): string[] {
 }
 
 console.log('=== 1. Content parity with the HTML preview ===');
-for (const layout of ['list', 'table'] as const) {
-  const cfg = config({ requirementsLayout: layout });
-  const data = richData();
-  const pdfText = squash((await pdfPages(data, cfg)).join(' ')).toUpperCase();
-  // The preview's running footer shows page 1 of 1; page numbers are the
-  // PDF's own, so they are not content to compare.
-  const missing = previewWords(data, cfg).filter(
-    (w) => !pdfText.includes(squash(w).toUpperCase()) && !/^\d+$/.test(w),
-  );
-  assert(
-    missing.length === 0,
-    `${layout} layout: every word the preview shows is in the PDF${missing.length ? ` (missing: ${missing.slice(0, 12).join(' ')})` : ''}`,
-  );
-}
+const TEMPLATE_IDS = Object.keys(SRD_PDF_TEMPLATES) as Array<keyof typeof SRD_PDF_TEMPLATES>;
+
+for (const templateId of TEMPLATE_IDS)
+  for (const layout of ['list', 'table'] as const) {
+    const cfg = config({ requirementsLayout: layout, templateId });
+    const data = richData();
+    const pdfText = squash((await pdfPages(data, cfg)).join(' ')).toUpperCase();
+    // The preview's running footer shows page 1 of 1; page numbers are the
+    // PDF's own, so they are not content to compare.
+    const missing = previewWords(data, cfg).filter(
+      (w) => !pdfText.includes(squash(w).toUpperCase()) && !/^\d+$/.test(w),
+    );
+    assert(
+      missing.length === 0,
+      `${templateId}, ${layout} layout: every word the preview shows is in the PDF${missing.length ? ` (missing: ${missing.slice(0, 12).join(' ')})` : ''}`,
+    );
+  }
 
 console.log('=== 2. Long content paginates cleanly ===');
 {
@@ -226,27 +229,56 @@ console.log('=== 2d. A section heading stays with its first block ===');
     roadmap: 'Target Date',
   };
   let separated = 0;
-  for (const layout of ['list', 'table'] as const) {
-    const cfg = config({
-      requirementsLayout: layout,
-      theme: { ...DEFAULT_SRD_TEMPLATE.theme, pageOrientation: 'landscape' },
-    });
-    for (const filler of [0, 15, 30, 45]) {
-      const data = richData({ components: 3, items: 4 });
-      data.metadata.description = 'Filler line.\n\n'.repeat(filler + 1);
-      const pages = await pdfPages(data, cfg);
-      for (const section of cfg.sections.filter((x) => x.enabled)) {
-        const at = pages.findIndex((t) => squash(t).includes(squash(section.title)));
-        if (at === -1 || !squash(pages[at]).includes(squash(firstBlock[section.id]))) {
-          separated++;
-          console.error(
-            `  "${section.title}" is apart from its first block (${layout}, filler ${filler})`,
+  for (const templateId of TEMPLATE_IDS)
+    for (const layout of ['list', 'table'] as const) {
+      const cfg = config({
+        requirementsLayout: layout,
+        templateId,
+        theme: { ...DEFAULT_SRD_TEMPLATE.theme, pageOrientation: 'landscape' },
+      });
+      // Every position for Classic; a sample for the others, to keep this quick.
+      for (const filler of templateId === 'classic' ? [0, 15, 30, 45] : [0, 30]) {
+        const data = richData({ components: 3, items: 4 });
+        data.metadata.description = 'Filler line.\n\n'.repeat(filler + 1);
+        const pages = await pdfPages(data, cfg);
+        for (const section of cfg.sections.filter((x) => x.enabled)) {
+          const at = pages.findIndex((t) =>
+            squash(t).toUpperCase().includes(squash(section.title).toUpperCase()),
           );
+          // Case-insensitive: a template may set headings in capitals.
+          if (
+            at === -1 ||
+            !squash(pages[at]).toUpperCase().includes(squash(firstBlock[section.id]).toUpperCase())
+          ) {
+            separated++;
+            console.error(
+              `  "${section.title}" is apart from its first block (${templateId}, ${layout}, filler ${filler})`,
+            );
+          }
         }
       }
     }
-  }
   assert(separated === 0, 'every section heading shares a page with its first block');
+}
+
+console.log('=== 2e. Engineering: each section on pages of its own ===');
+{
+  const cfg = config({ requirementsLayout: 'list', templateId: 'engineering' });
+  const pages = await pdfPages(richData(), cfg);
+  const titles = cfg.sections
+    .filter((x) => x.enabled)
+    .sort((a, b) => a.order - b.order)
+    .map((x) => squash(x.title).toUpperCase());
+  const starts = titles.map((t) => pages.findIndex((p) => squash(p).toUpperCase().includes(t)));
+  assert(
+    starts.every((page, i) => page !== -1 && (i === 0 || page > starts[i - 1])) &&
+      new Set(starts).size === starts.length,
+    `every section starts a page no other section starts on (pages ${starts.map((p) => p + 1).join(', ')})`,
+  );
+  assert(
+    pages.every((t, i) => squash(t).includes(squash(`Page ${i + 1} of ${pages.length}`))),
+    'page numbers run on across the sections pages',
+  );
 }
 
 console.log('=== 3. Empty states and settings ===');

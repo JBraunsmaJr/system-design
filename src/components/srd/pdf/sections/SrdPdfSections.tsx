@@ -8,7 +8,7 @@ import type {
 } from '../../../../domain/srd/srdTypes';
 import { interpolateTokens } from '../../../../domain/srd/srdMarkdownExport';
 import { PdfMarkdown } from '../srdPdfMarkdown';
-import { useSrdPdfSlots } from '../template/context';
+import { useSrdPdfFeatures, useSrdPdfSlots } from '../template/context';
 import { PdfTable } from '../primitives/PdfTable';
 import {
   Code,
@@ -63,8 +63,10 @@ const dash = (value: string | undefined) => value || '-';
  * in the footer band - as the guard: they reproduce the failure.
  */
 
-function ExecutiveSummary({ lead, data }: SectionProps) {
-  const { requirements, architecture, roadmap, metadata } = data;
+/** The scope and architecture metrics. Part of the executive summary, unless
+ * the template's layout draws them elsewhere (metricsInLayout). */
+export function SrdPdfMetrics({ data, heading }: { data: SrdDataContext; heading?: ReactNode }) {
+  const { requirements, architecture, roadmap } = data;
   const metrics: Array<[string, string]> = [
     ['Total Requirements & Scope Items', String(requirements.summaryStats.total)],
     ['Requirement Categories Defined', String(requirements.categories.length)],
@@ -79,25 +81,33 @@ function ExecutiveSummary({ lead, data }: SectionProps) {
     ['Target Delivery Milestones', String(roadmap.milestones.length)],
     ['Planned Delivery Sprints', String(roadmap.sprints.length)],
   ];
+  return (
+    <PdfTable
+      heading={heading ?? <SubHeading>Scope & Architecture Metrics</SubHeading>}
+      rows={metrics}
+      rowKey={([label]) => label}
+      columns={[
+        { header: 'Metric', weight: 3, cell: ([label]) => label },
+        { header: 'Value', weight: 1, cell: ([, value]) => <Strong>{value}</Strong> },
+      ]}
+    />
+  );
+}
+
+function ExecutiveSummary({ lead, data }: SectionProps) {
   const slots = useSrdPdfSlots();
+  const { metricsInLayout } = useSrdPdfFeatures();
+  const { description } = data.metadata;
   return (
     <>
       {lead.node}
-      {metadata.description && (
+      {description && (
         <>
           <SubHeading>Scope & Objectives</SubHeading>
-          <PdfMarkdown markdown={metadata.description} styles={slots.markdown} />
+          <PdfMarkdown markdown={description} styles={slots.markdown} />
         </>
       )}
-      <PdfTable
-        heading={<SubHeading>Scope & Architecture Metrics</SubHeading>}
-        rows={metrics}
-        rowKey={([label]) => label}
-        columns={[
-          { header: 'Metric', weight: 3, cell: ([label]) => label },
-          { header: 'Value', weight: 1, cell: ([, value]) => <Strong>{value}</Strong> },
-        ]}
-      />
+      {!metricsInLayout && <SrdPdfMetrics data={data} />}
     </>
   );
 }

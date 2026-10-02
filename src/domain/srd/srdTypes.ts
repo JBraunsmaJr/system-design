@@ -148,11 +148,12 @@ export interface SrdTemplateHeadersAndFooters {
 }
 
 /**
- * Which template draws the document. Templates are code (see the plan in
- * docs: SRD templating); only `classic` exists until the react-pdf renderer
- * lands, and it is the look the SRD has always had.
+ * Which template draws the document. Templates are code: each is registered
+ * in components/srd/pdf/templates, and this union is that registry's key, so
+ * an id without a template (or the reverse) does not compile. `classic` is
+ * the look the SRD has always had, and the default.
  */
-export type SrdTemplateId = 'classic';
+export type SrdTemplateId = 'classic' | 'engineering' | 'briefing';
 
 /**
  * A named starting point: a template plus the settings to start it with.
@@ -219,4 +220,11 @@ export interface SrdDocumentState {
   metadata: SrdMetadataOverrides;
   /** Keyed by requirement item id. Absent means default framing. */
   framing: Record<string, SrdSnapshotFraming>;
+  /**
+   * A template id the document names that this build does not have - from a
+   * newer version, say. The document draws with `templateId` (the default)
+   * meanwhile; this is kept so it can be reported, and so saving the
+   * document writes it back unchanged rather than losing the choice.
+   */
+  unsupportedTemplateId?: string;
 }

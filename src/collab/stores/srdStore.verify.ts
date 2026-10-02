@@ -206,6 +206,41 @@ console.log('=== 7. Seeding fills only what is missing ===');
   store.destroy();
 }
 
+console.log('=== 7b. Templates, including one this build does not have ===');
+{
+  const doc = new Y.Doc();
+  const store = createYjsSrdStore(doc);
+  store.setTemplate('engineering');
+  assert(store.getSnapshot().templateId === 'engineering', 'a template can be chosen');
+  assert(
+    store.getSnapshot().presetId === DEFAULT_SRD_DOCUMENT_STATE.presetId,
+    'without changing the preset',
+  );
+  store.setTemplate('classic');
+  assert(!doc.getMap(SRD_MAP).has('templateId'), 'choosing the default stores nothing');
+
+  doc.getMap(SRD_MAP).set('templateId', 'holographic');
+  const snap = store.getSnapshot();
+  assert(
+    snap.templateId === 'classic' && snap.unsupportedTemplateId === 'holographic',
+    'an unknown one is reported and drawn as the default',
+  );
+
+  const copy = new Y.Doc();
+  seedYjsSrd(copy, snap);
+  assert(
+    copy.getMap(SRD_MAP).get('templateId') === 'holographic',
+    'seeding another document keeps it as found',
+  );
+
+  store.setTemplate('briefing');
+  assert(
+    store.getSnapshot().unsupportedTemplateId === undefined,
+    'choosing a template replaces it',
+  );
+  store.destroy();
+}
+
 console.log('=== 8. destroy detaches ===');
 {
   const doc = new Y.Doc();

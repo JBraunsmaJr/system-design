@@ -79,5 +79,19 @@ const propsFor = (srdStore = createYjsSrdStore(new Y.Doc())): SrdViewProps => ({
   assert(!html.includes('Refresh Snapshot'), 'and is not offered for refresh');
 }
 
+// 5. A template this version does not have is named, not silently swapped
+{
+  const doc = new Y.Doc();
+  const store = createYjsSrdStore(doc);
+  doc.getMap('srd').set('templateId', 'holographic');
+  const html = renderToStaticMarkup(<SrdView {...propsFor(store)} />);
+  assert(html.includes('srd-view__notice'), 'A notice says the template is unavailable');
+  assert(html.includes('holographic'), 'naming the template the document asked for');
+  assert(html.includes('shown with Classic'), 'and what it is shown with meanwhile');
+
+  const fine = renderToStaticMarkup(<SrdView {...propsFor()} />);
+  assert(!fine.includes('srd-view__notice'), 'A supported template shows no notice');
+}
+
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);
 if (failures > 0) throw new Error(`${failures} test(s) failed`);

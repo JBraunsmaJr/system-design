@@ -4,6 +4,10 @@ import type { SrdDataContext, SrdTemplateConfig } from '../../../domain/srd/srdT
 import { SrdPdfTemplateContext } from './template/context';
 import { pdfTemplateFor } from './templates';
 import { stripSoftHyphens } from './srdPdfText';
+import { disableHyphenation } from './srdPdfFonts';
+
+// Before any document lays out its text (see disableHyphenation).
+disableHyphenation();
 
 /**
  * The PDF's creation and modification dates: the document's own date, so the
@@ -43,7 +47,11 @@ export function SrdPdfDocument({
   const config = useMemo(() => stripSoftHyphens(rawConfig), [rawConfig]);
   const template = pdfTemplateFor(config.templateId);
   const context = useMemo(
-    () => ({ slotsFor: template.createSlots(config, fontsRegistered), placement: 'body' as const }),
+    () => ({
+      slotsFor: template.createSlots(config, fontsRegistered),
+      placement: 'body' as const,
+      features: template.features ?? {},
+    }),
     [template, config, fontsRegistered],
   );
   const sections = useMemo(

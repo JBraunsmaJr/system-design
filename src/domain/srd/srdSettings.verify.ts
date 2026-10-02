@@ -170,5 +170,25 @@ console.log('=== 5. Applying state to SRD data ===');
   );
 }
 
+console.log('=== 6. A template this build does not have ===');
+{
+  const fromNewer = expandSrdFileValue({ templateId: 'holographic' });
+  assert(fromNewer.templateId === 'classic', 'it draws with the default meanwhile');
+  assert(fromNewer.unsupportedTemplateId === 'holographic', 'and is reported, by name');
+  assert(
+    compactSrdState(fromNewer)?.templateId === 'holographic',
+    'and saving writes it back unchanged, not the default',
+  );
+  const known = expandSrdFileValue({ templateId: 'engineering' });
+  assert(
+    known.templateId === 'engineering' && known.unsupportedTemplateId === undefined,
+    'a known template is simply used',
+  );
+  assert(
+    expandSrdFileValue({ templateId: 42 }).unsupportedTemplateId === undefined,
+    'a value that is not a name is not reported as one',
+  );
+}
+
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);
 if (failures > 0) throw new Error(`${failures} test(s) failed`);

@@ -44,7 +44,7 @@ import {
 
 // --- Templates and presets ----------------------------------------------------
 
-export const SRD_TEMPLATE_IDS: readonly SrdTemplateId[] = ['classic'];
+export const SRD_TEMPLATE_IDS: readonly SrdTemplateId[] = ['classic', 'engineering', 'briefing'];
 export const DEFAULT_SRD_TEMPLATE_ID: SrdTemplateId = 'classic';
 
 /** presetId once the settings no longer match any preset. */
@@ -386,19 +386,31 @@ export function readSrdState(
     const value = sanitizeFraming(raw);
     if (value) framing[itemId] = value;
   }
-  return {
+  const state: SrdDocumentState = {
     templateId: readSrdField('templateId', getField('templateId')),
     presetId: readSrdField('presetId', getField('presetId')),
     settings: readSettings(getField),
     metadata: readSrdField('metadata', getField('metadata')),
     framing,
   };
+  const unsupported = unsupportedTemplateIdOf(getField('templateId'));
+  if (unsupported) state.unsupportedTemplateId = unsupported;
+  return state;
+}
+
+/** A stored template id naming no template this build has, if it is one. */
+export function unsupportedTemplateIdOf(raw: unknown): string | undefined {
+  return typeof raw === 'string' && raw.length > 0 && raw.length <= 100 && !isSrdTemplateId(raw)
+    ? raw
+    : undefined;
 }
 
 // --- File representation ------------------------------------------------------
 
 /** The `srd` value of a diagram file: only what differs from the defaults. */
-export type SrdFileValue = Partial<SrdStoredFields> & {
+export type SrdFileValue = Partial<Omit<SrdStoredFields, 'templateId'>> & {
+  /** Any name: one from a newer version is kept as found. */
+  templateId?: string;
   framing?: Record<string, SrdSnapshotFraming>;
 };
 
@@ -415,6 +427,8 @@ export function compactSrdState(state: SrdDocumentState): SrdFileValue | undefin
     if (!isDefaultFraming(value)) framing[itemId] = value;
   }
   if (Object.keys(framing).length > 0) result.framing = framing;
+  // Written back as found, so a newer version's choice survives this one.
+  if (state.unsupportedTemplateId) result.templateId = state.unsupportedTemplateId;
   return Object.keys(result).length > 0 ? (result as SrdFileValue) : undefined;
 }
 

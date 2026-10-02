@@ -28,6 +28,7 @@ import { SrdDocumentPreview } from './SrdDocumentPreview';
 import { useSrdSnapshots } from './capture/useSrdSnapshots';
 import { useSrdDocumentData } from './useSrdDocumentData';
 import { useSrdView } from './useSrdView';
+import { SRD_TEMPLATE_CATALOG } from '../../domain/srd/srdTemplateCatalog';
 
 // Loaded only when someone turns the new renderer on: react-pdf and pdf.js
 // stay out of the view's own chunk.
@@ -86,6 +87,9 @@ export default function SrdView({
   const {
     activePresetId,
     templateConfig,
+    templateId,
+    unsupportedTemplateId,
+    handleSelectTemplate,
     activeTab,
     setActiveTab,
     isCapturingSnapshot,
@@ -219,6 +223,13 @@ export default function SrdView({
       </div>
 
       {/* Modal Body */}
+      {unsupportedTemplateId && (
+        <div className="srd-view__notice" role="status">
+          This document uses the “{unsupportedTemplateId}” template, which this version of the app
+          does not have. It is shown with {SRD_TEMPLATE_CATALOG[templateId].name} until you choose a
+          template; saving keeps the original choice.
+        </div>
+      )}
       <div className="srd-view__body">
         {/* Customization Sidebar */}
         <div className="srd-sidebar">
@@ -348,7 +359,12 @@ export default function SrdView({
 
           {/* Tab: Theme */}
           {activeTab === 'theme' && (
-            <SrdThemeTab templateConfig={templateConfig} handleThemeChange={handleThemeChange} />
+            <SrdThemeTab
+              templateConfig={templateConfig}
+              handleThemeChange={handleThemeChange}
+              templateId={templateId}
+              handleSelectTemplate={handleSelectTemplate}
+            />
           )}
 
           {/* Tab: Sections & Layout */}

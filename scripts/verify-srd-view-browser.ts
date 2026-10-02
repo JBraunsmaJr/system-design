@@ -230,6 +230,42 @@ async function run() {
       (await p.$$(ITEM_IMG)).length === 1,
       'after a reload the snapshot is still removed, and the reframed one is shown',
     );
+
+    console.log('=== The template picker ===');
+    const pressedTemplate = () =>
+      p.$eval('.srd-template-picker__option[aria-pressed="true"]', (el) =>
+        el.querySelector('.srd-template-picker__name')?.textContent?.trim(),
+      );
+    await p.click('button:has-text("Theme")');
+    await p.waitForSelector('.srd-template-picker__option');
+    check((await p.$$('.srd-template-picker__option')).length === 3, 'offers all three templates');
+    await p.waitForFunction(
+      () =>
+        [...document.querySelectorAll<HTMLImageElement>('.srd-template-picker__thumbnail')].every(
+          (img) => img.complete && img.naturalWidth > 0,
+        ),
+      null,
+      { timeout: 10000 },
+    );
+    check(true, 'with a thumbnail each');
+    check((await pressedTemplate()) === 'Classic', 'Classic is chosen by default');
+    await p.click('.srd-template-picker__option:has-text("Engineering")');
+    await p.waitForFunction(() =>
+      document
+        .querySelector('.srd-template-picker__option[aria-pressed="true"]')
+        ?.textContent?.includes('Engineering'),
+    );
+    check(true, 'choosing Engineering selects it');
+    await sleep(500); // let the document reach IndexedDB
+    await p.reload();
+    await p.waitForSelector('.collab-panel__trigger');
+    await openSrd(p);
+    await p.click('button:has-text("Theme")');
+    await p.waitForSelector('.srd-template-picker__option');
+    check(
+      (await pressedTemplate()) === 'Engineering',
+      'the choice is document content: it survives a reload',
+    );
   } catch (err) {
     failures++;
     console.error('Verification failed with error:', err);

@@ -10,8 +10,13 @@ import type {
   SrdTemplateConfig,
 } from '../../../domain/srd/srdTypes';
 
+/**
+ * The placeholder for every diagram and snapshot: a 2x2 neutral gray, the
+ * print palette's light ink. Fixed rather than captured, so reference images
+ * test the PDF's layout alone; gray, so it never reads as a rendering fault.
+ */
 export const PNG =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGP8z8DAwMDAxMDAwMDAAAANHQEDasKb6QAAAABJRU5ErkJggg==';
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEElEQVR4nGM4ffUhEDFAKABF0goFRG3BqgAAAABJRU5ErkJggg==';
 
 export function item(
   n: number,

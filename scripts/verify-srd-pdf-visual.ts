@@ -30,10 +30,23 @@ const CHANNEL_TOLERANCE = 48;
 /** A page matches when at most this share of its pixels differ. */
 const PAGE_TOLERANCE = 0.002;
 
-/** The documents compared: one per layout and orientation. */
+/** The documents compared: Classic in each layout and orientation, and each
+ * other template in the shape it is designed for. */
 const CASES = [
-  { name: 'portrait-list', layout: 'list', orientation: 'portrait' },
-  { name: 'landscape-table', layout: 'table', orientation: 'landscape' },
+  { name: 'portrait-list', template: 'classic', layout: 'list', orientation: 'portrait' },
+  { name: 'landscape-table', template: 'classic', layout: 'table', orientation: 'landscape' },
+  {
+    name: 'engineering-portrait-list',
+    template: 'engineering',
+    layout: 'list',
+    orientation: 'portrait',
+  },
+  {
+    name: 'briefing-landscape-table',
+    template: 'briefing',
+    layout: 'table',
+    orientation: 'landscape',
+  },
 ] as const;
 
 let failures = 0;
@@ -78,7 +91,10 @@ async function run() {
         const fixtures = await import('/system-design/src/components/srd/pdf/srdPdfTestData.ts');
         const pdfjs = await import('/system-design/node_modules/.vite/deps/pdfjs-dist_legacy_build_pdf__mjs.js');
         pdfjs.GlobalWorkerOptions.workerSrc = '/system-design/node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs';
-        const base = fixtures.config({ requirementsLayout: ${JSON.stringify(testCase.layout)} });
+        const base = fixtures.config({
+          requirementsLayout: ${JSON.stringify(testCase.layout)},
+          templateId: ${JSON.stringify(testCase.template)},
+        });
         const config = { ...base, theme: { ...base.theme, pageOrientation: ${JSON.stringify(testCase.orientation)} } };
         const blob = await engine.renderSrdPdfBlob(fixtures.richData(), config);
         const doc = await pdfjs.getDocument({ data: new Uint8Array(await blob.arrayBuffer()) }).promise;

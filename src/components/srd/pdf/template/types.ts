@@ -95,8 +95,19 @@ export interface SrdPdfLayoutProps {
  * the page - where the title block goes, whether there is a sidebar and which
  * sections it holds - and draws content only through the shared renderers.
  */
+/**
+ * Structural variations a template asks of the shared renderers, for content
+ * its layout draws elsewhere. Each is off by default.
+ */
+export interface SrdPdfTemplateFeatures {
+  /** The layout draws the scope metrics (SrdPdfMetrics) itself - in a
+   * sidebar, say - so the executive summary leaves them out. */
+  metricsInLayout?: boolean;
+}
+
 export interface SrdPdfTemplate {
   id: SrdTemplateId;
+  features?: SrdPdfTemplateFeatures;
   createSlots: (config: SrdTemplateConfig, fontsRegistered: boolean) => SrdPdfSlotsByPlacement;
   Layout: ComponentType<SrdPdfLayoutProps>;
 }

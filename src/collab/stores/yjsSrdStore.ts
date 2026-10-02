@@ -30,6 +30,7 @@ import type {
   SrdMetadataOverrides,
   SrdSnapshotFraming,
   SrdTemplateConfig,
+  SrdTemplateId,
 } from '../../domain/srd/srdTypes';
 import {
   CUSTOM_PRESET_ID,
@@ -41,6 +42,7 @@ import {
   sanitizeFraming,
   srdValuesEqual,
   stateWithPreset,
+  unsupportedTemplateIdOf,
   type SrdField,
   type SrdStoredFields,
 } from '../../domain/srd/srdSettings';
@@ -54,6 +56,9 @@ export interface SrdStore {
   /** Applies a preset or imported template: its template id and every
    * setting, in one transaction. Metadata and framing are kept. */
   applyPreset(preset: SrdTemplateConfig, presetId?: string): void;
+  /** Chooses the template that draws the document. Its settings, and so its
+   * preset, are unchanged: a template is how they are drawn. */
+  setTemplate(templateId: SrdTemplateId): void;
   /** Replaces the given settings. Marks the document as no longer matching a
    * preset, since it was edited by hand. */
   updateSettings(patch: Partial<SrdDocumentSettings>): void;
@@ -160,13 +165,16 @@ export function createYjsSrdStore(doc: Y.Doc): SrdStore {
       framingDirty = false;
     }
 
-    return {
+    const state: SrdDocumentState = {
       templateId: readField('templateId'),
       presetId: readField('presetId'),
       settings: settingsUnchanged ? previous.settings : settings,
       metadata: readField('metadata'),
       framing,
     };
+    const unsupported = unsupportedTemplateIdOf(fields.get('templateId'));
+    if (unsupported) state.unsupportedTemplateId = unsupported;
+    return state;
   };
 
   let lastSnapshot: SrdDocumentState | null = null;
@@ -193,6 +201,9 @@ export function createYjsSrdStore(doc: Y.Doc): SrdStore {
           writeField(fields, field, next[field]);
         }
       });
+    },
+    setTemplate(templateId) {
+      doc.transact(() => writeField(fields, 'templateId', readSrdField('templateId', templateId)));
     },
     updateSettings(patch) {
       const keys = (Object.keys(patch) as (keyof SrdDocumentSettings)[]).filter(
@@ -243,8 +254,11 @@ export function seedYjsSrd(doc: Y.Doc, state: SrdDocumentState | undefined): voi
   const missingFraming = Object.entries(state.framing).filter(
     ([itemId, framing]) => !framingMap.has(itemId) && !isDefaultFraming(framing),
   );
-  if (missingFields.length === 0 && missingFraming.length === 0) return;
+  // An unsupported template id is kept as found (see SrdDocumentState).
+  const keepUnsupported = Boolean(state.unsupportedTemplateId) && !fields.has('templateId');
+  if (missingFields.length === 0 && missingFraming.length === 0 && !keepUnsupported) return;
   doc.transact(() => {
+    if (keepUnsupported) fields.set('templateId', state.unsupportedTemplateId);
     for (const field of missingFields) fields.set(field, values[field]);
     for (const [itemId, framing] of missingFraming) framingMap.set(itemId, framing);
   });

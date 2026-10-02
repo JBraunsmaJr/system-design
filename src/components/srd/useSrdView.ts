@@ -5,6 +5,7 @@ import type {
   SrdDocumentSettings,
   SrdDocumentState,
   SrdTemplateConfig,
+  SrdTemplateId,
 } from '../../domain/srd/srdTypes';
 import {
   serializeTemplateConfig,
@@ -53,7 +54,7 @@ type FramingAdjustment = { pan: { x: number; y: number }; zoom: number };
  * still being dragged - committed to the document on release.
  */
 export function useSrdView({ srdStore, srd, currentSrdData, snapshots }: UseSrdViewOptions) {
-  const { presetId: activePresetId, templateId, settings } = srd;
+  const { presetId: activePresetId, templateId, settings, unsupportedTemplateId } = srd;
   const templateConfig = useMemo(
     () => toRenderConfig({ presetId: activePresetId, templateId, settings }),
     [activePresetId, templateId, settings],
@@ -80,6 +81,8 @@ export function useSrdView({ srdStore, srd, currentSrdData, snapshots }: UseSrdV
   const paperRef = useRef<HTMLDivElement>(null);
 
   // --- Editing ----------------------------------------------------------------
+
+  const handleSelectTemplate = (id: SrdTemplateId) => srdStore.setTemplate(id);
 
   const handleSelectPreset = (presetId: string) => {
     const found = findBuiltinPreset(presetId);
@@ -422,6 +425,9 @@ export function useSrdView({ srdStore, srd, currentSrdData, snapshots }: UseSrdV
   return {
     activePresetId,
     templateConfig,
+    templateId,
+    unsupportedTemplateId,
+    handleSelectTemplate,
     currentSrdData,
     activeTab,
     setActiveTab,

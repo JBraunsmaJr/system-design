@@ -38,7 +38,7 @@ const fontDir = decodeURIComponent(
 registerSrdPdfFonts((file) => fontDir + file);
 
 const PNG =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGP8z8DAwMDAxMDAwMDAAAANHQEDasKb6QAAAABJRU5ErkJggg==';
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEElEQVR4nGM4ffUhEDFAKABF0goFRG3BqgAAAABJRU5ErkJggg==';
 
 async function bytesOf(data: SrdDataContext, config: SrdTemplateConfig): Promise<Uint8Array> {
   const blob = await pdf(<SrdPdfDocument data={data} config={config} fontsRegistered />).toBlob();

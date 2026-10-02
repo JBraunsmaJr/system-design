@@ -1,34 +1,10 @@
 import { StyleSheet } from '@react-pdf/renderer';
 import type { SrdTemplateConfig } from '../../../../../domain/srd/srdTypes';
 import type { PdfMarkdownStyles, PdfStyle } from '../../srdPdfMarkdown';
-import { PDF_PALETTE as P, mixColors } from '../../srdPdfPalette';
+import { PDF_PALETTE as P } from '../../srdPdfPalette';
+import { FOOTER_BAND, HEADER_BAND, PAGE_MARGIN, tone, type } from '../shared';
 import { pdfMonoStyle, resolvePdfFontFamily } from '../../srdPdfFonts';
 import type { PillVariant, SrdPdfSlots, SrdPdfSlotsByPlacement } from '../../template/types';
-
-export const PAGE_MARGIN = 48;
-const HEADER_BAND = 34;
-const FOOTER_BAND = 40;
-
-/**
- * A text size with its line height, always declared together. react-pdf
- * turns a unitless line height into points where it is declared, using that
- * style's own font size - or 18pt when it has none - and children inherit
- * the points. So a line height without a size (or a size without one, under
- * an inherited line height) gives small text a tall line: chips and badges
- * once stood twice their height with the text at the top.
- */
-function type(fontSize: number, leading: number): PdfStyle {
-  return { fontSize, lineHeight: leading };
-}
-
-/** A pill's colors, mixed as the HTML preview's CSS mixes them. */
-function tone(base: string, bg: number, fg: number, border: number): PdfStyle {
-  return {
-    backgroundColor: mixColors(base, bg, P.white),
-    color: mixColors(base, fg, P.black),
-    borderColor: mixColors(base, border, P.white),
-  };
-}
 
 /**
  * Classic: the look the SRD has always had - a single column, numbered
