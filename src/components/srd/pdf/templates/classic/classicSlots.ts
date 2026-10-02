@@ -9,6 +9,18 @@ export const PAGE_MARGIN = 48;
 const HEADER_BAND = 34;
 const FOOTER_BAND = 40;
 
+/**
+ * A text size with its line height, always declared together. react-pdf
+ * turns a unitless line height into points where it is declared, using that
+ * style's own font size - or 18pt when it has none - and children inherit
+ * the points. So a line height without a size (or a size without one, under
+ * an inherited line height) gives small text a tall line: chips and badges
+ * once stood twice their height with the text at the top.
+ */
+function type(fontSize: number, leading: number): PdfStyle {
+  return { fontSize, lineHeight: leading };
+}
+
 /** A pill's colors, mixed as the HTML preview's CSS mixes them. */
 function tone(base: string, bg: number, fg: number, border: number): PdfStyle {
   return {
@@ -46,14 +58,14 @@ export function createClassicSlots(
     },
     // Line height lives on the body, never the page or any ancestor of the
     // page chrome: there it makes react-pdf drop the page numbers.
-    body: { lineHeight: 1.5 },
+    body: type(10, 1.5),
     banner: {
       position: 'absolute',
       top: 14,
       left: 0,
       right: 0,
       textAlign: 'center',
-      fontSize: 8,
+      ...type(8, 1.2),
       fontWeight: 700,
       letterSpacing: 1,
       color: theme.primaryColor,
@@ -68,7 +80,7 @@ export function createClassicSlots(
       paddingBottom: 6,
       borderBottomWidth: 1,
       borderColor: P.ink200,
-      fontSize: 8,
+      ...type(8, 1.2),
       color: P.ink500,
     },
     footerRule: {
@@ -83,6 +95,8 @@ export function createClassicSlots(
       position: 'absolute',
       bottom: PAGE_MARGIN - 20,
       left: PAGE_MARGIN,
+      // Size only: a line height on a footer text, as on the page, makes
+      // react-pdf drop the page numbers it renders.
       fontSize: 8,
       color: P.ink500,
     },
@@ -91,13 +105,14 @@ export function createClassicSlots(
       bottom: PAGE_MARGIN - 20,
       right: PAGE_MARGIN,
       textAlign: 'right',
+      // Size only: a line height on a footer text, as on the page, makes
+      // react-pdf drop the page numbers it renders.
       fontSize: 8,
       color: P.ink500,
     },
     title: {
-      fontSize: 24,
+      ...type(24, 1.2),
       fontWeight: 700,
-      lineHeight: 1.2,
       color: theme.primaryColor,
       marginBottom: 10,
     },
@@ -111,10 +126,10 @@ export function createClassicSlots(
       borderTopColor: theme.primaryColor,
       borderBottomColor: P.ink200,
     },
-    metaItem: { width: '50%', paddingVertical: 2, fontSize: 9 },
+    metaItem: { width: '50%', paddingVertical: 2, ...type(9, 1.5) },
     metaLabel: { fontWeight: 700, color: P.ink900 },
     sectionHeading: {
-      fontSize: 15,
+      ...type(15, 1.25),
       fontWeight: 700,
       color: theme.primaryColor,
       marginTop: 18,
@@ -125,7 +140,7 @@ export function createClassicSlots(
     },
     sectionIntro: { marginBottom: 8, color: P.ink500 },
     subHeading: {
-      fontSize: 11.5,
+      ...type(11.5, 1.3),
       fontWeight: 700,
       color: P.ink900,
       marginTop: 10,
@@ -137,8 +152,7 @@ export function createClassicSlots(
       marginBottom: 10,
       borderTopWidth: 1,
       borderColor: P.ink200,
-      fontSize: 9,
-      lineHeight: 1.3,
+      ...type(9, 1.3),
     },
     tableHeaderRow: {
       flexDirection: 'row',
@@ -151,7 +165,7 @@ export function createClassicSlots(
     tableRowAlt: { backgroundColor: P.ink50 },
     tableCell: { padding: cellPadding },
     strong: { fontWeight: 700, color: P.ink900 },
-    code: { ...mono, fontSize: 8.5, color: P.ink800 },
+    code: { ...mono, ...type(8.5, 1.3), color: P.ink800 },
     // Framed on the image itself, as one node (see IMAGES_IN_THE_BROWSER in
     // SrdPdfSections). A fixed box,
     // within one page's content height since an image never splits: Letter
@@ -191,7 +205,7 @@ export function createClassicSlots(
     cardTitleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 5 },
     cardId: {
       ...mono,
-      fontSize: 8.5,
+      ...type(8.5, 1.2),
       fontWeight: 700,
       color: theme.primaryColor,
       backgroundColor: P.ink100,
@@ -199,7 +213,7 @@ export function createClassicSlots(
       paddingHorizontal: 4,
       marginRight: 6,
     },
-    cardTitle: { flex: 1, fontSize: 11, fontWeight: semibold, color: P.ink900 },
+    cardTitle: { flex: 1, ...type(11, 1.3), fontWeight: semibold, color: P.ink900 },
     pillRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 4 },
     snapshotFrame: {
       marginTop: 4,
@@ -209,7 +223,7 @@ export function createClassicSlots(
       backgroundColor: P.ink50,
     },
     snapshotCaption: {
-      fontSize: 7.5,
+      ...type(7.5, 1.2),
       fontWeight: 700,
       color: P.ink500,
       marginBottom: 3,
@@ -218,13 +232,13 @@ export function createClassicSlots(
     // A fixed height (see IMAGES_IN_THE_BROWSER in SrdPdfSections), which
     // also bounds the unsplittable card head to fit on one page.
     snapshotImage: { width: '100%', height: 220, objectFit: 'contain' },
-    cardDetail: { fontSize: 8.5, color: P.ink600, marginTop: 3 },
-    nodeTag: { ...mono, fontSize: 8, color: P.ink700 },
+    cardDetail: { ...type(8.5, 1.45), color: P.ink600, marginTop: 3 },
+    nodeTag: { ...mono, ...type(8, 1.2), color: P.ink700 },
     cardBody: { marginTop: 4 },
   });
 
   const pillBase: PdfStyle = {
-    fontSize: 7.5,
+    ...type(7.5, 1.2),
     fontWeight: semibold,
     paddingVertical: 1.5,
     paddingHorizontal: 5,
@@ -248,15 +262,20 @@ export function createClassicSlots(
 
   const markdown: PdfMarkdownStyles = {
     paragraph: { marginBottom: 6 },
-    heading: { fontSize: 11.5, fontWeight: 700, color: P.ink900, marginTop: 8, marginBottom: 4 },
+    heading: {
+      ...type(11.5, 1.3),
+      fontWeight: 700,
+      color: P.ink900,
+      marginTop: 8,
+      marginBottom: 4,
+    },
     strong: { fontWeight: 700, color: P.ink900 },
     emphasis: { fontStyle: 'italic' },
     strikethrough: { textDecoration: 'line-through' },
-    inlineCode: { ...mono, fontSize: 9, backgroundColor: P.ink100 },
+    inlineCode: { ...mono, ...type(9, 1.3), backgroundColor: P.ink100 },
     codeBlock: {
       ...mono,
-      fontSize: 8.5,
-      lineHeight: 1.4,
+      ...type(8.5, 1.4),
       padding: 8,
       marginBottom: 8,
       backgroundColor: P.ink100,

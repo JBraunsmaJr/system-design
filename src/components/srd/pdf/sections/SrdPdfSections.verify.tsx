@@ -406,5 +406,47 @@ console.log('=== 5. Every template draws code without ligatures ===');
   );
 }
 
+console.log('=== 6. Every sized style declares its line height ===');
+{
+  // react-pdf resolves a unitless line height against the declaring style's
+  // own font size (18pt if it has none) and children inherit the points, so
+  // a size without a line height - or the reverse - draws small text in a
+  // tall line. Exempt: the page and the footer texts, where any line height
+  // makes react-pdf drop the page numbers (nothing above them sets one).
+  const offenders: string[] = [];
+  for (const [id, template] of Object.entries(SRD_PDF_TEMPLATES)) {
+    for (const fonts of [false, true]) {
+      const resolved = template.createSlots(config(), fonts)('body');
+      const pillVariants = [
+        'type',
+        'points',
+        'sprint',
+        'assignee',
+        'status-todo',
+        'status-in-progress',
+        'status-done',
+      ] as const;
+      const styles: Array<[string, unknown]> = [
+        ...Object.entries(resolved).filter(
+          ([key]) => !['markdown', 'pill', 'page', 'footerLeft', 'footerRight'].includes(key),
+        ),
+        ...Object.entries(resolved.markdown).map(
+          ([k, v]) => [`markdown.${k}`, v] as [string, unknown],
+        ),
+        ...pillVariants.map((v) => [`pill(${v})`, resolved.pill(v)] as [string, unknown]),
+      ];
+      for (const [name, style] of styles) {
+        const st = style as { fontSize?: unknown; lineHeight?: unknown };
+        if ((st.fontSize === undefined) !== (st.lineHeight === undefined))
+          offenders.push(`${id}/${name}`);
+      }
+    }
+  }
+  assert(
+    offenders.length === 0,
+    `size and line height are declared together (${[...new Set(offenders)].join(', ')})`,
+  );
+}
+
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);
 if (failures > 0) throw new Error(`${failures} test(s) failed`);
