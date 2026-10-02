@@ -65,7 +65,8 @@ async function run() {
   let servers: DevServers | undefined;
   let browser: Browser | undefined;
   try {
-    servers = await startDevServers({ vitePort: 5187, signalingPort: 14454, quiet: true });
+    // Ports no other suite uses, so suites never collide when run together.
+    servers = await startDevServers({ vitePort: 5197, signalingPort: 14466, quiet: true });
     browser = await chromium.launch({
       headless: true,
       executablePath: process.env.CHROMIUM_PATH || undefined,

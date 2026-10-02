@@ -149,7 +149,12 @@ console.log('=== 2. Markdown parsing ===');
 
 // Built-in fonts first: registration is once per process.
 const builtin = await render(sampleData(), config(), false);
-const fontDir = new URL('../../../../node_modules/@fontsource/', import.meta.url).pathname;
+// A file URL's path as an OS path, without Node's fileURLToPath (this config
+// has no Node types): decoded, so spaces survive, and with the slash before
+// a Windows drive letter dropped - '/D:/repo' becomes 'D:/repo'.
+const fontDir = decodeURIComponent(
+  new URL('../../../../node_modules/@fontsource/', import.meta.url).pathname,
+).replace(/^\/([A-Za-z]:\/)/, '$1');
 registerSrdPdfFonts((file) => fontDir + file);
 const rendered = await render(sampleData(), config(), true);
 const { pages } = rendered;
