@@ -127,6 +127,65 @@ async function run() {
     });
     check(true, 'snapshots are shown again without re-rendering');
 
+    console.log('=== The new PDF engine previews and exports the actual PDF ===');
+    check(pdfLibraryRequests.length === 0, 'react-pdf and pdf.js are not loaded until asked for');
+    // The images the document shows, by the HTML preview: the PDF must carry
+    // exactly these.
+    const shownImages = (await p.$$(`${DIAGRAM_IMG}, ${ITEM_IMG}`)).length;
+    await p.check('.srd-view__renderer-toggle input');
+    await p.waitForSelector('.srd-pdf-preview__pages canvas', { timeout: 60000 });
+    check(pdfLibraryRequests.length > 0, 'turning the engine on loads them');
+    const status = await p.textContent('.srd-pdf-preview__status');
+    const shownPages = await p.$$eval('.srd-pdf-preview__pages canvas', (els) => els.length);
+    check(/PDF · \d+ pages?/.test(status ?? ''), `the preview reports the PDF (${status})`);
+
+    const [download] = await Promise.all([
+      p.waitForEvent('download'),
+      p.click('button:has-text("Export PDF")'),
+    ]);
+    const bytes = new Uint8Array(readFileSync((await download.path())!));
+    check(
+      new TextDecoder().decode(bytes.slice(0, 5)) === '%PDF-',
+      `the export is a PDF (${download.suggestedFilename()})`,
+    );
+    const exported = await getDocument({ data: bytes.slice(), verbosity: 0 }).promise;
+    check(
+      exported.numPages === shownPages,
+      `the export is the previewed PDF (${exported.numPages} pages, ${shownPages} shown)`,
+    );
+    const raw = new TextDecoder('latin1').decode(bytes);
+    check(/\/BaseFont\s*\/[A-Z]{6}\+Inter/.test(raw), "the SRD's fonts are embedded");
+    // Here - landscape, a diagram pushed to a new page, then cards with both
+    // snapshots - the browser build of react-pdf dropped the snapshots and
+    // collapsed the pages after into the footer. The steps run at this point,
+    // before any snapshot is removed, because that changes the pagination.
+    // An image with transparency is two image objects - the picture and its
+    // alpha mask (referenced as /SMask) - so masks are not counted.
+    const imageObjects = (raw.match(/\/Subtype\s*\/Image/g) ?? []).length;
+    const alphaMasks = (raw.match(/\/SMask\s+\d+\s+0\s+R/g) ?? []).length;
+    const images = imageObjects - alphaMasks;
+    check(
+      images === shownImages && shownImages >= 2,
+      `every image the document shows is embedded (${images} of ${shownImages}; ${imageObjects} objects, ${alphaMasks} masks)`,
+    );
+    let strayText = 0;
+    for (let n = 1; n <= exported.numPages; n++) {
+      const content = await (await exported.getPage(n)).getTextContent();
+      for (const item of content.items) {
+        if (!('str' in item) || !item.str.trim()) continue;
+        // Body text sits above the footer band (Classic: 88pt bottom
+        // padding); the footer texts sit at ~28pt. Anything between, or a
+        // pile below, is content that collapsed into the footer.
+        const y = item.transform[5];
+        if (y > 36 && y < 80) strayText++;
+      }
+    }
+    check(strayText === 0, `no content collapses into the footer band (${strayText} stray)`);
+
+    // Back to the HTML preview, which the steps below inspect.
+    await p.uncheck('.srd-view__renderer-toggle input');
+    await p.waitForSelector(ITEM_IMG);
+
     console.log('=== Reframing renders that snapshot again ===');
     await p.click('button:has-text("Snapshots")');
     await p.selectOption(`select:has(option[value="${NESTED_ITEM}"])`, NESTED_ITEM);
@@ -159,34 +218,6 @@ async function run() {
     check(
       (await p.$$(ITEM_IMG)).length === 1,
       'after a reload the snapshot is still removed, and the reframed one is shown',
-    );
-
-    console.log('=== The new PDF engine previews and exports the actual PDF ===');
-    check(pdfLibraryRequests.length === 0, 'react-pdf and pdf.js are not loaded until asked for');
-    await p.check('.srd-view__renderer-toggle input');
-    await p.waitForSelector('.srd-pdf-preview__pages canvas', { timeout: 60000 });
-    check(pdfLibraryRequests.length > 0, 'turning the engine on loads them');
-    const status = await p.textContent('.srd-pdf-preview__status');
-    const shownPages = await p.$$eval('.srd-pdf-preview__pages canvas', (els) => els.length);
-    check(/PDF · \d+ pages?/.test(status ?? ''), `the preview reports the PDF (${status})`);
-
-    const [download] = await Promise.all([
-      p.waitForEvent('download'),
-      p.click('button:has-text("Export PDF")'),
-    ]);
-    const bytes = new Uint8Array(readFileSync((await download.path())!));
-    check(
-      new TextDecoder().decode(bytes.slice(0, 5)) === '%PDF-',
-      `the export is a PDF (${download.suggestedFilename()})`,
-    );
-    const exported = await getDocument({ data: bytes.slice(), verbosity: 0 }).promise;
-    check(
-      exported.numPages === shownPages,
-      `the export is the previewed PDF (${exported.numPages} pages, ${shownPages} shown)`,
-    );
-    check(
-      /\/BaseFont\s*\/[A-Z]{6}\+Inter/.test(new TextDecoder('latin1').decode(bytes)),
-      "the SRD's fonts are embedded",
     );
   } catch (err) {
     failures++;

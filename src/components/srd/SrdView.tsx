@@ -157,7 +157,7 @@ export default function SrdView({
         <div className="srd-view__header-actions">
           <label
             className="srd-view__renderer-toggle"
-            title="Preview and export with the new PDF engine. Section content is still being added."
+            title="Preview and export with the new PDF engine, which draws the document with templates."
           >
             <input
               type="checkbox"

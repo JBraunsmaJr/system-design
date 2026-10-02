@@ -1,0 +1,294 @@
+import { StyleSheet } from '@react-pdf/renderer';
+import type { SrdTemplateConfig } from '../../../../../domain/srd/srdTypes';
+import type { PdfMarkdownStyles, PdfStyle } from '../../srdPdfMarkdown';
+import { PDF_PALETTE as P, mixColors } from '../../srdPdfPalette';
+import { pdfMonoFamily, resolvePdfFontFamily } from '../../srdPdfFonts';
+import type { PillVariant, SrdPdfSlots, SrdPdfSlotsByPlacement } from '../../template/types';
+
+export const PAGE_MARGIN = 48;
+const HEADER_BAND = 34;
+const FOOTER_BAND = 40;
+
+/** A pill's colors, mixed as the HTML preview's CSS mixes them. */
+function tone(base: string, bg: number, fg: number, border: number): PdfStyle {
+  return {
+    backgroundColor: mixColors(base, bg, P.white),
+    color: mixColors(base, fg, P.black),
+    borderColor: mixColors(base, border, P.white),
+  };
+}
+
+/**
+ * Classic: the look the SRD has always had - a single column, numbered
+ * headings in the primary color with an accent rule, light-ruled tables.
+ */
+export function createClassicSlots(
+  config: SrdTemplateConfig,
+  fontsRegistered: boolean,
+): SrdPdfSlotsByPlacement {
+  const { theme } = config;
+  const fontFamily = resolvePdfFontFamily(theme.fontFamily, fontsRegistered);
+  const mono = pdfMonoFamily(fontsRegistered);
+  // PDF's built-in fonts have only regular and bold.
+  const semibold = fontsRegistered ? 600 : 700;
+  const hasBanner = Boolean(config.headersAndFooters.classificationBanner);
+  const cellPadding = theme.tableDense ? 3 : 5;
+
+  const s = StyleSheet.create({
+    page: {
+      paddingTop: PAGE_MARGIN + HEADER_BAND + (hasBanner ? 14 : 0),
+      paddingBottom: PAGE_MARGIN + FOOTER_BAND,
+      paddingHorizontal: PAGE_MARGIN,
+      fontFamily,
+      fontSize: 10,
+      color: P.ink700,
+      backgroundColor: P.paper,
+    },
+    // Line height lives on the body, never the page or any ancestor of the
+    // page chrome: there it makes react-pdf drop the page numbers.
+    body: { lineHeight: 1.5 },
+    banner: {
+      position: 'absolute',
+      top: 14,
+      left: 0,
+      right: 0,
+      textAlign: 'center',
+      fontSize: 8,
+      fontWeight: 700,
+      letterSpacing: 1,
+      color: theme.primaryColor,
+    },
+    runningHeader: {
+      position: 'absolute',
+      top: PAGE_MARGIN - 14 + (hasBanner ? 14 : 0),
+      left: PAGE_MARGIN,
+      right: PAGE_MARGIN,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingBottom: 6,
+      borderBottomWidth: 1,
+      borderColor: P.ink200,
+      fontSize: 8,
+      color: P.ink500,
+    },
+    footerRule: {
+      position: 'absolute',
+      bottom: PAGE_MARGIN - 6,
+      left: PAGE_MARGIN,
+      right: PAGE_MARGIN,
+      borderTopWidth: 1,
+      borderColor: P.ink200,
+    },
+    footerLeft: {
+      position: 'absolute',
+      bottom: PAGE_MARGIN - 20,
+      left: PAGE_MARGIN,
+      fontSize: 8,
+      color: P.ink500,
+    },
+    footerRight: {
+      position: 'absolute',
+      bottom: PAGE_MARGIN - 20,
+      right: PAGE_MARGIN,
+      textAlign: 'right',
+      fontSize: 8,
+      color: P.ink500,
+    },
+    title: {
+      fontSize: 24,
+      fontWeight: 700,
+      lineHeight: 1.2,
+      color: theme.primaryColor,
+      marginBottom: 10,
+    },
+    metaGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      paddingVertical: 8,
+      marginBottom: 18,
+      borderTopWidth: 2,
+      borderBottomWidth: 1,
+      borderTopColor: theme.primaryColor,
+      borderBottomColor: P.ink200,
+    },
+    metaItem: { width: '50%', paddingVertical: 2, fontSize: 9 },
+    metaLabel: { fontWeight: 700, color: P.ink900 },
+    sectionHeading: {
+      fontSize: 15,
+      fontWeight: 700,
+      color: theme.primaryColor,
+      marginTop: 18,
+      marginBottom: 6,
+      paddingBottom: 4,
+      borderBottomWidth: 1,
+      borderColor: theme.accentColor,
+    },
+    sectionIntro: { marginBottom: 8, color: P.ink500 },
+    subHeading: {
+      fontSize: 11.5,
+      fontWeight: 700,
+      color: P.ink900,
+      marginTop: 10,
+      marginBottom: 5,
+    },
+    emptyNote: { fontStyle: 'italic', color: P.ink500, marginBottom: 8 },
+    // Tighter than body text: rows are short and many.
+    table: {
+      marginBottom: 10,
+      borderTopWidth: 1,
+      borderColor: P.ink200,
+      fontSize: 9,
+      lineHeight: 1.3,
+    },
+    tableHeaderRow: {
+      flexDirection: 'row',
+      backgroundColor: P.ink100,
+      borderBottomWidth: 1,
+      borderColor: P.ink300,
+    },
+    tableHeaderCell: { padding: cellPadding, fontWeight: 700, color: P.ink900 },
+    tableRow: { flexDirection: 'row', borderBottomWidth: 1, borderColor: P.ink200 },
+    tableRowAlt: { backgroundColor: P.ink50 },
+    tableCell: { padding: cellPadding },
+    strong: { fontWeight: 700, color: P.ink900 },
+    code: { fontFamily: mono, fontSize: 8.5, color: P.ink800 },
+    // Framed on the image itself, as one node (see IMAGES_IN_THE_BROWSER in
+    // SrdPdfSections). A fixed box,
+    // within one page's content height since an image never splits: Letter
+    // landscape leaves about 428pt, portrait about 616pt.
+    diagramImage: {
+      width: '100%',
+      height: theme.pageOrientation === 'landscape' ? 300 : 420,
+      objectFit: 'contain',
+      marginVertical: 8,
+      padding: 6,
+      borderWidth: 1,
+      borderColor: P.ink200,
+      backgroundColor: P.ink100,
+    },
+    // One card drawn as two boxes: the head (top and sides) and the rest
+    // (sides and bottom), whose borders join into one frame.
+    cardHead: {
+      paddingTop: 10,
+      paddingHorizontal: 10,
+      paddingBottom: 4,
+      borderTopWidth: 1,
+      borderRightWidth: 1,
+      borderLeftWidth: 3,
+      borderColor: P.ink200,
+      borderLeftColor: theme.primaryColor,
+    },
+    cardRest: {
+      paddingHorizontal: 10,
+      paddingBottom: 10,
+      marginBottom: 10,
+      borderBottomWidth: 1,
+      borderRightWidth: 1,
+      borderLeftWidth: 3,
+      borderColor: P.ink200,
+      borderLeftColor: theme.primaryColor,
+    },
+    cardTitleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 5 },
+    cardId: {
+      fontFamily: mono,
+      fontSize: 8.5,
+      fontWeight: 700,
+      color: theme.primaryColor,
+      backgroundColor: P.ink100,
+      paddingVertical: 1.5,
+      paddingHorizontal: 4,
+      marginRight: 6,
+    },
+    cardTitle: { flex: 1, fontSize: 11, fontWeight: semibold, color: P.ink900 },
+    pillRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 4 },
+    snapshotFrame: {
+      marginTop: 4,
+      padding: 4,
+      borderWidth: 1,
+      borderColor: P.ink200,
+      backgroundColor: P.ink50,
+    },
+    snapshotCaption: {
+      fontSize: 7.5,
+      fontWeight: 700,
+      color: P.ink500,
+      marginBottom: 3,
+      letterSpacing: 0.5,
+    },
+    // A fixed height (see IMAGES_IN_THE_BROWSER in SrdPdfSections), which
+    // also bounds the unsplittable card head to fit on one page.
+    snapshotImage: { width: '100%', height: 220, objectFit: 'contain' },
+    cardDetail: { fontSize: 8.5, color: P.ink600, marginTop: 3 },
+    nodeTag: { fontFamily: mono, fontSize: 8, color: P.ink700 },
+    cardBody: { marginTop: 4 },
+  });
+
+  const pillBase: PdfStyle = {
+    fontSize: 7.5,
+    fontWeight: semibold,
+    paddingVertical: 1.5,
+    paddingHorizontal: 5,
+    marginRight: 4,
+    marginBottom: 2,
+    borderWidth: 1,
+    borderRadius: 3,
+  };
+  const pillTones: Record<PillVariant, PdfStyle> = {
+    type: tone(P.info, 15, 60, 35),
+    'status-done': tone(P.success, 15, 70, 25),
+    'status-in-progress': tone(P.warning, 20, 65, 35),
+    'status-todo': { backgroundColor: P.ink100, color: P.ink600, borderColor: P.ink200 },
+    points: tone(P.violet, 15, 80, 25),
+    sprint: tone(P.danger, 15, 75, 30),
+    assignee: { backgroundColor: P.ink100, color: P.ink700, borderColor: P.ink200 },
+  };
+  const pills = Object.fromEntries(
+    Object.entries(pillTones).map(([variant, colors]) => [variant, { ...pillBase, ...colors }]),
+  ) as Record<PillVariant, PdfStyle>;
+
+  const markdown: PdfMarkdownStyles = {
+    paragraph: { marginBottom: 6 },
+    heading: { fontSize: 11.5, fontWeight: 700, color: P.ink900, marginTop: 8, marginBottom: 4 },
+    strong: { fontWeight: 700, color: P.ink900 },
+    emphasis: { fontStyle: 'italic' },
+    strikethrough: { textDecoration: 'line-through' },
+    inlineCode: { fontFamily: mono, fontSize: 9, backgroundColor: P.ink100 },
+    codeBlock: {
+      fontFamily: mono,
+      fontSize: 8.5,
+      lineHeight: 1.4,
+      padding: 8,
+      marginBottom: 8,
+      backgroundColor: P.ink100,
+      borderLeftWidth: 2,
+      borderColor: theme.accentColor,
+    },
+    link: { color: theme.accentColor, textDecoration: 'underline' },
+    blockquote: {
+      marginBottom: 8,
+      paddingLeft: 10,
+      borderLeftWidth: 2,
+      borderColor: P.ink200,
+      color: P.ink500,
+    },
+    list: { marginBottom: 6 },
+    listItem: { flexDirection: 'row', marginBottom: 2 },
+    listMarker: { width: 16, color: P.ink500 },
+    listContent: { flex: 1 },
+    rule: { borderBottomWidth: 1, borderColor: P.ink200, marginVertical: 8 },
+    table: { marginBottom: 8, borderTopWidth: 1, borderColor: P.ink200 },
+    tableRow: { flexDirection: 'row', borderBottomWidth: 1, borderColor: P.ink200 },
+    tableHeaderCell: {
+      flex: 1,
+      padding: cellPadding,
+      fontWeight: 700,
+      color: P.ink900,
+      backgroundColor: P.ink100,
+    },
+    tableCell: { flex: 1, padding: cellPadding },
+  };
+
+  const slots: SrdPdfSlots = { ...s, pill: (variant) => pills[variant], markdown };
+  // One column, so the same slots wherever content is placed.
+  return () => slots;
+}
