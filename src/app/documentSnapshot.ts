@@ -1,20 +1,17 @@
-import { toDiagramFile, type parseDiagramFile } from '../domain/canvas/serialization';
-import type { Scenario, SubDiagram } from '../domain/canvas/types';
-import {
-  EMPTY_REQUIREMENTS_DOCUMENT,
-  type RequirementsDocument,
-} from '../domain/requirements/requirementsTypes';
+import {type parseDiagramFile, toDiagramFile} from '../domain/canvas/serialization';
+import type {Scenario, SubDiagram} from '../domain/canvas/types';
+import {EMPTY_REQUIREMENTS_DOCUMENT, type RequirementsDocument,} from '../domain/requirements/requirementsTypes';
 import {
   BUILT_IN_ITEM_TYPES,
   BUILT_IN_RELATIONSHIP_TYPES,
-  withMissingBuiltInTypes,
   withMissingBuiltInRelationshipTypes,
+  withMissingBuiltInTypes,
 } from '../domain/requirements/requirementsRegistry';
-import type { ProgramIncrement } from '../domain/timeline/programIncrements';
-import { EMPTY_TEAM_DOCUMENT, type TeamDocument } from '../domain/timeline/teamTypes';
-import type { Milestone } from '../domain/timeline/milestones';
-import { expandSrdFileValue } from '../domain/srd/srdSettings';
-import type { SrdDocumentState } from '../domain/srd/srdTypes';
+import type {ProgramIncrement} from '../domain/timeline/programIncrements';
+import {EMPTY_TEAM_DOCUMENT, type TeamDocument} from '../domain/timeline/teamTypes';
+import type {Milestone} from '../domain/timeline/milestones';
+import {expandSrdFileValue} from '../domain/srd/srdSettings';
+import type {SrdDocumentState} from '../domain/srd/srdTypes';
 
 /*
  * Moved unchanged from App.tsx. Pure functions and constants: nothing here
@@ -25,7 +22,7 @@ import type { SrdDocumentState } from '../domain/srd/srdTypes';
 export const EMPTY_DIAGRAM: SubDiagram = { nodes: [], edges: [] };
 
 /** A document's content as plain values - the shape a file or autosave is
- * normalised into before it seeds a Y.Doc. Not live state: the Y.Doc is. */
+ * normalized into before it seeds a Y.Doc. Not live state: the Y.Doc is. */
 export interface DiagramSnapshot {
   title: string;
   root: SubDiagram;

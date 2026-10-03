@@ -1,8 +1,8 @@
-import { useCallback, useMemo, useSyncExternalStore } from 'react';
+import {useCallback, useMemo, useSyncExternalStore} from 'react';
 import type * as Y from 'yjs';
-import { undoableStore, undoControllerFor } from '../../collab/stores/undoManager';
-import type { OpenDocument, OpenDocumentStores } from '../../collab/sync/localDocument';
-import type { Scenario } from '../../domain/canvas/types';
+import {undoableStore, undoControllerFor} from '../../collab/stores/undoManager';
+import type {OpenDocument, OpenDocumentStores} from '../../collab/sync/localDocument';
+import type {Scenario} from '../../domain/canvas/types';
 
 export interface UseDocumentStoresOptions {
   /** The joined session's document and stores, when in one. */
@@ -55,7 +55,7 @@ export function useDocumentStores({ activeSession, openDoc }: UseDocumentStoresO
   /**
    * The seams everything reads and writes through. Every mutating method runs
    * under the undo origin (undoableStore), so no call site can make an edit
-   * that silently falls outside history. Memoised on the underlying store set,
+   * that silently falls outside history. Memoized on the underlying store set,
    * so identities are stable for useSyncExternalStore and memoized children.
    */
   const teamStore = useMemo(() => undoableStore(rawStores.team, undo), [rawStores, undo]);

@@ -9,33 +9,26 @@
 import 'fake-indexeddb/auto';
 import * as Y from 'yjs';
 import {
-  openDocument,
   createDocumentStores,
   destroyDocumentStores,
-  replaceDocumentContents,
+  openDocument,
   type OpenDocumentStores,
+  replaceDocumentContents,
 } from '../sync/localDocument.ts';
 import {
   createUndoController,
-  undoableStore,
-  undoControllerFor,
   releaseUndoController,
+  undoableStore,
   type UndoController,
+  undoControllerFor,
 } from './undoManager.ts';
-import {
-  seedYjsDocumentMeta,
-  createYjsDocumentMetaStore,
-  DEFAULT_DOCUMENT_TITLE,
-} from './yjsDocumentMetaStore.ts';
-import { rebaseDocument } from '../sync/rebase.ts';
-import { SCHEMA_VERSION, type DiagramFile } from '../../domain/canvas/serialization.ts';
-import { EMPTY_REQUIREMENTS_DOCUMENT } from '../../domain/requirements/requirementsTypes.ts';
-import {
-  BUILT_IN_ITEM_TYPES,
-  BUILT_IN_RELATIONSHIP_TYPES,
-} from '../../domain/requirements/requirementsRegistry.ts';
-import { EMPTY_TEAM_DOCUMENT } from '../../domain/timeline/teamTypes.ts';
-import type { Scenario } from '../../domain/canvas/types.ts';
+import {createYjsDocumentMetaStore, DEFAULT_DOCUMENT_TITLE, seedYjsDocumentMeta,} from './yjsDocumentMetaStore.ts';
+import {rebaseDocument} from '../sync/rebase.ts';
+import {type DiagramFile, SCHEMA_VERSION} from '../../domain/canvas/serialization.ts';
+import {EMPTY_REQUIREMENTS_DOCUMENT} from '../../domain/requirements/requirementsTypes.ts';
+import {BUILT_IN_ITEM_TYPES, BUILT_IN_RELATIONSHIP_TYPES,} from '../../domain/requirements/requirementsRegistry.ts';
+import {EMPTY_TEAM_DOCUMENT} from '../../domain/timeline/teamTypes.ts';
+import type {Scenario} from '../../domain/canvas/types.ts';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {
@@ -241,7 +234,7 @@ console.log('\n=== Document boundaries stay out of history (WS3-R4) ===');
   );
   assert(
     JSON.stringify(reopened.stores.meta.getSnapshot().scenarios[0].steps[0].path) === '[]',
-    'scenario steps without a path are normalised to the root at import',
+      'scenario steps without a path are normalized to the root at import',
   );
   undo.destroy();
   await reopened.close();

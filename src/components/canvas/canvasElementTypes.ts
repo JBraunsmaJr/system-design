@@ -1,11 +1,11 @@
-import { memo } from 'react';
-import { MarkerType, type EdgeTypes, type NodeTypes } from '@xyflow/react';
-import { TypedNode } from './nodes/TypedNode';
-import { TypedEdge } from './edges/TypedEdge';
-import { GroupNode } from './nodes/GroupNode';
-import { TextNode } from './nodes/TextNode';
-import { ShapeNode } from './nodes/ShapeNode';
-import { CodeNode } from './nodes/CodeNode';
+import {memo} from 'react';
+import {type EdgeTypes, MarkerType, type NodeTypes} from '@xyflow/react';
+import {TypedNode} from './nodes/TypedNode';
+import {TypedEdge} from './edges/TypedEdge';
+import {GroupNode} from './nodes/GroupNode';
+import {TextNode} from './nodes/TextNode';
+import {ShapeNode} from './nodes/ShapeNode';
+import {CodeNode} from './nodes/CodeNode';
 
 /**
  * How diagram elements are drawn, shared by every React Flow instance that
@@ -13,7 +13,7 @@ import { CodeNode } from './nodes/CodeNode';
  * surface. Sharing them is what makes a captured snapshot look like the
  * canvas.
  *
- * Memoised, because React Flow renders a custom node or edge whenever it
+ * Memoized, because React Flow renders a custom node or edge whenever it
  * re-adopts it - including when only its measured size was handed back, which
  * changes nothing the component draws. Unmemoized, every node rendered twice on
  * mount (once, then again once measured), and how many of those second passes

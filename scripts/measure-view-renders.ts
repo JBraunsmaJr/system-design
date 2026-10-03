@@ -28,25 +28,19 @@
  * refactor should produce an identical census; --compare exits non-zero if
  * any count differs.
  */
-import { spawn, type ChildProcess } from 'child_process';
-import { build, loadConfigFromFile, type PluginOption } from 'vite';
-import { mkdtempSync, readFileSync, writeFileSync } from 'fs';
-import { fileURLToPath } from 'url';
-import { tmpdir } from 'os';
-import { join, resolve } from 'path';
-import { chromium, type Page } from 'playwright';
-import { waitForPort } from './lib/devServers';
-import { toDiagramFile } from '../src/domain/canvas/serialization';
-import type {
-  RequirementItem,
-  RequirementRelationship,
-} from '../src/domain/requirements/requirementsTypes';
-import {
-  BUILT_IN_ITEM_TYPES,
-  BUILT_IN_RELATIONSHIP_TYPES,
-} from '../src/domain/requirements/requirementsRegistry';
-import type { ProgramIncrement } from '../src/domain/timeline/programIncrements';
-import type { Milestone } from '../src/domain/timeline/milestones';
+import {type ChildProcess, spawn} from 'child_process';
+import {build, loadConfigFromFile, type PluginOption} from 'vite';
+import {mkdtempSync, readFileSync, writeFileSync} from 'fs';
+import {fileURLToPath} from 'url';
+import {tmpdir} from 'os';
+import {join, resolve} from 'path';
+import {chromium, type Page} from 'playwright';
+import {waitForPort} from './lib/devServers';
+import {toDiagramFile} from '../src/domain/canvas/serialization';
+import type {RequirementItem, RequirementRelationship,} from '../src/domain/requirements/requirementsTypes';
+import {BUILT_IN_ITEM_TYPES, BUILT_IN_RELATIONSHIP_TYPES,} from '../src/domain/requirements/requirementsRegistry';
+import type {ProgramIncrement} from '../src/domain/timeline/programIncrements';
+import type {Milestone} from '../src/domain/timeline/milestones';
 
 // ---------------------------------------------------------------------------
 // Arguments
@@ -61,7 +55,7 @@ export interface Census {
   commits: number;
   renders: number;
   byComponent: Record<string, number>;
-  /** Normalised outerHTML of the scenario's `dom` root after it settled,
+  /** Normalized outerHTML of the scenario's `dom` root after it settled,
    * for scenarios that declare one (the modals, whose markup is the
    * product - the SRD preview is what becomes the PDF). */
   dom?: string;
