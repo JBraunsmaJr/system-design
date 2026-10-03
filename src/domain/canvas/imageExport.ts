@@ -1,5 +1,5 @@
 import { getNodesBounds, getViewportForBounds, type Node } from '@xyflow/react';
-import { toPng, toSvg } from 'html-to-image';
+import { toJpeg, toPng, toSvg } from 'html-to-image';
 import { toAbsolutePosition, getDescendantIds, findNodesContainedInRect } from './graphUtils';
 
 const EXPORT_WIDTH = 1600;
@@ -29,6 +29,26 @@ function downloadDataUrl(dataUrl: string, filename: string): void {
 }
 
 /**
+ * A capture's file format. JPEG is for images embedded in other documents -
+ * the SRD's snapshots - where it is several times cheaper to place in a PDF
+ * than a PNG with transparency; captures have an opaque background, so it
+ * loses nothing there but a little fidelity.
+ */
+export type CaptureFormat = 'png' | 'svg' | 'jpeg';
+
+/** High enough that text in a capture stays sharp at print sizes. */
+const JPEG_QUALITY = 0.92;
+
+function encode(
+  format: CaptureFormat,
+  element: HTMLElement,
+  options: Parameters<typeof toPng>[1],
+): Promise<string> {
+  if (format === 'jpeg') return toJpeg(element, { ...options, quality: JPEG_QUALITY });
+  return format === 'png' ? toPng(element, options) : toSvg(element, options);
+}
+
+/**
  * Where and how to capture. Defaults capture the editor's own canvas at the
  * device's pixel ratio, which is what the PNG/SVG exports want. A caller
  * rendering its own canvas (the SRD capture surface) passes that canvas as
@@ -52,7 +72,7 @@ function findViewport(root: ParentNode = document): HTMLElement | null {
  * so they're excluded from the export automatically.
  */
 async function captureViewport(
-  format: 'png' | 'svg',
+  format: CaptureFormat,
   nodes: Node[],
   target: CaptureTarget = {},
 ): Promise<string> {
@@ -86,7 +106,7 @@ async function captureViewport(
     },
   };
 
-  return format === 'png' ? toPng(viewportEl, options) : toSvg(viewportEl, options);
+  return encode(format, viewportEl, options);
 }
 
 export async function exportDiagramAsPng(nodes: Node[], title: string): Promise<void> {
@@ -103,7 +123,7 @@ export async function exportDiagramAsPng(nodes: Node[], title: string): Promise<
  */
 export async function captureDiagramSnapshot(
   nodes: Node[],
-  format: 'png' | 'svg' = 'png',
+  format: CaptureFormat = 'png',
   target?: CaptureTarget,
 ): Promise<string | undefined> {
   if (!nodes || nodes.length === 0) return undefined;
@@ -137,7 +157,7 @@ export interface SubsetSnapshotOptions extends CaptureTarget {
   height?: number;
   panOffset?: { x: number; y: number };
   zoomMultiplier?: number;
-  format?: 'png' | 'svg';
+  format?: CaptureFormat;
   backgroundColor?: string;
 }
 
@@ -307,9 +327,7 @@ export async function captureNodeSubsetSnapshot(
       },
     };
 
-    return await (format === 'png'
-      ? toPng(viewportEl, renderOptions)
-      : toSvg(viewportEl, renderOptions));
+    return await encode(format, viewportEl, renderOptions);
   } catch (err) {
     console.warn('Could not capture node subset snapshot:', err);
     return undefined;

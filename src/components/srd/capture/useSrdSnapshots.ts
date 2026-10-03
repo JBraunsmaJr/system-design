@@ -78,8 +78,11 @@ function levelFor(
 
 function captureTarget(target: SrdSnapshotTarget, rendered: RenderedLevel) {
   const nodes = rendered.getNodes();
-  const capture = { root: rendered.root, pixelRatio: CAPTURE_PIXEL_RATIO };
-  if (target.kind === 'diagram') return captureDiagramSnapshot(nodes, 'png', capture);
+  // JPEG: about three times cheaper for the PDF engine to embed than a PNG
+  // with transparency, on every render. Captures are opaque, so nothing is
+  // lost to it but a little fidelity.
+  const capture = { root: rendered.root, pixelRatio: CAPTURE_PIXEL_RATIO, format: 'jpeg' as const };
+  if (target.kind === 'diagram') return captureDiagramSnapshot(nodes, 'jpeg', capture);
   return captureNodeSubsetSnapshot(nodes, target.nodeIds, {
     ...ITEM_SNAPSHOT_SIZE,
     ...capture,

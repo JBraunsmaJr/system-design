@@ -123,6 +123,14 @@ async function run() {
       failures++;
       console.error(`  FAIL: page threw: ${e.message}`);
     });
+    // The PDF worker must load; falling back to the main thread is for
+    // browsers without workers, not something to pass unnoticed here.
+    p.on('console', (m) => {
+      if (m.text().includes('SRD PDF worker failed')) {
+        failures++;
+        console.error(`  FAIL: ${m.text()}`);
+      }
+    });
     // Every request for the new renderer's libraries, to prove they load
     // only when it is turned on.
     const pdfLibraryRequests: string[] = [];
@@ -238,6 +246,36 @@ async function run() {
       }
     }
     check(strayText === 0, `no content collapses into the footer band (${strayText} stray)`);
+
+    console.log('=== The page stays responsive while the PDF renders ===');
+    // The PDF is built in a worker: typing while it re-renders must never
+    // wait on it. (Snapshot capture needs the page and is excluded: every
+    // snapshot is cached by now.) A long task is the browser's measure of
+    // the page being unable to respond.
+    await p.evaluate(() => {
+      const w = window as unknown as { __longTasks: number[] };
+      w.__longTasks = [];
+      new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) w.__longTasks.push(entry.duration);
+      }).observe({ entryTypes: ['longtask'] });
+    });
+    const titleInput = p.locator('.srd-sidebar input').first();
+    await titleInput.click();
+    await titleInput.press('End');
+    for (const ch of ' revised') {
+      await p.keyboard.type(ch);
+      await sleep(350); // past the preview's debounce, so renders start between keys
+    }
+    await p.waitForFunction(
+      () => document.querySelector('.srd-pdf-preview')?.getAttribute('aria-busy') === 'false',
+      null,
+      { timeout: 30000 },
+    );
+    const longTasks = await p.evaluate(
+      () => (window as unknown as { __longTasks: number[] }).__longTasks,
+    );
+    const longest = Math.round(Math.max(0, ...longTasks));
+    check(longest < 200, `typing never waits on a render (longest freeze ${longest}ms)`);
 
     console.log('=== Reframing renders that snapshot again ===');
     const beforeReframe = await exportWhen(p, isComplete);

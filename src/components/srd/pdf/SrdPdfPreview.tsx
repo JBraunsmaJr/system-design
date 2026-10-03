@@ -5,12 +5,14 @@ import { useEffect, useRef, useState } from 'react';
 import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
 import type { SrdDataContext, SrdTemplateConfig } from '../../../domain/srd/srdTypes';
-import { renderSrdPdfBlob } from './srdPdfBrowser';
+import { SupersededError, renderSrdPdf } from './srdPdfClient';
 
 GlobalWorkerOptions.workerSrc = workerUrl;
 
-/** Batches a burst of edits into one render. */
-const RENDER_DEBOUNCE_MS = 400;
+/** Batches a burst of edits into one render. Shorter than it was on the main
+ * thread: rendering now runs in a worker, and a render waiting behind
+ * another is replaced by newer ones (see srdPdfClient). */
+const RENDER_DEBOUNCE_MS = 250;
 /** The widest a page is drawn on screen. */
 const MAX_PAGE_WIDTH = 860;
 
@@ -52,7 +54,7 @@ export default function SrdPdfPreview({ data, config, onRendered }: SrdPdfPrevie
     const timer = setTimeout(async () => {
       setStatus({ state: 'rendering' });
       try {
-        const blob = await renderSrdPdfBlob(data, config);
+        const blob = await renderSrdPdf(data, config, { supersedable: true });
         if (!isCurrent()) return;
         const loading = getDocument({ data: new Uint8Array(await blob.arrayBuffer()) });
         try {
@@ -84,7 +86,8 @@ export default function SrdPdfPreview({ data, config, onRendered }: SrdPdfPrevie
           void loading.destroy();
         }
       } catch (err) {
-        if (!isCurrent()) return;
+        // A newer render replaced this one before it started: it reports.
+        if (err instanceof SupersededError || !isCurrent()) return;
         console.error('SRD PDF preview failed:', err);
         setStatus({ state: 'error', message: err instanceof Error ? err.message : String(err) });
       }

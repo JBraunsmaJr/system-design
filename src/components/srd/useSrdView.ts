@@ -328,8 +328,9 @@ export function useSrdView({ srdStore, srd, currentSrdData, snapshots }: UseSrdV
   const currentPdf = async (): Promise<Blob> => {
     const shown = shownPdfRef.current;
     if (shown) return shown;
-    const { renderSrdPdfBlob } = await import('./pdf/srdPdfBrowser');
-    return renderSrdPdfBlob(currentSrdData, templateConfig);
+    // In the worker, like the preview; an export is never superseded.
+    const { renderSrdPdf } = await import('./pdf/srdPdfClient');
+    return renderSrdPdf(currentSrdData, templateConfig);
   };
 
   // Whatever the preview showed is stale once the document changes.

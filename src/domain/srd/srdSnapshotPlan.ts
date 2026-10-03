@@ -18,7 +18,7 @@ import { SRD_DIAGRAM_FRAMING_KEY, framingFor } from './srdSettings';
  * capture size, pixel ratio, padding, or node rendering - so images rendered
  * by the old code are never reused.
  */
-export const SNAPSHOT_CAPTURE_VERSION = 1;
+export const SNAPSHOT_CAPTURE_VERSION = 2; // 2: JPEG instead of PNG
 
 export interface SrdSnapshotTarget {
   /** SRD_DIAGRAM_FRAMING_KEY for the architecture diagram, else an item id. */
