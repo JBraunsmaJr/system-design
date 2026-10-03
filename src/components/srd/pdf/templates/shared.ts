@@ -21,7 +21,8 @@ export function type(fontSize: number, leading: number): PdfStyle {
   return { fontSize, lineHeight: leading };
 }
 
-/** A pill's colors, mixed as the HTML preview's CSS mixes them. */
+/** A pill's colors: a light tint of `base` with darker text and border,
+ * mixed like CSS color-mix (see mixColors). */
 export function tone(base: string, bg: number, fg: number, border: number): PdfStyle {
   return {
     backgroundColor: mixColors(base, bg, P.white),

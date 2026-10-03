@@ -33,7 +33,7 @@ export interface RenderedLevel {
   getNodes: () => Node[];
 }
 
-interface SrdCaptureSurfaceProps {
+export interface SrdCaptureSurfaceProps {
   level: CaptureLevel | null;
   onRendered: (rendered: RenderedLevel) => void;
 }

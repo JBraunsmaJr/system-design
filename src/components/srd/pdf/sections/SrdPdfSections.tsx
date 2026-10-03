@@ -23,8 +23,8 @@ import {
  * The SRD's sections, drawn once for every template.
  *
  * What each section shows, and in what order, lives here; how it looks comes
- * from the template's slots. Wording matches the HTML preview, so the two
- * renderers carry the same content (checked by SrdPdfSections.verify.tsx).
+ * from the template's slots, so every template carries the whole document
+ * (checked for each by SrdPdfSections.verify.tsx).
  */
 
 /**

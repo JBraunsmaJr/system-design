@@ -11,7 +11,7 @@ GlobalWorkerOptions.workerSrc = workerUrl;
 
 /** Batches a burst of edits into one render. */
 const RENDER_DEBOUNCE_MS = 400;
-/** The widest a page is drawn, matching the HTML preview's paper. */
+/** The widest a page is drawn on screen. */
 const MAX_PAGE_WIDTH = 860;
 
 export interface SrdPdfPreviewProps {

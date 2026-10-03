@@ -1,7 +1,7 @@
 /**
  * The print palette for PDF output. react-pdf cannot read CSS variables, so
  * these mirror the tokens in src/index.css (--print-*, and the semantic
- * colors the HTML preview's badges mix from). Keep the two in step.
+ * semantic colors - --info, --success and the rest). Keep the two in step.
  */
 export const PDF_PALETTE = {
   paper: '#ffffff',
@@ -31,7 +31,7 @@ function channels(hex: string): [number, number, number] {
 
 /**
  * `color-mix(in srgb, a pct%, b)`: `pct` percent of `a`, the rest `b` - the
- * same mixing the HTML preview's CSS uses, so the PDF's badges match it.
+ * same mixing as CSS, so the PDF's colors sit with the app's.
  */
 export function mixColors(a: string, pct: number, b: string): string {
   const [ca, cb] = [channels(a), channels(b)];

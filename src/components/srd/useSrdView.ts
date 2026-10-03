@@ -20,7 +20,6 @@ import {
   toRenderConfig,
 } from '../../domain/srd/srdSettings';
 import { downloadSrdMarkdown } from '../../domain/srd/srdMarkdownExport';
-import { downloadSrdPdf } from '../../domain/srd/srdPdfExport';
 import { srdPdfFileName } from '../../domain/srd/srdFileNames';
 import { downloadFile } from '../../common/utils/download';
 import type { SrdStore } from '../../collab/stores/yjsSrdStore';
@@ -65,20 +64,14 @@ export function useSrdView({ srdStore, srd, currentSrdData, snapshots }: UseSrdV
   >('doc');
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [pdfStatus, setPdfStatus] = useState('');
-  // Which engine previews and exports: the react-pdf one, by default, or the
-  // previous jsPDF one as a fallback while it is retired. Per person and
-  // session - how this person works, not part of the document.
-  const [usePreviousEngine, setUsePreviousEngine] = useState(false);
-  const useNewRenderer = !usePreviousEngine;
-  // The PDF the new renderer's preview last finished drawing - exactly what
-  // the user sees, so exporting it needs no second render.
-  const newRendererPdfRef = useRef<Blob | null>(null);
-  const handleNewRendererPdf = useCallback((blob: Blob) => {
-    newRendererPdfRef.current = blob;
+  // The PDF the preview last finished drawing - exactly what the user sees,
+  // so exporting or printing it needs no second render.
+  const shownPdfRef = useRef<Blob | null>(null);
+  const handlePdfRendered = useCallback((blob: Blob) => {
+    shownPdfRef.current = blob;
   }, []);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const paperRef = useRef<HTMLDivElement>(null);
 
   // --- Editing ----------------------------------------------------------------
 
@@ -330,10 +323,10 @@ export function useSrdView({ srdStore, srd, currentSrdData, snapshots }: UseSrdV
 
   // --- Export -----------------------------------------------------------------------
 
-  /** The new renderer's PDF of the current document: the one on screen
-   * when it is current, else a fresh render. */
-  const newRendererPdf = async (): Promise<Blob> => {
-    const shown = newRendererPdfRef.current;
+  /** The PDF of the current document: the one on screen when it is current,
+   * else a fresh render. */
+  const currentPdf = async (): Promise<Blob> => {
+    const shown = shownPdfRef.current;
     if (shown) return shown;
     const { renderSrdPdfBlob } = await import('./pdf/srdPdfBrowser');
     return renderSrdPdfBlob(currentSrdData, templateConfig);
@@ -341,7 +334,7 @@ export function useSrdView({ srdStore, srd, currentSrdData, snapshots }: UseSrdV
 
   // Whatever the preview showed is stale once the document changes.
   useEffect(() => {
-    newRendererPdfRef.current = null;
+    shownPdfRef.current = null;
   }, [currentSrdData, templateConfig]);
 
   const handleExportPdf = async () => {
@@ -349,13 +342,7 @@ export function useSrdView({ srdStore, srd, currentSrdData, snapshots }: UseSrdV
     setIsExportingPdf(true);
     setPdfStatus('Generating PDF...');
     try {
-      if (useNewRenderer) {
-        downloadFile(await newRendererPdf(), srdPdfFileName(currentSrdData));
-        return;
-      }
-      await downloadSrdPdf(currentSrdData, templateConfig, undefined, (status) => {
-        setPdfStatus(status);
-      });
+      downloadFile(await currentPdf(), srdPdfFileName(currentSrdData));
     } catch (err) {
       console.error('PDF export error:', err);
       alert('Failed to generate PDF: ' + (err instanceof Error ? err.message : String(err)));
@@ -366,19 +353,32 @@ export function useSrdView({ srdStore, srd, currentSrdData, snapshots }: UseSrdV
   };
 
   const handlePrint = async () => {
-    if (!useNewRenderer) {
-      window.print();
-      return;
-    }
     // The preview is canvases, not printable markup: print the PDF itself
     // from the browser's PDF viewer. The window is opened before awaiting,
-    // so popup blockers see it as part of the click.
+    // so popup blockers see it as part of the click (or keypress).
     const viewer = window.open('', '_blank');
-    const url = URL.createObjectURL(await newRendererPdf());
+    const url = URL.createObjectURL(await currentPdf());
     if (viewer) viewer.location.href = url;
     else window.location.assign(url);
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   };
+
+  // In this view, Ctrl+P / Cmd+P prints the document - as it did when the
+  // preview was printable markup - rather than the app around it.
+  const printRef = useRef(handlePrint);
+  useEffect(() => {
+    printRef.current = handlePrint;
+  });
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        void printRef.current();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   const handleDownloadMarkdown = () => {
     downloadSrdMarkdown(currentSrdData, templateConfig);
@@ -417,10 +417,6 @@ export function useSrdView({ srdStore, srd, currentSrdData, snapshots }: UseSrdV
     () => [...templateConfig.sections].sort((a, b) => a.order - b.order),
     [templateConfig.sections],
   );
-  const activeSortedSections = useMemo(
-    () => sortedSections.filter((s) => s.enabled),
-    [sortedSections],
-  );
 
   return {
     activePresetId,
@@ -435,17 +431,13 @@ export function useSrdView({ srdStore, srd, currentSrdData, snapshots }: UseSrdV
     isDiagramHidden,
     isExportingPdf,
     pdfStatus,
-    useNewRenderer,
-    usePreviousEngine,
-    setUsePreviousEngine,
-    handleNewRendererPdf,
+    handlePdfRendered,
     selectedFramingItemId,
     setSelectedFramingItemId,
     isCapturingItemSnapshot,
     setIsInteractingWithSlider,
     batchProgress,
     fileInputRef,
-    paperRef,
     linkedRequirementItems,
     currentFramingItem,
     framingPanOffset,
@@ -481,6 +473,5 @@ export function useSrdView({ srdStore, srd, currentSrdData, snapshots }: UseSrdV
     handleRemoveItemSnapshot,
     handleBatchCaptureAllSnapshots,
     sortedSections,
-    activeSortedSections,
   };
 }

@@ -6,7 +6,7 @@ import { parseMarkdown } from './srdPdfMarkdownTree';
 /**
  * Markdown for the react-pdf renderer.
  *
- * Parsed with the same remark plugins as the HTML preview (GFM, and single
+ * Parsed with the same remark plugins as the app's own Markdown (requirement bodies, docs) (GFM, and single
  * line breaks kept), then walked into react-pdf elements: block nodes become
  * Views, inline nodes nested Texts. Raw HTML is shown as its text, never
  * interpreted, and only http(s) and mailto links are made clickable.

@@ -1,15 +1,12 @@
 /**
- * The shared section renderers through the Classic template: content parity
- * with the HTML preview, pagination of long content, empty states, settings,
- * and the template registry.
- *
+ * The shared section renderers through every template: all of the
+ * document's content shown, pagination of long content, empty states,
+ * settings, and the template registry. *
  * Run with: npx tsx --tsconfig tsconfig.app.json src/components/srd/pdf/sections/SrdPdfSections.verify.tsx
  */
-import { renderToStaticMarkup } from 'react-dom/server';
 import { pdf } from '@react-pdf/renderer';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { SrdPdfDocument } from '../SrdPdfDocument';
-import { SrdDocumentPreview } from '../../SrdDocumentPreview';
 import { SRD_PDF_TEMPLATES, pdfTemplateFor } from '../templates';
 import { PDF_FONT_MONO } from '../srdPdfFonts';
 import { DEFAULT_SRD_TEMPLATE } from '../../../../domain/srd/srdTemplatePresets';
@@ -47,28 +44,57 @@ async function pdfPages(data: SrdDataContext, cfg: SrdTemplateConfig): Promise<s
   return pages;
 }
 
-/** The words the HTML preview shows for a document. */
-function previewWords(data: SrdDataContext, cfg: SrdTemplateConfig): string[] {
-  const sections = cfg.sections.filter((s) => s.enabled).sort((a, b) => a.order - b.order);
-  const html = renderToStaticMarkup(
-    <SrdDocumentPreview
-      templateConfig={cfg}
-      currentSrdData={data}
-      paperRef={{ current: null }}
-      activeSortedSections={sections}
-    />,
+/**
+ * Everything the document's data says that a reader should see, for one
+ * layout: titles, metadata, every component, connection, requirement,
+ * relationship, milestone and sprint. Cards show more than table rows (the
+ * sprint, linked components, the body), so those are expected in cards only.
+ */
+function expectedContent(data: SrdDataContext, cfg: SrdTemplateConfig): string[] {
+  const { metadata, architecture, requirements, traceability, roadmap } = data;
+  const cards = cfg.requirementsLayout === 'list';
+  const items = requirements.categories.flatMap((c) => requirements.itemsByCategory[c.id] ?? []);
+  const shownCategories = requirements.categories.filter(
+    (c) => (requirements.itemsByCategory[c.id] ?? []).length > 0,
   );
-  const text = html
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#x27;/g, "'");
-  return [...new Set(text.split(/\s+/).filter((w) => w.length > 0))];
+  const sections = cfg.sections.filter((x) => x.enabled);
+  return [
+    metadata.title,
+    metadata.version,
+    metadata.generatedAt,
+    metadata.organization ?? '',
+    ...metadata.authors.map((a) => a.name),
+    'card payments',
+    'Fraud checks',
+    'Settlement',
+    ...sections.flatMap((x) => [x.title, x.customIntroText ?? '']),
+    ...(cfg.includeComponentTable
+      ? architecture.components.flatMap((c) => [c.name, c.type, c.description ?? ''])
+      : []),
+    ...(cfg.includeConnectionsTable
+      ? architecture.connections.flatMap((c) => [c.label ?? '', c.protocol ?? c.edgeType ?? ''])
+      : []),
+    ...shownCategories.map((c) => `Category: ${c.label}`),
+    ...items.flatMap((item) => [
+      item.id,
+      item.title,
+      item.typeLabel,
+      item.status ?? '',
+      item.assigneeName ?? '',
+      ...(cards ? [item.sprintName ?? '', ...(item.linkedNodeLabels ?? [])] : []),
+    ]),
+    ...traceability.flatMap((t) => [t.relation, t.sourceTitle, t.targetTitle]),
+    ...roadmap.milestones.flatMap((m) => [
+      m.title,
+      m.type,
+      m.targetDate ?? '',
+      m.description ?? '',
+    ]),
+    ...roadmap.sprints.flatMap((x) => [x.piName, x.name, x.startDate, x.endDate]),
+  ].filter((text) => text.length > 0);
 }
 
-console.log('=== 1. Content parity with the HTML preview ===');
+console.log('=== 1. Every template shows all of the document ===');
 const TEMPLATE_IDS = Object.keys(SRD_PDF_TEMPLATES) as Array<keyof typeof SRD_PDF_TEMPLATES>;
 
 for (const templateId of TEMPLATE_IDS)
@@ -76,14 +102,12 @@ for (const templateId of TEMPLATE_IDS)
     const cfg = config({ requirementsLayout: layout, templateId });
     const data = richData();
     const pdfText = squash((await pdfPages(data, cfg)).join(' ')).toUpperCase();
-    // The preview's running footer shows page 1 of 1; page numbers are the
-    // PDF's own, so they are not content to compare.
-    const missing = previewWords(data, cfg).filter(
-      (w) => !pdfText.includes(squash(w).toUpperCase()) && !/^\d+$/.test(w),
+    const missing = expectedContent(data, cfg).filter(
+      (text) => !pdfText.includes(squash(text).toUpperCase()),
     );
     assert(
       missing.length === 0,
-      `${templateId}, ${layout} layout: every word the preview shows is in the PDF${missing.length ? ` (missing: ${missing.slice(0, 12).join(' ')})` : ''}`,
+      `${templateId}, ${layout} layout: all of the document's content is in the PDF${missing.length ? ` (missing: ${missing.slice(0, 10).join(' | ')})` : ''}`,
     );
   }
 

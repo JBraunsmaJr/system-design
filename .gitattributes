@@ -1,2 +1,8 @@
 * text=auto
 *.sh text eol=lf
+
+# Images are binary: never convert line endings or otherwise transform them.
+*.png binary
+*.jpg binary
+*.woff binary
+*.woff2 binary

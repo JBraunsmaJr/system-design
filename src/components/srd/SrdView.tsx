@@ -24,14 +24,14 @@ import { SrdLayoutTab } from './SrdLayoutTab';
 import { SrdSnapshotsTab } from './SrdSnapshotsTab';
 import { SrdHeadersTab } from './SrdHeadersTab';
 import { SrdTemplateJsonControls } from './SrdTemplateJsonControls';
-import { SrdDocumentPreview } from './SrdDocumentPreview';
 import { useSrdSnapshots } from './capture/useSrdSnapshots';
+import { SrdCaptureSurface } from './capture/SrdCaptureSurface';
 import { useSrdDocumentData } from './useSrdDocumentData';
 import { useSrdView } from './useSrdView';
 import { SRD_TEMPLATE_CATALOG } from '../../domain/srd/srdTemplateCatalog';
 
-// Loaded only when someone turns the new renderer on: react-pdf and pdf.js
-// stay out of the view's own chunk.
+// Loaded once the view mounts: react-pdf and pdf.js stay out of the view's
+// own chunk, and out of the bundle every session downloads.
 const SrdPdfPreview = lazy(() => import('./pdf/SrdPdfPreview'));
 
 export interface SrdViewProps {
@@ -96,17 +96,13 @@ export default function SrdView({
     isDiagramHidden,
     isExportingPdf,
     pdfStatus,
-    useNewRenderer,
-    usePreviousEngine,
-    setUsePreviousEngine,
-    handleNewRendererPdf,
+    handlePdfRendered,
     selectedFramingItemId,
     setSelectedFramingItemId,
     isCapturingItemSnapshot,
     setIsInteractingWithSlider,
     batchProgress,
     fileInputRef,
-    paperRef,
     linkedRequirementItems,
     currentFramingItem,
     framingPanOffset,
@@ -142,12 +138,11 @@ export default function SrdView({
     handleRemoveItemSnapshot,
     handleBatchCaptureAllSnapshots,
     sortedSections,
-    activeSortedSections,
   } = useSrdView({ srdStore, srd, currentSrdData, snapshots });
 
   return (
     <div className="srd-view">
-      {snapshots.surface}
+      <SrdCaptureSurface {...snapshots.surfaceProps} />
       {/* Header */}
       <div className="srd-view__header">
         <div className="srd-view__title-group">
@@ -160,17 +155,6 @@ export default function SrdView({
           </div>
         </div>
         <div className="srd-view__header-actions">
-          <label
-            className="srd-view__renderer-toggle"
-            title="Preview and export with the previous PDF engine instead, while it is retired."
-          >
-            <input
-              type="checkbox"
-              checked={usePreviousEngine}
-              onChange={(e) => setUsePreviousEngine(e.target.checked)}
-            />
-            <span>Previous PDF engine</span>
-          </label>
           <button
             type="button"
             className="srd-btn-icon"
@@ -425,22 +409,13 @@ export default function SrdView({
         </div>
 
         {/* Document Preview Paper */}
-        {useNewRenderer ? (
-          <Suspense fallback={<div className="srd-pdf-preview">Loading PDF renderer…</div>}>
-            <SrdPdfPreview
-              data={currentSrdData}
-              config={templateConfig}
-              onRendered={handleNewRendererPdf}
-            />
-          </Suspense>
-        ) : (
-          <SrdDocumentPreview
-            templateConfig={templateConfig}
-            currentSrdData={currentSrdData}
-            paperRef={paperRef}
-            activeSortedSections={activeSortedSections}
+        <Suspense fallback={<div className="srd-pdf-preview">Loading PDF renderer…</div>}>
+          <SrdPdfPreview
+            data={currentSrdData}
+            config={templateConfig}
+            onRendered={handlePdfRendered}
           />
-        )}
+        </Suspense>
       </div>
     </div>
   );

@@ -131,7 +131,7 @@ export function SrdSnapshotsTab({
                   }}
                 >
                   {currentFramingItem.linkedNodeLabels?.map((lbl, idx) => (
-                    <span key={idx} className="srd-doc__node-tag">
+                    <span key={idx} className="srd-snapshots__node-tag">
                       {lbl}
                     </span>
                   ))}

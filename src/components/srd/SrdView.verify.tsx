@@ -34,13 +34,10 @@ const propsFor = (srdStore = createYjsSrdStore(new Y.Doc())): SrdViewProps => ({
   assert(html.includes('class="srd-view"'), 'Renders as a view');
   assert(!html.includes('srd-modal'), 'Has no modal backdrop or dialog');
   assert(!html.includes('Close modal'), 'Has no close button to dismiss by accident');
+  assert(html.includes('srd-pdf-preview'), 'Previews the document as its PDF');
   assert(
-    html.includes('srd-pdf-preview') && !html.includes('srd-preview-paper'),
-    'Previews with the new PDF engine by default, not the previous HTML one',
-  );
-  assert(
-    /<input type="checkbox"\/><span>Previous PDF engine<\/span>/.test(html),
-    'The previous engine is offered as an unchecked fallback',
+    !html.includes('srd-preview-paper') && !html.includes('Previous PDF engine'),
+    'with no other engine or preview left to choose',
   );
   assert(html.includes('srd-capture-surface'), 'Mounts the offscreen capture surface');
   assert(html.includes('Payments Platform'), "Content is derived from the document's title");

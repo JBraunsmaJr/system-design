@@ -1,13 +1,4 @@
-import {
-  createElement,
-  useCallback,
-  useDeferredValue,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import type { Edge, Node } from '@xyflow/react';
 import { projectCanvasElements } from '../../../app/canvasProjection';
 import { populatedLevelCounts } from '../../../collab/stores/diagramStore';
@@ -19,7 +10,7 @@ import type { ArchEdgeData, ArchNodeData } from '../../../domain/canvas/types';
 import { srdSnapshotCache } from '../../../domain/srd/srdSnapshotCache';
 import { planSrdSnapshots, type SrdSnapshotTarget } from '../../../domain/srd/srdSnapshotPlan';
 import type { SrdDocumentState, SrdSnapshotFraming } from '../../../domain/srd/srdTypes';
-import { SrdCaptureSurface, type CaptureLevel, type RenderedLevel } from './SrdCaptureSurface';
+import type { CaptureLevel, RenderedLevel, SrdCaptureSurfaceProps } from './SrdCaptureSurface';
 
 /**
  * Pinned so a snapshot looks the same on every screen, rather than following
@@ -40,8 +31,8 @@ export interface SrdSnapshotImage {
 }
 
 export interface SrdSnapshots {
-  /** Render this once, anywhere in the SRD view. It is offscreen. */
-  surface: ReactNode;
+  /** Props for the one SrdCaptureSurface the SRD view renders (offscreen). */
+  surfaceProps: SrdCaptureSurfaceProps;
   /** Rendered images by target key (an item id, or the diagram key). */
   images: ReadonlyMap<string, SrdSnapshotImage>;
   /** Snapshots the document needs. */
@@ -133,7 +124,12 @@ export function useSrdSnapshots({
   const [level, setLevel] = useState<CaptureLevel | null>(null);
   // Fingerprints that failed to render, not retried until refreshed - a
   // capture that fails once fails the same way again.
-  const failedRef = useRef(new Set<string>());
+  // State, not a ref: recording a failure must update `missing` below.
+  const [failed, setFailed] = useState<ReadonlySet<string>>(() => new Set());
+  const markFailed = useCallback(
+    (fingerprint: string) => setFailed((prev) => new Set(prev).add(fingerprint)),
+    [],
+  );
   const busyRef = useRef(false);
   const renderedRef = useRef<RenderedLevel | null>(null);
   const waitersRef = useRef(new Map<string, Array<(rendered: RenderedLevel) => void>>());
@@ -170,9 +166,8 @@ export function useSrdSnapshots({
   }, [targets, cacheVersion]);
 
   const missing = useMemo(
-    () => targets.filter((t) => !images.has(t.key) && !failedRef.current.has(t.fingerprint)),
-    // failedRef changes only alongside cacheVersion, which `images` tracks.
-    [targets, images],
+    () => targets.filter((t) => !images.has(t.key) && !failed.has(t.fingerprint)),
+    [targets, images, failed],
   );
 
   // Capture loop: one snapshot per pass; each completion bumps cacheVersion,
@@ -204,10 +199,10 @@ export function useSrdSnapshots({
         await document.fonts?.ready;
         const dataUrl = rendered ? await captureTarget(target, rendered) : undefined;
         if (dataUrl) srdSnapshotCache.set(target.fingerprint, dataUrl);
-        else failedRef.current.add(target.fingerprint);
+        else markFailed(target.fingerprint);
       } catch (err) {
         console.warn('SRD snapshot capture failed:', target.key, err);
-        failedRef.current.add(target.fingerprint);
+        markFailed(target.fingerprint);
       } finally {
         busyRef.current = false;
         if (mountedRef.current) {
@@ -217,7 +212,7 @@ export function useSrdSnapshots({
       }
     }, CAPTURE_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [missing, diagram, levelCounts, waitForLevel]);
+  }, [missing, diagram, levelCounts, waitForLevel, markFailed]);
 
   // The surface's level is released once nothing is left to render, so an
   // idle view does not keep a second canvas mounted.
@@ -231,23 +226,23 @@ export function useSrdSnapshots({
   const refresh = useCallback(
     (keys?: readonly string[]) => {
       const wanted = keys ? new Set(keys) : null;
-      for (const target of targets) {
-        if (wanted && !wanted.has(target.key)) continue;
-        srdSnapshotCache.delete(target.fingerprint);
-        failedRef.current.delete(target.fingerprint);
-      }
+      const refreshed = targets.filter((t) => !wanted || wanted.has(t.key));
+      for (const target of refreshed) srdSnapshotCache.delete(target.fingerprint);
+      // A refreshed snapshot is tried again even if it failed before.
+      setFailed((prev) => {
+        const next = new Set(prev);
+        for (const target of refreshed) next.delete(target.fingerprint);
+        return next;
+      });
       setCacheVersion((v) => v + 1);
     },
     [targets],
   );
 
-  const surface = useMemo(
-    () => createElement(SrdCaptureSurface, { level, onRendered }),
-    [level, onRendered],
-  );
+  const surfaceProps = useMemo(() => ({ level, onRendered }), [level, onRendered]);
 
   return {
-    surface,
+    surfaceProps,
     images,
     total: targets.length,
     pending: missing.length,

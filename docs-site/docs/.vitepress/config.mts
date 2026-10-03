@@ -48,6 +48,7 @@ export default defineConfig({
           { text: 'Requirements', link: '/guide/requirement' },
           { text: 'Timeline & Planning', link: '/guide/timeline' },
           { text: 'Team & Capacity', link: '/guide/team' },
+          { text: 'Solution Requirement Documents', link: '/guide/srd' },
           { text: 'Workspaces', link: '/guide/workspaces' },
           { text: 'How your work is protected', link: '/guide/security' },
         ],

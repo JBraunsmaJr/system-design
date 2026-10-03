@@ -8,6 +8,7 @@
  */
 import { chromium, type Browser, type Page } from 'playwright';
 import { mkdtempSync, readFileSync, writeFileSync } from 'fs';
+import { createHash } from 'crypto';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { tmpdir } from 'os';
 import { join, resolve } from 'path';
@@ -45,27 +46,67 @@ function check(condition: boolean, message: string) {
 }
 const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
-const ITEM_IMG = '.srd-doc__item-snapshot-img';
-const DIAGRAM_IMG = '.srd-doc__diagram-img';
-
-/**
- * Opens the SRD view. The new PDF engine is the default; the steps that
- * inspect snapshots through the HTML preview select the previous engine,
- * whose preview is plain markup (`engine: 'previous'`).
- */
-async function openSrd(p: Page, engine: 'new' | 'previous' = 'previous') {
+/** Opens the SRD view; its preview is the PDF itself. */
+async function openSrd(p: Page) {
   await p.click('button[title^="Solution Requirement Document"]');
   await p.waitForSelector('.srd-view');
-  if (engine === 'previous') await p.check('.srd-view__renderer-toggle input');
 }
 
-const imageSizes = (p: Page, selector: string) =>
-  p.$$eval(selector, (els) =>
-    els.map((el) => (el as HTMLImageElement).naturalWidth).filter((w) => w > 0),
-  );
+interface PdfImage {
+  width: number;
+  height: number;
+  /** A hash of the image's data: equal for an unchanged image. */
+  digest: string;
+}
 
-const itemImageSrc = (p: Page, itemId: string) =>
-  p.$eval(`img[alt="Context snapshot for ${itemId}"]`, (el) => (el as HTMLImageElement).src);
+/**
+ * The images in a PDF - the diagram and snapshots a reader gets - with
+ * their pixel sizes. Alpha masks (another image's /SMask) are not images of
+ * their own and are left out.
+ */
+function imagesOf(bytes: Buffer): PdfImage[] {
+  const raw = bytes.toString('latin1');
+  const masks = new Set([...raw.matchAll(/\/SMask\s+(\d+)\s+0\s+R/g)].map((m) => m[1]));
+  const images: PdfImage[] = [];
+  // Each object's dictionary, never running past its own endobj into the
+  // next object's - which would count a mask as an image.
+  for (const m of raw.matchAll(/(\d+)\s+0\s+obj\s*<<((?:(?!endobj)[\s\S])*?)>>\s*stream\r?\n/g)) {
+    const [whole, id, dict] = m;
+    if (!/\/Subtype\s*\/Image/.test(dict) || masks.has(id)) continue;
+    const start = (m.index ?? 0) + whole.length;
+    const end = raw.indexOf('endstream', start);
+    images.push({
+      width: Number(/\/Width\s+(\d+)/.exec(dict)?.[1]),
+      height: Number(/\/Height\s+(\d+)/.exec(dict)?.[1]),
+      digest: createHash('sha1').update(bytes.subarray(start, end)).digest('hex'),
+    });
+  }
+  return images;
+}
+
+/** Exports the SRD from the view, as a user would, and returns the file. */
+async function exportPdf(p: Page): Promise<{ bytes: Buffer; name: string }> {
+  const [download] = await Promise.all([
+    p.waitForEvent('download'),
+    p.click('button:has-text("Export PDF")'),
+  ]);
+  return { bytes: readFileSync((await download.path())!), name: download.suggestedFilename() };
+}
+
+/** Exports until `ready` accepts the PDF's images: snapshots are captured
+ * in the background, so the first export may predate them. */
+async function exportWhen(
+  p: Page,
+  ready: (images: PdfImage[]) => boolean,
+  timeoutMs = 30000,
+): Promise<PdfImage[]> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const images = imagesOf((await exportPdf(p)).bytes);
+    if (ready(images) || Date.now() > deadline) return images;
+    await sleep(1000);
+  }
+}
 
 async function run() {
   let servers: DevServers | undefined;
@@ -101,19 +142,20 @@ async function run() {
 
     console.log('=== Snapshots render offscreen from the document ===');
     await openSrd(p);
-    await p.waitForFunction(
-      ([item, diagram]) =>
-        document.querySelectorAll(item).length === 2 && document.querySelector(diagram) !== null,
-      [ITEM_IMG, DIAGRAM_IMG],
-      { timeout: 30000 },
-    );
-    check(true, 'the diagram and both linked requirements are rendered');
+    check(pdfLibraryRequests.length > 0, 'opening the SRD view loads the PDF engine');
+    await p.waitForSelector('.srd-pdf-preview__pages canvas', { timeout: 60000 });
+    const isComplete = (images: PdfImage[]) => images.length === 3;
+    const captured = await exportWhen(p, isComplete);
     check(
-      JSON.stringify(await imageSizes(p, DIAGRAM_IMG)) === '[3200]',
+      isComplete(captured),
+      `the diagram and both linked requirements are in the PDF (${captured.length} images)`,
+    );
+    check(
+      captured.filter((i) => i.width === 3200).length === 1,
       'the diagram is captured at the pinned 2x pixel ratio (3200px wide)',
     );
     check(
-      JSON.stringify(await imageSizes(p, ITEM_IMG)) === '[2400,2400]',
+      captured.filter((i) => i.width === 2400).length === 2,
       'requirement snapshots are captured at the pinned 2x pixel ratio (2400px wide)',
     );
     await p.waitForFunction(
@@ -132,20 +174,24 @@ async function run() {
     );
 
     console.log('=== Returning reuses rendered snapshots ===');
-    await openSrd(p);
-    await p.waitForFunction((sel) => document.querySelectorAll(sel).length === 2, ITEM_IMG, {
-      timeout: 1500,
+    // The capture surface mounts a canvas only to render a snapshot; with
+    // every snapshot cached it never does.
+    await p.evaluate(() => {
+      const w = window as unknown as { __surfaceMounted?: boolean };
+      w.__surfaceMounted = false;
+      new MutationObserver(() => {
+        if (document.querySelector('.srd-capture-surface .react-flow')) w.__surfaceMounted = true;
+      }).observe(document.body, { childList: true, subtree: true });
     });
-    check(true, 'snapshots are shown again without re-rendering');
-
-    console.log('=== The new PDF engine previews and exports the actual PDF ===');
-    // The images the document shows, by the HTML preview: the PDF must carry
-    // exactly these.
-    const shownImages = (await p.$$(`${DIAGRAM_IMG}, ${ITEM_IMG}`)).length;
-    // Back to the default engine: the new one.
-    await p.uncheck('.srd-view__renderer-toggle input');
+    await openSrd(p);
     await p.waitForSelector('.srd-pdf-preview__pages canvas', { timeout: 60000 });
-    check(pdfLibraryRequests.length > 0, 'opening the SRD view loaded them');
+    const reused = await exportWhen(p, isComplete, 5000);
+    const surfaceMounted = await p.evaluate(
+      () => (window as unknown as { __surfaceMounted?: boolean }).__surfaceMounted,
+    );
+    check(isComplete(reused) && !surfaceMounted, 'snapshots are reused without rendering again');
+    console.log('=== The new PDF engine previews and exports the actual PDF ===');
+    await p.waitForSelector('.srd-pdf-preview__pages canvas', { timeout: 60000 });
     const status = await p.textContent('.srd-pdf-preview__status');
     const shownPages = await p.$$eval('.srd-pdf-preview__pages canvas', (els) => els.length);
     check(/PDF · \d+ pages?/.test(status ?? ''), `the preview reports the PDF (${status})`);
@@ -176,8 +222,8 @@ async function run() {
     const alphaMasks = (raw.match(/\/SMask\s+\d+\s+0\s+R/g) ?? []).length;
     const images = imageObjects - alphaMasks;
     check(
-      images === shownImages && shownImages >= 2,
-      `every image the document shows is embedded (${images} of ${shownImages}; ${imageObjects} objects, ${alphaMasks} masks)`,
+      images === 3,
+      `the diagram and both snapshots are embedded (${images} images; ${imageObjects} objects, ${alphaMasks} masks)`,
     );
     let strayText = 0;
     for (let n = 1; n <= exported.numPages; n++) {
@@ -193,42 +239,41 @@ async function run() {
     }
     check(strayText === 0, `no content collapses into the footer band (${strayText} stray)`);
 
-    // Back to the HTML preview, which the steps below inspect.
-    await p.check('.srd-view__renderer-toggle input');
-    await p.waitForSelector(ITEM_IMG);
-
     console.log('=== Reframing renders that snapshot again ===');
+    const beforeReframe = await exportWhen(p, isComplete);
     await p.click('button:has-text("Snapshots")');
     await p.selectOption(`select:has(option[value="${NESTED_ITEM}"])`, NESTED_ITEM);
-    const before = await itemImageSrc(p, NESTED_ITEM);
-    const rootBefore = await itemImageSrc(p, ROOT_ITEM);
     await p.fill('.srd-framing-slider >> nth=0', '200');
-    await p.waitForFunction(
-      ([item, src]) =>
-        (document.querySelector(`img[alt="Context snapshot for ${item}"]`) as HTMLImageElement)
-          ?.src !== src,
-      [NESTED_ITEM, before],
-      { timeout: 15000 },
-    );
-    check(true, 'the reframed snapshot is rendered again');
+    const digests = (images: PdfImage[]) => new Set(images.map((i) => i.digest));
+    const changedFrom = (images: PdfImage[]) =>
+      images.filter((i) => !digests(beforeReframe).has(i.digest));
+    const afterReframe = await exportWhen(p, (images) => changedFrom(images).length > 0, 20000);
+    const changed = changedFrom(afterReframe);
     check(
-      (await itemImageSrc(p, ROOT_ITEM)) === rootBefore,
-      'other snapshots are left as they were',
+      changed.length === 1 && changed[0].width === 2400,
+      'the reframed snapshot is rendered again',
+    );
+    check(
+      afterReframe.length === 3 &&
+        afterReframe.filter((i) => digests(beforeReframe).has(i.digest)).length === 2,
+      'the other snapshot and the diagram are left as they were',
     );
 
     console.log('=== Removing a snapshot is document content ===');
     await p.click('button[title="Remove item snapshot"]');
-    await p.waitForFunction((sel) => document.querySelectorAll(sel).length === 1, ITEM_IMG);
-    check(true, 'the removed snapshot leaves the document');
+    const afterRemoval = await exportWhen(p, (images) => images.length === 2, 15000);
+    check(afterRemoval.length === 2, 'the removed snapshot leaves the PDF');
     await sleep(500); // let the document reach IndexedDB
     await p.reload();
     await p.waitForSelector('.collab-panel__trigger');
     await openSrd(p);
-    await p.waitForSelector(ITEM_IMG, { timeout: 30000 });
-    await sleep(1000);
+    await p.waitForSelector('.srd-pdf-preview__pages canvas', { timeout: 60000 });
+    const afterReload = await exportWhen(p, (images) => images.length >= 2, 30000);
+    await sleep(1500);
+    const settled = imagesOf((await exportPdf(p)).bytes);
     check(
-      (await p.$$(ITEM_IMG)).length === 1,
-      'after a reload the snapshot is still removed, and the reframed one is shown',
+      afterReload.length === 2 && settled.length === 2,
+      'after a reload the snapshot is still removed',
     );
 
     console.log('=== The template picker ===');

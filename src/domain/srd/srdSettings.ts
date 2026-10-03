@@ -80,9 +80,8 @@ export function findBuiltinPreset(presetId: string): SrdTemplateConfig | undefin
 }
 
 /**
- * The legacy render input, for the renderers that predate document state
- * (the HTML preview, jsPDF and markdown exports). Transitional: removed once
- * the template renderers take SrdDocumentState directly.
+ * What the PDF engine and the Markdown export draw from: the document's
+ * settings and template, with its preset's name.
  */
 export function toRenderConfig(
   state: Pick<SrdDocumentState, 'presetId' | 'templateId' | 'settings'>,
