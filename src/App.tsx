@@ -1,4 +1,12 @@
-import { useCallback, useMemo, useState, Profiler, type ProfilerOnRenderCallback } from 'react';
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useMemo,
+  useState,
+  Profiler,
+  type ProfilerOnRenderCallback,
+} from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { ReactFlowProvider } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -19,7 +27,6 @@ import { DurabilityIndicator } from './components/workspace/DurabilityIndicator'
 import { LeaveGuardDialog } from './components/workspace/LeaveGuardDialog';
 import { WorkspacePanel } from './components/workspace/WorkspacePanel';
 import { AccessRequestNotice } from './components/workspace/AccessRequestNotice';
-import { SrdPrintModal } from './components/srd/SrdPrintModal';
 import { Toast, type ToastType } from './common/components/toast/Toast';
 import { useFileSaving } from './hooks/useFileSaving';
 import { useAccessRequests } from './collab/hooks/useAccessRequests';
@@ -39,10 +46,12 @@ import { useCanvasEditing } from './app/hooks/useCanvasEditing';
 import { useClipboard } from './app/hooks/useClipboard';
 import { useKeyboardShortcuts } from './app/hooks/useKeyboardShortcuts';
 import { useFileActions } from './app/hooks/useFileActions';
-import { useSrdExport } from './app/hooks/useSrdExport';
 import { usePerfHarnessBridge } from './app/hooks/usePerfHarnessBridge';
 import './App.css';
-import './components/srd/SrdPrintModal.css';
+
+// Loaded on first visit: the SRD view carries the PDF exporter, which no
+// other view needs, so it stays out of the bundle every session downloads.
+const SrdView = lazy(() => import('./components/srd/SrdViewEntry'));
 
 /**
  * The editor shell: wires the app's hooks together and lays out the views.
@@ -140,6 +149,8 @@ function App() {
     programIncrementsStore,
     milestonesStore,
     diagramStore,
+    srdStore,
+    srdSnapshot,
     title,
     scenarios,
     setTitle,
@@ -177,6 +188,7 @@ function App() {
       programIncrementsSnapshot,
       teamSnapshot,
       milestonesSnapshot,
+      srdSnapshot,
       sessionPersistence,
       presencePeers,
     },
@@ -250,6 +262,8 @@ function App() {
     setSelectedNodeIds,
     setSelectedEdgeIds,
   });
+  // Stable, so the export menu's props do not change identity per render.
+  const openSrdView = useCallback(() => setViewMode('srd'), [setViewMode]);
 
   const [isScenarioPanelOpen, setIsScenarioPanelOpen] = useState(false);
   const [isLibraryModalOpen, setIsLibraryModalOpen] = useState(false);
@@ -373,6 +387,7 @@ function App() {
     programIncrementsSnapshot,
     teamSnapshot,
     milestonesSnapshot,
+    srdSnapshot,
     setPath,
     setActiveScenarioId,
     setActiveStepIndex,
@@ -388,25 +403,6 @@ function App() {
     if (isSoleReplicaHolder(durabilitySignals)) setIsLeaveGuardOpen(true);
     else leaveSession();
   }, [durabilitySignals, leaveSession]);
-
-  const {
-    isSrdModalOpen,
-    setIsSrdModalOpen,
-    srdModalData,
-    isGeneratingSrd,
-    openSrdModal,
-    onExportSrdMarkdown,
-  } = useSrdExport({
-    path,
-    setPath,
-    title,
-    diagramSnapshot,
-    requirementsSnapshot,
-    milestonesSnapshot,
-    programIncrementsSnapshot,
-    teamSnapshot,
-    showToast,
-  });
 
   usePerfHarnessBridge({
     diagramStore,
@@ -506,8 +502,7 @@ function App() {
           onToggleScenarioPanel={() => setIsScenarioPanelOpen((v) => !v)}
           onExportPng={onExportPng}
           onExportSvg={onExportSvg}
-          onExportSrdMarkdown={onExportSrdMarkdown}
-          onExportSrdPrint={openSrdModal}
+          onOpenSrd={openSrdView}
           canExport={nodes.length > 0}
           onUndo={onUndo}
           onRedo={onRedo}
@@ -742,6 +737,19 @@ function App() {
             requirements={requirementsSnapshot}
           />
         )}
+        {viewMode === 'srd' && (
+          <Suspense fallback={null}>
+            <SrdView
+              srdStore={srdStore}
+              title={title}
+              diagramSnapshot={diagramSnapshot}
+              requirementsSnapshot={requirementsSnapshot}
+              milestonesSnapshot={milestonesSnapshot}
+              programIncrementsSnapshot={programIncrementsSnapshot}
+              teamSnapshot={teamSnapshot}
+            />
+          </Suspense>
+        )}
         {viewMode === 'skill-tree' && (
           <SkillTreeView
             requirementsStore={requirementsStore}
@@ -796,26 +804,6 @@ function App() {
         isOpen={isLibraryModalOpen}
         onClose={() => setIsLibraryModalOpen(false)}
       />
-      {isSrdModalOpen && srdModalData && (
-        <SrdPrintModal
-          isOpen={isSrdModalOpen}
-          onClose={() => setIsSrdModalOpen(false)}
-          srdData={srdModalData}
-          nodes={diagramSnapshot.nodes}
-          selectedNodeIds={selectedNodeIds}
-          currentPath={path}
-          setPath={setPath}
-        />
-      )}
-      {isGeneratingSrd && (
-        <div className="srd-loading-overlay">
-          <div className="srd-loading-spinner" />
-          <div className="srd-loading-title">Preparing Solution Requirement Document...</div>
-          <div className="srd-loading-desc">
-            Aggregating requirements, architecture models, and generating snapshot...
-          </div>
-        </div>
-      )}
       {toast && (
         <Toast
           key={toast.id}

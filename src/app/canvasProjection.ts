@@ -1,17 +1,17 @@
-import type { Node, Edge } from '@xyflow/react';
-import { getNodesAtPath, getEdgesAtPath, levelKey } from '../collab/stores/diagramStore';
-import { reorderWithGroupsFirst } from '../domain/canvas/graphUtils';
-import { computeEffectiveZIndices } from '../domain/canvas/zOrder';
+import type {Edge, Node} from '@xyflow/react';
+import {getEdgesAtPath, getNodesAtPath, levelKey} from '../collab/stores/diagramStore';
+import {reorderWithGroupsFirst} from '../domain/canvas/graphUtils';
+import {computeEffectiveZIndices} from '../domain/canvas/zOrder';
 import {
-  applyInFlight,
   applyEdgeGesture,
+  applyInFlight,
   changesWaypoints,
-  type InFlightMap,
   type EdgeGestureMap,
+  type InFlightMap,
   type LabelPlacement,
 } from '../domain/canvas/gestureGeometry';
-import type { DiagramPath } from '../domain/canvas/subDiagramTree';
-import type { ArchNodeData, ArchEdgeData, EdgeWaypoint } from '../domain/canvas/types';
+import type {DiagramPath} from '../domain/canvas/subDiagramTree';
+import type {ArchEdgeData, ArchNodeData, EdgeWaypoint} from '../domain/canvas/types';
 
 /*
  * PERFORMANCE: these caches are module-level WeakMaps on purpose, and must
@@ -48,7 +48,7 @@ const derivedEdges = new WeakMap<
 /**
  * The `data` object handed to each node, kept separately so that a change to
  * only its measured size, selection or stacking - which gives the node a new
- * object - does not also give it new `data`. Memoised node components compare
+ * object - does not also give it new `data`. Memoized node components compare
  * `data` by identity, so this is what lets them skip those renders.
  */
 const derivedNodeData = new WeakMap<

@@ -1,5 +1,4 @@
 import {
-  memo,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -15,7 +14,6 @@ import {
   Controls,
   ControlButton,
   MiniMap,
-  MarkerType,
   SelectionMode,
   ViewportPortal,
   useReactFlow,
@@ -27,16 +25,14 @@ import {
   type OnConnect,
   type OnConnectStart,
   type NodeMouseHandler,
-  type NodeTypes,
-  type EdgeTypes,
 } from '@xyflow/react';
 import { MousePointer2 } from 'lucide-react';
-import { TypedNode } from './nodes/TypedNode';
-import { TypedEdge } from './edges/TypedEdge';
-import { GroupNode } from './nodes/GroupNode';
-import { TextNode } from './nodes/TextNode';
-import { ShapeNode } from './nodes/ShapeNode';
-import { CodeNode } from './nodes/CodeNode';
+import {
+  CANVAS_EDGE_TYPES,
+  CANVAS_NODE_TYPES,
+  DEFAULT_EDGE_OPTIONS,
+  PRO_OPTIONS,
+} from './canvasElementTypes';
 import { PresentationOverlay } from './PresentationOverlay';
 import { Breadcrumb } from './Breadcrumb';
 import { DocumentationPopup } from '../documentation/DocumentationPopup';
@@ -63,34 +59,6 @@ import { useCanvasCreation } from './useCanvasCreation';
 import { useNodeDragInteractions } from './useNodeDragInteractions';
 import { useCanvasContextMenu } from './useCanvasContextMenu';
 import { useCanvasFocusDisplay } from './useCanvasFocusDisplay';
-
-/**
- * Memoised, because React Flow renders a custom node or edge whenever it
- * re-adopts it - including when only its measured size was handed back, which
- * changes nothing the component draws. Unmemoized, every node rendered twice on
- * mount (once, then again once measured), and how many of those second passes
- * landed inside a short measurement window depended on timing: drill-in-out
- * reported 450, 525 or 600 node renders from run to run.
- */
-const CANVAS_NODE_TYPES: NodeTypes = {
-  typed: memo(TypedNode),
-  group: memo(GroupNode),
-  shape: memo(ShapeNode),
-  text: memo(TextNode),
-  code: memo(CodeNode),
-};
-
-const CANVAS_EDGE_TYPES: EdgeTypes = {
-  typed: memo(TypedEdge),
-};
-
-const DEFAULT_EDGE_OPTIONS = {
-  type: 'typed',
-  markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16, color: '#98a2b3' },
-  markerStart: { type: MarkerType.ArrowClosed, width: 16, height: 16, color: '#98a2b3' },
-};
-
-const PRO_OPTIONS = { hideAttribution: true };
 
 export interface PresentationState {
   scenario: Scenario;

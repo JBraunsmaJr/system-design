@@ -24,6 +24,7 @@ VERSIONS=(
   "0.5:4f7b54d"
   "0.6:d7cb944"
   "0.7:fb6d4ee"
+  # "0.8:<commit>" - add the commit that introduces schema 0.8 once it exists.
 )
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"

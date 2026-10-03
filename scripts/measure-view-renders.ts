@@ -28,25 +28,19 @@
  * refactor should produce an identical census; --compare exits non-zero if
  * any count differs.
  */
-import { spawn, type ChildProcess } from 'child_process';
-import { build, loadConfigFromFile, type PluginOption } from 'vite';
-import { mkdtempSync, readFileSync, writeFileSync } from 'fs';
-import { fileURLToPath } from 'url';
-import { tmpdir } from 'os';
-import { join, resolve } from 'path';
-import { chromium, type Page } from 'playwright';
-import { waitForPort } from './lib/devServers';
-import { toDiagramFile } from '../src/domain/canvas/serialization';
-import type {
-  RequirementItem,
-  RequirementRelationship,
-} from '../src/domain/requirements/requirementsTypes';
-import {
-  BUILT_IN_ITEM_TYPES,
-  BUILT_IN_RELATIONSHIP_TYPES,
-} from '../src/domain/requirements/requirementsRegistry';
-import type { ProgramIncrement } from '../src/domain/timeline/programIncrements';
-import type { Milestone } from '../src/domain/timeline/milestones';
+import {type ChildProcess, spawn} from 'child_process';
+import {build, loadConfigFromFile, type PluginOption} from 'vite';
+import {mkdtempSync, readFileSync, writeFileSync} from 'fs';
+import {fileURLToPath} from 'url';
+import {tmpdir} from 'os';
+import {join, resolve} from 'path';
+import {chromium, type Page} from 'playwright';
+import {waitForPort} from './lib/devServers';
+import {toDiagramFile} from '../src/domain/canvas/serialization';
+import type {RequirementItem, RequirementRelationship,} from '../src/domain/requirements/requirementsTypes';
+import {BUILT_IN_ITEM_TYPES, BUILT_IN_RELATIONSHIP_TYPES,} from '../src/domain/requirements/requirementsRegistry';
+import type {ProgramIncrement} from '../src/domain/timeline/programIncrements';
+import type {Milestone} from '../src/domain/timeline/milestones';
 
 // ---------------------------------------------------------------------------
 // Arguments
@@ -61,7 +55,7 @@ export interface Census {
   commits: number;
   renders: number;
   byComponent: Record<string, number>;
-  /** Normalised outerHTML of the scenario's `dom` root after it settled,
+  /** Normalized outerHTML of the scenario's `dom` root after it settled,
    * for scenarios that declare one (the modals, whose markup is the
    * product - the SRD preview is what becomes the PDF). */
   dom?: string;
@@ -328,7 +322,7 @@ async function typeSlowly(page: Page, selector: string, text: string) {
   }
 }
 
-const SRD = '.srd-modal-backdrop';
+const SRD = '.srd-view';
 const LIB = '.modal-overlay';
 const MENU = '.canvas-context-menu, .color-picker-panel, .icon-picker__panel';
 const menuItem = (label: string) => `.canvas-context-menu button:has-text("${label}")`;
@@ -419,7 +413,7 @@ const SCENARIOS: Scenario[] = [
   },
   { id: 'timeline/open-item', run: (p) => p.getByText('Ticket 5 auth token work').first().click() },
   { id: 'timeline/close-item', run: (p) => p.keyboard.press('Escape') },
-  // --- SRD modal (DOM compared: the preview is what becomes the PDF) ----
+  // --- SRD view (DOM compared: the preview is what becomes the PDF) -----
   // Remounting the canvas lets React Flow measure its nodes through
   // ResizeObserver, so this step's commit count varies from run to run.
   { id: 'srd/to-diagram', setup: true, run: (p) => p.click('button[title="Diagram"]') },
@@ -427,9 +421,8 @@ const SCENARIOS: Scenario[] = [
     id: 'srd/open',
     dom: SRD,
     run: async (p) => {
-      await p.click('button[title="Export"]');
-      await p.click('button:has-text("Export SRD (PDF / Print)")');
-      await p.waitForSelector('.srd-modal');
+      await p.click('button[title^="Solution Requirement Document"]');
+      await p.waitForSelector(SRD);
     },
   },
   { id: 'srd/type-title', dom: SRD, run: (p) => typeSlowly(p, srdField('Document Title'), ' v2') },
@@ -456,7 +449,7 @@ const SCENARIOS: Scenario[] = [
       p.selectOption('.srd-sidebar__select >> nth=0', 'agile_engineering').then(() => undefined),
   },
   { id: 'srd/tab-doc', dom: SRD, run: (p) => srdTab(p, 0) },
-  { id: 'srd/close', run: (p) => p.keyboard.press('Escape') },
+  { id: 'srd/close', run: (p) => p.click('button[title="Diagram"]') },
   // --- Library manager modal ---------------------------------------------
   {
     id: 'lib/open',

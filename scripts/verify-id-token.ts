@@ -9,19 +9,19 @@
  * Tokens are signed here in all three accepted algorithms, so signature
  * verification is exercised for real, not stubbed.
  */
-import { constants, createHmac, generateKeyPairSync, sign as nodeSign } from 'crypto';
+import {constants, createHmac, generateKeyPairSync, sign as nodeSign} from 'crypto';
 import {
-  createJwksSource,
-  parseAccessRule,
-  verifyJoinEvidence,
   type AccessRule,
+  createJwksSource,
   type JoinEvidence,
   type Jwk,
   type KeySource,
+  parseAccessRule,
   type RejectionReason,
+  verifyJoinEvidence,
 } from '../src/crypto/idToken.ts';
-import { joinCommitment, newJoinSalt } from '../src/crypto/joinCommitment.ts';
-import { exportPublicKey, generateWrappingKeyPair } from '../src/crypto/keys.ts';
+import {joinCommitment, newJoinSalt} from '../src/crypto/joinCommitment.ts';
+import {exportPublicKey, generateWrappingKeyPair} from '../src/crypto/keys.ts';
 
 let failures = 0;
 function check(condition: boolean, message: string) {
@@ -427,7 +427,7 @@ console.log('\n=== The rule itself (R8) ===');
   );
   check(
     parseAccessRule({ ...base, issuer: `${ISSUER}/` }).issuer === ISSUER,
-    'a trailing slash on the issuer is normalised',
+      'a trailing slash on the issuer is normalized',
   );
   refuses('an unknown schema', { ...base, schema: 2 });
   refuses('no groups', { ...base, groups: [] });

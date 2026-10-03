@@ -21,7 +21,6 @@ constrained by performance first, readability second.
 | `hooks/useClipboard`           | Copy and paste                                                       |
 | `hooks/useKeyboardShortcuts`   | Window-level shortcuts                                               |
 | `hooks/useFileActions`         | New, save, load, attached file, timed copies, exports                |
-| `hooks/useSrdExport`           | Solution Requirement Document                                        |
 | `hooks/usePerfHarnessBridge`   | `window.__PERF__` handles for the perf harness                       |
 
 ## Performance rules

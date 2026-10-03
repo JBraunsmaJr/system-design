@@ -147,14 +147,84 @@ export interface SrdTemplateHeadersAndFooters {
   showPageNumbers: boolean;
 }
 
+/**
+ * Which template draws the document. Templates are code: each is registered
+ * in components/srd/pdf/templates, and this union is that registry's key, so
+ * an id without a template (or the reverse) does not compile. `classic` is
+ * the look the SRD has always had, and the default.
+ */
+export type SrdTemplateId = 'classic' | 'engineering' | 'briefing';
+
+/**
+ * A named starting point: a template plus the settings to start it with.
+ * Historically called a "template", which is why the type keeps that name and
+ * why exported JSON files use this shape.
+ */
 export interface SrdTemplateConfig {
   id: string;
   name: string;
   description?: string;
+  /** Absent in presets and files written before templates were code. */
+  templateId?: SrdTemplateId;
   requirementsLayout?: 'table' | 'list';
   includeComponentTable?: boolean;
   includeConnectionsTable?: boolean;
   theme: SrdTemplateTheme;
   headersAndFooters: SrdTemplateHeadersAndFooters;
   sections: SrdSectionConfig[];
+}
+
+/**
+ * Everything about how a document's SRD looks, apart from which template
+ * draws it. Every field is required: a document always has a complete set,
+ * filled from defaults where it has none of its own.
+ */
+export type SrdDocumentSettings = Required<
+  Pick<
+    SrdTemplateConfig,
+    | 'requirementsLayout'
+    | 'includeComponentTable'
+    | 'includeConnectionsTable'
+    | 'theme'
+    | 'headersAndFooters'
+    | 'sections'
+  >
+>;
+
+/** How a requirement's context snapshot is framed. Only these parameters are
+ * stored; every reader renders the image from them. */
+export interface SrdSnapshotFraming {
+  offsetX: number;
+  offsetY: number;
+  zoom: number;
+  /** The snapshot was removed from the document. */
+  hidden?: boolean;
+}
+
+/** Document metadata edited for the SRD, overriding what is derived from the
+ * diagram. Absent fields fall back to the derived value. */
+export type SrdMetadataOverrides = Partial<
+  Pick<
+    SrdDataContext['metadata'],
+    'title' | 'description' | 'generatedAt' | 'version' | 'authors' | 'organization'
+  >
+>;
+
+/** The SRD as stored in the document: shared by every collaborator, so
+ * everyone sees and prints the same thing. */
+export interface SrdDocumentState {
+  templateId: SrdTemplateId;
+  /** The preset last applied, or 'custom' once settings diverge from it. */
+  presetId: string;
+  settings: SrdDocumentSettings;
+  metadata: SrdMetadataOverrides;
+  /** Keyed by requirement item id. Absent means default framing. */
+  framing: Record<string, SrdSnapshotFraming>;
+  /**
+   * A template id the document names that this build does not have - from a
+   * newer version, say. The document draws with `templateId` (the default)
+   * meanwhile; this is kept so it can be reported, and so saving the
+   * document writes it back unchanged rather than losing the choice.
+   */
+  unsupportedTemplateId?: string;
 }

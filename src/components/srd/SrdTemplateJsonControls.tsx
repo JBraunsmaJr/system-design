@@ -1,14 +1,12 @@
 import { Upload, Download, RotateCcw } from 'lucide-react';
 import { DEFAULT_SRD_TEMPLATE } from '../../domain/srd/srdTemplatePresets';
-import type { SrdModalState } from './useSrdPrintModal';
+import type { SrdViewState } from './useSrdView';
 
 /**
  * Importing and exporting the template configuration as JSON.
  *
- * Moved unchanged from SrdPrintModal.tsx; its props are exactly the modal
- * state it reads. Not memoized: it re-renders whenever the modal does, as
- * this markup did when it was inline, at the cost of one extra function
- * call per modal render.
+ * Its props are exactly the SRD view state it reads. Not memoized: it
+ * re-renders whenever the view does, at the cost of one function call.
  */
 export function SrdTemplateJsonControls({
   fileInputRef,
@@ -16,7 +14,7 @@ export function SrdTemplateJsonControls({
   handleExportTemplateJson,
   handleImportTemplateJson,
 }: Pick<
-  SrdModalState,
+  SrdViewState,
   'fileInputRef' | 'handleSelectPreset' | 'handleExportTemplateJson' | 'handleImportTemplateJson'
 >) {
   return (

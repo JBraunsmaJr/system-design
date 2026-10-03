@@ -43,6 +43,14 @@ import {
   META_MAP,
   type DocumentMetaStore,
 } from '../stores/yjsDocumentMetaStore.ts';
+import {
+  createYjsSrdStore,
+  seedYjsSrd,
+  SRD_FRAMING_MAP,
+  SRD_MAP,
+  type SrdStore,
+} from '../stores/yjsSrdStore.ts';
+import { expandSrdFileValue } from '../../domain/srd/srdSettings.ts';
 import { seedTeamStore } from '../stores/teamStore.ts';
 import type { DiagramStore } from '../stores/diagramStore.ts';
 import type { RequirementsStore } from '../stores/requirementsStore.ts';
@@ -78,6 +86,8 @@ export interface OpenDocumentStores {
   milestones: MilestonesStore;
   /** Title and scenarios (WS1-R7). */
   meta: DocumentMetaStore;
+  /** The SRD's template, settings and snapshot framing. */
+  srd: SrdStore;
 }
 
 /** Every store over `doc`. The single place the set is built, so a session and
@@ -90,6 +100,7 @@ export function createDocumentStores(doc: Y.Doc): OpenDocumentStores {
     team: createYjsTeamStore(doc),
     milestones: createYjsMilestonesStore(doc),
     meta: createYjsDocumentMetaStore(doc),
+    srd: createYjsSrdStore(doc),
   };
 }
 
@@ -273,6 +284,9 @@ export function seedDocument(
   seedYjsMilestonesDoc(doc, file.milestones ?? []);
   if (file.team) seedTeamStore(teamStore, file.team);
   seedMetaFrom(doc, file);
+  // Files from before the SRD was document content have none; absent reads
+  // as the defaults, so there is nothing to seed for them.
+  if (file.srd !== undefined) seedYjsSrd(doc, expandSrdFileValue(file.srd));
 }
 
 /**
@@ -331,6 +345,8 @@ export function replaceDocumentContents(doc: Y.Doc, file: DiagramFile): void {
       'members',
       'extraDaysOff',
       META_MAP,
+      SRD_MAP,
+      SRD_FRAMING_MAP,
     ]) {
       doc.getMap(name).clear();
     }

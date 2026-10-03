@@ -1,44 +1,33 @@
-import { Upload, Camera, Trash2, RefreshCw } from 'lucide-react';
+import { Camera, Trash2, RefreshCw, Undo2 } from 'lucide-react';
 import { AutoResizeTextarea } from './AutoResizeTextarea';
-import type { SrdModalState, SrdPrintModalProps } from './useSrdPrintModal';
+import type { SrdViewState } from './useSrdView';
 
 /**
  * The Doc tab: document metadata and the architecture snapshot controls.
  *
- * Moved unchanged from SrdPrintModal.tsx; its props are exactly the modal
- * state it reads. Not memoized: it re-renders whenever the modal does, as
- * this markup did when it was inline, at the cost of one extra function
- * call per modal render.
+ * Its props are exactly the SRD view state it reads. Not memoized: it
+ * re-renders whenever the view does, at the cost of one function call.
  */
 export function SrdDocTab({
   currentSrdData,
-  snapshotScope,
-  setSnapshotScope,
   isCapturingSnapshot,
-  diagramUploadInputRef,
+  isDiagramHidden,
   handleMetadataChange,
   handleAuthorsStringChange,
   authorsDisplayString,
   handleCaptureSnapshot,
-  handleUploadDiagramImage,
   handleRemoveDiagram,
-  nodes,
-  selectedNodeIds,
 }: Pick<
-  SrdModalState,
+  SrdViewState,
   | 'currentSrdData'
-  | 'snapshotScope'
-  | 'setSnapshotScope'
   | 'isCapturingSnapshot'
-  | 'diagramUploadInputRef'
+  | 'isDiagramHidden'
   | 'handleMetadataChange'
   | 'handleAuthorsStringChange'
   | 'authorsDisplayString'
   | 'handleCaptureSnapshot'
-  | 'handleUploadDiagramImage'
   | 'handleRemoveDiagram'
-> &
-  Required<Pick<SrdPrintModalProps, 'nodes' | 'selectedNodeIds'>>) {
+>) {
   return (
     <div className="srd-sidebar__field-group">
       <div className="srd-sidebar__field">
@@ -124,67 +113,55 @@ export function SrdDocTab({
           <span>Diagram Snapshot</span>
         </div>
 
-        <div className="srd-sidebar__field" style={{ marginBottom: '0.5rem' }}>
-          <label className="srd-sidebar__label">Capture Target</label>
-          <select
-            className="srd-sidebar__select"
-            value={snapshotScope}
-            onChange={(e) => setSnapshotScope(e.target.value as 'all' | 'selected' | 'viewport')}
-          >
-            <option value="all">Full Diagram (All {nodes.length} Nodes)</option>
-            <option value="selected" disabled={selectedNodeIds.length === 0}>
-              Selected Nodes Only ({selectedNodeIds.length} selected)
-            </option>
-            <option value="viewport">Current Viewport (Exact Canvas View)</option>
-          </select>
-        </div>
+        <p className="srd-sidebar__hint">
+          The full architecture diagram, rendered from the document so everyone sees the same image.
+          It updates automatically as the diagram changes.
+        </p>
 
         <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            className="srd-btn-icon"
-            style={{
-              flex: 1,
-              padding: '0.4rem',
-              gap: '0.3rem',
-              backgroundColor: '#1e3a8a',
-              color: '#ffffff',
-            }}
-            onClick={handleCaptureSnapshot}
-            disabled={isCapturingSnapshot}
-            title="Capture diagram snapshot from canvas"
-          >
-            <RefreshCw size={13} className={isCapturingSnapshot ? 'animate-spin' : ''} />
-            <span>{isCapturingSnapshot ? 'Capturing...' : 'Capture Snapshot'}</span>
-          </button>
-          <button
-            type="button"
-            className="srd-btn-icon"
-            style={{ padding: '0.4rem', gap: '0.3rem' }}
-            onClick={() => diagramUploadInputRef.current?.click()}
-            title="Upload custom PNG or SVG image"
-          >
-            <Upload size={13} />
-            <span>Upload</span>
-          </button>
-          {currentSrdData.architecture.diagramImageBase64 && (
+          {isDiagramHidden ? (
             <button
               type="button"
               className="srd-btn-icon"
-              style={{ padding: '0.4rem', color: '#f87171' }}
-              onClick={handleRemoveDiagram}
-              title="Remove diagram from document"
+              style={{ flex: 1, padding: '0.4rem', gap: '0.3rem' }}
+              onClick={handleCaptureSnapshot}
+              title="Add the architecture diagram back to the document"
             >
-              <Trash2 size={13} />
+              <Undo2 size={13} />
+              <span>Restore Diagram</span>
             </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="srd-btn-icon"
+                style={{
+                  flex: 1,
+                  padding: '0.4rem',
+                  gap: '0.3rem',
+                  backgroundColor: '#1e3a8a',
+                  color: '#ffffff',
+                }}
+                onClick={handleCaptureSnapshot}
+                disabled={isCapturingSnapshot}
+                title="Render the diagram snapshot again"
+              >
+                <RefreshCw size={13} className={isCapturingSnapshot ? 'animate-spin' : ''} />
+                <span>{isCapturingSnapshot ? 'Rendering...' : 'Refresh Snapshot'}</span>
+              </button>
+              {currentSrdData.architecture.diagramImageBase64 && (
+                <button
+                  type="button"
+                  className="srd-btn-icon"
+                  style={{ padding: '0.4rem', color: '#f87171' }}
+                  onClick={handleRemoveDiagram}
+                  title="Remove the diagram from the document, for everyone"
+                >
+                  <Trash2 size={13} />
+                </button>
+              )}
+            </>
           )}
-          <input
-            type="file"
-            ref={diagramUploadInputRef}
-            style={{ display: 'none' }}
-            accept="image/png,image/jpeg,image/svg+xml"
-            onChange={handleUploadDiagramImage}
-          />
         </div>
       </div>
     </div>

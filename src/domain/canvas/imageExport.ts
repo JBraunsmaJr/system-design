@@ -1,5 +1,5 @@
 import { getNodesBounds, getViewportForBounds, type Node } from '@xyflow/react';
-import { toPng, toSvg } from 'html-to-image';
+import { toCanvas, toJpeg, toPng, toSvg } from 'html-to-image';
 import { toAbsolutePosition, getDescendantIds, findNodesContainedInRect } from './graphUtils';
 
 const EXPORT_WIDTH = 1600;
@@ -29,17 +29,104 @@ function downloadDataUrl(dataUrl: string, filename: string): void {
 }
 
 /**
+ * A capture's file format. JPEG is for images embedded in other documents -
+ * the SRD's snapshots - where it is several times cheaper to place in a PDF
+ * than a PNG with transparency; captures have an opaque background, so it
+ * loses nothing there but a little fidelity.
+ */
+export type CaptureFormat = 'png' | 'svg' | 'jpeg';
+
+/** Room around a frame within which a node still counts as in it, so a
+ * node's shadow or border just outside the frame is kept. */
+const FRAME_MARGIN = 24;
+
+/** High enough that text in a capture stays sharp at print sizes. */
+const JPEG_QUALITY = 0.92;
+
+function encode(
+  format: CaptureFormat,
+  element: HTMLElement,
+  options: Parameters<typeof toPng>[1],
+): Promise<string> {
+  if (format === 'jpeg') return toJpeg(element, { ...options, quality: JPEG_QUALITY });
+  return format === 'png' ? toPng(element, options) : toSvg(element, options);
+}
+
+/**
+ * Where and how to capture. Defaults capture the editor's own canvas at the
+ * device's pixel ratio, which is what the PNG/SVG exports want. A caller
+ * rendering its own canvas (the SRD capture surface) passes that canvas as
+ * `root`, and pins `pixelRatio` so the result does not depend on the screen.
+ */
+export interface CaptureTarget {
+  /** The element containing the React Flow canvas to capture. */
+  root?: ParentNode;
+  pixelRatio?: number;
+  /**
+   * The page's web fonts as CSS, from html-to-image's getFontEmbedCSS. By
+   * default every capture re-reads the stylesheets and inlines every font;
+   * a caller capturing repeatedly computes it once and passes it in.
+   */
+  fontEmbedCSS?: string;
+  /**
+   * Capture in this many tiles, stitched into one image. Each tile clones
+   * only the nodes it shows, so no single step blocks the page for long, and
+   * `betweenTiles` runs before every tile after the first - to wait for a
+   * pause in the user's work, say. Whole-diagram PNG and JPEG only.
+   */
+  tiles?: { columns: number; rows: number; betweenTiles?: () => Promise<void> };
+}
+
+/**
+ * html-to-image's filter keeping only the nodes that fall inside a frame,
+ * given the transform (offset, zoom) that places the diagram in it. Cloning
+ * copies every element's computed styles, most of a capture's cost, and
+ * nodes outside the frame cannot appear in the image anyway. Edges are kept:
+ * they are few and cheap.
+ */
+function keepNodesInFrame(
+  nodes: Node[],
+  frame: { x: number; y: number; zoom: number; width: number; height: number },
+): (el: HTMLElement) => boolean {
+  const inFrame = new Set(
+    nodes
+      .filter((n) => {
+        const r = calculateNodesAbsoluteBounds([n], nodes);
+        const left = r.x * frame.zoom + frame.x;
+        const top = r.y * frame.zoom + frame.y;
+        return (
+          left < frame.width + FRAME_MARGIN &&
+          top < frame.height + FRAME_MARGIN &&
+          left + r.width * frame.zoom > -FRAME_MARGIN &&
+          top + r.height * frame.zoom > -FRAME_MARGIN
+        );
+      })
+      .map((n) => n.id),
+  );
+  return (el) =>
+    !(el.classList?.contains('react-flow__node') && !inFrame.has(el.dataset?.id ?? ''));
+}
+
+function findViewport(root: ParentNode = document): HTMLElement | null {
+  return root.querySelector<HTMLElement>('.react-flow__viewport');
+}
+
+/**
  * Renders the current diagram (all nodes, not just what's currently in
  * view/zoomed to) by temporarily transforming a clone of React Flow's
  * `.react-flow__viewport` element - this is the standard html-to-image +
  * React Flow recipe. Background/MiniMap/Controls live outside that element,
  * so they're excluded from the export automatically.
  */
-async function captureViewport(format: 'png' | 'svg', nodes: Node[]): Promise<string> {
+async function captureViewport(
+  format: CaptureFormat,
+  nodes: Node[],
+  target: CaptureTarget = {},
+): Promise<string> {
   if (nodes.length === 0) {
     throw new Error('Nothing to export yet - add some nodes first.');
   }
-  const viewportEl = document.querySelector<HTMLElement>('.react-flow__viewport');
+  const viewportEl = findViewport(target.root);
   if (!viewportEl) {
     throw new Error("Couldn't find the canvas to export.");
   }
@@ -54,10 +141,16 @@ async function captureViewport(format: 'png' | 'svg', nodes: Node[]): Promise<st
     EXPORT_PADDING,
   );
 
+  if (target.tiles && format !== 'svg') {
+    return captureInTiles(format, viewportEl, nodes, { x, y, zoom }, target);
+  }
+
   const options = {
     backgroundColor: EXPORT_BACKGROUND,
     width: EXPORT_WIDTH,
     height: EXPORT_HEIGHT,
+    pixelRatio: target.pixelRatio,
+    fontEmbedCSS: target.fontEmbedCSS,
     style: {
       width: `${EXPORT_WIDTH}px`,
       height: `${EXPORT_HEIGHT}px`,
@@ -65,7 +158,7 @@ async function captureViewport(format: 'png' | 'svg', nodes: Node[]): Promise<st
     },
   };
 
-  return format === 'png' ? toPng(viewportEl, options) : toSvg(viewportEl, options);
+  return encode(format, viewportEl, options);
 }
 
 export async function exportDiagramAsPng(nodes: Node[], title: string): Promise<void> {
@@ -80,13 +173,60 @@ export async function exportDiagramAsPng(nodes: Node[], title: string): Promise<
  * behave like a "clean" vector file in every design tool (e.g. Illustrator).
  * A true vector exporter is a bigger, separate undertaking if that's ever needed.
  */
+/** The whole-diagram capture, tile by tile (see CaptureTarget.tiles). */
+async function captureInTiles(
+  format: 'png' | 'jpeg',
+  viewportEl: HTMLElement,
+  nodes: Node[],
+  view: { x: number; y: number; zoom: number },
+  target: CaptureTarget,
+): Promise<string> {
+  const { columns, rows, betweenTiles } = target.tiles!;
+  const ratio = target.pixelRatio ?? 1;
+  const out = document.createElement('canvas');
+  out.width = Math.round(EXPORT_WIDTH * ratio);
+  out.height = Math.round(EXPORT_HEIGHT * ratio);
+  const ctx = out.getContext('2d')!;
+  ctx.fillStyle = EXPORT_BACKGROUND;
+  ctx.fillRect(0, 0, out.width, out.height);
+  const tileWidth = Math.ceil(EXPORT_WIDTH / columns);
+  const tileHeight = Math.ceil(EXPORT_HEIGHT / rows);
+  for (let row = 0; row < rows; row++) {
+    for (let column = 0; column < columns; column++) {
+      if (row + column > 0) await betweenTiles?.();
+      const left = column * tileWidth;
+      const top = row * tileHeight;
+      const width = Math.min(tileWidth, EXPORT_WIDTH - left);
+      const height = Math.min(tileHeight, EXPORT_HEIGHT - top);
+      // The same view, shifted so this tile's region lands at its origin.
+      const frame = { x: view.x - left, y: view.y - top, zoom: view.zoom, width, height };
+      const tile = await toCanvas(viewportEl, {
+        backgroundColor: EXPORT_BACKGROUND,
+        width,
+        height,
+        pixelRatio: ratio,
+        fontEmbedCSS: target.fontEmbedCSS,
+        filter: keepNodesInFrame(nodes, frame),
+        style: {
+          width: `${width}px`,
+          height: `${height}px`,
+          transform: `translate(${frame.x}px, ${frame.y}px) scale(${frame.zoom})`,
+        },
+      });
+      ctx.drawImage(tile, Math.round(left * ratio), Math.round(top * ratio));
+    }
+  }
+  return format === 'jpeg' ? out.toDataURL('image/jpeg', JPEG_QUALITY) : out.toDataURL('image/png');
+}
+
 export async function captureDiagramSnapshot(
   nodes: Node[],
-  format: 'png' | 'svg' = 'png',
+  format: CaptureFormat = 'png',
+  target?: CaptureTarget,
 ): Promise<string | undefined> {
   if (!nodes || nodes.length === 0) return undefined;
   try {
-    return await captureViewport(format, nodes);
+    return await captureViewport(format, nodes, target);
   } catch (err) {
     console.warn('Could not capture diagram snapshot:', err);
     return undefined;
@@ -109,13 +249,13 @@ export async function captureSelectedNodesSnapshot(
   return captureDiagramSnapshot(targetNodes, format);
 }
 
-export interface SubsetSnapshotOptions {
+export interface SubsetSnapshotOptions extends CaptureTarget {
   padding?: number;
   width?: number;
   height?: number;
   panOffset?: { x: number; y: number };
   zoomMultiplier?: number;
-  format?: 'png' | 'svg';
+  format?: CaptureFormat;
   backgroundColor?: string;
 }
 
@@ -230,7 +370,7 @@ export async function captureNodeSubsetSnapshot(
     return undefined;
   }
 
-  const viewportEl = document.querySelector<HTMLElement>('.react-flow__viewport');
+  const viewportEl = findViewport(options?.root);
   if (!viewportEl) {
     console.warn("Couldn't find .react-flow__viewport to export node subset.");
     return undefined;
@@ -277,6 +417,16 @@ export async function captureNodeSubsetSnapshot(
       backgroundColor: bgColor,
       width,
       height,
+      pixelRatio: options?.pixelRatio,
+      fontEmbedCSS: options?.fontEmbedCSS,
+      // Only the nodes inside the frame are cloned (see keepNodesInFrame).
+      filter: keepNodesInFrame(allNodes, {
+        x: finalX,
+        y: finalY,
+        zoom: adjustedZoom,
+        width,
+        height,
+      }),
       style: {
         width: `${width}px`,
         height: `${height}px`,
@@ -284,9 +434,7 @@ export async function captureNodeSubsetSnapshot(
       },
     };
 
-    return await (format === 'png'
-      ? toPng(viewportEl, renderOptions)
-      : toSvg(viewportEl, renderOptions));
+    return await encode(format, viewportEl, renderOptions);
   } catch (err) {
     console.warn('Could not capture node subset snapshot:', err);
     return undefined;

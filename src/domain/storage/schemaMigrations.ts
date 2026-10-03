@@ -30,9 +30,9 @@ export type RawDiagramFile = Record<string, unknown>;
  *
  * 0.1-0.5 were never tagged and existed in development only; they are listed
  * so that any file produced during that period still has a path forward.
- * 0.6 shipped in v0.9 through v0.91.3, 0.7 in v0.92 onward.
+ * 0.6 shipped in v0.9 through v0.91.3, 0.7 in v0.92 onward, 0.8 after.
  */
-export const VERSION_ORDER = ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7'] as const;
+export const VERSION_ORDER = ['0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8'] as const;
 
 export type SchemaVersion = (typeof VERSION_ORDER)[number];
 
@@ -110,6 +110,12 @@ export const MIGRATIONS: Migration[] = [
     from: '0.6',
     to: '0.7',
     description: 'Added milestones and shape/icon fallback maps; all absent-safe.',
+    migrate: (file) => file,
+  },
+  {
+    from: '0.7',
+    to: '0.8',
+    description: 'Added srd (template, settings, framing); absent means the defaults.',
     migrate: (file) => file,
   },
 ];

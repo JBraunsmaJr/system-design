@@ -518,7 +518,11 @@ async function run() {
       await first.waitForSelector('.access-request', { state: 'detached', timeout: 20000 });
       check(true, 'giving access from the notice clears it');
 
-      await newcomer.click('.workspace-panel__recheck');
+      // The panel re-checks on its own every few seconds while someone waits,
+      // so it may already have moved on to the workspace - taking this button
+      // with it - before the click lands. Either way the next line checks the
+      // outcome. (Missing this lost a race on slower machines: a 30s timeout.)
+      await newcomer.click('.workspace-panel__recheck', { timeout: 3000 }).catch(() => {});
       await newcomer.waitForSelector('.workspace-panel__entry', { timeout: 20000 });
       check(
         (await newcomer.textContent('.workspace-panel__title'))?.startsWith(

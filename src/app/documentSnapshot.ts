@@ -1,18 +1,17 @@
-import { toDiagramFile, type parseDiagramFile } from '../domain/canvas/serialization';
-import type { Scenario, SubDiagram } from '../domain/canvas/types';
-import {
-  EMPTY_REQUIREMENTS_DOCUMENT,
-  type RequirementsDocument,
-} from '../domain/requirements/requirementsTypes';
+import {type parseDiagramFile, toDiagramFile} from '../domain/canvas/serialization';
+import type {Scenario, SubDiagram} from '../domain/canvas/types';
+import {EMPTY_REQUIREMENTS_DOCUMENT, type RequirementsDocument,} from '../domain/requirements/requirementsTypes';
 import {
   BUILT_IN_ITEM_TYPES,
   BUILT_IN_RELATIONSHIP_TYPES,
-  withMissingBuiltInTypes,
   withMissingBuiltInRelationshipTypes,
+  withMissingBuiltInTypes,
 } from '../domain/requirements/requirementsRegistry';
-import type { ProgramIncrement } from '../domain/timeline/programIncrements';
-import { EMPTY_TEAM_DOCUMENT, type TeamDocument } from '../domain/timeline/teamTypes';
-import type { Milestone } from '../domain/timeline/milestones';
+import type {ProgramIncrement} from '../domain/timeline/programIncrements';
+import {EMPTY_TEAM_DOCUMENT, type TeamDocument} from '../domain/timeline/teamTypes';
+import type {Milestone} from '../domain/timeline/milestones';
+import {expandSrdFileValue} from '../domain/srd/srdSettings';
+import type {SrdDocumentState} from '../domain/srd/srdTypes';
 
 /*
  * Moved unchanged from App.tsx. Pure functions and constants: nothing here
@@ -23,7 +22,7 @@ import type { Milestone } from '../domain/timeline/milestones';
 export const EMPTY_DIAGRAM: SubDiagram = { nodes: [], edges: [] };
 
 /** A document's content as plain values - the shape a file or autosave is
- * normalised into before it seeds a Y.Doc. Not live state: the Y.Doc is. */
+ * normalized into before it seeds a Y.Doc. Not live state: the Y.Doc is. */
 export interface DiagramSnapshot {
   title: string;
   root: SubDiagram;
@@ -32,6 +31,10 @@ export interface DiagramSnapshot {
   programIncrements: ProgramIncrement[];
   team: TeamDocument;
   milestones: Milestone[];
+  /** Absent for files from before the SRD was document content, and for a
+   * new document; both read as the defaults. Carried through so opening a
+   * file or restoring an autosave keeps the file's SRD. */
+  srd?: SrdDocumentState;
 }
 
 /**
@@ -69,6 +72,7 @@ export function diagramFileToSnapshot(file: ReturnType<typeof parseDiagramFile>)
     programIncrements: file.programIncrements,
     team: file.team ?? EMPTY_TEAM_DOCUMENT,
     milestones: file.milestones ?? [],
+    srd: file.srd === undefined ? undefined : expandSrdFileValue(file.srd),
   };
 }
 
@@ -98,5 +102,6 @@ export function snapshotToDiagramFile(snapshot: DiagramSnapshot) {
     snapshot.programIncrements,
     snapshot.team,
     snapshot.milestones,
+    snapshot.srd,
   );
 }

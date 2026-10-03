@@ -1,19 +1,51 @@
-import type { SrdModalState } from './useSrdPrintModal';
+import type { SrdViewState } from './useSrdView';
+import { SRD_TEMPLATE_CATALOG, templateThumbnailUrl } from '../../domain/srd/srdTemplateCatalog';
 
 /**
- * The Theme tab: colors and typography of the generated document.
+ * The Theme tab: the template that draws the document, then its colors and
+ * typography.
  *
- * Moved unchanged from SrdPrintModal.tsx; its props are exactly the modal
- * state it reads. Not memoized: it re-renders whenever the modal does, as
- * this markup did when it was inline, at the cost of one extra function
- * call per modal render.
+ * Its props are exactly the SRD view state it reads. Not memoized: it
+ * re-renders whenever the view does, at the cost of one function call.
  */
 export function SrdThemeTab({
   templateConfig,
   handleThemeChange,
-}: Pick<SrdModalState, 'templateConfig' | 'handleThemeChange'>) {
+  templateId,
+  handleSelectTemplate,
+}: Pick<
+  SrdViewState,
+  'templateConfig' | 'handleThemeChange' | 'templateId' | 'handleSelectTemplate'
+>) {
   return (
     <div className="srd-sidebar__field-group">
+      <div className="srd-sidebar__field">
+        <span className="srd-sidebar__label" id="srd-template-label">
+          Template
+        </span>
+        <div className="srd-template-picker" role="group" aria-labelledby="srd-template-label">
+          {Object.values(SRD_TEMPLATE_CATALOG).map((template) => (
+            <button
+              key={template.id}
+              type="button"
+              className="srd-template-picker__option"
+              aria-pressed={template.id === templateId}
+              onClick={() => handleSelectTemplate(template.id)}
+              title={template.description}
+            >
+              <img
+                className="srd-template-picker__thumbnail"
+                src={templateThumbnailUrl(template.id)}
+                alt=""
+                loading="lazy"
+              />
+              <span className="srd-template-picker__name">{template.name}</span>
+              <span className="srd-template-picker__description">{template.description}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="srd-sidebar__field">
         <label className="srd-sidebar__label">Primary Brand Color</label>
         <div className="srd-sidebar__color-picker-row">

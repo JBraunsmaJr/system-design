@@ -24,6 +24,7 @@ import type { RequirementsDocument } from '../../domain/requirements/requirement
 import type { ProgramIncrement } from '../../domain/timeline/programIncrements';
 import type { TeamDocument } from '../../domain/timeline/teamTypes';
 import type { Milestone } from '../../domain/timeline/milestones';
+import type { SrdDocumentState } from '../../domain/srd/srdTypes';
 
 export interface UseDocumentPersistenceOptions {
   fileSaving: FileSaving;
@@ -43,6 +44,7 @@ export interface UseDocumentPersistenceOptions {
   programIncrementsSnapshot: ProgramIncrement[];
   teamSnapshot: TeamDocument;
   milestonesSnapshot: Milestone[];
+  srdSnapshot: SrdDocumentState;
   sessionPersistence: { session: object | null; state: 'active' | 'loading' | 'unavailable' };
   presencePeers: PresenceInfo[];
 }
@@ -72,6 +74,7 @@ export function useDocumentPersistence({
   programIncrementsSnapshot,
   teamSnapshot,
   milestonesSnapshot,
+  srdSnapshot,
   sessionPersistence,
   presencePeers,
 }: UseDocumentPersistenceOptions) {
@@ -126,6 +129,7 @@ export function useDocumentPersistence({
         programIncrementsSnapshot,
         teamSnapshot,
         milestonesSnapshot,
+        srdSnapshot,
       );
       // A snapshot in the document store, alongside the live y-indexeddb
       // replica: it keeps the index's title and time current (WS2-R3), is a
@@ -179,6 +183,7 @@ export function useDocumentPersistence({
     programIncrementsSnapshot,
     teamSnapshot,
     milestonesSnapshot,
+    srdSnapshot,
     documentStore,
     activeDocId,
     activeRoom,

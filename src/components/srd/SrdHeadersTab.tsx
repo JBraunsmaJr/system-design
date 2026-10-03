@@ -1,17 +1,15 @@
-import type { SrdModalState } from './useSrdPrintModal';
+import type { SrdViewState } from './useSrdView';
 
 /**
  * The Headers tab: running header and footer text.
  *
- * Moved unchanged from SrdPrintModal.tsx; its props are exactly the modal
- * state it reads. Not memoized: it re-renders whenever the modal does, as
- * this markup did when it was inline, at the cost of one extra function
- * call per modal render.
+ * Its props are exactly the SRD view state it reads. Not memoized: it
+ * re-renders whenever the view does, at the cost of one function call.
  */
 export function SrdHeadersTab({
   templateConfig,
   handleHeadersChange,
-}: Pick<SrdModalState, 'templateConfig' | 'handleHeadersChange'>) {
+}: Pick<SrdViewState, 'templateConfig' | 'handleHeadersChange'>) {
   return (
     <div className="srd-sidebar__field-group">
       <div className="srd-sidebar__field">

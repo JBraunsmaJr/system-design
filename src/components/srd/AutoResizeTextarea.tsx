@@ -9,7 +9,7 @@ interface AutoResizeTextareaProps {
   minHeight?: number;
 }
 
-/** A textarea that grows with its content. Moved unchanged from SrdPrintModal.tsx. */
+/** A textarea that grows with its content. Moved unchanged from the SRD modal. */
 export function AutoResizeTextarea({
   value,
   onChange,

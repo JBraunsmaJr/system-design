@@ -1,45 +1,41 @@
 import {
+  type ChangeEvent,
+  type Dispatch,
+  type SetStateAction,
   useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
   useState,
-  type ChangeEvent,
-  type Dispatch,
-  type SetStateAction,
 } from 'react';
-import type { Node, Edge } from '@xyflow/react';
+import type {Edge, Node} from '@xyflow/react';
 import type * as Y from 'yjs';
-import { unflattenToSubDiagram } from '../../collab/stores/diagramStore';
-import type { UndoController } from '../../collab/stores/undoManager';
-import { replaceDocumentContents, type OpenDocument } from '../../collab/sync/localDocument';
-import type { ToastType } from '../../common/components/toast/Toast';
+import {unflattenToSubDiagram} from '../../collab/stores/diagramStore';
+import type {UndoController} from '../../collab/stores/undoManager';
+import {type OpenDocument, replaceDocumentContents} from '../../collab/sync/localDocument';
+import type {ToastType} from '../../common/components/toast/Toast';
+import {downloadDiagram, downloadDiagramAs, parseDiagramFile, toDiagramFile,} from '../../domain/canvas/serialization';
+import {exportDiagramAsPng, exportDiagramAsSvg} from '../../domain/canvas/imageExport';
+import {downloadRequirementsMarkdown} from '../../domain/requirements/requirementsExport';
+import {newDocumentId} from '../../domain/storage/documentStore';
 import {
-  toDiagramFile,
-  downloadDiagram,
-  downloadDiagramAs,
-  parseDiagramFile,
-} from '../../domain/canvas/serialization';
-import { exportDiagramAsPng, exportDiagramAsSvg } from '../../domain/canvas/imageExport';
-import { downloadRequirementsMarkdown } from '../../domain/requirements/requirementsExport';
-import { newDocumentId } from '../../domain/storage/documentStore';
-import {
+  isCopyDue,
   loadTimedCopies,
   saveTimedCopies,
-  timedCopyFileName,
-  isCopyDue,
   TIMED_COPIES_TEST_SECONDS_KEY,
   type TimedCopiesSettings,
+  timedCopyFileName,
 } from '../../domain/storage/timedCopies';
-import type { FileSaving } from '../../hooks/useFileSaving';
-import { isPerfInstrumentationActive } from '../../perf/instrumentation';
-import type { DiagramPath } from '../../domain/canvas/subDiagramTree';
-import type { ArchNodeData, ArchEdgeData, Scenario } from '../../domain/canvas/types';
-import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
-import type { ProgramIncrement } from '../../domain/timeline/programIncrements';
-import type { TeamDocument } from '../../domain/timeline/teamTypes';
-import type { Milestone } from '../../domain/timeline/milestones';
-import { diagramFileToSnapshot, snapshotToDiagramFile } from '../documentSnapshot';
+import type {FileSaving} from '../../hooks/useFileSaving';
+import {isPerfInstrumentationActive} from '../../perf/instrumentation';
+import type {DiagramPath} from '../../domain/canvas/subDiagramTree';
+import type {ArchEdgeData, ArchNodeData, Scenario} from '../../domain/canvas/types';
+import type {RequirementsDocument} from '../../domain/requirements/requirementsTypes';
+import type {ProgramIncrement} from '../../domain/timeline/programIncrements';
+import type {TeamDocument} from '../../domain/timeline/teamTypes';
+import type {Milestone} from '../../domain/timeline/milestones';
+import type {SrdDocumentState} from '../../domain/srd/srdTypes';
+import {diagramFileToSnapshot, snapshotToDiagramFile} from '../documentSnapshot';
 
 export interface UseFileActionsOptions {
   openDocumentInTab: (docId: string) => void;
@@ -56,6 +52,7 @@ export interface UseFileActionsOptions {
   programIncrementsSnapshot: ProgramIncrement[];
   teamSnapshot: TeamDocument;
   milestonesSnapshot: Milestone[];
+  srdSnapshot: SrdDocumentState;
   setPath: Dispatch<SetStateAction<DiagramPath>>;
   setActiveScenarioId: Dispatch<SetStateAction<string | null>>;
   setActiveStepIndex: Dispatch<SetStateAction<number>>;
@@ -89,6 +86,7 @@ export function useFileActions({
   programIncrementsSnapshot,
   teamSnapshot,
   milestonesSnapshot,
+  srdSnapshot,
   setPath,
   setActiveScenarioId,
   setActiveStepIndex,
@@ -122,6 +120,7 @@ export function useFileActions({
       programIncrementsSnapshot,
       teamSnapshot,
       milestonesSnapshot,
+      srdSnapshot,
     );
   }, [
     title,
@@ -131,6 +130,7 @@ export function useFileActions({
     programIncrementsSnapshot,
     teamSnapshot,
     milestonesSnapshot,
+    srdSnapshot,
   ]);
 
   const onSave = useCallback(() => {
@@ -230,7 +230,7 @@ export function useFileActions({
         // Into the document, not into React state: the canvas reads the
         // document, so writing state here would leave the old diagram on
         // screen with no error to explain it.
-        // Normalised through the snapshot so a file gets the same upgrades as a
+        // Normalized through the snapshot so a file gets the same upgrades as a
         // restored autosave (built-in requirement types, scenario step paths).
         replaceDocumentContents(activeDoc, snapshotToDiagramFile(diagramFileToSnapshot(parsed)));
         // Undo must not reach back across a file load (WS3-R4).

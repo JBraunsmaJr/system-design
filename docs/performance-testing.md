@@ -232,7 +232,7 @@ How it works, and why each choice matters:
 - **Production build, unminified.** The development build double-renders
   under StrictMode; minification would erase component names. The PWA plugin
   is dropped so a service worker cannot cache the page being measured.
-- **Normalised HTML.** Only what is not markup is normalised: captured
+- **Normalized HTML.** Only what is not markup is normalized: captured
   diagram images (`data:` and `blob:` URLs) and library ids built from
   `Date.now()`.
 - **Quiet windows.** Each window starts and ends only once the app has made

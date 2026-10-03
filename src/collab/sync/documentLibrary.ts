@@ -91,6 +91,7 @@ function fileFromDoc(doc: Y.Doc): DiagramFile {
     c.programIncrements,
     c.team,
     c.milestones,
+    c.srd,
   );
 }
 

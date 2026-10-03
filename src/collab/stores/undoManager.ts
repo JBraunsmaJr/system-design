@@ -64,6 +64,9 @@ const TRACKED_MAPS = [
   'settings',
   // Title and scenarios (yjsDocumentMetaStore.ts).
   'meta',
+  // SRD settings and snapshot framing (yjsSrdStore.ts).
+  'srd',
+  'srdFraming',
 ] as const;
 
 export interface UndoController {

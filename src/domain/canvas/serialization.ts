@@ -18,8 +18,10 @@ import { migrateToCurrent, type RawDiagramFile } from '../storage/schemaMigratio
 
 import { sanitizeFileName } from '../../common/utils/string.ts';
 import { downloadFile } from '../../common/utils/download.ts';
+import { compactSrdState, expandSrdFileValue, type SrdFileValue } from '../srd/srdSettings.ts';
+import type { SrdDocumentState } from '../srd/srdTypes.ts';
 
-export const SCHEMA_VERSION = '0.7';
+export const SCHEMA_VERSION = '0.8';
 
 export interface DiagramFile {
   schemaVersion: string;
@@ -37,6 +39,12 @@ export interface DiagramFile {
   programIncrements: ProgramIncrement[];
   team: TeamDocument;
   milestones?: Milestone[];
+  /**
+   * The SRD's template, settings and snapshot framing - only what differs
+   * from the defaults, and absent entirely when nothing does. See
+   * domain/srd/srdSettings.ts.
+   */
+  srd?: SrdFileValue;
   shapeFallbacks?: Record<string, ShapeDefinition>;
   iconFallbacks?: Record<string, IconDefinition>;
   metadata: {
@@ -87,8 +95,10 @@ export function toDiagramFile(
   programIncrements: ProgramIncrement[],
   team: TeamDocument,
   milestones: Milestone[] = [],
+  srd?: SrdDocumentState,
 ): DiagramFile {
   const { shapeFallbacks, iconFallbacks } = collectAssetFallbacks(nodes);
+  const srdValue = srd ? compactSrdState(srd) : undefined;
 
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -100,6 +110,7 @@ export function toDiagramFile(
     programIncrements,
     team,
     milestones,
+    ...(srdValue ? { srd: srdValue } : {}),
     ...(Object.keys(shapeFallbacks).length > 0 ? { shapeFallbacks } : {}),
     ...(Object.keys(iconFallbacks).length > 0 ? { iconFallbacks } : {}),
     metadata: { updatedAt: new Date().toISOString() },
@@ -365,6 +376,9 @@ export function parseDiagramFile(raw: string): DiagramFile {
     programIncrements: parseProgramIncrements(upgraded.programIncrements),
     team: parseTeamDocument(upgraded.team),
     milestones: parseMilestones(upgraded.milestones),
+    // Normalized through the document reader and compacted again, so a file
+    // carries the same minimal, sanitized value whichever build wrote it.
+    srd: upgraded.srd === undefined ? undefined : compactSrdState(expandSrdFileValue(upgraded.srd)),
     shapeFallbacks: upgraded.shapeFallbacks,
     iconFallbacks: upgraded.iconFallbacks,
     metadata: upgraded.metadata ?? { updatedAt: new Date().toISOString() },

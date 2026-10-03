@@ -32,12 +32,7 @@ console.log('=== Toolbar Menus (FileMenu & ExportMenu) Verification ===');
 // 2. ExportMenu renders trigger button without errors
 {
   const html = renderToStaticMarkup(
-    <ExportMenu
-      onExportPng={() => {}}
-      onExportSvg={() => {}}
-      onExportSrdMarkdown={() => {}}
-      onExportSrdPrint={() => {}}
-    />,
+    <ExportMenu onExportPng={() => {}} onExportSvg={() => {}} onOpenSrd={() => {}} />,
   );
   assert(html.includes('title="Export"'), 'ExportMenu renders trigger with Export title');
   assert(html.includes('toolbar__label'), 'ExportMenu renders toolbar label');

@@ -7,20 +7,14 @@ import { usePositionedDropdown } from '../../common/hooks/usePositionedDropdown'
 interface ExportMenuProps {
   onExportPng: () => void;
   onExportSvg: () => void;
-  onExportSrdMarkdown?: () => void;
-  onExportSrdPrint?: () => void;
+  /** Opens the SRD view, where it is previewed and exported. */
+  onOpenSrd?: () => void;
   disabled?: boolean;
 }
 
 const DROPDOWN_WIDTH = 190;
 
-export function ExportMenu({
-  onExportPng,
-  onExportSvg,
-  onExportSrdMarkdown,
-  onExportSrdPrint,
-  disabled,
-}: ExportMenuProps) {
+export function ExportMenu({ onExportPng, onExportSvg, onOpenSrd, disabled }: ExportMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -85,26 +79,15 @@ export function ExportMenu({
             >
               Download SVG
             </button>
-            {onExportSrdMarkdown && (
+            {onOpenSrd && (
               <button
                 type="button"
                 onClick={() => {
-                  onExportSrdMarkdown();
+                  onOpenSrd();
                   close();
                 }}
               >
-                Export SRD (.md)
-              </button>
-            )}
-            {onExportSrdPrint && (
-              <button
-                type="button"
-                onClick={() => {
-                  onExportSrdPrint();
-                  close();
-                }}
-              >
-                Export SRD (PDF / Print)
+                Solution Requirement Document…
               </button>
             )}
           </div>,
