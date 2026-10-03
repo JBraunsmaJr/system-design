@@ -9,11 +9,13 @@ import type {
 import type { PdfMarkdownStyles, PdfStyle } from '../srdPdfMarkdown';
 
 /**
- * Where on the page content sits. Classic puts everything in the body; a
- * template with a side column renders some sections in the `sidebar`, where
- * its slots may style them differently (as reactive-resume's sidebar does).
+ * Where on the page content sits. Classic puts everything in the body. A
+ * template with a distinct opening page - Briefing's sidebar page - renders
+ * that page's main column as `opening` and its side column as `sidebar`,
+ * where its slots may style them differently; the pages after it are `body`.
+ * Templates without such a page return the same slots for every placement.
  */
-export type SrdPlacement = 'body' | 'sidebar';
+export type SrdPlacement = 'body' | 'opening' | 'sidebar';
 
 /** The kinds of pill on a requirement card. */
 export type PillVariant = 'type' | 'points' | 'sprint' | 'assignee' | `status-${RequirementStatus}`;

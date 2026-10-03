@@ -159,12 +159,12 @@ async function run() {
       `the diagram and both linked requirements are in the PDF (${captured.length} images)`,
     );
     check(
-      captured.filter((i) => i.width === 3200).length === 1,
-      'the diagram is captured at the pinned 2x pixel ratio (3200px wide)',
+      captured.filter((i) => i.width === 1600).length === 1,
+      'the diagram is captured at the pinned pixel ratio (1600px wide, ~300 DPI as placed)',
     );
     check(
-      captured.filter((i) => i.width === 2400).length === 2,
-      'requirement snapshots are captured at the pinned 2x pixel ratio (2400px wide)',
+      captured.filter((i) => i.width === 1200).length === 2,
+      'requirement snapshots are captured at the pinned pixel ratio (1200px wide)',
     );
     await p.waitForFunction(
       () => document.querySelectorAll('.srd-capture-surface .react-flow').length === 0,
@@ -288,7 +288,7 @@ async function run() {
     const afterReframe = await exportWhen(p, (images) => changedFrom(images).length > 0, 20000);
     const changed = changedFrom(afterReframe);
     check(
-      changed.length === 1 && changed[0].width === 2400,
+      changed.length === 1 && changed[0].width === 1200,
       'the reframed snapshot is rendered again',
     );
     check(

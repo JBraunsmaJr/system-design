@@ -376,7 +376,7 @@ console.log('=== 5. Every template draws code without ligatures ===');
   const offenders: string[] = [];
   for (const [id, template] of Object.entries(SRD_PDF_TEMPLATES)) {
     const slots = template.createSlots(config(), true);
-    for (const placement of ['body', 'sidebar'] as const) {
+    for (const placement of ['body', 'opening', 'sidebar'] as const) {
       const resolved = slots(placement);
       const styles: Array<[string, unknown]> = [
         ...Object.entries(resolved).filter(([key]) => key !== 'markdown' && key !== 'pill'),
@@ -409,35 +409,68 @@ console.log('=== 6. Every sized style declares its line height ===');
   const offenders: string[] = [];
   for (const [id, template] of Object.entries(SRD_PDF_TEMPLATES)) {
     for (const fonts of [false, true]) {
-      const resolved = template.createSlots(config(), fonts)('body');
-      const pillVariants = [
-        'type',
-        'points',
-        'sprint',
-        'assignee',
-        'status-todo',
-        'status-in-progress',
-        'status-done',
-      ] as const;
-      const styles: Array<[string, unknown]> = [
-        ...Object.entries(resolved).filter(
-          ([key]) => !['markdown', 'pill', 'page', 'footerLeft', 'footerRight'].includes(key),
-        ),
-        ...Object.entries(resolved.markdown).map(
-          ([k, v]) => [`markdown.${k}`, v] as [string, unknown],
-        ),
-        ...pillVariants.map((v) => [`pill(${v})`, resolved.pill(v)] as [string, unknown]),
-      ];
-      for (const [name, style] of styles) {
-        const st = style as { fontSize?: unknown; lineHeight?: unknown };
-        if ((st.fontSize === undefined) !== (st.lineHeight === undefined))
-          offenders.push(`${id}/${name}`);
+      for (const placement of ['body', 'opening', 'sidebar'] as const) {
+        const resolved = template.createSlots(config(), fonts)(placement);
+        const pillVariants = [
+          'type',
+          'points',
+          'sprint',
+          'assignee',
+          'status-todo',
+          'status-in-progress',
+          'status-done',
+        ] as const;
+        const styles: Array<[string, unknown]> = [
+          ...Object.entries(resolved).filter(
+            ([key]) => !['markdown', 'pill', 'page', 'footerLeft', 'footerRight'].includes(key),
+          ),
+          ...Object.entries(resolved.markdown).map(
+            ([k, v]) => [`markdown.${k}`, v] as [string, unknown],
+          ),
+          ...pillVariants.map((v) => [`pill(${v})`, resolved.pill(v)] as [string, unknown]),
+        ];
+        for (const [name, style] of styles) {
+          const st = style as { fontSize?: unknown; lineHeight?: unknown };
+          if ((st.fontSize === undefined) !== (st.lineHeight === undefined))
+            offenders.push(`${id}/${placement}/${name}`);
+        }
       }
     }
   }
   assert(
     offenders.length === 0,
     `size and line height are declared together (${[...new Set(offenders)].join(', ')})`,
+  );
+}
+
+console.log('=== 7. Briefing: a sidebar on the opening page only ===');
+{
+  // Positions, not just text: the first section sits beside the sidebar,
+  // the sections after it at the page's own margin, full width.
+  const cfg = config({ requirementsLayout: 'table', templateId: 'briefing' });
+  const blob = await pdf(<SrdPdfDocument data={richData()} config={cfg} />).toBlob();
+  const doc = await getDocument({ data: new Uint8Array(await blob.arrayBuffer()), verbosity: 0 })
+    .promise;
+  const headingX = new Map<string, number>();
+  for (let n = 1; n <= doc.numPages; n++) {
+    for (const item of (await (await doc.getPage(n)).getTextContent()).items) {
+      if (!('str' in item)) continue;
+      for (const section of cfg.sections) {
+        if (item.str.startsWith(section.title) && !headingX.has(section.id)) {
+          headingX.set(section.id, item.transform[4]);
+        }
+      }
+    }
+  }
+  const [first, ...rest] = cfg.sections.filter((x) => x.enabled).sort((a, b) => a.order - b.order);
+  assert(
+    (headingX.get(first.id) ?? 0) >= 200,
+    `the first section sits beside the sidebar (x=${Math.round(headingX.get(first.id) ?? 0)})`,
+  );
+  const offsets = rest.map((x) => Math.round(headingX.get(x.id) ?? -1));
+  assert(
+    offsets.every((x) => x >= 0 && x < 100),
+    `the rest are full width (x=${offsets.join(', ')})`,
   );
 }
 

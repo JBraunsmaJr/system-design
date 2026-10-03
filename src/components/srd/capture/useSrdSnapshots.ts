@@ -7,6 +7,7 @@ import {
   captureNodeSubsetSnapshot,
 } from '../../../domain/canvas/imageExport';
 import type { ArchEdgeData, ArchNodeData } from '../../../domain/canvas/types';
+import { getFontEmbedCSS } from 'html-to-image';
 import { srdSnapshotCache } from '../../../domain/srd/srdSnapshotCache';
 import { planSrdSnapshots, type SrdSnapshotTarget } from '../../../domain/srd/srdSnapshotPlan';
 import type { SrdDocumentState, SrdSnapshotFraming } from '../../../domain/srd/srdTypes';
@@ -14,15 +15,20 @@ import type { CaptureLevel, RenderedLevel, SrdCaptureSurfaceProps } from './SrdC
 
 /**
  * Pinned so a snapshot looks the same on every screen, rather than following
- * each device's pixel ratio. 2 keeps text crisp in print.
+ * each device's pixel ratio. 1 is about 300 DPI where the PDF places them
+ * (the diagram 240pt tall, about 5.3in wide, at 1600px; requirement snapshots
+ * 150pt tall at 1200px) - print quality. 2 doubled that and quadrupled the
+ * pixels, and with them the time each capture blocks the page.
  */
-const CAPTURE_PIXEL_RATIO = 2;
+const CAPTURE_PIXEL_RATIO = 1;
 const ITEM_SNAPSHOT_SIZE = { width: 1200, height: 600, padding: 0.06 };
 /** Batches a burst of edits into one round of captures. */
 const CAPTURE_DEBOUNCE_MS = 200;
 /** A level that never reports rendered (it should) is captured anyway
  * rather than stalling every snapshot behind it. */
 const RENDER_TIMEOUT_MS = 4000;
+/** How long the user must have paused before a capture starts. */
+const USER_PAUSE_MS = 700;
 
 export interface SrdSnapshotImage {
   dataUrl: string;
@@ -76,13 +82,71 @@ function levelFor(
   return { key: target.levelKey, nodes, edges };
 }
 
-function captureTarget(target: SrdSnapshotTarget, rendered: RenderedLevel) {
+/**
+ * The page's web fonts as embeddable CSS, computed once per page load: by
+ * default html-to-image re-reads every stylesheet and inlines every font on
+ * each capture - about 40% of a capture's time, repeated for nothing.
+ */
+let fontEmbedCSS: Promise<string | undefined> | null = null;
+function embeddedFonts(root: HTMLElement): Promise<string | undefined> {
+  fontEmbedCSS ??= getFontEmbedCSS(root).catch(() => undefined);
+  return fontEmbedCSS;
+}
+
+/** When the user last typed, clicked or scrolled anywhere on the page. */
+let lastInput = 0;
+let watchingInput = false;
+function watchInput() {
+  if (watchingInput || typeof window === 'undefined') return;
+  watchingInput = true;
+  for (const type of ['keydown', 'pointerdown', 'wheel', 'input'] as const) {
+    window.addEventListener(type, () => (lastInput = performance.now()), {
+      capture: true,
+      passive: true,
+    });
+  }
+}
+
+/**
+ * Resolves once the user has paused and the browser is idle. A capture
+ * blocks the page for a few hundred milliseconds (it clones the diagram's
+ * DOM, which cannot leave the page), so captures wait for the user's pauses
+ * rather than land in the middle of typing or dragging.
+ */
+async function waitForPause(): Promise<void> {
+  watchInput();
+  for (;;) {
+    const quiet = performance.now() - lastInput;
+    if (quiet >= USER_PAUSE_MS) break;
+    await new Promise((resolve) => setTimeout(resolve, USER_PAUSE_MS - quiet));
+  }
+  await new Promise<void>((resolve) => {
+    if (typeof requestIdleCallback === 'function')
+      requestIdleCallback(() => resolve(), { timeout: 1000 });
+    else setTimeout(resolve, 0);
+  });
+}
+
+async function captureTarget(target: SrdSnapshotTarget, rendered: RenderedLevel) {
   const nodes = rendered.getNodes();
   // JPEG: about three times cheaper for the PDF engine to embed than a PNG
   // with transparency, on every render. Captures are opaque, so nothing is
   // lost to it but a little fidelity.
-  const capture = { root: rendered.root, pixelRatio: CAPTURE_PIXEL_RATIO, format: 'jpeg' as const };
-  if (target.kind === 'diagram') return captureDiagramSnapshot(nodes, 'jpeg', capture);
+  const capture = {
+    root: rendered.root,
+    pixelRatio: CAPTURE_PIXEL_RATIO,
+    format: 'jpeg' as const,
+    fontEmbedCSS: await embeddedFonts(rendered.root),
+  };
+  // The diagram shows its whole level, so the frame filter cannot shrink it:
+  // captured in tiles instead, pausing for the user between them, so no
+  // single step blocks the page for long.
+  if (target.kind === 'diagram') {
+    return captureDiagramSnapshot(nodes, 'jpeg', {
+      ...capture,
+      tiles: { columns: 2, rows: 2, betweenTiles: waitForPause },
+    });
+  }
   return captureNodeSubsetSnapshot(nodes, target.nodeIds, {
     ...ITEM_SNAPSHOT_SIZE,
     ...capture,
@@ -192,6 +256,10 @@ export function useSrdSnapshots({
       busyRef.current = true;
       setIsCapturing(true);
       try {
+        // Mounting the level and capturing both block the page: wait for a
+        // pause in the user's work first.
+        await waitForPause();
+        if (!mountedRef.current) return;
         if (renderedRef.current?.key !== target.levelKey) {
           setLevel(levelFor(target, diagram, levelCounts));
         }
@@ -200,6 +268,10 @@ export function useSrdSnapshots({
         // Text is drawn in web fonts; capturing before they load would
         // render the fallback font into the image.
         await document.fonts?.ready;
+        // Again, right before capturing: the user may have started working
+        // while the level was mounting.
+        await waitForPause();
+        if (!mountedRef.current) return;
         const dataUrl = rendered ? await captureTarget(target, rendered) : undefined;
         if (dataUrl) srdSnapshotCache.set(target.fingerprint, dataUrl);
         else markFailed(target.fingerprint);

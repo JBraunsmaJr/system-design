@@ -12,10 +12,11 @@ const GUTTER = 30;
 export const MAIN_LEFT = SIDEBAR_WIDTH + GUTTER;
 
 /**
- * Briefing: a colored sidebar down every page, holding the title, the
- * metadata and the key metrics on the first; the sections flow beside it.
- * Body slots are Classic's moved clear of the strip; sidebar slots draw
- * light on the strip's color.
+ * Briefing: an opening page with a colored sidebar holding the title, the
+ * details and the key metrics, the first section beside it; the sections
+ * after it on full-width pages. Opening slots are Classic's moved clear of
+ * the strip, sidebar slots draw light on the strip's color, and body slots -
+ * the pages after - are Classic's own.
  */
 export function createBriefingSlots(
   config: SrdTemplateConfig,
@@ -26,18 +27,23 @@ export function createBriefingSlots(
   const onStrip = mixColors(primaryColor, 18, P.white);
   const stripRule = mixColors(primaryColor, 55, P.white);
 
-  const body: SrdPdfSlots = {
+  // The headings stay the same on every page; only the opening page's
+  // geometry differs.
+  const sectionHeading = { ...classic.sectionHeading, borderBottomWidth: 0, marginTop: 14 };
+  const body: SrdPdfSlots = { ...classic, sectionHeading };
+
+  const opening: SrdPdfSlots = {
     ...classic,
     page: { ...classic.page, paddingLeft: MAIN_LEFT, paddingRight: PAGE_MARGIN },
     banner: { ...classic.banner, left: SIDEBAR_WIDTH },
     runningHeader: { ...classic.runningHeader, left: MAIN_LEFT },
     footerRule: { ...classic.footerRule, left: MAIN_LEFT },
     footerLeft: { ...classic.footerLeft, left: MAIN_LEFT },
-    sectionHeading: { ...classic.sectionHeading, borderBottomWidth: 0, marginTop: 14 },
+    sectionHeading,
   };
 
   const sidebar: SrdPdfSlots = {
-    ...body,
+    ...opening,
     title: { ...type(18, 1.2), fontWeight: 700, color: P.white, marginBottom: 12 },
     metaGrid: { flexDirection: 'column', marginBottom: 18 },
     metaItem: { ...type(8.5, 1.45), color: onStrip, paddingVertical: 2 },
@@ -65,5 +71,6 @@ export function createBriefingSlots(
     strong: { fontWeight: 700, color: P.white },
   };
 
-  return (placement) => (placement === 'sidebar' ? sidebar : body);
+  return (placement) =>
+    placement === 'sidebar' ? sidebar : placement === 'opening' ? opening : body;
 }

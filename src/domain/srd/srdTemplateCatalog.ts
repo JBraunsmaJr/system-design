@@ -26,7 +26,7 @@ export const SRD_TEMPLATE_CATALOG: Record<SrdTemplateId, SrdTemplateInfo> = {
   briefing: {
     id: 'briefing',
     name: 'Briefing',
-    description: 'A sidebar with the title and key metrics; sections beside it.',
+    description: 'An opening page with a sidebar of key facts; full-width pages after.',
   },
 };
 

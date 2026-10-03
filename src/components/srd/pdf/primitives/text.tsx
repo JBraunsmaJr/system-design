@@ -34,9 +34,12 @@ export function Pill({ variant, children }: { variant: PillVariant; children: Re
   return <Text style={slots.pill(variant)}>{children}</Text>;
 }
 
-/** Renders its children with the slots of another placement - a template's
- * sidebar, say. */
-export function Placement({
+/**
+ * Renders its children with the slots of another placement, adding nothing
+ * to the page: for whole pages (a template's opening page, say), which
+ * cannot sit inside a View.
+ */
+export function PlacementScope({
   placement,
   children,
 }: {
@@ -44,10 +47,26 @@ export function Placement({
   children: ReactNode;
 }) {
   const context = useContext(SrdPdfTemplateContext);
-  if (!context) throw new Error('Placement must be rendered inside a template');
+  if (!context) throw new Error('PlacementScope must be rendered inside a template');
   return (
     <SrdPdfTemplateContext.Provider value={{ ...context, placement }}>
-      <View>{children}</View>
+      {children}
     </SrdPdfTemplateContext.Provider>
+  );
+}
+
+/** Renders its children with the slots of another placement, in a View of
+ * their own - a template's sidebar column, say. */
+export function Placement({
+  placement,
+  children,
+}: {
+  placement: SrdPlacement;
+  children: ReactNode;
+}) {
+  return (
+    <PlacementScope placement={placement}>
+      <View>{children}</View>
+    </PlacementScope>
   );
 }

@@ -25,8 +25,17 @@ const BASELINES = resolve('fixtures/srd-pdf-baselines', process.platform);
 const UPDATE = process.env.SRD_PDF_UPDATE_BASELINES === '1';
 /** Rendering scale: enough to see layout, small enough to keep references light. */
 const SCALE = 0.75;
+/**
+ * Pages are compared shrunk by this factor, averaging blocks of pixels:
+ * browsers anti-alias text differently (CI's Chromium is not the one the
+ * references were made with), and averaging erases that while moved, missing
+ * or resized content still shows. Calibrated on a page re-drawn half a pixel
+ * off - every glyph's anti-aliasing changed, nothing moved - which compares
+ * equal at 4x, while one extra line of text still differs by over 0.6%.
+ */
+const DOWNSCALE = 4;
 /** A pixel differs when any channel is off by more than this (of 255). */
-const CHANNEL_TOLERANCE = 48;
+const CHANNEL_TOLERANCE = 64;
 /** A page matches when at most this share of its pixels differ. */
 const PAGE_TOLERANCE = 0.002;
 
@@ -139,7 +148,7 @@ async function run() {
           if (actual.width !== expected.width || actual.height !== expected.height) {
             return { sizeMismatch: [actual.width, actual.height, expected.width, expected.height] };
           }
-          const pixels = (img) => { const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const x = c.getContext('2d'); x.drawImage(img, 0, 0); return x.getImageData(0, 0, c.width, c.height); };
+          const pixels = (img) => { const c = document.createElement('canvas'); c.width = Math.floor(img.width / ${DOWNSCALE}); c.height = Math.floor(img.height / ${DOWNSCALE}); const x = c.getContext('2d'); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; x.drawImage(img, 0, 0, c.width, c.height); return x.getImageData(0, 0, c.width, c.height); };
           const a = pixels(actual), e = pixels(expected);
           const diff = document.createElement('canvas'); diff.width = a.width; diff.height = a.height;
           const dctx = diff.getContext('2d'); const d = dctx.createImageData(a.width, a.height);

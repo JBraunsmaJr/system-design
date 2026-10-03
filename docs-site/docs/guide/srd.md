@@ -21,10 +21,10 @@ The preview refreshes a moment after each change. While it renders, the line abo
 
 A **template** decides how the document looks and how its pages are laid out. Every template shows the same content - only the presentation differs. Choose one in the **Theme** tab.
 
-|                             Classic                              |                                Engineering                                 |                                          Briefing                                          |
-| :--------------------------------------------------------------: | :------------------------------------------------------------------------: | :----------------------------------------------------------------------------------------: |
-|              ![Classic](../images/srd/classic.png)               |               ![Engineering](../images/srd/engineering.png)                |                          ![Briefing](../images/srd/briefing.png)                           |
-| One column, numbered headings with an accent rule, ruled tables. | A specification: a title band, and each section starting on its own pages. | A colored sidebar on every page, holding the title, details, and key metrics on the first. |
+|                             Classic                              |                                Engineering                                 |                                                       Briefing                                                        |
+| :--------------------------------------------------------------: | :------------------------------------------------------------------------: | :-------------------------------------------------------------------------------------------------------------------: |
+|              ![Classic](../images/srd/classic.png)               |               ![Engineering](../images/srd/engineering.png)                |                                        ![Briefing](../images/srd/briefing.png)                                        |
+| One column, numbered headings with an accent rule, ruled tables. | A specification: a title band, and each section starting on its own pages. | An opening page with a colored sidebar of the title, details, and key metrics; the pages after it use the full width. |
 
 ### Templates and presets
 
