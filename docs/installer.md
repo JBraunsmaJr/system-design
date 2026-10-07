@@ -55,6 +55,7 @@ translated, pass `--skip-mount-check`.
 | `restore <id>`      | Puts a backup's configuration back. `--with-data` restores the databases too.                                |
 | `rollback`          | Undoes the most recent install, upgrade or reconfigure, using the backup taken just before it.               |
 | `promote-admin`     | Adds a store administrator (`ADMIN_SUBJECTS`). `--username` for Keycloak, `--subject issuer#sub` otherwise.  |
+| `proxy-reload`      | Validates the proxy configuration (including a shared Caddyfile you edited) and applies it without downtime. |
 | `render`            | Writes the configuration files and starts nothing. With `--dry-run`, only shows the diff.                    |
 | `doctor`            | Checks Docker, compose, the mount, disk, DNS and the registry, and changes nothing.                          |
 
@@ -68,6 +69,8 @@ Useful options: `--manifest <file>`, `--non-interactive`, `--yes`,
 compose.yml              all services; image references and secrets come from .env
 .env                     image references and every secret (mode 0600)
 Caddyfile | nginx/ …     the proxy configuration, for the proxy you chose
+caddy/Caddyfile          shared Caddy only: yours, created once, never rewritten
+caddy/system-design.caddy shared Caddy only: the app's routes, as a snippet
 keycloak-realm.json      realm, client and groups; no users, no secret
 turnserver.conf          when coturn runs here
 keys/recovery-public.pem the organization's recovery public key
@@ -113,25 +116,33 @@ Examples for each proxy option are in [`installer/examples/`](../installer/examp
 ### Reference
 
 ```yaml
-domain: design.example.com          # required
-project: system-design              # compose project; volume names derive from it
+domain: design.example.com # required
+project: system-design # compose project; volume names derive from it
 routing:
-  mode: path                        # path: /editor /store /relay /keycloak on one host
-                                    # subdomain: a hostname per service
-  hosts:                            # subdomain mode; defaults shown
+  mode:
+    path # path: /editor /store /relay /keycloak on one host
+    # subdomain: a hostname per service
+  hosts: # subdomain mode; defaults shown
     editor: design.example.com
     store: store.design.example.com
     relay: relay.design.example.com
     auth: auth.design.example.com
 
-proxy:                              # one of:
+proxy: # one of:
   type: caddy
-  acme: http                        # or cloudflare-dns
+  acme: http # or cloudflare-dns
   email: ops@example.com
-  cloudflareApiToken: env:CLOUDFLARE_API_TOKEN   # cloudflare-dns only
-  resolvers: [clyde.ns.cloudflare.com]           # optional DNS-01 tuning
+  cloudflareApiToken: env:CLOUDFLARE_API_TOKEN # cloudflare-dns only
+  resolvers: [clyde.ns.cloudflare.com] # optional DNS-01 tuning
   propagationDelay: 30s
   propagationTimeout: 10m
+  build:
+    false # true: compile Caddy + module here instead of
+    # using images.caddyCloudflare
+  shared: false # true: Caddy also serves your other sites
+  dataVolume: caddy_caddy_data # existing volume for /data (keeps certificates)
+  replaces: [caddy-caddy-1] # containers to stop when this proxy takes 80/443
+  networks: [media] # existing networks, to reach other stacks by name
 # type: nginx
 #   tls: certbot-http | certbot-cloudflare | provided
 #   email, cloudflareApiToken, certPath, keyPath, staging: false
@@ -141,7 +152,7 @@ proxy:                              # one of:
 #   upstreamHost: 192.168.2.146     # how your proxy reaches this host
 #   bindAddress: 192.168.2.146      # interface service ports are published on
 
-identity:                           # one of:
+identity: # one of:
   type: keycloak
   realm: system-design
   clientId: system-design-store
@@ -149,7 +160,7 @@ identity:                           # one of:
   adminPassword: generate
   dbPassword: generate
   groups: [design-team-a]
-  initialUser:                      # optional; becomes a store administrator
+  initialUser: # optional; becomes a store administrator
     username: jdoe
     email: jdoe@example.com
     groups: [design-team-a]
@@ -162,43 +173,45 @@ identity:                           # one of:
 #   clientId, clientSecret
 
 turn:
-  type: none                        # or bundled, or external
+  type: none # or bundled, or external
 # bundled: host, externalIp, username: webrtc, password: generate,
 #          port: 3478, minPort: 49160, maxPort: 49200, denyPrivatePeers: true
 # external: iceServers: "stun:h:3478,turn:h:3478|user|pass"
 
 recovery:
-  mode: generate                    # or existing
-  publicKeyPath: keys/recovery-public.pem   # existing only
+  mode: generate # or existing
+  publicKeyPath: keys/recovery-public.pem # existing only
 
 store:
-  retention: 30d                    # immediate | indefinite | 7d, 12w, 6m, 7y
+  retention: 30d # immediate | indefinite | 7d, 12w, 6m, 7y
   autoAccess: true
   relayAuth: true
-  adminSubjects: []                 # issuer#subject; promote-admin maintains this
+  adminSubjects: [] # issuer#subject; promote-admin maintains this
 
 secrets:
   postgresPassword: generate
   relayTokenSecret: generate
 
-versions:                           # latest | a dated tag | sha256:…
+versions: # latest | a dated tag | sha256:…
   editor: latest
   relay: latest
   store: latest
 
-images:                             # third-party images, all overridable
-  registry: ghcr.io/jbraunsmajr     # for mirrors
+images: # third-party images, all overridable
+  registry: ghcr.io/jbraunsmajr # for mirrors
   postgres: postgres:16-alpine
   keycloak: quay.io/keycloak/keycloak:26.0
   coturn: coturn/coturn:4.6
-  caddy: caddy:2.8
-  caddyBuilder: caddy:2.8-builder
+  caddy: caddy:2.11
+  caddyBuilder: caddy:2.11-builder
+  caddyCloudflare: slothcroissant/caddy-cloudflaredns:2.11.2
+  ddns: favonia/cloudflare-ddns:1
   nginx: nginx:1.27-alpine
   cloudflared: cloudflare/cloudflared:latest
   certbot: certbot/certbot:latest
   certbotCloudflare: certbot/dns-cloudflare:latest
 
-ports:                              # external proxy only
+ports: # external proxy only
   editor: 8888
   store: 8889
   relay: 4444
@@ -206,6 +219,12 @@ ports:                              # external proxy only
 
 backups:
   keep: 10
+
+ddns: # caddy or nginx run here only
+  enabled: false
+  domains: [] # default: every public hostname (+ TURN's)
+  proxied: false
+  cloudflareApiToken: env:CLOUDFLARE_API_TOKEN # only if the proxy has none
 ```
 
 ## Choosing a proxy
@@ -213,8 +232,91 @@ backups:
 **Caddy** obtains and renews certificates by itself. With `acme: http` the
 host must be reachable on 80 and 443 from the internet. With
 `acme: cloudflare-dns` it proves ownership through the Cloudflare API
-instead, which works for hosts only reachable on a private network; the
-installer builds a Caddy image with the Cloudflare module for this.
+instead, which works for hosts only reachable on a private network. That
+needs Caddy with the Cloudflare DNS module: by default the installer uses
+the prebuilt `slothcroissant/caddy-cloudflaredns` image, pinned to a Caddy
+version (its tags follow Caddy's). That image holds your API token and
+TLS keys; if you would rather not trust a community build, set
+`proxy.build: true` and the installer compiles one from the official image
+with `xcaddy` instead.
+
+**Dynamic DNS** (`ddns.enabled`) adds a `cloudflare-ddns` service that keeps
+the records pointed at the host's public IP, for connections whose address
+changes. It reuses the DNS-01 token when there is one, so the token needs
+Zone:DNS:Edit on every zone involved. Records stay DNS-only (grey cloud)
+unless `ddns.proxied` is set; TURN never works through Cloudflare's proxy.
+
+### One Caddy for everything on the host
+
+If Caddy should also serve your other sites, answer yes to "Will this Caddy
+also serve other sites of yours?" (`proxy.shared: true`). Ownership then
+splits:
+
+- `caddy/Caddyfile` is **yours**. The installer writes a starting version
+  once, if none exists, and never touches it again.
+- `caddy/system-design.caddy` is the installer's: the app's routes as a
+  snippet, each with a host matcher, regenerated on every run.
+
+Your Caddyfile needs two lines: `import system-design.caddy` at the top level,
+and `import system-design` inside whichever site block serves the app's
+hostname. That can be a wildcard block shared with other services, so one
+certificate covers everything:
+
+```caddyfile
+{
+	email you@example.com
+}
+
+import system-design.caddy
+
+*.home.example.com {
+	tls {
+		dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+	}
+
+	@nas host nas.home.example.com
+	handle @nas {
+		reverse_proxy 192.168.1.20:5000
+	}
+
+	import system-design
+}
+```
+
+Both files are mounted as a directory at `/etc/caddy`, so editors that save
+by replacing the file still take effect. After editing your Caddyfile, run
+`proxy-reload`: it validates the file with the exact image that runs it and
+reloads Caddy gracefully, and refuses (changing nothing) if it does not
+validate. Installs and upgrades check that both imports are present before
+doing anything.
+
+Other sites can reach services on the host by its LAN address, or other
+compose stacks' containers by name if you list their networks in
+`proxy.networks`.
+
+### Replacing a proxy that already runs here
+
+When the chosen proxy needs ports 80/443 and other containers hold them,
+the installer lists them, together with the rest of their compose project (a DDNS updater, say), and offers to replace
+them. For a Caddy being
+replaced it also offers to reuse its `/data` volume, which keeps its
+certificates and ACME account, and to start your shared Caddyfile from the
+one it serves (copied out of the container).
+
+The swap is ordered to keep downtime short and reversible:
+
+1. the new Caddyfile is validated with the image that will run it;
+2. every other service is started and must be healthy;
+3. the old containers are stopped and their restart policy set to `no`;
+4. the new proxy starts. If it fails, it is removed and the old containers
+   are started again with their original restart policy.
+
+`rollback` of that deployment does the same: the old stack gets 80/443 back.
+Once you are happy, remove the old stack (`docker compose down` in its
+directory, keeping its volume if `dataVolume` points at it).
+
+Non-interactive runs never stop containers they were not told about: list
+them in `proxy.replaces`.
 
 **nginx** uses certbot. The first certificate is requested before nginx
 starts, and a `certbot` service renews it twice a day while nginx reloads
@@ -295,6 +397,11 @@ taken over in place:
    passwords), backs up the running databases, and replaces the files.
 3. An existing `keys/recovery-public.pem` can be kept with
    `recovery.mode: existing`.
+
+If your Caddy runs as its own compose stack on the same host, combine them
+with `proxy: { type: caddy, shared: true }` (see `installer/examples/caddy-shared.yml`)
+rather than `external`: the installer takes over 80/443 from the old stack
+as described under "Replacing a proxy that already runs here".
 
 Things that change on adoption: PostgreSQL is no longer published on the
 host; service ports are bound to `bindAddress` only; coturn gets a new

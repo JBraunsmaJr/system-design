@@ -15,15 +15,26 @@ export const RECOVERY_PRIVATE = 'keys/recovery-private.pem';
  * Generation uses the store image's own tool, so the key format always
  * matches what the store expects.
  */
-export async function ensureRecoveryKey(dir: string, c: Config, storeImage: string): Promise<'generated' | 'copied' | 'present'> {
+export async function ensureRecoveryKey(
+    dir: string,
+    c: Config,
+    storeImage: string,
+): Promise<'generated' | 'copied' | 'present'> {
     const pub = join(dir, RECOVERY_PUBLIC);
     mkdirSync(join(dir, 'keys'), {recursive: true});
 
     if (c.recovery.mode === 'existing') {
         const source = resolve(dir, c.recovery.publicKeyPath!);
-        if (!existsSync(source)) throw new InstallerError(`Recovery public key not found at ${source}.`, 'Mount it into the installer container, or place it in the install directory.');
+        if (!existsSync(source))
+            throw new InstallerError(
+                `Recovery public key not found at ${source}.`,
+                'Mount it into the installer container, or place it in the install directory.',
+            );
         if (!readFileSync(source, 'utf8').includes('-----BEGIN PUBLIC KEY-----')) {
-            throw new InstallerError(`${source} is not a PEM public key.`, 'Give the *public* half (recovery-public.pem). Never put the private half on the server.');
+            throw new InstallerError(
+                `${source} is not a PEM public key.`,
+                'Give the *public* half (recovery-public.pem). Never put the private half on the server.',
+            );
         }
         if (source === pub) return 'present';
         copyFileSync(source, pub);
@@ -32,7 +43,18 @@ export async function ensureRecoveryKey(dir: string, c: Config, storeImage: stri
 
     if (existsSync(pub)) return 'present';
     await ui.task('Generating the recovery key pair', () =>
-        docker(['run', '--rm', '-u', '0:0', '-v', `${join(dir, 'keys')}:/keys`, storeImage, 'generate-recovery-key', '--out', '/keys/recovery']),
+        docker([
+            'run',
+            '--rm',
+            '-u',
+            '0:0',
+            '-v',
+            `${join(dir, 'keys')}:/keys`,
+            storeImage,
+            'generate-recovery-key',
+            '--out',
+            '/keys/recovery',
+        ]),
     );
     return 'generated';
 }
@@ -51,7 +73,9 @@ export async function handOverPrivateKey(dir: string): Promise<void> {
         'Recovery key',
     );
     if (!ui.interactive) {
-        ui.warn(`Leaving ${RECOVERY_PRIVATE} in place because this run is non-interactive. Move it off the server; \`status\` will keep reminding you.`);
+        ui.warn(
+            `Leaving ${RECOVERY_PRIVATE} in place because this run is non-interactive. Move it off the server; \`status\` will keep reminding you.`,
+        );
         return;
     }
     for (; ;) {
@@ -68,7 +92,10 @@ export async function handOverPrivateKey(dir: string): Promise<void> {
             continue;
         }
         if (choice === 'delete') {
-            const sure = await ui.confirm('Delete it? Without a copy, escrowed documents can never be recovered.', false);
+            const sure = await ui.confirm(
+                'Delete it? Without a copy, escrowed documents can never be recovered.',
+                false,
+            );
             if (!sure) continue;
             rmSync(priv);
             ui.success('Private key removed from this server.');
@@ -94,12 +121,17 @@ export async function ensureCertificate(
     const p = c.proxy;
     const live = join(dir, 'certbot', 'conf', 'live', certName(c), 'fullchain.pem');
     const wanted = [...d.hosts].sort();
-    if (existsSync(live) && JSON.stringify(issuedFor ?? []) === JSON.stringify(wanted)) return issuedFor;
+    if (existsSync(live) && JSON.stringify(issuedFor ?? []) === JSON.stringify(wanted))
+        return issuedFor;
 
     mkdirSync(join(dir, 'certbot', 'www'), {recursive: true});
     const common = [
-        'certonly', '--non-interactive', '--agree-tos', '--expand',
-        '--cert-name', certName(c),
+        'certonly',
+        '--non-interactive',
+        '--agree-tos',
+        '--expand',
+        '--cert-name',
+        certName(c),
         ...(p.email ? ['-m', p.email] : ['--register-unsafely-without-email']),
         ...(p.staging ? ['--staging'] : []),
         ...d.hosts.flatMap((h) => ['-d', h]),
@@ -108,13 +140,47 @@ export async function ensureCertificate(
 
     await ui.task(`Requesting a certificate for ${d.hosts.join(', ')}`, async () => {
         if (p.tls === 'certbot-cloudflare') {
-            return docker(['run', '--rm', '-v', conf, c.images.certbotCloudflare, ...common, '--dns-cloudflare', '--dns-cloudflare-credentials', '/etc/letsencrypt/cloudflare.ini', '--dns-cloudflare-propagation-seconds', '30']);
+            return docker([
+                'run',
+                '--rm',
+                '-v',
+                conf,
+                c.images.certbotCloudflare,
+                ...common,
+                '--dns-cloudflare',
+                '--dns-cloudflare-credentials',
+                '/etc/letsencrypt/cloudflare.ini',
+                '--dns-cloudflare-propagation-seconds',
+                '30',
+            ]);
         }
         // nginx already serving: answer the challenge through it. Otherwise certbot listens on :80 itself.
         if (await compose.isRunning('proxy')) {
-            return docker(['run', '--rm', '-v', conf, '-v', `${join(dir, 'certbot', 'www')}:/var/www/certbot`, c.images.certbot, ...common, '--webroot', '-w', '/var/www/certbot']);
+            return docker([
+                'run',
+                '--rm',
+                '-v',
+                conf,
+                '-v',
+                `${join(dir, 'certbot', 'www')}:/var/www/certbot`,
+                c.images.certbot,
+                ...common,
+                '--webroot',
+                '-w',
+                '/var/www/certbot',
+            ]);
         }
-        return docker(['run', '--rm', '-p', '80:80', '-v', conf, c.images.certbot, ...common, '--standalone']);
+        return docker([
+            'run',
+            '--rm',
+            '-p',
+            '80:80',
+            '-v',
+            conf,
+            c.images.certbot,
+            ...common,
+            '--standalone',
+        ]);
     });
     return wanted;
 }

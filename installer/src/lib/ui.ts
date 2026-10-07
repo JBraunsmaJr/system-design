@@ -60,7 +60,12 @@ class Ui {
         }
     }
 
-    spinner(): { start(m: string): void; stop(m: string): void; fail(m: string): void; message(m: string): void } {
+    spinner(): {
+        start(m: string): void;
+        stop(m: string): void;
+        fail(m: string): void;
+        message(m: string): void;
+    } {
         if (this.interactive) {
             const s = p.spinner();
             return {
@@ -126,7 +131,10 @@ class Ui {
         return this.unwrap(value).trim();
     }
 
-    async password(opts: { message: string; validate?: (v: string) => string | undefined }): Promise<string> {
+    async password(opts: {
+        message: string;
+        validate?: (v: string) => string | undefined;
+    }): Promise<string> {
         this.requireInteractive(opts.message);
         const value = await p.password({
             message: opts.message,
@@ -162,7 +170,10 @@ class Ui {
     async confirmOrAbort(message: string): Promise<void> {
         if (!this.interactive) {
             if (this.assumeYes) return;
-            throw new InstallerError(`Refusing to continue without confirmation: ${message}`, 'Re-run with --yes.');
+            throw new InstallerError(
+                `Refusing to continue without confirmation: ${message}`,
+                'Re-run with --yes.',
+            );
         }
         const ok = await this.confirm(message, true);
         if (!ok) {

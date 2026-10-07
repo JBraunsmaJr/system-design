@@ -25,26 +25,26 @@
  */
 import * as Y from 'yjs';
 import type {
-  SrdDocumentSettings,
-  SrdDocumentState,
-  SrdMetadataOverrides,
-  SrdSnapshotFraming,
-  SrdTemplateConfig,
-  SrdTemplateId,
+    SrdDocumentSettings,
+    SrdDocumentState,
+    SrdMetadataOverrides,
+    SrdSnapshotFraming,
+    SrdTemplateConfig,
+    SrdTemplateId,
 } from '../../domain/srd/srdTypes';
 import {
-  CUSTOM_PRESET_ID,
-  SRD_FIELDS,
-  fieldsOf,
-  isDefaultFraming,
-  isDefaultSrdField,
-  readSrdField,
-  sanitizeFraming,
-  srdValuesEqual,
-  stateWithPreset,
-  unsupportedTemplateIdOf,
-  type SrdField,
-  type SrdStoredFields,
+    CUSTOM_PRESET_ID,
+    fieldsOf,
+    isDefaultFraming,
+    isDefaultSrdField,
+    readSrdField,
+    sanitizeFraming,
+    SRD_FIELDS,
+    type SrdField,
+    type SrdStoredFields,
+    srdValuesEqual,
+    stateWithPreset,
+    unsupportedTemplateIdOf,
 } from '../../domain/srd/srdSettings';
 
 export const SRD_MAP = 'srd';

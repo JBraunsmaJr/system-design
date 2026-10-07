@@ -1,10 +1,10 @@
-import { useMemo } from 'react';
-import { Document } from '@react-pdf/renderer';
-import type { SrdDataContext, SrdTemplateConfig } from '../../../domain/srd/srdTypes';
-import { SrdPdfTemplateContext } from './template/context';
-import { pdfTemplateFor } from './templates';
-import { stripSoftHyphens } from './srdPdfText';
-import { disableHyphenation } from './srdPdfFonts';
+import {useMemo} from 'react';
+import {Document} from '@react-pdf/renderer';
+import type {SrdDataContext, SrdTemplateConfig} from '../../../domain/srd/srdTypes';
+import {SrdPdfTemplateContext} from './template/context';
+import {pdfTemplateFor} from './templates';
+import {stripSoftHyphens} from './srdPdfText';
+import {disableHyphenation} from './srdPdfFonts';
 
 // Before any document lays out its text (see disableHyphenation).
 disableHyphenation();

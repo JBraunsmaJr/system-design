@@ -1,7 +1,7 @@
-import { useContext, type ReactNode } from 'react';
-import { Text, View } from '@react-pdf/renderer';
-import { SrdPdfTemplateContext, useSrdPdfSlots } from '../template/context';
-import type { PillVariant, SrdPlacement } from '../template/types';
+import {type ReactNode, useContext} from 'react';
+import {Text, View} from '@react-pdf/renderer';
+import {SrdPdfTemplateContext, useSrdPdfSlots} from '../template/context';
+import type {PillVariant, SrdPlacement} from '../template/types';
 
 /** Room a heading keeps for what follows it, so it never ends a page. */
 export const HEADING_KEEP_WITH_NEXT = 60;

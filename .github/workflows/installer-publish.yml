@@ -39,17 +39,23 @@ jobs:
 
       # Every example manifest is rendered and the output checked by the
       # tools that will read it: compose, Caddy and nginx.
-      - name: Validate rendered configuration
+      - name: Install Caddy and nginx for validation
         run: |
           sudo apt-get update -q && sudo apt-get install -y -q nginx-core >/dev/null
-          curl -sSL https://github.com/caddyserver/caddy/releases/download/v2.8.4/caddy_2.8.4_linux_amd64.tar.gz | tar -xz -C /tmp caddy
+          curl -sSL https://github.com/caddyserver/caddy/releases/download/v2.11.2/caddy_2.11.2_linux_amd64.tar.gz | tar -xz -C /tmp caddy
+          /tmp/caddy version
+
+      - name: Validate rendered configuration
+        run: |
           sudo -E env "PATH=$PATH" COMPOSE="docker compose" CADDY=/tmp/caddy NGINX=nginx sh test/validate-rendered.sh
 
       # Install, upgrade, a failing upgrade's automatic rollback, manual
-      # rollback and adoption, against a fake docker that forwards
-      # `compose config` to the real plugin.
+      # rollback, adoption, and replacing an existing Caddy stack with a
+      # shared one, against a fake docker that forwards `compose config` to
+      # the real plugin and Caddyfile validation to the real caddy.
       - name: End-to-end lifecycle
         run: |
+          export REAL_CADDY=/tmp/caddy
           export REAL_COMPOSE="$(docker info --format '{{range .ClientInfo.Plugins}}{{if eq .Name "compose"}}{{.Path}}{{end}}{{end}}')"
           node --test test/e2e.test.ts
 

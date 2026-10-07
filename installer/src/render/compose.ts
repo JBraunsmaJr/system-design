@@ -14,7 +14,8 @@ const NET = ['core'];
  */
 export function renderCompose(c: Config, d: Derived): string {
     const services: Record<string, Service> = {};
-    const volumes: Record<string, null> = {'store-data': null};
+    const volumes: Record<string, null | { external: true }> = {'store-data': null};
+    const networks: Record<string, null | { external: true }> = {core: null};
     const external = c.proxy.type === 'external';
     const bind = c.proxy.type === 'external' ? c.proxy.bindAddress : '';
     const publish = (hostPort: number, containerPort: number) =>
@@ -61,7 +62,11 @@ export function renderCompose(c: Config, d: Derived): string {
         image: c.images.postgres,
         restart: RESTART,
         networks: NET,
-        environment: {POSTGRES_USER: 'store', POSTGRES_PASSWORD: '${POSTGRES_PASSWORD}', POSTGRES_DB: 'store'},
+        environment: {
+            POSTGRES_USER: 'store',
+            POSTGRES_PASSWORD: '${POSTGRES_PASSWORD}',
+            POSTGRES_DB: 'store',
+        },
         volumes: ['store-data:/var/lib/postgresql/data'],
         healthcheck: pgHealth('store'),
     };
@@ -92,7 +97,9 @@ export function renderCompose(c: Config, d: Derived): string {
                 // Substituted into the realm file's ${OIDC_CLIENT_SECRET} at import.
                 OIDC_CLIENT_SECRET: '${OIDC_CLIENT_SECRET}',
             },
-            volumes: [`./keycloak-realm.json:/opt/keycloak/data/import/${c.identity.realm}-realm.json:ro`],
+            volumes: [
+                `./keycloak-realm.json:/opt/keycloak/data/import/${c.identity.realm}-realm.json:ro`,
+            ],
             // The image has no curl; bash's /dev/tcp reaches the management port.
             healthcheck: {
                 test: [
@@ -114,7 +121,7 @@ export function renderCompose(c: Config, d: Derived): string {
             environment: {
                 POSTGRES_USER: 'keycloak',
                 POSTGRES_PASSWORD: '${KEYCLOAK_DB_PASSWORD}',
-                POSTGRES_DB: 'keycloak'
+                POSTGRES_DB: 'keycloak',
             },
             volumes: ['keycloak-data:/var/lib/postgresql/data'],
             healthcheck: pgHealth('keycloak'),
@@ -127,23 +134,51 @@ export function renderCompose(c: Config, d: Derived): string {
             restart: RESTART,
             // TURN needs the host's address and a wide UDP range; host networking avoids NAT-in-NAT.
             network_mode: 'host',
-            command: ['-c', '/etc/coturn/turnserver.conf', '--user', `${c.turn.username}:\${TURN_PASSWORD}`],
+            command: [
+                '-c',
+                '/etc/coturn/turnserver.conf',
+                '--user',
+                `${c.turn.username}:\${TURN_PASSWORD}`,
+            ],
             volumes: ['./turnserver.conf:/etc/coturn/turnserver.conf:ro'],
         };
     }
 
     addProxy(c, services, volumes);
+    const p = c.proxy;
+    if ((p.type === 'caddy' || p.type === 'nginx') && p.networks.length && services.proxy) {
+        services.proxy.networks = [...NET, ...p.networks];
+        for (const n of p.networks) networks[n] = {external: true};
+    }
+
+    if (c.ddns.enabled) {
+        services.ddns = {
+            image: c.images.ddns,
+            restart: RESTART,
+            // Hardening as recommended by the image's own documentation.
+            user: '1000:1000',
+            read_only: true,
+            cap_drop: ['all'],
+            security_opt: ['no-new-privileges:true'],
+            environment: {
+                CLOUDFLARE_API_TOKEN: '${CLOUDFLARE_API_TOKEN}',
+                DOMAINS: (c.ddns.domains.length ? c.ddns.domains : ddnsDefaultDomains(c, d)).join(','),
+                PROXIED: c.ddns.proxied ? 'true' : 'false',
+            },
+        };
+    }
 
     // YAML 1.1 so values such as "on", "true" and "80:80" are quoted for
     // compose's parser; no anchors, so each service reads on its own.
     const doc = new YAML.Document(
-        {name: c.project, services, volumes, networks: {core: null}},
+        {name: c.project, services, volumes, networks},
         {version: '1.1', aliasDuplicateObjects: false},
     );
     // "80:80" is a base-60 integer to a YAML 1.1 reader; always quote port mappings.
     YAML.visit(doc, {
         Scalar(_key, node) {
-            if (typeof node.value === 'string' && /^[\d.]+(:\d+)+(\/\w+)?$/.test(node.value)) node.type = 'QUOTE_DOUBLE';
+            if (typeof node.value === 'string' && /^[\d.]+(:\d+)+(\/\w+)?$/.test(node.value))
+                node.type = 'QUOTE_DOUBLE';
         },
     });
     doc.commentBefore =
@@ -152,8 +187,21 @@ export function renderCompose(c: Config, d: Derived): string {
     return doc.toString({lineWidth: 0, nullStr: ''});
 }
 
+/** Every public hostname, plus TURN's when it is a name rather than an IP. */
+export function ddnsDefaultDomains(c: Config, d: Derived): string[] {
+    const names = [...d.hosts];
+    if (c.turn.type === 'bundled' && !/^(\d{1,3}\.){3}\d{1,3}$/.test(c.turn.host))
+        names.push(c.turn.host);
+    return [...new Set(names)];
+}
+
 function pgHealth(user: string) {
-    return {test: ['CMD-SHELL', `pg_isready -U ${user}`], interval: '5s', timeout: '5s', retries: 10};
+    return {
+        test: ['CMD-SHELL', `pg_isready -U ${user}`],
+        interval: '5s',
+        timeout: '5s',
+        retries: 10,
+    };
 }
 
 function storeEnvironment(c: Config, d: Derived): Record<string, string> {
@@ -205,28 +253,47 @@ function appDependencies(c: Config): Record<string, { condition: string }> {
     return deps;
 }
 
-function addProxy(c: Config, services: Record<string, Service>, volumes: Record<string, null>): void {
+function addProxy(
+    c: Config,
+    services: Record<string, Service>,
+    volumes: Record<string, null | { external: true }>,
+): void {
     const p = c.proxy;
     if (p.type === 'caddy') {
-        volumes['caddy-data'] = null;
+        // An existing volume keeps the certificates and ACME account an earlier Caddy obtained.
+        const data = p.dataVolume ?? 'caddy-data';
+        volumes[data] = p.dataVolume ? {external: true} : null;
         volumes['caddy-config'] = null;
-        const custom = p.acme === 'cloudflare-dns';
-        services.proxy = {
-            ...(custom
+        const cloudflare = p.acme === 'cloudflare-dns';
+        const image = !cloudflare
+            ? {image: c.images.caddy}
+            : p.build
                 ? {image: `${c.project}-caddy:local`, build: {context: './caddy'}, pull_policy: 'build'}
-                : {image: c.images.caddy}),
+                : {image: c.images.caddyCloudflare};
+        services.proxy = {
+            ...image,
             restart: RESTART,
             networks: NET,
             ports: ['80:80', '443:443', '443:443/udp'],
-            ...(custom ? {environment: {CLOUDFLARE_API_TOKEN: '${CLOUDFLARE_API_TOKEN}'}} : {}),
-            volumes: ['./Caddyfile:/etc/caddy/Caddyfile:ro', 'caddy-data:/data', 'caddy-config:/config'],
+            ...(cloudflare ? {environment: {CLOUDFLARE_API_TOKEN: '${CLOUDFLARE_API_TOKEN}'}} : {}),
+            // Shared: the whole directory, so editors that replace the file (new inode) still take effect.
+            volumes: [
+                p.shared ? './caddy:/etc/caddy:ro' : './Caddyfile:/etc/caddy/Caddyfile:ro',
+                `${data}:/data`,
+                'caddy-config:/config',
+            ],
             depends_on: appDependencies(c),
         };
     } else if (p.type === 'nginx') {
         const certbot = p.tls !== 'provided';
         const vols = ['./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro'];
-        if (certbot) vols.push('./certbot/conf:/etc/letsencrypt:ro', './certbot/www:/var/www/certbot:ro');
-        else vols.push(`${p.certPath}:/etc/nginx/certs/fullchain.pem:ro`, `${p.keyPath}:/etc/nginx/certs/privkey.pem:ro`);
+        if (certbot)
+            vols.push('./certbot/conf:/etc/letsencrypt:ro', './certbot/www:/var/www/certbot:ro');
+        else
+            vols.push(
+                `${p.certPath}:/etc/nginx/certs/fullchain.pem:ro`,
+                `${p.keyPath}:/etc/nginx/certs/privkey.pem:ro`,
+            );
         services.proxy = {
             image: c.images.nginx,
             restart: RESTART,
@@ -235,7 +302,11 @@ function addProxy(c: Config, services: Record<string, Service>, volumes: Record<
             volumes: vols,
             depends_on: appDependencies(c),
             // Reload periodically so renewed certificates are picked up.
-            command: ['/bin/sh', '-c', "while :; do sleep 6h & wait $${!}; nginx -s reload; done & exec nginx -g 'daemon off;'"],
+            command: [
+                '/bin/sh',
+                '-c',
+                "while :; do sleep 6h & wait $${!}; nginx -s reload; done & exec nginx -g 'daemon off;'",
+            ],
         };
         if (certbot) {
             const dns = p.tls === 'certbot-cloudflare';
@@ -244,7 +315,11 @@ function addProxy(c: Config, services: Record<string, Service>, volumes: Record<
                 image: dns ? c.images.certbotCloudflare : c.images.certbot,
                 restart: RESTART,
                 volumes: ['./certbot/conf:/etc/letsencrypt', './certbot/www:/var/www/certbot'],
-                entrypoint: ['/bin/sh', '-c', `trap exit TERM; while :; do certbot renew --quiet${renewArgs}; sleep 12h & wait $\${!}; done`],
+                entrypoint: [
+                    '/bin/sh',
+                    '-c',
+                    `trap exit TERM; while :; do certbot renew --quiet${renewArgs}; sleep 12h & wait $\${!}; done`,
+                ],
             };
         }
     } else if (p.type === 'cloudflare-tunnel') {

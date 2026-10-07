@@ -2,7 +2,7 @@
 # host's LAN address. The installer publishes the service ports on that
 # address only and writes ready-to-paste snippets to proxy-snippets/.
 domain: editor.home.jbraunsma.dev
-project: prod            # keep the existing project name so volumes are found
+project: prod # keep the existing project name so volumes are found
 proxy:
   type: external
   upstreamHost: 192.168.2.146

@@ -38,7 +38,10 @@ function parseRepo(repository: string): Repo {
     const [first, ...rest] = repository.split('/');
     if (!first || !rest.length || !/[.:]/.test(first)) {
         // Docker Hub shorthand.
-        return {host: 'registry-1.docker.io', path: rest.length ? repository : `library/${repository}`};
+        return {
+            host: 'registry-1.docker.io',
+            path: rest.length ? repository : `library/${repository}`,
+        };
     }
     return {host: first, path: rest.join('/')};
 }
@@ -57,7 +60,11 @@ class RegistryClient {
         const url = `https://${this.repo.host}/v2/${this.repo.path}${path}`;
         const headers = new Headers(init.headers);
         if (this.token) headers.set('Authorization', `Bearer ${this.token}`);
-        let response = await this.fetcher(url, {...init, headers, signal: AbortSignal.timeout(15000)});
+        let response = await this.fetcher(url, {
+            ...init,
+            headers,
+            signal: AbortSignal.timeout(15000),
+        });
         if (response.status === 401 && !this.token) {
             await this.authenticate(response.headers.get('www-authenticate') ?? '');
             headers.set('Authorization', `Bearer ${this.token}`);
@@ -68,13 +75,19 @@ class RegistryClient {
 
     /** Anonymous bearer token, from the challenge the registry sent back. */
     private async authenticate(challenge: string): Promise<void> {
-        const params = Object.fromEntries([...challenge.matchAll(/(\w+)="([^"]*)"/g)].map((m) => [m[1], m[2]]));
-        if (!params.realm) throw new InstallerError(`${this.repo.host} asked for authentication this installer cannot provide.`);
+        const params = Object.fromEntries(
+            [...challenge.matchAll(/(\w+)="([^"]*)"/g)].map((m) => [m[1], m[2]]),
+        );
+        if (!params.realm)
+            throw new InstallerError(
+                `${this.repo.host} asked for authentication this installer cannot provide.`,
+            );
         const url = new URL(params.realm);
         if (params.service) url.searchParams.set('service', params.service);
         url.searchParams.set('scope', params.scope ?? `repository:${this.repo.path}:pull`);
         const r = await this.fetcher(url, {signal: AbortSignal.timeout(15000)});
-        if (!r.ok) throw new InstallerError(`Could not get a pull token from ${url.host} (${r.status}).`);
+        if (!r.ok)
+            throw new InstallerError(`Could not get a pull token from ${url.host} (${r.status}).`);
         const body = (await r.json()) as { token?: string; access_token?: string };
         this.token = body.token ?? body.access_token ?? null;
     }
@@ -84,7 +97,8 @@ class RegistryClient {
         let next: string | null = '/tags/list?n=1000';
         while (next) {
             const r = await this.request(next);
-            if (!r.ok) throw new InstallerError(`Listing tags for ${this.repo.path} failed (${r.status}).`);
+            if (!r.ok)
+                throw new InstallerError(`Listing tags for ${this.repo.path} failed (${r.status}).`);
             const body = (await r.json()) as { tags?: string[] | null };
             all.push(...(body.tags ?? []));
             const link = r.headers.get('link');
@@ -95,7 +109,10 @@ class RegistryClient {
     }
 
     async digest(tag: string): Promise<string | null> {
-        const r = await this.request(`/manifests/${tag}`, {method: 'HEAD', headers: {Accept: MANIFEST_ACCEPT}});
+        const r = await this.request(`/manifests/${tag}`, {
+            method: 'HEAD',
+            headers: {Accept: MANIFEST_ACCEPT},
+        });
         if (r.status === 404) return null;
         if (!r.ok) throw new InstallerError(`Reading ${this.repo.path}:${tag} failed (${r.status}).`);
         return r.headers.get('docker-content-digest');
@@ -109,8 +126,13 @@ export interface Resolution {
     note?: string;
 }
 
-export async function resolveImage(repository: string, wanted: string, fetcher?: typeof fetch): Promise<Resolution> {
-    if (wanted.startsWith('sha256:')) return {ref: `${repository}@${wanted}`, version: wanted.slice(0, 19)};
+export async function resolveImage(
+    repository: string,
+    wanted: string,
+    fetcher?: typeof fetch,
+): Promise<Resolution> {
+    if (wanted.startsWith('sha256:'))
+        return {ref: `${repository}@${wanted}`, version: wanted.slice(0, 19)};
     if (wanted !== 'latest') return {ref: `${repository}:${wanted}`, version: wanted};
 
     const client = new RegistryClient(repository, fetcher);
@@ -118,7 +140,10 @@ export async function resolveImage(repository: string, wanted: string, fetcher?:
     let dated: string[];
     try {
         latestDigest = await client.digest('latest');
-        dated = (await client.tags()).filter((t) => DATE_TAG.test(t)).sort().reverse();
+        dated = (await client.tags())
+            .filter((t) => DATE_TAG.test(t))
+            .sort()
+            .reverse();
     } catch (error) {
         if (error instanceof InstallerError) throw error;
         throw new InstallerError(
@@ -129,7 +154,8 @@ export async function resolveImage(repository: string, wanted: string, fetcher?:
     if (!latestDigest) throw new InstallerError(`${repository} has no "latest" tag.`);
     // The newest dated tag almost always matches; look a little further for a same-day rebuild.
     for (const tag of dated.slice(0, 14)) {
-        if ((await client.digest(tag)) === latestDigest) return {ref: `${repository}:${tag}`, version: tag};
+        if ((await client.digest(tag)) === latestDigest)
+            return {ref: `${repository}:${tag}`, version: tag};
     }
     return {
         ref: `${repository}@${latestDigest}`,
@@ -138,10 +164,19 @@ export async function resolveImage(repository: string, wanted: string, fetcher?:
     };
 }
 
-export async function resolveAll(c: Config, wanted: Partial<ImageRefs> = {}, fetcher?: typeof fetch): Promise<Record<keyof ImageRefs, Resolution>> {
+export async function resolveAll(
+    c: Config,
+    wanted: Partial<ImageRefs> = {},
+    fetcher?: typeof fetch,
+): Promise<Record<keyof ImageRefs, Resolution>> {
     const which = Object.keys(IMAGE_NAMES) as (keyof ImageRefs)[];
-    const results = await Promise.all(which.map((w) => resolveImage(repositoryFor(c, w), wanted[w] ?? c.versions[w], fetcher)));
-    return Object.fromEntries(which.map((w, i) => [w, results[i]!])) as Record<keyof ImageRefs, Resolution>;
+    const results = await Promise.all(
+        which.map((w) => resolveImage(repositoryFor(c, w), wanted[w] ?? c.versions[w], fetcher)),
+    );
+    return Object.fromEntries(which.map((w, i) => [w, results[i]!])) as Record<
+        keyof ImageRefs,
+        Resolution
+    >;
 }
 
 export function refsOf(r: Record<keyof ImageRefs, Resolution>): ImageRefs {

@@ -1,0 +1,81 @@
+# Caddyfile
+*.home.jbraunsma.dev {
+        tls {
+                dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+                resolvers clyde.ns.cloudflare.com mckenzie.ns.cloudflare.com
+                propagation_delay 30s
+                propagation_timeout 10m
+        }
+
+        header {
+                Strict-Transport-Security "max-age=31536000; includeSubdomains; preload"
+                X-Content-Type-Options  "nosniff"
+                X-Frame-Options "SAMEORIGIN"
+                Referrer-Policy "strict-origin-when-cross-origin"
+                -Server
+        }
+
+        @grpc {
+                header Content-Type application/grpc*
+        }
+
+        @editor_store {
+                host editor.home.jbraunsma.dev
+                path /store /store/*
+        }
+        handle @editor_store {
+                uri strip_prefix /store
+                reverse_proxy 192.168.2.146:8889 {
+                        header_up Host                  {upstream_hostport}
+                        header_up X-Real-IP             {remote_host}
+                        header_up X-Forwarded-For       {remote_host}
+                        header_up X-Forwarded-Proto     {scheme}
+                        flush_interval                  -1
+                }
+        }
+
+        @editor_auth {
+                host editor.home.jbraunsma.dev
+                path /keycloak /keycloak/*
+        }
+        handle @editor_auth {
+                reverse_proxy 192.168.2.146:8001 {
+                        header_up Host                  {upstream_hostport}
+                        header_up X-Real-IP             {remote_host}
+                        header_up X-Forwarded-For       {remote_host}
+                        header_up X-Forwarded-Proto     {scheme}
+                        flush_interval                  -1
+                }
+        }
+
+        @editor_relay {
+                host editor.home.jbraunsma.dev
+                path /relay /relay/*
+        }
+        handle @editor_relay {
+                uri strip_prefix /relay
+                 reverse_proxy 192.168.2.146:4444 {
+                        header_up Host                  {upstream_hostport}
+                        header_up X-Real-IP             {remote_host}
+                        header_up X-Forwarded-For       {remote_host}
+                        header_up X-Forwarded-Proto     {scheme}
+                        flush_interval                  -1
+                }
+        }
+
+        @editor {
+                host editor.home.jbraunsma.dev
+                path /editor /editor/*
+        }
+        handle @editor {
+                uri strip_prefix /editor
+                reverse_proxy 192.168.2.146:8888 {
+                        header_up Host                  {upstream_hostport}
+                        header_up X-Real-IP             {remote_host}
+                        header_up X-Forwarded-For       {remote_host}
+                        header_up X-Forwarded-Proto     {scheme}
+                        flush_interval                  -1
+                }
+        }
+
+}

@@ -1,6 +1,6 @@
-import { renderToStaticMarkup } from 'react-dom/server';
-import { FileMenu } from './FileMenu';
-import { ExportMenu } from './ExportMenu';
+import {renderToStaticMarkup} from 'react-dom/server';
+import {FileMenu} from './FileMenu';
+import {ExportMenu} from './ExportMenu';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {

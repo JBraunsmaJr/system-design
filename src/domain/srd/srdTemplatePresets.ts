@@ -1,11 +1,5 @@
-import type { SrdSectionConfig, SrdTemplateConfig } from './srdTypes';
-import {
-  isFiniteNumber,
-  isPlainObject,
-  isSafeFontFamily,
-  isSafeHexColor,
-  isSrdSectionId,
-} from './srdValidation';
+import type {SrdSectionConfig, SrdTemplateConfig} from './srdTypes';
+import {isFiniteNumber, isPlainObject, isSafeFontFamily, isSafeHexColor, isSrdSectionId,} from './srdValidation';
 
 export const DEFAULT_SRD_SECTIONS: SrdSectionConfig[] = [
   {

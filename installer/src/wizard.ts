@@ -1,6 +1,6 @@
 import {existsSync} from 'node:fs';
 import {basename, join} from 'node:path';
-import {type Config, ConfigSchema, describeIssues, HOSTNAME_RE, RETENTION_RE} from './config/schema.ts';
+import {type Config, ConfigSchema, describeIssues, HOSTNAME_RE, RETENTION_RE,} from './config/schema.ts';
 import {type Draft, getPath, InstallerError, setPath} from './lib/util.ts';
 import {pc, ui} from './lib/ui.ts';
 
@@ -22,12 +22,23 @@ interface Question {
     help?: string | ((d: Draft) => string | undefined);
 }
 
-const is = (path: string, ...values: unknown[]) => (d: Draft) => values.includes(getPath(d, path));
-const all = (...preds: ((d: Draft) => boolean)[]) => (d: Draft) => preds.every((p) => p(d));
+const is =
+    (path: string, ...values: unknown[]) =>
+        (d: Draft) =>
+            values.includes(getPath(d, path));
+const all =
+    (...preds: ((d: Draft) => boolean)[]) =>
+        (d: Draft) =>
+            preds.every((p) => p(d));
 
-const host = (v: string) => (HOSTNAME_RE.test(v) ? undefined : 'Enter a hostname like design.example.com');
-const hostOrIp = (v: string) => (HOSTNAME_RE.test(v) || /^(\d{1,3}\.){3}\d{1,3}$/.test(v) ? undefined : 'Enter a hostname or IPv4 address');
-const emailish = (v: string) => (!v || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v) ? undefined : 'Enter an email address');
+const host = (v: string) =>
+    HOSTNAME_RE.test(v) ? undefined : 'Enter a hostname like design.example.com';
+const hostOrIp = (v: string) =>
+    HOSTNAME_RE.test(v) || /^(\d{1,3}\.){3}\d{1,3}$/.test(v)
+        ? undefined
+        : 'Enter a hostname or IPv4 address';
+const emailish = (v: string) =>
+    !v || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v) ? undefined : 'Enter an email address';
 const url = (v: string) => {
     try {
         new URL(v);
@@ -48,7 +59,7 @@ export function questions(dir: string): Question[] {
             kind: 'text',
             message: 'Public hostname',
             validate: host,
-            help: 'The name people type into the browser. DNS for it should point at this server (or at Cloudflare).'
+            help: 'The name people type into the browser. DNS for it should point at this server (or at Cloudflare).',
         },
         {
             section: 'Site',
@@ -68,7 +79,7 @@ export function questions(dir: string): Question[] {
             message: 'Store hostname',
             when: is('routing.mode', 'subdomain'),
             default: (d: Draft) => `store.${d.domain}`,
-            validate: host
+            validate: host,
         },
         {
             section: 'Site',
@@ -77,30 +88,41 @@ export function questions(dir: string): Question[] {
             message: 'Relay hostname',
             when: is('routing.mode', 'subdomain'),
             default: (d: Draft) => `relay.${d.domain}`,
-            validate: host
+            validate: host,
         },
         {
-            section: 'Site', path: 'project', kind: 'text', message: 'Compose project name',
-            default: () => basename(dir).toLowerCase().replace(/[^a-z0-9_-]/g, '-').replace(/^[^a-z0-9]+/, '') || 'system-design',
+            section: 'Site',
+            path: 'project',
+            kind: 'text',
+            message: 'Compose project name',
+            default: () =>
+                basename(dir)
+                    .toLowerCase()
+                    .replace(/[^a-z0-9_-]/g, '-')
+                    .replace(/^[^a-z0-9]+/, '') || 'system-design',
             help: 'Volume names derive from this. When adopting an existing setup, keep the name it already uses so its data is found.',
-            validate: (v) => (/^[a-z0-9][a-z0-9_-]*$/.test(v) ? undefined : 'lowercase letters, digits, - and _'),
+            validate: (v) =>
+                /^[a-z0-9][a-z0-9_-]*$/.test(v) ? undefined : 'lowercase letters, digits, - and _',
         },
 
         // ---------------------------------------------------------------- proxy
         {
-            section: 'Reverse proxy', path: 'proxy.type', kind: 'select', message: 'What terminates HTTPS?',
+            section: 'Reverse proxy',
+            path: 'proxy.type',
+            kind: 'select',
+            message: 'What terminates HTTPS?',
             options: [
                 {value: 'caddy', label: 'Caddy, run here', hint: 'automatic certificates'},
                 {value: 'nginx', label: 'nginx, run here', hint: 'certbot, or certificates you provide'},
                 {
                     value: 'cloudflare-tunnel',
                     label: 'Cloudflare Tunnel',
-                    hint: 'no inbound ports; Cloudflare holds the certificate'
+                    hint: 'no inbound ports; Cloudflare holds the certificate',
                 },
                 {
                     value: 'external',
                     label: 'A proxy I already run elsewhere',
-                    hint: 'services publish ports; snippets are generated'
+                    hint: 'services publish ports; snippets are generated',
                 },
             ],
         },
@@ -112,24 +134,45 @@ export function questions(dir: string): Question[] {
             when: is('proxy.type', 'caddy'),
             default: 'http',
             options: [
-                {value: 'http', label: 'HTTP challenge', hint: 'ports 80 and 443 reachable from the internet'},
+                {
+                    value: 'http',
+                    label: 'HTTP challenge',
+                    hint: 'ports 80 and 443 reachable from the internet',
+                },
                 {
                     value: 'cloudflare-dns',
                     label: 'Cloudflare DNS challenge',
-                    hint: 'works on private networks; needs an API token'
+                    hint: 'works on private networks; needs an API token',
                 },
             ],
         },
         {
             section: 'Reverse proxy',
+            path: 'proxy.shared',
+            kind: 'confirm',
+            message: 'Will this Caddy also serve other sites of yours?',
+            when: is('proxy.type', 'caddy'),
+            default: false,
+            help: 'Yes: caddy/Caddyfile becomes yours to edit, and the installer only maintains caddy/system-design.caddy, which your site block imports. Lets one Caddy (and one wildcard certificate) serve everything on this host.',
+        },
+        {
+            section: 'Reverse proxy',
             path: 'proxy.tls',
             kind: 'select',
-            message: 'Where do nginx\'s certificates come from?',
+            message: "Where do nginx's certificates come from?",
             when: is('proxy.type', 'nginx'),
             default: 'certbot-http',
             options: [
-                {value: 'certbot-http', label: "Let's Encrypt, HTTP challenge", hint: 'port 80 reachable'},
-                {value: 'certbot-cloudflare', label: "Let's Encrypt, Cloudflare DNS", hint: 'needs an API token'},
+                {
+                    value: 'certbot-http',
+                    label: "Let's Encrypt, HTTP challenge",
+                    hint: 'port 80 reachable',
+                },
+                {
+                    value: 'certbot-cloudflare',
+                    label: "Let's Encrypt, Cloudflare DNS",
+                    hint: 'needs an API token',
+                },
                 {value: 'provided', label: 'I have certificate files'},
             ],
         },
@@ -139,12 +182,18 @@ export function questions(dir: string): Question[] {
             kind: 'text',
             message: 'Email for certificate expiry notices (optional)',
             optional: true,
-            when: (d) => is('proxy.type', 'caddy')(d) || (is('proxy.type', 'nginx')(d) && getPath(d, 'proxy.tls') !== 'provided'),
-            validate: emailish
+            when: (d) =>
+                is('proxy.type', 'caddy')(d) ||
+                (is('proxy.type', 'nginx')(d) && getPath(d, 'proxy.tls') !== 'provided'),
+            validate: emailish,
         },
         {
-            section: 'Reverse proxy', path: 'proxy.cloudflareApiToken', kind: 'secret', message: 'Cloudflare API token',
-            when: (d) => is('proxy.acme', 'cloudflare-dns')(d) || is('proxy.tls', 'certbot-cloudflare')(d),
+            section: 'Reverse proxy',
+            path: 'proxy.cloudflareApiToken',
+            kind: 'secret',
+            message: 'Cloudflare API token',
+            when: (d) =>
+                is('proxy.acme', 'cloudflare-dns')(d) || is('proxy.tls', 'certbot-cloudflare')(d),
             help: 'Create one at dash.cloudflare.com → My Profile → API Tokens with Zone:DNS:Edit on this zone.',
         },
         {
@@ -152,14 +201,14 @@ export function questions(dir: string): Question[] {
             path: 'proxy.certPath',
             kind: 'text',
             message: 'Host path to the certificate chain (fullchain.pem)',
-            when: is('proxy.tls', 'provided')
+            when: is('proxy.tls', 'provided'),
         },
         {
             section: 'Reverse proxy',
             path: 'proxy.keyPath',
             kind: 'text',
             message: 'Host path to the private key',
-            when: is('proxy.tls', 'provided')
+            when: is('proxy.tls', 'provided'),
         },
         {
             section: 'Reverse proxy',
@@ -184,16 +233,47 @@ export function questions(dir: string): Question[] {
             kind: 'text',
             message: 'Interface to publish service ports on',
             when: is('proxy.type', 'external'),
-            default: (d: Draft) => (/^(\d{1,3}\.){3}\d{1,3}$/.test(String(getPath(d, 'proxy.upstreamHost'))) ? getPath(d, 'proxy.upstreamHost') : '0.0.0.0'),
+            default: (d: Draft) =>
+                /^(\d{1,3}\.){3}\d{1,3}$/.test(String(getPath(d, 'proxy.upstreamHost')))
+                    ? getPath(d, 'proxy.upstreamHost')
+                    : '0.0.0.0',
             help: 'Binding to one address keeps the ports off other networks. 0.0.0.0 means every interface.',
+        },
+
+        {
+            section: 'Reverse proxy',
+            path: 'ddns.enabled',
+            kind: 'confirm',
+            message: "Keep Cloudflare DNS pointed at this server's public IP (dynamic DNS)?",
+            when: is('proxy.type', 'caddy', 'nginx'),
+            default: false,
+            help: 'For connections whose address changes, such as home internet. The records must be in a Cloudflare zone.',
+        },
+        {
+            section: 'Reverse proxy',
+            path: 'ddns.cloudflareApiToken',
+            kind: 'secret',
+            message: 'Cloudflare API token for dynamic DNS',
+            when: (d) =>
+                getPath(d, 'ddns.enabled') === true &&
+                !is('proxy.acme', 'cloudflare-dns')(d) &&
+                !is('proxy.tls', 'certbot-cloudflare')(d),
+            help: 'Zone:DNS:Edit on the zone holding these records.',
         },
 
         // ---------------------------------------------------------------- identity
         {
-            section: 'Sign-in', path: 'identity.type', kind: 'select', message: 'Who signs people in?',
+            section: 'Sign-in',
+            path: 'identity.type',
+            kind: 'select',
+            message: 'Who signs people in?',
             options: [
                 {value: 'keycloak', label: 'Keycloak, run here'},
-                {value: 'oidc', label: 'An existing OIDC provider', hint: 'Entra ID, Okta, Auth0, GitLab, Google…'},
+                {
+                    value: 'oidc',
+                    label: 'An existing OIDC provider',
+                    hint: 'Entra ID, Okta, Auth0, GitLab, Google…',
+                },
                 {value: 'github', label: 'GitHub'},
             ],
         },
@@ -204,7 +284,7 @@ export function questions(dir: string): Question[] {
             message: 'Keycloak hostname',
             when: all(is('routing.mode', 'subdomain'), is('identity.type', 'keycloak')),
             default: (d: Draft) => `auth.${d.domain}`,
-            validate: host
+            validate: host,
         },
         {
             section: 'Sign-in',
@@ -214,7 +294,7 @@ export function questions(dir: string): Question[] {
             optional: true,
             when: is('identity.type', 'keycloak'),
             default: [],
-            help: 'Group membership can grant workspace access automatically.'
+            help: 'Group membership can grant workspace access automatically.',
         },
         {
             section: 'Sign-in',
@@ -223,7 +303,7 @@ export function questions(dir: string): Question[] {
             message: 'Create a first user account now?',
             when: is('identity.type', 'keycloak'),
             default: () => ui.interactive,
-            help: 'They get a temporary password and are made a store administrator.'
+            help: 'They get a temporary password and are made a store administrator.',
         },
         {
             section: 'Sign-in',
@@ -231,7 +311,8 @@ export function questions(dir: string): Question[] {
             kind: 'text',
             message: 'Username',
             when: all(is('identity.type', 'keycloak'), is('identity.createUser', true)),
-            validate: (v) => (/^[a-zA-Z0-9._@-]{1,64}$/.test(v) ? undefined : 'letters, digits, . _ @ - only')
+            validate: (v) =>
+                /^[a-zA-Z0-9._@-]{1,64}$/.test(v) ? undefined : 'letters, digits, . _ @ - only',
         },
         {
             section: 'Sign-in',
@@ -239,7 +320,8 @@ export function questions(dir: string): Question[] {
             kind: 'text',
             message: 'Their email',
             when: all(is('identity.type', 'keycloak'), is('identity.createUser', true)),
-            validate: (v) => (v ? emailish(v) : 'Required: Keycloak asks users without one to complete their profile')
+            validate: (v) =>
+                v ? emailish(v) : 'Required: Keycloak asks users without one to complete their profile',
         },
         {
             section: 'Sign-in',
@@ -248,7 +330,11 @@ export function questions(dir: string): Question[] {
             message: 'Their groups (comma separated, optional)',
             optional: true,
             default: [],
-            when: all(is('identity.type', 'keycloak'), is('identity.createUser', true), (d) => ((getPath(d, 'identity.groups') as unknown[]) ?? []).length > 0)
+            when: all(
+                is('identity.type', 'keycloak'),
+                is('identity.createUser', true),
+                (d) => ((getPath(d, 'identity.groups') as unknown[]) ?? []).length > 0,
+            ),
         },
         {
             section: 'Sign-in',
@@ -257,7 +343,8 @@ export function questions(dir: string): Question[] {
             message: 'Issuer URL (serves /.well-known/openid-configuration)',
             when: is('identity.type', 'oidc'),
             validate: url,
-            help: (d) => `Register a confidential client with redirect URI ${pc.bold(`${storeUrlOf(d)}/v1/auth/callback`)}`
+            help: (d) =>
+                `Register a confidential client with redirect URI ${pc.bold(`${storeUrlOf(d)}/v1/auth/callback`)}`,
         },
         {
             section: 'Sign-in',
@@ -265,7 +352,8 @@ export function questions(dir: string): Question[] {
             kind: 'text',
             message: 'Client id',
             when: is('identity.type', 'oidc', 'github'),
-            default: (d: Draft) => (getPath(d, 'identity.type') === 'oidc' ? 'system-design-store' : undefined)
+            default: (d: Draft) =>
+                getPath(d, 'identity.type') === 'oidc' ? 'system-design-store' : undefined,
         },
         {
             section: 'Sign-in',
@@ -273,7 +361,10 @@ export function questions(dir: string): Question[] {
             kind: 'secret',
             message: 'Client secret',
             when: is('identity.type', 'oidc', 'github'),
-            help: (d) => (getPath(d, 'identity.type') === 'github' ? `GitHub → Settings → Developer settings → OAuth Apps. Callback URL: ${pc.bold(`${storeUrlOf(d)}/v1/auth/callback`)}` : undefined)
+            help: (d) =>
+                getPath(d, 'identity.type') === 'github'
+                    ? `GitHub → Settings → Developer settings → OAuth Apps. Callback URL: ${pc.bold(`${storeUrlOf(d)}/v1/auth/callback`)}`
+                    : undefined,
         },
         {
             section: 'Sign-in',
@@ -282,7 +373,7 @@ export function questions(dir: string): Question[] {
             message: 'Address the store uses to reach the provider, if different (optional)',
             optional: true,
             when: is('identity.type', 'oidc'),
-            validate: (v) => (v ? url(v) : undefined)
+            validate: (v) => (v ? url(v) : undefined),
         },
 
         // ---------------------------------------------------------------- turn
@@ -292,7 +383,12 @@ export function questions(dir: string): Question[] {
             kind: 'select',
             message: 'TURN server for peers behind strict NATs?',
             default: 'none',
-            help: (d) => (getPath(d, 'proxy.type') === 'cloudflare-tunnel' ? pc.yellow('Cloudflare Tunnel cannot carry TURN (UDP). A bundled TURN server needs its own DNS-only record and open ports.') : 'Peers on the same network, or behind ordinary home routers, connect without one.'),
+            help: (d) =>
+                getPath(d, 'proxy.type') === 'cloudflare-tunnel'
+                    ? pc.yellow(
+                        'Cloudflare Tunnel cannot carry TURN (UDP). A bundled TURN server needs its own DNS-only record and open ports.',
+                    )
+                    : 'Peers on the same network, or behind ordinary home routers, connect without one.',
             options: [
                 {value: 'none', label: 'None'},
                 {value: 'bundled', label: 'Run coturn here', hint: 'opens 3478 and a UDP range'},
@@ -307,7 +403,7 @@ export function questions(dir: string): Question[] {
             when: is('turn.type', 'bundled'),
             default: (d: Draft) => d.domain,
             validate: hostOrIp,
-            help: 'If DNS goes through Cloudflare, this record must be DNS-only (grey cloud).'
+            help: 'If DNS goes through Cloudflare, this record must be DNS-only (grey cloud).',
         },
         {
             section: 'Collaboration',
@@ -315,7 +411,7 @@ export function questions(dir: string): Question[] {
             kind: 'text',
             message: 'Public IP, if this server is behind NAT (optional; public/private for 1:1 NAT)',
             optional: true,
-            when: is('turn.type', 'bundled')
+            when: is('turn.type', 'bundled'),
         },
         {
             section: 'Collaboration',
@@ -324,14 +420,14 @@ export function questions(dir: string): Question[] {
             message: 'Stop TURN relaying into private address ranges?',
             when: is('turn.type', 'bundled'),
             default: true,
-            help: 'Recommended: otherwise anyone with the credential can use TURN to reach your LAN.'
+            help: 'Recommended: otherwise anyone with the credential can use TURN to reach your LAN.',
         },
         {
             section: 'Collaboration',
             path: 'turn.iceServers',
             kind: 'text',
             message: 'ICE servers (url|user|pass, comma separated)',
-            when: is('turn.type', 'external')
+            when: is('turn.type', 'external'),
         },
 
         // ---------------------------------------------------------------- recovery
@@ -346,12 +442,12 @@ export function questions(dir: string): Question[] {
                 {
                     value: 'generate',
                     label: 'Generate a new key pair now',
-                    hint: 'you will move the private half off this server'
+                    hint: 'you will move the private half off this server',
                 },
                 {
                     value: 'existing',
                     label: 'Use a public key I already have',
-                    hint: keysExist ? 'keys/recovery-public.pem is present' : undefined
+                    hint: keysExist ? 'keys/recovery-public.pem is present' : undefined,
                 },
             ],
         },
@@ -361,7 +457,7 @@ export function questions(dir: string): Question[] {
             kind: 'text',
             message: 'Path to the public key (PEM)',
             when: is('recovery.mode', 'existing'),
-            default: keysExist ? join(dir, 'keys', 'recovery-public.pem') : undefined
+            default: keysExist ? join(dir, 'keys', 'recovery-public.pem') : undefined,
         },
 
         // ---------------------------------------------------------------- policy
@@ -371,8 +467,9 @@ export function questions(dir: string): Question[] {
             kind: 'text',
             message: 'How long deleted documents stay restorable',
             default: '30d',
-            validate: (v) => (RETENTION_RE.test(v) ? undefined : 'immediate, indefinite, or e.g. 30d, 12w, 6m, 7y'),
-            help: 'Set what your records schedule requires before the first document is stored; changes only affect later deletions.'
+            validate: (v) =>
+                RETENTION_RE.test(v) ? undefined : 'immediate, indefinite, or e.g. 30d, 12w, 6m, 7y',
+            help: 'Set what your records schedule requires before the first document is stored; changes only affect later deletions.',
         },
         {
             section: 'Policy',
@@ -380,14 +477,16 @@ export function questions(dir: string): Question[] {
             kind: 'confirm',
             message: 'Only let signed-in members join collaboration sessions?',
             default: true,
-            help: 'Without this, anyone who can reach the relay and knows a room name can join.'
+            help: 'Without this, anyone who can reach the relay and knows a room name can join.',
         },
     ];
 }
 
 function storeUrlOf(d: Draft): string {
     const domain = String(d.domain ?? 'example.com');
-    return getPath(d, 'routing.mode') === 'subdomain' ? `https://${getPath(d, 'routing.hosts.store') ?? `store.${domain}`}` : `https://${domain}/store`;
+    return getPath(d, 'routing.mode') === 'subdomain'
+        ? `https://${getPath(d, 'routing.hosts.store') ?? `store.${domain}`}`
+        : `https://${domain}/store`;
 }
 
 /** Wizard-only keys that are not part of the configuration. */
@@ -398,17 +497,26 @@ const WIZARD_ONLY = ['identity.createUser'];
  * manifest or a previous install) is not asked again. Returns a validated
  * configuration.
  */
-export async function runWizard(draft: Draft, dir: string, opts: { reask?: boolean } = {}): Promise<Config> {
+export async function runWizard(
+    draft: Draft,
+    dir: string,
+    opts: { reask?: boolean } = {},
+): Promise<Config> {
     const d = structuredClone(draft);
     // A manifest that names an initial user implies the wizard's "create one?" question.
-    if (getPath(d, 'identity.initialUser') !== undefined && getPath(d, 'identity.createUser') === undefined) setPath(d, 'identity.createUser', true);
+    if (
+        getPath(d, 'identity.initialUser') !== undefined &&
+        getPath(d, 'identity.createUser') === undefined
+    )
+        setPath(d, 'identity.createUser', true);
 
     const missing: string[] = [];
     let lastSection = '';
     for (const q of questions(dir)) {
         if (q.when && !q.when(d)) continue;
         const present = getPath(d, q.path);
-        const def = typeof q.default === 'function' ? (q.default as (d: Draft) => unknown)(d) : q.default;
+        const def =
+            typeof q.default === 'function' ? (q.default as (d: Draft) => unknown)(d) : q.default;
         if (present !== undefined && !(opts.reask && ui.interactive && q.kind !== 'secret')) continue;
 
         if (!ui.interactive) {
@@ -435,7 +543,8 @@ export async function runWizard(draft: Draft, dir: string, opts: { reask?: boole
     }
 
     const identity = d.identity as Draft | undefined;
-    if (identity && (identity.createUser === false || identity.type !== 'keycloak')) delete identity.initialUser;
+    if (identity && (identity.createUser === false || identity.type !== 'keycloak'))
+        delete identity.initialUser;
     for (const key of WIZARD_ONLY) {
         const parts = key.split('.');
         const parent = getPath(d, parts.slice(0, -1).join('.')) as Draft | undefined;
@@ -443,7 +552,8 @@ export async function runWizard(draft: Draft, dir: string, opts: { reask?: boole
     }
 
     const parsed = ConfigSchema.safeParse(d);
-    if (!parsed.success) throw new InstallerError(`The configuration is not valid:\n${describeIssues(parsed.error)}`);
+    if (!parsed.success)
+        throw new InstallerError(`The configuration is not valid:\n${describeIssues(parsed.error)}`);
     return parsed.data;
 }
 
@@ -460,15 +570,22 @@ async function ask(q: Question, initial: unknown, d: Draft): Promise<unknown> {
         case 'list': {
             const v = await ui.text({
                 message: q.message,
-                defaultValue: Array.isArray(initial) ? initial.join(', ') : undefined
+                defaultValue: Array.isArray(initial) ? initial.join(', ') : undefined,
             });
-            return v.split(',').map((s) => s.trim()).filter(Boolean);
+            return v
+                .split(',')
+                .map((s) => s.trim())
+                .filter(Boolean);
         }
         case 'confirm':
             return ui.confirm(q.message, initial === undefined ? true : Boolean(initial));
         case 'select': {
             const options = typeof q.options === 'function' ? q.options(d) : q.options!;
-            return ui.select({message: q.message, options, initialValue: (initial as string) ?? options[0]!.value});
+            return ui.select({
+                message: q.message,
+                options,
+                initialValue: (initial as string) ?? options[0]!.value,
+            });
         }
         case 'secret':
             return ui.password({message: q.message});
@@ -479,7 +596,12 @@ async function ask(q: Question, initial: unknown, d: Draft): Promise<unknown> {
 export function summarize(c: Config): string {
     const lines = [
         `${pc.dim('domain')}      ${c.domain} (${c.routing.mode === 'path' ? 'paths' : 'subdomains'})`,
-        `${pc.dim('proxy')}       ${c.proxy.type}${c.proxy.type === 'caddy' ? `, ${c.proxy.acme} challenge` : c.proxy.type === 'nginx' ? `, ${c.proxy.tls}` : c.proxy.type === 'external' ? ` → ${c.proxy.upstreamHost}` : ''}`,
+        `${pc.dim('proxy')}       ${c.proxy.type}${c.proxy.type === 'caddy' ? `${c.proxy.shared ? ', shared Caddyfile' : ''}${c.proxy.replaces.length ? `, replacing ${c.proxy.replaces.join(', ')}` : ''}, ${c.proxy.acme} challenge${c.proxy.acme === 'cloudflare-dns' ? (c.proxy.build ? ', built here' : `, ${c.images.caddyCloudflare}`) : ''}` : c.proxy.type === 'nginx' ? `, ${c.proxy.tls}` : c.proxy.type === 'external' ? ` → ${c.proxy.upstreamHost}` : ''}`,
+        ...(c.ddns.enabled
+            ? [
+                `${pc.dim('ddns')}        Cloudflare${c.ddns.domains.length ? `: ${c.ddns.domains.join(', ')}` : ', every public hostname'}`,
+            ]
+            : []),
         `${pc.dim('sign-in')}     ${c.identity.type}${c.identity.type === 'keycloak' && c.identity.initialUser ? `, first user ${c.identity.initialUser.username}` : ''}`,
         `${pc.dim('turn')}        ${c.turn.type}${c.turn.type === 'bundled' ? ` at ${c.turn.host}` : ''}`,
         `${pc.dim('recovery')}    ${c.recovery.mode === 'generate' ? 'generate a new key pair' : c.recovery.publicKeyPath}`,

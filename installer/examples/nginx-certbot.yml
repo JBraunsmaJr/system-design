@@ -22,4 +22,4 @@ recovery:
   mode: existing
   publicKeyPath: /run/secrets/recovery-public.pem
 versions:
-  store: 2026-10-03      # pinned; editor and relay follow latest
+  store: 2026-10-03 # pinned; editor and relay follow latest

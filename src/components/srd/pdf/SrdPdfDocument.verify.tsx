@@ -3,21 +3,16 @@
  *
  * Run with: npx tsx --tsconfig tsconfig.app.json src/components/srd/pdf/SrdPdfDocument.verify.tsx
  */
-import { pdf } from '@react-pdf/renderer';
-import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
-import { SrdPdfDocument } from './SrdPdfDocument';
-import {
-  SRD_PDF_FONT_FILES,
-  registerSrdPdfFonts,
-  resolvePdfFontFamily,
-  pdfMonoFamily,
-} from './srdPdfFonts';
-import { parseMarkdown } from './srdPdfMarkdownTree';
-import { stripSoftHyphens } from './srdPdfText';
-import { aggregateSrdData } from '../../../domain/srd/srdDataAggregator';
-import { DEFAULT_SNAPSHOT } from '../../../app/documentSnapshot';
-import { DEFAULT_SRD_TEMPLATE } from '../../../domain/srd/srdTemplatePresets';
-import type { SrdDataContext, SrdTemplateConfig } from '../../../domain/srd/srdTypes';
+import {pdf} from '@react-pdf/renderer';
+import {getDocument} from 'pdfjs-dist/legacy/build/pdf.mjs';
+import {SrdPdfDocument} from './SrdPdfDocument';
+import {pdfMonoFamily, registerSrdPdfFonts, resolvePdfFontFamily, SRD_PDF_FONT_FILES,} from './srdPdfFonts';
+import {parseMarkdown} from './srdPdfMarkdownTree';
+import {stripSoftHyphens} from './srdPdfText';
+import {aggregateSrdData} from '../../../domain/srd/srdDataAggregator';
+import {DEFAULT_SNAPSHOT} from '../../../app/documentSnapshot';
+import {DEFAULT_SRD_TEMPLATE} from '../../../domain/srd/srdTemplatePresets';
+import type {SrdDataContext, SrdTemplateConfig} from '../../../domain/srd/srdTypes';
 
 /** pdf.js splits letter-spaced and nested text into separately spaced
  * runs; comparing without whitespace tests the content, not the spacing. */

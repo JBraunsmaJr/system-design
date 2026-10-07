@@ -1,4 +1,4 @@
-import {chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
+import {chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync,} from 'node:fs';
 import {dirname, join} from 'node:path';
 import {createTwoFilesPatch} from 'diff';
 import type {RenderedFile} from './render/index.ts';
@@ -28,6 +28,11 @@ export function planFiles(dir: string, files: RenderedFile[], state: State): Pla
     const wanted = new Set(files.map((f) => f.path));
     for (const file of files) {
         const abs = join(dir, file.path);
+        if (file.seed) {
+            // Operator-owned once it exists: never compared, never tracked.
+            if (!existsSync(abs)) plan.push({path: file.path, status: 'new', file});
+            continue;
+        }
         if (!existsSync(abs)) {
             plan.push({path: file.path, status: 'new', file});
             continue;
@@ -74,11 +79,27 @@ export function diffFor(p: PlannedFile): string {
     const before = p.existing ?? '';
     const after = p.file?.content ?? '';
     const mask = p.file?.secret ? maskSecrets : (s: string) => s;
-    const patch = createTwoFilesPatch(`a/${p.path}`, `b/${p.path}`, mask(before), mask(after), '', '', {context: 2});
+    const patch = createTwoFilesPatch(
+        `a/${p.path}`,
+        `b/${p.path}`,
+        mask(before),
+        mask(after),
+        '',
+        '',
+        {context: 2},
+    );
     return patch
         .split('\n')
         .slice(2) // drop the "===" banner and blank line createTwoFilesPatch adds
-        .map((l) => (l.startsWith('+') ? pc.green(l) : l.startsWith('-') ? pc.red(l) : l.startsWith('@@') ? pc.cyan(l) : l))
+        .map((l) =>
+            l.startsWith('+')
+                ? pc.green(l)
+                : l.startsWith('-')
+                    ? pc.red(l)
+                    : l.startsWith('@@')
+                        ? pc.cyan(l)
+                        : l,
+        )
         .join('\n');
 }
 
@@ -95,12 +116,17 @@ export function showPlan(plan: PlannedFile[], opts: { diffs: boolean }): void {
  * (keeping a copy); non-interactive without --force, refuses rather than
  * guessing which version is right.
  */
-export async function resolveConflicts(plan: PlannedFile[], opts: { force: boolean }): Promise<void> {
+export async function resolveConflicts(
+    plan: PlannedFile[],
+    opts: { force: boolean },
+): Promise<void> {
     const conflicts = plan.filter((p) => p.status === 'conflict' && !p.decision);
     if (!conflicts.length) return;
     if (opts.force) {
         for (const p of conflicts) p.decision = 'overwrite';
-        ui.warn(`Overwriting ${conflicts.length} hand-edited file(s) because of --force; copies are kept under ${STATE_DIR}/replaced/.`);
+        ui.warn(
+            `Overwriting ${conflicts.length} hand-edited file(s) because of --force; copies are kept under ${STATE_DIR}/replaced/.`,
+        );
         return;
     }
     if (!ui.interactive) {
@@ -114,7 +140,11 @@ export async function resolveConflicts(plan: PlannedFile[], opts: { force: boole
         p.decision = await ui.select<'overwrite' | 'keep'>({
             message: `What should happen to ${p.path}?`,
             options: [
-                {value: 'overwrite', label: 'Replace it', hint: `your version is copied to ${STATE_DIR}/replaced/`},
+                {
+                    value: 'overwrite',
+                    label: 'Replace it',
+                    hint: `your version is copied to ${STATE_DIR}/replaced/`,
+                },
                 {value: 'keep', label: 'Keep my version', hint: 'the installer will ask again next time'},
             ],
             initialValue: 'overwrite',
@@ -162,7 +192,7 @@ export function applyPlan(dir: string, plan: PlannedFile[], state: State): Apply
         writeFileSync(abs, p.file.content, {mode: p.file.mode ?? 0o644});
         // writeFileSync's mode only applies on creation.
         chmodSync(abs, p.file.mode ?? 0o644);
-        state.files[p.path] = sha256(p.file.content);
+        if (!p.file.seed) state.files[p.path] = sha256(p.file.content);
         result.written.push(p.path);
     }
     return result;

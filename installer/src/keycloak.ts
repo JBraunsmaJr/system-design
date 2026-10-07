@@ -17,7 +17,8 @@ export class KeycloakAdmin {
     private readonly relativePath: string;
 
     constructor(compose: Compose, c: Config, d: Derived) {
-        if (c.identity.type !== 'keycloak' || !d.keycloak) throw new Error('Keycloak is not configured');
+        if (c.identity.type !== 'keycloak' || !d.keycloak)
+            throw new Error('Keycloak is not configured');
         this.compose = compose;
         this.realm = c.identity.realm;
         this.relativePath = d.keycloak.relativePath === '/' ? '' : d.keycloak.relativePath;
@@ -32,10 +33,8 @@ export class KeycloakAdmin {
             'kc() { "$K" "$@" --config "$C"; }',
         ].join('\n');
         const r = await this.compose.exec('keycloak', ['bash', '-c', `${prelude}\n${script}`], {
-            env: {
-                ...env,
-                R: this.realm
-            }, allowFail: true
+            env: {...env, R: this.realm},
+            allowFail: true,
         });
         if (r.code !== 0) {
             const detail = (r.stderr || r.stdout).trim().split('\n').slice(-5).join('\n');
@@ -54,13 +53,28 @@ export class KeycloakAdmin {
     async reconcileClient(clientId: string, d: Derived): Promise<string[]> {
         const origins = [...new Set([new URL(d.editorUrl).origin, new URL(d.storeUrl).origin])];
         const redirect = `${d.storeUrl}/v1/auth/callback`;
-        const out = await this.kc('kc get clients -r "$R" -q clientId="$CID" --fields id,redirectUris,webOrigins', {CID: clientId});
-        const clients = JSON.parse(out || '[]') as { id: string; redirectUris?: string[]; webOrigins?: string[] }[];
+        const out = await this.kc(
+            'kc get clients -r "$R" -q clientId="$CID" --fields id,redirectUris,webOrigins',
+            {CID: clientId},
+        );
+        const clients = JSON.parse(out || '[]') as {
+            id: string;
+            redirectUris?: string[];
+            webOrigins?: string[];
+        }[];
         const client = clients[0];
-        if (!client) throw new InstallerError(`Keycloak realm "${this.realm}" has no client "${clientId}".`, 'Was the realm created by hand under a different client id?');
+        if (!client)
+            throw new InstallerError(
+                `Keycloak realm "${this.realm}" has no client "${clientId}".`,
+                'Was the realm created by hand under a different client id?',
+            );
         const changes: string[] = [];
-        if (JSON.stringify(client.redirectUris ?? []) !== JSON.stringify([redirect])) changes.push('redirect URI');
-        if (JSON.stringify([...(client.webOrigins ?? [])].sort()) !== JSON.stringify([...origins].sort())) changes.push('web origins');
+        if (JSON.stringify(client.redirectUris ?? []) !== JSON.stringify([redirect]))
+            changes.push('redirect URI');
+        if (
+            JSON.stringify([...(client.webOrigins ?? [])].sort()) !== JSON.stringify([...origins].sort())
+        )
+            changes.push('web origins');
         // The secret is always re-applied: cheap, and the only way to know it matches.
         await this.kc(
             'kc update "clients/$ID" -r "$R" -s "redirectUris=$REDIRECTS" -s "webOrigins=$ORIGINS" -s "secret=$OIDC_CLIENT_SECRET"',
@@ -72,7 +86,7 @@ export class KeycloakAdmin {
     async ensureGroups(groups: string[]): Promise<string[]> {
         if (!groups.length) return [];
         const existing = JSON.parse((await this.kc('kc get groups -r "$R" --fields name')) || '[]') as {
-            name: string
+            name: string;
         }[];
         const have = new Set(existing.map((g) => g.name));
         const created: string[] = [];
@@ -85,7 +99,10 @@ export class KeycloakAdmin {
     }
 
     async findUserId(username: string): Promise<string | null> {
-        const out = await this.kc('kc get users -r "$R" -q username="$U" -q exact=true --fields id,username', {U: username});
+        const out = await this.kc(
+            'kc get users -r "$R" -q username="$U" -q exact=true --fields id,username',
+            {U: username},
+        );
         const users = JSON.parse(out || '[]') as { id: string }[];
         return users[0]?.id ?? null;
     }
@@ -100,7 +117,7 @@ export class KeycloakAdmin {
         email: string;
         firstName?: string;
         lastName?: string;
-        groups: string[]
+        groups: string[];
     }): Promise<{ id: string; password: string | null }> {
         const existing = await this.findUserId(u.username);
         if (existing) return {id: existing, password: null};
@@ -114,19 +131,21 @@ export class KeycloakAdmin {
                 {U: u.username, E: u.email, FN: u.firstName ?? u.username, LN: u.lastName ?? '-'},
             )
         ).trim();
-        await this.kc('kc set-password -r "$R" --userid "$ID" --new-password "$P" --temporary', {ID: id, P: password});
+        await this.kc('kc set-password -r "$R" --userid "$ID" --new-password "$P" --temporary', {
+            ID: id,
+            P: password,
+        });
         if (u.groups.length) {
-            const groups = JSON.parse((await this.kc('kc get groups -r "$R" --fields id,name')) || '[]') as {
-                id: string;
-                name: string
-            }[];
+            const groups = JSON.parse(
+                (await this.kc('kc get groups -r "$R" --fields id,name')) || '[]',
+            ) as { id: string; name: string }[];
             for (const name of u.groups) {
                 const g = groups.find((x) => x.name === name);
                 if (!g) continue;
-                await this.kc('kc update "users/$ID/groups/$GID" -r "$R" -s "realm=$R" -s "userId=$ID" -s "groupId=$GID" -n', {
-                    ID: id,
-                    GID: g.id
-                });
+                await this.kc(
+                    'kc update "users/$ID/groups/$GID" -r "$R" -s "realm=$R" -s "userId=$ID" -s "groupId=$GID" -n',
+                    {ID: id, GID: g.id},
+                );
             }
         }
         return {id, password};

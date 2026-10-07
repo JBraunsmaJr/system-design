@@ -6,12 +6,13 @@ import {
     doctor,
     install,
     promoteAdmin,
+    proxyReload,
     reconfigure,
     render,
     restore,
     rollback,
     status,
-    upgrade
+    upgrade,
 } from './commands.ts';
 import {type Ctx, INSTALLER_VERSION} from './deploy.ts';
 import {InstallerError} from './lib/util.ts';
@@ -37,6 +38,7 @@ ${pc.bold('Commands')}
   ${pc.cyan('restore')} <id>     Put a backup's configuration back  (--with-data for databases too)
   ${pc.cyan('rollback')}         Undo the last install/upgrade/reconfigure
   ${pc.cyan('promote-admin')}    Add a store administrator (--username, or --subject issuer#sub)
+  ${pc.cyan('proxy-reload')}     Validate and apply proxy config (after editing a shared Caddyfile)
   ${pc.cyan('render')}           Write configuration files only; start nothing
   ${pc.cyan('doctor')}           Check the environment without changing anything
 
@@ -92,7 +94,8 @@ async function main(): Promise<number> {
         return command || values.help ? 0 : 1;
     }
 
-    ui.interactive = !values['non-interactive'] && Boolean(process.stdin.isTTY && process.stdout.isTTY);
+    ui.interactive =
+        !values['non-interactive'] && Boolean(process.stdin.isTTY && process.stdout.isTTY);
     ui.assumeYes = Boolean(values.yes);
 
     const ctx: Ctx = {
@@ -103,7 +106,12 @@ async function main(): Promise<number> {
         diffs: !values['no-diff'],
         manifest: values.manifest ? resolve(values.manifest) : undefined,
     };
-    const versions = {to: values.to, editor: values.editor, relay: values.relay, store: values.store};
+    const versions = {
+        to: values.to,
+        editor: values.editor,
+        relay: values.relay,
+        store: values.store,
+    };
     const skipMount = Boolean(values['skip-mount-check']);
 
     switch (command) {
@@ -133,6 +141,9 @@ async function main(): Promise<number> {
             break;
         case 'doctor':
             return (await doctor(ctx, skipMount)) ? 0 : 1;
+        case 'proxy-reload':
+            await proxyReload(ctx);
+            break;
         case 'promote-admin':
             await promoteAdmin(ctx, values.username, values.subject);
             break;
@@ -148,7 +159,15 @@ main().then(
     (error: unknown) => {
         if (error instanceof InstallerError) {
             ui.error(error.message);
-            if (error.hint) console.error(pc.dim(error.hint.split('\n').map((l) => `  ${l}`).join('\n')));
+            if (error.hint)
+                console.error(
+                    pc.dim(
+                        error.hint
+                            .split('\n')
+                            .map((l) => `  ${l}`)
+                            .join('\n'),
+                    ),
+                );
         } else if (error instanceof Error && error.name !== 'ExitPromptError') {
             ui.error(error.message);
             if (process.env.SD_DEBUG) console.error(error.stack);

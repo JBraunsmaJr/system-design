@@ -1,9 +1,9 @@
-import type { SrdTemplateConfig } from '../../../../../domain/srd/srdTypes';
-import type { PdfStyle } from '../../srdPdfMarkdown';
-import { PDF_PALETTE as P } from '../../srdPdfPalette';
-import type { PillVariant, SrdPdfSlots, SrdPdfSlotsByPlacement } from '../../template/types';
-import { createClassicSlots } from '../classic/classicSlots';
-import { PAGE_MARGIN, solidTone, type } from '../shared';
+import type {SrdTemplateConfig} from '../../../../../domain/srd/srdTypes';
+import type {PdfStyle} from '../../srdPdfMarkdown';
+import {PDF_PALETTE as P} from '../../srdPdfPalette';
+import type {PillVariant, SrdPdfSlots, SrdPdfSlotsByPlacement} from '../../template/types';
+import {createClassicSlots} from '../classic/classicSlots';
+import {PAGE_MARGIN, solidTone, type} from '../shared';
 
 /**
  * Engineering: a specification's look. A dark title band across the first

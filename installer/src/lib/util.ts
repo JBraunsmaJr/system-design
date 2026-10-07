@@ -58,7 +58,10 @@ export function randomSecret(bytes = 24): string {
 }
 
 export function timestampId(date = new Date()): string {
-    return date.toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
+    return date
+        .toISOString()
+        .replace(/[-:]/g, '')
+        .replace(/\.\d+Z$/, 'Z');
 }
 
 export function stripTrailingSlash(s: string): string {

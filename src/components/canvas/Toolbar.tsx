@@ -1,26 +1,26 @@
-import type { ReactNode } from 'react';
+import type {ReactNode} from 'react';
 import {
-  Check,
-  ListChecks,
-  CalendarRange,
-  Users,
-  Network,
-  Redo2,
-  Undo2,
-  Workflow,
-  Save,
-  Route,
-  FileDown,
-  Package,
-  BookOpen,
-  FileText,
+    BookOpen,
+    CalendarRange,
+    Check,
+    FileDown,
+    FileText,
+    ListChecks,
+    Network,
+    Package,
+    Redo2,
+    Route,
+    Save,
+    Undo2,
+    Users,
+    Workflow,
 } from 'lucide-react';
-import type { ViewMode } from '../../app/hooks/useViewNavigation';
-import { ExportMenu } from '../workspace/ExportMenu';
-import { getDocsUrl } from '../../domain/network/docsLocation';
-import { FileMenu } from '../workspace/FileMenu';
-import { faGithub } from '@fortawesome/free-brands-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import type {ViewMode} from '../../app/hooks/useViewNavigation';
+import {ExportMenu} from '../workspace/ExportMenu';
+import {getDocsUrl} from '../../domain/network/docsLocation';
+import {FileMenu} from '../workspace/FileMenu';
+import {faGithub} from '@fortawesome/free-brands-svg-icons';
+import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
 
 interface ToolbarProps {
   title: string;

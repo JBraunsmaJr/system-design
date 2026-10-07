@@ -4,14 +4,14 @@
  * settings, and the template registry. *
  * Run with: npx tsx --tsconfig tsconfig.app.json src/components/srd/pdf/sections/SrdPdfSections.verify.tsx
  */
-import { pdf } from '@react-pdf/renderer';
-import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
-import { SrdPdfDocument } from '../SrdPdfDocument';
-import { SRD_PDF_TEMPLATES, pdfTemplateFor } from '../templates';
-import { PDF_FONT_MONO } from '../srdPdfFonts';
-import { DEFAULT_SRD_TEMPLATE } from '../../../../domain/srd/srdTemplatePresets';
-import type { SrdDataContext, SrdTemplateConfig } from '../../../../domain/srd/srdTypes';
-import { config, richData } from '../srdPdfTestData';
+import {pdf} from '@react-pdf/renderer';
+import {getDocument} from 'pdfjs-dist/legacy/build/pdf.mjs';
+import {SrdPdfDocument} from '../SrdPdfDocument';
+import {pdfTemplateFor, SRD_PDF_TEMPLATES} from '../templates';
+import {PDF_FONT_MONO} from '../srdPdfFonts';
+import {DEFAULT_SRD_TEMPLATE} from '../../../../domain/srd/srdTemplatePresets';
+import type {SrdDataContext, SrdTemplateConfig} from '../../../../domain/srd/srdTypes';
+import {config, richData} from '../srdPdfTestData';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {

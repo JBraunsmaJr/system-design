@@ -18,3 +18,7 @@ identity:
     groups: [ design-team-a ]
 recovery:
   mode: generate
+# Same token keeps the A record current when the public IP changes.
+ddns:
+  enabled: true
+  domains: [ editor.example.com ]

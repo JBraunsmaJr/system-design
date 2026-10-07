@@ -1,34 +1,24 @@
-import { lazy, Suspense, useMemo, useSyncExternalStore } from 'react';
-import type { Edge, Node } from '@xyflow/react';
-import {
-  Printer,
-  FileDown,
-  Download,
-  Palette,
-  Sliders,
-  FileText,
-  Building2,
-  Camera,
-  RefreshCw,
-} from 'lucide-react';
-import { BUILTIN_SRD_TEMPLATES } from '../../domain/srd/srdTemplatePresets';
-import type { ArchEdgeData, ArchNodeData } from '../../domain/canvas/types';
-import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
-import type { ProgramIncrement } from '../../domain/timeline/programIncrements';
-import type { TeamDocument } from '../../domain/timeline/teamTypes';
-import type { Milestone } from '../../domain/timeline/milestones';
-import type { SrdStore } from '../../collab/stores/yjsSrdStore';
-import { SrdDocTab } from './SrdDocTab';
-import { SrdThemeTab } from './SrdThemeTab';
-import { SrdLayoutTab } from './SrdLayoutTab';
-import { SrdSnapshotsTab } from './SrdSnapshotsTab';
-import { SrdHeadersTab } from './SrdHeadersTab';
-import { SrdTemplateJsonControls } from './SrdTemplateJsonControls';
-import { useSrdSnapshots } from './capture/useSrdSnapshots';
-import { SrdCaptureSurface } from './capture/SrdCaptureSurface';
-import { useSrdDocumentData } from './useSrdDocumentData';
-import { useSrdView } from './useSrdView';
-import { SRD_TEMPLATE_CATALOG } from '../../domain/srd/srdTemplateCatalog';
+import {lazy, Suspense, useMemo, useSyncExternalStore} from 'react';
+import type {Edge, Node} from '@xyflow/react';
+import {Building2, Camera, Download, FileDown, FileText, Palette, Printer, RefreshCw, Sliders,} from 'lucide-react';
+import {BUILTIN_SRD_TEMPLATES} from '../../domain/srd/srdTemplatePresets';
+import type {ArchEdgeData, ArchNodeData} from '../../domain/canvas/types';
+import type {RequirementsDocument} from '../../domain/requirements/requirementsTypes';
+import type {ProgramIncrement} from '../../domain/timeline/programIncrements';
+import type {TeamDocument} from '../../domain/timeline/teamTypes';
+import type {Milestone} from '../../domain/timeline/milestones';
+import type {SrdStore} from '../../collab/stores/yjsSrdStore';
+import {SrdDocTab} from './SrdDocTab';
+import {SrdThemeTab} from './SrdThemeTab';
+import {SrdLayoutTab} from './SrdLayoutTab';
+import {SrdSnapshotsTab} from './SrdSnapshotsTab';
+import {SrdHeadersTab} from './SrdHeadersTab';
+import {SrdTemplateJsonControls} from './SrdTemplateJsonControls';
+import {useSrdSnapshots} from './capture/useSrdSnapshots';
+import {SrdCaptureSurface} from './capture/SrdCaptureSurface';
+import {useSrdDocumentData} from './useSrdDocumentData';
+import {useSrdView} from './useSrdView';
+import {SRD_TEMPLATE_CATALOG} from '../../domain/srd/srdTemplateCatalog';
 
 // Loaded once the view mounts: react-pdf and pdf.js stay out of the view's
 // own chunk, and out of the bundle every session downloads.

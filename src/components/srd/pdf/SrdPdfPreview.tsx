@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import {useEffect, useRef, useState} from 'react';
 // The legacy build: pdf.js's modern build relies on the newest JavaScript
 // (e.g. Map.prototype.getOrInsertComputed) and fails outright in browsers
 // even slightly behind; the legacy build polyfills it.
-import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
+import {getDocument, GlobalWorkerOptions} from 'pdfjs-dist/legacy/build/pdf.mjs';
 import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
-import type { SrdDataContext, SrdTemplateConfig } from '../../../domain/srd/srdTypes';
-import { SupersededError, renderSrdPdf } from './srdPdfClient';
+import type {SrdDataContext, SrdTemplateConfig} from '../../../domain/srd/srdTypes';
+import {renderSrdPdf, SupersededError} from './srdPdfClient';
 
 GlobalWorkerOptions.workerSrc = workerUrl;
 

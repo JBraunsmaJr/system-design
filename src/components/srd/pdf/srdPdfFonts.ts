@@ -1,4 +1,4 @@
-import { Font } from '@react-pdf/renderer';
+import {Font} from '@react-pdf/renderer';
 
 /**
  * Fonts for the react-pdf renderer.

@@ -1,7 +1,7 @@
-import { Text, View } from '@react-pdf/renderer';
-import type { SrdDataContext, SrdTemplateConfig } from '../../../../domain/srd/srdTypes';
-import { interpolateTokens } from '../../../../domain/srd/srdMarkdownExport';
-import { useSrdPdfSlots } from '../template/context';
+import {Text, View} from '@react-pdf/renderer';
+import type {SrdDataContext, SrdTemplateConfig} from '../../../../domain/srd/srdTypes';
+import {interpolateTokens} from '../../../../domain/srd/srdMarkdownExport';
+import {useSrdPdfSlots} from '../template/context';
 
 interface ChromeProps {
   data: SrdDataContext;

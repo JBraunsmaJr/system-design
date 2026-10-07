@@ -1,25 +1,22 @@
-import type { Node, Edge } from '@xyflow/react';
-import type { ArchNodeData, ArchEdgeData, Scenario } from './types.ts';
-import type { RequirementsDocument } from '../requirements/requirementsTypes.ts';
-import { EMPTY_REQUIREMENTS_DOCUMENT } from '../requirements/requirementsTypes.ts';
-import {
-  BUILT_IN_ITEM_TYPES,
-  BUILT_IN_RELATIONSHIP_TYPES,
-} from '../requirements/requirementsRegistry.ts';
-import type { ProgramIncrement } from '../timeline/programIncrements.ts';
-import { DEFAULT_SPRINT_DURATION_DAYS } from '../timeline/programIncrements.ts';
-import type { TeamDocument } from '../timeline/teamTypes.ts';
-import { EMPTY_TEAM_DOCUMENT, DEFAULT_TEAM_SETTINGS } from '../timeline/teamTypes.ts';
-import type { Milestone } from '../timeline/milestones.ts';
-import { sanitizeRelatedItemIds, validateMilestone } from '../timeline/milestones.ts';
-import { globalShapeRegistry, type ShapeDefinition } from './shapeRegistry.ts';
-import { globalIconRegistry, type IconDefinition } from './iconRegistry.ts';
-import { migrateToCurrent, type RawDiagramFile } from '../storage/schemaMigrations.ts';
+import type {Edge, Node} from '@xyflow/react';
+import type {ArchEdgeData, ArchNodeData, Scenario} from './types.ts';
+import type {RequirementsDocument} from '../requirements/requirementsTypes.ts';
+import {EMPTY_REQUIREMENTS_DOCUMENT} from '../requirements/requirementsTypes.ts';
+import {BUILT_IN_ITEM_TYPES, BUILT_IN_RELATIONSHIP_TYPES,} from '../requirements/requirementsRegistry.ts';
+import type {ProgramIncrement} from '../timeline/programIncrements.ts';
+import {DEFAULT_SPRINT_DURATION_DAYS} from '../timeline/programIncrements.ts';
+import type {TeamDocument} from '../timeline/teamTypes.ts';
+import {DEFAULT_TEAM_SETTINGS, EMPTY_TEAM_DOCUMENT} from '../timeline/teamTypes.ts';
+import type {Milestone} from '../timeline/milestones.ts';
+import {sanitizeRelatedItemIds, validateMilestone} from '../timeline/milestones.ts';
+import {globalShapeRegistry, type ShapeDefinition} from './shapeRegistry.ts';
+import {globalIconRegistry, type IconDefinition} from './iconRegistry.ts';
+import {migrateToCurrent, type RawDiagramFile} from '../storage/schemaMigrations.ts';
 
-import { sanitizeFileName } from '../../common/utils/string.ts';
-import { downloadFile } from '../../common/utils/download.ts';
-import { compactSrdState, expandSrdFileValue, type SrdFileValue } from '../srd/srdSettings.ts';
-import type { SrdDocumentState } from '../srd/srdTypes.ts';
+import {sanitizeFileName} from '../../common/utils/string.ts';
+import {downloadFile} from '../../common/utils/download.ts';
+import {compactSrdState, expandSrdFileValue, type SrdFileValue} from '../srd/srdSettings.ts';
+import type {SrdDocumentState} from '../srd/srdTypes.ts';
 
 export const SCHEMA_VERSION = '0.8';
 

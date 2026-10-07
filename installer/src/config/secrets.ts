@@ -1,5 +1,5 @@
 import {existsSync, readFileSync} from 'node:fs';
-import type {Config} from './schema.ts';
+import {cloudflareToken, type Config} from './schema.ts';
 import {type Draft, getPath, InstallerError, randomSecret, setPath} from '../lib/util.ts';
 
 export interface SecretSpec {
@@ -20,22 +20,47 @@ export interface SecretSpec {
 }
 
 /** Every secret the installer knows about, given the configuration's shape. */
-export function secretSpecs(c: Pick<Config, 'proxy' | 'identity' | 'turn'>): SecretSpec[] {
+export function secretSpecs(
+    c: Pick<Config, 'proxy' | 'identity' | 'turn'> & { ddns?: Config['ddns'] },
+): SecretSpec[] {
     const specs: SecretSpec[] = [
-        {path: 'secrets.postgresPassword', env: 'POSTGRES_PASSWORD', generatable: true, initOnly: true, urlSafe: true},
+        {
+            path: 'secrets.postgresPassword',
+            env: 'POSTGRES_PASSWORD',
+            generatable: true,
+            initOnly: true,
+            urlSafe: true,
+        },
         {path: 'secrets.relayTokenSecret', env: 'RELAY_TOKEN_SECRET', generatable: true},
     ];
     const p = c.proxy;
-    if ((p.type === 'caddy' && p.acme === 'cloudflare-dns') || (p.type === 'nginx' && p.tls === 'certbot-cloudflare')) {
-        specs.push({path: 'proxy.cloudflareApiToken', env: 'CLOUDFLARE_API_TOKEN', generatable: false});
+    if (cloudflareToken(c)) {
+        specs.push({
+            path: 'proxy.cloudflareApiToken',
+            env: 'CLOUDFLARE_API_TOKEN',
+            generatable: false,
+        });
+    } else if (c.ddns?.enabled) {
+        // Dynamic DNS without DNS-01: the token is its own. With DNS-01, it shares the proxy's.
+        specs.push({
+            path: 'ddns.cloudflareApiToken',
+            env: 'CLOUDFLARE_API_TOKEN',
+            generatable: false,
+        });
     }
-    if (p.type === 'cloudflare-tunnel') specs.push({path: 'proxy.token', env: 'TUNNEL_TOKEN', generatable: false});
+    if (p.type === 'cloudflare-tunnel')
+        specs.push({path: 'proxy.token', env: 'TUNNEL_TOKEN', generatable: false});
 
     const i = c.identity;
     if (i.type === 'keycloak') {
         specs.push(
             {path: 'identity.adminPassword', env: 'KEYCLOAK_ADMIN_PASSWORD', generatable: true},
-            {path: 'identity.dbPassword', env: 'KEYCLOAK_DB_PASSWORD', generatable: true, initOnly: true},
+            {
+                path: 'identity.dbPassword',
+                env: 'KEYCLOAK_DB_PASSWORD',
+                generatable: true,
+                initOnly: true,
+            },
             {path: 'identity.clientSecret', env: 'OIDC_CLIENT_SECRET', generatable: true},
         );
     } else if (i.type === 'oidc') {
@@ -43,7 +68,8 @@ export function secretSpecs(c: Pick<Config, 'proxy' | 'identity' | 'turn'>): Sec
     } else {
         specs.push({path: 'identity.clientSecret', env: 'GITHUB_CLIENT_SECRET', generatable: false});
     }
-    if (c.turn.type === 'bundled') specs.push({path: 'turn.password', env: 'TURN_PASSWORD', generatable: true});
+    if (c.turn.type === 'bundled')
+        specs.push({path: 'turn.password', env: 'TURN_PASSWORD', generatable: true});
     return specs;
 }
 
@@ -76,12 +102,18 @@ export function resolveSecrets(
         if (ref === undefined || ref === 'generate' || ref === 'stored') {
             if (existing) value = existing;
             else if (ref === 'stored') {
-                throw new InstallerError(`${spec.env} is expected in .env but is missing.`, `Set ${spec.path} in a manifest, or restore .env from a backup.`);
+                throw new InstallerError(
+                    `${spec.env} is expected in .env but is missing.`,
+                    `Set ${spec.path} in a manifest, or restore .env from a backup.`,
+                );
             } else if (spec.generatable) {
                 value = randomSecret();
                 out.generated.push(spec.env);
             } else {
-                throw new InstallerError(`${spec.path} has no value and cannot be generated.`, 'Supply it in the manifest or answer the prompt.');
+                throw new InstallerError(
+                    `${spec.path} has no value and cannot be generated.`,
+                    'Supply it in the manifest or answer the prompt.',
+                );
             }
         } else {
             value = dereference(String(ref), spec.path);
@@ -106,12 +138,20 @@ export function dereference(ref: string, label: string): string {
     if (ref.startsWith('env:')) {
         const name = ref.slice(4);
         const v = process.env[name];
-        if (!v) throw new InstallerError(`${label} refers to environment variable ${name}, which is not set.`, `Pass it with docker run -e ${name}=…`);
+        if (!v)
+            throw new InstallerError(
+                `${label} refers to environment variable ${name}, which is not set.`,
+                `Pass it with docker run -e ${name}=…`,
+            );
         return v;
     }
     if (ref.startsWith('file:')) {
         const path = ref.slice(5);
-        if (!existsSync(path)) throw new InstallerError(`${label} refers to ${path}, which does not exist inside the installer container.`, 'Mount it with -v.');
+        if (!existsSync(path))
+            throw new InstallerError(
+                `${label} refers to ${path}, which does not exist inside the installer container.`,
+                'Mount it with -v.',
+            );
         return readFileSync(path, 'utf8').trim();
     }
     return ref;
@@ -121,7 +161,8 @@ function validateSecret(spec: SecretSpec, value: string): void {
     if (/[\r\n]/.test(value)) throw new InstallerError(`${spec.env} must be a single line.`);
     // .env values are single-quoted so compose takes them literally; a single
     // quote cannot be represented inside one.
-    if (value.includes("'")) throw new InstallerError(`${spec.env} cannot contain a single quote (').`);
+    if (value.includes("'"))
+        throw new InstallerError(`${spec.env} cannot contain a single quote (').`);
     if (spec.urlSafe && !/^[A-Za-z0-9._~-]+$/.test(value)) {
         throw new InstallerError(
             `${spec.env} is placed inside a database URL and may only contain letters, digits and . _ ~ -`,
@@ -148,9 +189,15 @@ export function parseEnvFile(text: string): Record<string, string> {
         if (!line || line.startsWith('#')) continue;
         const eq = line.indexOf('=');
         if (eq < 1) continue;
-        const key = line.slice(0, eq).trim().replace(/^export\s+/, '');
+        const key = line
+            .slice(0, eq)
+            .trim()
+            .replace(/^export\s+/, '');
         let value = line.slice(eq + 1).trim();
-        if ((value.startsWith("'") && value.endsWith("'")) || (value.startsWith('"') && value.endsWith('"'))) {
+        if (
+            (value.startsWith("'") && value.endsWith("'")) ||
+            (value.startsWith('"') && value.endsWith('"'))
+        ) {
             value = value.slice(1, -1);
         }
         out[key] = value;

@@ -7,11 +7,11 @@
  *   npx tsx scripts/generate-srd-template-thumbnails.ts
  * CHROMIUM_PATH may point at a Chromium build other than Playwright's own.
  */
-import { chromium, type Browser } from 'playwright';
-import { mkdirSync, writeFileSync } from 'fs';
-import { join, resolve } from 'path';
-import { startDevServers, type DevServers } from './lib/devServers';
-import { SRD_TEMPLATE_CATALOG } from '../src/domain/srd/srdTemplateCatalog';
+import {type Browser, chromium} from 'playwright';
+import {mkdirSync, writeFileSync} from 'fs';
+import {join, resolve} from 'path';
+import {type DevServers, startDevServers} from './lib/devServers';
+import {SRD_TEMPLATE_CATALOG} from '../src/domain/srd/srdTemplateCatalog';
 
 const OUT = resolve('public/srd-templates');
 /** Two device pixels per CSS pixel at the picker's card width. */

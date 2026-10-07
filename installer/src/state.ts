@@ -16,6 +16,8 @@ export interface Deployment {
     /** Backup taken immediately before this deployment, if any. */
     backup?: string;
     status: 'ok' | 'failed' | 'rolled-back';
+    /** Containers this deployment stopped to take over 80/443; rollback restarts them. */
+    replaced?: { name: string; restart: string }[];
 }
 
 export interface State {

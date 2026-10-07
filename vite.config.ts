@@ -1,7 +1,7 @@
-import { defineConfig } from 'vite';
-import { fileURLToPath } from 'node:url';
+import {defineConfig} from 'vite';
+import {fileURLToPath} from 'node:url';
 import react from '@vitejs/plugin-react';
-import { VitePWA } from 'vite-plugin-pwa';
+import {VitePWA} from 'vite-plugin-pwa';
 
 // https://vite.dev/config/
 // Base path matches the GitHub Pages project-site URL:

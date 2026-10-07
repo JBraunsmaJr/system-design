@@ -1,4 +1,4 @@
-import type { SrdSectionId } from './srdTypes';
+import type {SrdSectionId} from './srdTypes';
 
 /**
  * Validation primitives shared by the strict template-JSON parser

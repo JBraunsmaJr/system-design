@@ -1,0 +1,25 @@
+# One Caddy for everything on this host: the app's routes come from
+# caddy/system-design.caddy, which your own caddy/Caddyfile imports inside
+# whatever site block you like (a wildcard block sharing one certificate).
+# Mirrors a setup that previously ran Caddy and DDNS as their own stack.
+domain: editor.home.jbraunsma.dev
+project: prod
+proxy:
+  type: caddy
+  acme: cloudflare-dns
+  email: jonbraunsma@gmail.com
+  cloudflareApiToken: env:CLOUDFLARE_API_TOKEN
+  shared: true
+  # The earlier stack, stopped once this one is healthy (rollback restarts it).
+  replaces: [ caddy-caddy-1, caddy-cloudflare-ddns-1 ]
+  # Keep its certificates and ACME account.
+  dataVolume: caddy_caddy_data
+ddns:
+  enabled: true
+  domains: [ home.jbraunsma.dev ]
+identity:
+  type: keycloak
+  groups: [ design-team-a ]
+recovery:
+  mode: existing
+  publicKeyPath: keys/recovery-public.pem

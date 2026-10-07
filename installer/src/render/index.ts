@@ -2,7 +2,7 @@ import type {Config} from '../config/schema.ts';
 import {derive, type Derived} from '../config/derive.ts';
 import {formatEnvValue, type Secrets, secretSpecs} from '../config/secrets.ts';
 import {renderCompose} from './compose.ts';
-import {renderCaddyDockerfile, renderCaddyfile} from './caddy.ts';
+import {renderCaddyDockerfile, renderCaddyfile, renderCaddySnippet, renderSharedCaddyfileSeed,} from './caddy.ts';
 import {renderNginx} from './nginx.ts';
 
 export interface RenderedFile {
@@ -12,6 +12,8 @@ export interface RenderedFile {
     mode?: number;
     /** Holds secrets: masked in diffs, written 0600. */
     secret?: boolean;
+    /** Written only when absent and never tracked: the operator owns it afterwards. */
+    seed?: boolean;
 }
 
 export interface ImageRefs {
@@ -35,8 +37,16 @@ export function renderAll({config: c, secrets, images}: RenderInput): RenderedFi
 
     const p = c.proxy;
     if (p.type === 'caddy') {
-        files.push({path: 'Caddyfile', content: renderCaddyfile(c, d, 'bundled')});
-        if (p.acme === 'cloudflare-dns') files.push({path: 'caddy/Dockerfile', content: renderCaddyDockerfile(c)});
+        if (p.shared) {
+            files.push(
+                {path: 'caddy/system-design.caddy', content: renderCaddySnippet(c, d)},
+                {path: 'caddy/Caddyfile', content: renderSharedCaddyfileSeed(c, d), seed: true},
+            );
+        } else {
+            files.push({path: 'Caddyfile', content: renderCaddyfile(c, d, 'bundled')});
+        }
+        if (p.acme === 'cloudflare-dns' && p.build)
+            files.push({path: 'caddy/Dockerfile', content: renderCaddyDockerfile(c)});
     } else if (p.type === 'nginx') {
         files.push({path: 'nginx/default.conf', content: renderNginx(c, d, 'bundled')});
         if (p.tls === 'certbot-cloudflare') {
@@ -56,7 +66,8 @@ export function renderAll({config: c, secrets, images}: RenderInput): RenderedFi
         );
     }
 
-    if (c.identity.type === 'keycloak') files.push({path: 'keycloak-realm.json', content: renderRealm(c, d)});
+    if (c.identity.type === 'keycloak')
+        files.push({path: 'keycloak-realm.json', content: renderRealm(c, d)});
     if (c.turn.type === 'bundled') files.push({path: 'turnserver.conf', content: renderTurn(c)});
     return files;
 }

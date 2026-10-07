@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react';
-import { Text, View } from '@react-pdf/renderer';
-import { useSrdPdfSlots } from '../template/context';
+import type {ReactNode} from 'react';
+import {Text, View} from '@react-pdf/renderer';
+import {useSrdPdfSlots} from '../template/context';
 
 export interface PdfColumn<Row> {
   header: string;

@@ -1,0 +1,126 @@
+services:
+  relay:
+    networks: [ core ]
+    image: ghcr.io/jbraunsmajr/system-design-relay:${VERSION:-latest}
+    ports:
+      - '4444:4444'
+    container_name: 'relay'
+    restart: unless-stopped
+    environment:
+      RELAY_TOKEN_SECRET: ${RELAY_TOKEN_SECRET}
+
+  editor:
+    networks: [ core ]
+    image: ghcr.io/jbraunsmajr/system-design:${VERSION:-latest}
+    restart: unless-stopped
+    ports:
+      - '8888:80'
+    environment:
+      APP_URL: https://${DOMAIN}/editor
+      RELAY: wss://${DOMAIN}/relay
+      ICE_SERVERS: ${ICE_SERVERS:-}
+      STORE_URL: https://${DOMAIN}/store
+
+  store:
+    networks: [ core ]
+    image: ghcr.io/jbraunsmajr/system-design-store:${VERSION:-latest}
+    restart: unless-stopped
+    ports:
+      - '8889:8080'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PUBLIC_URL: https://${DOMAIN}/store
+      AFTER_LOGIN_URL: https://${DOMAIN}/editor/
+      DATABASE_URL: postgresql://store:${POSTGRES_PASSWORD}@postgres:5432/store
+      AUTH_PROVIDERS: oidc
+      OIDC_ISSUER: ${OIDC_ISSUER}
+      OIDC_INTERNAL_URL: ${OIDC_INTERNAL_URL:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
+      RECOVERY_PUBLIC_KEY_FILE: /run/keys/recovery-public.pem
+      RELAY_TOKEN_SECRET: ${RELAY_TOKEN_SECRET}
+      ADMIN_SUBJECTS: ${ADMIN_SUBJECTS:-}
+      RETENTION_PERIOD: ${RETENTION_PERIOD:-30d}
+      OIDC_GROUPS_CLAIM: ${OIDC_GROUPS_CLAIM:-groups}
+      AUTO_ACCESS: on
+    volumes:
+      - ./keys/recovery-public.pem:/run/keys/recovery-public.pem:ro
+
+  postgres:
+    networks: [ core ]
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - 5433:5432
+    environment:
+      POSTGRES_USER: store
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: store
+    volumes:
+      - store-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ 'CMD-SHELL', 'pg_isready -U store' ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  keycloak:
+    networks: [ core ]
+    hostname: keycloak
+    image: quay.io/keycloak/keycloak:26.0
+    restart: unless-stopped
+    command: start --import-realm
+    ports:
+      - '8001:8080'
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
+      KC_HOSTNAME: ${DOMAIN}
+      KC_HTTP_RELATIVE_PATH: /keycloak
+      KC_HTTP_ENABLED: 'true'
+      KC_PROXY_HEADERS: xforwarded
+      KC_HEALTH_ENABLED: 'true'
+      DOMAIN: ${DOMAIN}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
+    volumes:
+      - ./keycloak-realm.json:/opt/keycloak/data/import/system-design-realm.json:ro
+
+  keycloak-db:
+    networks: [ core ]
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
+      POSTGRES_DB: keycloak
+    volumes:
+      - keycloak-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ 'CMD-SHELL', 'pg_isready -U keycloak' ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  coturn:
+    image: coturn/coturn:latest
+    container_name: coturn
+    network_mode: host
+    volumes:
+      - './turnserver.conf:/etc/coturn/turnserver.conf:ro'
+    restart: unless-stopped
+
+volumes:
+  store-data:
+  keycloak-data:
+
+networks:
+  core:

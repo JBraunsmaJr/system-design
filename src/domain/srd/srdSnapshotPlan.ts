@@ -8,10 +8,10 @@
  * as nothing it depends on has changed, and is recaptured as soon as anything
  * has. Pure, so it is cheap to test and to run on every document change.
  */
-import type { Edge, Node } from '@xyflow/react';
-import type { DiagramPath } from '../canvas/subDiagramTree';
-import type { SrdDocumentState, SrdSnapshotFraming } from './srdTypes';
-import { SRD_DIAGRAM_FRAMING_KEY, framingFor } from './srdSettings';
+import type {Edge, Node} from '@xyflow/react';
+import type {DiagramPath} from '../canvas/subDiagramTree';
+import type {SrdDocumentState, SrdSnapshotFraming} from './srdTypes';
+import {framingFor, SRD_DIAGRAM_FRAMING_KEY} from './srdSettings';
 
 /**
  * Bump whenever the captured image would differ for the same inputs - a new

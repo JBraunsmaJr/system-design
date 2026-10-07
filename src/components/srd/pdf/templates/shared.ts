@@ -2,8 +2,8 @@
  * Building blocks every template's slots use, so templates differ in their
  * choices rather than in how they make them.
  */
-import type { PdfStyle } from '../srdPdfMarkdown';
-import { PDF_PALETTE as P, mixColors } from '../srdPdfPalette';
+import type {PdfStyle} from '../srdPdfMarkdown';
+import {mixColors, PDF_PALETTE as P} from '../srdPdfPalette';
 
 export const PAGE_MARGIN = 48;
 export const HEADER_BAND = 34;

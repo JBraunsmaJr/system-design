@@ -1,12 +1,12 @@
-import { Page, View } from '@react-pdf/renderer';
-import type { SrdSectionConfig } from '../../../../../domain/srd/srdTypes';
-import { useSrdPdfSlots } from '../../template/context';
-import type { SrdPdfLayoutProps } from '../../template/types';
-import { Placement, PlacementScope } from '../../primitives/text';
-import { SrdPdfPageChrome, SrdPdfTitleBlock } from '../../sections/SrdPdfPageChrome';
-import { SrdPdfMetrics, SrdPdfSection } from '../../sections/SrdPdfSections';
-import { PAGE_MARGIN } from '../shared';
-import { SIDEBAR_WIDTH } from './briefingSlots';
+import {Page, View} from '@react-pdf/renderer';
+import type {SrdSectionConfig} from '../../../../../domain/srd/srdTypes';
+import {useSrdPdfSlots} from '../../template/context';
+import type {SrdPdfLayoutProps} from '../../template/types';
+import {Placement, PlacementScope} from '../../primitives/text';
+import {SrdPdfPageChrome, SrdPdfTitleBlock} from '../../sections/SrdPdfPageChrome';
+import {SrdPdfMetrics, SrdPdfSection} from '../../sections/SrdPdfSections';
+import {PAGE_MARGIN} from '../shared';
+import {SIDEBAR_WIDTH} from './briefingSlots';
 
 const SIDEBAR_PADDING = 20;
 

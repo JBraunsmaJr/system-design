@@ -1,5 +1,4 @@
-import type { RequirementStatus } from '../requirements/requirementsTypes';
-import type { EpicInferredSchedule } from '../requirements/requirementsTypes';
+import type {EpicInferredSchedule, RequirementStatus} from '../requirements/requirementsTypes';
 
 export interface RequirementItemViewModel {
   id: string;

@@ -1,12 +1,12 @@
-import type { SrdTemplateId } from '../../../../domain/srd/srdTypes';
-import { DEFAULT_SRD_TEMPLATE_ID } from '../../../../domain/srd/srdSettings';
-import type { SrdPdfTemplate } from '../template/types';
-import { createClassicSlots } from './classic/classicSlots';
-import { ClassicLayout } from './classic/ClassicLayout';
-import { createEngineeringSlots } from './engineering/engineeringSlots';
-import { EngineeringLayout } from './engineering/EngineeringLayout';
-import { createBriefingSlots } from './briefing/briefingSlots';
-import { BriefingLayout } from './briefing/BriefingLayout';
+import type {SrdTemplateId} from '../../../../domain/srd/srdTypes';
+import {DEFAULT_SRD_TEMPLATE_ID} from '../../../../domain/srd/srdSettings';
+import type {SrdPdfTemplate} from '../template/types';
+import {createClassicSlots} from './classic/classicSlots';
+import {ClassicLayout} from './classic/ClassicLayout';
+import {createEngineeringSlots} from './engineering/engineeringSlots';
+import {EngineeringLayout} from './engineering/EngineeringLayout';
+import {createBriefingSlots} from './briefing/briefingSlots';
+import {BriefingLayout} from './briefing/BriefingLayout';
 
 /**
  * Every PDF template, by id (names and descriptions are in the template

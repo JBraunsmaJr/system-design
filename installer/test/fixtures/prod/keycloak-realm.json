@@ -1,0 +1,111 @@
+{
+  "realm": "system-design",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "clients": [
+    {
+      "clientId": "system-design-store",
+      "name": "Engineers Notebook Workspace",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "${OIDC_CLIENT_SECRET}",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "https://${DOMAIN}/store/v1/auth/callback"
+      ],
+      "webOrigins": [
+        "https://${DOMAIN}"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "protocolMappers": [
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "groups",
+            "full.path": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "false",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "demo",
+      "enabled": true,
+      "email": "demo@example.invalid",
+      "emailVerified": true,
+      "firstName": "Demo",
+      "lastName": "User",
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "demo",
+          "temporary": false
+        }
+      ],
+      "groups": [
+        "/design-team-a"
+      ]
+    },
+    {
+      "username": "otter",
+      "enabled": true,
+      "email": "otter@example.invalid",
+      "emailVerified": true,
+      "firstName": "Otter",
+      "lastName": "User",
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "otter",
+          "temporary": false
+        }
+      ],
+      "groups": [
+        "/design-team-a"
+      ]
+    },
+    {
+      "username": "Badger",
+      "enabled": true,
+      "email": "badger@example.invalid",
+      "emailVerified": true,
+      "firstName": "Badger",
+      "lastName": "2-3",
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "badger",
+          "temporary": false
+        }
+      ],
+      "groups": [
+        "/design-team-b"
+      ]
+    }
+  ],
+  "groups": [
+    {
+      "name": "design-team-a"
+    },
+    {
+      "name": "design-team-b"
+    }
+  ]
+}

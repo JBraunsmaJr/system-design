@@ -62,7 +62,7 @@ export function derive(c: Config): Derived {
             service: 'editor',
             internalPort: 80,
             publishedPort: c.ports.editor,
-            websocket: false
+            websocket: false,
         },
         {
             id: 'store',
@@ -72,7 +72,7 @@ export function derive(c: Config): Derived {
             service: 'store',
             internalPort: 8080,
             publishedPort: c.ports.store,
-            websocket: false
+            websocket: false,
         },
         {
             id: 'relay',
@@ -82,7 +82,7 @@ export function derive(c: Config): Derived {
             service: 'relay',
             internalPort: 4444,
             publishedPort: c.ports.relay,
-            websocket: true
+            websocket: true,
         },
     ];
     if (c.identity.type === 'keycloak') {
@@ -95,7 +95,7 @@ export function derive(c: Config): Derived {
             service: 'keycloak',
             internalPort: 8080,
             publishedPort: c.ports.keycloak,
-            websocket: false
+            websocket: false,
         });
     }
 

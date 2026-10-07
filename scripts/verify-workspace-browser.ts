@@ -10,19 +10,19 @@
  * browser after approving it, and see the passthrough warning when the
  * store reads content.
  */
-import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
-import type { AddressInfo } from 'net';
-import { startDevServers, type DevServers } from './lib/devServers';
-import { startTestOidcProvider } from './lib/testIdentityProviders';
-import { createMemoryBlobStore, type MemoryTx } from '../store/src/blobStore';
-import { createDocumentService } from '../store/src/documentService';
-import { createHttpService, type StoreBackend } from '../store/src/httpService';
-import { createMemoryUserDirectory } from '../store/src/userDirectory';
-import { createMemoryWorkspaceIndex } from '../store/src/workspaceIndex';
-import { createSessionStore } from '../store/src/auth/sessions';
-import { createProvider } from '../store/src/auth/providers';
-import { exportPublicKey, generateWrappingKeyPair } from '../src/crypto/keys';
-import { toPem } from '../src/crypto/documentPackage';
+import {type Browser, type BrowserContext, chromium, type Page} from 'playwright';
+import type {AddressInfo} from 'net';
+import {type DevServers, startDevServers} from './lib/devServers';
+import {startTestOidcProvider} from './lib/testIdentityProviders';
+import {createMemoryBlobStore, type MemoryTx} from '../store/src/blobStore';
+import {createDocumentService} from '../store/src/documentService';
+import {createHttpService, type StoreBackend} from '../store/src/httpService';
+import {createMemoryUserDirectory} from '../store/src/userDirectory';
+import {createMemoryWorkspaceIndex} from '../store/src/workspaceIndex';
+import {createSessionStore} from '../store/src/auth/sessions';
+import {createProvider} from '../store/src/auth/providers';
+import {exportPublicKey, generateWrappingKeyPair} from '../src/crypto/keys';
+import {toPem} from '../src/crypto/documentPackage';
 
 let failures = 0;
 function check(condition: boolean, message: string) {

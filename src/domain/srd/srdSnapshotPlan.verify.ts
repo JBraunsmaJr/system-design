@@ -1,11 +1,11 @@
 /**
  * Run with: npx tsx --tsconfig tsconfig.app.json src/domain/srd/srdSnapshotPlan.verify.ts
  */
-import type { Edge, Node } from '@xyflow/react';
-import { planSrdSnapshots, primaryLinkedNodes } from './srdSnapshotPlan';
-import { SnapshotCache } from './srdSnapshotCache';
-import { SRD_DIAGRAM_FRAMING_KEY } from './srdSettings';
-import type { SrdSnapshotFraming } from './srdTypes';
+import type {Edge, Node} from '@xyflow/react';
+import {planSrdSnapshots, primaryLinkedNodes} from './srdSnapshotPlan';
+import {SnapshotCache} from './srdSnapshotCache';
+import {SRD_DIAGRAM_FRAMING_KEY} from './srdSettings';
+import type {SrdSnapshotFraming} from './srdTypes';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {

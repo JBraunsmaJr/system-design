@@ -17,30 +17,20 @@
  *     defaults that preserve today's output, never alter existing ones.
  */
 import type {
-  RequirementItemViewModel,
-  SrdDataContext,
-  SrdDocumentSettings,
-  SrdDocumentState,
-  SrdMetadataOverrides,
-  SrdSectionConfig,
-  SrdSnapshotFraming,
-  SrdTemplateConfig,
-  SrdTemplateHeadersAndFooters,
-  SrdTemplateId,
-  SrdTemplateTheme,
+    RequirementItemViewModel,
+    SrdDataContext,
+    SrdDocumentSettings,
+    SrdDocumentState,
+    SrdMetadataOverrides,
+    SrdSectionConfig,
+    SrdSnapshotFraming,
+    SrdTemplateConfig,
+    SrdTemplateHeadersAndFooters,
+    SrdTemplateId,
+    SrdTemplateTheme,
 } from './srdTypes';
-import {
-  BUILTIN_SRD_TEMPLATES,
-  DEFAULT_SRD_TEMPLATE,
-  mergeTemplateWithDefaults,
-} from './srdTemplatePresets';
-import {
-  isFiniteNumber,
-  isPlainObject,
-  isSafeFontFamily,
-  isSafeHexColor,
-  isSrdSectionId,
-} from './srdValidation';
+import {BUILTIN_SRD_TEMPLATES, DEFAULT_SRD_TEMPLATE, mergeTemplateWithDefaults,} from './srdTemplatePresets';
+import {isFiniteNumber, isPlainObject, isSafeFontFamily, isSafeHexColor, isSrdSectionId,} from './srdValidation';
 
 // --- Templates and presets ----------------------------------------------------
 

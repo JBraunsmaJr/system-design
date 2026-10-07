@@ -14,20 +14,35 @@ import {z} from 'zod';
  * Secrets are always written to .env, never to config.yml.
  */
 
-export const HOSTNAME_RE = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,61}[a-z0-9]$/i;
+export const HOSTNAME_RE =
+    /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,61}[a-z0-9]$/i;
 const IPV4_RE = /^(\d{1,3}\.){3}\d{1,3}$/;
 
-export const hostname = z.string().regex(HOSTNAME_RE, 'must be a hostname such as design.example.com');
+export const hostname = z
+    .string()
+    .regex(HOSTNAME_RE, 'must be a hostname such as design.example.com');
 const hostOrIp = z
     .string()
-    .refine((v) => HOSTNAME_RE.test(v) || IPV4_RE.test(v) || v === 'localhost', 'must be a hostname or IPv4 address');
+    .refine(
+        (v) => HOSTNAME_RE.test(v) || IPV4_RE.test(v) || v === 'localhost',
+        'must be a hostname or IPv4 address',
+    );
 const port = z.number().int().min(1).max(65535);
 const secretRef = z.string().min(1);
 const email = z.email();
 
 export const RETENTION_RE = /^(immediate|indefinite|\d+[dwmy])$/;
 
+/** Fields shared by proxies that run on this host and bind 80/443. */
+const hostProxy = {
+    /** Containers to stop when this proxy takes over 80/443 (an earlier proxy stack). */
+    replaces: z.array(z.string()).default([]),
+    /** Existing Docker networks to attach the proxy to, to reach other stacks' containers by name. */
+    networks: z.array(z.string()).default([]),
+};
+
 const CaddyProxy = z.object({
+    ...hostProxy,
     type: z.literal('caddy'),
     /** http: ACME HTTP-01/TLS-ALPN (needs 80/443 reachable). cloudflare-dns: DNS-01 via the API. */
     acme: z.enum(['http', 'cloudflare-dns']),
@@ -37,9 +52,25 @@ const CaddyProxy = z.object({
     resolvers: z.array(z.string()).optional(),
     propagationDelay: z.string().optional(),
     propagationTimeout: z.string().optional(),
+    /**
+     * cloudflare-dns only. false (default): use a prebuilt image that already
+     * contains the Cloudflare module (images.caddyCloudflare). true: build one
+     * from the official image with xcaddy, for those who would rather not
+     * trust a community image with the API token and TLS keys.
+     */
+    build: z.boolean().default(false),
+    /**
+     * This Caddy also serves other sites. caddy/Caddyfile then belongs to the
+     * operator: created once, never rewritten. The installer maintains only
+     * caddy/system-design.caddy, a snippet the Caddyfile imports.
+     */
+    shared: z.boolean().default(false),
+    /** An existing volume to use as Caddy's /data, keeping certificates and the ACME account. */
+    dataVolume: z.string().optional(),
 });
 
 const NginxProxy = z.object({
+    ...hostProxy,
     type: z.literal('nginx'),
     tls: z.enum(['certbot-http', 'certbot-cloudflare', 'provided']),
     email: email.optional(),
@@ -64,7 +95,12 @@ const ExternalProxy = z.object({
     bindAddress: hostOrIp.or(z.literal('0.0.0.0')).default('0.0.0.0'),
 });
 
-export const ProxySchema = z.discriminatedUnion('type', [CaddyProxy, NginxProxy, TunnelProxy, ExternalProxy]);
+export const ProxySchema = z.discriminatedUnion('type', [
+    CaddyProxy,
+    NginxProxy,
+    TunnelProxy,
+    ExternalProxy,
+]);
 
 const InitialUser = z.object({
     username: z.string().regex(/^[a-zA-Z0-9._@-]{1,64}$/, 'letters, digits, . _ @ - only'),
@@ -78,7 +114,10 @@ const InitialUser = z.object({
 
 const KeycloakIdentity = z.object({
     type: z.literal('keycloak'),
-    realm: z.string().regex(/^[a-zA-Z0-9_-]+$/).default('system-design'),
+    realm: z
+        .string()
+        .regex(/^[a-zA-Z0-9_-]+$/)
+        .default('system-design'),
     clientId: z.string().default('system-design-store'),
     clientSecret: secretRef.default('generate'),
     adminPassword: secretRef.default('generate'),
@@ -103,7 +142,11 @@ const GithubIdentity = z.object({
     clientSecret: secretRef,
 });
 
-export const IdentitySchema = z.discriminatedUnion('type', [KeycloakIdentity, OidcIdentity, GithubIdentity]);
+export const IdentitySchema = z.discriminatedUnion('type', [
+    KeycloakIdentity,
+    OidcIdentity,
+    GithubIdentity,
+]);
 
 const TurnNone = z.object({type: z.literal('none')});
 const TurnBundled = z.object({
@@ -112,7 +155,10 @@ const TurnBundled = z.object({
     host: hostOrIp,
     /** Public IP, or public/private when behind NAT — coturn's external-ip. */
     externalIp: z.string().optional(),
-    username: z.string().regex(/^[a-zA-Z0-9_-]+$/).default('webrtc'),
+    username: z
+        .string()
+        .regex(/^[a-zA-Z0-9_-]+$/)
+        .default('webrtc'),
     password: secretRef.default('generate'),
     port: port.default(3478),
     minPort: port.default(49160),
@@ -155,7 +201,10 @@ export const ConfigSchema = z
             .prefault({mode: 'generate'}),
         store: z
             .object({
-                retention: z.string().regex(RETENTION_RE, 'immediate, indefinite, or a duration like 30d, 12w, 6m, 7y').default('30d'),
+                retention: z
+                    .string()
+                    .regex(RETENTION_RE, 'immediate, indefinite, or a duration like 30d, 12w, 6m, 7y')
+                    .default('30d'),
                 autoAccess: z.boolean().default(true),
                 relayAuth: z.boolean().default(true),
                 adminSubjects: z.array(z.string()).default([]),
@@ -181,8 +230,11 @@ export const ConfigSchema = z
                 postgres: z.string().default('postgres:16-alpine'),
                 keycloak: z.string().default('quay.io/keycloak/keycloak:26.0'),
                 coturn: z.string().default('coturn/coturn:4.6'),
-                caddy: z.string().default('caddy:2.8'),
-                caddyBuilder: z.string().default('caddy:2.8-builder'),
+                caddy: z.string().default('caddy:2.11'),
+                caddyBuilder: z.string().default('caddy:2.11-builder'),
+                /** Caddy with the Cloudflare DNS module, versioned like Caddy itself. */
+                caddyCloudflare: z.string().default('slothcroissant/caddy-cloudflaredns:2.11.2'),
+                ddns: z.string().default('favonia/cloudflare-ddns:1'),
                 nginx: z.string().default('nginx:1.27-alpine'),
                 cloudflared: z.string().default('cloudflare/cloudflared:latest'),
                 certbot: z.string().default('certbot/certbot:latest'),
@@ -199,15 +251,34 @@ export const ConfigSchema = z
             })
             .prefault({}),
         backups: z.object({keep: z.number().int().min(1).default(10)}).prefault({}),
+        /**
+         * Keeps Cloudflare DNS records pointed at this host's public IP, for
+         * connections whose address changes. Shares CLOUDFLARE_API_TOKEN with
+         * DNS-01 validation when both are used.
+         */
+        ddns: z
+            .object({
+                enabled: z.boolean().default(false),
+                /** Records to keep updated; defaults to every public hostname. */
+                domains: z.array(z.string()).default([]),
+                /** Orange-cloud the records. Leave off for TURN or direct TLS. */
+                proxied: z.boolean().default(false),
+                /** Only needed when the proxy does not already have a Cloudflare token. */
+                cloudflareApiToken: secretRef.optional(),
+            })
+            .prefault({}),
     })
     .superRefine((c, ctx) => {
         const p = c.proxy;
-        if ((p.type === 'caddy' && p.acme === 'cloudflare-dns') || (p.type === 'nginx' && p.tls === 'certbot-cloudflare')) {
+        if (
+            (p.type === 'caddy' && p.acme === 'cloudflare-dns') ||
+            (p.type === 'nginx' && p.tls === 'certbot-cloudflare')
+        ) {
             if (!p.cloudflareApiToken) {
                 ctx.addIssue({
                     code: 'custom',
                     path: ['proxy', 'cloudflareApiToken'],
-                    message: 'required for Cloudflare DNS validation'
+                    message: 'required for Cloudflare DNS validation',
                 });
             }
         }
@@ -215,22 +286,49 @@ export const ConfigSchema = z
             ctx.addIssue({
                 code: 'custom',
                 path: ['proxy', 'certPath'],
-                message: 'certPath and keyPath are required for tls: provided'
+                message: 'certPath and keyPath are required for tls: provided',
+            });
+        }
+        if (c.ddns.enabled && c.proxy.type !== 'caddy' && c.proxy.type !== 'nginx') {
+            ctx.addIssue({
+                code: 'custom',
+                path: ['ddns', 'enabled'],
+                message: 'dynamic DNS belongs with the proxy: use it with caddy or nginx run here',
+            });
+        }
+        if (c.ddns.enabled && !cloudflareToken(c) && !c.ddns.cloudflareApiToken) {
+            ctx.addIssue({
+                code: 'custom',
+                path: ['ddns', 'cloudflareApiToken'],
+                message: 'required for dynamic DNS',
             });
         }
         if (c.recovery.mode === 'existing' && !c.recovery.publicKeyPath) {
             ctx.addIssue({
                 code: 'custom',
                 path: ['recovery', 'publicKeyPath'],
-                message: 'required when recovery.mode is existing'
+                message: 'required when recovery.mode is existing',
             });
         }
         if (c.turn.type === 'bundled' && c.turn.minPort > c.turn.maxPort) {
-            ctx.addIssue({code: 'custom', path: ['turn', 'minPort'], message: 'must not exceed maxPort'});
+            ctx.addIssue({
+                code: 'custom',
+                path: ['turn', 'minPort'],
+                message: 'must not exceed maxPort',
+            });
         }
     });
 
 export type Config = z.output<typeof ConfigSchema>;
+
+/** Whether the proxy itself already needs a Cloudflare API token. */
+export function cloudflareToken(c: { proxy: z.output<typeof ProxySchema> }): boolean {
+    const p = c.proxy;
+    return (
+        (p.type === 'caddy' && p.acme === 'cloudflare-dns') ||
+        (p.type === 'nginx' && p.tls === 'certbot-cloudflare')
+    );
+}
 export type ProxyConfig = Config['proxy'];
 export type IdentityConfig = Config['identity'];
 

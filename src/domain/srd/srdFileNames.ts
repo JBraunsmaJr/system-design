@@ -1,4 +1,4 @@
-import type { SrdDataContext } from './srdTypes';
+import type {SrdDataContext} from './srdTypes';
 
 /** Lowercases, collapses non-alphanumerics to '-', and trims leading/trailing dashes. */
 function slugifyFilenamePart(value: string | undefined): string {

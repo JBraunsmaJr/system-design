@@ -1,5 +1,5 @@
-import type { SrdViewState } from './useSrdView';
-import { SRD_TEMPLATE_CATALOG, templateThumbnailUrl } from '../../domain/srd/srdTemplateCatalog';
+import type {SrdViewState} from './useSrdView';
+import {SRD_TEMPLATE_CATALOG, templateThumbnailUrl} from '../../domain/srd/srdTemplateCatalog';
 
 /**
  * The Theme tab: the template that draws the document, then its colors and

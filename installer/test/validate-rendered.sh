@@ -28,12 +28,17 @@ for manifest in "$here"/examples/*.yml; do
 
   (cd "$dir" && $COMPOSE -p "validate-$name" -f compose.yml --env-file .env config --quiet) && echo "compose: ok" || { echo "compose: FAILED"; fail=1; }
 
-  for cf in "$dir/Caddyfile" "$dir/proxy-snippets/Caddyfile"; do
+  for cf in "$dir/Caddyfile" "$dir/proxy-snippets/Caddyfile" "$dir/caddy/Caddyfile"; do
     [ -f "$cf" ] || continue
-    # The stock binary lacks the Cloudflare DNS module; validate everything else.
-    sed '/dns cloudflare/d' "$cf" > "$cf.check"
-    $CADDY adapt --config "$cf.check" --adapter caddyfile --validate >/dev/null 2>"$cf.err" && echo "caddy $(basename "$(dirname "$cf")")/Caddyfile: ok" || { echo "caddy: FAILED"; cat "$cf.err"; fail=1; }
-    rm -f "$cf.check" "$cf.err"
+    # The stock binary lacks the Cloudflare DNS module: check a copy of the
+    # directory (imports included) with an internal issuer in its place, from
+    # another working directory, as the container would.
+    check=$(mktemp -d)
+    cp "$(dirname "$cf")"/* "$check"/ 2>/dev/null || true
+    for f in "$check"/*; do sed -i -e 's/dns cloudflare .*/issuer internal/' -e '/^\s*\(resolvers\|propagation_\)/d' "$f"; done
+    (cd / && $CADDY adapt --config "$check/$(basename "$cf")" --adapter caddyfile --validate >/dev/null 2>"$check/.err") \
+      && echo "caddy $(basename "$(dirname "$cf")")/Caddyfile: ok" || { echo "caddy: FAILED"; cat "$check/.err"; fail=1; }
+    rm -rf "$check"
   done
 
   for nc in "$dir/nginx/default.conf" "$dir/proxy-snippets/nginx.conf"; do

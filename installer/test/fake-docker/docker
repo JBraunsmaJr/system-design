@@ -3,7 +3,18 @@
 // Records every call in $FAKE_DOCKER_STATE/calls.log, keeps a little state
 // (running services, volumes, a toy Keycloak), and forwards `compose config`
 // to a real compose binary ($REAL_COMPOSE) so the generated file is checked.
-import {appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
+import {
+    appendFileSync,
+    copyFileSync,
+    existsSync,
+    mkdirSync,
+    mkdtempSync,
+    readdirSync,
+    readFileSync,
+    statSync,
+    writeFileSync,
+} from 'node:fs';
+import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {spawnSync} from 'node:child_process';
 
@@ -20,13 +31,101 @@ if (args[0] === 'version') {
     out('27.3.1\n');
     exit(0);
 }
-if (args[0] === 'inspect' || args[0] === 'ps') exit(args[0] === 'ps' ? 0 : 1);
+// Containers outside the deployment (an earlier proxy stack), from world.json "foreign".
+const W = () => load('world.json', {running: [], volumes: false, foreign: []});
+const foreign = (w) => w.foreign ?? [];
+if (args[0] === 'ps') {
+    const w = W();
+    const f = args.indexOf('--format') >= 0 ? args[args.indexOf('--format') + 1] : '{{.Names}}';
+    const filter = args.indexOf('--filter') >= 0 ? args[args.indexOf('--filter') + 1] : '';
+    const rows = foreign(w).filter(
+        (c) => c.running && (!filter || filter === `label=com.docker.compose.project=${c.project}`),
+    );
+    out(
+        rows
+            .map((c) =>
+                f
+                    .replace('{{.Names}}', c.name)
+                    .replace('{{.Ports}}', c.ports ?? '')
+                    .replace('{{.Label "com.docker.compose.project"}}', c.project ?? ''),
+            )
+            .join('\n'),
+    );
+    exit(0);
+}
+if (args[0] === 'inspect') {
+    const c = foreign(W()).find((x) => x.name === args[1]);
+    if (!c) exit(1);
+    out(
+        JSON.stringify({
+            Name: '/' + c.name,
+            Config: {Image: c.image, Labels: {'com.docker.compose.project': c.project}},
+            HostConfig: {RestartPolicy: {Name: c.restart}},
+            State: {Running: c.running},
+            Mounts: c.mounts ?? [],
+        }),
+    );
+    exit(0);
+}
+if (['update', 'stop', 'start'].includes(args[0])) {
+    const w = W();
+    const name = args.at(-1);
+    const c = foreign(w).find((x) => x.name === name);
+    if (!c) exit(1);
+    if (args[0] === 'stop') c.running = false;
+    if (args[0] === 'start') c.running = true;
+    if (args[0] === 'update') c.restart = args[1].split('=')[1];
+    save('world.json', w);
+    exit(0);
+}
+if (args[0] === 'cp') {
+    const [src, dest] = args.slice(1);
+    const c = foreign(W()).find((x) => x.name === src.split(':')[0]);
+    if (!c?.caddyfile) exit(1);
+    writeFileSync(dest, c.caddyfile);
+    exit(0);
+}
+if (args[0] === 'run' && args.includes('adapt')) {
+    // Validate with the real caddy binary: a copy with the Cloudflare module's lines swapped out.
+    const v = args[args.indexOf('-v') + 1].split(':');
+    const tmp = mkdtempSync(join(tmpdir(), 'fake-caddy-'));
+    let config;
+    if (v[1] === '/etc/caddy') {
+        for (const f of readdirSync(v[0]))
+            if (statSync(join(v[0], f)).isFile()) copyFileSync(join(v[0], f), join(tmp, f));
+        config = join(tmp, 'Caddyfile');
+    } else {
+        copyFileSync(v[0], join(tmp, 'Caddyfile'));
+        config = join(tmp, 'Caddyfile');
+    }
+    for (const f of readdirSync(tmp))
+        writeFileSync(
+            join(tmp, f),
+            readFileSync(join(tmp, f), 'utf8')
+                .replace(/dns cloudflare .*/g, 'issuer internal')
+                .replace(/^\s*(resolvers|propagation_\w+).*$/gm, ''),
+        );
+    const r = spawnSync(
+        process.env.REAL_CADDY,
+        ['adapt', '--config', config, '--adapter', 'caddyfile', '--validate'],
+        {cwd: '/', encoding: 'utf8'},
+    );
+    process.stderr.write(r.stderr ?? '');
+    exit(r.status ?? 1);
+}
 if (args[0] === 'volume') exit(load('world.json', {}).volumes ? 0 : 1);
 if (args[0] === 'run') {
     if (args.includes('generate-recovery-key')) {
         const mount = args[args.indexOf('-v') + 1].split(':')[0];
-        writeFileSync(join(mount, 'recovery-public.pem'), '-----BEGIN PUBLIC KEY-----\nFAKE\n-----END PUBLIC KEY-----\n');
-        writeFileSync(join(mount, 'recovery-private.pem'), '-----BEGIN PRIVATE KEY-----\nFAKE\n-----END PRIVATE KEY-----\n', {mode: 0o600});
+        writeFileSync(
+            join(mount, 'recovery-public.pem'),
+            '-----BEGIN PUBLIC KEY-----\nFAKE\n-----END PUBLIC KEY-----\n',
+        );
+        writeFileSync(
+            join(mount, 'recovery-private.pem'),
+            '-----BEGIN PRIVATE KEY-----\nFAKE\n-----END PRIVATE KEY-----\n',
+            {mode: 0o600},
+        );
     }
     exit(0);
 }
@@ -55,20 +154,19 @@ if (sub === 'config') {
 }
 const world = load('world.json', {running: [], volumes: false});
 const services = () => {
-    const text = readFileSync(join(dir, 'compose.yml'), 'utf8');
+    const text = readFileSync(join(dir, 'compose.yml'), 'utf8').replace(/\r/g, '');
     const block = text.split(/^services:\n/m)[1].split(/^\S/m)[0];
     return [...block.matchAll(/^  ([a-z][\w-]*):$/gm)].map((m) => m[1]);
 };
 if (sub === 'ps') {
-    out(world.running.map((s) => JSON.stringify({
-        Service: s,
-        State: 'running',
-        Health: 'healthy',
-        Image: 'x'
-    })).join('\n'));
+    out(
+        world.running
+            .map((s) => JSON.stringify({Service: s, State: 'running', Health: 'healthy', Image: 'x'}))
+            .join('\n'),
+    );
     exit(0);
 }
-if (sub === 'pull' || sub === 'build') exit(0);
+if (['pull', 'build', 'restart', 'rm'].includes(sub)) exit(0);
 if (sub === 'stop') {
     world.running = world.running.filter((s) => !rest.includes(s));
     save('world.json', world);
@@ -113,14 +211,16 @@ if (sub === 'exec') {
             users: [{id: 'demo-id', username: 'demo'}],
             groups: [],
             client: {id: 'cid', redirectUris: ['old'], webOrigins: []},
-            updates: []
+            updates: [],
         });
         const body = script.split('\n').slice(5).join('\n');
         if (body.includes('get clients')) out(JSON.stringify([kc.client]));
-        else if (body.includes('update "clients/')) kc.updates.push({secret: true, redirects: env.REDIRECTS});
+        else if (body.includes('update "clients/'))
+            kc.updates.push({secret: true, redirects: env.REDIRECTS});
         else if (body.includes('get groups')) out(JSON.stringify(kc.groups));
         else if (body.includes('create groups')) kc.groups.push({id: 'g-' + env.G, name: env.G});
-        else if (body.includes('get users')) out(JSON.stringify(kc.users.filter((u) => u.username === env.U)));
+        else if (body.includes('get users'))
+            out(JSON.stringify(kc.users.filter((u) => u.username === env.U)));
         else if (body.includes('create users')) {
             const id = 'uid-' + env.U;
             kc.users.push({id, username: env.U});

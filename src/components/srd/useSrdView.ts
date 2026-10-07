@@ -1,29 +1,29 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import type {
-  RequirementItemViewModel,
-  SrdDataContext,
-  SrdDocumentSettings,
-  SrdDocumentState,
-  SrdTemplateConfig,
-  SrdTemplateId,
+    RequirementItemViewModel,
+    SrdDataContext,
+    SrdDocumentSettings,
+    SrdDocumentState,
+    SrdTemplateConfig,
+    SrdTemplateId,
 } from '../../domain/srd/srdTypes';
 import {
-  serializeTemplateConfig,
-  parseTemplateConfig,
-  mergeTemplateWithDefaults,
+    mergeTemplateWithDefaults,
+    parseTemplateConfig,
+    serializeTemplateConfig,
 } from '../../domain/srd/srdTemplatePresets';
 import {
-  CUSTOM_PRESET_ID,
-  SRD_DIAGRAM_FRAMING_KEY,
-  findBuiltinPreset,
-  framingFor,
-  toRenderConfig,
+    CUSTOM_PRESET_ID,
+    findBuiltinPreset,
+    framingFor,
+    SRD_DIAGRAM_FRAMING_KEY,
+    toRenderConfig,
 } from '../../domain/srd/srdSettings';
-import { downloadSrdMarkdown } from '../../domain/srd/srdMarkdownExport';
-import { srdPdfFileName } from '../../domain/srd/srdFileNames';
-import { downloadFile } from '../../common/utils/download';
-import type { SrdStore } from '../../collab/stores/yjsSrdStore';
-import type { SrdSnapshots } from './capture/useSrdSnapshots';
+import {downloadSrdMarkdown} from '../../domain/srd/srdMarkdownExport';
+import {srdPdfFileName} from '../../domain/srd/srdFileNames';
+import {downloadFile} from '../../common/utils/download';
+import type {SrdStore} from '../../collab/stores/yjsSrdStore';
+import type {SrdSnapshots} from './capture/useSrdSnapshots';
 
 /** Framing snapshots are rendered at, in the units the sliders use. */
 const FRAMING_FRAME = { width: 1200, height: 600 };
