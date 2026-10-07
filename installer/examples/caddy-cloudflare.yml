@@ -1,0 +1,20 @@
+# Caddy runs alongside the services and gets certificates through
+# Cloudflare DNS, which also works for a host that is not reachable from
+# the internet.
+domain: editor.example.com
+proxy:
+  type: caddy
+  acme: cloudflare-dns
+  email: ops@example.com
+  cloudflareApiToken: env:CLOUDFLARE_API_TOKEN
+  propagationDelay: 30s
+  propagationTimeout: 10m
+identity:
+  type: keycloak
+  groups: [ design-team-a ]
+  initialUser:
+    username: jdoe
+    email: jdoe@example.com
+    groups: [ design-team-a ]
+recovery:
+  mode: generate

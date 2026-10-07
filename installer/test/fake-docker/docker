@@ -1,0 +1,135 @@
+#!/usr/bin/env node
+// A stand-in for the docker CLI, for end-to-end tests without a daemon.
+// Records every call in $FAKE_DOCKER_STATE/calls.log, keeps a little state
+// (running services, volumes, a toy Keycloak), and forwards `compose config`
+// to a real compose binary ($REAL_COMPOSE) so the generated file is checked.
+import {appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
+import {join} from 'node:path';
+import {spawnSync} from 'node:child_process';
+
+const S = process.env.FAKE_DOCKER_STATE;
+mkdirSync(S, {recursive: true});
+const args = process.argv.slice(2);
+appendFileSync(join(S, 'calls.log'), args.join(' ') + '\n');
+const load = (f, d) => (existsSync(join(S, f)) ? JSON.parse(readFileSync(join(S, f), 'utf8')) : d);
+const save = (f, v) => writeFileSync(join(S, f), JSON.stringify(v));
+const out = (s) => process.stdout.write(s);
+const exit = (c) => process.exit(c);
+
+if (args[0] === 'version') {
+    out('27.3.1\n');
+    exit(0);
+}
+if (args[0] === 'inspect' || args[0] === 'ps') exit(args[0] === 'ps' ? 0 : 1);
+if (args[0] === 'volume') exit(load('world.json', {}).volumes ? 0 : 1);
+if (args[0] === 'run') {
+    if (args.includes('generate-recovery-key')) {
+        const mount = args[args.indexOf('-v') + 1].split(':')[0];
+        writeFileSync(join(mount, 'recovery-public.pem'), '-----BEGIN PUBLIC KEY-----\nFAKE\n-----END PUBLIC KEY-----\n');
+        writeFileSync(join(mount, 'recovery-private.pem'), '-----BEGIN PRIVATE KEY-----\nFAKE\n-----END PRIVATE KEY-----\n', {mode: 0o600});
+    }
+    exit(0);
+}
+if (args[0] !== 'compose') {
+    console.error('fake docker: unhandled ' + args.join(' '));
+    exit(2);
+}
+
+// compose: skip global flags
+let i = 1;
+const globals = {};
+while (args[i]?.startsWith('-')) {
+    globals[args[i]] = args[i + 1];
+    i += 2;
+}
+const sub = args[i];
+const rest = args.slice(i + 1);
+const dir = globals['--project-directory'];
+if (sub === 'version') {
+    out('2.29.7\n');
+    exit(0);
+}
+if (sub === 'config') {
+    const r = spawnSync(process.env.REAL_COMPOSE, args.slice(1), {stdio: 'inherit'});
+    exit(r.status ?? 1);
+}
+const world = load('world.json', {running: [], volumes: false});
+const services = () => {
+    const text = readFileSync(join(dir, 'compose.yml'), 'utf8');
+    const block = text.split(/^services:\n/m)[1].split(/^\S/m)[0];
+    return [...block.matchAll(/^  ([a-z][\w-]*):$/gm)].map((m) => m[1]);
+};
+if (sub === 'ps') {
+    out(world.running.map((s) => JSON.stringify({
+        Service: s,
+        State: 'running',
+        Health: 'healthy',
+        Image: 'x'
+    })).join('\n'));
+    exit(0);
+}
+if (sub === 'pull' || sub === 'build') exit(0);
+if (sub === 'stop') {
+    world.running = world.running.filter((s) => !rest.includes(s));
+    save('world.json', world);
+    exit(0);
+}
+if (sub === 'up') {
+    const env = readFileSync(join(dir, '.env'), 'utf8');
+    if (/STORE_IMAGE='[^']*broken/.test(env)) {
+        console.error('container store is unhealthy');
+        exit(1);
+    }
+    const named = rest.filter((a) => !a.startsWith('-') && !/^\d+$/.test(a));
+    world.running = [...new Set([...world.running, ...(named.length ? named : services())])];
+    world.volumes = true;
+    save('world.json', world);
+    exit(0);
+}
+if (sub === 'exec') {
+    let j = 0;
+    const env = {};
+    while (rest[j]?.startsWith('-')) {
+        if (rest[j] === '-e') {
+            const [k, ...v] = rest[j + 1].split('=');
+            env[k] = v.join('=');
+            j += 2;
+        } else j += 1;
+    }
+    const service = rest[j];
+    const cmd = rest.slice(j + 1);
+    if (cmd[0] === 'pg_dump') {
+        out('PGDMP-fake-' + service);
+        exit(0);
+    }
+    if (cmd[0] === 'pg_restore') {
+        readFileSync(0);
+        appendFileSync(join(S, 'restores.log'), service + '\n');
+        exit(0);
+    }
+    if (service === 'keycloak') {
+        const script = cmd[2];
+        const kc = load('keycloak.json', {
+            users: [{id: 'demo-id', username: 'demo'}],
+            groups: [],
+            client: {id: 'cid', redirectUris: ['old'], webOrigins: []},
+            updates: []
+        });
+        const body = script.split('\n').slice(5).join('\n');
+        if (body.includes('get clients')) out(JSON.stringify([kc.client]));
+        else if (body.includes('update "clients/')) kc.updates.push({secret: true, redirects: env.REDIRECTS});
+        else if (body.includes('get groups')) out(JSON.stringify(kc.groups));
+        else if (body.includes('create groups')) kc.groups.push({id: 'g-' + env.G, name: env.G});
+        else if (body.includes('get users')) out(JSON.stringify(kc.users.filter((u) => u.username === env.U)));
+        else if (body.includes('create users')) {
+            const id = 'uid-' + env.U;
+            kc.users.push({id, username: env.U});
+            out(id + '\n');
+        }
+        save('keycloak.json', kc);
+        exit(0);
+    }
+    exit(0);
+}
+console.error('fake docker: unhandled compose ' + sub);
+exit(2);

@@ -1,0 +1,15 @@
+# No inbound ports: cloudflared connects out to Cloudflare, which serves
+# HTTPS. Route the hostname to http://proxy:80 in the tunnel's settings.
+domain: design.example.com
+proxy:
+  type: cloudflare-tunnel
+  token: env:TUNNEL_TOKEN
+identity:
+  type: github
+  clientId: Iv1.0123456789abcdef
+  clientSecret: env:GITHUB_CLIENT_SECRET
+recovery:
+  mode: generate
+store:
+  retention: 7y
+  relayAuth: true

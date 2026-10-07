@@ -1,0 +1,20 @@
+# Your current topology: Caddy runs on another machine and forwards to this
+# host's LAN address. The installer publishes the service ports on that
+# address only and writes ready-to-paste snippets to proxy-snippets/.
+domain: editor.home.jbraunsma.dev
+project: prod            # keep the existing project name so volumes are found
+proxy:
+  type: external
+  upstreamHost: 192.168.2.146
+  bindAddress: 192.168.2.146
+identity:
+  type: keycloak
+  groups: [ design-team-a, design-team-b ]
+turn:
+  type: bundled
+  host: turn.jbraunsma.dev
+recovery:
+  mode: existing
+  publicKeyPath: keys/recovery-public.pem
+store:
+  retention: 30d

@@ -1,0 +1,25 @@
+# nginx with Let's Encrypt over HTTP-01, one hostname per service, and an
+# existing OIDC provider instead of Keycloak.
+domain: design.example.com
+routing:
+  mode: subdomain
+  hosts:
+    store: store.design.example.com
+    relay: relay.design.example.com
+proxy:
+  type: nginx
+  tls: certbot-http
+  email: ops@example.com
+identity:
+  type: oidc
+  issuer: https://login.example.com/realms/corp
+  clientId: system-design-store
+  clientSecret: file:/run/secrets/oidc-client-secret
+  groupsClaim: groups
+turn:
+  type: none
+recovery:
+  mode: existing
+  publicKeyPath: /run/secrets/recovery-public.pem
+versions:
+  store: 2026-10-03      # pinned; editor and relay follow latest
