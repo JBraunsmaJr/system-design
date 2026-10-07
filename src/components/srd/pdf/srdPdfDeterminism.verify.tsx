@@ -5,21 +5,17 @@
  *
  * Run with: npx tsx --tsconfig tsconfig.app.json src/components/srd/pdf/srdPdfDeterminism.verify.tsx
  */
-import { pdf } from '@react-pdf/renderer';
-import { getDocument, OPS } from 'pdfjs-dist/legacy/build/pdf.mjs';
+import {pdf} from '@react-pdf/renderer';
+import {getDocument, OPS} from 'pdfjs-dist/legacy/build/pdf.mjs';
 import * as Y from 'yjs';
-import { SrdPdfDocument } from './SrdPdfDocument';
-import { registerSrdPdfFonts } from './srdPdfFonts';
-import { createYjsSrdStore } from '../../../collab/stores/yjsSrdStore';
-import { aggregateSrdData } from '../../../domain/srd/srdDataAggregator';
-import {
-  applyDocumentState,
-  settingsFromPreset,
-  toRenderConfig,
-} from '../../../domain/srd/srdSettings';
-import { AGILE_ENGINEERING_TEMPLATE } from '../../../domain/srd/srdTemplatePresets';
-import { DEFAULT_SNAPSHOT } from '../../../app/documentSnapshot';
-import type { SrdDataContext, SrdTemplateConfig } from '../../../domain/srd/srdTypes';
+import {SrdPdfDocument} from './SrdPdfDocument';
+import {registerSrdPdfFonts} from './srdPdfFonts';
+import {createYjsSrdStore} from '../../../collab/stores/yjsSrdStore';
+import {aggregateSrdData} from '../../../domain/srd/srdDataAggregator';
+import {applyDocumentState, settingsFromPreset, toRenderConfig,} from '../../../domain/srd/srdSettings';
+import {AGILE_ENGINEERING_TEMPLATE} from '../../../domain/srd/srdTemplatePresets';
+import {DEFAULT_SNAPSHOT} from '../../../app/documentSnapshot';
+import type {SrdDataContext, SrdTemplateConfig} from '../../../domain/srd/srdTypes';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {

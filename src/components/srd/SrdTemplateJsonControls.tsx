@@ -1,6 +1,6 @@
-import { Upload, Download, RotateCcw } from 'lucide-react';
-import { DEFAULT_SRD_TEMPLATE } from '../../domain/srd/srdTemplatePresets';
-import type { SrdViewState } from './useSrdView';
+import {Download, RotateCcw, Upload} from 'lucide-react';
+import {DEFAULT_SRD_TEMPLATE} from '../../domain/srd/srdTemplatePresets';
+import type {SrdViewState} from './useSrdView';
 
 /**
  * Importing and exporting the template configuration as JSON.

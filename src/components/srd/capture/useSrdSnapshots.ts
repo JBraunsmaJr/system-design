@@ -1,17 +1,14 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import type { Edge, Node } from '@xyflow/react';
-import { projectCanvasElements } from '../../../app/canvasProjection';
-import { populatedLevelCounts } from '../../../collab/stores/diagramStore';
-import {
-  captureDiagramSnapshot,
-  captureNodeSubsetSnapshot,
-} from '../../../domain/canvas/imageExport';
-import type { ArchEdgeData, ArchNodeData } from '../../../domain/canvas/types';
-import { getFontEmbedCSS } from 'html-to-image';
-import { srdSnapshotCache } from '../../../domain/srd/srdSnapshotCache';
-import { planSrdSnapshots, type SrdSnapshotTarget } from '../../../domain/srd/srdSnapshotPlan';
-import type { SrdDocumentState, SrdSnapshotFraming } from '../../../domain/srd/srdTypes';
-import type { CaptureLevel, RenderedLevel, SrdCaptureSurfaceProps } from './SrdCaptureSurface';
+import {useCallback, useDeferredValue, useEffect, useMemo, useRef, useState} from 'react';
+import type {Edge, Node} from '@xyflow/react';
+import {projectCanvasElements} from '../../../app/canvasProjection';
+import {populatedLevelCounts} from '../../../collab/stores/diagramStore';
+import {captureDiagramSnapshot, captureNodeSubsetSnapshot,} from '../../../domain/canvas/imageExport';
+import type {ArchEdgeData, ArchNodeData} from '../../../domain/canvas/types';
+import {getFontEmbedCSS} from 'html-to-image';
+import {srdSnapshotCache} from '../../../domain/srd/srdSnapshotCache';
+import {planSrdSnapshots, type SrdSnapshotTarget} from '../../../domain/srd/srdSnapshotPlan';
+import type {SrdDocumentState, SrdSnapshotFraming} from '../../../domain/srd/srdTypes';
+import type {CaptureLevel, RenderedLevel, SrdCaptureSurfaceProps} from './SrdCaptureSurface';
 
 /**
  * Pinned so a snapshot looks the same on every screen, rather than following

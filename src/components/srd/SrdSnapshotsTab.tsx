@@ -1,5 +1,5 @@
-import { RotateCcw, Camera, Trash2, RefreshCw } from 'lucide-react';
-import type { SrdViewState } from './useSrdView';
+import {Camera, RefreshCw, RotateCcw, Trash2} from 'lucide-react';
+import type {SrdViewState} from './useSrdView';
 
 /**
  * The Snapshots tab: per-requirement diagram snapshots and their framing.

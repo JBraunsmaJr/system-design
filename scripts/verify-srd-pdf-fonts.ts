@@ -7,9 +7,9 @@
  *
  * Run with: npx tsx scripts/verify-srd-pdf-fonts.ts
  */
-import { existsSync, readFileSync } from 'fs';
-import { join, resolve } from 'path';
-import { SRD_PDF_FONT_FILES } from '../src/components/srd/pdf/srdPdfFonts';
+import {existsSync, readFileSync} from 'fs';
+import {join, resolve} from 'path';
+import {SRD_PDF_FONT_FILES} from '../src/components/srd/pdf/srdPdfFonts';
 
 let failures = 0;
 function check(condition: boolean, message: string) {

@@ -1,4 +1,4 @@
-import type { SrdTemplateId } from './srdTypes';
+import type {SrdTemplateId} from './srdTypes';
 
 /**
  * What the template picker shows: each template's name, description and

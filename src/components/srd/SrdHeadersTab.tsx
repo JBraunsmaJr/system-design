@@ -1,4 +1,4 @@
-import type { SrdViewState } from './useSrdView';
+import type {SrdViewState} from './useSrdView';
 
 /**
  * The Headers tab: running header and footer text.

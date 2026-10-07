@@ -1,8 +1,8 @@
-import type { SrdTemplateConfig } from '../../../../../domain/srd/srdTypes';
-import { PDF_PALETTE as P, mixColors } from '../../srdPdfPalette';
-import type { SrdPdfSlots, SrdPdfSlotsByPlacement } from '../../template/types';
-import { createClassicSlots } from '../classic/classicSlots';
-import { PAGE_MARGIN, type } from '../shared';
+import type {SrdTemplateConfig} from '../../../../../domain/srd/srdTypes';
+import {mixColors, PDF_PALETTE as P} from '../../srdPdfPalette';
+import type {SrdPdfSlots, SrdPdfSlotsByPlacement} from '../../template/types';
+import {createClassicSlots} from '../classic/classicSlots';
+import {PAGE_MARGIN, type} from '../shared';
 
 /** The colored strip down every page's left edge. */
 export const SIDEBAR_WIDTH = 190;

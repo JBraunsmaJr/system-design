@@ -1,5 +1,5 @@
-import type { SrdDataContext, SrdTemplateConfig } from '../../../domain/srd/srdTypes';
-import { createRenderQueue } from './srdPdfQueue';
+import type {SrdDataContext, SrdTemplateConfig} from '../../../domain/srd/srdTypes';
+import {createRenderQueue} from './srdPdfQueue';
 
 export { SupersededError } from './srdPdfQueue';
 

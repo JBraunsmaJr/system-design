@@ -1,52 +1,44 @@
-import {
-  lazy,
-  Suspense,
-  useCallback,
-  useMemo,
-  useState,
-  Profiler,
-  type ProfilerOnRenderCallback,
-} from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { ReactFlowProvider } from '@xyflow/react';
+import {lazy, Profiler, type ProfilerOnRenderCallback, Suspense, useCallback, useMemo, useState,} from 'react';
+import {ChevronLeft, ChevronRight} from 'lucide-react';
+import {ReactFlowProvider} from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import * as Y from 'yjs';
-import { Toolbar } from './components/canvas/Toolbar';
-import { CollabPanel } from './components/workspace/CollabPanel';
-import { Palette } from './components/canvas/Palette';
-import { Canvas } from './components/canvas/Canvas';
-import { Inspector } from './components/canvas/Inspector';
-import { ScenarioPanel } from './components/canvas/ScenarioPanel';
-import { LibraryManagerModal } from './components/workspace/LibraryManagerModal';
-import { RequirementsView } from './components/requirements/RequirementsView';
-import { TimelineView } from './components/timeline/TimelineView';
-import { TeamView } from './components/team/TeamView';
-import { SkillTreeView } from './components/skilltree/SkillTreeView';
-import { DocumentManager } from './components/workspace/DocumentManager';
-import { DurabilityIndicator } from './components/workspace/DurabilityIndicator';
-import { LeaveGuardDialog } from './components/workspace/LeaveGuardDialog';
-import { WorkspacePanel } from './components/workspace/WorkspacePanel';
-import { AccessRequestNotice } from './components/workspace/AccessRequestNotice';
-import { Toast, type ToastType } from './common/components/toast/Toast';
-import { useFileSaving } from './hooks/useFileSaving';
-import { useAccessRequests } from './collab/hooks/useAccessRequests';
-import { getStoreUrl } from './domain/storage/storeConfig';
-import { isSoleReplicaHolder } from './domain/storage/durability';
-import { recordCommit, isPerfInstrumentationActive } from './perf/instrumentation';
-import { useOpenDocument } from './app/hooks/useOpenDocument';
-import { useStoreSignIn } from './app/hooks/useStoreSignIn';
-import { useCollabSession } from './app/hooks/useCollabSession';
-import { useDocumentStores } from './app/hooks/useDocumentStores';
-import { useWorkspaceSession } from './app/hooks/useWorkspaceSession';
-import { useDocumentPersistence } from './app/hooks/useDocumentPersistence';
-import { useDiagramSelection } from './app/hooks/useDiagramSelection';
-import { useScenarios } from './app/hooks/useScenarios';
-import { useViewNavigation } from './app/hooks/useViewNavigation';
-import { useCanvasEditing } from './app/hooks/useCanvasEditing';
-import { useClipboard } from './app/hooks/useClipboard';
-import { useKeyboardShortcuts } from './app/hooks/useKeyboardShortcuts';
-import { useFileActions } from './app/hooks/useFileActions';
-import { usePerfHarnessBridge } from './app/hooks/usePerfHarnessBridge';
+import {Toolbar} from './components/canvas/Toolbar';
+import {CollabPanel} from './components/workspace/CollabPanel';
+import {Palette} from './components/canvas/Palette';
+import {Canvas} from './components/canvas/Canvas';
+import {Inspector} from './components/canvas/Inspector';
+import {ScenarioPanel} from './components/canvas/ScenarioPanel';
+import {LibraryManagerModal} from './components/workspace/LibraryManagerModal';
+import {RequirementsView} from './components/requirements/RequirementsView';
+import {TimelineView} from './components/timeline/TimelineView';
+import {TeamView} from './components/team/TeamView';
+import {SkillTreeView} from './components/skilltree/SkillTreeView';
+import {DocumentManager} from './components/workspace/DocumentManager';
+import {DurabilityIndicator} from './components/workspace/DurabilityIndicator';
+import {LeaveGuardDialog} from './components/workspace/LeaveGuardDialog';
+import {WorkspacePanel} from './components/workspace/WorkspacePanel';
+import {AccessRequestNotice} from './components/workspace/AccessRequestNotice';
+import {Toast, type ToastType} from './common/components/toast/Toast';
+import {useFileSaving} from './hooks/useFileSaving';
+import {useAccessRequests} from './collab/hooks/useAccessRequests';
+import {getStoreUrl} from './domain/storage/storeConfig';
+import {isSoleReplicaHolder} from './domain/storage/durability';
+import {isPerfInstrumentationActive, recordCommit} from './perf/instrumentation';
+import {useOpenDocument} from './app/hooks/useOpenDocument';
+import {useStoreSignIn} from './app/hooks/useStoreSignIn';
+import {useCollabSession} from './app/hooks/useCollabSession';
+import {useDocumentStores} from './app/hooks/useDocumentStores';
+import {useWorkspaceSession} from './app/hooks/useWorkspaceSession';
+import {useDocumentPersistence} from './app/hooks/useDocumentPersistence';
+import {useDiagramSelection} from './app/hooks/useDiagramSelection';
+import {useScenarios} from './app/hooks/useScenarios';
+import {useViewNavigation} from './app/hooks/useViewNavigation';
+import {useCanvasEditing} from './app/hooks/useCanvasEditing';
+import {useClipboard} from './app/hooks/useClipboard';
+import {useKeyboardShortcuts} from './app/hooks/useKeyboardShortcuts';
+import {useFileActions} from './app/hooks/useFileActions';
+import {usePerfHarnessBridge} from './app/hooks/usePerfHarnessBridge';
 import './App.css';
 
 // Loaded on first visit: the SRD view carries the PDF exporter, which no

@@ -1,7 +1,7 @@
-import { Fragment, type ReactNode } from 'react';
-import { Link, Text, View, type Styles } from '@react-pdf/renderer';
-import type { Nodes, Parents, PhrasingContent, RootContent, Table } from 'mdast';
-import { parseMarkdown } from './srdPdfMarkdownTree';
+import {Fragment, type ReactNode} from 'react';
+import {Link, type Styles, Text, View} from '@react-pdf/renderer';
+import type {Nodes, Parents, PhrasingContent, RootContent, Table} from 'mdast';
+import {parseMarkdown} from './srdPdfMarkdownTree';
 
 /**
  * Markdown for the react-pdf renderer.

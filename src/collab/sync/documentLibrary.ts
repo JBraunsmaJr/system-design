@@ -11,21 +11,12 @@
  * database as well as the index entry.
  */
 import * as Y from 'yjs';
-import type {
-  DocumentIndexEntry,
-  DocumentStore,
-  StorageResult,
-} from '../../domain/storage/documentStore.ts';
-import { newDocumentId } from '../../domain/storage/documentStore.ts';
-import { toDiagramFile, type DiagramFile } from '../../domain/canvas/serialization.ts';
-import { openDocument, storageKeyForDocument, type OpenDocument } from './localDocument.ts';
-import {
-  readDocumentContents,
-  rebaseDocument,
-  canRebase,
-  type RebaseEligibility,
-} from './rebase.ts';
-import type { CompactionResult } from './persistence.ts';
+import type {DocumentIndexEntry, DocumentStore, StorageResult,} from '../../domain/storage/documentStore.ts';
+import {newDocumentId} from '../../domain/storage/documentStore.ts';
+import {type DiagramFile, toDiagramFile} from '../../domain/canvas/serialization.ts';
+import {openDocument, type OpenDocument, storageKeyForDocument} from './localDocument.ts';
+import {canRebase, readDocumentContents, rebaseDocument, type RebaseEligibility,} from './rebase.ts';
+import type {CompactionResult} from './persistence.ts';
 
 export interface DocumentLibraryDeps {
   store: DocumentStore;

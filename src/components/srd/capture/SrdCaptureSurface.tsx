@@ -1,19 +1,12 @@
-import { useEffect, useRef, type RefObject } from 'react';
-import {
-  ReactFlow,
-  ReactFlowProvider,
-  useNodesInitialized,
-  useReactFlow,
-  type Edge,
-  type Node,
-} from '@xyflow/react';
+import {type RefObject, useEffect, useRef} from 'react';
+import {type Edge, type Node, ReactFlow, ReactFlowProvider, useNodesInitialized, useReactFlow,} from '@xyflow/react';
 import {
   CANVAS_EDGE_TYPES,
   CANVAS_NODE_TYPES,
   DEFAULT_EDGE_OPTIONS,
   PRO_OPTIONS,
 } from '../../canvas/canvasElementTypes';
-import type { ArchEdgeData, ArchNodeData } from '../../../domain/canvas/types';
+import type {ArchEdgeData, ArchNodeData} from '../../../domain/canvas/types';
 
 /** One diagram level to render. `key` changes whenever its content does, and
  * stays the same across snapshots of the same level, so those share a render. */

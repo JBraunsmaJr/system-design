@@ -4,8 +4,8 @@
  *
  * Run with: npx tsx --tsconfig tsconfig.app.json src/components/srd/pdf/srdPdfPagination.verify.tsx
  */
-import { Document, Page, Text, View, pdf, StyleSheet } from '@react-pdf/renderer';
-import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
+import {Document, Page, pdf, StyleSheet, Text, View} from '@react-pdf/renderer';
+import {getDocument} from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {

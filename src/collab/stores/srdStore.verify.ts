@@ -2,17 +2,10 @@
  * Run with: npx tsx --tsconfig tsconfig.app.json src/collab/stores/srdStore.verify.ts
  */
 import * as Y from 'yjs';
-import { createYjsSrdStore, seedYjsSrd, SRD_FRAMING_MAP, SRD_MAP } from './yjsSrdStore.ts';
-import {
-  AGILE_ENGINEERING_TEMPLATE,
-  ENTERPRISE_FORMAL_TEMPLATE,
-} from '../../domain/srd/srdTemplatePresets.ts';
-import {
-  CUSTOM_PRESET_ID,
-  DEFAULT_SRD_DOCUMENT_STATE,
-  srdValuesEqual,
-} from '../../domain/srd/srdSettings.ts';
-import type { SrdDocumentState } from '../../domain/srd/srdTypes.ts';
+import {createYjsSrdStore, seedYjsSrd, SRD_FRAMING_MAP, SRD_MAP} from './yjsSrdStore.ts';
+import {AGILE_ENGINEERING_TEMPLATE, ENTERPRISE_FORMAL_TEMPLATE,} from '../../domain/srd/srdTemplatePresets.ts';
+import {CUSTOM_PRESET_ID, DEFAULT_SRD_DOCUMENT_STATE, srdValuesEqual,} from '../../domain/srd/srdSettings.ts';
+import type {SrdDocumentState} from '../../domain/srd/srdTypes.ts';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {

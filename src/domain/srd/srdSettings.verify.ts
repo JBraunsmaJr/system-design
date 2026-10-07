@@ -2,11 +2,11 @@
  * Run with: npx tsx --tsconfig tsconfig.app.json src/domain/srd/srdSettings.verify.ts
  */
 import {
+  applyMetadataOverrides,
+  compactSrdState,
   CUSTOM_PRESET_ID,
   DEFAULT_SNAPSHOT_FRAMING,
   DEFAULT_SRD_DOCUMENT_STATE,
-  applyMetadataOverrides,
-  compactSrdState,
   expandSrdFileValue,
   framingFor,
   isCapturedWith,
@@ -14,8 +14,8 @@ import {
   stateWithPreset,
   toRenderConfig,
 } from './srdSettings';
-import { AGILE_ENGINEERING_TEMPLATE, ENTERPRISE_FORMAL_TEMPLATE } from './srdTemplatePresets';
-import type { SrdDataContext, SrdDocumentState } from './srdTypes';
+import {AGILE_ENGINEERING_TEMPLATE, ENTERPRISE_FORMAL_TEMPLATE} from './srdTemplatePresets';
+import type {SrdDataContext, SrdDocumentState} from './srdTypes';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {

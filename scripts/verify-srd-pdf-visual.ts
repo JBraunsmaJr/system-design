@@ -15,11 +15,11 @@
  * Run with: npx tsx scripts/verify-srd-pdf-visual.ts
  * CHROMIUM_PATH may point at a Chromium build other than Playwright's own.
  */
-import { chromium, type Browser } from 'playwright';
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'fs';
-import { join, resolve } from 'path';
-import { tmpdir } from 'os';
-import { startDevServers, type DevServers } from './lib/devServers';
+import {type Browser, chromium} from 'playwright';
+import {existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync} from 'fs';
+import {join, resolve} from 'path';
+import {tmpdir} from 'os';
+import {type DevServers, startDevServers} from './lib/devServers';
 
 const BASELINES = resolve('fixtures/srd-pdf-baselines', process.platform);
 const UPDATE = process.env.SRD_PDF_UPDATE_BASELINES === '1';

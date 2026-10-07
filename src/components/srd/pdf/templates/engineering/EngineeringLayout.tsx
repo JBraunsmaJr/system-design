@@ -1,8 +1,8 @@
-import { Page, View } from '@react-pdf/renderer';
-import { useSrdPdfSlots } from '../../template/context';
-import type { SrdPdfLayoutProps } from '../../template/types';
-import { SrdPdfPageChrome, SrdPdfTitleBlock } from '../../sections/SrdPdfPageChrome';
-import { SrdPdfSection } from '../../sections/SrdPdfSections';
+import {Page, View} from '@react-pdf/renderer';
+import {useSrdPdfSlots} from '../../template/context';
+import type {SrdPdfLayoutProps} from '../../template/types';
+import {SrdPdfPageChrome, SrdPdfTitleBlock} from '../../sections/SrdPdfPageChrome';
+import {SrdPdfSection} from '../../sections/SrdPdfSections';
 
 /**
  * Engineering's structure: each section on pages of its own, as chapters are

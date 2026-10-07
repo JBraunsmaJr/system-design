@@ -1,18 +1,14 @@
-import { useDeferredValue, useMemo } from 'react';
-import type { Edge, Node } from '@xyflow/react';
-import type { ArchEdgeData, ArchNodeData } from '../../domain/canvas/types';
-import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
-import type { ProgramIncrement } from '../../domain/timeline/programIncrements';
-import type { TeamDocument } from '../../domain/timeline/teamTypes';
-import type { Milestone } from '../../domain/timeline/milestones';
-import { aggregateSrdData } from '../../domain/srd/srdDataAggregator';
-import { SRD_DIAGRAM_FRAMING_KEY, applyDocumentState } from '../../domain/srd/srdSettings';
-import type {
-  SrdDataContext,
-  SrdDocumentState,
-  SrdSnapshotFraming,
-} from '../../domain/srd/srdTypes';
-import type { SrdSnapshotImage } from './capture/useSrdSnapshots';
+import {useDeferredValue, useMemo} from 'react';
+import type {Edge, Node} from '@xyflow/react';
+import type {ArchEdgeData, ArchNodeData} from '../../domain/canvas/types';
+import type {RequirementsDocument} from '../../domain/requirements/requirementsTypes';
+import type {ProgramIncrement} from '../../domain/timeline/programIncrements';
+import type {TeamDocument} from '../../domain/timeline/teamTypes';
+import type {Milestone} from '../../domain/timeline/milestones';
+import {aggregateSrdData} from '../../domain/srd/srdDataAggregator';
+import {applyDocumentState, SRD_DIAGRAM_FRAMING_KEY} from '../../domain/srd/srdSettings';
+import type {SrdDataContext, SrdDocumentState, SrdSnapshotFraming,} from '../../domain/srd/srdTypes';
+import type {SrdSnapshotImage} from './capture/useSrdSnapshots';
 
 export interface UseSrdDocumentDataOptions {
   title: string;

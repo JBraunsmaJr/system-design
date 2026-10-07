@@ -8,7 +8,7 @@
  * Never hand-author these fixtures. The point is to capture what each version
  * actually wrote, not what we currently believe it wrote.
  */
-import { writeFileSync, mkdirSync } from 'node:fs';
+import {mkdirSync, writeFileSync} from 'node:fs';
 
 // Serialization moved from src/domain/ to src/domain/canvas/; historical
 // commits have it at the old path, newer ones at the new path.

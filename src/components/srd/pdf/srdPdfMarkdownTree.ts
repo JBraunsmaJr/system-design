@@ -1,8 +1,8 @@
-import { unified } from 'unified';
+import {unified} from 'unified';
 import remarkParse from 'remark-parse';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
-import type { Root } from 'mdast';
+import type {Root} from 'mdast';
 
 /**
  * Markdown to a syntax tree, with the same remark plugins as the HTML

@@ -1,7 +1,7 @@
 /**
  * Run with: npx tsx --tsconfig tsconfig.app.json src/components/srd/pdf/srdPdfQueue.verify.ts
  */
-import { SupersededError, createRenderQueue } from './srdPdfQueue';
+import {createRenderQueue, SupersededError} from './srdPdfQueue';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {

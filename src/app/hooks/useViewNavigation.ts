@@ -1,17 +1,10 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  type Dispatch,
-  type SetStateAction,
-} from 'react';
-import type { Node, Edge } from '@xyflow/react';
-import { unflattenToSubDiagram, type DiagramStore } from '../../collab/stores/diagramStore';
-import type { PresenceInfo } from '../../collab/sync/session';
-import { EMPTY_DIAGRAM } from '../documentSnapshot';
-import type { DiagramPath } from '../../domain/canvas/subDiagramTree';
-import type { ArchNodeData, ArchEdgeData } from '../../domain/canvas/types';
+import {type Dispatch, type SetStateAction, useCallback, useEffect, useMemo, useState,} from 'react';
+import type {Edge, Node} from '@xyflow/react';
+import {type DiagramStore, unflattenToSubDiagram} from '../../collab/stores/diagramStore';
+import type {PresenceInfo} from '../../collab/sync/session';
+import {EMPTY_DIAGRAM} from '../documentSnapshot';
+import type {DiagramPath} from '../../domain/canvas/subDiagramTree';
+import type {ArchEdgeData, ArchNodeData} from '../../domain/canvas/types';
 
 export type ViewMode = 'diagram' | 'requirements' | 'timeline' | 'team' | 'skill-tree' | 'srd';
 

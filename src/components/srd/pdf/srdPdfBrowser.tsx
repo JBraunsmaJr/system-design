@@ -1,9 +1,9 @@
-import { Buffer } from 'buffer';
-import { pdf } from '@react-pdf/renderer';
-import type { SrdDataContext, SrdTemplateConfig } from '../../../domain/srd/srdTypes';
-import { SrdPdfDocument } from './SrdPdfDocument';
-import { registerSrdPdfFonts } from './srdPdfFonts';
-import { SRD_PDF_FONT_URLS } from './srdPdfFontAssets';
+import {Buffer} from 'buffer';
+import {pdf} from '@react-pdf/renderer';
+import type {SrdDataContext, SrdTemplateConfig} from '../../../domain/srd/srdTypes';
+import {SrdPdfDocument} from './SrdPdfDocument';
+import {registerSrdPdfFonts} from './srdPdfFonts';
+import {SRD_PDF_FONT_URLS} from './srdPdfFontAssets';
 
 /**
  * The browser's entry to the react-pdf renderer. Registers the SRD's fonts

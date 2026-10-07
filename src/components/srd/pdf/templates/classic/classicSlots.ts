@@ -1,10 +1,10 @@
-import { StyleSheet } from '@react-pdf/renderer';
-import type { SrdTemplateConfig } from '../../../../../domain/srd/srdTypes';
-import type { PdfMarkdownStyles, PdfStyle } from '../../srdPdfMarkdown';
-import { PDF_PALETTE as P } from '../../srdPdfPalette';
-import { FOOTER_BAND, HEADER_BAND, PAGE_MARGIN, tone, type } from '../shared';
-import { pdfMonoStyle, resolvePdfFontFamily } from '../../srdPdfFonts';
-import type { PillVariant, SrdPdfSlots, SrdPdfSlotsByPlacement } from '../../template/types';
+import {StyleSheet} from '@react-pdf/renderer';
+import type {SrdTemplateConfig} from '../../../../../domain/srd/srdTypes';
+import type {PdfMarkdownStyles, PdfStyle} from '../../srdPdfMarkdown';
+import {PDF_PALETTE as P} from '../../srdPdfPalette';
+import {FOOTER_BAND, HEADER_BAND, PAGE_MARGIN, tone, type} from '../shared';
+import {pdfMonoStyle, resolvePdfFontFamily} from '../../srdPdfFonts';
+import type {PillVariant, SrdPdfSlots, SrdPdfSlotsByPlacement} from '../../template/types';
 
 /**
  * Classic: the look the SRD has always had - a single column, numbered

@@ -1,64 +1,59 @@
 import {
+  type MouseEvent as ReactMouseEvent,
   useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
   useState,
-  type MouseEvent as ReactMouseEvent,
 } from 'react';
 import {
-  ReactFlow,
   Background,
   BackgroundVariant,
-  Controls,
   ControlButton,
-  MiniMap,
-  SelectionMode,
-  ViewportPortal,
-  useReactFlow,
-  useUpdateNodeInternals,
-  type Node,
+  Controls,
   type Edge,
-  type OnNodesChange,
-  type OnEdgesChange,
+  MiniMap,
+  type Node,
+  type NodeMouseHandler,
   type OnConnect,
   type OnConnectStart,
-  type NodeMouseHandler,
+  type OnEdgesChange,
+  type OnNodesChange,
+  ReactFlow,
+  SelectionMode,
+  useReactFlow,
+  useUpdateNodeInternals,
+  ViewportPortal,
 } from '@xyflow/react';
-import { MousePointer2 } from 'lucide-react';
-import {
-  CANVAS_EDGE_TYPES,
-  CANVAS_NODE_TYPES,
-  DEFAULT_EDGE_OPTIONS,
-  PRO_OPTIONS,
-} from './canvasElementTypes';
-import { PresentationOverlay } from './PresentationOverlay';
-import { Breadcrumb } from './Breadcrumb';
-import { DocumentationPopup } from '../documentation/DocumentationPopup';
-import { useDiagramHoverDocumentation } from '../documentation/useDiagramHoverDocumentation';
-import type { ZOrderCommand } from '../../domain/canvas/zOrder';
+import {MousePointer2} from 'lucide-react';
+import {CANVAS_EDGE_TYPES, CANVAS_NODE_TYPES, DEFAULT_EDGE_OPTIONS, PRO_OPTIONS,} from './canvasElementTypes';
+import {PresentationOverlay} from './PresentationOverlay';
+import {Breadcrumb} from './Breadcrumb';
+import {DocumentationPopup} from '../documentation/DocumentationPopup';
+import {useDiagramHoverDocumentation} from '../documentation/useDiagramHoverDocumentation';
+import type {ZOrderCommand} from '../../domain/canvas/zOrder';
 import type {
-  ArchNodeData,
   ArchEdgeData,
   ArchEdgeDataPatch,
+  ArchNodeData,
   EdgeWaypoint,
   Scenario,
   ScenarioStep,
 } from '../../domain/canvas/types';
-import type { EdgeEndpoints } from '../../domain/canvas/edgeReconnect';
-import { EdgeConnectionLine } from './edges/EdgeConnectionLine';
-import type { PresenceInfo } from '../../collab/sync/session';
-import { CanvasContext, type CanvasContextValue } from './CanvasContext';
-import { recordCanvasRender, registerPerfViewportFramer } from '../../perf/instrumentation';
-import { nodeToAlignBox } from './nodeAlignBox';
-import { CanvasContextMenu } from './CanvasContextMenu';
-import { useCanvasFocusSets } from './useCanvasFocusSets';
-import { useEdgeConnectionGestures } from './useEdgeConnectionGestures';
-import { useCanvasCreation } from './useCanvasCreation';
-import { useNodeDragInteractions } from './useNodeDragInteractions';
-import { useCanvasContextMenu } from './useCanvasContextMenu';
-import { useCanvasFocusDisplay } from './useCanvasFocusDisplay';
+import type {EdgeEndpoints} from '../../domain/canvas/edgeReconnect';
+import {EdgeConnectionLine} from './edges/EdgeConnectionLine';
+import type {PresenceInfo} from '../../collab/sync/session';
+import {CanvasContext, type CanvasContextValue} from './CanvasContext';
+import {recordCanvasRender, registerPerfViewportFramer} from '../../perf/instrumentation';
+import {nodeToAlignBox} from './nodeAlignBox';
+import {CanvasContextMenu} from './CanvasContextMenu';
+import {useCanvasFocusSets} from './useCanvasFocusSets';
+import {useEdgeConnectionGestures} from './useEdgeConnectionGestures';
+import {useCanvasCreation} from './useCanvasCreation';
+import {useNodeDragInteractions} from './useNodeDragInteractions';
+import {useCanvasContextMenu} from './useCanvasContextMenu';
+import {useCanvasFocusDisplay} from './useCanvasFocusDisplay';
 
 export interface PresentationState {
   scenario: Scenario;

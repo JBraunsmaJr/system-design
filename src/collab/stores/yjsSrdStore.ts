@@ -34,17 +34,17 @@ import type {
 } from '../../domain/srd/srdTypes';
 import {
   CUSTOM_PRESET_ID,
-  SRD_FIELDS,
   fieldsOf,
   isDefaultFraming,
   isDefaultSrdField,
   readSrdField,
   sanitizeFraming,
+  SRD_FIELDS,
+  type SrdField,
+  type SrdStoredFields,
   srdValuesEqual,
   stateWithPreset,
   unsupportedTemplateIdOf,
-  type SrdField,
-  type SrdStoredFields,
 } from '../../domain/srd/srdSettings';
 
 export const SRD_MAP = 'srd';

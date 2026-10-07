@@ -1,23 +1,16 @@
-import { Fragment, type ReactNode } from 'react';
-import { Image, Text, View } from '@react-pdf/renderer';
+import {Fragment, type ReactNode} from 'react';
+import {Image, Text, View} from '@react-pdf/renderer';
 import type {
   RequirementItemViewModel,
   SrdDataContext,
   SrdSectionConfig,
   SrdTemplateConfig,
 } from '../../../../domain/srd/srdTypes';
-import { interpolateTokens } from '../../../../domain/srd/srdMarkdownExport';
-import { PdfMarkdown } from '../srdPdfMarkdown';
-import { useSrdPdfFeatures, useSrdPdfSlots } from '../template/context';
-import { PdfTable } from '../primitives/PdfTable';
-import {
-  Code,
-  EmptyNote,
-  HEADING_KEEP_WITH_NEXT,
-  Pill,
-  Strong,
-  SubHeading,
-} from '../primitives/text';
+import {interpolateTokens} from '../../../../domain/srd/srdMarkdownExport';
+import {PdfMarkdown} from '../srdPdfMarkdown';
+import {useSrdPdfFeatures, useSrdPdfSlots} from '../template/context';
+import {PdfTable} from '../primitives/PdfTable';
+import {Code, EmptyNote, HEADING_KEEP_WITH_NEXT, Pill, Strong, SubHeading,} from '../primitives/text';
 
 /**
  * The SRD's sections, drawn once for every template.

@@ -1,12 +1,12 @@
 /**
  * Run with: npx tsx --tsconfig tsconfig.app.json src/components/srd/SrdView.verify.tsx
  */
-import { renderToStaticMarkup } from 'react-dom/server';
+import {renderToStaticMarkup} from 'react-dom/server';
 import * as Y from 'yjs';
-import SrdView, { type SrdViewProps } from './SrdView';
-import { createYjsSrdStore } from '../../collab/stores/yjsSrdStore';
-import { DEFAULT_SNAPSHOT } from '../../app/documentSnapshot';
-import { AGILE_ENGINEERING_TEMPLATE } from '../../domain/srd/srdTemplatePresets';
+import SrdView, {type SrdViewProps} from './SrdView';
+import {createYjsSrdStore} from '../../collab/stores/yjsSrdStore';
+import {DEFAULT_SNAPSHOT} from '../../app/documentSnapshot';
+import {AGILE_ENGINEERING_TEMPLATE} from '../../domain/srd/srdTemplatePresets';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {

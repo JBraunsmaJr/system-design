@@ -4,18 +4,18 @@
  *
  * Run with: npx tsx scripts/verify-srd-document.ts
  */
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import {readFileSync} from 'node:fs';
+import {dirname, join} from 'node:path';
+import {fileURLToPath} from 'node:url';
 import * as Y from 'yjs';
-import { openDocument, replaceDocumentContents } from '../src/collab/sync/localDocument.ts';
-import { readDocumentContents, rebaseDocument } from '../src/collab/sync/rebase.ts';
-import { createYjsSrdStore, SRD_FRAMING_MAP, SRD_MAP } from '../src/collab/stores/yjsSrdStore.ts';
-import { undoableStore, createUndoController } from '../src/collab/stores/undoManager.ts';
-import { parseDiagramFile, toDiagramFile } from '../src/domain/canvas/serialization.ts';
-import { AGILE_ENGINEERING_TEMPLATE } from '../src/domain/srd/srdTemplatePresets.ts';
-import { DEFAULT_SRD_DOCUMENT_STATE } from '../src/domain/srd/srdSettings.ts';
-import { diagramFileToSnapshot, snapshotToDiagramFile } from '../src/app/documentSnapshot.ts';
+import {openDocument, replaceDocumentContents} from '../src/collab/sync/localDocument.ts';
+import {readDocumentContents, rebaseDocument} from '../src/collab/sync/rebase.ts';
+import {createYjsSrdStore, SRD_FRAMING_MAP, SRD_MAP} from '../src/collab/stores/yjsSrdStore.ts';
+import {createUndoController, undoableStore} from '../src/collab/stores/undoManager.ts';
+import {parseDiagramFile, toDiagramFile} from '../src/domain/canvas/serialization.ts';
+import {AGILE_ENGINEERING_TEMPLATE} from '../src/domain/srd/srdTemplatePresets.ts';
+import {DEFAULT_SRD_DOCUMENT_STATE} from '../src/domain/srd/srdSettings.ts';
+import {diagramFileToSnapshot, snapshotToDiagramFile} from '../src/app/documentSnapshot.ts';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {

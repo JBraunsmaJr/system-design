@@ -1,6 +1,6 @@
-import { Camera, Trash2, RefreshCw, Undo2 } from 'lucide-react';
-import { AutoResizeTextarea } from './AutoResizeTextarea';
-import type { SrdViewState } from './useSrdView';
+import {Camera, RefreshCw, Trash2, Undo2} from 'lucide-react';
+import {AutoResizeTextarea} from './AutoResizeTextarea';
+import type {SrdViewState} from './useSrdView';
 
 /**
  * The Doc tab: document metadata and the architecture snapshot controls.

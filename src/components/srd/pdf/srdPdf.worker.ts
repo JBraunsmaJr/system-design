@@ -6,8 +6,8 @@
  *
  * Messages: { id, data, config } in; { id, blob } or { id, error } out.
  */
-import { renderSrdPdfBlob } from './srdPdfBrowser';
-import type { SrdPdfRequest, SrdPdfResponse } from './srdPdfClient';
+import {renderSrdPdfBlob} from './srdPdfBrowser';
+import type {SrdPdfRequest, SrdPdfResponse} from './srdPdfClient';
 
 // This file runs as a worker; the app's type configuration is for pages.
 const scope = self as unknown as {

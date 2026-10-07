@@ -1,6 +1,6 @@
-import { ArrowUp, ArrowDown, List, Table as TableIcon } from 'lucide-react';
-import { AutoResizeTextarea } from './AutoResizeTextarea';
-import type { SrdViewState } from './useSrdView';
+import {ArrowDown, ArrowUp, List, Table as TableIcon} from 'lucide-react';
+import {AutoResizeTextarea} from './AutoResizeTextarea';
+import type {SrdViewState} from './useSrdView';
 
 /**
  * The Layout tab: which sections appear, their order and table options.

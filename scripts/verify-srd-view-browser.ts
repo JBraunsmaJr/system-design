@@ -6,13 +6,13 @@
  * Run with: npx tsx scripts/verify-srd-view-browser.ts
  * CHROMIUM_PATH may point at a Chromium build other than Playwright's own.
  */
-import { chromium, type Browser, type Page } from 'playwright';
-import { mkdtempSync, readFileSync, writeFileSync } from 'fs';
-import { createHash } from 'crypto';
-import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
-import { tmpdir } from 'os';
-import { join, resolve } from 'path';
-import { startDevServers, type DevServers } from './lib/devServers';
+import {type Browser, chromium, type Page} from 'playwright';
+import {mkdtempSync, readFileSync, writeFileSync} from 'fs';
+import {createHash} from 'crypto';
+import {getDocument} from 'pdfjs-dist/legacy/build/pdf.mjs';
+import {tmpdir} from 'os';
+import {join, resolve} from 'path';
+import {type DevServers, startDevServers} from './lib/devServers';
 
 type FixtureNode = {
   id: string;

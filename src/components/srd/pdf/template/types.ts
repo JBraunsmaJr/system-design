@@ -1,12 +1,12 @@
-import type { ComponentType } from 'react';
-import type { RequirementStatus } from '../../../../domain/requirements/requirementsTypes';
+import type {ComponentType} from 'react';
+import type {RequirementStatus} from '../../../../domain/requirements/requirementsTypes';
 import type {
   SrdDataContext,
   SrdSectionConfig,
   SrdTemplateConfig,
   SrdTemplateId,
 } from '../../../../domain/srd/srdTypes';
-import type { PdfMarkdownStyles, PdfStyle } from '../srdPdfMarkdown';
+import type {PdfMarkdownStyles, PdfStyle} from '../srdPdfMarkdown';
 
 /**
  * Where on the page content sits. Classic puts everything in the body. A

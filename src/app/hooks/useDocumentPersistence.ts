@@ -1,30 +1,26 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Node, Edge } from '@xyflow/react';
-import { unflattenToSubDiagram } from '../../collab/stores/diagramStore';
-import { countPersistedReplicas, type PresenceInfo } from '../../collab/sync/session';
-import { toDiagramFile } from '../../domain/canvas/serialization';
+import {useEffect, useMemo, useRef, useState} from 'react';
+import type {Edge, Node} from '@xyflow/react';
+import {unflattenToSubDiagram} from '../../collab/stores/diagramStore';
+import {countPersistedReplicas, type PresenceInfo} from '../../collab/sync/session';
+import {toDiagramFile} from '../../domain/canvas/serialization';
+import {clearLegacyAutosave, getAutosaveBlockedReason, hasLegacyAutosave,} from '../../domain/storage/autosave';
+import {sessionDocumentId} from '../../domain/storage/currentDocument';
 import {
-  clearLegacyAutosave,
-  hasLegacyAutosave,
-  getAutosaveBlockedReason,
-} from '../../domain/storage/autosave';
-import { sessionDocumentId } from '../../domain/storage/currentDocument';
-import {
-  requestPersistentStorage,
   type createDocumentStore,
+  requestPersistentStorage,
   type StorageFailureReason,
 } from '../../domain/storage/documentStore';
-import { installUnloadGuard } from '../../domain/storage/unloadGuard';
-import type { DurabilitySignals } from '../../domain/storage/durability';
-import type { FileSaving } from '../../hooks/useFileSaving';
-import type { useWorkspaceSync } from '../../collab/hooks/useWorkspaceSync';
-import { isPerfAutosaveSuppressed } from '../../perf/instrumentation';
-import type { ArchNodeData, ArchEdgeData, Scenario } from '../../domain/canvas/types';
-import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
-import type { ProgramIncrement } from '../../domain/timeline/programIncrements';
-import type { TeamDocument } from '../../domain/timeline/teamTypes';
-import type { Milestone } from '../../domain/timeline/milestones';
-import type { SrdDocumentState } from '../../domain/srd/srdTypes';
+import {installUnloadGuard} from '../../domain/storage/unloadGuard';
+import type {DurabilitySignals} from '../../domain/storage/durability';
+import type {FileSaving} from '../../hooks/useFileSaving';
+import type {useWorkspaceSync} from '../../collab/hooks/useWorkspaceSync';
+import {isPerfAutosaveSuppressed} from '../../perf/instrumentation';
+import type {ArchEdgeData, ArchNodeData, Scenario} from '../../domain/canvas/types';
+import type {RequirementsDocument} from '../../domain/requirements/requirementsTypes';
+import type {ProgramIncrement} from '../../domain/timeline/programIncrements';
+import type {TeamDocument} from '../../domain/timeline/teamTypes';
+import type {Milestone} from '../../domain/timeline/milestones';
+import type {SrdDocumentState} from '../../domain/srd/srdTypes';
 
 export interface UseDocumentPersistenceOptions {
   fileSaving: FileSaving;
