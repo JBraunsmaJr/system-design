@@ -36,7 +36,14 @@ RUN npm --prefix docs-site ci && \
 # ---- Runtime stage: serves the built static files via nginx ----
 FROM nginx:stable-alpine AS runtime
 
-RUN apk update && apk upgrade
+# OS package fixes land in Alpine's repositories long before they land in
+# a new base image tag. CI builds with a persistent layer cache, and with a
+# pinned base image this layer's inputs never change, so without the
+# argument below it would be served from cache indefinitely and never pick
+# up those fixes. CI passes a fresh value on every build; a local build
+# can pass anything (or nothing) and still upgrade.
+ARG APK_UPGRADE_STAMP=local
+RUN echo "apk upgrade stamp: ${APK_UPGRADE_STAMP}" && apk upgrade --no-cache
 
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
 COPY docker/docker-entrypoint.d/ /docker-entrypoint.d/

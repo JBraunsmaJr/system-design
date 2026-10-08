@@ -124,6 +124,8 @@ jobs:
           tags: store-under-test:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            APK_UPGRADE_STAMP=${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: The built image starts and serves
         run: |
@@ -157,3 +159,5 @@ jobs:
           tags: ${{ steps.vars.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            APK_UPGRADE_STAMP=${{ github.run_id }}-${{ github.run_attempt }}
