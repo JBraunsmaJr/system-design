@@ -23,18 +23,18 @@ import {attachPersistence, createNullPersistence, type DocPersistence, persisten
 import {isYjsDocEmpty} from './seedGuards.ts';
 import {createYjsDiagramStore, seedYjsDiagramDoc} from '../stores/yjsDiagramStore.ts';
 import {
-  createYjsRequirementsStore,
-  seedYjsRequirementsDoc,
-  topUpBuiltInTypes,
+    createYjsRequirementsStore,
+    seedYjsRequirementsDoc,
+    topUpBuiltInTypes,
 } from '../stores/yjsRequirementsStore.ts';
 import {createYjsProgramIncrementsStore, seedYjsProgramIncrementsDoc,} from '../stores/yjsProgramIncrementsStore.ts';
 import {createYjsMilestonesStore, seedYjsMilestonesDoc} from '../stores/yjsMilestonesStore.ts';
 import {createYjsTeamStore} from '../stores/yjsTeamStore.ts';
 import {
-  createYjsDocumentMetaStore,
-  type DocumentMetaStore,
-  META_MAP,
-  seedYjsDocumentMeta,
+    createYjsDocumentMetaStore,
+    type DocumentMetaStore,
+    META_MAP,
+    seedYjsDocumentMeta,
 } from '../stores/yjsDocumentMetaStore.ts';
 import {createYjsSrdStore, seedYjsSrd, SRD_FRAMING_MAP, SRD_MAP, type SrdStore,} from '../stores/yjsSrdStore.ts';
 import {expandSrdFileValue} from '../../domain/srd/srdSettings.ts';

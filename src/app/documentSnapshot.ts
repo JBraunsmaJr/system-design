@@ -2,10 +2,10 @@ import {type parseDiagramFile, toDiagramFile} from '../domain/canvas/serializati
 import type {Scenario, SubDiagram} from '../domain/canvas/types';
 import {EMPTY_REQUIREMENTS_DOCUMENT, type RequirementsDocument,} from '../domain/requirements/requirementsTypes';
 import {
-  BUILT_IN_ITEM_TYPES,
-  BUILT_IN_RELATIONSHIP_TYPES,
-  withMissingBuiltInRelationshipTypes,
-  withMissingBuiltInTypes,
+    BUILT_IN_ITEM_TYPES,
+    BUILT_IN_RELATIONSHIP_TYPES,
+    withMissingBuiltInRelationshipTypes,
+    withMissingBuiltInTypes,
 } from '../domain/requirements/requirementsRegistry';
 import type {ProgramIncrement} from '../domain/timeline/programIncrements';
 import {EMPTY_TEAM_DOCUMENT, type TeamDocument} from '../domain/timeline/teamTypes';

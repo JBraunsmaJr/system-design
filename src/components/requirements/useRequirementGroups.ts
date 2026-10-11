@@ -1,20 +1,20 @@
 import {useMemo} from 'react';
 import type {
-  RequirementItem,
-  RequirementItemType,
-  RequirementsDocument,
+    RequirementItem,
+    RequirementItemType,
+    RequirementsDocument,
 } from '../../domain/requirements/requirementsTypes';
 import type {SubDiagram} from '../../domain/canvas/types';
 import {findAllLinkedNodes} from '../../domain/canvas/subDiagramTree';
 import plur from 'plur';
 import {itemTextMatches} from '../../domain/requirements/decisionRecords';
 import {
-  buildEpicTree,
-  buildHierarchyIndex,
-  type EpicTree,
-  type EpicTreeNode,
-  filterEpicTree,
-  flattenEpicTreeMatches,
+    buildEpicTree,
+    buildHierarchyIndex,
+    type EpicTree,
+    type EpicTreeNode,
+    filterEpicTree,
+    flattenEpicTreeMatches,
 } from '../../domain/requirements/requirementsHierarchy';
 import type {RequirementsGroupBy} from '../../domain/requirements/requirementsViewPrefs';
 

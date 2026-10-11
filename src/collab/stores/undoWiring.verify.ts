@@ -9,18 +9,18 @@
 import 'fake-indexeddb/auto';
 import * as Y from 'yjs';
 import {
-  createDocumentStores,
-  destroyDocumentStores,
-  openDocument,
-  type OpenDocumentStores,
-  replaceDocumentContents,
+    createDocumentStores,
+    destroyDocumentStores,
+    openDocument,
+    type OpenDocumentStores,
+    replaceDocumentContents,
 } from '../sync/localDocument.ts';
 import {
-  createUndoController,
-  releaseUndoController,
-  undoableStore,
-  type UndoController,
-  undoControllerFor,
+    createUndoController,
+    releaseUndoController,
+    undoableStore,
+    type UndoController,
+    undoControllerFor,
 } from './undoManager.ts';
 import {createYjsDocumentMetaStore, DEFAULT_DOCUMENT_TITLE, seedYjsDocumentMeta,} from './yjsDocumentMetaStore.ts';
 import {rebaseDocument} from '../sync/rebase.ts';

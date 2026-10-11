@@ -1,10 +1,10 @@
 import type {ComponentType} from 'react';
 import type {RequirementStatus} from '../../../../domain/requirements/requirementsTypes';
 import type {
-  SrdDataContext,
-  SrdSectionConfig,
-  SrdTemplateConfig,
-  SrdTemplateId,
+    SrdDataContext,
+    SrdSectionConfig,
+    SrdTemplateConfig,
+    SrdTemplateId,
 } from '../../../../domain/srd/srdTypes';
 import type {PdfMarkdownStyles, PdfStyle} from '../srdPdfMarkdown';
 

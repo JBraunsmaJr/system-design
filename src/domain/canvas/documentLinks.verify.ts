@@ -7,11 +7,11 @@
 import * as Y from 'yjs';
 import type {Node} from '@xyflow/react';
 import {
-  linkedDocumentHref,
-  linkedDocumentLabel,
-  normalizeLinkedDocument,
-  parseDocumentIdInput,
-  resolveLinkedDocument,
+    linkedDocumentHref,
+    linkedDocumentLabel,
+    normalizeLinkedDocument,
+    parseDocumentIdInput,
+    resolveLinkedDocument,
 } from './documentLinks.ts';
 import type {ArchNodeData} from './types.ts';
 import {createYjsDiagramStore, seedYjsDiagramDoc} from '../../collab/stores/yjsDiagramStore.ts';
@@ -75,8 +75,8 @@ console.log('The URL a link opens');
 
 console.log('Resolving the title shown');
 {
-  const ref = {docId: 'auth', title: 'Auth (old name)'};
-  const known = resolveLinkedDocument(ref, [{docId: 'auth', title: 'Auth platform'}]);
+    const ref = {docId: 'auth', title: 'Auth (old name)'};
+    const known = resolveLinkedDocument(ref, [{docId: 'auth', title: 'Auth platform'}]);
   assert(
       known.title === 'Auth platform' && known.isKnownHere,
       "where this browser has the document, its current title wins over the link's cached one",
@@ -111,11 +111,11 @@ console.log('Entering a document directly');
 
 console.log('Stored with the node');
 {
-  const link = {docId: 'auth-platform', title: 'Auth platform'};
+    const link = {docId: 'auth-platform', title: 'Auth platform'};
   const node: Node<ArchNodeData> = {
     id: 'n1',
     type: 'typed',
-    position: {x: 0, y: 0},
+      position: {x: 0, y: 0},
     data: {
       nodeType: 'custom',
       label: 'Shared auth',
@@ -126,7 +126,7 @@ console.log('Stored with the node');
   };
 
   const doc = new Y.Doc();
-  seedYjsDiagramDoc(doc, {nodes: [node], edges: []});
+    seedYjsDiagramDoc(doc, {nodes: [node], edges: []});
   const store = createYjsDiagramStore(doc);
   const read = () =>
       normalizeLinkedDocument(
@@ -137,15 +137,15 @@ console.log('Stored with the node');
   const peer = new Y.Doc();
   Y.applyUpdate(peer, Y.encodeStateAsUpdate(doc));
   createYjsDiagramStore(peer).updateNode('n1', {
-    linkedDocument: {docId: 'identity', title: 'Identity'},
+      linkedDocument: {docId: 'identity', title: 'Identity'},
   });
   Y.applyUpdate(doc, Y.encodeStateAsUpdate(peer));
   assert(read()?.docId === 'identity', "a peer's relink arrives");
 
-  store.updateNode('n1', {linkedDocument: undefined});
+    store.updateNode('n1', {linkedDocument: undefined});
   assert(read() === undefined, 'unlinking removes it');
 
-  const local = createLocalDiagramStore({nodes: [node], edges: []});
+    const local = createLocalDiagramStore({nodes: [node], edges: []});
   assert(
       normalizeLinkedDocument(local.getSnapshot().nodes[0]?.data.linkedDocument)?.title ===
       'Auth platform',

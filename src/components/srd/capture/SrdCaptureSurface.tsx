@@ -1,10 +1,10 @@
 import {type RefObject, useEffect, useRef} from 'react';
 import {type Edge, type Node, ReactFlow, ReactFlowProvider, useNodesInitialized, useReactFlow,} from '@xyflow/react';
 import {
-  CANVAS_EDGE_TYPES,
-  CANVAS_NODE_TYPES,
-  DEFAULT_EDGE_OPTIONS,
-  PRO_OPTIONS,
+    CANVAS_EDGE_TYPES,
+    CANVAS_NODE_TYPES,
+    DEFAULT_EDGE_OPTIONS,
+    PRO_OPTIONS,
 } from '../../canvas/canvasElementTypes';
 import type {ArchEdgeData, ArchNodeData} from '../../../domain/canvas/types';
 
