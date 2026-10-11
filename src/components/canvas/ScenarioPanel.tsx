@@ -1,7 +1,7 @@
-import { Film, MapPin, X, Plus, Play, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
-import type { Node } from '@xyflow/react';
-import { getBreadcrumbLabelsFlat } from '../../collab/stores/diagramStore';
-import type { ArchNodeData, Scenario, ScenarioStep } from '../../domain/canvas/types';
+import {ChevronDown, ChevronUp, Download, Film, MapPin, Play, Plus, Trash2, X,} from 'lucide-react';
+import type {Node} from '@xyflow/react';
+import {getBreadcrumbLabelsFlat} from '../../collab/stores/diagramStore';
+import type {ArchNodeData, Scenario, ScenarioStep} from '../../domain/canvas/types';
 
 interface ScenarioPanelProps {
   scenarios: Scenario[];
@@ -17,6 +17,8 @@ interface ScenarioPanelProps {
   onDeleteStep: (scenarioId: string, stepId: string) => void;
   onMoveStep: (scenarioId: string, stepId: string, direction: 'up' | 'down') => void;
   onPresent: (scenarioId: string) => void;
+    /** Opens the export dialog (PDF slides, PNGs, GIF, MP4) for a scenario. */
+    onExport?: (scenarioId: string) => void;
   canAddStep: boolean;
   /** The step currently selected in the list - shown in the editor pane
    * AND previewed/highlighted on the canvas at the same time. */
@@ -57,6 +59,7 @@ export function ScenarioPanel({
   onDeleteStep,
   onMoveStep,
   onPresent,
+                                  onExport,
   canAddStep,
   activeStepId,
   onSelectStep,
@@ -156,6 +159,21 @@ export function ScenarioPanel({
               >
                 <Play size={11} /> Present
               </button>
+                {onExport && (
+                    <button
+                        type="button"
+                        className="scenario-panel__btn-export"
+                        disabled={active.steps.length === 0}
+                        onClick={() => onExport(active.id)}
+                        title={
+                            active.steps.length === 0
+                                ? 'Add at least one step first'
+                                : 'Export as PDF slides, images, GIF or video'
+                        }
+                    >
+                        <Download size={11}/> Export
+                    </button>
+                )}
               <button
                 type="button"
                 className="scenario-panel__btn-delete-scenario"

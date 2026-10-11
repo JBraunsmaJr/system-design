@@ -139,6 +139,41 @@ Click **Present** to launch the presentation mode:
 - **Controls**: Use `← Prev`, `Next →` buttons (or keyboard arrow keys) to step through flows, and press `Esc` to return
   to the editor.
 
+### Exporting a Scenario
+
+Click **Export** next to **Present** to take a scenario outside the editor. Each step is drawn exactly as Presentation
+Mode shows it (the same framing, dimming and highlights), on a hidden canvas, so your own view never moves.
+
+| Format           | What you get                                                                            | Best for                                  |
+|------------------|-----------------------------------------------------------------------------------------|-------------------------------------------|
+| **PDF slides**   | A 16:9 deck: an optional title slide listing the steps, then one slide per step         | Review meetings, attaching to a ticket    |
+| **PNG images**   | One 1920×1080 image per step, numbered in order (`01-…png`), in a single `.zip`         | Pasting individual steps into other tools |
+| **Animated GIF** | A 960×540 loop that plays the steps in order                                            | READMEs, wikis, Jira and Confluence pages |
+| **MP4 video**    | A 1920×1080 H.264 video, which plays in browsers, PowerPoint, Keynote and media players | Embedding in slides, sharing in chat      |
+
+Options:
+
+- **Show the step title and narration**: adds a header (scenario, diagram level, step number) and a caption band with
+  the step's title and narration to images and video. PDF slides always include them, as selectable text.
+- **Time per step** (GIF and MP4): _Auto_ gives each step 3 to 15 seconds depending on how much there is to read; or
+  pick a fixed time.
+- **Fade between steps** (GIF and MP4): crossfades from one step to the next instead of cutting.
+
+Notes:
+
+- Narration longer than four lines is shortened with an ellipsis on slides, images and video. Keep the full text in the
+  narration for live presenting.
+- Focused edges are drawn highlighted but still: the flowing-dash animation is a live-presentation effect.
+- If a step highlights something that has since been deleted, or points at a sub-diagram that no longer exists, the
+  export dialog says so before you export, and those steps are exported without it.
+- MP4 export needs a browser with WebCodecs video encoding (current Chrome, Edge, Safari and desktop Firefox). Where
+  it isn't available the option is disabled; every other format works in any supported browser. If a browser can
+  encode video but not H.264, the video is made in another codec and the dialog tells you.
+
+Everything runs in your browser. The export uses only code and fonts served by your own deployment of the editor and
+the browser's built-in video encoder. It contacts no outside service or CDN, so it works the same on an isolated or
+air-gapped network.
+
 ---
 
 ## 4. Linking to Requirements

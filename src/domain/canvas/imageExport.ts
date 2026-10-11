@@ -255,6 +255,9 @@ export interface SubsetSnapshotOptions extends CaptureTarget {
   height?: number;
   panOffset?: { x: number; y: number };
   zoomMultiplier?: number;
+    /** Caps how far a small subset is zoomed in (default 4). Presentation's
+     * camera stops at 2, which scenario exports match. */
+    maxZoom?: number;
   format?: CaptureFormat;
   backgroundColor?: string;
 }
@@ -400,7 +403,7 @@ export async function captureNodeSubsetSnapshot(
 
     const baseZoom = Math.min(effectiveW / bounds.width, effectiveH / bounds.height);
     const MIN_SUBSET_ZOOM = 0.2;
-    const MAX_SUBSET_ZOOM = 4.0;
+      const MAX_SUBSET_ZOOM = options?.maxZoom ?? 4.0;
     const clampedBaseZoom = Math.min(MAX_SUBSET_ZOOM, Math.max(MIN_SUBSET_ZOOM, baseZoom));
     const adjustedZoom = Math.min(
       MAX_SUBSET_ZOOM,

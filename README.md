@@ -15,7 +15,8 @@ It is built for teams that can't put their designs in someone else's cloud. The 
 - **Diagrams**: a node-based canvas for system and architecture diagrams, with a component library, icons, and custom shapes.
 - **Requirements traceability**: link diagram components to requirements, and look up a requirement's components in reverse. Export requirements as print-ready PDF documents.
 - **Planning**: Program Increment (PI) planning with capacity reservations, sprint planning, team views, milestones and a timeline, and a dependency view of work items.
-- **Presentations**: build step-by-step "scenarios" on a diagram and present them like slides.
+- **Presentations**: build step-by-step "scenarios" on a diagram, present them like slides, or export them as PDF
+  slides, PNG images, an animated GIF or an MP4 video.
 - **Real-time collaboration**: edit together, peer to peer. Document data flows directly between browsers.
 - **Offline and installable**: works as a PWA, with documents stored locally in the browser.
 - **Optional team store**: an end-to-end encrypted document store with single sign-on, for teams that want shared workspaces that outlive any one browser.

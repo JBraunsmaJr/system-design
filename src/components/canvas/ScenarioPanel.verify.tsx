@@ -1,8 +1,8 @@
 import React from 'react';
-import { flattenSubDiagramTree } from '../../collab/stores/diagramStore';
-import { renderToStaticMarkup } from 'react-dom/server';
-import { ScenarioPanel } from './ScenarioPanel';
-import type { Scenario, SubDiagram } from '../../domain/canvas/types';
+import {flattenSubDiagramTree} from '../../collab/stores/diagramStore';
+import {renderToStaticMarkup} from 'react-dom/server';
+import {ScenarioPanel} from './ScenarioPanel';
+import type {Scenario, SubDiagram} from '../../domain/canvas/types';
 
 function assert(condition: boolean, message: string) {
   if (!condition) {
@@ -176,6 +176,70 @@ const sampleScenarios: Scenario[] = [
   // Clicking step-1 again (toggle deselect)
   simulateSelectStep('step-1', 'step-1', sampleScenarios[0]);
   assert(activeStepResult === null, 'Deselects step when clicked again');
+}
+
+// === Test 4: Export is offered only where it is wired up ===
+{
+    const props = {
+        scenarios: sampleScenarios,
+        activeScenarioId: 'sc-1',
+        onSelectScenario: () => {
+        },
+        onCreateScenario: () => {
+        },
+        onRenameScenario: () => {
+        },
+        onDeleteScenario: () => {
+        },
+        onAddStep: () => {
+        },
+        onAddSelectionToStep: () => {
+        },
+        onRemoveSelectionFromStep: () => {
+        },
+        onUpdateStep: () => {
+        },
+        onDeleteStep: () => {
+        },
+        onMoveStep: () => {
+        },
+        onPresent: () => {
+        },
+        canAddStep: false,
+        activeStepId: null,
+        onSelectStep: () => {
+        },
+        diagramNodes: flattenSubDiagramTree(mockRoot).nodes,
+        currentPath: [],
+        onClose: () => {
+        },
+    };
+    const withExport = renderToStaticMarkup(
+        React.createElement(ScenarioPanel, {
+            ...props, onExport: () => {
+            }
+        }),
+    );
+    assert(withExport.includes('scenario-panel__btn-export'), 'renders the Export button');
+    assert(
+        !renderToStaticMarkup(React.createElement(ScenarioPanel, props)).includes(
+            'scenario-panel__btn-export',
+        ),
+        'no Export button without an export handler',
+    );
+    const empty = renderToStaticMarkup(
+        React.createElement(ScenarioPanel, {
+            ...props,
+            scenarios: [{id: 'sc-2', title: 'Empty', steps: []}],
+            activeScenarioId: 'sc-2',
+            onExport: () => {
+            },
+        }),
+    );
+    assert(
+        /<button[^>]*scenario-panel__btn-export[^>]*disabled/.test(empty),
+        'Export is disabled for a scenario with no steps',
+    );
 }
 
 console.log('ScenarioPanel verification passed successfully!');

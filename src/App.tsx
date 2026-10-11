@@ -47,6 +47,11 @@ import './App.css';
 // Loaded on first visit: the SRD view carries the PDF exporter, which no
 // other view needs, so it stays out of the bundle every session downloads.
 const SrdView = lazy(() => import('./components/srd/SrdViewEntry'));
+// Loaded when a scenario is first exported: its encoders (react-pdf, gifenc,
+// Mediabunny) load later still, each only for its own format.
+const ScenarioExportDialog = lazy(
+    () => import('./components/canvas/scenarioExport/ScenarioExportDialog'),
+);
 
 /**
  * The editor shell: wires the app's hooks together and lays out the views.
@@ -261,6 +266,8 @@ function App() {
   const openSrdView = useCallback(() => setViewMode('srd'), [setViewMode]);
 
   const [isScenarioPanelOpen, setIsScenarioPanelOpen] = useState(false);
+    const [exportScenarioId, setExportScenarioId] = useState<string | null>(null);
+    const closeScenarioExport = useCallback(() => setExportScenarioId(null), []);
   const [isLibraryModalOpen, setIsLibraryModalOpen] = useState(false);
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [isPaletteCollapsed, setIsPaletteCollapsed] = useState(false);
@@ -678,6 +685,7 @@ function App() {
                     onDeleteStep={onDeleteStep}
                     onMoveStep={onMoveStep}
                     onPresent={onStartPresenting}
+                    onExport={setExportScenarioId}
                     canAddStep={canAddStep}
                     activeStepId={activeStepId}
                     onSelectStep={onSelectStep}
@@ -830,6 +838,20 @@ function App() {
         isOpen={isLibraryModalOpen}
         onClose={() => setIsLibraryModalOpen(false)}
       />
+        {exportScenarioId &&
+            (() => {
+                const scenario = scenarios.find((sc) => sc.id === exportScenarioId);
+                return scenario ? (
+                    <Suspense fallback={null}>
+                        <ScenarioExportDialog
+                            scenario={scenario}
+                            diagramSnapshot={diagramSnapshot}
+                            documentTitle={title}
+                            onClose={closeScenarioExport}
+                        />
+                    </Suspense>
+                ) : null;
+            })()}
       {toast && (
         <Toast
           key={toast.id}
