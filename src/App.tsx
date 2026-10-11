@@ -1,4 +1,4 @@
-import {lazy, Profiler, type ProfilerOnRenderCallback, Suspense, useCallback, useMemo, useState,} from 'react';
+import {lazy, Profiler, type ProfilerOnRenderCallback, Suspense, useCallback, useMemo, useRef, useState,} from 'react';
 import {ChevronLeft, ChevronRight} from 'lucide-react';
 import {ReactFlowProvider} from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -39,6 +39,9 @@ import {useClipboard} from './app/hooks/useClipboard';
 import {useKeyboardShortcuts} from './app/hooks/useKeyboardShortcuts';
 import {useFileActions} from './app/hooks/useFileActions';
 import {usePerfHarnessBridge} from './app/hooks/usePerfHarnessBridge';
+import {listLinkableDocuments, listWorkspaceDocuments} from './collab/sync/linkableDocuments';
+import {createStoreClient} from './collab/access/storeClient';
+import {createIndexedDbDeviceKeyStorage} from './collab/access/deviceIdentity';
 import './App.css';
 
 // Loaded on first visit: the SRD view carries the PDF exporter, which no
@@ -471,6 +474,33 @@ function App() {
   );
 
   const getDocumentState = useCallback(() => Y.encodeStateAsUpdate(openDoc.doc), [openDoc.doc]);
+    // The Inspector's "Linked document" picker reads the catalogue on demand:
+    // this browser's documents and, where there is a store, the workspace's
+    // (see linkableDocuments.ts). Either source failing leaves the other's
+    // documents available - the field is a convenience, and the Documents
+    // dialog is where storage problems are reported. Client and key storage
+    // are created once, and only the first time a node is inspected.
+    const workspaceReader = useRef<{
+        client: ReturnType<typeof createStoreClient>;
+        storage: ReturnType<typeof createIndexedDbDeviceKeyStorage>;
+    } | null>(null);
+    const listStoredDocuments = useCallback(
+        () =>
+            listLinkableDocuments({
+                listLocal: () =>
+                    documentStore.listDocuments().then((result) => (result.ok ? result.value : [])),
+                listWorkspace: storeUrl
+                    ? () => {
+                        workspaceReader.current ??= {
+                            client: createStoreClient({baseUrl: storeUrl}),
+                            storage: createIndexedDbDeviceKeyStorage(),
+                        };
+                        return listWorkspaceDocuments(workspaceReader.current);
+                    }
+                    : undefined,
+            }),
+        [documentStore, storeUrl],
+    );
   const handleOpenWorkspaceDocument = useCallback(
     (docId: string) => {
       setIsDocumentManagerOpen(false);
@@ -685,6 +715,8 @@ function App() {
                         requirements={requirementsSnapshot}
                         onNavigateToRequirement={onNavigateToRequirement}
                         onZOrderCommand={onZOrderCommand}
+                        currentDocId={openDocId}
+                        listDocuments={listStoredDocuments}
                       />
                     )}
                   </>

@@ -1,6 +1,7 @@
-import type { RequirementsDocument } from './requirementsTypes';
-import { sanitizeFileName } from '../../common/utils/string';
-import { downloadFile } from '../../common/utils/download';
+import type {RequirementsDocument} from './requirementsTypes';
+import {composeItemMarkdown} from './decisionRecords';
+import {sanitizeFileName} from '../../common/utils/string';
+import {downloadFile} from '../../common/utils/download';
 
 /**
  * Renders the full requirements document as a single markdown string,
@@ -26,8 +27,10 @@ export function toMarkdownDocument(title: string, doc: RequirementsDocument): st
       if (category) {
         lines.push(`*Category: ${category.label}*`, '');
       }
-      if (item.body.trim()) {
-        lines.push(item.body.trim(), '');
+        // A decision's sections as well as its context (composeItemMarkdown).
+        const content = composeItemMarkdown(item).trim();
+        if (content) {
+            lines.push(content, '');
       }
     }
   }

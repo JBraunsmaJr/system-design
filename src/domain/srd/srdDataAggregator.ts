@@ -1,20 +1,17 @@
-import type { Node, Edge } from '@xyflow/react';
+import type {Edge, Node} from '@xyflow/react';
+import type {RequirementItem, RequirementsDocument, RequirementStatus,} from '../requirements/requirementsTypes';
+import type {Milestone} from '../timeline/milestones';
+import type {ProgramIncrement} from '../timeline/programIncrements';
+import {computeSprintDateRanges} from '../timeline/programIncrements';
+import type {TeamDocument} from '../timeline/teamTypes';
+import {isItemWorkable} from '../requirements/requirementsRegistry';
+import {composeItemMarkdown} from '../requirements/decisionRecords';
+import {getAllEpicsWithInferredSchedule} from '../timeline/epicScheduling';
 import type {
-  RequirementsDocument,
-  RequirementItem,
-  RequirementStatus,
-} from '../requirements/requirementsTypes';
-import type { Milestone } from '../timeline/milestones';
-import type { ProgramIncrement } from '../timeline/programIncrements';
-import { computeSprintDateRanges } from '../timeline/programIncrements';
-import type { TeamDocument } from '../timeline/teamTypes';
-import { isItemWorkable } from '../requirements/requirementsRegistry';
-import { getAllEpicsWithInferredSchedule } from '../timeline/epicScheduling';
-import type {
+  RequirementItemViewModel,
   SrdArchitectureComponent,
   SrdArchitectureConnection,
   SrdDataContext,
-  RequirementItemViewModel,
 } from './srdTypes';
 
 export interface AggregateSrdDataParams {
@@ -256,7 +253,9 @@ export function aggregateSrdData(params: AggregateSrdDataParams): SrdDataContext
       typeId: item.typeId,
       typeLabel,
       title: item.title,
-      body: item.body || '',
+        // For a decision, its ADR sections too - every SRD output (PDF and
+        // markdown) renders this one field as the item's content.
+        body: composeItemMarkdown(item),
       categoryId: item.categoryId,
       categoryLabel,
       sprintId: item.sprintId,

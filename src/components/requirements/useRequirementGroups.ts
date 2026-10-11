@@ -1,21 +1,23 @@
-import { useMemo } from 'react';
+import {useMemo} from 'react';
 import type {
-  RequirementsDocument,
   RequirementItem,
   RequirementItemType,
+  RequirementsDocument,
 } from '../../domain/requirements/requirementsTypes';
-import type { SubDiagram } from '../../domain/canvas/types';
-import { findAllLinkedNodes } from '../../domain/canvas/subDiagramTree';
+import type {SubDiagram} from '../../domain/canvas/types';
+import {findAllLinkedNodes} from '../../domain/canvas/subDiagramTree';
 import plur from 'plur';
+import {itemTextMatches} from '../../domain/requirements/decisionRecords';
 import {
   buildEpicTree,
   buildHierarchyIndex,
-  filterEpicTree,
-  flattenEpicTreeMatches,
   type EpicTree,
   type EpicTreeNode,
+  filterEpicTree,
+  flattenEpicTreeMatches,
 } from '../../domain/requirements/requirementsHierarchy';
-import type { RequirementsGroupBy } from '../../domain/requirements/requirementsViewPrefs';
+import type {RequirementsGroupBy} from '../../domain/requirements/requirementsViewPrefs';
+
 const UNCATEGORIZED_KEY = '__uncategorized__';
 export const NO_EPIC_KEY = '__no-epic__';
 const EMPTY_EPIC_TREE: EpicTree = { roots: [], unparented: [] };
@@ -89,7 +91,8 @@ export function useRequirementGroups({
     return doc.items.filter((item) => {
       if (item.id.toLowerCase().includes(q)) return true;
       if (item.title.toLowerCase().includes(q)) return true;
-      if (item.body.toLowerCase().includes(q)) return true;
+        // The body, and a decision's own sections too.
+        if (itemTextMatches(item, q)) return true;
       const category = doc.categories.find((c) => c.id === item.categoryId);
       return category ? category.label.toLowerCase().includes(q) : false;
     });
