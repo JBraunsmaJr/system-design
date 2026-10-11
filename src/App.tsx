@@ -471,6 +471,13 @@ function App() {
   );
 
   const getDocumentState = useCallback(() => Y.encodeStateAsUpdate(openDoc.doc), [openDoc.doc]);
+    // The Inspector's "Linked document" picker reads the catalogue on demand.
+    // A failed read offers nothing to link rather than an error: the field is
+    // a convenience, and the Documents dialog reports storage problems.
+    const listStoredDocuments = useCallback(
+        () => documentStore.listDocuments().then((result) => (result.ok ? result.value : [])),
+        [documentStore],
+    );
   const handleOpenWorkspaceDocument = useCallback(
     (docId: string) => {
       setIsDocumentManagerOpen(false);
@@ -685,6 +692,8 @@ function App() {
                         requirements={requirementsSnapshot}
                         onNavigateToRequirement={onNavigateToRequirement}
                         onZOrderCommand={onZOrderCommand}
+                        currentDocId={openDocId}
+                        listDocuments={listStoredDocuments}
                       />
                     )}
                   </>

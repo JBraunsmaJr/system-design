@@ -22,7 +22,11 @@ import type {DiagramFile} from '../../domain/canvas/serialization.ts';
 import {attachPersistence, createNullPersistence, type DocPersistence, persistenceKeyForRoom,} from './persistence.ts';
 import {isYjsDocEmpty} from './seedGuards.ts';
 import {createYjsDiagramStore, seedYjsDiagramDoc} from '../stores/yjsDiagramStore.ts';
-import {createYjsRequirementsStore, seedYjsRequirementsDoc,} from '../stores/yjsRequirementsStore.ts';
+import {
+  createYjsRequirementsStore,
+  seedYjsRequirementsDoc,
+  topUpBuiltInTypes,
+} from '../stores/yjsRequirementsStore.ts';
 import {createYjsProgramIncrementsStore, seedYjsProgramIncrementsDoc,} from '../stores/yjsProgramIncrementsStore.ts';
 import {createYjsMilestonesStore, seedYjsMilestonesDoc} from '../stores/yjsMilestonesStore.ts';
 import {createYjsTeamStore} from '../stores/yjsTeamStore.ts';
@@ -161,6 +165,10 @@ export function openDocumentNow(options: OpenDocumentOptions): OpenDocument & {
       } else if (options.initial) {
         seedMetaFrom(doc, options.initial);
       }
+      // A document persisted before a later built-in type existed reopens
+      // from its own database, never through the file path that would have
+      // merged that type in. A no-op on an empty or already-current one.
+      if (!handle.wasSeeded) topUpBuiltInTypes(doc);
     }),
     async close() {
       destroyDocumentStores(stores);

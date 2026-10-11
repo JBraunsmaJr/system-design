@@ -1,24 +1,26 @@
 import * as Y from 'yjs';
-import { orderIdSet, pushIfAbsent } from '../sync/seedGuards.ts';
+import {orderIdSet, pushIfAbsent} from '../sync/seedGuards.ts';
 import type {
-  RequirementsDocument,
+  RelationshipType,
+  RequirementCategory,
   RequirementItem,
   RequirementItemType,
-  RequirementCategory,
-  RelationshipType,
   RequirementRelationship,
+  RequirementsDocument,
 } from '../../domain/requirements/requirementsTypes';
 import {
-  defaultStatusForType,
-  isPrefixTaken,
   addRelationship as addRelationshipPure,
-  updateItemReferencesInText,
   BUILT_IN_ITEM_TYPES,
   BUILT_IN_RELATIONSHIP_TYPES,
+  builtInTypesToAdd,
+  defaultStatusForType,
   generateRelationshipId,
+  isPrefixTaken,
+  ITEM_MARKDOWN_FIELDS,
   PARENT_OF_RELATIONSHIP_TYPE_ID,
+  updateItemReferencesInText,
 } from '../../domain/requirements/requirementsRegistry';
-import type { RequirementsStore } from './requirementsStore';
+import type {RequirementsStore} from './requirementsStore';
 
 /** Item storage keys are purely internal - never displayed, never
  * referenced by anything outside this file (see this file's top doc
@@ -28,6 +30,14 @@ import type { RequirementsStore } from './requirementsStore';
 function collisionResistantId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
+
+/** The item fields an architecture decision adds (see RequirementItem). */
+const DECISION_ITEM_FIELDS = [
+  'decisionStatus',
+  'decisionOptions',
+  'decisionOutcome',
+  'decisionConsequences',
+] as const satisfies readonly (keyof RequirementItem)[];
 
 /**
  * Populates a Y.Doc directly from an existing, already-populated
@@ -107,6 +117,11 @@ export function seedYjsRequirementsDoc(doc: Y.Doc, initial: RequirementsDocument
       m.set('assigneeId', item.assigneeId);
       m.set('points', item.points);
       m.set('status', item.status);
+      // Decision fields only when present, so seeding an ordinary item
+      // writes exactly the keys it always has.
+      for (const field of DECISION_ITEM_FIELDS) {
+        if (item[field] !== undefined) m.set(field, item[field]);
+      }
       itemsMap.set(storageKey, m);
       itemOrder.push([storageKey]);
       seenItemIds.add(item.id);
@@ -121,6 +136,59 @@ export function seedYjsRequirementsDoc(doc: Y.Doc, initial: RequirementsDocument
       nextSequenceMap.set(typeId, seq);
     }
   });
+}
+
+/**
+ * Adds the built-in item and relationship types a persisted document is
+ * missing, leaving everything already there untouched. The collaborative
+ * counterpart of withMissingBuiltInTypes: a document saved before a
+ * built-in existed (Decision, "Addresses", "Supersedes") reopens from its
+ * own database rather than from a file, so the file-path merge never sees
+ * it and its "Add item" menu would never offer the new type.
+ *
+ * Unlike seedBuiltInTypesIfEmpty below, this refuses to touch a document
+ * that has no item types at all - an empty replica waiting for a peer's
+ * sync must stay empty (see that function's comment for what goes wrong
+ * otherwise). Two peers topping up the same document while disconnected
+ * write identical values; the duplicate itemTypeOrder entry that leaves
+ * is removed by the store's own repair pass (repairDuplicateItemTypes).
+ *
+ * Written without the local-edit origin, so it is not an undo step.
+ * Returns whether anything was added.
+ */
+export function topUpBuiltInTypes(doc: Y.Doc): boolean {
+  const itemTypeOrder = doc.getArray<string>('itemTypeOrder');
+  const itemTypes = doc.getMap<Y.Map<unknown>>('itemTypes');
+  const relationshipTypes = doc.getMap<RelationshipType>('relationshipTypes');
+  // Not a requirements document yet (a brand-new or still-syncing replica):
+  // seeding is someone else's job, and writing here is how duplicates start.
+  if (itemTypeOrder.length === 0 && itemTypes.size === 0) return false;
+
+  const existing = [...itemTypes.entries()].map(([id, m]) => ({
+    id,
+    prefix: (m.get('prefix') as string | undefined) ?? '',
+  }));
+  const missingItemTypes = builtInTypesToAdd(existing);
+  const missingRelationshipTypes = BUILT_IN_RELATIONSHIP_TYPES.filter(
+      (t) => !relationshipTypes.has(t.id),
+  );
+  if (missingItemTypes.length === 0 && missingRelationshipTypes.length === 0) return false;
+
+  const seenOrder = orderIdSet(itemTypeOrder);
+  doc.transact(() => {
+    for (const t of missingItemTypes) {
+      const m = new Y.Map<unknown>();
+      m.set('label', t.label);
+      m.set('prefix', t.prefix);
+      m.set('color', t.color);
+      m.set('isBuiltIn', t.isBuiltIn);
+      m.set('isWorkable', t.isWorkable);
+      itemTypes.set(t.id, m);
+      pushIfAbsent(itemTypeOrder, seenOrder, t.id);
+    }
+    for (const t of missingRelationshipTypes) relationshipTypes.set(t.id, t);
+  });
+  return true;
 }
 
 /**
@@ -249,6 +317,10 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
       assigneeId: m.get('assigneeId') as string | undefined,
       points: m.get('points') as number | undefined,
       status: m.get('status') as RequirementItem['status'],
+      decisionStatus: m.get('decisionStatus') as RequirementItem['decisionStatus'],
+      decisionOptions: m.get('decisionOptions') as string | undefined,
+      decisionOutcome: m.get('decisionOutcome') as string | undefined,
+      decisionConsequences: m.get('decisionConsequences') as string | undefined,
     };
   }
 
@@ -736,13 +808,15 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
           }
         }
 
-        // Update references in body of all items
+        // Update references in every markdown field of all items (the
+        // body, and a decision's own sections - see ITEM_MARKDOWN_FIELDS).
         for (const key of itemOrder.toArray()) {
           const itemMap = items.get(key);
-          if (itemMap) {
-            const body = itemMap.get('body') as string | undefined;
-            if (body && (body.includes(`#${id}`) || body.includes(`#ref:${id}`))) {
-              itemMap.set('body', updateItemReferencesInText(body, id, newId));
+          if (!itemMap) continue;
+          for (const field of ITEM_MARKDOWN_FIELDS) {
+            const text = itemMap.get(field) as string | undefined;
+            if (text && (text.includes(`#${id}`) || text.includes(`#ref:${id}`))) {
+              itemMap.set(field, updateItemReferencesInText(text, id, newId));
             }
           }
         }
@@ -817,22 +891,21 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
           }
         }
 
-        // Update references in body of all items
+        // Update references in every markdown field of all items (see
+        // ITEM_MARKDOWN_FIELDS).
         for (const key of itemOrder.toArray()) {
           const itemMap = items.get(key);
-          if (itemMap) {
-            const body = itemMap.get('body') as string | undefined;
-            if (body) {
-              let updated = body;
-              for (const { oldId, newId } of conversions) {
-                if (updated.includes(`#${oldId}`) || updated.includes(`#ref:${oldId}`)) {
-                  updated = updateItemReferencesInText(updated, oldId, newId);
-                }
-              }
-              if (updated !== body) {
-                itemMap.set('body', updated);
+          if (!itemMap) continue;
+          for (const field of ITEM_MARKDOWN_FIELDS) {
+            const text = itemMap.get(field) as string | undefined;
+            if (!text) continue;
+            let updated = text;
+            for (const {oldId, newId} of conversions) {
+              if (updated.includes(`#${oldId}`) || updated.includes(`#ref:${oldId}`)) {
+                updated = updateItemReferencesInText(updated, oldId, newId);
               }
             }
+            if (updated !== text) itemMap.set(field, updated);
           }
         }
 

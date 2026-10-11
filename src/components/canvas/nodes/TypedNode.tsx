@@ -1,11 +1,12 @@
-import { type NodeProps, type Node } from '@xyflow/react';
-import { Maximize2 } from 'lucide-react';
-import { getNodeType, CATEGORY_LABELS } from '../../../domain/canvas/nodeRegistry';
-import { EdgeHandles } from './EdgeHandles';
-import { IconRenderer } from '../IconRenderer';
-import type { ArchNodeData } from '../../../domain/canvas/types';
-import { useCanvasContext } from '../CanvasContext';
-import { recordNodeRender } from '../../../perf/instrumentation';
+import {type Node, type NodeProps} from '@xyflow/react';
+import {Maximize2} from 'lucide-react';
+import {CATEGORY_LABELS, getNodeType} from '../../../domain/canvas/nodeRegistry';
+import {EdgeHandles} from './EdgeHandles';
+import {IconRenderer} from '../IconRenderer';
+import type {ArchNodeData} from '../../../domain/canvas/types';
+import {useCanvasContext} from '../CanvasContext';
+import {recordNodeRender} from '../../../perf/instrumentation';
+import {LinkedDocumentBadge} from './LinkedDocumentBadge';
 
 type TypedNodeType = Node<ArchNodeData, 'typed'>;
 
@@ -84,6 +85,8 @@ export function TypedNode({ id, data, selected, onDrillInto: propOnDrillInto }: 
           )}
         </div>
       )}
+
+      <LinkedDocumentBadge value={data.linkedDocument} className="typed-node__doc-link"/>
 
       {onDrillInto && (
         <button

@@ -1,4 +1,5 @@
-import type { Node, Edge } from '@xyflow/react';
+import type {Edge, Node} from '@xyflow/react';
+import type {LinkedDocumentRef} from './documentLinks';
 
 // Core domain types for the system-design editor.
 // These mirror the taxonomy described in the project's Requirements & Software
@@ -109,6 +110,12 @@ export interface ArchNodeData extends Record<string, unknown> {
    * accident) - display code is responsible for silently filtering out
    * ids that no longer resolve to an existing item. */
   linkedRequirementIds?: string[];
+    /** Another document this node stands for - e.g. a "Shared auth" box
+     * pointing at the auth platform's own document. A reference by document
+     * id with a cached title; see domain/canvas/documentLinks.ts. Read it
+     * through normalizeLinkedDocument, never directly: it comes from files
+     * and peers like everything else here. */
+    linkedDocument?: LinkedDocumentRef;
 }
 
 /**

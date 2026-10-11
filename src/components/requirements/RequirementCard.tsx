@@ -1,29 +1,30 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, ListPlus, Maximize2, Trash2 } from 'lucide-react';
-import { getItemType, isItemWorkable } from '../../domain/requirements/requirementsRegistry';
-import type { LinkedNodeRef, DiagramPath } from '../../domain/canvas/subDiagramTree';
-import { RequirementBody } from './RequirementBody';
-import { peerBadgesAreEqual } from '../../domain/network/presenceComparison';
-import { LinkedDiagramsSection } from './LinkedDiagramsSection';
-import { RequirementEditor } from './RequirementEditor';
-import { CategoryPicker } from './CategoryPicker';
-import { StatusPicker } from './StatusPicker';
-import { TypePicker } from './TypePicker';
-import { SprintPicker } from './SprintPicker';
-import { RelationshipManager } from './RelationshipManager';
-import { ChildQuickAdd } from './ChildQuickAdd';
-import { isEpicItem } from '../../domain/requirements/requirementsHierarchy';
-import { MemberPicker } from '../team/MemberPicker';
-import { PointsPicker } from '../team/PointsPicker';
-import { HighlightedText, HighlightedTitle } from '../../common/components/highlight/HighlightText';
-import type {
-  RequirementItem,
-  RequirementsDocument,
-} from '../../domain/requirements/requirementsTypes';
-import type { ProgramIncrement } from '../../domain/timeline/programIncrements';
-import type { TeamDocument } from '../../domain/timeline/teamTypes';
-import type { SubDiagram } from '../../domain/canvas/types';
-import type { PresenceInfo } from '../../collab/sync/session';
+import {memo, useCallback, useEffect, useRef, useState} from 'react';
+import {ChevronDown, ChevronRight, ListPlus, Maximize2, Trash2} from 'lucide-react';
+import type {ItemMarkdownField} from '../../domain/requirements/requirementsRegistry';
+import {getItemType, isItemWorkable} from '../../domain/requirements/requirementsRegistry';
+import type {DiagramPath, LinkedNodeRef} from '../../domain/canvas/subDiagramTree';
+import {RequirementBody} from './RequirementBody';
+import {peerBadgesAreEqual} from '../../domain/network/presenceComparison';
+import {LinkedDiagramsSection} from './LinkedDiagramsSection';
+import {RequirementEditor} from './RequirementEditor';
+import {CategoryPicker} from './CategoryPicker';
+import {StatusPicker} from './StatusPicker';
+import {DecisionStatusPicker} from './DecisionStatusPicker';
+import {DecisionSections} from './DecisionSections';
+import {isDecisionItem} from '../../domain/requirements/decisionRecords';
+import {TypePicker} from './TypePicker';
+import {SprintPicker} from './SprintPicker';
+import {RelationshipManager} from './RelationshipManager';
+import {ChildQuickAdd} from './ChildQuickAdd';
+import {isEpicItem} from '../../domain/requirements/requirementsHierarchy';
+import {MemberPicker} from '../team/MemberPicker';
+import {PointsPicker} from '../team/PointsPicker';
+import {HighlightedText, HighlightedTitle} from '../../common/components/highlight/HighlightText';
+import type {RequirementItem, RequirementsDocument,} from '../../domain/requirements/requirementsTypes';
+import type {ProgramIncrement} from '../../domain/timeline/programIncrements';
+import type {TeamDocument} from '../../domain/timeline/teamTypes';
+import type {SubDiagram} from '../../domain/canvas/types';
+import type {PresenceInfo} from '../../collab/sync/session';
 
 interface RequirementCardProps {
   item: RequirementItem;
@@ -137,7 +138,15 @@ function RequirementCardImpl({
   onVerbUsed,
   onOpenItem,
 }: RequirementCardProps) {
-  const [isEditingBody, setIsEditingBody] = useState(false);
+    // Which markdown field is open in an editor: the body for most items, or
+    // any of a decision's sections. One slot rather than a flag per section,
+    // so presence ("editing this item") and collapsing treat them all alike.
+    const [editingField, setEditingField] = useState<ItemMarkdownField | null>(null);
+    const isEditingBody = editingField !== null;
+    const setIsEditingBody = useCallback(
+        (editing: boolean) => setEditingField(editing ? 'body' : null),
+        [],
+    );
   const cardRef = useRef<HTMLDivElement>(null);
   const pointerIsDownRef = useRef(false);
   const selectionKey = cardKey ?? item.id;
@@ -166,6 +175,7 @@ function RequirementCardImpl({
   const canAddChildren =
     Boolean(onAddChildItem) && Boolean(defaultChildTypeId) && isEpicItem(doc, item);
   const collapsed = isCollapsed && Boolean(onToggleCollapsed);
+    const isDecision = isDecisionItem(item);
 
   // A collapsed card has no body editor, whoever collapsed it
   const editingBody = isEditingBody && !collapsed;
@@ -274,6 +284,12 @@ function RequirementCardImpl({
               onChange={(status) => onUpdateItem(item.id, { status })}
             />
           )}
+            {isDecision && (
+                <DecisionStatusPicker
+                    status={item.decisionStatus}
+                    onChange={(decisionStatus) => onUpdateItem(item.id, {decisionStatus})}
+                />
+            )}
           <CategoryPicker
             doc={doc}
             categoryId={item.categoryId}
@@ -383,7 +399,17 @@ function RequirementCardImpl({
       </div>
       {!collapsed && (
         <>
-          {editingBody ? (
+            {isDecision ? (
+                <DecisionSections
+                    item={item}
+                    doc={doc}
+                    editingField={editingField}
+                    onEditField={setEditingField}
+                    onUpdateItem={onUpdateItem}
+                    onNavigateToItem={navigateFromHere}
+                    searchQuery={searchQuery}
+                />
+            ) : editingBody ? (
             <RequirementEditor
               value={item.body}
               onChange={(body) => onUpdateItem(item.id, { body })}

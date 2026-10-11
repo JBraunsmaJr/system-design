@@ -81,6 +81,13 @@ export interface RequirementRelationship {
  * fully custom workflow engine, which this app doesn't need yet. */
 export type RequirementStatus = 'todo' | 'in-progress' | 'done';
 
+/** Lifecycle of an architecture decision record. Fixed for the same reason
+ * RequirementStatus is: these are the states the ADR convention itself
+ * defines (Nygard's original set, plus "rejected" for an option that was
+ * written up and turned down), not a workflow anyone needs to customize.
+ * Only meaningful on a Decision item - see RequirementItem.decisionStatus. */
+export type DecisionStatus = 'proposed' | 'accepted' | 'rejected' | 'deprecated' | 'superseded';
+
 export interface RequirementItem {
   /** The full generated reference id, e.g. "REQ-1" - stable for the life
    * of the item, never reused even after deletion. */
@@ -109,6 +116,32 @@ export interface RequirementItem {
    * field existed doesn't need a migration to remain valid - display code
    * treats a missing status on a workable item as "todo". */
   status?: RequirementStatus;
+
+    /*
+     * Architecture decision record fields - only shown and exported for an
+     * item of the built-in Decision type (see decisionRecords.ts). An ADR is
+     * context, options considered, the decision, and its consequences; the
+     * CONTEXT is the item's ordinary `body`, so everything that already
+     * handles bodies (search, #references, exports, converting another item
+     * into a decision) keeps working, and only the other three need fields
+     * of their own.
+     *
+     * Kept as separate flat fields rather than one nested object so that
+     * two people editing different sections of the same decision at once
+     * both keep their changes: the collaborative store writes each item
+     * field independently, and a nested object would be replaced wholesale.
+     *
+     * All optional, and left in place if the item is converted to another
+     * type, so converting back restores them rather than losing the write-up.
+     */
+    /** Undefined reads as "proposed". */
+    decisionStatus?: DecisionStatus;
+    /** Markdown: the alternatives that were weighed. */
+    decisionOptions?: string;
+    /** Markdown: what was decided, and why. */
+    decisionOutcome?: string;
+    /** Markdown: what follows from the decision - good, bad and neutral. */
+    decisionConsequences?: string;
 }
 
 export interface RequirementsDocument {

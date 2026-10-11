@@ -1,16 +1,19 @@
-import { useState, type KeyboardEvent } from 'react';
-import { SendToBack, BringToFront, ChevronUp, ChevronDown } from 'lucide-react';
-import type { Node, Edge } from '@xyflow/react';
-import { getNodeType } from '../../domain/canvas/nodeRegistry';
-import { getGroupType } from '../../domain/canvas/groupRegistry';
-import { getShapeType, globalShapeRegistry } from '../../domain/canvas/shapeRegistry';
-import { CODE_LANGUAGES } from '../../domain/canvas/codeRegistry';
-import { EDGE_TYPES, STYLE_GROUP_LABELS } from '../../domain/canvas/edgeRegistry';
-import { IconPicker } from './IconPicker';
-import { RequirementLinker } from '../requirements/RequirementLinker';
-import type { ArchNodeData, ArchEdgeData, ArchEdgeDataPatch } from '../../domain/canvas/types';
-import type { ZOrderCommand } from '../../domain/canvas/zOrder';
-import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
+import {type KeyboardEvent, useEffect, useState} from 'react';
+import {BringToFront, ChevronDown, ChevronUp, ExternalLink, FileText, SendToBack, X,} from 'lucide-react';
+import type {Edge, Node} from '@xyflow/react';
+import {getNodeType} from '../../domain/canvas/nodeRegistry';
+import {getGroupType} from '../../domain/canvas/groupRegistry';
+import {getShapeType, globalShapeRegistry} from '../../domain/canvas/shapeRegistry';
+import {CODE_LANGUAGES} from '../../domain/canvas/codeRegistry';
+import {EDGE_TYPES, STYLE_GROUP_LABELS} from '../../domain/canvas/edgeRegistry';
+import {IconPicker} from './IconPicker';
+import {RequirementLinker} from '../requirements/RequirementLinker';
+import type {ArchEdgeData, ArchEdgeDataPatch, ArchNodeData} from '../../domain/canvas/types';
+import type {ZOrderCommand} from '../../domain/canvas/zOrder';
+import type {RequirementsDocument} from '../../domain/requirements/requirementsTypes';
+import {getDecisionStatusMeta, isDecisionItem} from '../../domain/requirements/decisionRecords';
+import {markdownExcerpt} from '../../common/utils/markdownExcerpt';
+import {linkedDocumentHref, normalizeLinkedDocument, resolveLinkedDocument,} from '../../domain/canvas/documentLinks';
 
 const EDGE_STYLE_GROUP_ORDER = [
   'sync',
@@ -70,6 +73,13 @@ interface InspectorProps {
   requirements: RequirementsDocument;
   onNavigateToRequirement: (itemId: string) => void;
   onZOrderCommand: (command: ZOrderCommand) => void;
+    /** The document open in this tab - never offered as a link target. */
+    currentDocId?: string;
+    /** This browser's stored documents, for the "Linked document" picker.
+     * Read when a node is selected rather than held as App state, so the
+     * catalogue costs nothing until someone actually looks at a node.
+     * Without it the field isn't shown. */
+    listDocuments?: () => Promise<{ docId: string; title: string }[]>;
 }
 
 export function Inspector({
@@ -85,6 +95,8 @@ export function Inspector({
   requirements,
   onNavigateToRequirement,
   onZOrderCommand,
+                              currentDocId,
+                              listDocuments,
 }: InspectorProps) {
   if (!selectedNode && !selectedEdge) {
     return (
@@ -282,6 +294,16 @@ export function Inspector({
             onNavigateToRequirement={onNavigateToRequirement}
           />
 
+            {listDocuments && (
+                <LinkedDocumentField
+                    nodeId={selectedNode.id}
+                    linkedDocument={data.linkedDocument}
+                    onUpdateNode={onUpdateNode}
+                    currentDocId={currentDocId}
+                    listDocuments={listDocuments}
+                />
+            )}
+
           <ZOrderControls onCommand={onZOrderCommand} />
 
           <button
@@ -429,6 +451,16 @@ export function Inspector({
           requirements={requirements}
           onNavigateToRequirement={onNavigateToRequirement}
         />
+
+          {listDocuments && (
+              <LinkedDocumentField
+                  nodeId={selectedNode.id}
+                  linkedDocument={data.linkedDocument}
+                  onUpdateNode={onUpdateNode}
+                  currentDocId={currentDocId}
+                  listDocuments={listDocuments}
+              />
+          )}
 
         <ZOrderControls onCommand={onZOrderCommand} />
 
@@ -622,16 +654,203 @@ function LinkedRequirementsField({
 }) {
   const linkedIds = linkedRequirementIds ?? [];
   return (
-    <Field label="Linked requirements">
-      <RequirementLinker
-        linkedIds={linkedIds}
-        doc={requirements}
-        onLink={(itemId) => onUpdateNode(nodeId, { linkedRequirementIds: [...linkedIds, itemId] })}
-        onUnlink={(itemId) =>
-          onUpdateNode(nodeId, { linkedRequirementIds: linkedIds.filter((id) => id !== itemId) })
-        }
-        onNavigate={onNavigateToRequirement}
-      />
+      <>
+          <Field label="Linked requirements">
+              <RequirementLinker
+                  linkedIds={linkedIds}
+                  doc={requirements}
+                  onLink={(itemId) =>
+                      onUpdateNode(nodeId, {linkedRequirementIds: [...linkedIds, itemId]})
+                  }
+                  onUnlink={(itemId) =>
+                      onUpdateNode(nodeId, {linkedRequirementIds: linkedIds.filter((id) => id !== itemId)})
+                  }
+                  onNavigate={onNavigateToRequirement}
+              />
+          </Field>
+          <LinkedDecisionsSummary
+              linkedIds={linkedIds}
+              requirements={requirements}
+              onNavigateToRequirement={onNavigateToRequirement}
+          />
+      </>
+  );
+}
+
+/**
+ * "Why is this built this way?", answered on the node itself: every
+ * decision record linked to it, with its status and what was decided.
+ * Linking happens through the ordinary requirement linker above - a
+ * decision is just another item - so this only reads. Rejected and
+ * superseded decisions are listed last and dimmed: still history worth
+ * finding, but not the reason the node looks the way it does today.
+ */
+function LinkedDecisionsSummary({
+                                    linkedIds,
+                                    requirements,
+                                    onNavigateToRequirement,
+                                }: {
+    linkedIds: string[];
+    requirements: RequirementsDocument;
+    onNavigateToRequirement: (itemId: string) => void;
+}) {
+    const decisions = linkedIds
+        .map((id) => requirements.items.find((i) => i.id === id))
+        .filter((item): item is NonNullable<typeof item> => !!item && isDecisionItem(item));
+    if (decisions.length === 0) return null;
+    const typeColor =
+        requirements.itemTypes.find((t) => t.id === decisions[0].typeId)?.color ?? undefined;
+    const isHistory = (status: string) => status === 'rejected' || status === 'superseded';
+    const ordered = [...decisions].sort(
+        (a, b) =>
+            Number(isHistory(getDecisionStatusMeta(a.decisionStatus).id)) -
+            Number(isHistory(getDecisionStatusMeta(b.decisionStatus).id)),
+    );
+    return (
+        <div className="inspector__decisions">
+            <span className="inspector__decisions-title">Why it's built this way</span>
+            {ordered.map((item) => {
+                const status = getDecisionStatusMeta(item.decisionStatus);
+                const summary = markdownExcerpt(item.decisionOutcome?.trim() || item.body, 140);
+                return (
+                    <button
+                        key={item.id}
+                        type="button"
+                        className={`inspector__decision${isHistory(status.id) ? ' is-history' : ''}`}
+                        style={{borderLeftColor: typeColor}}
+                        onClick={() => onNavigateToRequirement(item.id)}
+                        title={`Go to ${item.id}`}
+                    >
+            <span className="inspector__decision-head">
+              <span className="inspector__decision-id" style={{color: typeColor}}>
+                {item.id}
+              </span>
+              <span className="inspector__decision-title">{item.title || 'Untitled'}</span>
+              <span className="inspector__decision-status" style={{color: status.color}}>
+                {status.label}
+              </span>
+            </span>
+                        {summary && <span className="inspector__decision-summary">{summary}</span>}
+                    </button>
+                );
+            })}
+        </div>
+    );
+}
+
+/**
+ * Points this node at another document - the box for a shared platform
+ * opening that platform's own document. See domain/canvas/documentLinks.ts.
+ *
+ * The picker offers this browser's stored documents (never the one open
+ * here). An existing link to a document this browser doesn't have still
+ * shows and still opens: a workspace document arrives by its id, so the
+ * link is right even where the list can't confirm it.
+ */
+function LinkedDocumentField({
+                                 nodeId,
+                                 linkedDocument,
+                                 onUpdateNode,
+                                 currentDocId,
+                                 listDocuments,
+                             }: {
+    nodeId: string;
+    linkedDocument: unknown;
+    onUpdateNode: (id: string, patch: Partial<ArchNodeData>) => void;
+    currentDocId: string | undefined;
+    listDocuments: () => Promise<{ docId: string; title: string }[]>;
+}) {
+    const [documents, setDocuments] = useState<{ docId: string; title: string }[] | null>(null);
+    useEffect(() => {
+        let cancelled = false;
+        listDocuments().then(
+            (list) => {
+                if (!cancelled) setDocuments(list);
+            },
+            () => {
+                if (!cancelled) setDocuments([]);
+            },
+        );
+        return () => {
+            cancelled = true;
+        };
+    }, [listDocuments, nodeId]);
+
+    const ref = normalizeLinkedDocument(linkedDocument);
+    const resolved = ref ? resolveLinkedDocument(ref, documents ?? []) : null;
+    const candidates = (documents ?? []).filter((d) => d.docId !== currentDocId);
+
+    if (resolved) {
+        const href = linkedDocumentHref(window.location.href, resolved.ref.docId);
+        // A div rather than Field's <label>: a click anywhere in a label
+        // activates its first control, which here would be "Unlink".
+        return (
+            <div className="inspector__field">
+                <span>Linked document</span>
+                <div className="inspector__doc-link">
+          <span className="inspector__doc-link-pill">
+            <FileText size={12}/>
+            <span className="inspector__doc-link-title" title={resolved.title}>
+              {resolved.title}
+            </span>
+            <button
+                type="button"
+                className="inspector__doc-link-remove"
+                onClick={() => onUpdateNode(nodeId, {linkedDocument: undefined})}
+                aria-label="Unlink document"
+                title="Unlink document"
+            >
+              <X size={10}/>
+            </button>
+          </span>
+                    {href && (
+                        <a
+                            className="inspector__doc-link-open"
+                            href={href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+                            Open <ExternalLink size={11}/>
+                        </a>
+                    )}
+                </div>
+                {documents && !resolved.isKnownHere && (
+                    <p className="inspector__hint">
+                        This browser doesn't have that document. It opens wherever the document exists - for
+                        example through a shared workspace.
+                    </p>
+                )}
+            </div>
+        );
+    }
+
+    return (
+        <Field label="Linked document">
+            <select
+                value=""
+                disabled={!documents || candidates.length === 0}
+                onChange={(e) => {
+                    const target = candidates.find((d) => d.docId === e.target.value);
+                    if (target) {
+                        onUpdateNode(nodeId, {
+                            linkedDocument: {docId: target.docId, title: target.title},
+                        });
+                    }
+                }}
+            >
+                <option value="">
+                    {!documents
+                        ? 'Loading documents...'
+                        : candidates.length === 0
+                            ? 'No other documents in this browser'
+                            : 'Link to another document...'}
+                </option>
+                {candidates.map((d) => (
+                    <option key={d.docId} value={d.docId}>
+                        {d.title || 'Untitled document'}
+                    </option>
+                ))}
+            </select>
     </Field>
   );
 }
