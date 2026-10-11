@@ -451,6 +451,14 @@ export function Inspector({
           </button>
         )}
 
+          {!isGroup && (data.unwiredPortCount ?? 0) > 0 && (
+              <p className="inspector__hint inspector__hint--warning">
+                  {data.unwiredPortCount} connection{data.unwiredPortCount === 1 ? '' : 's'} to this node{' '}
+                  {data.unwiredPortCount === 1 ? "isn't" : "aren't"} wired to anything inside its
+                  sub-diagram. Open it and drag from the port on its edge to the node that handles it.
+              </p>
+          )}
+
         <LinkedRequirementsField
           nodeId={selectedNode.id}
           linkedRequirementIds={data.linkedRequirementIds}

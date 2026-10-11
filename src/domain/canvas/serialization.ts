@@ -3,7 +3,7 @@ import type {ArchEdgeData, ArchNodeData, Scenario} from './types.ts';
 import type {RequirementsDocument} from '../requirements/requirementsTypes.ts';
 import {EMPTY_REQUIREMENTS_DOCUMENT} from '../requirements/requirementsTypes.ts';
 import {BUILT_IN_ITEM_TYPES, BUILT_IN_RELATIONSHIP_TYPES,} from '../requirements/requirementsRegistry.ts';
-import type {ProgramIncrement} from '../timeline/programIncrements.ts';
+import type {PlanningDetails, ProgramIncrement} from '../timeline/programIncrements.ts';
 import {DEFAULT_SPRINT_DURATION_DAYS} from '../timeline/programIncrements.ts';
 import type {TeamDocument} from '../timeline/teamTypes.ts';
 import {DEFAULT_TEAM_SETTINGS, EMPTY_TEAM_DOCUMENT} from '../timeline/teamTypes.ts';
@@ -154,6 +154,15 @@ function parseRequirementsDocument(raw: unknown): RequirementsDocument {
   };
 }
 
+/** Keeps only non-empty string goal/notes; anything else is dropped so a
+ * bad value never reaches the stores. */
+function parsePlanningDetails(raw: Record<string, unknown>): PlanningDetails {
+    const out: PlanningDetails = {};
+    if (typeof raw.goal === 'string' && raw.goal.trim() !== '') out.goal = raw.goal;
+    if (typeof raw.notes === 'string' && raw.notes.trim() !== '') out.notes = raw.notes;
+    return out;
+}
+
 /** A malformed individual PI (missing fields, sprints not an array, etc.)
  * is dropped from the list entirely rather than throwing and blocking the
  * whole file from loading - one corrupted PI shouldn't take down
@@ -188,6 +197,7 @@ function parseProgramIncrements(raw: unknown): ProgramIncrement[] {
           typeof s.durationDays === 'number' && s.durationDays > 0
             ? s.durationDays
             : DEFAULT_SPRINT_DURATION_DAYS,
+          ...parsePlanningDetails(s),
       }));
 
     const reservations = Array.isArray(pi.reservations)
@@ -221,6 +231,7 @@ function parseProgramIncrements(raw: unknown): ProgramIncrement[] {
       name: pi.name,
       startDate: pi.startDate,
       sprints,
+        ...parsePlanningDetails(pi as Record<string, unknown>),
       ...(reservations && reservations.length > 0 ? { reservations } : {}),
     });
   }

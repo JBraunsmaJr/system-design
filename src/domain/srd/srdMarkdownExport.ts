@@ -1,6 +1,6 @@
-import type { SrdDataContext, SrdTemplateConfig } from './srdTypes';
-import { sanitizeFileName } from '../../common/utils/string';
-import { downloadFile } from '../../common/utils/download';
+import type {SrdDataContext, SrdTemplateConfig} from './srdTypes';
+import {sanitizeFileName} from '../../common/utils/string';
+import {downloadFile} from '../../common/utils/download';
 
 export function interpolateTokens(
   text: string,
@@ -252,11 +252,22 @@ export function generateSrdMarkdown(data: SrdDataContext, config: SrdTemplateCon
         if (data.roadmap.sprints.length === 0) {
           lines.push('*No sprint iterations planned.*', '');
         } else {
+            // PI goals are listed once above the table rather than repeated on
+            // every sprint row of that PI.
+            const piGoals = new Map<string, string>();
+            for (const s of data.roadmap.sprints) {
+                if (s.piGoal && !piGoals.has(s.piName)) piGoals.set(s.piName, s.piGoal);
+            }
+            for (const [piName, goal] of piGoals) {
+                lines.push(`- **${piName} goal:** ${goal.replace(/\r?\n/g, ' ').trim()}`);
+            }
+            if (piGoals.size > 0) lines.push('');
+
           lines.push(
-            '| Program Increment | Sprint | Start Date | End Date | Effort | Work Items |',
+              '| Program Increment | Sprint | Goal | Start Date | End Date | Effort | Work Items |',
           );
           lines.push(
-            '| ----------------- | ------ | ---------- | -------- | ------ | ---------- |',
+              '| ----------------- | ------ | ---- | ---------- | -------- | ------ | ---------- |',
           );
           for (const s of data.roadmap.sprints) {
             const itemsStr =
@@ -264,7 +275,7 @@ export function generateSrdMarkdown(data: SrdDataContext, config: SrdTemplateCon
                 ? `${s.assignedItems.length} items (${s.assignedItems.join(', ')})`
                 : '-';
             lines.push(
-              `| **${escapeTableCol(s.piName)}** | ${escapeTableCol(s.name)} | ${escapeTableCol(s.startDate)} | ${escapeTableCol(s.endDate)} | ${s.totalPoints} pts | ${escapeTableCol(itemsStr)} |`,
+                `| **${escapeTableCol(s.piName)}** | ${escapeTableCol(s.name)} | ${escapeTableCol(s.goal ?? '-')} | ${escapeTableCol(s.startDate)} | ${escapeTableCol(s.endDate)} | ${s.totalPoints} pts | ${escapeTableCol(itemsStr)} |`,
             );
           }
           lines.push('');

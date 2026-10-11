@@ -73,9 +73,15 @@ export interface FocusSet {
 /** React Flow's instance API as Canvas uses it, for the hooks that receive parts of it. */
 export type CanvasFlow = ReturnType<typeof useReactFlow<Node<ArchNodeData>>>;
 
+const NO_PORT_NODES: Node<ArchNodeData>[] = [];
+
 export interface CanvasProps {
   nodes: Node<ArchNodeData>[];
   edges: Edge<ArchEdgeData>[];
+  /** Boundary ports for the level being shown (domain/canvas/boundaryPorts.ts).
+   * Drawn and connectable, but kept apart from `nodes`, which is the
+   * document. */
+  portNodes?: Node<ArchNodeData>[];
   onNodesChange: OnNodesChange<Node<ArchNodeData>>;
   onEdgesChange: OnEdgesChange<Edge<ArchEdgeData>>;
   onConnect: OnConnect;
@@ -183,6 +189,7 @@ export function Canvas({
   onToggleSelectMode,
   peers,
   onCursorMove,
+                         portNodes = NO_PORT_NODES,
 }: CanvasProps) {
   recordCanvasRender();
   const { screenToFlowPosition, getIntersectingNodes, fitView } =
@@ -278,9 +285,21 @@ export function Canvas({
   );
 
   const pathKey = breadcrumbLabels.join('>');
+  const breadcrumbDepth = breadcrumbLabels.length;
+
+  // Ports are valid edge endpoints, so reconnection checks against them too.
+  const connectableNodesRef = useRef<Node<ArchNodeData>[]>(nodes);
+  useLayoutEffect(() => {
+    connectableNodesRef.current = portNodes.length > 0 ? [...nodes, ...portNodes] : nodes;
+  }, [nodes, portNodes]);
 
   const { handleConnectEnd, handleReconnectStart, handleReconnect, handleReconnectEnd } =
-    useEdgeConnectionGestures({ screenToFlowPosition, onConnect, onReconnectEdge, nodesRef });
+      useEdgeConnectionGestures({
+        screenToFlowPosition,
+        onConnect,
+        onReconnectEdge,
+        nodesRef: connectableNodesRef,
+      });
 
   const { onDragOver, onDrop, onCanvasDoubleClick } = useCanvasCreation({
     screenToFlowPosition,
@@ -303,6 +322,13 @@ export function Canvas({
 
   const onNodeDoubleClick = useCallback<NodeMouseHandler<Node<ArchNodeData>>>(
     (_event, node) => {
+      // A port belongs to the level above: double-clicking one goes there.
+      if (node.type === 'port') {
+        if (isPresenting || breadcrumbDepth === 0) return;
+        if (breadcrumbDepth === 1) onNavigateToRoot();
+        else onNavigateToPathIndex(breadcrumbDepth - 2);
+        return;
+      }
       if (
         isPresenting ||
         node.type === 'group' ||
@@ -313,7 +339,7 @@ export function Canvas({
         return;
       onDrillInto(node.id);
     },
-    [isPresenting, onDrillInto],
+      [isPresenting, onDrillInto, breadcrumbDepth, onNavigateToRoot, onNavigateToPathIndex],
   );
 
   const {
@@ -342,6 +368,25 @@ export function Canvas({
     focusNodeId,
     onFocusHandled,
   });
+
+  // What React Flow draws: the document's nodes, then this level's ports.
+  // Only rebuilt when either changes, which is when it would change anyway.
+  const flowNodes = useMemo(
+      () => (portNodes.length > 0 ? [...displayNodes, ...portNodes] : displayNodes),
+      [displayNodes, portNodes],
+  );
+
+  // Ports have nothing to recolor or reorder - keep the node menu off them.
+  const handleNodeContextMenu = useCallback(
+      (event: ReactMouseEvent, node: Node<ArchNodeData>) => {
+        if (node.type === 'port') {
+          event.preventDefault();
+          return;
+        }
+        onNodeContextMenu(event, node);
+      },
+      [onNodeContextMenu],
+  );
 
   const levelLabel = breadcrumbLabels.length === 0 ? 'Root' : breadcrumbLabels.join(' › ');
 
@@ -399,7 +444,7 @@ export function Canvas({
         onDoubleClick={onCanvasDoubleClick}
       >
         <ReactFlow
-          nodes={displayNodes}
+            nodes={flowNodes}
           edges={displayEdges}
           nodeTypes={CANVAS_NODE_TYPES}
           edgeTypes={CANVAS_EDGE_TYPES}
@@ -415,7 +460,7 @@ export function Canvas({
           // mode, which has nothing to complete against now that no handle
           // is a drop target - connections are drag-only.
           connectOnClick={false}
-          onNodeContextMenu={onNodeContextMenu}
+            onNodeContextMenu={handleNodeContextMenu}
           onSelectionContextMenu={onSelectionContextMenu}
           onNodeMouseEnter={docHover.handleNodeMouseEnter}
           onNodeMouseMove={docHover.handleNodeMouseMove}

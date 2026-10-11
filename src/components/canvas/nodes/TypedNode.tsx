@@ -1,5 +1,5 @@
 import {type Node, type NodeProps} from '@xyflow/react';
-import {Maximize2} from 'lucide-react';
+import {Maximize2, Unplug} from 'lucide-react';
 import {CATEGORY_LABELS, getNodeType} from '../../../domain/canvas/nodeRegistry';
 import {EdgeHandles} from './EdgeHandles';
 import {IconRenderer} from '../IconRenderer';
@@ -27,6 +27,9 @@ export function TypedNode({ id, data, selected, onDrillInto: propOnDrillInto }: 
   const iconName = rawIcon && rawIcon.trim() !== '' ? rawIcon : undefined;
   const accent = data.color ?? def?.color ?? '#98A2B3';
   const hasSubDiagram = data.hasSubDiagram ?? false;
+  // Connections at this level that nothing inside the sub-diagram is wired
+  // to - the levels have drifted apart (domain/canvas/boundaryPorts.ts).
+  const unwired = data.unwiredPortCount ?? 0;
   // The "Custom" type's category label and its own type label are both
   // literally "Custom", so the usual "Category · Type" subtitle would read
   // as "Custom · Custom" - show the description there instead, since that's
@@ -86,7 +89,24 @@ export function TypedNode({ id, data, selected, onDrillInto: propOnDrillInto }: 
         </div>
       )}
 
-        <LinkedDocumentBadge value={data.linkedDocument} className="typed-node__doc-link"/>
+      <LinkedDocumentBadge value={data.linkedDocument} className="typed-node__doc-link"/>
+
+      {unwired > 0 && (
+          <button
+              type="button"
+              className="typed-node__unwired nodrag"
+              onClick={(event) => {
+                event.stopPropagation();
+                onDrillInto?.(id);
+              }}
+              disabled={!onDrillInto}
+              title={`${unwired} connection${unwired === 1 ? '' : 's'} not wired inside the sub-diagram${onDrillInto ? ' - open it to wire them up' : ''}`}
+              aria-label={`${unwired} unwired connection${unwired === 1 ? '' : 's'}`}
+          >
+            <Unplug size={10}/>
+            {unwired}
+          </button>
+      )}
 
       {onDrillInto && (
         <button

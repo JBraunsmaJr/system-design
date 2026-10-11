@@ -270,6 +270,7 @@ function App() {
   const {
     nodes,
     edges,
+      portNodes,
     onNodesChange,
     onEdgesChange,
     onConnect,
@@ -428,6 +429,7 @@ function App() {
     <Canvas
       nodes={nodes}
       edges={edges}
+      portNodes={portNodes}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       peers={

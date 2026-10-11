@@ -71,6 +71,24 @@ model high-level architectures at the root while encapsulating low-level impleme
 4. **Hierarchy Management**:
    - Deleting a parent node cleanly cascades and removes its underlying sub-diagram structure.
 
+### Keeping Levels Connected (Boundary Ports)
+
+Every connection to a node at its own level appears inside that node's sub-diagram as a **port** on the boundary,
+much like the input and output pins of a collapsed graph in Unreal Engine's Blueprints:
+
+- **Inbound ports** sit in a column on the left, one per edge pointing _at_ the node. **Outbound ports** sit on the
+  right, one per edge leaving it. Each names the node at the other end and the connection's label or type.
+- **Wire a port** by dragging from its pin to the node inside that handles the connection, or from that node onto the
+  port. The wire runs the right way whichever end you start from, and takes on the connection's type.
+- **Unwired ports** are drawn dashed in amber with a hollow pin. The parent node shows an amber badge with the number of
+  connections not yet wired inside, and the Inspector repeats it - so the levels can't quietly drift apart.
+- **Ports follow the level above.** Add an edge to the parent and a port appears inside; delete it (or move it to
+  another node) and the port goes, along with any wire to it. One undo brings both back.
+- **Wires carry on down.** A wire from a port into a node is itself a connection to that node, so if that node has its
+  own sub-diagram, the connection shows up as a port there too - named after the node it really comes from, however
+  many levels up.
+- **Double-click a port** to go up to the level it comes from.
+
 ---
 
 ## 3. Scenarios & Presentation Mode

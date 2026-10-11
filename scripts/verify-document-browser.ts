@@ -15,10 +15,10 @@
  *    clear history (WS3-R4);
  *  - New clears the canvas.
  */
-import { chromium, type Browser, type Page } from 'playwright';
-import { readFileSync } from 'fs';
-import { join, resolve } from 'path';
-import { startDevServers, type DevServers } from './lib/devServers';
+import {type Browser, chromium, type Page} from 'playwright';
+import {readFileSync} from 'fs';
+import {join, resolve} from 'path';
+import {type DevServers, startDevServers} from './lib/devServers';
 
 const FIXTURE = resolve(join('fixtures', 'schema-0.7.json'));
 const fixture = JSON.parse(readFileSync(FIXTURE, 'utf8')) as {
@@ -38,7 +38,10 @@ function check(condition: boolean, message: string) {
 }
 const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
-const nodeCount = (p: Page) => p.$$eval('.react-flow__node', (els) => els.length);
+// Document nodes only: inside a sub-diagram the canvas also draws boundary
+// ports (domain/canvas/boundaryPorts.ts), which aren't part of the document.
+const DOC_NODE = '.react-flow__node:not(.react-flow__node-port)';
+const nodeCount = (p: Page) => p.$$eval(DOC_NODE, (els) => els.length);
 const transformOf = (p: Page, id: string) =>
   p.$eval(`.react-flow__node[data-id="${id}"]`, (el) => (el as HTMLElement).style.transform);
 const undoDisabled = (p: Page) =>
@@ -102,8 +105,8 @@ async function run() {
     // short when the whole suite loads the machine.
     await a
       .waitForFunction(
-        (n) => document.querySelectorAll('.react-flow__node').length === n,
-        NESTED.data.subDiagram!.nodes.length,
+          ([n, sel]) => document.querySelectorAll(sel).length === n,
+          [NESTED.data.subDiagram!.nodes.length, DOC_NODE] as const,
         { timeout: 5000 },
       )
       .catch(() => {});
@@ -114,8 +117,8 @@ async function run() {
     await a.evaluate(`window.__PERF__.setPath([])`);
     await a
       .waitForFunction(
-        (n) => document.querySelectorAll('.react-flow__node').length === n,
-        fixture.nodes.length,
+          ([n, sel]) => document.querySelectorAll(sel).length === n,
+          [fixture.nodes.length, DOC_NODE] as const,
         { timeout: 5000 },
       )
       .catch(() => {});

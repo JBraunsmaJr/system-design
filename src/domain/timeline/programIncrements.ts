@@ -13,7 +13,39 @@ export interface CapacityReservation {
   note?: string;
 }
 
-export interface Sprint {
+/** Free-text planning context shared by sprints and PIs. Both fields are
+ * optional and omitted (not stored as '') when empty, so documents written
+ * before these fields existed round-trip unchanged. */
+export interface PlanningDetails {
+    /** One-line statement of what this sprint/PI is meant to achieve. */
+    goal?: string;
+    /** Longer free-form notes: context, risks, decisions, retro points. */
+    notes?: string;
+}
+
+/** A patch to PlanningDetails. A key that is absent leaves that field
+ * alone; a key set to '' (or only whitespace) clears it. */
+export type PlanningDetailsPatch = Partial<Record<keyof PlanningDetails, string>>;
+
+export const PLANNING_DETAIL_KEYS: readonly (keyof PlanningDetails)[] = ['goal', 'notes'];
+
+/** Applies a PlanningDetailsPatch to any object carrying PlanningDetails,
+ * dropping cleared fields rather than storing empty strings. Pure. */
+export function applyPlanningDetails<T extends PlanningDetails>(
+    target: T,
+    patch: PlanningDetailsPatch,
+): T {
+    const next: T = {...target};
+    for (const key of PLANNING_DETAIL_KEYS) {
+        if (!(key in patch)) continue;
+        const value = patch[key];
+        if (typeof value === 'string' && value.trim() !== '') next[key] = value;
+        else delete next[key];
+    }
+    return next;
+}
+
+export interface Sprint extends PlanningDetails {
   id: string;
   name: string;
   /** Length of this sprint in days, inclusive of both its start and end
@@ -23,7 +55,7 @@ export interface Sprint {
   durationDays: number;
 }
 
-export interface ProgramIncrement {
+export interface ProgramIncrement extends PlanningDetails {
   id: string;
   name: string;
   /** ISO date (YYYY-MM-DD) - the only directly-stored date in the whole

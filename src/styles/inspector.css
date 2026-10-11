@@ -473,6 +473,11 @@
   margin-top: 8px;
 }
 
+.inspector__hint--warning {
+    color: var(--warning);
+    margin: 0 0 16px;
+}
+
 /* ---------- Inspector: color input ---------- */
 
 .inspector__field input[type='color'] {

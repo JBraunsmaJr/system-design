@@ -107,7 +107,11 @@ export interface SrdDataContext {
     sprints: Array<{
       id: string;
       piName: string;
+        /** The PI's goal, if one was set. */
+        piGoal?: string;
       name: string;
+        /** The sprint's goal, if one was set. */
+        goal?: string;
       startDate: string;
       endDate: string;
       assignedItems: string[];

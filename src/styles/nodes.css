@@ -485,6 +485,132 @@
   color: var(--white);
 }
 
+/* ---------- Unwired-connections badge (sub-diagram out of step) ---------- */
+
+.typed-node__unwired {
+    position: absolute;
+    top: -9px;
+    right: 16px;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    height: 18px;
+    padding: 0 6px;
+    border-radius: var(--radius-pill);
+    background: color-mix(in srgb, var(--warning) 18%, var(--node-bg));
+    border: 1px solid var(--warning);
+    color: var(--warning);
+    font-size: var(--text-3xs);
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.typed-node__unwired:hover {
+    background: var(--warning);
+    color: var(--black);
+}
+
+/* ---------- Boundary port (sub-diagram tunnel) ---------- */
+
+.boundary-port {
+    --port-accent: var(--accent);
+    position: relative;
+    box-sizing: border-box;
+    width: 200px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    background: color-mix(in srgb, var(--port-accent) 10%, var(--node-bg));
+    border: 1px solid color-mix(in srgb, var(--port-accent) 55%, var(--node-border));
+    font-family: var(--sans);
+    color: var(--chrome-text);
+    cursor: default;
+}
+
+/* Tab shape pointing into the diagram, like a blueprint tunnel node. */
+.boundary-port--in {
+    border-radius: var(--radius-sm) var(--radius-pill) var(--radius-pill) var(--radius-sm);
+    border-right-width: 3px;
+}
+
+.boundary-port--out {
+    flex-direction: row-reverse;
+    text-align: right;
+    border-radius: var(--radius-pill) var(--radius-sm) var(--radius-sm) var(--radius-pill);
+    border-left-width: 3px;
+}
+
+.boundary-port.is-unbound {
+    border-style: dashed;
+    border-color: var(--warning);
+    background: color-mix(in srgb, var(--warning) 8%, var(--node-bg));
+}
+
+.boundary-port__dir {
+    display: inline-flex;
+    flex-shrink: 0;
+    color: var(--port-accent);
+}
+
+.boundary-port.is-unbound .boundary-port__dir {
+    color: var(--warning);
+}
+
+.boundary-port__text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+}
+
+.boundary-port__label {
+    font-size: var(--text-xs-plus);
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.boundary-port__sub {
+    font-size: var(--text-3xs-plus);
+    color: var(--chrome-text-dim);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* The pin: a filled circle when wired, hollow when not - Unreal's
+   connected/unconnected pin convention. */
+.boundary-port__pin {
+    flex-shrink: 0;
+    width: 10px;
+    height: 10px;
+    border-radius: var(--radius-round);
+    border: 2px solid var(--port-accent);
+    background: var(--port-accent);
+}
+
+.boundary-port.is-unbound .boundary-port__pin {
+    background: transparent;
+    border-color: var(--warning);
+}
+
+/* The whole pin end of the port is the grab area, not just a thin strip. */
+.react-flow__handle.edge-grab.boundary-port__grab {
+    width: 28px;
+}
+
+.react-flow__handle.edge-grab--right.boundary-port__grab {
+    right: -8px;
+}
+
+.react-flow__handle.edge-grab--left.boundary-port__grab {
+    left: -8px;
+}
+
 /* ---------- Text annotation node ---------- */
 
 .text-node {

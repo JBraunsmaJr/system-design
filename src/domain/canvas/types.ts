@@ -80,6 +80,11 @@ export interface ArchNodeData extends Record<string, unknown> {
   /** Number of nodes in this node's sub-diagram - computed fresh by App.tsx
    * on every render from the flat diagram store's own data. */
   subDiagramNodeCount?: number;
+    /** How many of this node's connections at its own level aren't wired to
+     * anything inside its sub-diagram - see domain/canvas/boundaryPorts.ts.
+     * Computed per render like hasSubDiagram, never stored, and only set
+     * on nodes with a populated sub-diagram. */
+    unwiredPortCount?: number;
   /** An explicit stacking override set with the Inspector's z-order
    * controls. Undefined means "order me automatically by area" - see
    * domain/zOrder.ts for why the automatic rule is what it is. */

@@ -12,6 +12,13 @@ import {
 } from '../domain/canvas/gestureGeometry';
 import type {DiagramPath} from '../domain/canvas/subDiagramTree';
 import type {ArchEdgeData, ArchNodeData, EdgeWaypoint} from '../domain/canvas/types';
+import {
+  type BoundaryPort,
+  type BoundaryPortNodeData,
+  type PortIndex,
+  portsForLevel,
+  unwiredPortCounts,
+} from '../domain/canvas/boundaryPorts';
 
 /*
  * PERFORMANCE: these caches are module-level WeakMaps on purpose, and must
@@ -38,6 +45,7 @@ const derivedNodes = new WeakMap<
     selected: boolean;
     hasSub: boolean;
     subCount: number;
+    unwired: number;
     out: Node<ArchNodeData>;
   }
 >();
@@ -53,8 +61,10 @@ const derivedEdges = new WeakMap<
  */
 const derivedNodeData = new WeakMap<
   Node<ArchNodeData>,
-  { hasSub: boolean; subCount: number; data: ArchNodeData }
+    { hasSub: boolean; subCount: number; unwired: number; data: ArchNodeData }
 >();
+
+const NO_COUNTS: ReadonlyMap<string, number> = new Map();
 
 export interface CanvasProjectionInput {
   diagramSnapshot: { nodes: Node<ArchNodeData>[]; edges: Edge<ArchEdgeData>[] };
@@ -68,6 +78,10 @@ export interface CanvasProjectionInput {
   edgeInFlight: EdgeGestureMap;
   peerEdgeInFlight: ReadonlyMap<string, unknown>;
   peerEdgeLabels: ReadonlyMap<string, LabelPlacement>;
+  /** Boundary-port state for the whole document (boundaryPorts.ts). Omit
+   * to project without it - no unwired counts, and orphaned wires are not
+   * filtered out. */
+  portIndex?: PortIndex;
 }
 
 /**
@@ -97,9 +111,15 @@ export function projectCanvasElements(input: CanvasProjectionInput): {
     edgeInFlight,
     peerEdgeInFlight,
     peerEdgeLabels,
+    portIndex,
   } = input;
   const rawNodes = reorderWithGroupsFirst(getNodesAtPath(diagramSnapshot.nodes, path));
-  const rawEdges = getEdgesAtPath(diagramSnapshot.edges, path);
+  // Wires whose port no longer exists are orphans left by a peer's edit or
+  // an old file; the operation that orphans one deletes it, but until
+  // then it must not render as a dangling edge.
+  const levelEdges = getEdgesAtPath(diagramSnapshot.edges, path);
+  const rawEdges = portIndex ? levelEdges.filter((e) => portIndex.isValidEdge(e.id)) : levelEdges;
+  const unwiredByNode = portIndex ? unwiredPortCounts(portIndex, path) : NO_COUNTS;
   /**
    * Keyed only on what the ordering actually depends on - id, size and
    * any explicit override. Position is deliberately excluded: the rule
@@ -137,6 +157,8 @@ export function projectCanvasElements(input: CanvasProjectionInput): {
       const selected = selectedNodes.has(n.id);
       const subCount = subDiagramLevelCounts.get(levelKey([...path, n.id])) ?? 0;
       const hasSub = subCount > 0;
+      // Only a node with something inside can be out of step with it.
+      const unwired = hasSub ? (unwiredByNode.get(n.id) ?? 0) : 0;
       // Same inputs, same object (WS1-R8): React Flow skips a node whose
       // object is identical to last time, and re-renders it otherwise.
       const hit = derivedNodes.get(n);
@@ -147,21 +169,30 @@ export function projectCanvasElements(input: CanvasProjectionInput): {
         hit.measured === measured &&
         hit.selected === selected &&
         hit.hasSub === hasSub &&
-        hit.subCount === subCount
+          hit.subCount === subCount &&
+          hit.unwired === unwired
       ) {
         out = hit.out;
       } else {
         let dataHit = derivedNodeData.get(n);
-        if (!dataHit || dataHit.hasSub !== hasSub || dataHit.subCount !== subCount) {
-          dataHit = {
-            hasSub,
-            subCount,
-            data: { ...n.data, hasSubDiagram: hasSub, subDiagramNodeCount: subCount },
+        if (
+            !dataHit ||
+            dataHit.hasSub !== hasSub ||
+            dataHit.subCount !== subCount ||
+            dataHit.unwired !== unwired
+        ) {
+          const data: ArchNodeData = {
+            ...n.data,
+            hasSubDiagram: hasSub,
+            subDiagramNodeCount: subCount,
           };
+          if (unwired > 0) data.unwiredPortCount = unwired;
+          else delete data.unwiredPortCount;
+          dataHit = {hasSub, subCount, unwired, data};
           derivedNodeData.set(n, dataHit);
         }
         out = { ...n, zIndex, measured, selected, data: dataHit.data };
-        derivedNodes.set(n, { zIndex, measured, selected, hasSub, subCount, out });
+        derivedNodes.set(n, {zIndex, measured, selected, hasSub, subCount, unwired, out});
       }
       // In-flight geometry over the document's (WS4-R1, WS4-R3): this
       // user's own gesture first, since they are the one holding the node.
@@ -191,4 +222,113 @@ export function projectCanvasElements(input: CanvasProjectionInput): {
       return { ...out, data };
     }),
   };
+}
+
+/** Horizontal gap between the outermost node and the port column, and the
+ * vertical pitch between ports. */
+const PORT_GAP_X = 120;
+const PORT_PITCH_Y = 64;
+const PORT_WIDTH = 200;
+
+/** Same object while a port's inputs are unchanged, for the same reason as
+ * the node caches above. Keyed by port id, which is stable. */
+const derivedPorts = new Map<string, { key: string; out: Node<BoundaryPortNodeData> }>();
+
+/**
+ * The ports to draw on the boundary of the sub-diagram at `path` - inbound
+ * in a column to the left of everything at this level, outbound to the
+ * right, both starting level with the topmost node.
+ *
+ * Laid out from the document's own positions, not in-flight ones, so the
+ * ports hold still while something is being dragged and move once it's
+ * dropped. They're not draggable, selectable or deletable: they belong to
+ * the level above, and the only thing to do with one here is wire it.
+ */
+export function projectBoundaryPorts(input: {
+  portIndex: PortIndex;
+  path: DiagramPath;
+  diagramSnapshot: { nodes: Node<ArchNodeData>[] };
+  measuredDimensions: ReadonlyMap<string, { width: number; height: number }>;
+}): Node<BoundaryPortNodeData>[] {
+  const {portIndex, path, diagramSnapshot, measuredDimensions} = input;
+  const ports = portsForLevel(portIndex, path);
+  if (ports.length === 0) return [];
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  // Children of a boundary sit inside it, so the top-level nodes alone
+  // give the extent of the level.
+  for (const n of getNodesAtPath(diagramSnapshot.nodes, path)) {
+    if (n.parentId) continue;
+    const width = n.width ?? measuredDimensions.get(n.id)?.width ?? n.measured?.width ?? 180;
+    minX = Math.min(minX, n.position.x);
+    minY = Math.min(minY, n.position.y);
+    maxX = Math.max(maxX, n.position.x + width);
+  }
+  if (minX === Infinity) {
+    minX = 0;
+    minY = 0;
+    maxX = 400;
+  }
+
+  const inbound = ports.filter((p) => p.side === 'in');
+  const outbound = ports.filter((p) => p.side === 'out');
+  const column = (list: BoundaryPort[], x: number) =>
+      list.map((port, i) => {
+        const position = {x, y: minY + i * PORT_PITCH_Y};
+        // Re-attached for the same reason as document nodes' `measured`: a
+        // port that moves gets a new object, and React Flow would otherwise
+        // drop its size until a re-measure that never comes (the size itself
+        // didn't change, so its ResizeObserver doesn't fire).
+        const measured = measuredDimensions.get(port.id);
+        const key = [
+          measured ? `${measured.width}x${measured.height}` : '',
+          position.x,
+          position.y,
+          port.peerLabel,
+          port.connectionLabel,
+          port.bound,
+          port.color ?? '',
+          port.edgeType,
+          port.peerDepth,
+        ].join('|');
+        const hit = derivedPorts.get(port.id);
+        if (hit && hit.key === key) return hit.out;
+        const out: Node<BoundaryPortNodeData> = {
+          id: port.id,
+          type: 'port',
+          // React Flow only marks DRAGGABLE nodes `nopan`; without it the
+          // pane's zoom handler swallows a double-click on the port before
+          // the node sees it.
+          className: 'nopan',
+          position,
+          draggable: false,
+          selectable: false,
+          deletable: false,
+          focusable: false,
+          connectable: true,
+          ...(measured ? {measured} : {}),
+          data: {
+            nodeType: 'port',
+            label: port.peerLabel,
+            properties: {},
+            tags: [],
+            port,
+          },
+        };
+        derivedPorts.set(port.id, {key, out});
+        return out;
+      });
+
+  const result = [
+    ...column(inbound, minX - PORT_GAP_X - PORT_WIDTH),
+    ...column(outbound, maxX + PORT_GAP_X),
+  ];
+  // Only one level is on screen at a time, so anything not in it is stale.
+  if (derivedPorts.size > result.length) {
+    const live = new Set(result.map((n) => n.id));
+    for (const id of derivedPorts.keys()) if (!live.has(id)) derivedPorts.delete(id);
+  }
+  return result;
 }
