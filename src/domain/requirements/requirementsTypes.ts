@@ -117,31 +117,31 @@ export interface RequirementItem {
    * treats a missing status on a workable item as "todo". */
   status?: RequirementStatus;
 
-    /*
-     * Architecture decision record fields - only shown and exported for an
-     * item of the built-in Decision type (see decisionRecords.ts). An ADR is
-     * context, options considered, the decision, and its consequences; the
-     * CONTEXT is the item's ordinary `body`, so everything that already
-     * handles bodies (search, #references, exports, converting another item
-     * into a decision) keeps working, and only the other three need fields
-     * of their own.
-     *
-     * Kept as separate flat fields rather than one nested object so that
-     * two people editing different sections of the same decision at once
-     * both keep their changes: the collaborative store writes each item
-     * field independently, and a nested object would be replaced wholesale.
-     *
-     * All optional, and left in place if the item is converted to another
-     * type, so converting back restores them rather than losing the write-up.
-     */
-    /** Undefined reads as "proposed". */
-    decisionStatus?: DecisionStatus;
-    /** Markdown: the alternatives that were weighed. */
-    decisionOptions?: string;
-    /** Markdown: what was decided, and why. */
-    decisionOutcome?: string;
-    /** Markdown: what follows from the decision - good, bad and neutral. */
-    decisionConsequences?: string;
+  /*
+   * Architecture decision record fields - only shown and exported for an
+   * item of the built-in Decision type (see decisionRecords.ts). An ADR is
+   * context, options considered, the decision, and its consequences; the
+   * CONTEXT is the item's ordinary `body`, so everything that already
+   * handles bodies (search, #references, exports, converting another item
+   * into a decision) keeps working, and only the other three need fields
+   * of their own.
+   *
+   * Kept as separate flat fields rather than one nested object so that
+   * two people editing different sections of the same decision at once
+   * both keep their changes: the collaborative store writes each item
+   * field independently, and a nested object would be replaced wholesale.
+   *
+   * All optional, and left in place if the item is converted to another
+   * type, so converting back restores them rather than losing the write-up.
+   */
+  /** Undefined reads as "proposed". */
+  decisionStatus?: DecisionStatus;
+  /** Markdown: the alternatives that were weighed. */
+  decisionOptions?: string;
+  /** Markdown: what was decided, and why. */
+  decisionOutcome?: string;
+  /** Markdown: what follows from the decision - good, bad and neutral. */
+  decisionConsequences?: string;
 }
 
 export interface RequirementsDocument {

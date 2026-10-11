@@ -78,18 +78,18 @@ export const BUILT_IN_ITEM_TYPES: RequirementItemType[] = [
     isBuiltIn: true,
     isWorkable: true,
   },
-    {
-        // An architecture decision record. Not workable: a decision documents
-        // why the system is shaped the way it is, and has its own lifecycle
-        // (proposed, accepted, superseded...) rather than a to-do status. See
-        // decisionRecords.ts for its sections and status.
-        id: 'decision',
-        label: 'Decision',
-        prefix: 'ADR',
-        color: '#14B8A6',
-        isBuiltIn: true,
-        isWorkable: false,
-    },
+  {
+    // An architecture decision record. Not workable: a decision documents
+    // why the system is shaped the way it is, and has its own lifecycle
+    // (proposed, accepted, superseded...) rather than a to-do status. See
+    // decisionRecords.ts for its sections and status.
+    id: 'decision',
+    label: 'Decision',
+    prefix: 'ADR',
+    color: '#14B8A6',
+    isBuiltIn: true,
+    isWorkable: false,
+  },
 ];
 
 /** Status is fixed and not user-extensible (see RequirementStatus's own
@@ -174,26 +174,26 @@ export const BUILT_IN_RELATIONSHIP_TYPES: RelationshipType[] = [
     isBuiltIn: true,
     isBlocking: false,
   },
-    {
-        // A decision answering a requirement, constraint or risk - the link
-        // that lets a requirement show "here is how we chose to meet this".
-        id: 'addresses',
-        label: 'Addresses',
-        inverseLabel: 'Is addressed by',
-        color: '#14B8A6',
-        isBuiltIn: true,
-        isBlocking: false,
-    },
-    {
-        // A newer decision replacing an older one. Not blocking: it records
-        // history, not an ordering of work.
-        id: 'supersedes',
-        label: 'Supersedes',
-        inverseLabel: 'Is superseded by',
-        color: '#64748B',
-        isBuiltIn: true,
-        isBlocking: false,
-    },
+  {
+    // A decision answering a requirement, constraint or risk - the link
+    // that lets a requirement show "here is how we chose to meet this".
+    id: 'addresses',
+    label: 'Addresses',
+    inverseLabel: 'Is addressed by',
+    color: '#14B8A6',
+    isBuiltIn: true,
+    isBlocking: false,
+  },
+  {
+    // A newer decision replacing an older one. Not blocking: it records
+    // history, not an ordering of work.
+    id: 'supersedes',
+    label: 'Supersedes',
+    inverseLabel: 'Is superseded by',
+    color: '#64748B',
+    isBuiltIn: true,
+    isBlocking: false,
+  },
 ];
 
 export function getItemType(
@@ -224,7 +224,7 @@ export function withMissingBuiltInTypes(itemTypes: RequirementItemType[]): Requi
       deduped.push(t);
     }
   }
-    const missing = builtInTypesToAdd(deduped);
+  const missing = builtInTypesToAdd(deduped);
   return missing.length > 0 ? [...deduped, ...missing] : deduped;
 }
 
@@ -246,9 +246,9 @@ export function withMissingBuiltInTypes(itemTypes: RequirementItemType[]): Requi
 export function builtInTypesToAdd(
     existing: readonly Pick<RequirementItemType, 'id' | 'prefix'>[],
 ): RequirementItemType[] {
-    const ids = new Set(existing.map((t) => t.id));
-    const prefixes = new Set(existing.map((t) => (t.prefix ?? '').toUpperCase()));
-    return BUILT_IN_ITEM_TYPES.filter((t) => !ids.has(t.id) && !prefixes.has(t.prefix.toUpperCase()));
+  const ids = new Set(existing.map((t) => t.id));
+  const prefixes = new Set(existing.map((t) => (t.prefix ?? '').toUpperCase()));
+  return BUILT_IN_ITEM_TYPES.filter((t) => !ids.has(t.id) && !prefixes.has(t.prefix.toUpperCase()));
 }
 
 /** Same reasoning as withMissingBuiltInTypes, for relationship types -
@@ -502,10 +502,10 @@ export function updateItemReferencesInRelationships(
  * one in a body does.
  */
 export const ITEM_MARKDOWN_FIELDS = [
-    'body',
-    'decisionOptions',
-    'decisionOutcome',
-    'decisionConsequences',
+  'body',
+  'decisionOptions',
+  'decisionOutcome',
+  'decisionConsequences',
 ] as const satisfies readonly (keyof RequirementItem)[];
 
 export type ItemMarkdownField = (typeof ITEM_MARKDOWN_FIELDS)[number];
@@ -520,14 +520,14 @@ export function updateItemReferencesInItems(
 ): RequirementItem[] {
   if (oldId === newId) return items;
   return items.map((item) => {
-      let patch: Partial<RequirementItem> | null = null;
-      for (const field of ITEM_MARKDOWN_FIELDS) {
-          const text = item[field];
-          if (!text) continue;
-          const updated = updateItemReferencesInText(text, oldId, newId);
-          if (updated !== text) (patch ??= {})[field] = updated;
-      }
-      return patch ? {...item, ...patch} : item;
+    let patch: Partial<RequirementItem> | null = null;
+    for (const field of ITEM_MARKDOWN_FIELDS) {
+      const text = item[field];
+      if (!text) continue;
+      const updated = updateItemReferencesInText(text, oldId, newId);
+      if (updated !== text) (patch ??= {})[field] = updated;
+    }
+    return patch ? {...item, ...patch} : item;
   });
 }
 

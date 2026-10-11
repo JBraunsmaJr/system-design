@@ -16,23 +16,23 @@ import {linkedDocumentHref, linkedDocumentLabel, normalizeLinkedDocument,} from 
  * a drag, and the click doesn't also select the node underneath.
  */
 export function LinkedDocumentBadge({value, className}: { value: unknown; className?: string }) {
-    const ref = normalizeLinkedDocument(value);
-    if (!ref) return null;
-    const href = linkedDocumentHref(window.location.href, ref.docId);
-    if (!href) return null;
-    const label = linkedDocumentLabel(ref);
-    return (
-        <a
-            className={`linked-doc-badge nodrag nopan${className ? ` ${className}` : ''}`}
-            href={href}
-            target="_blank"
-            rel="noopener noreferrer"
-            title={`Open "${label}" in a new tab`}
-            onClick={(e) => e.stopPropagation()}
-            onDoubleClick={(e) => e.stopPropagation()}
-        >
-            <FileText size={10}/>
-            <span className="linked-doc-badge__label">{label}</span>
-        </a>
-    );
+  const ref = normalizeLinkedDocument(value);
+  if (!ref) return null;
+  const href = linkedDocumentHref(window.location.href, ref.docId);
+  if (!href) return null;
+  const label = linkedDocumentLabel(ref);
+  return (
+      <a
+          className={`linked-doc-badge nodrag nopan${className ? ` ${className}` : ''}`}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={`Open "${label}" in a new tab`}
+          onClick={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
+      >
+        <FileText size={10}/>
+        <span className="linked-doc-badge__label">{label}</span>
+      </a>
+  );
 }

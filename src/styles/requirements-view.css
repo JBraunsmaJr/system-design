@@ -1850,33 +1850,33 @@ mark.search-highlight--ellipsis {
 /* ---------- Decision records (ADR sections on a Decision card) ---------- */
 
 .decision-sections {
-    display: flex;
-    flex-direction: column;
+  display: flex;
+  flex-direction: column;
 }
 
 .decision-sections__section + .decision-sections__section {
-    border-top: 1px solid var(--chrome-border);
+  border-top: 1px solid var(--chrome-border);
 }
 
 .decision-sections__label {
-    margin: 0;
-    padding: 10px 12px 0;
-    font-size: var(--text-2xs);
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--chrome-text-dim);
+  margin: 0;
+  padding: 10px 12px 0;
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--chrome-text-dim);
 }
 
 .decision-sections__body {
-    padding-top: 4px;
+  padding-top: 4px;
 }
 
 .decision-sections__superseded {
-    margin: 0;
-    padding: 8px 12px;
-    font-size: var(--text-xs-plus);
-    color: var(--chrome-text-dim);
-    background: color-mix(in srgb, var(--chrome-text-dim) 12%, transparent);
-    border-bottom: 1px solid var(--chrome-border);
+  margin: 0;
+  padding: 8px 12px;
+  font-size: var(--text-xs-plus);
+  color: var(--chrome-text-dim);
+  background: color-mix(in srgb, var(--chrome-text-dim) 12%, transparent);
+  border-bottom: 1px solid var(--chrome-border);
 }
