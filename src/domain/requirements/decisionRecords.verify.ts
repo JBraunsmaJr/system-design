@@ -40,7 +40,6 @@ import {
 } from '../../collab/stores/yjsRequirementsStore.ts';
 
 let failures = 0;
-
 function assert(condition: boolean, message: string) {
     if (condition) console.log(`  ✓ ${message}`);
     else {

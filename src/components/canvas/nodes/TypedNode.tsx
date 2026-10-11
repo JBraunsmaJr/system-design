@@ -86,7 +86,7 @@ export function TypedNode({ id, data, selected, onDrillInto: propOnDrillInto }: 
         </div>
       )}
 
-      <LinkedDocumentBadge value={data.linkedDocument} className="typed-node__doc-link"/>
+        <LinkedDocumentBadge value={data.linkedDocument} className="typed-node__doc-link"/>
 
       {onDrillInto && (
         <button

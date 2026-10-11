@@ -1,7 +1,7 @@
 import {
-  DECISION_SECTIONS,
-  getDecisionStatusMeta,
-  getSupersedingDecisionIds,
+    DECISION_SECTIONS,
+    getDecisionStatusMeta,
+    getSupersedingDecisionIds,
 } from '../../domain/requirements/decisionRecords';
 import type {ItemMarkdownField} from '../../domain/requirements/requirementsRegistry';
 import type {RequirementItem, RequirementsDocument,} from '../../domain/requirements/requirementsTypes';
@@ -32,69 +32,69 @@ interface DecisionSectionsProps {
  * never disagree with them.
  */
 export function DecisionSections({
-                                   item,
-                                   doc,
-                                   editingField,
-                                   onEditField,
-                                   onUpdateItem,
-                                   onNavigateToItem,
-                                   searchQuery,
+                                     item,
+                                     doc,
+                                     editingField,
+                                     onEditField,
+                                     onUpdateItem,
+                                     onNavigateToItem,
+                                     searchQuery,
                                  }: DecisionSectionsProps) {
   const supersededBy = getSupersedingDecisionIds(doc, item.id);
   const status = getDecisionStatusMeta(item.decisionStatus);
 
   return (
       <div className="decision-sections">
-        {supersededBy.length > 0 && (
-            <p className="decision-sections__superseded">
-              {status.id === 'superseded' ? 'Superseded by ' : 'A later decision supersedes this: '}
-              {supersededBy.map((id, i) => (
-                  <span key={id}>
+          {supersededBy.length > 0 && (
+              <p className="decision-sections__superseded">
+                  {status.id === 'superseded' ? 'Superseded by ' : 'A later decision supersedes this: '}
+                  {supersededBy.map((id, i) => (
+                      <span key={id}>
               {i > 0 && ', '}
-                    <button
-                        type="button"
-                        className="requirement-body__ref-link"
-                        onClick={() => onNavigateToItem(id)}
-                    >
+                          <button
+                              type="button"
+                              className="requirement-body__ref-link"
+                              onClick={() => onNavigateToItem(id)}
+                          >
                 #{id}
               </button>
             </span>
-              ))}
-              {status.id !== 'superseded' && ' - consider marking it Superseded.'}
-            </p>
-        )}
-        {DECISION_SECTIONS.map((section) => {
-          const value = item[section.field] ?? '';
-          const isEditing = editingField === section.field;
-          return (
-              <section key={section.field} className="decision-sections__section">
-                <h4 className="decision-sections__label">{section.label}</h4>
-                {isEditing ? (
-                    <RequirementEditor
-                        value={value}
-                        onChange={(text) => onUpdateItem(item.id, {[section.field]: text})}
-                        onDone={() => onEditField(null)}
-                        doc={doc}
-                        autoFocus
-                        placeholder={section.placeholder}
-                    />
-                ) : (
-                    <div
-                        className="requirement-card__body-wrap decision-sections__body"
-                        onDoubleClick={() => onEditField(section.field)}
-                        title={value.trim() ? undefined : section.placeholder}
-                    >
-                      <RequirementBody
-                          text={value}
-                          doc={doc}
-                          onNavigateToItem={onNavigateToItem}
-                          searchQuery={searchQuery}
-                      />
-                    </div>
-                )}
-              </section>
-          );
-        })}
+                  ))}
+                  {status.id !== 'superseded' && ' - consider marking it Superseded.'}
+              </p>
+          )}
+          {DECISION_SECTIONS.map((section) => {
+              const value = item[section.field] ?? '';
+              const isEditing = editingField === section.field;
+              return (
+                  <section key={section.field} className="decision-sections__section">
+                      <h4 className="decision-sections__label">{section.label}</h4>
+                      {isEditing ? (
+                          <RequirementEditor
+                              value={value}
+                              onChange={(text) => onUpdateItem(item.id, {[section.field]: text})}
+                              onDone={() => onEditField(null)}
+                              doc={doc}
+                              autoFocus
+                              placeholder={section.placeholder}
+                          />
+                      ) : (
+                          <div
+                              className="requirement-card__body-wrap decision-sections__body"
+                              onDoubleClick={() => onEditField(section.field)}
+                              title={value.trim() ? undefined : section.placeholder}
+                          >
+                              <RequirementBody
+                                  text={value}
+                                  doc={doc}
+                                  onNavigateToItem={onNavigateToItem}
+                                  searchQuery={searchQuery}
+                              />
+                          </div>
+                      )}
+                  </section>
+              );
+          })}
       </div>
   );
 }

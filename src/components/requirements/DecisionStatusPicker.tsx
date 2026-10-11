@@ -26,7 +26,7 @@ export function DecisionStatusPicker({status, onChange}: DecisionStatusPickerPro
 
   const meta = getDecisionStatusMeta(status);
 
-  const {position: dropdownPos} = usePositionedDropdown({
+    const {position: dropdownPos} = usePositionedDropdown({
     triggerRef,
     dropdownRef,
     isOpen,
@@ -40,51 +40,51 @@ export function DecisionStatusPicker({status, onChange}: DecisionStatusPickerPro
 
   return (
       <div className="status-picker" onClick={(e) => e.stopPropagation()}>
-        <button
-            ref={triggerRef}
-            type="button"
-            className="status-picker__trigger"
-            style={{color: meta.color, borderColor: `${meta.color}66`}}
-            onClick={() => setIsOpen((prev) => !prev)}
-            title={`Decision status: ${meta.label} - ${meta.description}`}
-        >
-          <Scale size={11}/>
-          <span>{meta.label}</span>
-          <ChevronDown size={10} className="status-picker__chevron"/>
-        </button>
+          <button
+              ref={triggerRef}
+              type="button"
+              className="status-picker__trigger"
+              style={{color: meta.color, borderColor: `${meta.color}66`}}
+              onClick={() => setIsOpen((prev) => !prev)}
+              title={`Decision status: ${meta.label} - ${meta.description}`}
+          >
+              <Scale size={11}/>
+              <span>{meta.label}</span>
+              <ChevronDown size={10} className="status-picker__chevron"/>
+          </button>
 
-        {isOpen &&
-            dropdownPos &&
-            createPortal(
-                <div
-                    ref={dropdownRef}
-                    className="status-picker__dropdown"
-                    style={{
-                      position: 'fixed',
-                      top: dropdownPos.top,
-                      left: dropdownPos.left,
-                      width: DROPDOWN_WIDTH,
-                    }}
-                >
-                  {DECISION_STATUSES.map((s) => (
-                      <button
-                          key={s.id}
-                          type="button"
-                          className={`status-picker__option${s.id === meta.id ? ' is-selected' : ''}`}
-                          style={{color: s.color}}
-                          title={s.description}
-                          onClick={() => {
-                            onChange(s.id);
-                            setIsOpen(false);
-                          }}
-                      >
-                        <Scale size={13}/>
-                        {s.label}
-                      </button>
-                  ))}
-                </div>,
-                document.body,
-            )}
+          {isOpen &&
+              dropdownPos &&
+              createPortal(
+                  <div
+                      ref={dropdownRef}
+                      className="status-picker__dropdown"
+                      style={{
+                          position: 'fixed',
+                          top: dropdownPos.top,
+                          left: dropdownPos.left,
+                          width: DROPDOWN_WIDTH,
+                      }}
+                  >
+                      {DECISION_STATUSES.map((s) => (
+                          <button
+                              key={s.id}
+                              type="button"
+                              className={`status-picker__option${s.id === meta.id ? ' is-selected' : ''}`}
+                              style={{color: s.color}}
+                              title={s.description}
+                              onClick={() => {
+                                  onChange(s.id);
+                                  setIsOpen(false);
+                              }}
+                          >
+                              <Scale size={13}/>
+                              {s.label}
+                          </button>
+                      ))}
+                  </div>,
+                  document.body,
+              )}
       </div>
   );
 }

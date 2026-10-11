@@ -779,3 +779,193 @@
 .inspector__doc-link-open:hover {
     text-decoration: underline;
 }
+
+.inspector__doc-id {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.inspector__doc-id-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.inspector__doc-id-actions button {
+    padding: 4px 10px;
+    background: transparent;
+    border: 1px solid var(--chrome-border);
+    border-radius: var(--radius-sm);
+    color: var(--chrome-text);
+    font-size: var(--text-xs-plus);
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+.inspector__doc-id-actions button:first-child:not(:disabled) {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.inspector__doc-id-actions button:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.inspector__doc-id-toggle {
+    align-self: flex-start;
+    margin-top: 6px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    color: var(--chrome-text-dim);
+    font-size: var(--text-xs);
+    text-decoration: underline;
+    text-transform: none;
+    letter-spacing: normal;
+    cursor: pointer;
+}
+
+.inspector__doc-id-toggle:hover {
+    color: var(--chrome-text);
+}
+
+/* ---------- Decisions linked to the selected node ---------- */
+
+.inspector__decisions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: -6px 0 16px;
+}
+
+.inspector__decisions-title {
+    font-size: var(--text-xs);
+    font-weight: 600;
+    color: var(--chrome-text-dim);
+}
+
+.inspector__decision {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+    padding: 7px 9px;
+    background: var(--chrome-bg);
+    border: 1px solid var(--chrome-border);
+    /* The left edge takes the Decision type's own color, set inline. */
+    border-left: 3px solid var(--chrome-border);
+    border-radius: var(--radius-sm);
+    text-align: left;
+    text-transform: none;
+    letter-spacing: normal;
+    color: var(--chrome-text);
+    cursor: pointer;
+}
+
+.inspector__decision:hover {
+    border-top-color: var(--accent);
+    border-right-color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+.inspector__decision.is-history {
+    opacity: 0.6;
+}
+
+.inspector__decision-head {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    min-width: 0;
+}
+
+.inspector__decision-id {
+    flex-shrink: 0;
+    font-family: var(--mono);
+    font-size: var(--text-2xs);
+}
+
+.inspector__decision-title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--text-xs-plus);
+    font-weight: 600;
+}
+
+.inspector__decision-status {
+    flex-shrink: 0;
+    font-size: var(--text-2xs);
+    font-weight: 600;
+}
+
+.inspector__decision-summary {
+    font-size: var(--text-xs);
+    line-height: 1.45;
+    color: var(--chrome-text-dim);
+}
+
+/* ---------- Linked document (cross-document links) ---------- */
+
+.inspector__doc-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.inspector__doc-link-pill {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 4px 4px 8px;
+    border: 1px solid var(--chrome-border);
+    border-radius: var(--radius-sm);
+    color: var(--chrome-text);
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+.inspector__doc-link-title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--text-xs-plus);
+}
+
+.inspector__doc-link-remove {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3px;
+    background: transparent;
+    border: none;
+    color: var(--chrome-text-dim);
+}
+
+.inspector__doc-link-remove:hover {
+    color: var(--chrome-text);
+}
+
+.inspector__doc-link-open {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    font-size: var(--text-xs-plus);
+    font-weight: 600;
+    color: var(--accent);
+    text-decoration: none;
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+.inspector__doc-link-open:hover {
+    text-decoration: underline;
+}

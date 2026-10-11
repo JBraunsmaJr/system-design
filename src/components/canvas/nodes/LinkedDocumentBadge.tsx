@@ -31,8 +31,8 @@ export function LinkedDocumentBadge({value, className}: { value: unknown; classN
           onClick={(e) => e.stopPropagation()}
           onDoubleClick={(e) => e.stopPropagation()}
       >
-        <FileText size={10}/>
-        <span className="linked-doc-badge__label">{label}</span>
+          <FileText size={10}/>
+          <span className="linked-doc-badge__label">{label}</span>
       </a>
   );
 }

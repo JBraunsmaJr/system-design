@@ -13,7 +13,13 @@ import type {ZOrderCommand} from '../../domain/canvas/zOrder';
 import type {RequirementsDocument} from '../../domain/requirements/requirementsTypes';
 import {getDecisionStatusMeta, isDecisionItem} from '../../domain/requirements/decisionRecords';
 import {markdownExcerpt} from '../../common/utils/markdownExcerpt';
-import {linkedDocumentHref, normalizeLinkedDocument, resolveLinkedDocument,} from '../../domain/canvas/documentLinks';
+import {
+    linkedDocumentHref,
+    normalizeLinkedDocument,
+    parseDocumentIdInput,
+    resolveLinkedDocument,
+} from '../../domain/canvas/documentLinks';
+import type {LinkableDocumentList} from '../../collab/sync/linkableDocuments';
 
 const EDGE_STYLE_GROUP_ORDER = [
   'sync',
@@ -75,11 +81,12 @@ interface InspectorProps {
   onZOrderCommand: (command: ZOrderCommand) => void;
     /** The document open in this tab - never offered as a link target. */
     currentDocId?: string;
-    /** This browser's stored documents, for the "Linked document" picker.
-     * Read when a node is selected rather than held as App state, so the
-     * catalogue costs nothing until someone actually looks at a node.
-     * Without it the field isn't shown. */
-    listDocuments?: () => Promise<{ docId: string; title: string }[]>;
+    /** The documents a node can link to - this browser's and the
+     * workspace's - for the "Linked document" picker. Read when a node is
+     * selected (and when the tab regains focus) rather than held as App
+     * state, so the catalogue costs nothing until someone actually looks at
+     * a node. Without it the field isn't shown. */
+    listDocuments?: () => Promise<LinkableDocumentList>;
 }
 
 export function Inspector({
@@ -742,10 +749,12 @@ function LinkedDecisionsSummary({
  * Points this node at another document - the box for a shared platform
  * opening that platform's own document. See domain/canvas/documentLinks.ts.
  *
- * The picker offers this browser's stored documents (never the one open
- * here). An existing link to a document this browser doesn't have still
- * shows and still opens: a workspace document arrives by its id, so the
- * link is right even where the list can't confirm it.
+ * The picker offers this browser's documents and the workspace documents it
+ * can read (collab/sync/linkableDocuments.ts), never the one open here. For
+ * anything else - a document shared by link, or a workspace that can't be
+ * reached right now - a document id or editor link can be entered directly.
+ * An existing link to a document neither source lists still shows and still
+ * opens: a document arrives by its id wherever it exists.
  */
 function LinkedDocumentField({
                                  nodeId,
@@ -758,27 +767,80 @@ function LinkedDocumentField({
     linkedDocument: unknown;
     onUpdateNode: (id: string, patch: Partial<ArchNodeData>) => void;
     currentDocId: string | undefined;
-    listDocuments: () => Promise<{ docId: string; title: string }[]>;
+    listDocuments: () => Promise<LinkableDocumentList>;
 }) {
-    const [documents, setDocuments] = useState<{ docId: string; title: string }[] | null>(null);
+    const [list, setList] = useState<LinkableDocumentList | null>(null);
+    const [isEnteringId, setIsEnteringId] = useState(false);
+    const [idInput, setIdInput] = useState('');
+
+    // Loaded when a node is selected, and again whenever this tab regains
+    // focus - the usual way a document gets created or renamed is in another
+    // tab, and the picker shouldn't need the node reselected to see it.
     useEffect(() => {
         let cancelled = false;
-        listDocuments().then(
-            (list) => {
-                if (!cancelled) setDocuments(list);
-            },
-            () => {
-                if (!cancelled) setDocuments([]);
-            },
-        );
+        // Responses can arrive out of order (a slow workspace read, then a
+        // quick one after a focus); only the latest request may land.
+        let latest = 0;
+        const load = () => {
+            const request = ++latest;
+            listDocuments().then(
+                (next) => {
+                    if (!cancelled && request === latest) setList(next);
+                },
+                () => {
+                    if (!cancelled && request === latest)
+                        setList({documents: [], workspaceUnavailable: false});
+                },
+            );
+        };
+        const onVisibilityChange = () => {
+            if (document.visibilityState === 'visible') load();
+        };
+        load();
+        window.addEventListener('focus', load);
+        document.addEventListener('visibilitychange', onVisibilityChange);
         return () => {
             cancelled = true;
+            window.removeEventListener('focus', load);
+            document.removeEventListener('visibilitychange', onVisibilityChange);
         };
     }, [listDocuments, nodeId]);
 
+    // Leaving a half-typed id behind when the selection moves on would
+    // offer it to the next node.
+    const [idFormNodeId, setIdFormNodeId] = useState(nodeId);
+    if (idFormNodeId !== nodeId) {
+        setIdFormNodeId(nodeId);
+        setIsEnteringId(false);
+        setIdInput('');
+    }
+
+    const documents = list?.documents ?? null;
     const ref = normalizeLinkedDocument(linkedDocument);
     const resolved = ref ? resolveLinkedDocument(ref, documents ?? []) : null;
     const candidates = (documents ?? []).filter((d) => d.docId !== currentDocId);
+    const localCandidates = candidates.filter((d) => d.source !== 'workspace');
+    const workspaceCandidates = candidates.filter((d) => d.source === 'workspace');
+
+    const linkTo = (docId: string, title: string) =>
+        onUpdateNode(nodeId, {linkedDocument: {docId, title}});
+
+    const enteredId = parseDocumentIdInput(idInput);
+    const idError =
+        idInput.trim() === ''
+            ? null
+            : !enteredId
+                ? 'Not a document id or editor link.'
+                : enteredId === currentDocId
+                    ? "That's the document open here."
+                    : null;
+    const submitId = () => {
+        if (!enteredId || idError) return;
+        const known = documents?.find((d) => d.docId === enteredId);
+        linkTo(enteredId, known?.title ?? '');
+        setIsEnteringId(false);
+        setIdInput('');
+    };
 
     if (resolved) {
         const href = linkedDocumentHref(window.location.href, resolved.ref.docId);
@@ -816,8 +878,9 @@ function LinkedDocumentField({
                 </div>
                 {documents && !resolved.isKnownHere && (
                     <p className="inspector__hint">
-                        This browser doesn't have that document. It opens wherever the document exists - for
-                        example through a shared workspace.
+                        {list?.workspaceUnavailable
+                            ? "Not in this browser, and the workspace can't be reached right now to check. It still opens wherever the document exists."
+                            : 'Neither this browser nor your workspace lists that document. It still opens wherever it exists - for example from a link someone shared.'}
                     </p>
                 )}
             </div>
@@ -825,33 +888,99 @@ function LinkedDocumentField({
     }
 
     return (
-        <Field label="Linked document">
-            <select
-                value=""
-                disabled={!documents || candidates.length === 0}
-                onChange={(e) => {
-                    const target = candidates.find((d) => d.docId === e.target.value);
-                    if (target) {
-                        onUpdateNode(nodeId, {
-                            linkedDocument: {docId: target.docId, title: target.title},
-                        });
-                    }
-                }}
-            >
-                <option value="">
-                    {!documents
-                        ? 'Loading documents...'
-                        : candidates.length === 0
-                            ? 'No other documents in this browser'
-                            : 'Link to another document...'}
-                </option>
-                {candidates.map((d) => (
-                    <option key={d.docId} value={d.docId}>
-                        {d.title || 'Untitled document'}
-                    </option>
-                ))}
-            </select>
-    </Field>
+        <div className="inspector__field">
+            <span>Linked document</span>
+            {isEnteringId ? (
+                <div className="inspector__doc-id">
+                    <input
+                        autoFocus
+                        aria-label="Document id or editor link"
+                        placeholder="Document id, or a link to it"
+                        value={idInput}
+                        onChange={(e) => setIdInput(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') submitId();
+                            if (e.key === 'Escape') {
+                                setIsEnteringId(false);
+                                setIdInput('');
+                            }
+                        }}
+                    />
+                    <div className="inspector__doc-id-actions">
+                        <button type="button" disabled={!enteredId || Boolean(idError)} onClick={submitId}>
+                            Link
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setIsEnteringId(false);
+                                setIdInput('');
+                            }}
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                    {idError && <p className="inspector__hint">{idError}</p>}
+                </div>
+            ) : (
+                <>
+                    <select
+                        aria-label="Link to another document"
+                        value=""
+                        disabled={!documents || candidates.length === 0}
+                        onChange={(e) => {
+                            const target = candidates.find((d) => d.docId === e.target.value);
+                            if (target) linkTo(target.docId, target.title);
+                        }}
+                    >
+                        <option value="">
+                            {!documents
+                                ? 'Loading documents...'
+                                : candidates.length === 0
+                                    ? 'No other documents to link'
+                                    : 'Link to another document...'}
+                        </option>
+                        {workspaceCandidates.length > 0 ? (
+                            <>
+                                <optgroup label="In this browser">
+                                    {localCandidates.map((d) => (
+                                        <option key={d.docId} value={d.docId}>
+                                            {d.title || 'Untitled document'}
+                                        </option>
+                                    ))}
+                                </optgroup>
+                                <optgroup label="In your workspace">
+                                    {workspaceCandidates.map((d) => (
+                                        <option key={d.docId} value={d.docId}>
+                                            {d.title || 'Untitled document'}
+                                        </option>
+                                    ))}
+                                </optgroup>
+                            </>
+                        ) : (
+                            localCandidates.map((d) => (
+                                <option key={d.docId} value={d.docId}>
+                                    {d.title || 'Untitled document'}
+                                </option>
+                            ))
+                        )}
+                    </select>
+                    <button
+                        type="button"
+                        className="inspector__doc-id-toggle"
+                        onClick={() => setIsEnteringId(true)}
+                    >
+                        Enter a document id or link instead
+                    </button>
+                    {list?.workspaceUnavailable && (
+                        <p className="inspector__hint">
+                            Your workspace can't be reached right now, so only this browser's documents are
+                            listed.
+                        </p>
+                    )}
+                </>
+            )}
+        </div>
   );
 }
 

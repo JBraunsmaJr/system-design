@@ -330,6 +330,98 @@ async function run() {
       'once approved, the second browser lists the workspace',
     );
 
+      console.log('\n=== Linking a node to another document ===');
+      {
+          // A tab of its own, on a document of its own: the workspace document
+          // is "local", which is also what this browser has open in its first
+          // tab, and a document is never offered as a link to itself.
+          await closeManager(second);
+          const linking = await second.context().newPage();
+          linking.on('pageerror', (error) => check(false, `linking tab threw: ${error.message}`));
+          await linking.goto(`${appOrigin}/system-design/?doc=linking-check`);
+          await linking.waitForFunction("typeof window.__PERF__?.loadFixture === 'function'", null, {
+              timeout: 15000,
+          });
+          await linking.evaluate(`window.__PERF__.addNode("Shared platform")`);
+          const node = linking.locator('.react-flow__node', {hasText: 'Shared platform'}).first();
+          await node.click();
+          const picker = linking.locator('select[aria-label="Link to another document"]');
+          await picker.waitFor({timeout: 10000});
+          const optionLabels = () => picker.locator('option').allTextContents();
+
+          // This browser has never opened the workspace document: its copy of
+          // "local" is the empty default. The workspace is what knows the title.
+          const listed = await linking
+              .waitForFunction(
+                  () =>
+                      [
+                          ...document.querySelectorAll('select[aria-label="Link to another document"] option'),
+                      ].some((o) => o.textContent === 'Shared architecture'),
+                  null,
+                  {timeout: 20000},
+              )
+              .then(
+                  () => true,
+                  () => false,
+              );
+          check(
+              listed,
+              `the picker offers the workspace document by its workspace title (${(await optionLabels()).join(', ')})`,
+          );
+
+          // A document created in another tab appears when this tab regains
+          // focus - with the same node still selected.
+          const otherTab = await second.context().newPage();
+          await otherTab.goto(`${appOrigin}/system-design/?doc=made-in-another-tab`);
+          await otherTab.waitForFunction("typeof window.__PERF__?.loadFixture === 'function'", null, {
+              timeout: 15000,
+          });
+          await otherTab.fill('[aria-label="Diagram title"]', 'Made in another tab');
+          let refreshed = false;
+          for (let attempt = 0; attempt < 30 && !refreshed; attempt++) {
+              await sleep(500);
+              await linking.bringToFront();
+              await linking.evaluate(() => window.dispatchEvent(new Event('focus')));
+              await sleep(200);
+              refreshed = (await optionLabels()).includes('Made in another tab');
+          }
+          check(refreshed, 'regaining focus refreshes the picker without reselecting the node');
+          await otherTab.close();
+
+          // Picking the workspace document links it.
+          const workspaceDocId = await picker
+              .locator('option', {hasText: 'Shared architecture'})
+              .getAttribute('value');
+          await picker.selectOption(workspaceDocId!);
+          const badge = node.locator('.linked-doc-badge');
+          await badge.waitFor({timeout: 10000});
+          check(
+              (await badge.getAttribute('href'))?.endsWith(`?doc=${workspaceDocId}`) === true &&
+              (await badge.textContent())?.trim() === 'Shared architecture',
+              'and choosing it links the node to it',
+          );
+
+          // Or an id can be entered directly - here, pasted as an editor link.
+          await linking.click('button[aria-label="Unlink document"]');
+          await linking.click('.inspector__doc-id-toggle');
+          const idField = linking.locator('input[aria-label="Document id or editor link"]');
+          await idField.fill('not a document');
+          check(
+              await linking.locator('.inspector__doc-id-actions button:has-text("Link")').isDisabled(),
+              'an entry that is not a document id cannot be linked',
+          );
+          await idField.fill(`${appOrigin}/system-design/?doc=pasted-by-link#room=r&key=k`);
+          await idField.press('Enter');
+          await badge.waitFor({timeout: 10000});
+          check(
+              (await badge.getAttribute('href'))?.endsWith('?doc=pasted-by-link') === true,
+              'a pasted editor link links its document, without the session part',
+          );
+          await linking.close();
+          await second.bringToFront();
+          await openManager(second);
+      }
+
     // Opening switches to that document, which then fills from the store:
     // a merge, not a copy, so the browser reloads into it.
     await second.click('.workspace-panel__open');

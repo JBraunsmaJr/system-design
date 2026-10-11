@@ -60,7 +60,7 @@ export function ItemPeekContent({
         )}
       </div>
       <div className="item-peek__title">{item.title || 'Untitled'}</div>
-      <ItemPeekBody markdown={previewMarkdown} doc={doc}/>
+        <ItemPeekBody markdown={previewMarkdown} doc={doc}/>
       {counts.size > 0 && (
         <div className="item-peek__relationships">
           {[...counts.entries()].map(([label, { color, count }]) => (
