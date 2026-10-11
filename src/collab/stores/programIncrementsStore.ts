@@ -168,10 +168,10 @@ export function createLocalProgramIncrementsStore(
       pis = pis.map((pi) =>
           pi.id === piId
               ? {
-                ...pi,
-                sprints: pi.sprints.map((s) =>
-                    s.id === sprintId ? applyPlanningDetails(s, patch) : s,
-                ),
+                  ...pi,
+                  sprints: pi.sprints.map((s) =>
+                      s.id === sprintId ? applyPlanningDetails(s, patch) : s,
+                  ),
               }
               : pi,
       );
@@ -325,10 +325,10 @@ export function createAdapterProgramIncrementsStore(
           prev.map((pi) =>
               pi.id === piId
                   ? {
-                    ...pi,
-                    sprints: pi.sprints.map((s) =>
-                        s.id === sprintId ? applyPlanningDetails(s, patch) : s,
-                    ),
+                      ...pi,
+                      sprints: pi.sprints.map((s) =>
+                          s.id === sprintId ? applyPlanningDetails(s, patch) : s,
+                      ),
                   }
                   : pi,
           ),

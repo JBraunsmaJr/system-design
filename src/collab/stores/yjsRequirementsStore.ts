@@ -1,24 +1,24 @@
 import * as Y from 'yjs';
 import {orderIdSet, pushIfAbsent} from '../sync/seedGuards.ts';
 import type {
-    RelationshipType,
-    RequirementCategory,
-    RequirementItem,
-    RequirementItemType,
-    RequirementRelationship,
-    RequirementsDocument,
+  RelationshipType,
+  RequirementCategory,
+  RequirementItem,
+  RequirementItemType,
+  RequirementRelationship,
+  RequirementsDocument,
 } from '../../domain/requirements/requirementsTypes';
 import {
-    addRelationship as addRelationshipPure,
-    BUILT_IN_ITEM_TYPES,
-    BUILT_IN_RELATIONSHIP_TYPES,
-    builtInTypesToAdd,
-    defaultStatusForType,
-    generateRelationshipId,
-    isPrefixTaken,
-    ITEM_MARKDOWN_FIELDS,
-    PARENT_OF_RELATIONSHIP_TYPE_ID,
-    updateItemReferencesInText,
+  addRelationship as addRelationshipPure,
+  BUILT_IN_ITEM_TYPES,
+  BUILT_IN_RELATIONSHIP_TYPES,
+  builtInTypesToAdd,
+  defaultStatusForType,
+  generateRelationshipId,
+  isPrefixTaken,
+  ITEM_MARKDOWN_FIELDS,
+  PARENT_OF_RELATIONSHIP_TYPE_ID,
+  updateItemReferencesInText,
 } from '../../domain/requirements/requirementsRegistry';
 import type {RequirementsStore} from './requirementsStore';
 

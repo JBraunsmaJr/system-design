@@ -7,11 +7,11 @@
 import * as Y from 'yjs';
 import type {Node} from '@xyflow/react';
 import {
-    linkedDocumentHref,
-    linkedDocumentLabel,
-    normalizeLinkedDocument,
-    parseDocumentIdInput,
-    resolveLinkedDocument,
+  linkedDocumentHref,
+  linkedDocumentLabel,
+  normalizeLinkedDocument,
+  parseDocumentIdInput,
+  resolveLinkedDocument,
 } from './documentLinks.ts';
 import type {ArchNodeData} from './types.ts';
 import {createYjsDiagramStore, seedYjsDiagramDoc} from '../../collab/stores/yjsDiagramStore.ts';

@@ -3,21 +3,21 @@ import {getEdgesAtPath, getNodesAtPath, levelKey} from '../collab/stores/diagram
 import {reorderWithGroupsFirst} from '../domain/canvas/graphUtils';
 import {computeEffectiveZIndices} from '../domain/canvas/zOrder';
 import {
-  applyEdgeGesture,
-  applyInFlight,
-  changesWaypoints,
-  type EdgeGestureMap,
-  type InFlightMap,
-  type LabelPlacement,
+    applyEdgeGesture,
+    applyInFlight,
+    changesWaypoints,
+    type EdgeGestureMap,
+    type InFlightMap,
+    type LabelPlacement,
 } from '../domain/canvas/gestureGeometry';
 import type {DiagramPath} from '../domain/canvas/subDiagramTree';
 import type {ArchEdgeData, ArchNodeData, EdgeWaypoint} from '../domain/canvas/types';
 import {
-  type BoundaryPort,
-  type BoundaryPortNodeData,
-  type PortIndex,
-  portsForLevel,
-  unwiredPortCounts,
+    type BoundaryPort,
+    type BoundaryPortNodeData,
+    type PortIndex,
+    portsForLevel,
+    unwiredPortCounts,
 } from '../domain/canvas/boundaryPorts';
 
 /*
@@ -188,11 +188,11 @@ export function projectCanvasElements(input: CanvasProjectionInput): {
           };
           if (unwired > 0) data.unwiredPortCount = unwired;
           else delete data.unwiredPortCount;
-          dataHit = {hasSub, subCount, unwired, data};
+            dataHit = {hasSub, subCount, unwired, data};
           derivedNodeData.set(n, dataHit);
         }
         out = { ...n, zIndex, measured, selected, data: dataHit.data };
-        derivedNodes.set(n, {zIndex, measured, selected, hasSub, subCount, unwired, out});
+          derivedNodes.set(n, {zIndex, measured, selected, hasSub, subCount, unwired, out});
       }
       // In-flight geometry over the document's (WS4-R1, WS4-R3): this
       // user's own gesture first, since they are the one holding the node.
@@ -250,7 +250,7 @@ export function projectBoundaryPorts(input: {
   diagramSnapshot: { nodes: Node<ArchNodeData>[] };
   measuredDimensions: ReadonlyMap<string, { width: number; height: number }>;
 }): Node<BoundaryPortNodeData>[] {
-  const {portIndex, path, diagramSnapshot, measuredDimensions} = input;
+    const {portIndex, path, diagramSnapshot, measuredDimensions} = input;
   const ports = portsForLevel(portIndex, path);
   if (ports.length === 0) return [];
 
@@ -276,49 +276,49 @@ export function projectBoundaryPorts(input: {
   const outbound = ports.filter((p) => p.side === 'out');
   const column = (list: BoundaryPort[], x: number) =>
       list.map((port, i) => {
-        const position = {x, y: minY + i * PORT_PITCH_Y};
-        // Re-attached for the same reason as document nodes' `measured`: a
-        // port that moves gets a new object, and React Flow would otherwise
-        // drop its size until a re-measure that never comes (the size itself
-        // didn't change, so its ResizeObserver doesn't fire).
-        const measured = measuredDimensions.get(port.id);
-        const key = [
-          measured ? `${measured.width}x${measured.height}` : '',
-          position.x,
-          position.y,
-          port.peerLabel,
-          port.connectionLabel,
-          port.bound,
-          port.color ?? '',
-          port.edgeType,
-          port.peerDepth,
-        ].join('|');
-        const hit = derivedPorts.get(port.id);
-        if (hit && hit.key === key) return hit.out;
-        const out: Node<BoundaryPortNodeData> = {
-          id: port.id,
-          type: 'port',
-          // React Flow only marks DRAGGABLE nodes `nopan`; without it the
-          // pane's zoom handler swallows a double-click on the port before
-          // the node sees it.
-          className: 'nopan',
-          position,
-          draggable: false,
-          selectable: false,
-          deletable: false,
-          focusable: false,
-          connectable: true,
-          ...(measured ? {measured} : {}),
-          data: {
-            nodeType: 'port',
-            label: port.peerLabel,
-            properties: {},
-            tags: [],
-            port,
-          },
-        };
-        derivedPorts.set(port.id, {key, out});
-        return out;
+          const position = {x, y: minY + i * PORT_PITCH_Y};
+          // Re-attached for the same reason as document nodes' `measured`: a
+          // port that moves gets a new object, and React Flow would otherwise
+          // drop its size until a re-measure that never comes (the size itself
+          // didn't change, so its ResizeObserver doesn't fire).
+          const measured = measuredDimensions.get(port.id);
+          const key = [
+              measured ? `${measured.width}x${measured.height}` : '',
+              position.x,
+              position.y,
+              port.peerLabel,
+              port.connectionLabel,
+              port.bound,
+              port.color ?? '',
+              port.edgeType,
+              port.peerDepth,
+          ].join('|');
+          const hit = derivedPorts.get(port.id);
+          if (hit && hit.key === key) return hit.out;
+          const out: Node<BoundaryPortNodeData> = {
+              id: port.id,
+              type: 'port',
+              // React Flow only marks DRAGGABLE nodes `nopan`; without it the
+              // pane's zoom handler swallows a double-click on the port before
+              // the node sees it.
+              className: 'nopan',
+              position,
+              draggable: false,
+              selectable: false,
+              deletable: false,
+              focusable: false,
+              connectable: true,
+              ...(measured ? {measured} : {}),
+              data: {
+                  nodeType: 'port',
+                  label: port.peerLabel,
+                  properties: {},
+                  tags: [],
+                  port,
+              },
+          };
+          derivedPorts.set(port.id, {key, out});
+          return out;
       });
 
   const result = [

@@ -352,19 +352,19 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: ProgramIncrementsStore
   function runDetails(store: ProgramIncrementsStore) {
     const piId = store.addPI();
     const sprintId = store.getSnapshot().find((pi) => pi.id === piId)!.sprints[0].id;
-    store.updatePIDetails(piId, {goal: 'Ship checkout v2', notes: 'Payments team on loan'});
-    store.updateSprintDetails(piId, sprintId, {goal: 'Card flow end-to-end'});
-    store.updateSprintDetails(piId, sprintId, {notes: 'Demo Friday'});
+      store.updatePIDetails(piId, {goal: 'Ship checkout v2', notes: 'Payments team on loan'});
+      store.updateSprintDetails(piId, sprintId, {goal: 'Card flow end-to-end'});
+      store.updateSprintDetails(piId, sprintId, {notes: 'Demo Friday'});
     // A patch that only touches notes must not clear the goal.
-    store.updatePIDetails(piId, {notes: 'Payments team on loan until S3'});
-    return {piId, sprintId};
+      store.updatePIDetails(piId, {notes: 'Payments team on loan until S3'});
+      return {piId, sprintId};
   }
 
   for (const [label, store] of [
     ['local', createLocalProgramIncrementsStore()],
     ['Yjs', createYjsProgramIncrementsStore(new Y.Doc())],
   ] as const) {
-    const {piId, sprintId} = runDetails(store);
+      const {piId, sprintId} = runDetails(store);
     const pi = store.getSnapshot().find((p) => p.id === piId)!;
     const sprint = pi.sprints.find((s) => s.id === sprintId)!;
     assert(
@@ -376,7 +376,7 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: ProgramIncrementsStore
         `${label} store: sprint goal and notes are set independently`,
     );
 
-    store.updateSprintDetails(piId, sprintId, {goal: '   '});
+      store.updateSprintDetails(piId, sprintId, {goal: '   '});
     const cleared = store.getSnapshot().find((p) => p.id === piId)!.sprints[0];
     assert(
         !('goal' in cleared) && cleared.notes === 'Demo Friday',
@@ -390,8 +390,8 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: ProgramIncrementsStore
   const piId = storeA.addPI();
   const sprintId = storeA.getSnapshot()[0].sprints[0].id;
   const peerB = forkPeer(docA);
-  storeA.updateSprintDetails(piId, sprintId, {goal: 'Goal from A'});
-  peerB.store.updateSprintDetails(piId, sprintId, {notes: 'Notes from B'});
+    storeA.updateSprintDetails(piId, sprintId, {goal: 'Goal from A'});
+    peerB.store.updateSprintDetails(piId, sprintId, {notes: 'Notes from B'});
   sync(docA, peerB.doc);
   const merged = storeA.getSnapshot()[0].sprints[0];
   assert(

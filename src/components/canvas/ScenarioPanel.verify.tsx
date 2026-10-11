@@ -216,8 +216,9 @@ const sampleScenarios: Scenario[] = [
     };
     const withExport = renderToStaticMarkup(
         React.createElement(ScenarioPanel, {
-            ...props, onExport: () => {
-            }
+            ...props,
+            onExport: () => {
+            },
         }),
     );
     assert(withExport.includes('scenario-panel__btn-export'), 'renders the Export button');

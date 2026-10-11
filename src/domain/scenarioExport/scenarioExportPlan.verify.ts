@@ -10,15 +10,16 @@ import {
     FRAME_HEIGHT,
     frameLayout,
     MAX_NARRATION_LINES,
+    MP4_FPS,
     planScenarioFrames,
     safeFileName,
     stepFileName,
     stepHoldSeconds,
+    videoFrameCounts,
     wrapText,
 } from './scenarioExportPlan';
 
 let failures = 0;
-
 function assert(condition: boolean, message: string) {
     if (condition) {
         console.log(`ok: ${message}`);
@@ -183,6 +184,43 @@ console.log('Testing timing...');
     assert(
         mixes.every((m) => m > 0 && m < 1),
         'fade frames are strictly between the two steps',
+    );
+}
+
+console.log('Testing constant-rate video frames...');
+{
+    const steps = [
+        {title: 'a', narration: ''},
+        {title: 'b', narration: ''},
+        {title: 'c', narration: ''},
+    ];
+    const timeline = buildTimeline(
+        steps,
+        {secondsPerStep: 3, crossfade: true},
+        CROSSFADE_FRAMES.mp4,
+    );
+    const counts = videoFrameCounts(timeline, MP4_FPS);
+    assert(
+        counts.reduce((a, b) => a + b, 0) === 9 * MP4_FPS,
+        `frames add up to the full length (${counts.reduce((a, b) => a + b, 0)} at ${MP4_FPS} fps)`,
+    );
+    assert(
+        counts.every((c) => c >= 1),
+        'every timeline frame is shown',
+    );
+    assert(
+        timeline.every((f, i) => f.kind === 'hold' || counts[i] === 1),
+        'each crossfade frame is exactly one video frame',
+    );
+    assert(counts[0] === Math.round((3 - 0.5) * MP4_FPS), 'a held step repeats for its whole hold');
+    const odd = buildTimeline([{title: 'x'.repeat(7), narration: 'y'.repeat(13)}], {
+        secondsPerStep: 'auto',
+        crossfade: false,
+    });
+    const oddEnd = odd[0].start + odd[0].duration;
+    assert(
+        videoFrameCounts(odd, MP4_FPS)[0] === Math.round(oddEnd * MP4_FPS),
+        'an uneven length rounds to the nearest frame',
     );
 }
 

@@ -213,15 +213,15 @@ const first = projectCanvasElements(input());
   const box = makeNode('box', 200);
   const sink = makeNode('sink', 400);
   const inner = makeNode('inner', 50, ['box']);
-  const inEdge = {...makeEdge('in-e', 'outside', 'box')};
+    const inEdge = {...makeEdge('in-e', 'outside', 'box')};
   const outEdge = makeEdge('out-e', 'box', 'sink');
   const wire: Edge<ArchEdgeData> = {
     ...makeEdge('wire', portId('in-e', 'in'), 'inner'),
-    data: {...makeEdge('x', 'a', 'b').data!, parentPath: ['box']} as ArchEdgeData,
+      data: {...makeEdge('x', 'a', 'b').data!, parentPath: ['box']} as ArchEdgeData,
   };
   const orphan: Edge<ArchEdgeData> = {
     ...makeEdge('orphan', portId('gone', 'in'), 'inner'),
-    data: {...makeEdge('x', 'a', 'b').data!, parentPath: ['box']} as ArchEdgeData,
+      data: {...makeEdge('x', 'a', 'b').data!, parentPath: ['box']} as ArchEdgeData,
   };
   const snapshot = {
     nodes: [outside, box, sink, inner],
@@ -229,7 +229,7 @@ const first = projectCanvasElements(input());
   };
   const portIndex = buildPortIndex(snapshot.nodes, snapshot.edges);
 
-  const root = projectCanvasElements(input({diagramSnapshot: snapshot, portIndex}));
+    const root = projectCanvasElements(input({diagramSnapshot: snapshot, portIndex}));
   assert(
       byId(root.nodes, 'box').data.unwiredPortCount === 1,
       'a node with a sub-diagram reports the one connection not wired inside',
@@ -239,7 +239,7 @@ const first = projectCanvasElements(input());
       'a node without a sub-diagram reports nothing',
   );
 
-  const insideInput = input({diagramSnapshot: snapshot, portIndex, path: ['box']});
+    const insideInput = input({diagramSnapshot: snapshot, portIndex, path: ['box']});
   const inside = projectCanvasElements(insideInput);
   assert(
       inside.edges.some((e) => e.id === 'wire') && !inside.edges.some((e) => e.id === 'orphan'),
@@ -266,14 +266,14 @@ const first = projectCanvasElements(input());
   );
   assert(inPort.className === 'nopan', 'ports are nopan, so a double-click reaches them');
 
-  const again = projectBoundaryPorts({...portArgs, measuredDimensions: new Map()});
+    const again = projectBoundaryPorts({...portArgs, measuredDimensions: new Map()});
   assert(
       byId(again, inPort.id) === inPort && byId(again, outPort.id) === outPort,
       'unchanged ports are the same objects on the next projection',
   );
   const measured = projectBoundaryPorts({
     ...portArgs,
-    measuredDimensions: new Map([[inPort.id, {width: 200, height: 44}]]),
+      measuredDimensions: new Map([[inPort.id, {width: 200, height: 44}]]),
   });
   assert(
       byId(measured, inPort.id) !== inPort && byId(measured, inPort.id).measured?.height === 44,

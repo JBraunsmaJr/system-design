@@ -7,7 +7,7 @@
  * loaded only for its format), and MP4 encoding uses the browser's built-in
  * WebCodecs encoder. Nothing is fetched at runtime.
  */
-import type {TimelineFrame} from '../../../domain/scenarioExport/scenarioExportPlan';
+import {MP4_FPS, type TimelineFrame, videoFrameCounts,} from '../../../domain/scenarioExport/scenarioExportPlan';
 
 export interface VideoRequest {
     kind: 'gif' | 'mp4';
@@ -101,15 +101,27 @@ async function encodeMp4(req: VideoRequest): Promise<{ bytes: ArrayBuffer; codec
         format: new Mp4OutputFormat({fastStart: 'in-memory'}),
         target: new BufferTarget(),
     });
-    const source = new CanvasSource(canvas, {codec, quality: QUALITY_HIGH});
-    output.addVideoTrack(source);
+    // Key frames every second keep scrubbing responsive anywhere in a step.
+    const source = new CanvasSource(canvas, {codec, quality: QUALITY_HIGH, keyFrameInterval: 1});
+    // A constant frame rate (see MP4_FPS): a held step is the same frame
+    // repeated, which the encoder stores in almost nothing.
+    output.addVideoTrack(source, {frameRate: MP4_FPS});
     await output.start();
+    const counts = videoFrameCounts(req.timeline, MP4_FPS);
+    const total = counts.reduce((a, b) => a + b, 0);
+    let n = 0;
     for (let i = 0; i < req.timeline.length; i++) {
         const frame = req.timeline[i];
         draw(ctx, frame, req.frames, req.width, req.height);
-        // Each step starts on a key frame, so seeking to a step is instant.
-        await source.add(frame.start, frame.duration, {keyFrame: frame.kind === 'hold'});
-        post({type: 'progress', done: i + 1, total: req.timeline.length});
+        for (let k = 0; k < counts[i]; k++) {
+            // Each step also starts on a key frame, so seeking to a step is
+            // instant. Elsewhere the option is left out rather than false: false
+            // would override keyFrameInterval and leave a step with only one.
+            const startsStep = k === 0 && frame.kind === 'hold';
+            await source.add(n / MP4_FPS, 1 / MP4_FPS, startsStep ? {keyFrame: true} : undefined);
+            n++;
+            if (n % 15 === 0 || n === total) post({type: 'progress', done: n, total});
+        }
     }
     await output.finalize();
     const buffer = (output.target as InstanceType<typeof BufferTarget>).buffer;

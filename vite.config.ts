@@ -17,17 +17,17 @@ export default defineConfig({
   // ES-module workers, so the SRD's PDF worker shares code-split chunks
   // (react-pdf, the templates) with the page instead of failing to build.
   worker: { format: 'es' },
-    // The scenario exporter's encoders are the same: found only on first
-    // export (gifenc and Mediabunny inside its worker), which would reload the
-    // page mid-export.
+  // The scenario exporter's encoders are the same: found only on first
+  // export (gifenc and Mediabunny inside its worker), which would reload the
+  // page mid-export.
   optimizeDeps: {
-      include: [
-          '@react-pdf/renderer',
-          'pdfjs-dist/legacy/build/pdf.mjs',
-          'fflate',
-          'gifenc',
-          'mediabunny',
-      ],
+    include: [
+      '@react-pdf/renderer',
+      'pdfjs-dist/legacy/build/pdf.mjs',
+      'fflate',
+      'gifenc',
+      'mediabunny',
+    ],
   },
   resolve: {
     alias: {

@@ -189,7 +189,7 @@ export function Canvas({
   onToggleSelectMode,
   peers,
   onCursorMove,
-                         portNodes = NO_PORT_NODES,
+                           portNodes = NO_PORT_NODES,
 }: CanvasProps) {
   recordCanvasRender();
   const { screenToFlowPosition, getIntersectingNodes, fitView } =
@@ -295,10 +295,10 @@ export function Canvas({
 
   const { handleConnectEnd, handleReconnectStart, handleReconnect, handleReconnectEnd } =
       useEdgeConnectionGestures({
-        screenToFlowPosition,
-        onConnect,
-        onReconnectEdge,
-        nodesRef: connectableNodesRef,
+          screenToFlowPosition,
+          onConnect,
+          onReconnectEdge,
+          nodesRef: connectableNodesRef,
       });
 
   const { onDragOver, onDrop, onCanvasDoubleClick } = useCanvasCreation({
@@ -379,11 +379,11 @@ export function Canvas({
   // Ports have nothing to recolor or reorder - keep the node menu off them.
   const handleNodeContextMenu = useCallback(
       (event: ReactMouseEvent, node: Node<ArchNodeData>) => {
-        if (node.type === 'port') {
-          event.preventDefault();
-          return;
-        }
-        onNodeContextMenu(event, node);
+          if (node.type === 'port') {
+              event.preventDefault();
+              return;
+          }
+          onNodeContextMenu(event, node);
       },
       [onNodeContextMenu],
   );

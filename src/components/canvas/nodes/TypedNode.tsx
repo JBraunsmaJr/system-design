@@ -89,22 +89,22 @@ export function TypedNode({ id, data, selected, onDrillInto: propOnDrillInto }: 
         </div>
       )}
 
-      <LinkedDocumentBadge value={data.linkedDocument} className="typed-node__doc-link"/>
+        <LinkedDocumentBadge value={data.linkedDocument} className="typed-node__doc-link"/>
 
       {unwired > 0 && (
           <button
               type="button"
               className="typed-node__unwired nodrag"
               onClick={(event) => {
-                event.stopPropagation();
-                onDrillInto?.(id);
+                  event.stopPropagation();
+                  onDrillInto?.(id);
               }}
               disabled={!onDrillInto}
               title={`${unwired} connection${unwired === 1 ? '' : 's'} not wired inside the sub-diagram${onDrillInto ? ' - open it to wire them up' : ''}`}
               aria-label={`${unwired} unwired connection${unwired === 1 ? '' : 's'}`}
           >
-            <Unplug size={10}/>
-            {unwired}
+              <Unplug size={10}/>
+              {unwired}
           </button>
       )}
 

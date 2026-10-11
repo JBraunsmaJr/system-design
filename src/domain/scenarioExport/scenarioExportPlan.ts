@@ -267,7 +267,16 @@ const SECONDS_PER_CHARACTER = 0.06;
 export const CROSSFADE_SECONDS = 0.5;
 /** Frames drawn across one crossfade: smooth in a video, and fewer in a GIF,
  * where every frame is a full image and adds to the file's size. */
-export const CROSSFADE_FRAMES = {mp4: 12, gif: 4} as const;
+export const CROSSFADE_FRAMES = {mp4: 15, gif: 4} as const;
+
+/**
+ * MP4s are written at a constant frame rate, repeating a held step's frame,
+ * rather than as one frame lasting several seconds. Both are valid MP4, but
+ * many players - Windows' Media Player and Movies & TV, PowerPoint, chat
+ * previews - freeze, stutter or seek wrongly on the latter. 15 fade frames
+ * over half a second is exactly one fade frame per video frame.
+ */
+export const MP4_FPS = 30;
 
 /** How long a step stays on screen, in seconds. */
 export function stepHoldSeconds(
@@ -319,6 +328,20 @@ export function buildTimeline(
         }
     });
     return frames;
+}
+
+/**
+ * How many constant-rate video frames each timeline frame covers. Each
+ * frame's start and end are rounded to the frame grid, and timeline frames
+ * are contiguous, so the counts add up to the video's length with no drift.
+ */
+export function videoFrameCounts(timeline: readonly TimelineFrame[], fps: number): number[] {
+    return timeline.map((f) => {
+        const first = Math.round(f.start * fps);
+        const end = Math.round((f.start + f.duration) * fps);
+        // A frame too short for the grid still shows for one frame.
+        return Math.max(1, end - first);
+    });
 }
 
 function round(seconds: number): number {
