@@ -1,4 +1,16 @@
-import {ChevronDown, ChevronUp, Download, Film, MapPin, Play, Plus, Trash2, X,} from 'lucide-react';
+import {
+    ChevronDown,
+    ChevronUp,
+    Download,
+    Film,
+    MapPin,
+    Minus,
+    MousePointerClick,
+    Play,
+    Plus,
+    Trash2,
+    X,
+} from 'lucide-react';
 import type {Node} from '@xyflow/react';
 import {getBreadcrumbLabelsFlat} from '../../collab/stores/diagramStore';
 import type {ArchNodeData, Scenario, ScenarioStep} from '../../domain/canvas/types';
@@ -19,7 +31,11 @@ interface ScenarioPanelProps {
   onPresent: (scenarioId: string) => void;
   /** Opens the export dialog (PDF slides, PNGs, GIF, MP4) for a scenario. */
   onExport?: (scenarioId: string) => void;
-  canAddStep: boolean;
+    /** What is selected on the canvas right now: the selection bar's
+     * actions turn it into a new step, or add it to or remove it from the
+     * open step. */
+    selectedNodeIds: string[];
+    selectedEdgeIds: string[];
   /** The step currently selected in the list - shown in the editor pane
    * AND previewed/highlighted on the canvas at the same time. */
   activeStepId: string | null;
@@ -59,8 +75,9 @@ export function ScenarioPanel({
   onDeleteStep,
   onMoveStep,
   onPresent,
-                                onExport,
-  canAddStep,
+                                  onExport,
+                                  selectedNodeIds,
+                                  selectedEdgeIds,
   activeStepId,
   onSelectStep,
   diagramNodes,
@@ -72,6 +89,13 @@ export function ScenarioPanel({
   const activeStep = active?.steps.find((st) => st.id === activeStepId) ?? null;
   const activeStepIndex = active && activeStep ? active.steps.indexOf(activeStep) : -1;
   const activeStepEditable = activeStep ? pathsEqual(activeStep.path, currentPath) : false;
+    const selectionCount = selectedNodeIds.length + selectedEdgeIds.length;
+    // How much of the selection the open step already highlights: decides
+    // whether "Add" and "Remove" would change anything.
+    const inStep = activeStep
+        ? selectedNodeIds.filter((id) => activeStep.focusNodeIds.includes(id)).length +
+        selectedEdgeIds.filter((id) => activeStep.focusEdgeIds.includes(id)).length
+        : 0;
 
   return (
     <div className="scenario-panel">
@@ -139,13 +163,16 @@ export function ScenarioPanel({
         )}
 
         {active && (
-          <div className="scenario-panel__scenario-actions">
+            <>
+                {/* The title gets the whole line: it is what a long name needs
+                room for, and the buttons get a row of their own below. */}
             <input
               className="scenario-panel__title-input"
               value={active.title}
               placeholder="Scenario title"
               onChange={(e) => onRenameScenario(active.id, e.target.value)}
               aria-label="Scenario title"
+              title={active.title}
             />
             <div className="scenario-panel__action-buttons">
               <button
@@ -184,7 +211,7 @@ export function ScenarioPanel({
                 <Trash2 size={12} />
               </button>
             </div>
-          </div>
+            </>
         )}
       </div>
 
@@ -202,27 +229,81 @@ export function ScenarioPanel({
           <div className="scenario-panel__section">
             <div className="scenario-panel__section-header">
               <span className="scenario-panel__section-title">Steps ({active.steps.length})</span>
-              <button
-                type="button"
-                className="scenario-panel__btn-add-step"
-                disabled={!canAddStep}
-                onClick={() => onAddStep(active.id)}
-                title={
-                  canAddStep
-                    ? `Add current canvas selection as a new step (${currentLevelLabel})`
-                    : 'Select one or more nodes/edges on the canvas first'
-                }
+            </div>
+
+              {/* Every action that uses the canvas selection lives here, and
+                says exactly what it does with it. */}
+              <div
+                  className={`scenario-selection-bar${selectionCount > 0 ? ' has-selection' : ''}`}
+                  aria-live="polite"
               >
-                <Plus size={12} /> Add Selection
-              </button>
+                  {selectionCount === 0 ? (
+                      <p className="scenario-selection-bar__hint">
+                          <MousePointerClick size={13} aria-hidden="true"/>
+                          Select nodes or edges on the diagram to build a step from them.
+                      </p>
+                  ) : (
+                      <>
+                          <div className="scenario-selection-bar__summary">
+                              <strong>{selectionCount} selected</strong>
+                              <span className="scenario-selection-bar__level">
+                      <MapPin size={10} aria-hidden="true"/> {currentLevelLabel}
+                    </span>
+                          </div>
+                          <div className="scenario-selection-bar__actions">
+                              <button
+                                  type="button"
+                                  className="scenario-selection-bar__primary"
+                                  onClick={() => onAddStep(active.id)}
+                                  title={`Create step ${active.steps.length + 1} from the ${selectionCount} selected ${
+                                      selectionCount === 1 ? 'element' : 'elements'
+                                  }`}
+                              >
+                                  <Plus size={12}/> New step from selection
+                              </button>
+                              {activeStep && (
+                                  <>
+                                      <button
+                                          type="button"
+                                          disabled={!activeStepEditable || inStep === selectionCount}
+                                          onClick={() => onAddSelectionToStep(active.id, activeStep.id)}
+                                          title={
+                                              !activeStepEditable
+                                                  ? `Step ${activeStepIndex + 1} is on another diagram level`
+                                                  : inStep === selectionCount
+                                                      ? `Step ${activeStepIndex + 1} already highlights all of it`
+                                                      : `Highlight the selection in step ${activeStepIndex + 1} too`
+                                          }
+                                      >
+                                          <Plus size={12}/> Add to step {activeStepIndex + 1}
+                                      </button>
+                                      <button
+                                          type="button"
+                                          disabled={!activeStepEditable || inStep === 0}
+                                          onClick={() => onRemoveSelectionFromStep(active.id, activeStep.id)}
+                                          title={
+                                              !activeStepEditable
+                                                  ? `Step ${activeStepIndex + 1} is on another diagram level`
+                                                  : inStep === 0
+                                                      ? `Step ${activeStepIndex + 1} highlights none of it`
+                                                      : `Stop highlighting the selection in step ${activeStepIndex + 1}`
+                                          }
+                                      >
+                                          <Minus size={12}/> Remove from step {activeStepIndex + 1}
+                                      </button>
+                                  </>
+                              )}
+                          </div>
+                      </>
+                  )}
             </div>
 
             {active.steps.length === 0 ? (
               <div className="scenario-panel__empty-steps">
                 <p>No steps in this scenario yet.</p>
                 <p className="scenario-panel__hint">
-                  Select elements on the diagram, then click <strong>Add Selection</strong> above to
-                  create your first step.
+                    Select elements on the diagram, then click <strong>New step from selection</strong>{' '}
+                    above to create your first step.
                 </p>
               </div>
             ) : (
@@ -351,37 +432,8 @@ export function ScenarioPanel({
                   {activeStep.focusNodeIds.length + activeStep.focusEdgeIds.length === 1
                     ? ''
                     : 's'}{' '}
-                  highlighted
-                </div>
-                <div className="scenario-step-editor__selection-actions">
-                  <button
-                    type="button"
-                    disabled={!canAddStep || !activeStepEditable}
-                    onClick={() => onAddSelectionToStep(active.id, activeStep.id)}
-                    title={
-                      !activeStepEditable
-                        ? "Navigate to this step's diagram first"
-                        : canAddStep
-                          ? 'Add selected nodes/edges to this step'
-                          : 'Select something on the canvas first'
-                    }
-                  >
-                    <Plus size={11} /> Add selection
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!canAddStep || !activeStepEditable}
-                    onClick={() => onRemoveSelectionFromStep(active.id, activeStep.id)}
-                    title={
-                      !activeStepEditable
-                        ? "Navigate to this step's diagram first"
-                        : canAddStep
-                          ? 'Remove selected nodes/edges from this step'
-                          : 'Select something on the canvas first'
-                    }
-                  >
-                    <X size={11} /> Remove selection
-                  </button>
+                    highlighted. Select elements on the diagram to add them to this step or
+                    remove them from it.
                 </div>
               </div>
             </div>

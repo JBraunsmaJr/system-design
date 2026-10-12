@@ -103,12 +103,15 @@ Static diagrams often fail to convey runtime execution order, request lifecycles
 1. Click **Scenarios** (film icon) in the top toolbar or bottom tray to open the **Scenario Panel**.
 2. Click **+ New Scenario** and give your scenario a descriptive title (e.g., _"User Authentication & Token Refresh
    Flow"_ or _"Payment Processing with Circuit Breaking"_).
-3. Click **Add Step** to create a presentation sequence. Any selected node and edge wil be added to the step.
+3. Select the nodes and edges a step should highlight. The **Selection** bar under the step list shows how many are
+   selected; click **New step from selection** to create a step from them.
 
 ![scenario step configuration](../images/diagram/scenario-add-to.png)
 
-4. Click **Add Selection to Step** to add the currently selected nodes and edges to the step. The selected items will
-   highlight in the diagram to make it clear what would be added.
+4. To change an existing step, click it in the list to open it, select elements on the diagram, then click **Add to step
+   N** or **Remove from step N** in the Selection bar. Each button is only enabled when it would change
+   the step: Add when part of the selection isn't in the step yet, Remove when some of it is. While a step is open,
+   the elements it already highlights are marked on the diagram, as are selected elements that would be added.
 
 ![scenario add to step](../images/diagram/scenario-add-to-step.png)
 
@@ -119,7 +122,8 @@ Static diagrams often fail to convey runtime execution order, request lifecycles
 For each step in the sequence:
 
 - **Title & Narration**: Add an explanatory title and detailed speaker notes / walkthrough narration.
-- **Focus Elements**: Select the nodes and edges involved in this specific step, then click **Add Selection to Step**.
+- **Focus Elements**: With the step open, select nodes and edges on the diagram and use **Add to step N** or **Remove
+  from step N** in the Selection bar.
 - **Level Context**: Steps can span different sub-diagram depths. When stepping into a component, the scenario
   automatically transitions to the appropriate sub-diagram level.
 - **Reordering**: Use the **Up** / **Down** buttons in the step list to adjust sequencing.

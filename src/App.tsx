@@ -424,7 +424,6 @@ function App() {
   const selectedEdgeId = selectedEdgeIds[0] ?? null;
   const selectedNode = nodes.find((n) => n.id === selectedNodeId) ?? null;
   const selectedEdge = edges.find((e) => e.id === selectedEdgeId) ?? null;
-  const canAddStep = selectedNodeIds.length > 0 || selectedEdgeIds.length > 0;
   const onCanvasProfilerRender: ProfilerOnRenderCallback = useCallback(
     (_id, _phase, actualDuration) => {
       recordCommit(actualDuration);
@@ -686,7 +685,8 @@ function App() {
                     onMoveStep={onMoveStep}
                     onPresent={onStartPresenting}
                     onExport={setExportScenarioId}
-                    canAddStep={canAddStep}
+                    selectedNodeIds={selectedNodeIds}
+                    selectedEdgeIds={selectedEdgeIds}
                     activeStepId={activeStepId}
                     onSelectStep={onSelectStep}
                     diagramNodes={diagramSnapshot.nodes}
