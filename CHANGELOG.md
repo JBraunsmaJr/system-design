@@ -11,6 +11,8 @@ fails if there is none. Items without a marker are still published. The
 markers are removed when the section becomes a release. See
 [docs/releasing.md](docs/releasing.md).
 
+## [Unreleased]
+
 ## [0.98.0] - 2026-10-12
 
 ### Duplicate scenarios and steps
