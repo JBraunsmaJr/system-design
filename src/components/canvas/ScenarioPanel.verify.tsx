@@ -327,7 +327,8 @@ const sampleScenarios: Scenario[] = [
     );
     const notInStep = render({selectedNodeIds: ['node-other'], activeStepId: 'step-2'});
     assert(
-        !disabled(button(notInStep, 'Add to step 2')) && disabled(button(notInStep, 'Remove from step 2')),
+        !disabled(button(notInStep, 'Add to step 2')) &&
+        disabled(button(notInStep, 'Remove from step 2')),
         'with something else selected: only Add would change it',
     );
     const otherLevel = render({

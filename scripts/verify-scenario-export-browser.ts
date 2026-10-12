@@ -45,7 +45,7 @@ async function exportAs(p: Page, format: string, setup?: () => Promise<void>): P
   await p.click(`.scenario-export__format:has(input[value="${format}"])`);
   await setup?.();
   const [download] = await Promise.all([
-    p.waitForEvent('download', {timeout: 120000}),
+      p.waitForEvent('download', {timeout: 120000}),
     p.click('.scenario-export button:has-text("Export")'),
   ]);
   await p.waitForSelector('.scenario-export__status-text:has-text("Saved")');
@@ -53,13 +53,13 @@ async function exportAs(p: Page, format: string, setup?: () => Promise<void>): P
   const name = download.suggestedFilename();
   if (process.env.SCENARIO_EXPORT_OUT)
     writeFileSync(join(process.env.SCENARIO_EXPORT_OUT, name), bytes);
-  return {bytes, name};
+    return {bytes, name};
 }
 
 /** Width and height from a PNG's IHDR chunk. */
 function pngSize(bytes: Uint8Array): { width: number; height: number } {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  return {width: view.getUint32(16), height: view.getUint32(20)};
+    return {width: view.getUint32(16), height: view.getUint32(20)};
 }
 
 /** A GIF's logical screen size and how many image frames it has. */
@@ -91,7 +91,7 @@ function gifInfo(bytes: Buffer): { width: number; height: number; frames: number
       skipSubBlocks();
     } else break;
   }
-  return {width, height, frames, loops};
+    return {width, height, frames, loops};
 }
 
 /**
@@ -110,7 +110,7 @@ async function drawnFraction(p: Page, png: Uint8Array): Promise<number> {
     const g = c.getContext('2d')!;
     g.drawImage(img, 0, 0);
     // The diagram band: below the header, above the caption.
-    const {data: px} = g.getImageData(0, 120, img.width, 500);
+      const {data: px} = g.getImageData(0, 120, img.width, 500);
     const [r0, g0, b0] = [px[0], px[1], px[2]];
     let drawn = 0;
     for (let i = 0; i < px.length; i += 16) {
@@ -125,13 +125,13 @@ async function run() {
   let browser: Browser | undefined;
   try {
     // Ports no other suite uses, so suites never collide when run together.
-    servers = await startDevServers({vitePort: 5204, signalingPort: 14490, quiet: true});
+      servers = await startDevServers({vitePort: 5204, signalingPort: 14490, quiet: true});
     const appOrigin = new URL(servers.appUrl).origin;
     browser = await chromium.launch({
       headless: true,
       executablePath: process.env.CHROMIUM_PATH || undefined,
     });
-    const context = await browser.newContext({acceptDownloads: true});
+      const context = await browser.newContext({acceptDownloads: true});
     const p = await context.newPage();
     p.on('pageerror', (e) => {
       failures++;
@@ -183,8 +183,8 @@ async function run() {
     );
     check(
         names.every((n) => {
-          const {width, height} = pngSize(files[n]);
-          return width === 1920 && height === 1080;
+            const {width, height} = pngSize(files[n]);
+            return width === 1920 && height === 1080;
         }),
         'each PNG is 1920x1080',
     );
@@ -198,7 +198,7 @@ async function run() {
     console.log('=== PDF slides ===');
     const pdf = await exportAs(p, 'pdf');
     check(pdf.name === 'login-flow.pdf', `named after the scenario (${pdf.name})`);
-    const doc = await getDocument({data: new Uint8Array(pdf.bytes)}).promise;
+      const doc = await getDocument({data: new Uint8Array(pdf.bytes)}).promise;
     check(doc.numPages === STEPS + 1, `a title slide plus one slide per step (${doc.numPages})`);
     const page = await doc.getPage(2);
     const [, , w, h] = page.view;

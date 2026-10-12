@@ -31,6 +31,9 @@ The editor is designed for rapid, low-friction diagramming with zero configurati
 - **Waypoints**: Click and drag mid-points on connection lines to insert bends and cleanly route edges around
   intervening components.
 - **Flow Direction**: Set edge flow semantics, which dynamically drive data-flow animations during scenario playback.
+- **Line Style**: In the Inspector, give an edge its own **Color** (the arrowheads follow it), **Thickness** (Thin to
+  Heavy), and **Routing** - **Orthogonal** (right-angled, the default), **Straight**, or **Curved**. Bends work with
+  every routing: a curved edge passes smoothly through each bend.
 
 ### Inspection & Customization
 
@@ -41,6 +44,30 @@ Select any component or edge to open the **Inspector Panel** on the right:
 - **Visual Styling**: Customize node accent colors, border styles, and Z-index layering.
 - **Custom Properties & Tags**: Attach arbitrary key-value metadata and tags for categorizing systems.
 - **Requirement Linking**: Bi-directionally link diagram elements directly to engineering requirements for traceability.
+- **Locking**: Tick **Locked** to pin a node in place - it can't be dragged, nudged, resized or deleted until it's
+  unlocked. Locked nodes show a small padlock.
+
+### Editing Many Items at Once
+
+Select several nodes and edges (Ctrl/⌘-click, or drag a selection box in select mode) and the Inspector edits **all of
+them together**: color, icon, text size, node or boundary type, tags, linked requirements and lock for the nodes; type,
+color, thickness, routing, direction and label visibility for the edges. A field whose items disagree shows **Mixed**
+until you change it. Each change is a single undo step, however many items it touched.
+
+### The Right-Click Menu
+
+Right-click a node, an edge, or a selection for:
+
+| Command                         | Shortcut         | What it does                                                                                                                      |
+|---------------------------------|------------------|-----------------------------------------------------------------------------------------------------------------------------------|
+| Change color / icon             |                  | Recolor (nodes and edges) or re-icon everything targeted.                                                                         |
+| Duplicate                       | Ctrl/⌘+D         | Copies the nodes (with their sub-diagrams and the edges between them) next to the originals, without touching the clipboard.      |
+| Group                           | Ctrl/⌘+G         | Wraps the nodes in a new boundary sized to fit them.                                                                              |
+| Ungroup                         | Ctrl/⌘+Shift+G   | Removes a boundary and keeps what was inside it.                                                                                  |
+| Lock / Unlock                   |                  | Pins nodes in place, or frees them again.                                                                                         |
+| Copy style / Paste style        | Ctrl/⌘+Alt+C / V | Copies one item's color, icon, text size, thickness and routing and applies them to others. Color pastes between nodes and edges. |
+| Link requirement                |                  | Searches requirements and toggles each one on every targeted node.                                                                |
+| Bring to front ... Send to back |                  | Stacking order.                                                                                                                   |
 
 ---
 

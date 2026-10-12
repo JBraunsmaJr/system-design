@@ -192,6 +192,15 @@ export function projectCanvasElements(input: CanvasProjectionInput): {
           derivedNodeData.set(n, dataHit);
         }
         out = { ...n, zIndex, measured, selected, data: dataHit.data };
+          // A locked node can't be dragged or arrow-key nudged - React Flow
+          // honors draggable:false for both. Only set when locked, so an
+          // unlocked node's object is exactly what it was before locking
+          // existed. A change to `locked` is a change to the store's node
+          // object, so the cache above can't hand back a stale answer.
+          if (n.data.locked) {
+              out.draggable = false;
+              out.className = 'is-locked';
+          }
           derivedNodes.set(n, {zIndex, measured, selected, hasSub, subCount, unwired, out});
       }
       // In-flight geometry over the document's (WS4-R1, WS4-R3): this

@@ -284,7 +284,6 @@
   color: var(--chrome-text-dim);
 }
 
-
 /* ---------- Selection bar: the canvas selection's step actions ---------- */
 
 .scenario-selection-bar {
@@ -625,7 +624,6 @@
 .scenario-step-editor__selection-summary {
   color: var(--chrome-text-dim);
 }
-
 
 .scenario-step-editor--empty {
   border-style: dashed;

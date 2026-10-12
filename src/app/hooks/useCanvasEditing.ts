@@ -13,7 +13,8 @@ import {type DiagramStore, getNodesAtPath, populatedLevelCounts,} from '../../co
 import type {UndoController} from '../../collab/stores/undoManager';
 import type {PresenceInfo} from '../../collab/sync/session';
 import {NODE_TYPES} from '../../domain/canvas/nodeRegistry';
-import {GROUP_TYPES} from '../../domain/canvas/groupRegistry';
+import {DEFAULT_GROUP_TYPE_ID, getGroupType, GROUP_TYPES,} from '../../domain/canvas/groupRegistry';
+import {planGroup} from '../../domain/canvas/grouping';
 import {globalShapeRegistry, SHAPE_TYPES} from '../../domain/canvas/shapeRegistry';
 import {
     isDescendantOf,
@@ -668,6 +669,63 @@ export function useCanvasEditing({
     diagramStoreRef.current.updateNode(id, patch);
   }, []);
 
+    /**
+     * The same edit to several nodes at once - the multi-selection Inspector
+     * and the context menu. Each node gets its own patch (a text node's color
+     * lives in a different field than everyone else's), but all of them land
+     * in ONE transaction: one update for peers, and one undo step rather than
+     * one per node.
+     */
+    const onUpdateNodes = useCallback(
+        (updates: { id: string; patch: Partial<ArchNodeData> }[]) => {
+            if (updates.length === 0) return;
+            undo.transact(() => {
+                for (const {id, patch} of updates) diagramStoreRef.current.updateNode(id, patch);
+            });
+        },
+        [undo],
+    );
+
+    /** Locks or unlocks nodes - see ArchNodeData.locked. */
+    const onSetLocked = useCallback(
+        (ids: string[], locked: boolean) => {
+            // Stored as absent rather than false when unlocked, so a node that was
+            // locked and unlocked again is indistinguishable from one never locked.
+            onUpdateNodes(ids.map((id) => ({id, patch: {locked: locked ? true : undefined}})));
+        },
+        [onUpdateNodes],
+    );
+
+    /**
+     * Wraps the given nodes in a new plain boundary sized to fit them (see
+     * domain/canvas/grouping.ts), and selects it. One transaction, so it's
+     * one undo step and peers never see the empty boundary on its own.
+     */
+    const onGroup = useCallback(
+        (targetIds: string[]) => {
+            const plan = planGroup(targetIds, nodesRef.current);
+            if (!plan) return;
+            const store = diagramStoreRef.current;
+            let groupId = '';
+            undo.transact(() => {
+                groupId = store.addNode(path, 'group', plan.position, {
+                    nodeType: DEFAULT_GROUP_TYPE_ID,
+                    label: getGroupType(DEFAULT_GROUP_TYPE_ID)?.label ?? 'Group',
+                    description: '',
+                    properties: {},
+                    tags: [],
+                });
+                store.updateDimensions(groupId, plan.width, plan.height);
+                if (plan.parentId) store.updateParentId(groupId, plan.parentId, plan.position);
+                for (const member of plan.members)
+                    store.updateParentId(member.id, groupId, member.position);
+            });
+            setSelectedNodeIds([groupId]);
+            setSelectedEdgeIds([]);
+        },
+        [undo, path, setSelectedNodeIds, setSelectedEdgeIds],
+    );
+
   /**
    * Applies a z-order command to the current selection.
    *
@@ -706,6 +764,17 @@ export function useCanvasEditing({
   const onUpdateEdge = useCallback((id: string, patch: ArchEdgeDataPatch) => {
     diagramStoreRef.current.updateEdge(id, patch);
   }, []);
+
+    /** onUpdateNodes for edges - one transaction, one undo step. */
+    const onUpdateEdges = useCallback(
+        (updates: { id: string; patch: ArchEdgeDataPatch }[]) => {
+            if (updates.length === 0) return;
+            undo.transact(() => {
+                for (const {id, patch} of updates) diagramStoreRef.current.updateEdge(id, patch);
+            });
+        },
+        [undo],
+    );
 
   /**
    * Edge manipulation - moving an edge's ends onto different nodes, and
@@ -854,6 +923,9 @@ export function useCanvasEditing({
     (id: string) => {
       const target = nodes.find((n) => n.id === id);
       if (!target) return;
+        // Locked means pinned: it stays until someone unlocks it first. This
+        // is also what makes Delete on a selection skip locked nodes.
+        if (target.data.locked) return;
       const nestedCount = getNodesAtPath(diagramStore.getSnapshot().nodes, [...path, id]).length;
       if (nestedCount > 0) {
         const ok = window.confirm(
@@ -887,17 +959,17 @@ export function useCanvasEditing({
             // Orphaned wires first: this reads the store's snapshot, which only
             // catches up with writes once the transaction ends. Reparenting
             // below cannot change which wires are orphaned.
-        deleteOrphanedWires(({nodes: n, edges: e}) => {
-            const removed = new Set(
-                n.filter((node) => node.id === id || isInside(levelOf(node))).map((node) => node.id),
-            );
-            return {
-                nodes: n.filter((node) => !removed.has(node.id)),
-                edges: e.filter(
-                    (edge) =>
-                        !removed.has(edge.source) && !removed.has(edge.target) && !isInside(levelOf(edge)),
-                ),
-            };
+            deleteOrphanedWires(({nodes: n, edges: e}) => {
+                const removed = new Set(
+                    n.filter((node) => node.id === id || isInside(levelOf(node))).map((node) => node.id),
+                );
+                return {
+                    nodes: n.filter((node) => !removed.has(node.id)),
+                    edges: e.filter(
+                        (edge) =>
+                            !removed.has(edge.source) && !removed.has(edge.target) && !isInside(levelOf(edge)),
+                    ),
+                };
         });
             for (const child of live) {
                 if (child.parentId !== id) continue;
@@ -920,9 +992,9 @@ export function useCanvasEditing({
         // One transaction: one update for peers, one undo step for the edge
         // and the port wires it orphans. Orphans first - see onReconnectEdge.
         undo.transact(() => {
-        deleteOrphanedWires(({nodes: n, edges: e}) => ({
-            nodes: n,
-            edges: e.filter((edge) => edge.id !== id),
+            deleteOrphanedWires(({nodes: n, edges: e}) => ({
+                nodes: n,
+                edges: e.filter((edge) => edge.id !== id),
         }));
             diagramStore.deleteEdge(id);
         });
@@ -930,6 +1002,36 @@ export function useCanvasEditing({
     },
       [undo, diagramStore, setSelectedEdgeIds, deleteOrphanedWires],
   );
+
+    /**
+     * Removes the given boundaries while keeping what's inside them - which
+     * is exactly what deleting a boundary already does (onDeleteNode hands its
+     * children to its own parent), so this is that, plus selecting the
+     * released nodes so they can be regrouped or moved straight away.
+     *
+     * One deletion per boundary rather than one shared transaction:
+     * onDeleteNode reads the store's snapshot, which only catches up once a
+     * transaction ends, and ungrouping a boundary and one nested inside it
+     * needs the second deletion to see the first.
+     */
+    const onUngroup = useCallback(
+        (targetIds: string[]) => {
+            const current = nodesRef.current;
+            const groupIds = new Set(
+                current
+                    .filter((n) => targetIds.includes(n.id) && n.type === 'group' && !n.data.locked)
+                    .map((n) => n.id),
+            );
+            if (groupIds.size === 0) return;
+            const released = current
+                .filter((n) => n.parentId && groupIds.has(n.parentId) && !groupIds.has(n.id))
+                .map((n) => n.id);
+            for (const id of groupIds) onDeleteNode(id);
+            setSelectedNodeIds(released);
+            setSelectedEdgeIds([]);
+        },
+        [onDeleteNode, setSelectedNodeIds, setSelectedEdgeIds],
+    );
 
   const onDeleteSelection = useCallback(() => {
     selectedEdgeIds.forEach(onDeleteEdge);
@@ -981,8 +1083,13 @@ export function useCanvasEditing({
     onReparentNode,
     onAdoptIntoGroup,
     onUpdateNode,
+      onUpdateNodes,
+      onSetLocked,
+      onGroup,
+      onUngroup,
     onZOrderCommand,
     onUpdateEdge,
+      onUpdateEdges,
     onReconnectEdge,
     onAddEdgeWaypoint,
     onMoveEdgeWaypoint,

@@ -59,7 +59,7 @@ export function ShapeNode({
   return (
     <>
       <NodeResizer
-        isVisible={!!selected && !isEditing}
+          isVisible={!!selected && !isEditing && !data.locked}
         minWidth={minWidth}
         minHeight={minHeight}
         keepAspectRatio={keepAspectRatio}

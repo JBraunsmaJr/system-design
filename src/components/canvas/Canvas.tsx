@@ -52,7 +52,7 @@ import {useCanvasFocusSets} from './useCanvasFocusSets';
 import {useEdgeConnectionGestures} from './useEdgeConnectionGestures';
 import {useCanvasCreation} from './useCanvasCreation';
 import {useNodeDragInteractions} from './useNodeDragInteractions';
-import {useCanvasContextMenu} from './useCanvasContextMenu';
+import {type CanvasContextActions, useCanvasContextMenu} from './useCanvasContextMenu';
 import {useCanvasFocusDisplay} from './useCanvasFocusDisplay';
 
 export interface PresentationState {
@@ -150,6 +150,9 @@ export interface CanvasProps {
    * coordinates (not screen pixels) because every peer's own viewport
    * (pan/zoom) is independent. */
   onCursorMove: (position: { x: number; y: number } | null) => void;
+    /** Duplicate, group, lock, style and requirement commands for the
+     * right-click menu - see CanvasContextActions. */
+    contextActions?: CanvasContextActions;
 }
 
 export function Canvas({
@@ -190,6 +193,7 @@ export function Canvas({
   peers,
   onCursorMove,
                            portNodes = NO_PORT_NODES,
+                           contextActions,
 }: CanvasProps) {
   recordCanvasRender();
   const { screenToFlowPosition, getIntersectingNodes, fitView } =
@@ -355,7 +359,16 @@ export function Canvas({
     targetDefaultIcon,
     onNodeContextMenu,
     onSelectionContextMenu,
-  } = useCanvasContextMenu({ isPresenting, nodes, nodesRef, onUpdateNode });
+      onEdgeContextMenu,
+  } = useCanvasContextMenu({
+      isPresenting,
+      nodes,
+      edges,
+      nodesRef,
+      onUpdateNode,
+      onUpdateEdge,
+      contextActions,
+  });
 
   const { displayNodes, displayEdges } = useCanvasFocusDisplay({
     nodes,
@@ -462,6 +475,7 @@ export function Canvas({
           connectOnClick={false}
             onNodeContextMenu={handleNodeContextMenu}
           onSelectionContextMenu={onSelectionContextMenu}
+            onEdgeContextMenu={onEdgeContextMenu}
           onNodeMouseEnter={docHover.handleNodeMouseEnter}
           onNodeMouseMove={docHover.handleNodeMouseMove}
           onNodeMouseLeave={docHover.handleNodeMouseLeave}
@@ -630,6 +644,8 @@ export function Canvas({
             setActiveSubmenu={setActiveSubmenu}
             closeContextMenu={closeContextMenu}
             onZOrderCommand={onZOrderCommand}
+            contextActions={contextActions}
+            nodes={nodes}
             targetCurrentColor={targetCurrentColor}
             targetDefaultColor={targetDefaultColor}
             handleColorChange={handleColorChange}

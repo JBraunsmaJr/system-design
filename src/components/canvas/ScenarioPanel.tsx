@@ -193,12 +193,12 @@ export function ScenarioPanel({
                       disabled={active.steps.length === 0}
                       onClick={() => onExport(active.id)}
                       title={
-                        active.steps.length === 0
-                            ? 'Add at least one step first'
-                            : 'Export as PDF slides, images, GIF or video'
+                          active.steps.length === 0
+                              ? 'Add at least one step first'
+                              : 'Export as PDF slides, images, GIF or video'
                       }
                   >
-                    <Download size={11}/> Export
+                      <Download size={11}/> Export
                   </button>
               )}
               <button
@@ -302,8 +302,8 @@ export function ScenarioPanel({
               <div className="scenario-panel__empty-steps">
                 <p>No steps in this scenario yet.</p>
                 <p className="scenario-panel__hint">
-                    Select elements on the diagram, then click <strong>New step from selection</strong>{' '}
-                    above to create your first step.
+                    Select elements on the diagram, then click{' '}
+                    <strong>New step from selection</strong> above to create your first step.
                 </p>
               </div>
             ) : (
@@ -432,8 +432,8 @@ export function ScenarioPanel({
                   {activeStep.focusNodeIds.length + activeStep.focusEdgeIds.length === 1
                     ? ''
                     : 's'}{' '}
-                    highlighted. Select elements on the diagram to add them to this step or
-                    remove them from it.
+                    highlighted. Select elements on the diagram to add them to this step or remove
+                    them from it.
                 </div>
               </div>
             </div>

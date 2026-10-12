@@ -1,9 +1,9 @@
-import { useEffect, useRef } from 'react';
-import { NodeResizer, type NodeProps, type Node } from '@xyflow/react';
-import type { ArchNodeData } from '../../../domain/canvas/types';
-import { useCanvasContext } from '../CanvasContext';
-import { recordNodeRender } from '../../../perf/instrumentation';
-import { fitHeightToContent } from '../../../common/utils/autoSizeTextarea';
+import {useEffect, useRef} from 'react';
+import {type Node, type NodeProps, NodeResizer} from '@xyflow/react';
+import type {ArchNodeData} from '../../../domain/canvas/types';
+import {useCanvasContext} from '../CanvasContext';
+import {recordNodeRender} from '../../../perf/instrumentation';
+import {fitHeightToContent} from '../../../common/utils/autoSizeTextarea';
 
 type TextNodeType = Node<ArchNodeData, 'text'>;
 
@@ -79,7 +79,7 @@ export function TextNode({
   return (
     <>
       <NodeResizer
-        isVisible={!!selected}
+          isVisible={!!selected && !data.locked}
         minWidth={40}
         minHeight={24}
         lineClassName="node-resize-line"

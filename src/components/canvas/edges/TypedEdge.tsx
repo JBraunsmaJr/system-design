@@ -1,40 +1,50 @@
 import {
-  useCallback,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type MouseEvent as ReactMouseEvent,
-  type PointerEvent as ReactPointerEvent,
+    type MouseEvent as ReactMouseEvent,
+    type PointerEvent as ReactPointerEvent,
+    useCallback,
+    useLayoutEffect,
+    useRef,
+    useState,
 } from 'react';
 import {
-  BaseEdge,
-  EdgeLabelRenderer,
-  getSmoothStepPath,
-  useReactFlow,
-  useStore,
-  type EdgeProps,
-  type Edge,
+    BaseEdge,
+    type Edge,
+    EdgeLabelRenderer,
+    type EdgeProps,
+    getBezierPath,
+    getSmoothStepPath,
+    getStraightPath,
+    type Position,
+    useReactFlow,
+    useStore,
 } from '@xyflow/react';
-import { getEdgeType } from '../../../domain/canvas/edgeRegistry';
 import {
-  createWaypointId,
-  getSegmentInsertions,
-  getWaypointNeighbors,
-  getWaypointPath,
-  snapWaypoint,
-  type WaypointInsertion,
+    arrowheadSize,
+    getEdgeType,
+    resolveEdgeRouting,
+    resolveEdgeStrokeWidth,
+} from '../../../domain/canvas/edgeRegistry';
+import {
+    createWaypointId,
+    getRoutedSegmentInsertions,
+    getRoutedWaypointPath,
+    getWaypointNeighbors,
+    snapWaypoint,
+    type WaypointInsertion,
 } from '../../../domain/canvas/edgeRouting';
 import {
-  getClickBandEndpoints,
-  getContainmentAwarePositions,
-  getContainmentRelation,
-  type ContainmentRelation,
+    type ContainmentRelation,
+    getClickBandEndpoints,
+    getContainmentAwarePositions,
+    getContainmentRelation,
 } from '../../../domain/canvas/edgeContainment';
-import type { ArchEdgeData, ArchEdgeDataPatch, EdgeWaypoint } from '../../../domain/canvas/types';
-import { useCanvasContext } from '../CanvasContext';
-import { recordEdgeRender } from '../../../perf/instrumentation';
+import type {ArchEdgeData, ArchEdgeDataPatch, EdgeRouting, EdgeWaypoint,} from '../../../domain/canvas/types';
+import {useCanvasContext} from '../CanvasContext';
+import {recordEdgeRender} from '../../../perf/instrumentation';
 
 type TypedEdgeType = Edge<ArchEdgeData, 'typed'>;
+
+const selectRfId = (state: { rfId: string }) => state.rfId;
 
 interface TypedEdgeProps extends EdgeProps<TypedEdgeType> {
   onUpdateEdge?: (id: string, patch: ArchEdgeDataPatch) => void;
@@ -60,6 +70,38 @@ const DRAG_THRESHOLD = 3;
 // which is plenty for a label-positioning UI - and getPointAtLength is a
 // native browser call, so 50 of them per pointermove is comfortably cheap.
 const PATH_SAMPLE_COUNT = 50;
+
+/**
+ * The line between two points for an edge with no bends, under each
+ * routing. Orthogonal goes through React Flow's own getSmoothStepPath with
+ * exactly the arguments it always had, so every edge that predates the
+ * routing choice renders through the identical code path.
+ */
+function unbentPath(
+    routing: EdgeRouting,
+    sourceX: number,
+    sourceY: number,
+    sourcePosition: Position,
+    targetX: number,
+    targetY: number,
+    targetPosition: Position,
+): string {
+    if (routing === 'straight') {
+        return getStraightPath({sourceX, sourceY, targetX, targetY})[0];
+    }
+    if (routing === 'curved') {
+        return getBezierPath({sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition})[0];
+    }
+    return getSmoothStepPath({
+        sourceX,
+        sourceY,
+        sourcePosition,
+        targetX,
+        targetY,
+        targetPosition,
+        borderRadius: 10,
+    })[0];
+}
 
 function findClosestPointOnPath(pathEl: SVGPathElement, targetX: number, targetY: number) {
   const totalLength = pathEl.getTotalLength();
@@ -119,6 +161,12 @@ export function TypedEdge({
   const def = getEdgeType(data?.edgeType ?? 'generic');
   const color = data?.color ?? def.color;
   const direction = data?.direction ?? 'forward';
+    const routing = resolveEdgeRouting(data?.routing);
+    const baseStrokeWidth = resolveEdgeStrokeWidth(data?.strokeWidth);
+    // Scopes this edge's arrowhead ids to its own React Flow instance: the
+    // SRD's offscreen capture surface draws the same edge ids on the same
+    // page, and a url(#id) resolving into a hidden copy draws nothing.
+    const rfId = useStore(selectRfId);
 
   /**
    * Whether one end of this edge is a boundary containing the other.
@@ -143,32 +191,32 @@ export function TypedEdge({
   const hasWaypoints = Boolean(waypoints && waypoints.length > 0);
 
   /**
-   * An edge with no bends keeps going through React Flow's own
-   * getSmoothStepPath, exactly as it always has - containment routing,
-   * click band and all. The custom router only takes over once there IS
-   * something to route through. Every diagram that predates waypoints
-   * therefore renders through the identical code path it did before,
-   * rather than through a reimplementation that merely intends to match.
+   * An edge with no bends keeps going through React Flow's own path
+   * helpers - getSmoothStepPath for the default orthogonal routing, exactly
+   * as it always has, containment routing, click band and all. The custom
+   * router only takes over once there IS something to route through. Every
+   * diagram that predates waypoints therefore renders through the identical
+   * code path it did before, rather than through a reimplementation that
+   * merely intends to match.
    */
-  const [smoothPath] = getSmoothStepPath({
-    sourceX,
-    sourceY,
-    sourcePosition: routed.sourcePosition,
-    targetX,
-    targetY,
-    targetPosition: routed.targetPosition,
-    borderRadius: 10,
-  });
-
   const path = hasWaypoints
-    ? getWaypointPath(
+      ? getRoutedWaypointPath(
+          routing,
         { x: sourceX, y: sourceY },
         routed.sourcePosition,
         waypoints!,
         { x: targetX, y: targetY },
         routed.targetPosition,
       )
-    : smoothPath;
+      : unbentPath(
+          routing,
+          sourceX,
+          sourceY,
+          routed.sourcePosition,
+          targetX,
+          targetY,
+          routed.targetPosition,
+      );
 
   /**
    * A second, invisible path used only as the click target, generated
@@ -194,16 +242,15 @@ export function TypedEdge({
       { sourceX, sourceY, targetX, targetY },
       routed,
     );
-    const [p] = getSmoothStepPath({
-      sourceX: inset.sourceX,
-      sourceY: inset.sourceY,
-      sourcePosition: routed.sourcePosition,
-      targetX: inset.targetX,
-      targetY: inset.targetY,
-      targetPosition: routed.targetPosition,
-      borderRadius: 10,
-    });
-    return p;
+      return unbentPath(
+          routing,
+          inset.sourceX,
+          inset.sourceY,
+          routed.sourcePosition,
+          inset.targetX,
+          inset.targetY,
+          routed.targetPosition,
+      );
   })();
 
   const anchorT = data?.labelAnchorT ?? 0.5;
@@ -275,7 +322,8 @@ export function TypedEdge({
   const insertions: WaypointInsertion[] = !showBendHandles
     ? []
     : hasWaypoints
-      ? getSegmentInsertions(
+          ? getRoutedSegmentInsertions(
+              routing,
           { x: sourceX, y: sourceY },
           routed.sourcePosition,
           waypoints!,
@@ -534,6 +582,22 @@ export function TypedEdge({
   const isStepMember = data?.isStepMember === true;
   const isStepCandidate = selected && data?.isStepMember === false;
   const flowClass = animated ? ` typed-edge--flow-${direction}` : '';
+    const isHighlighted = selected || isFocused || isStepMember || isStepCandidate;
+    const strokeWidth = isHighlighted ? baseStrokeWidth + 0.75 : baseStrokeWidth;
+    const strokeColor = isStepCandidate ? '#fbbf24' : color;
+
+    /**
+     * Arrowheads drawn per edge, in the line's own color and scaled to its
+     * thickness. React Flow's shared markers come from DEFAULT_EDGE_OPTIONS
+     * with one fixed grey, so a recolored edge used to keep grey arrowheads -
+     * which read as the color override not working. Only drawn where React
+     * Flow would have drawn one (it hands over markerEnd/markerStart), so
+     * an edge configured without arrowheads still has none.
+     */
+    const markerId = `${rfId}-typed-edge-arrow-${id}`;
+    const wantsEnd = Boolean(markerEnd) && direction !== 'reverse';
+    const wantsStart = Boolean(markerStart) && (direction === 'reverse' || direction === 'both');
+    const markerSize = arrowheadSize(baseStrokeWidth);
 
   return (
     <>
@@ -548,6 +612,28 @@ export function TypedEdge({
           className="react-flow__edge-interaction"
         />
       )}
+        {(wantsEnd || wantsStart) && (
+            <defs>
+                <marker
+                    id={markerId}
+                    className="react-flow__arrowhead"
+                    markerWidth={markerSize}
+                    markerHeight={markerSize}
+                    viewBox="-10 -10 20 20"
+                    markerUnits="userSpaceOnUse"
+                    orient="auto-start-reverse"
+                    refX="0"
+                    refY="0"
+                >
+                    <polyline
+                        style={{stroke: strokeColor, fill: strokeColor, strokeWidth: 1}}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        points="-5,-4 0,0 -5,4 -5,-4"
+                    />
+                </marker>
+            </defs>
+        )}
       <BaseEdge
         id={id}
         path={path}
@@ -556,12 +642,12 @@ export function TypedEdge({
         // arrowhead to the source end, indicating the real traffic runs
         // opposite to how the edge happens to be drawn; "both" keeps one
         // at each end for a genuinely bi-directional relationship.
-        markerEnd={direction === 'reverse' ? undefined : markerEnd}
-        markerStart={direction === 'reverse' || direction === 'both' ? markerStart : undefined}
+        markerEnd={wantsEnd ? `url(#${markerId})` : undefined}
+        markerStart={wantsStart ? `url(#${markerId})` : undefined}
         className={`typed-edge${flowClass}`}
         style={{
-          stroke: isStepCandidate ? '#fbbf24' : color,
-          strokeWidth: selected || isFocused || isStepMember || isStepCandidate ? 2.5 : 1.75,
+            stroke: strokeColor,
+            strokeWidth,
           strokeDasharray: isStepCandidate
             ? '6 4'
             : animated

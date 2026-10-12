@@ -121,6 +121,11 @@ export interface ArchNodeData extends Record<string, unknown> {
    * through normalizeLinkedDocument, never directly: it comes from files
    * and peers like everything else here. */
   linkedDocument?: LinkedDocumentRef;
+    /** Pinned in place: a locked node can't be dragged, nudged, resized or
+     * deleted until it's unlocked again (context menu or Inspector). Purely
+     * an editing guard - it changes nothing about how the node is drawn
+     * beyond a small lock badge. Undefined and false both mean unlocked. */
+    locked?: boolean;
 }
 
 /**
@@ -145,6 +150,14 @@ export interface EdgeWaypoint {
 }
 
 /**
+ * How an edge's line is drawn between its anchors (source, any bends,
+ * target). Undefined means "orthogonal", the only behavior that existed
+ * before this field did, so every diagram saved without it keeps rendering
+ * exactly as it always has.
+ */
+export type EdgeRouting = 'orthogonal' | 'straight' | 'curved';
+
+/**
  * Per-instance data stored on a React Flow edge.
  * `edgeType` points back into the EDGE_TYPES registry. `direction` lets an
  * edge's animated flow (Presentation Mode only) run against its drawn
@@ -165,6 +178,11 @@ export interface ArchEdgeData extends Record<string, unknown> {
   hideLabel?: boolean;
   /** Per-instance color override - overrides the edge type's own default stroke/label color. Undefined means "use the type default". */
   color?: string;
+    /** Line thickness in pixels. Undefined means the default
+     * (DEFAULT_EDGE_STROKE_WIDTH in edgeRegistry.ts). */
+    strokeWidth?: number;
+    /** Straight, orthogonal or curved - see EdgeRouting. */
+    routing?: EdgeRouting;
   /**
    * Where the label sits, expressed relative to the edge's OWN path
    * geometry rather than a raw pixel position - this is what keeps it
@@ -227,6 +245,8 @@ export interface ArchEdgeDataPatch {
   direction?: 'forward' | 'reverse' | 'both';
   hideLabel?: boolean;
   color?: string;
+    strokeWidth?: number;
+    routing?: EdgeRouting;
   labelAnchorT?: number;
   labelOffsetX?: number;
   labelOffsetY?: number;

@@ -1,12 +1,22 @@
 import {type KeyboardEvent, useEffect, useState} from 'react';
-import {BringToFront, ChevronDown, ChevronUp, ExternalLink, FileText, SendToBack, X,} from 'lucide-react';
+import {ExternalLink, FileText, X} from 'lucide-react';
 import type {Edge, Node} from '@xyflow/react';
 import {getNodeType} from '../../domain/canvas/nodeRegistry';
 import {getGroupType} from '../../domain/canvas/groupRegistry';
 import {getShapeType, globalShapeRegistry} from '../../domain/canvas/shapeRegistry';
 import {CODE_LANGUAGES} from '../../domain/canvas/codeRegistry';
-import {EDGE_TYPES, STYLE_GROUP_LABELS} from '../../domain/canvas/edgeRegistry';
+import {EDGE_TYPES, resolveEdgeRouting, resolveEdgeStrokeWidth,} from '../../domain/canvas/edgeRegistry';
 import {IconPicker} from './IconPicker';
+import {
+    ColorField,
+    EdgeRoutingField,
+    EdgeStrokeWidthField,
+    EdgeTypeSelect,
+    Field,
+    LockField,
+    ZOrderControls,
+} from './InspectorFields';
+import {type MultiSelectionActions, MultiSelectionInspector} from './MultiSelectionInspector';
 import {RequirementLinker} from '../requirements/RequirementLinker';
 import type {ArchEdgeData, ArchEdgeDataPatch, ArchNodeData} from '../../domain/canvas/types';
 import type {ZOrderCommand} from '../../domain/canvas/zOrder';
@@ -20,48 +30,6 @@ import {
     resolveLinkedDocument,
 } from '../../domain/canvas/documentLinks';
 import type {LinkableDocumentList} from '../../collab/sync/linkableDocuments';
-
-const EDGE_STYLE_GROUP_ORDER = [
-  'sync',
-  'async',
-  'control',
-  'vcs',
-  'blank',
-  'data',
-  'file',
-  'generic',
-] as const;
-
-/**
- * Front/back controls for the current selection.
- *
- * Shown for every node type because any node can end up buried - the
- * reported case was a rectangle covering nodes, but a large node can
- * just as easily cover a small one. The commands themselves live in
- * App.tsx, since deciding what "in front" means needs every node's
- * geometry and the Inspector only sees the selected one.
- */
-function ZOrderControls({ onCommand }: { onCommand: (command: ZOrderCommand) => void }) {
-  return (
-    <div className="inspector__z-order">
-      <span className="inspector__z-order-label">Arrange</span>
-      <div className="inspector__z-order-buttons">
-        <button type="button" onClick={() => onCommand('back')} title="Send to back">
-          <SendToBack size={13} />
-        </button>
-        <button type="button" onClick={() => onCommand('backward')} title="Send backward">
-          <ChevronDown size={13} />
-        </button>
-        <button type="button" onClick={() => onCommand('forward')} title="Bring forward">
-          <ChevronUp size={13} />
-        </button>
-        <button type="button" onClick={() => onCommand('front')} title="Bring to front">
-          <BringToFront size={13} />
-        </button>
-      </div>
-    </div>
-  );
-}
 
 interface InspectorProps {
   selectedNode: Node<ArchNodeData> | null;
@@ -87,6 +55,12 @@ interface InspectorProps {
      * state, so the catalogue costs nothing until someone actually looks at
      * a node. Without it the field isn't shown. */
     listDocuments?: () => Promise<LinkableDocumentList>;
+    /** Every selected node and edge. When more than one thing is selected
+     * and `multiSelection` is given, the Inspector edits all of them at
+     * once instead of showing only the first. */
+    selectedNodes?: Node<ArchNodeData>[];
+    selectedEdges?: Edge<ArchEdgeData>[];
+    multiSelection?: MultiSelectionActions;
 }
 
 export function Inspector({
@@ -104,7 +78,24 @@ export function Inspector({
   onZOrderCommand,
                               currentDocId,
                               listDocuments,
+                              selectedNodes,
+                              selectedEdges,
+                              multiSelection,
 }: InspectorProps) {
+    const selectionCount = (selectedNodes?.length ?? 0) + (selectedEdges?.length ?? 0);
+    if (multiSelection && selectionCount > 1) {
+        return (
+            <MultiSelectionInspector
+                nodes={selectedNodes ?? []}
+                edges={selectedEdges ?? []}
+                actions={multiSelection}
+                requirements={requirements}
+                onNavigateToRequirement={onNavigateToRequirement}
+                onZOrderCommand={onZOrderCommand}
+            />
+        );
+    }
+
   if (!selectedNode && !selectedEdge) {
     return (
       <aside className="inspector">
@@ -168,10 +159,13 @@ export function Inspector({
           />
 
           <ZOrderControls onCommand={onZOrderCommand} />
+            <NodeLockField node={selectedNode} onUpdateNode={onUpdateNode}/>
 
           <button
             type="button"
             className="inspector__delete"
+            disabled={data.locked === true}
+            title={data.locked ? 'Unlock to delete' : undefined}
             onClick={() => onDeleteNode(selectedNode.id)}
           >
             Delete text
@@ -312,10 +306,13 @@ export function Inspector({
             )}
 
           <ZOrderControls onCommand={onZOrderCommand} />
+            <NodeLockField node={selectedNode} onUpdateNode={onUpdateNode}/>
 
           <button
             type="button"
             className="inspector__delete"
+            disabled={data.locked === true}
+            title={data.locked ? 'Unlock to delete' : undefined}
             onClick={() => onDeleteNode(selectedNode.id)}
           >
             Delete shape
@@ -370,10 +367,13 @@ export function Inspector({
           />
 
           <ZOrderControls onCommand={onZOrderCommand} />
+            <NodeLockField node={selectedNode} onUpdateNode={onUpdateNode}/>
 
           <button
             type="button"
             className="inspector__delete"
+            disabled={data.locked === true}
+            title={data.locked ? 'Unlock to delete' : undefined}
             onClick={() => onDeleteNode(selectedNode.id)}
           >
             Delete code snippet
@@ -478,10 +478,13 @@ export function Inspector({
           )}
 
         <ZOrderControls onCommand={onZOrderCommand} />
+          <NodeLockField node={selectedNode} onUpdateNode={onUpdateNode}/>
 
         <button
           type="button"
           className="inspector__delete"
+          disabled={data.locked === true}
+          title={data.locked ? 'Unlock to delete' : undefined}
           onClick={() => onDeleteNode(selectedNode.id)}
         >
           {isGroup ? 'Delete boundary' : 'Delete node'}
@@ -509,24 +512,10 @@ export function Inspector({
       <div className="panel-header">Edge</div>
 
       <Field label="Type">
-        <select
+          <EdgeTypeSelect
           value={data.edgeType}
-          onChange={(e) => onUpdateEdge(edge.id, { edgeType: e.target.value })}
-        >
-          {EDGE_STYLE_GROUP_ORDER.map((group) => {
-            const options = EDGE_TYPES.filter((t) => t.styleGroup === group);
-            if (!options.length) return null;
-            return (
-              <optgroup key={group} label={STYLE_GROUP_LABELS[group]}>
-                {options.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.menuLabel ?? t.label}
-                  </option>
-                ))}
-              </optgroup>
-            );
-          })}
-        </select>
+          onChange={(edgeType) => onUpdateEdge(edge.id, {edgeType})}
+          />
       </Field>
 
       <ColorField
@@ -534,6 +523,16 @@ export function Inspector({
         defaultValue={edgeTypeDef?.color ?? '#98A2B3'}
         onChange={(color) => onUpdateEdge(edge.id, { color })}
       />
+
+        <EdgeStrokeWidthField
+            value={resolveEdgeStrokeWidth(data.strokeWidth)}
+            onChange={(strokeWidth) => onUpdateEdge(edge.id, {strokeWidth})}
+        />
+
+        <EdgeRoutingField
+            value={resolveEdgeRouting(data.routing)}
+            onChange={(routing) => onUpdateEdge(edge.id, {routing})}
+        />
 
       <Field label="Direction">
         <select
@@ -641,12 +640,19 @@ export function Inspector({
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function NodeLockField({
+                           node,
+                           onUpdateNode,
+                       }: {
+    node: Node<ArchNodeData>;
+    onUpdateNode: (id: string, patch: Partial<ArchNodeData>) => void;
+}) {
   return (
-    <label className="inspector__field">
-      <span>{label}</span>
-      {children}
-    </label>
+      <LockField
+          locked={node.data.locked === true}
+          // Absent rather than false when unlocked - see onSetLocked.
+          onChange={(locked) => onUpdateNode(node.id, {locked: locked ? true : undefined})}
+      />
   );
 }
 
@@ -989,37 +995,6 @@ function LinkedDocumentField({
                 </>
             )}
         </div>
-  );
-}
-
-// Shared by typed/group nodes, edges, and shapes - a color override with a
-// "Reset" link that only appears once an override is actually set, so
-// there's a clear way back to "just use the type's default color" without
-// needing to manually match the exact default hex value.
-function ColorField({
-  value,
-  defaultValue,
-  onChange,
-}: {
-  value: string | undefined;
-  defaultValue: string;
-  onChange: (color: string | undefined) => void;
-}) {
-  return (
-    <Field label="Color">
-      <div className="color-field">
-        <input
-          type="color"
-          value={value ?? defaultValue}
-          onChange={(e) => onChange(e.target.value)}
-        />
-        {value && (
-          <button type="button" className="color-field__reset" onClick={() => onChange(undefined)}>
-            Reset
-          </button>
-        )}
-      </div>
-    </Field>
   );
 }
 
