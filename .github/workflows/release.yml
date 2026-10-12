@@ -1,0 +1,121 @@
+name: Release
+
+# Cuts a release from CHANGELOG.md: bumps the version by the highest
+# [MAJOR]/[MINOR]/[PATCH] marker under [Unreleased], publishes that section
+# as the GitHub release, then opens a new [Unreleased] section on main.
+# See docs/releasing.md.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Only show the next version and its notes; change nothing
+        type: boolean
+        default: false
+
+permissions:
+  # Push the release commits and tag, and create the release.
+  contents: write
+  # Start the downstream workflows (see "Run the release workflows").
+  actions: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release from CHANGELOG.md
+    runs-on: ubuntu-latest
+    env:
+      # Every workflow that runs on `release: published`. A release created
+      # with GITHUB_TOKEN does not fire that event, so they are dispatched
+      # here against the new tag instead. scripts/verify-changelog.ts fails
+      # if a release-triggered workflow is missing from this list.
+      DOWNSTREAM_WORKFLOWS: test.yml deploy.yml docker-publish.yml signal-server-publish.yml store-publish.yml perf.yml
+      GH_TOKEN: ${{ github.token }}
+      NOTES_FILE: /tmp/release-notes.md
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check the changelog and versions
+        run: npx tsx scripts/verify-changelog.ts
+
+      - name: Work out the version and notes
+        id: next
+        run: npx tsx scripts/release.ts prepare --notes-file "$NOTES_FILE" ${{ inputs.dry_run && '--dry-run' || '' }}
+
+      - name: Summary
+        env:
+          TAG: ${{ steps.next.outputs.tag }}
+          BUMP: ${{ steps.next.outputs.bump }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          {
+            if [ "$DRY_RUN" = "true" ]; then echo "## Dry run: $TAG ($BUMP)"; else echo "## $TAG ($BUMP)"; fi
+            echo
+            cat "$NOTES_FILE"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Refuse a tag that already exists
+        env:
+          TAG: ${{ steps.next.outputs.tag }}
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null; then
+            echo "::error::Tag $TAG already exists. Is package.json behind the latest release?"
+            exit 1
+          fi
+
+      - name: Commit and tag the release
+        if: ${{ !inputs.dry_run }}
+        env:
+          TAG: ${{ steps.next.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md package.json package-lock.json docs-site/package.json docs-site/package-lock.json docker/signaling/package.json
+          git commit -m "chore(release): $TAG"
+          git tag -a "$TAG" -m "$TAG"
+          # Atomic: if main moved since checkout, neither the commit nor the
+          # tag lands, and the run can simply be started again.
+          git push --atomic origin HEAD:main "refs/tags/$TAG"
+
+      - name: Publish the GitHub release
+        if: ${{ !inputs.dry_run }}
+        env:
+          TAG: ${{ steps.next.outputs.tag }}
+        run: gh release create "$TAG" --verify-tag --title "$TAG" --notes-file "$NOTES_FILE"
+
+      - name: Run the release workflows
+        if: ${{ !inputs.dry_run }}
+        env:
+          TAG: ${{ steps.next.outputs.tag }}
+        run: |
+          for workflow in $DOWNSTREAM_WORKFLOWS; do
+            echo "Dispatching $workflow on $TAG"
+            gh workflow run "$workflow" --ref "$TAG"
+          done
+
+      - name: Open the next Unreleased section
+        if: ${{ !inputs.dry_run }}
+        env:
+          TAG: ${{ steps.next.outputs.tag }}
+        run: |
+          npx tsx scripts/release.ts open-unreleased
+          git add CHANGELOG.md
+          git commit -m "chore: open [Unreleased] after $TAG"
+          # Someone may have pushed while the release ran; replay on top.
+          git pull --rebase origin main
+          git push origin HEAD:main
