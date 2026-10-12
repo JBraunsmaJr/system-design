@@ -11,9 +11,9 @@ fails if there is none. Items without a marker are still published. The
 markers are removed when the section becomes a release. See
 [docs/releasing.md](docs/releasing.md).
 
-## [Unreleased]
+## [0.98.0] - 2026-10-12
 
-### [MINOR] Duplicate scenarios and steps
+### Duplicate scenarios and steps
 
 - In the **Scenarios** panel, a new copy button next to **Present** and **Export** copies the whole scenario (every
   step, its narration, levels, and highlights) as "Title (copy)" and opens the copy
@@ -21,7 +21,7 @@ markers are removed when the section becomes a release. See
 - Copying a copy is named "(copy 2") and so on, not "(copy) (copy)". The copy shares nothing with the original, so
   editing one never changes the other.
 
-### [MINOR] Reusable diagram fragments
+### Reusable diagram fragments
 
 - Select some nodes, right-click and choose **Save as fragment**, then give it a name.
 - The palette has a new **Fragments** tab. Drag a fragment onto any diagram in any document: it lands with fresh ids,
@@ -32,7 +32,7 @@ markers are removed when the section becomes a release. See
   level data and edge bends
 - Fragments are stored in this browser, are checked when loaded, are copied at 1MB each, and stay in sync across tabs
 
-### [MINOR] Filters and bulk edit (Requirements)
+### Filters and bulk edit (Requirements)
 
 - Tags: these didn't exist on requirement items before. Each card has a tag editor that suggests tags already in the
   document, and tags match ignoring case. Search and the Markdown export include them.
