@@ -730,15 +730,21 @@ export function useCanvasEditing({
           // A wire can't be turned to run against its port's direction - it
           // would be hidden as invalid, which reads as the edge vanishing.
           if (!isPortOrientationValid(endpoints)) return;
-          // Orphans first, against the document as it will be: moving an outer
-          // edge off a node takes its port - and the wires to it - with it.
-          deleteOrphanedWires(({nodes: n, edges: e}) => ({
-              nodes: n,
-              edges: e.map((edge) => (edge.id === edgeId ? {...edge, ...endpoints} : edge)),
-          }));
-          diagramStoreRef.current.reconnectEdge(edgeId, endpoints);
+          // One transaction: one update for peers, and one undo step that
+          // brings the old endpoints and the cleaned-up wires back together.
+          undo.transact(() => {
+              // Orphans first, against the document as it will be: moving an
+              // outer edge off a node takes its port - and the wires to it -
+              // with it. First because it reads the store's snapshot, which
+              // only catches up with writes once the transaction ends.
+              deleteOrphanedWires(({nodes: n, edges: e}) => ({
+                  nodes: n,
+                  edges: e.map((edge) => (edge.id === edgeId ? {...edge, ...endpoints} : edge)),
+              }));
+              diagramStoreRef.current.reconnectEdge(edgeId, endpoints);
+          });
       },
-      [deleteOrphanedWires],
+      [undo, deleteOrphanedWires],
   );
 
   /**
@@ -868,15 +874,6 @@ export function useCanvasEditing({
       const live = getNodesAtPath(diagramStore.getSnapshot().nodes, path);
       const liveTarget = live.find((n) => n.id === id);
       const newParentId = liveTarget?.parentId;
-      for (const child of live) {
-        if (child.parentId !== id) continue;
-        const absolute = toAbsolutePosition(child, live, id);
-        diagramStore.updateParentId(
-          child.id,
-          newParentId,
-          toRelativePosition(absolute, live, newParentId),
-        );
-      }
         // Every edge touching this node goes with it, and so does every
         // port those edges put on OTHER nodes' boundaries - wires to those
         // would be orphaned. (Wires inside this node's own sub-diagram go
@@ -884,6 +881,12 @@ export function useCanvasEditing({
         const level = [...path, id];
         const isInside = (p: string[] | undefined) =>
             !!p && p.length >= level.length && level.every((seg, i) => p[i] === seg);
+        // One transaction for the whole deletion - wires, children, node - so
+        // peers get one update and a single undo restores all of it.
+        undo.transact(() => {
+            // Orphaned wires first: this reads the store's snapshot, which only
+            // catches up with writes once the transaction ends. Reparenting
+            // below cannot change which wires are orphaned.
         deleteOrphanedWires(({nodes: n, edges: e}) => {
             const removed = new Set(
                 n.filter((node) => node.id === id || isInside(levelOf(node))).map((node) => node.id),
@@ -896,22 +899,36 @@ export function useCanvasEditing({
                 ),
             };
         });
-      diagramStore.deleteNode(id);
+            for (const child of live) {
+                if (child.parentId !== id) continue;
+                const absolute = toAbsolutePosition(child, live, id);
+                diagramStore.updateParentId(
+                    child.id,
+                    newParentId,
+                    toRelativePosition(absolute, live, newParentId),
+                );
+            }
+            diagramStore.deleteNode(id);
+        });
       setSelectedNodeIds((cur) => cur.filter((n) => n !== id));
     },
-      [nodes, path, diagramStore, setSelectedNodeIds, deleteOrphanedWires],
+      [nodes, path, undo, diagramStore, setSelectedNodeIds, deleteOrphanedWires],
   );
 
   const onDeleteEdge = useCallback(
     (id: string) => {
+        // One transaction: one update for peers, one undo step for the edge
+        // and the port wires it orphans. Orphans first - see onReconnectEdge.
+        undo.transact(() => {
         deleteOrphanedWires(({nodes: n, edges: e}) => ({
             nodes: n,
             edges: e.filter((edge) => edge.id !== id),
         }));
-      diagramStore.deleteEdge(id);
+            diagramStore.deleteEdge(id);
+        });
       setSelectedEdgeIds((cur) => cur.filter((e) => e !== id));
     },
-      [diagramStore, setSelectedEdgeIds, deleteOrphanedWires],
+      [undo, diagramStore, setSelectedEdgeIds, deleteOrphanedWires],
   );
 
   const onDeleteSelection = useCallback(() => {

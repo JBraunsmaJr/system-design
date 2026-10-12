@@ -113,9 +113,13 @@ export function richData(counts = { components: 6, items: 8 }): SrdDataContext {
           description: 'First customers',
         },
       ],
+        programIncrements: [
+            {id: 'pi-7', name: 'PI-7', startDate: '2026-10-05', sprintCount: 1},
+        ],
       sprints: [
         {
           id: 's1',
+            piId: 'pi-7',
           piName: 'PI-7',
           name: 'Sprint 1',
           startDate: '2026-10-05',

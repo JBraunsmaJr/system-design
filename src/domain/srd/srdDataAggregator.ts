@@ -372,6 +372,16 @@ export function aggregateSrdData(params: AggregateSrdDataParams): SrdDataContext
     relatedItemIds: m.relatedItemIds ?? m.relatedWorkableItemIds,
   }));
 
+    // Every PI, independently of its sprints: one with none planned yet still
+    // carries a goal the document should show.
+    const piList: SrdDataContext['roadmap']['programIncrements'] = programIncrements.map((pi) => ({
+        id: pi.id,
+        name: pi.name,
+        ...(pi.goal ? {goal: pi.goal} : {}),
+        startDate: pi.startDate,
+        sprintCount: pi.sprints.length,
+    }));
+
   const sprintsList: SrdDataContext['roadmap']['sprints'] = [];
   for (const pi of programIncrements) {
     const ranges = computeSprintDateRanges(pi);
@@ -388,8 +398,8 @@ export function aggregateSrdData(params: AggregateSrdDataParams): SrdDataContext
 
       sprintsList.push({
         id: sprint.id,
+          piId: pi.id,
         piName: pi.name,
-          ...(pi.goal ? {piGoal: pi.goal} : {}),
         name: sprint.name,
           ...(sprint.goal ? {goal: sprint.goal} : {}),
         startDate: range?.startDate || pi.startDate,
@@ -408,6 +418,7 @@ export function aggregateSrdData(params: AggregateSrdDataParams): SrdDataContext
 
   const roadmap: SrdDataContext['roadmap'] = {
     milestones: milestoneList,
+      programIncrements: piList,
     sprints: sprintsList,
     epicSchedules,
   };

@@ -249,20 +249,23 @@ export function generateSrdMarkdown(data: SrdDataContext, config: SrdTemplateCon
         }
 
         lines.push('### Program Increments & Sprints', '');
+          // PI goals are listed once, above the table, rather than repeated on
+          // every sprint row of that PI - and for every PI, including one with
+          // no sprints planned yet. Keyed by the PI's id, not its name: two PIs
+          // may share a name, and each still shows its own goal.
+          const piGoals = new Map<string, { name: string; goal: string }>();
+          for (const pi of data.roadmap.programIncrements) {
+              if (pi.goal?.trim() && !piGoals.has(pi.id))
+                  piGoals.set(pi.id, {name: pi.name, goal: pi.goal});
+          }
+          for (const {name, goal} of piGoals.values()) {
+              lines.push(`- **${name} goal:** ${goal.replace(/\r?\n/g, ' ').trim()}`);
+          }
+          if (piGoals.size > 0) lines.push('');
+
         if (data.roadmap.sprints.length === 0) {
           lines.push('*No sprint iterations planned.*', '');
         } else {
-            // PI goals are listed once above the table rather than repeated on
-            // every sprint row of that PI.
-            const piGoals = new Map<string, string>();
-            for (const s of data.roadmap.sprints) {
-                if (s.piGoal && !piGoals.has(s.piName)) piGoals.set(s.piName, s.piGoal);
-            }
-            for (const [piName, goal] of piGoals) {
-                lines.push(`- **${piName} goal:** ${goal.replace(/\r?\n/g, ' ').trim()}`);
-            }
-            if (piGoals.size > 0) lines.push('');
-
           lines.push(
               '| Program Increment | Sprint | Goal | Start Date | End Date | Effort | Work Items |',
           );
