@@ -21,6 +21,22 @@ The editor is designed for rapid, low-friction diagramming with zero configurati
   and Cloud boundaries) for custom flowcharts and structural grouping.
 - **Annotations & Snippets**: Add text callouts, sticky notes, and formatted code snippets to document decisions
   in-place.
+- **Fragments**: Your own reusable groups of nodes - see [Reusable Fragments](#reusable-fragments) below.
+
+### Reusable Fragments
+
+A fragment is a group of nodes saved for reuse, like a "service + database + cache" trio you draw in every design.
+
+1. Select the nodes, right-click, and choose **Save as fragment**. Give it a name and click **Save fragment**.
+2. Switch the palette to **Fragments**. Drag a fragment onto any diagram, in any document - it lands with its top-left
+   corner where you drop it, and becomes the selection so you can move it straight away.
+
+A fragment brings along everything copying its nodes would: the connections between them, the contents of any
+boundary, and every sub-diagram inside them. It leaves behind what only means something in the document it came from -
+requirement links, document links and locks - and edge bends, which are redrawn where it lands.
+
+Fragments are kept in this browser and shared by every document you open in it. Double-click a fragment's name in the
+palette to rename it; click its bin icon twice to delete it.
 
 ### Connecting & Routing Edges
 
@@ -79,6 +95,7 @@ Right-click a node, an edge, or a selection for:
 | Change color / icon             |                  | Recolor (nodes and edges) or re-icon everything targeted.                                                                         |
 | Align & distribute              |                  | Align, distribute or match the size of the selected nodes (see above).                                                            |
 | Duplicate                       | Ctrl/⌘+D         | Copies the nodes (with their sub-diagrams and the edges between them) next to the originals, without touching the clipboard.      |
+| Save as fragment                |                  | Saves the nodes (and what Duplicate would copy with them) to the palette's **Fragments**, for any document.                       |
 | Group                           | Ctrl/⌘+G         | Wraps the nodes in a new boundary sized to fit them.                                                                              |
 | Ungroup                         | Ctrl/⌘+Shift+G   | Removes a boundary and keeps what was inside it.                                                                                  |
 | Lock / Unlock                   |                  | Pins nodes in place, or frees them again.                                                                                         |
@@ -171,6 +188,14 @@ For each step in the sequence:
 - **Level Context**: Steps can span different sub-diagram depths. When stepping into a component, the scenario
   automatically transitions to the appropriate sub-diagram level.
 - **Reordering**: Use the **Up** / **Down** buttons in the step list to adjust sequencing.
+- **Duplicating a step**: The copy button on a step inserts a copy right after it and opens it - handy when the next
+  step is this one plus or minus a few elements.
+
+### Building Variants of a Scenario
+
+To walk through a variation of an existing flow (the same login, but with an expired token), click the copy button
+next to **Present** and **Export**. The whole scenario is copied - every step, its narration, levels and highlighted
+elements - as _"Title (copy)"_, and the copy opens so you can change only what differs. The original is untouched.
 
 ### Presenting to Stakeholders
 

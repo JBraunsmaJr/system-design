@@ -116,6 +116,13 @@ export interface RequirementItem {
    * field existed doesn't need a migration to remain valid - display code
    * treats a missing status on a workable item as "todo". */
   status?: RequirementStatus;
+    /** Free-form labels ("security", "tech-debt", "q3") for filtering -
+     * orthogonal to both type and category, and any number per item. Kept
+     * normalized (trimmed, no duplicates ignoring case) by
+     * requirementTags.ts; undefined and [] both mean untagged. Written as one
+     * value, so two people retagging the same item at the same moment end
+     * with whichever tag set landed last - the same as categoryId. */
+    tags?: string[];
 
   /*
    * Architecture decision record fields - only shown and exported for an

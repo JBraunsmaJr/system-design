@@ -1,15 +1,16 @@
 /**
  * Run with: npx tsx --tsconfig tsconfig.app.json src/components/CanvasContextMenu.verify.tsx
  */
-import { renderToStaticMarkup } from 'react-dom/server';
+import {renderToStaticMarkup} from 'react-dom/server';
 import React from 'react';
-import { ColorPickerPanel } from './ColorPickerPanel';
-import { IconPickerPanel } from './IconPicker';
-import { getNodeType } from '../../domain/canvas/nodeRegistry';
-import { getGroupType } from '../../domain/canvas/groupRegistry';
-import { globalShapeRegistry } from '../../domain/canvas/shapeRegistry';
-import type { ArchNodeData } from '../../domain/canvas/types';
-import type { Node } from '@xyflow/react';
+import {ColorPickerPanel} from './ColorPickerPanel';
+import {IconPickerPanel} from './IconPicker';
+import {SaveFragmentPanel} from './SaveFragmentPanel';
+import {getNodeType} from '../../domain/canvas/nodeRegistry';
+import {getGroupType} from '../../domain/canvas/groupRegistry';
+import {globalShapeRegistry} from '../../domain/canvas/shapeRegistry';
+import type {ArchNodeData} from '../../domain/canvas/types';
+import type {Node} from '@xyflow/react';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {
@@ -116,6 +117,34 @@ function assert(condition: boolean, message: string) {
   // Simulate updating icon for typed node
   onUpdateNode('n1', { icon: 'Cloud' });
   assert(patches['n1'].icon === 'Cloud', 'typed node receives icon update');
+}
+
+// === Part: Save as fragment panel ===
+{
+  const one = renderToStaticMarkup(
+      React.createElement(SaveFragmentPanel, {
+        defaultName: 'Auth service',
+        nodeCount: 1,
+        onSave: () => {
+        },
+        onClose: () => {
+        },
+      }),
+  );
+  assert(one.includes('value="Auth service"'), 'save panel starts with the suggested name');
+  assert(one.includes('Saves this node'), 'save panel explains what one node saves');
+  assert(one.includes('Save fragment'), 'save panel has a Save button');
+  const many = renderToStaticMarkup(
+      React.createElement(SaveFragmentPanel, {
+        defaultName: '',
+        nodeCount: 3,
+        onSave: () => {
+        },
+        onClose: () => {
+        },
+      }),
+  );
+  assert(many.includes('these 3 nodes'), 'save panel counts several nodes');
 }
 
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);

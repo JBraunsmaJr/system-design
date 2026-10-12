@@ -27,6 +27,9 @@ export function toMarkdownDocument(title: string, doc: RequirementsDocument): st
       if (category) {
         lines.push(`*Category: ${category.label}*`, '');
       }
+        if (item.tags && item.tags.length > 0) {
+            lines.push(`*Tags: ${item.tags.join(', ')}*`, '');
+        }
         // A decision's sections as well as its context (composeItemMarkdown).
         const content = composeItemMarkdown(item).trim();
         if (content) {

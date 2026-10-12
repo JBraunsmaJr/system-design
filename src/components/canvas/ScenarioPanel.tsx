@@ -1,6 +1,7 @@
 import {
     ChevronDown,
     ChevronUp,
+    CopyPlus,
     Download,
     Film,
     MapPin,
@@ -22,11 +23,16 @@ interface ScenarioPanelProps {
   onCreateScenario: () => void;
   onRenameScenario: (id: string, title: string) => void;
   onDeleteScenario: (id: string) => void;
+    /** Copies a scenario, steps and all, and opens the copy - the starting
+     * point for a variant. Optional: without it the button isn't shown. */
+    onDuplicateScenario?: (id: string) => void;
   onAddStep: (scenarioId: string) => void;
   onAddSelectionToStep: (scenarioId: string, stepId: string) => void;
   onRemoveSelectionFromStep: (scenarioId: string, stepId: string) => void;
   onUpdateStep: (scenarioId: string, stepId: string, patch: Partial<ScenarioStep>) => void;
   onDeleteStep: (scenarioId: string, stepId: string) => void;
+    /** Copies a step to directly after itself. Optional, like onDuplicateScenario. */
+    onDuplicateStep?: (scenarioId: string, stepId: string) => void;
   onMoveStep: (scenarioId: string, stepId: string, direction: 'up' | 'down') => void;
   onPresent: (scenarioId: string) => void;
   /** Opens the export dialog (PDF slides, PNGs, GIF, MP4) for a scenario. */
@@ -68,11 +74,13 @@ export function ScenarioPanel({
   onCreateScenario,
   onRenameScenario,
   onDeleteScenario,
+                                  onDuplicateScenario,
   onAddStep,
   onAddSelectionToStep,
   onRemoveSelectionFromStep,
   onUpdateStep,
   onDeleteStep,
+                                  onDuplicateStep,
   onMoveStep,
   onPresent,
                                   onExport,
@@ -201,6 +209,17 @@ export function ScenarioPanel({
                       <Download size={11}/> Export
                   </button>
               )}
+                {onDuplicateScenario && (
+                    <button
+                        type="button"
+                        className="scenario-panel__btn-duplicate-scenario"
+                        onClick={() => onDuplicateScenario(active.id)}
+                        title="Duplicate scenario - copies every step, to start a variant from"
+                        aria-label="Duplicate scenario"
+                    >
+                        <CopyPlus size={12}/>
+                    </button>
+              )}
               <button
                 type="button"
                 className="scenario-panel__btn-delete-scenario"
@@ -314,40 +333,42 @@ export function ScenarioPanel({
                   const stepLocLabel = levelLabel(diagramNodes, step.path);
                   const isSubDiagram = step.path.length > 0;
                   return (
+                      // The row is a plain container: selecting the step is its own
+                      // button, beside the move, duplicate and delete buttons rather
+                      // than around them, so each control is reached and activated
+                      // (Enter / Space) on its own.
                     <div
                       key={step.id}
-                      role="button"
-                      tabIndex={0}
                       className={`scenario-step-row${isActive ? ' is-active' : ''}`}
-                      onClick={() => onSelectStep(step.id)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          onSelectStep(step.id);
-                        }
-                      }}
-                      title="Click to preview this step on the diagram and edit details"
                     >
-                      <span className="scenario-step-row__number">{index + 1}</span>
-                      <div className="scenario-step-row__info">
-                        <span className="scenario-step-row__title">
-                          {step.title || `Step ${index + 1}`}
-                        </span>
-                        <div className="scenario-step-row__meta">
-                          <span className="scenario-step-row__count">
-                            {count} {count === 1 ? 'item' : 'items'}
+                        <button
+                            type="button"
+                            className="scenario-step-row__select"
+                            onClick={() => onSelectStep(step.id)}
+                            aria-pressed={isActive}
+                            title="Click to preview this step on the diagram and edit details"
+                        >
+                            <span className="scenario-step-row__number">{index + 1}</span>
+                            <span className="scenario-step-row__info">
+                          <span className="scenario-step-row__title">
+                            {step.title || `Step ${index + 1}`}
                           </span>
-                          {isSubDiagram && (
-                            <span
-                              className="scenario-step-row__path-badge"
-                              title={`In subdiagram: ${stepLocLabel}`}
-                            >
-                              <MapPin size={9} /> {stepLocLabel}
+                          <span className="scenario-step-row__meta">
+                            <span className="scenario-step-row__count">
+                              {count} {count === 1 ? 'item' : 'items'}
                             </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="scenario-step-row__move" onClick={(e) => e.stopPropagation()}>
+                              {isSubDiagram && (
+                                  <span
+                                      className="scenario-step-row__path-badge"
+                                      title={`In subdiagram: ${stepLocLabel}`}
+                                  >
+                                <MapPin size={9}/> {stepLocLabel}
+                              </span>
+                              )}
+                          </span>
+                        </span>
+                        </button>
+                        <div className="scenario-step-row__move">
                         <button
                           type="button"
                           disabled={index === 0}
@@ -367,13 +388,21 @@ export function ScenarioPanel({
                           <ChevronDown size={12} />
                         </button>
                       </div>
+                        {onDuplicateStep && (
+                            <button
+                                type="button"
+                                className="scenario-step-row__duplicate"
+                                onClick={() => onDuplicateStep(active.id, step.id)}
+                                aria-label="Duplicate step"
+                                title="Duplicate step - the copy goes right after this one"
+                            >
+                                <CopyPlus size={12}/>
+                            </button>
+                        )}
                       <button
                         type="button"
                         className="scenario-step-row__delete"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDeleteStep(active.id, step.id);
-                        }}
+                        onClick={() => onDeleteStep(active.id, step.id)}
                         aria-label="Delete step"
                         title="Delete step"
                       >

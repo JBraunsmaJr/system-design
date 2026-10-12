@@ -92,6 +92,10 @@ export interface CanvasProps {
   onAddShape: (typeId: string, position: { x: number; y: number }) => void;
   /** Creates a code snippet node and returns its id, so the caller can immediately put it into edit mode. */
   onAddCode: (position: { x: number; y: number }) => string;
+  /** Drops a saved diagram fragment (see domain/canvas/diagramFragments.ts)
+   * with its top-left corner at `position`. Optional: without it, dropping
+   * a fragment from the palette does nothing. */
+  onInsertFragment?: (fragmentId: string, position: { x: number; y: number }) => void;
   onUpdateNode: (id: string, patch: Partial<ArchNodeData>) => void;
   onUpdateEdge: (id: string, patch: ArchEdgeDataPatch) => void;
   /** Moves one of an edge's ends onto a different node/handle. Given
@@ -166,6 +170,7 @@ export function Canvas({
   onAddText,
   onAddShape,
   onAddCode,
+  onInsertFragment,
   onUpdateNode,
   onUpdateEdge,
   onReconnectEdge,
@@ -313,6 +318,7 @@ export function Canvas({
     onAddShape,
     onAddCode,
     onAddText,
+    onInsertFragment,
     setEditingLabelNodeId,
   });
 

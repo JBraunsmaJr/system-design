@@ -1,54 +1,49 @@
+import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore,} from 'react';
 import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from 'react';
-import {
-  ChevronUp,
-  ArrowLeft,
-  ChevronDown,
-  ChevronRight,
-  ChevronsDownUp,
-  ChevronsUpDown,
-  Columns2,
-  LayoutList,
-  ListTree,
-  Rows3,
-  Search,
-  Settings2,
-  Tags,
-  Waypoints,
-  X,
+    ArrowLeft,
+    ChevronDown,
+    ChevronRight,
+    ChevronsDownUp,
+    ChevronsUpDown,
+    ChevronUp,
+    Columns2,
+    Filter,
+    LayoutList,
+    ListChecks,
+    ListTree,
+    Rows3,
+    Search,
+    Settings2,
+    Tags,
+    Waypoints,
+    X,
 } from 'lucide-react';
-import { RequirementCard } from './RequirementCard';
-import { ManageTypesModal } from './ManageTypesModal';
-import { ManageRelationshipTypesModal } from './ManageRelationshipTypesModal';
-import { AddItemDropdown } from './AddItemDropdown';
-import type { RequirementItem } from '../../domain/requirements/requirementsTypes';
-import type { ProgramIncrement } from '../../domain/timeline/programIncrements';
-import type { TeamDocument } from '../../domain/timeline/teamTypes';
-import type { SubDiagram } from '../../domain/canvas/types';
-import type { DiagramPath, LinkedNodeRef } from '../../domain/canvas/subDiagramTree';
-import type { RequirementsStore } from '../../collab/stores/requirementsStore';
-import type { PresenceInfo } from '../../collab/sync/session';
+import {RequirementCard} from './RequirementCard';
+import {ManageTypesModal} from './ManageTypesModal';
+import {ManageRelationshipTypesModal} from './ManageRelationshipTypesModal';
+import {AddItemDropdown} from './AddItemDropdown';
+import {RequirementsFilterBar} from './RequirementsFilterBar';
+import {BulkEditBar} from './BulkEditBar';
+import type {BulkItemUpdate} from '../../domain/requirements/requirementsBulkEdit';
+import {collectTags} from '../../domain/requirements/requirementTags';
+import {activeFilterCount, type RequirementsFilter,} from '../../domain/requirements/requirementsFilter';
+import type {RequirementItem} from '../../domain/requirements/requirementsTypes';
+import type {ProgramIncrement} from '../../domain/timeline/programIncrements';
+import type {TeamDocument} from '../../domain/timeline/teamTypes';
+import type {SubDiagram} from '../../domain/canvas/types';
+import type {DiagramPath, LinkedNodeRef} from '../../domain/canvas/subDiagramTree';
+import type {RequirementsStore} from '../../collab/stores/requirementsStore';
+import type {PresenceInfo} from '../../collab/sync/session';
+import {countDescendants, type EpicTreeNode, isEpicItem,} from '../../domain/requirements/requirementsHierarchy';
 import {
-  countDescendants,
-  isEpicItem,
-  type EpicTreeNode,
-} from '../../domain/requirements/requirementsHierarchy';
-import {
-  loadRequirementsViewPrefs,
-  saveRequirementsViewPrefs,
-  type RequirementsGroupBy,
-  type RequirementsLayout,
+    loadRequirementsViewPrefs,
+    type RequirementsGroupBy,
+    type RequirementsLayout,
+    saveRequirementsViewPrefs,
 } from '../../domain/requirements/requirementsViewPrefs';
-import { RequirementsOutline } from './RequirementsOutline';
-import { NO_EPIC_KEY, useRequirementGroups } from './useRequirementGroups';
-import { useRequirementStoreActions } from './useRequirementStoreActions';
+import {RequirementsOutline} from './RequirementsOutline';
+import {NO_EPIC_KEY, useRequirementGroups} from './useRequirementGroups';
+import {useRequirementStoreActions} from './useRequirementStoreActions';
 
 interface RequirementsViewProps {
   requirementsStore: RequirementsStore;
@@ -195,6 +190,18 @@ export function RequirementsView({
   const [lastVerbByTypeId, setLastVerbByTypeId] = useState<Record<string, string>>(
     () => initialPrefs.lastVerbByTypeId ?? {},
   );
+  const [filter, setFilter] = useState<RequirementsFilter>(() => initialPrefs.filter ?? {});
+  // The filter row stays out of the way until it's wanted, but is always
+  // shown while a filter is narrowing the list - so a filtered view never
+  // looks like a complete one.
+  const [isFilterBarOpen, setIsFilterBarOpen] = useState(false);
+  // Selecting items for a bulk edit. Only the selected items that are
+  // currently shown count (see bulkSelectedItems), so what a bulk change
+  // touches is always exactly what's ticked on screen.
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [bulkSelectedIds, setBulkSelectedIds] = useState<ReadonlySet<string>>(
+    () => new Set<string>(),
+  );
   const [navHistory, setNavHistory] = useState<NavHistoryEntry[]>([]);
   // Back positions only make sense within the arrangement they were taken
   // in, so switching grouping or layout starts a fresh history.
@@ -251,6 +258,7 @@ export function RequirementsView({
       foldedIds: [...foldedIds],
       collapsedSectionKeys: [...collapsedSectionKeys],
       lastVerbByTypeId,
+      filter,
     });
   }, [
     documentId,
@@ -260,6 +268,7 @@ export function RequirementsView({
     foldedIds,
     collapsedSectionKeys,
     lastVerbByTypeId,
+    filter,
   ]);
 
   const onToggleCollapsed = useCallback((itemId: string) => {
@@ -286,6 +295,17 @@ export function RequirementsView({
     );
   }, []);
 
+  // What "backlog" and "unassigned" mean to the filter: a sprint or member
+  // that no longer exists counts as none, as the pickers show it.
+  const existingSprintIds = useMemo(
+    () => new Set(programIncrements.flatMap((pi) => pi.sprints.map((sp) => sp.id))),
+    [programIncrements],
+  );
+  const existingMemberIds = useMemo(
+    () => (team ? new Set(team.members.map((m) => m.id)) : undefined),
+    [team],
+  );
+
   const {
     linkedNodesByItemId,
     hierarchyIndex,
@@ -296,7 +316,80 @@ export function RequirementsView({
     visibleItems,
     outlineSectionOf,
     itemCountsByType,
-  } = useRequirementGroups({ doc, search, groupBy, diagramRoot });
+    filterActive,
+  } = useRequirementGroups({
+    doc,
+    search,
+    groupBy,
+    diagramRoot,
+    filter,
+    existingSprintIds,
+    existingMemberIds,
+  });
+
+  // Every tag in the document. Keyed by its contents so the array keeps its
+  // identity across edits that don't change the tag set - every card
+  // compares it in its memo check.
+  const allTagsKey = useMemo(() => JSON.stringify(collectTags(doc.items)), [doc.items]);
+  const allTags = useMemo(() => JSON.parse(allTagsKey) as string[], [allTagsKey]);
+
+  /** Shown items in on-screen order, once each (an item can appear under
+   * two epics) - what "Select all" selects and a shift-click range spans. */
+  const visibleUniqueItems = useMemo(() => {
+    const seen = new Set<string>();
+    return visibleItems.filter((i) => (seen.has(i.id) ? false : (seen.add(i.id), true)));
+  }, [visibleItems]);
+  const bulkSelectedItems = useMemo(
+    () => visibleUniqueItems.filter((i) => bulkSelectedIds.has(i.id)),
+    [visibleUniqueItems, bulkSelectedIds],
+  );
+
+  // Read by onToggleBulkSelected, which every card compares by identity
+  // and so must not change when the list does.
+  const bulkRangeRef = useRef({ anchorId: null as string | null, order: [] as string[] });
+  useLayoutEffect(() => {
+    bulkRangeRef.current.order = visibleUniqueItems.map((i) => i.id);
+  }, [visibleUniqueItems]);
+
+  const onToggleBulkSelected = useCallback((itemId: string, extendRange: boolean) => {
+    const range = bulkRangeRef.current;
+    const anchorId = range.anchorId;
+    range.anchorId = itemId;
+    setBulkSelectedIds((prev) => {
+      const next = new Set(prev);
+      const from = anchorId ? range.order.indexOf(anchorId) : -1;
+      const to = range.order.indexOf(itemId);
+      if (extendRange && from !== -1 && to !== -1) {
+        // Shift-click: everything between the last toggled item and this
+        // one takes this one's new state.
+        const select = !prev.has(itemId);
+        const [lo, hi] = from < to ? [from, to] : [to, from];
+        for (const id of range.order.slice(lo, hi + 1)) {
+          if (select) next.add(id);
+          else next.delete(id);
+        }
+        return next;
+      }
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  }, []);
+
+  const onApplyBulk = useCallback(
+    (updates: BulkItemUpdate[]) => {
+      if (updates.length > 0) requirementsStoreRef.current.updateItems(updates);
+    },
+    [requirementsStoreRef],
+  );
+
+  const exitSelectMode = () => {
+    setIsSelectMode(false);
+    setBulkSelectedIds(new Set());
+    bulkRangeRef.current.anchorId = null;
+  };
+
+  const isNarrowed = Boolean(search.trim()) || filterActive;
 
   const onAddItem = (typeId: string) => {
     const id = requirementsStoreRef.current.addItem(typeId);
@@ -306,6 +399,7 @@ export function RequirementsView({
      * to it the same way a reference-click navigation would.
      */
     setSearch('');
+    setFilter({});
     if (layout === 'split') {
       setSplitSelectedId(id);
       return;
@@ -621,6 +715,9 @@ export function RequirementsView({
         }
         onVerbUsed={onVerbUsed}
         onOpenItem={options.openable ? onOpenFromDetail : undefined}
+        tagSuggestions={allTags}
+        isBulkSelected={bulkSelectedIds.has(item.id)}
+        onToggleBulkSelected={isSelectMode && !options.isContext ? onToggleBulkSelected : undefined}
       />
     );
   };
@@ -648,8 +745,8 @@ export function RequirementsView({
     const color = type?.color ?? 'var(--chrome-text-dim)';
     const descendantCount = countDescendants(node);
     const hasChildren = node.children.length > 0;
-    // A search shows every match, folded or not.
-    const isFolded = hasChildren && foldedIds.has(node.item.id) && !trimmedSearch;
+    // A search or filter shows every match, folded or not.
+    const isFolded = hasChildren && foldedIds.has(node.item.id) && !isNarrowed;
     return (
       <div
         key={node.key}
@@ -884,11 +981,36 @@ export function RequirementsView({
               </button>
             )}
           </div>
-          {!search.trim() && doc.items.length > 0 && (
+          {!search.trim() && !filterActive && doc.items.length > 0 && (
             <span className="requirements-view__count-badge">
               {doc.items.length} {doc.items.length === 1 ? 'item' : 'items'}
             </span>
           )}
+          <div className="requirements-view__group-toggle requirements-view__tools-toggle">
+            <button
+              type="button"
+              className={isFilterBarOpen || filterActive ? 'active' : undefined}
+              aria-pressed={isFilterBarOpen || filterActive}
+              onClick={() => setIsFilterBarOpen((open) => !open)}
+              title="Filter by status, assignee, sprint or tag"
+            >
+              <Filter size={12} />
+              <span>Filter</span>
+              {filterActive && (
+                <span className="requirements-view__filter-count">{activeFilterCount(filter)}</span>
+              )}
+            </button>
+            <button
+              type="button"
+              className={isSelectMode ? 'active' : undefined}
+              aria-pressed={isSelectMode}
+              onClick={() => (isSelectMode ? exitSelectMode() : setIsSelectMode(true))}
+              title="Select items to change their status, sprint, category, assignee or tags together"
+            >
+              <ListChecks size={12} />
+              <span>Select</span>
+            </button>
+          </div>
         </div>
 
         <div className="requirements-view__toolbar-right">
@@ -1000,6 +1122,32 @@ export function RequirementsView({
         </div>
       </div>
 
+      {(isFilterBarOpen || filterActive) && (
+        <RequirementsFilterBar
+          filter={filter}
+          onChange={setFilter}
+          team={team}
+          programIncrements={programIncrements}
+          allTags={allTags}
+          shownCount={visibleUniqueItems.length}
+          totalCount={doc.items.length}
+        />
+      )}
+      {isSelectMode && (
+        <BulkEditBar
+          doc={doc}
+          selectedItems={bulkSelectedItems}
+          visibleCount={visibleUniqueItems.length}
+          team={team}
+          programIncrements={programIncrements}
+          allTags={allTags}
+          onSelectAll={() => setBulkSelectedIds(new Set(visibleUniqueItems.map((i) => i.id)))}
+          onClearSelection={() => setBulkSelectedIds(new Set())}
+          onApply={onApplyBulk}
+          onExit={exitSelectMode}
+        />
+      )}
+
       {layout === 'split' ? (
         <div className="requirements-split">
           <aside className="requirements-split__outline">
@@ -1023,6 +1171,9 @@ export function RequirementsView({
                 onCollapseAll={onCollapseOutline}
                 onExpandAll={onExpandOutline}
                 searchQuery={trimmedSearch}
+                isFiltered={filterActive}
+                bulkSelectedIds={bulkSelectedIds}
+                onToggleBulkSelected={isSelectMode ? onToggleBulkSelected : undefined}
               />
             )}
           </aside>
@@ -1053,7 +1204,11 @@ export function RequirementsView({
                 No requirements yet - add one above to get started.
               </p>
             ) : visibleItems.length === 0 ? (
-              <p className="requirements-view__empty">No requirements match your search.</p>
+              <p className="requirements-view__empty">
+                {filterActive
+                  ? 'No requirements match your search and filters.'
+                  : 'No requirements match your search.'}
+              </p>
             ) : groupBy === 'epic' ? (
               <>
                 {epicTree.roots.length > 0 && (

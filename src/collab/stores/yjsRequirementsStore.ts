@@ -20,7 +20,8 @@ import {
   PARENT_OF_RELATIONSHIP_TYPE_ID,
   updateItemReferencesInText,
 } from '../../domain/requirements/requirementsRegistry';
-import type {RequirementsStore} from './requirementsStore';
+import {mergedPatches, type RequirementsStore} from './requirementsStore';
+import {normalizeTags} from '../../domain/requirements/requirementTags';
 
 /** Item storage keys are purely internal - never displayed, never
  * referenced by anything outside this file (see this file's top doc
@@ -122,6 +123,8 @@ export function seedYjsRequirementsDoc(doc: Y.Doc, initial: RequirementsDocument
       for (const field of DECISION_ITEM_FIELDS) {
         if (item[field] !== undefined) m.set(field, item[field]);
       }
+      // Same: only when the item has tags.
+      if (item.tags && item.tags.length > 0) m.set('tags', [...item.tags]);
       itemsMap.set(storageKey, m);
       itemOrder.push([storageKey]);
       seenItemIds.add(item.id);
@@ -307,7 +310,7 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
   }
 
   function itemMapToPlain(m: Y.Map<unknown>): RequirementItem {
-    return {
+    const item: RequirementItem = {
       id: m.get('id') as string,
       typeId: m.get('typeId') as string,
       title: m.get('title') as string,
@@ -322,6 +325,12 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
       decisionOutcome: m.get('decisionOutcome') as string | undefined,
       decisionConsequences: m.get('decisionConsequences') as string | undefined,
     };
+    // Only present when the item has tags, so an untagged item's snapshot
+    // has exactly the keys it always had. Normalized on the way out: tags
+    // arrive from peers and files like everything else.
+    const tags = normalizeTags(m.get('tags'));
+    if (tags) item.tags = tags;
+    return item;
   }
 
   /**
@@ -755,6 +764,25 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
       doc.transact(() => {
         for (const [key, value] of Object.entries(patch)) {
           m.set(key, value);
+        }
+      });
+    },
+
+    // One transaction for the whole batch: one undo step, one snapshot
+    // rebuild, and collaborators see the edit land all at once. Each field
+    // is still written on its own, so a peer editing a different field of
+    // one of these items at the same moment keeps their change.
+    updateItems: (updates) => {
+      if (updates.length === 0) return;
+      const patchById = mergedPatches(updates);
+      doc.transact(() => {
+        for (const [id, patch] of patchById) {
+          const storageKey = displayIdToStorageKey.get(id);
+          const m = storageKey ? items.get(storageKey) : undefined;
+          if (!m) continue;
+          for (const [key, value] of Object.entries(patch)) {
+            m.set(key, value);
+          }
         }
       });
     },

@@ -85,6 +85,40 @@ Toggle between two organization modes using the toolbar controls:
 - **Group by Type**: Groups items by their artifact type (_Requirements_, _Goals_, _Tickets_, etc.).
 - **Group by Category**: Groups items by assigned functional category, with an _Uncategorized_ section for unsorted items.
 
+### Tags
+
+Tags are free-form labels (_security_, _tech-debt_, _q3_) for anything a category or type doesn't capture - an item
+can have any number of them, and every item type can be tagged. Click **+ Tag** under a card's title, type, and press
+**Enter** (or a comma to add several). Tags already used in the document are suggested as you type, and they match
+ignoring case. Click a tag's **×** to remove it.
+
+### Filtering
+
+Click **Filter** in the toolbar to filter by **Status**, **Assignee**, **Sprint** and **Tag**. Each opens a checklist:
+
+- Values within one filter are alternatives (_To Do_ or _In Progress_); different filters must all match (_In Progress_
+  and assigned to Ana).
+- **Unassigned**, **Backlog** (no sprint) and **Untagged** find what hasn't been planned yet. An item assigned to a
+  removed team member, or planned into a deleted sprint, counts as unassigned or backlog.
+- Status, assignee and sprint only apply to work items, so filtering on any of them hides requirements and goals.
+
+Filters combine with the search box and with every grouping and layout. The filter row stays visible while a filter is
+on, with a count of what's shown and **Clear filters**. Your filter is remembered for each document in this browser and
+doesn't change what collaborators see.
+
+### Changing Many Items at Once
+
+Click **Select** in the toolbar. Each card (and, in the split view, each outline row) gets a checkbox; **Shift**-click
+a second one to select everything in between, or use **Select all**. Then, in the bar that appears:
+
+- **Status…**, **Sprint…** (including _Backlog_) and **Assignee…** set work items; requirements and goals in the
+  selection are left alone.
+- **Category…** sets the category of every selected item.
+- **Add tag** and **Remove tag…** change tags on every selected item.
+
+Each change applies to all of them at once and is a single undo step. Only selected items that are currently shown are
+changed, so what's ticked on screen is exactly what changes. Click **×** or **Select** again to finish.
+
 ---
 
 ## 4. Rich Markdown & Cross-References
@@ -110,7 +144,7 @@ Requirement descriptions support full GitHub Flavored Markdown (GFM) alongside i
 
 The toolbar search filter provides fast lookup across the entire requirements repository.
 
-- **Multi-Field Search**: Filters items instantly by ID, title text, body content, and category name.
+- **Multi-Field Search**: Filters items instantly by ID, title text, body content, category name and tags.
 - **Match Counter & Navigation**: Displays matching result counts (`3 of 12`) with `▲` Prev and `▼` Next buttons.
 - **Keyboard Shortcuts**:
   - `Ctrl + F` / `Cmd + F`: Focus the search input.

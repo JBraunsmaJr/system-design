@@ -46,6 +46,68 @@
   cursor: grabbing;
 }
 
+.palette__empty {
+    font-size: var(--text-xs);
+    line-height: 1.5;
+    color: var(--chrome-text-dim);
+    margin: 0;
+    padding: 0 8px;
+}
+
+.palette__fragment-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.palette__fragment-rename {
+    flex: 1;
+    min-width: 0;
+    font: inherit;
+    color: var(--chrome-text);
+    background: var(--chrome-bg);
+    border: 1px solid var(--accent);
+    border-radius: var(--radius-xs);
+    padding: 1px 4px;
+    outline: none;
+}
+
+.palette__fragment-count {
+    font-family: var(--mono);
+    font-size: var(--text-2xs);
+    color: var(--chrome-text-dim);
+    flex-shrink: 0;
+}
+
+.palette__fragment-delete {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    background: transparent;
+    border: none;
+    color: var(--chrome-text-dim);
+    padding: 2px 3px;
+    border-radius: var(--radius-xs);
+    font-size: var(--text-2xs);
+    cursor: pointer;
+    opacity: 0;
+}
+
+.palette__item--fragment:hover .palette__fragment-delete,
+.palette__fragment-delete:focus-visible,
+.palette__fragment-delete.is-confirming {
+    opacity: 1;
+}
+
+.palette__fragment-delete:hover,
+.palette__fragment-delete.is-confirming {
+    color: var(--danger);
+    background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
 .palette__hint {
   font-size: var(--text-sm);
   line-height: 1.5;

@@ -219,6 +219,7 @@ function App() {
     onCreateScenario,
     onRenameScenario,
     onDeleteScenario,
+    onDuplicateScenario,
     onSelectScenario,
     onSelectStep,
     onAddStep,
@@ -226,6 +227,7 @@ function App() {
     onRemoveSelectionFromStep,
     onUpdateStep,
     onDeleteStep,
+    onDuplicateStep,
     onMoveStep,
     previewFocus,
     onStartPresenting,
@@ -330,7 +332,7 @@ function App() {
     setActiveStepId,
   });
 
-  const {onCopy, onPaste, onDuplicate} = useClipboard({
+  const {onCopy, onPaste, onDuplicate, onSaveFragment, onInsertFragment} = useClipboard({
     nodes,
     edges,
     selectedNodeIds,
@@ -339,6 +341,22 @@ function App() {
     setSelectedNodeIds,
     setSelectedEdgeIds,
   });
+
+  // Saving a fragment says where it went, since nothing on the canvas
+  // changes; read only by the right-click menu, like onDuplicate.
+  const onSaveFragmentWithToast = useCallback(
+      (nodeIds: string[], name: string) => {
+        const result = onSaveFragment(nodeIds, name);
+        if (result.ok) {
+          showToast(`Saved "${result.fragment.name}" to Fragments in the palette`);
+        } else if (result.reason === 'too-large') {
+          showToast('That selection is too large to save as a fragment', 'error');
+        } else if (result.reason === 'storage') {
+          showToast('The fragment could not be saved in this browser', 'error');
+        }
+      },
+      [onSaveFragment, showToast],
+  );
 
   const {copiedStyle, onCopyStyle, onPasteStyle} = useStyleClipboard({
     nodes,
@@ -475,6 +493,7 @@ function App() {
         onUpdateNodes,
         onUpdateEdges,
         onDuplicate,
+        onSaveFragment: onSaveFragmentWithToast,
         onGroup,
         onUngroup,
         onSetLocked,
@@ -488,6 +507,7 @@ function App() {
         onUpdateNodes,
         onUpdateEdges,
         onDuplicate,
+        onSaveFragmentWithToast,
         onGroup,
         onUngroup,
         onSetLocked,
@@ -528,6 +548,7 @@ function App() {
       onAddText={onAddText}
       onAddShape={onAddShape}
       onAddCode={onAddCode}
+      onInsertFragment={onInsertFragment}
       onUpdateNode={onUpdateNode}
       onUpdateEdge={onUpdateEdge}
       onReconnectEdge={onReconnectEdge}
@@ -752,11 +773,13 @@ function App() {
                     onCreateScenario={onCreateScenario}
                     onRenameScenario={onRenameScenario}
                     onDeleteScenario={onDeleteScenario}
+                    onDuplicateScenario={onDuplicateScenario}
                     onAddStep={onAddStep}
                     onAddSelectionToStep={onAddSelectionToStep}
                     onRemoveSelectionFromStep={onRemoveSelectionFromStep}
                     onUpdateStep={onUpdateStep}
                     onDeleteStep={onDeleteStep}
+                    onDuplicateStep={onDuplicateStep}
                     onMoveStep={onMoveStep}
                     onPresent={onStartPresenting}
                     onExport={setExportScenarioId}

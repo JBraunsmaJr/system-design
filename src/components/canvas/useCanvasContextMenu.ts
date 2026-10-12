@@ -32,6 +32,9 @@ export interface CanvasContextActions {
     onUpdateNodes: (updates: { id: string; patch: Partial<ArchNodeData> }[]) => void;
     onUpdateEdges: (updates: { id: string; patch: ArchEdgeDataPatch }[]) => void;
     onDuplicate: (nodeIds: string[]) => void;
+    /** Saves the nodes (and what copying them brings along) as a reusable
+     * fragment in the palette. Optional: without it the command isn't offered. */
+    onSaveFragment?: (nodeIds: string[], name: string) => void;
     onGroup: (nodeIds: string[]) => void;
     onUngroup: (nodeIds: string[]) => void;
     onSetLocked: (nodeIds: string[], locked: boolean) => void;
@@ -45,7 +48,7 @@ export interface CanvasContextActions {
     onArrange: (command: ArrangeCommand, nodeIds: string[]) => void;
 }
 
-export type ContextSubmenu = 'color' | 'icon' | 'requirements' | 'arrange';
+export type ContextSubmenu = 'color' | 'icon' | 'requirements' | 'arrange' | 'fragment';
 
 /**
  * The right-click menu's state: what it targets, which submenu is open,

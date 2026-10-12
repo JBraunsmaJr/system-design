@@ -1,29 +1,41 @@
-import { useEffect, useRef, useState, type DragEvent } from 'react';
-import { createPortal } from 'react-dom';
+import {type DragEvent, useEffect, useRef, useState, useSyncExternalStore} from 'react';
+import {createPortal} from 'react-dom';
 import {
   Boxes,
+  Check,
+  ChevronDown,
   Cloud,
-  Shapes,
   Code2,
   GitBranch,
-  ChevronDown,
-  Check,
   type LucideIcon,
+  Package,
+  Shapes,
+  Trash2,
 } from 'lucide-react';
-import { useOutsideClick } from '../../common/hooks/useOutsideClick';
-import { usePositionedDropdown } from '../../common/hooks/usePositionedDropdown';
+import {useOutsideClick} from '../../common/hooks/useOutsideClick';
+import {usePositionedDropdown} from '../../common/hooks/usePositionedDropdown';
 import {
-  NODE_TYPES,
-  CATEGORY_LABELS,
   CATEGORY_COLORS,
+  CATEGORY_LABELS,
   CLOUD_SUBCATEGORY_ORDER,
   LOGIC_SUBCATEGORY_ORDER,
+  NODE_TYPES,
   VCS_SUBCATEGORY_ORDER,
 } from '../../domain/canvas/nodeRegistry';
-import { GROUP_TYPES } from '../../domain/canvas/groupRegistry';
-import { globalShapeRegistry, getShapePaletteIcon } from '../../domain/canvas/shapeRegistry';
-import { IconRenderer } from './IconRenderer';
-import type { NodeCategory, NodeTypeDefinition } from '../../domain/canvas/types';
+import {GROUP_TYPES} from '../../domain/canvas/groupRegistry';
+import {getShapePaletteIcon, globalShapeRegistry} from '../../domain/canvas/shapeRegistry';
+import {IconRenderer} from './IconRenderer';
+import {
+  deleteFragment,
+  type DiagramFragment,
+  fragmentNodeCount,
+  FRAGMENTS_STORAGE_KEY,
+  listFragments,
+  reloadFragments,
+  renameFragment,
+  subscribeToFragments,
+} from '../../domain/canvas/diagramFragments';
+import type {NodeCategory, NodeTypeDefinition} from '../../domain/canvas/types';
 
 const SYSTEM_CATEGORIES: NodeCategory[] = [
   'compute',
@@ -40,8 +52,9 @@ export const GROUP_DRAG_MIME_TYPE = 'application/x-archgroup';
 export const TEXT_DRAG_MIME_TYPE = 'application/x-archtext';
 export const SHAPE_DRAG_MIME_TYPE = 'application/x-archshape';
 export const CODE_DRAG_MIME_TYPE = 'application/x-archcode';
+export const FRAGMENT_DRAG_MIME_TYPE = 'application/x-archfragment';
 
-type PaletteMode = 'system' | 'cloud' | 'shapes' | 'code' | 'git';
+type PaletteMode = 'system' | 'cloud' | 'shapes' | 'code' | 'git' | 'fragments';
 
 const PALETTE_TABS: { id: PaletteMode; label: string; icon: LucideIcon }[] = [
   { id: 'system', label: 'System', icon: Boxes },
@@ -49,6 +62,7 @@ const PALETTE_TABS: { id: PaletteMode; label: string; icon: LucideIcon }[] = [
   { id: 'shapes', label: 'Shapes', icon: Shapes },
   { id: 'code', label: 'Code', icon: Code2 },
   { id: 'git', label: 'Git', icon: GitBranch },
+  {id: 'fragments', label: 'Fragments', icon: Package},
 ];
 
 const MODE_HINTS: Record<PaletteMode, string | null> = {
@@ -58,7 +72,11 @@ const MODE_HINTS: Record<PaletteMode, string | null> = {
     'Diagram shapes, flowchart symbols, infrastructure components, and imported custom libraries.',
   code: "Endpoints and pseudo-code steps for modeling request-handling logic - most useful inside a node's sub-diagram (double-click a node to drill in).",
   git: "Branching strategy and release/CI pipeline concepts - handy for a repo's own sub-diagram, or a standalone diagram of your workflow.",
+  fragments:
+      'Groups of nodes you saved for reuse. Drag one onto any diagram - its connections and sub-diagrams come with it. Saved in this browser, shared by every document.',
 };
+
+const NO_FRAGMENTS: DiagramFragment[] = [];
 
 export function Palette() {
   const [mode, setMode] = useState<PaletteMode>('system');
@@ -71,6 +89,16 @@ export function Palette() {
     return globalShapeRegistry.subscribe(() => {
       setVersion((v) => v + 1);
     });
+  }, []);
+
+  const fragments = useSyncExternalStore(subscribeToFragments, listFragments, () => NO_FRAGMENTS);
+  // Fragments saved in another tab show up here without a reload.
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === FRAGMENTS_STORAGE_KEY || event.key === null) reloadFragments();
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
   }, []);
 
   const close = () => {
@@ -264,6 +292,8 @@ export function Palette() {
             />
           ))}
 
+        {mode === 'fragments' && <FragmentList fragments={fragments}/>}
+
         <PaletteGroup
           label="Code"
           color="#22B8CF"
@@ -320,5 +350,108 @@ function PaletteGroup({ label, color, items, dragMimeType }: PaletteGroupProps) 
         );
       })}
     </div>
+  );
+}
+
+/**
+ * The Fragments tab: each saved fragment is draggable onto the canvas like
+ * any palette item, and can be renamed (double-click its name) or deleted
+ * (click the bin, then confirm).
+ */
+function FragmentList({fragments}: { fragments: DiagramFragment[] }) {
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [draftName, setDraftName] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  if (fragments.length === 0) {
+    return (
+        <div className="palette__group">
+          <div className="palette__group-label" style={{color: '#8b90a0'}}>
+            Saved fragments
+          </div>
+          <p className="palette__empty">
+            None yet. Select some nodes, right-click and choose <strong>Save as fragment</strong>.
+          </p>
+        </div>
+    );
+  }
+
+  const commitRename = (id: string) => {
+    renameFragment(id, draftName);
+    setRenamingId(null);
+  };
+
+  return (
+      <div className="palette__group">
+        <div className="palette__group-label" style={{color: '#8b90a0'}}>
+          Saved fragments
+        </div>
+        {fragments.map((fragment) => {
+          const count = fragmentNodeCount(fragment);
+          const isRenaming = renamingId === fragment.id;
+          const isConfirming = confirmDeleteId === fragment.id;
+          return (
+              <div
+                  key={fragment.id}
+                  className="palette__item palette__item--fragment"
+                  draggable={!isRenaming}
+                  onDragStart={(event) => {
+                    event.dataTransfer.setData(FRAGMENT_DRAG_MIME_TYPE, fragment.id);
+                    // Matches the canvas's dragover dropEffect ('move'), or the browser
+                    // refuses the drop.
+                    event.dataTransfer.effectAllowed = 'move';
+                  }}
+                  title={`${fragment.name} - ${count} ${count === 1 ? 'element' : 'elements'}. Drag onto the canvas to insert; double-click the name to rename.`}
+              >
+                <Package size={15} style={{color: '#5B7CFA', flexShrink: 0}}/>
+                {isRenaming ? (
+                    <input
+                        className="palette__fragment-rename"
+                        autoFocus
+                        value={draftName}
+                        aria-label="Fragment name"
+                        onChange={(e) => setDraftName(e.target.value)}
+                        onBlur={() => commitRename(fragment.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') commitRename(fragment.id);
+                          else if (e.key === 'Escape') setRenamingId(null);
+                        }}
+                    />
+                ) : (
+                    <span
+                        className="palette__fragment-name"
+                        onDoubleClick={() => {
+                          setDraftName(fragment.name);
+                          setRenamingId(fragment.id);
+                          setConfirmDeleteId(null);
+                        }}
+                    >
+                {fragment.name}
+              </span>
+                )}
+                <span className="palette__fragment-count">{count}</span>
+                <button
+                    type="button"
+                    className={`palette__fragment-delete${isConfirming ? ' is-confirming' : ''}`}
+                    onClick={() => {
+                      if (isConfirming) {
+                        deleteFragment(fragment.id);
+                        setConfirmDeleteId(null);
+                      } else {
+                        setConfirmDeleteId(fragment.id);
+                      }
+                    }}
+                    onBlur={() => setConfirmDeleteId((cur) => (cur === fragment.id ? null : cur))}
+                    aria-label={
+                      isConfirming ? `Confirm deleting ${fragment.name}` : `Delete ${fragment.name}`
+                    }
+                    title={isConfirming ? 'Click again to delete' : 'Delete fragment'}
+                >
+                  {isConfirming ? 'Delete?' : <Trash2 size={12}/>}
+                </button>
+              </div>
+          );
+        })}
+      </div>
   );
 }

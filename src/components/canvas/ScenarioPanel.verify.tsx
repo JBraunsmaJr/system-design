@@ -348,4 +348,73 @@ const sampleScenarios: Scenario[] = [
     );
 }
 
+// === Test: duplicate buttons appear only when their handlers are given ===
+{
+    const props = {
+        scenarios: sampleScenarios,
+        activeScenarioId: 'sc-1',
+        onSelectScenario: () => {
+        },
+        onCreateScenario: () => {
+        },
+        onRenameScenario: () => {
+        },
+        onDeleteScenario: () => {
+        },
+        onAddStep: () => {
+        },
+        onAddSelectionToStep: () => {
+        },
+        onRemoveSelectionFromStep: () => {
+        },
+        onUpdateStep: () => {
+        },
+        onDeleteStep: () => {
+        },
+        onMoveStep: () => {
+        },
+        onPresent: () => {
+        },
+        selectedNodeIds: [] as string[],
+        selectedEdgeIds: [] as string[],
+        activeStepId: null as string | null,
+        onSelectStep: () => {
+        },
+        diagramNodes: flattenSubDiagramTree(mockRoot).nodes,
+        currentPath: [] as string[],
+        onClose: () => {
+        },
+    };
+    const without = renderToStaticMarkup(React.createElement(ScenarioPanel, props));
+    assert(
+        !without.includes('aria-label="Duplicate scenario"') &&
+        !without.includes('aria-label="Duplicate step"'),
+        'no duplicate buttons without handlers',
+    );
+    const withDup = renderToStaticMarkup(
+        React.createElement(ScenarioPanel, {
+            ...props,
+            onDuplicateScenario: () => {
+            },
+            onDuplicateStep: () => {
+            },
+        }),
+    );
+    assert(withDup.includes('aria-label="Duplicate scenario"'), 'renders Duplicate scenario');
+    assert(!withDup.includes('role="button"'), 'step rows are not themselves buttons');
+    assert(
+        !/<button[^>]*>(?:(?!<\/button>).)*<button/.test(withDup),
+        'no button is nested inside another (selecting, moving, duplicating and deleting are siblings)',
+    );
+    assert(
+        (withDup.match(/class="scenario-step-row__select"/g) ?? []).length ===
+        sampleScenarios[0].steps.length,
+        'each step is selected with its own button',
+    );
+    assert(
+        (withDup.match(/aria-label="Duplicate step"/g) ?? []).length === sampleScenarios[0].steps.length,
+        'renders one Duplicate step button per step',
+    );
+}
+
 console.log('ScenarioPanel verification passed successfully!');
