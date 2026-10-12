@@ -21,22 +21,21 @@ import {
 } from './lib/changelog';
 
 let failures = 0;
-
 function check(condition: boolean, message: string) {
-    if (condition) console.log(`  ✓ ${message}`);
-    else {
-        failures++;
-        console.error(`  FAIL: ${message}`);
-    }
+  if (condition) console.log(`  ✓ ${message}`);
+  else {
+    failures++;
+    console.error(`  FAIL: ${message}`);
+  }
 }
 
 function throws(fn: () => unknown, pattern: RegExp): boolean {
-    try {
-        fn();
-        return false;
-    } catch (error) {
-        return pattern.test((error as Error).message);
-    }
+  try {
+    fn();
+    return false;
+  } catch (error) {
+    return pattern.test((error as Error).message);
+  }
 }
 
 console.log('=== Bumping the version ===');
@@ -65,6 +64,47 @@ check(
     stripMarkers(['- [MINOR] Sprint markers', '  - [PATCH] nested', '- plain']).join('|') ===
     '- Sprint markers|  - nested|- plain',
     'stripping removes the marker and keeps the bullet and indentation',
+);
+
+console.log('=== Markers on subheadings ===');
+const grouped = [
+  '### [MAJOR]',
+  '',
+  '- Drop the v1 store API',
+  '',
+  '### [PATCH] Fixes',
+  '',
+  '- Fix PDF font fallback',
+  '',
+  '### Notes',
+  '',
+  '- Docs tidy-up',
+];
+check(highestBump(grouped) === 'major', 'a marker on a subheading counts');
+check(
+    highestBump(['#### [MINOR] Deeper']) === 'minor',
+    'any subheading level from ### down counts',
+);
+check(
+    highestBump(['# [MAJOR] Title', '## [MAJOR] x']) === null,
+    'top-level and ## headings do not',
+);
+check(highestBump(['### Breaking [MAJOR]']) === null, 'the marker must start the heading text');
+check(
+    stripMarkers(grouped).join('|') ===
+    '### Major||- Drop the v1 store API||### Fixes||- Fix PDF font fallback||### Notes||- Docs tidy-up',
+    'stripping keeps a heading title, and names a heading that was only a marker',
+);
+const groupedRelease = cutRelease(
+    `# Changelog\n\n## [Unreleased]\n\n${grouped.join('\n')}\n\n## [0.97.0] - 2026-10-12\n\n- Baseline.\n`,
+    '0.97.0',
+    '2026-10-20',
+);
+check(groupedRelease.version === '1.0.0', 'a release can be driven by a subheading marker alone');
+check(
+    groupedRelease.changelog.includes('## [1.0.0] - 2026-10-20\n\n### Major\n') &&
+    groupedRelease.changelog.includes('### Notes\n\n- Docs tidy-up\n\n## [0.97.0]'),
+    'subheadings stay inside the released section',
 );
 
 console.log('=== Cutting a release ===');
@@ -176,17 +216,17 @@ check(
 const unmarked =
     body.filter((line) => /^\s*[-*+]\s/.test(line)).length > 0 && highestBump(body) === null;
 if (unmarked)
-    console.log('  note: [Unreleased] has items but no marker yet; a release would be refused');
+  console.log('  note: [Unreleased] has items but no marker yet; a release would be refused');
 for (const file of VERSIONED_FILES) {
-    const parsed = JSON.parse(readFileSync(file, 'utf8')) as {
-        version?: string;
-        packages?: Record<string, { version?: string }>;
-    };
-    const versions = [parsed.version, ...(parsed.packages ? [parsed.packages['']?.version] : [])];
-    check(
-        versions.every((v) => v === rootVersion),
-        `${file} is at ${rootVersion}`,
-    );
+  const parsed = JSON.parse(readFileSync(file, 'utf8')) as {
+    version?: string;
+    packages?: Record<string, { version?: string }>;
+  };
+  const versions = [parsed.version, ...(parsed.packages ? [parsed.packages['']?.version] : [])];
+  check(
+      versions.every((v) => v === rootVersion),
+      `${file} is at ${rootVersion}`,
+  );
 }
 
 console.log('=== The release workflow reaches every release-triggered workflow ===');
@@ -199,22 +239,22 @@ const dispatched = (/^\s*DOWNSTREAM_WORKFLOWS:\s*(.+)$/m.exec(releaseWorkflow)?.
     .trim()
     .split(/\s+/);
 for (const name of readdirSync(workflowDir).filter((n) => /\.ya?ml$/.test(n))) {
-    if (name === 'release.yml') continue;
-    const text = readFileSync(`${workflowDir}/${name}`, 'utf8');
-    const triggers = /^on:\s*\n((?:[ \t]+.*\n|\s*\n)*)/m.exec(text)?.[1] ?? '';
-    if (!/^ {2}release:/m.test(triggers)) continue;
-    check(dispatched.includes(name), `release.yml dispatches ${name}`);
-    check(/^ {2}workflow_dispatch:/m.test(triggers), `${name} can be dispatched`);
+  if (name === 'release.yml') continue;
+  const text = readFileSync(`${workflowDir}/${name}`, 'utf8');
+  const triggers = /^on:\s*\n((?:[ \t]+.*\n|\s*\n)*)/m.exec(text)?.[1] ?? '';
+  if (!/^ {2}release:/m.test(triggers)) continue;
+  check(dispatched.includes(name), `release.yml dispatches ${name}`);
+  check(/^ {2}workflow_dispatch:/m.test(triggers), `${name} can be dispatched`);
 }
 for (const file of ['CHANGELOG.md', ...VERSIONED_FILES]) {
-    check(releaseWorkflow.includes(` ${file}`), `release.yml commits ${file}`);
+  check(releaseWorkflow.includes(` ${file}`), `release.yml commits ${file}`);
 }
 for (const name of dispatched) {
-    check(readdirSync(workflowDir).includes(name), `${name}, dispatched by release.yml, exists`);
+  check(readdirSync(workflowDir).includes(name), `${name}, dispatched by release.yml, exists`);
 }
 
 if (failures > 0) {
-    console.error(`\n${failures} check(s) failed`);
-    process.exit(1);
+  console.error(`\n${failures} check(s) failed`);
+  process.exit(1);
 }
 console.log('\nAll changelog checks passed.');

@@ -21,7 +21,24 @@ it should move the version:
 | `[MINOR]`              | 0.98.0         |
 | `[PATCH]`              | 0.97.4         |
 
-Markers must be upper case and come right after the list bullet. Items without a
+Markers can also go on a subheading (`###` or deeper) to cover the items grouped under it:
+
+```markdown
+## [Unreleased]
+
+### [MAJOR] Breaking changes
+
+- Remove the v1 store API
+
+### [PATCH]
+
+- Fix PDF font fallback
+```
+
+When released, the marker is removed and the heading keeps its text (`### Breaking changes`).
+A heading that was only a marker is named after it instead (`### [PATCH]` becomes `### Patch`).
+
+Markers must be upper case and come right after the list bullet or the `###`. Items without a
 marker are still published; a release is refused only when no item has one.
 
 ## Cutting a release

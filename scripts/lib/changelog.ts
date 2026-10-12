@@ -2,7 +2,8 @@
  * CHANGELOG.md and version handling for the release workflow.
  *
  * Developers add line items under `## [Unreleased]`, each one that should
- * move the version prefixed with [MAJOR], [MINOR] or [PATCH]. Releasing
+ * move the version prefixed with [MAJOR], [MINOR] or [PATCH] - or group
+ * items under a subheading that carries the marker (`### [MAJOR]`). Releasing
  * takes the highest marker present, bumps the version accordingly (lower
  * parts reset to zero, as semver expects), renames the section to the new
  * version and date, and strips the markers from it - they say how big a
@@ -17,8 +18,17 @@ export type Bump = 'major' | 'minor' | 'patch';
 
 export const UNRELEASED_HEADING = '## [Unreleased]';
 
-/** A list item that starts with a marker: `- [MINOR] Something`. */
-const MARKER_PATTERN = /^(\s*[-*+]\s+)\[(MAJOR|MINOR|PATCH)\]\s*/;
+/**
+ * A marker at the start of a list item (`- [MINOR] Something`) or of a
+ * subheading inside the section (`### [MAJOR]`, `### [MAJOR] Breaking`).
+ */
+const MARKER_PATTERN = /^(\s*[-*+]\s+|#{3,6}\s+)\[(MAJOR|MINOR|PATCH)\]\s*/;
+/** What a subheading that was only a marker reads as once it is stripped. */
+const BARE_HEADING_TITLES: Record<Bump, string> = {
+  major: 'Major',
+  minor: 'Minor',
+  patch: 'Patch',
+};
 /** Any second-level heading begins a new section. */
 const SECTION_PATTERN = /^## /;
 const VERSION_HEADING_PATTERN = /^## \[(\d+\.\d+\.\d+)\]/;
@@ -27,87 +37,96 @@ const SEMVER_PATTERN = /^(\d+)\.(\d+)\.(\d+)$/;
 const RANK: Record<Bump, number> = {patch: 1, minor: 2, major: 3};
 
 interface UnreleasedSection {
-    /** Line index of the `## [Unreleased]` heading. */
-    start: number;
-    /** Line index just past the section (the next `## ` heading, or the end). */
-    end: number;
-    /** The section's lines between the heading and `end`, blank edges trimmed. */
-    body: string[];
+  /** Line index of the `## [Unreleased]` heading. */
+  start: number;
+  /** Line index just past the section (the next `## ` heading, or the end). */
+  end: number;
+  /** The section's lines between the heading and `end`, blank edges trimmed. */
+  body: string[];
 }
 
 function lines(text: string): string[] {
-    return text.replace(/\r\n/g, '\n').split('\n');
+  return text.replace(/\r\n/g, '\n').split('\n');
 }
 
 function trimBlankEdges(body: string[]): string[] {
-    let first = 0;
-    let last = body.length;
-    while (first < last && body[first].trim() === '') first++;
-    while (last > first && body[last - 1].trim() === '') last--;
-    return body.slice(first, last);
+  let first = 0;
+  let last = body.length;
+  while (first < last && body[first].trim() === '') first++;
+  while (last > first && body[last - 1].trim() === '') last--;
+  return body.slice(first, last);
 }
 
 function findUnreleased(all: string[]): UnreleasedSection {
-    const starts = all.flatMap((line, i) => (line.trim() === UNRELEASED_HEADING ? [i] : []));
-    if (starts.length === 0) throw new Error(`CHANGELOG.md has no "${UNRELEASED_HEADING}" section.`);
-    if (starts.length > 1) {
-        throw new Error(
-            `CHANGELOG.md has ${starts.length} "${UNRELEASED_HEADING}" sections; expected one.`,
-        );
-    }
-    const start = starts[0];
-    let end = start + 1;
-    while (end < all.length && !SECTION_PATTERN.test(all[end])) end++;
-    return {start, end, body: trimBlankEdges(all.slice(start + 1, end))};
+  const starts = all.flatMap((line, i) => (line.trim() === UNRELEASED_HEADING ? [i] : []));
+  if (starts.length === 0) throw new Error(`CHANGELOG.md has no "${UNRELEASED_HEADING}" section.`);
+  if (starts.length > 1) {
+    throw new Error(
+        `CHANGELOG.md has ${starts.length} "${UNRELEASED_HEADING}" sections; expected one.`,
+    );
+  }
+  const start = starts[0];
+  let end = start + 1;
+  while (end < all.length && !SECTION_PATTERN.test(all[end])) end++;
+  return {start, end, body: trimBlankEdges(all.slice(start + 1, end))};
 }
 
 /** The line items currently under `## [Unreleased]`, blank edges trimmed. */
 export function unreleasedBody(text: string): string[] {
-    return findUnreleased(lines(text)).body;
+  return findUnreleased(lines(text)).body;
 }
 
 /** The largest bump any marker in these lines asks for, or null if none do. */
 export function highestBump(body: string[]): Bump | null {
-    let highest: Bump | null = null;
-    for (const line of body) {
-        const match = MARKER_PATTERN.exec(line);
-        if (!match) continue;
-        const bump = match[2].toLowerCase() as Bump;
-        if (!highest || RANK[bump] > RANK[highest]) highest = bump;
-    }
-    return highest;
+  let highest: Bump | null = null;
+  for (const line of body) {
+    const match = MARKER_PATTERN.exec(line);
+    if (!match) continue;
+    const bump = match[2].toLowerCase() as Bump;
+    if (!highest || RANK[bump] > RANK[highest]) highest = bump;
+  }
+  return highest;
 }
 
 /** The same lines with the [MAJOR]/[MINOR]/[PATCH] markers removed. */
 export function stripMarkers(body: string[]): string[] {
-    return body.map((line) => line.replace(MARKER_PATTERN, '$1'));
+  return body.map((line) => {
+    const match = MARKER_PATTERN.exec(line);
+    if (!match) return line;
+    const rest = line.slice(match[0].length).trimEnd();
+    // `### [MAJOR]` on its own would strip to an empty heading; name it instead.
+    if (rest === '' && match[1].startsWith('#')) {
+      return `${match[1]}${BARE_HEADING_TITLES[match[2].toLowerCase() as Bump]}`;
+    }
+    return match[1] + rest;
+  });
 }
 
 export function bumpVersion(version: string, bump: Bump): string {
-    const match = SEMVER_PATTERN.exec(version);
-    if (!match) throw new Error(`"${version}" is not a MAJOR.MINOR.PATCH version.`);
-    const [major, minor, patch] = match.slice(1).map(Number);
-    if (bump === 'major') return `${major + 1}.0.0`;
-    if (bump === 'minor') return `${major}.${minor + 1}.0`;
-    return `${major}.${minor}.${patch + 1}`;
+  const match = SEMVER_PATTERN.exec(version);
+  if (!match) throw new Error(`"${version}" is not a MAJOR.MINOR.PATCH version.`);
+  const [major, minor, patch] = match.slice(1).map(Number);
+  if (bump === 'major') return `${major + 1}.0.0`;
+  if (bump === 'minor') return `${major}.${minor + 1}.0`;
+  return `${major}.${minor}.${patch + 1}`;
 }
 
 /** The newest released version in the changelog: the first `## [x.y.z]` heading. */
 export function latestReleasedVersion(text: string): string | null {
-    for (const line of lines(text)) {
-        const match = VERSION_HEADING_PATTERN.exec(line);
-        if (match) return match[1];
-    }
-    return null;
+  for (const line of lines(text)) {
+    const match = VERSION_HEADING_PATTERN.exec(line);
+    if (match) return match[1];
+  }
+  return null;
 }
 
 export interface Release {
-    version: string;
-    bump: Bump;
-    /** The release notes: the Unreleased items, markers stripped. */
-    notes: string;
-    /** The changelog with `[Unreleased]` renamed to the version and date. */
-    changelog: string;
+  version: string;
+  bump: Bump;
+  /** The release notes: the Unreleased items, markers stripped. */
+  notes: string;
+  /** The changelog with `[Unreleased]` renamed to the version and date. */
+  changelog: string;
 }
 
 /**
@@ -115,30 +134,30 @@ export interface Release {
  * marker, since then there is nothing saying what the version should be.
  */
 export function cutRelease(text: string, currentVersion: string, date: string): Release {
-    const all = lines(text);
-    const section = findUnreleased(all);
-    const bump = highestBump(section.body);
-    if (!bump) {
-        throw new Error(
-            `Nothing to release: no line under "${UNRELEASED_HEADING}" is marked [MAJOR], [MINOR] or [PATCH].`,
-        );
-    }
-    const version = bumpVersion(currentVersion, bump);
-    const notes = stripMarkers(section.body);
-    const changelog = [
-        ...all.slice(0, section.start),
-        `## [${version}] - ${date}`,
-        '',
-        ...notes,
-        '',
-        ...all.slice(section.end),
-    ];
-    return {
-        version,
-        bump,
-        notes: notes.join('\n') + '\n',
-        changelog: changelog.join('\n').replace(/\n*$/, '\n'),
-    };
+  const all = lines(text);
+  const section = findUnreleased(all);
+  const bump = highestBump(section.body);
+  if (!bump) {
+    throw new Error(
+        `Nothing to release: no line under "${UNRELEASED_HEADING}" is marked [MAJOR], [MINOR] or [PATCH].`,
+    );
+  }
+  const version = bumpVersion(currentVersion, bump);
+  const notes = stripMarkers(section.body);
+  const changelog = [
+    ...all.slice(0, section.start),
+    `## [${version}] - ${date}`,
+    '',
+    ...notes,
+    '',
+    ...all.slice(section.end),
+  ];
+  return {
+    version,
+    bump,
+    notes: notes.join('\n') + '\n',
+    changelog: changelog.join('\n').replace(/\n*$/, '\n'),
+  };
 }
 
 /**
@@ -146,13 +165,13 @@ export function cutRelease(text: string, currentVersion: string, date: string): 
  * work that comes after it. A changelog that already has one is unchanged.
  */
 export function openUnreleased(text: string): string {
-    const all = lines(text);
-    if (all.some((line) => line.trim() === UNRELEASED_HEADING)) return text;
-    const firstSection = all.findIndex((line) => SECTION_PATTERN.test(line));
-    const at = firstSection === -1 ? all.length : firstSection;
-    return [...all.slice(0, at), UNRELEASED_HEADING, '', ...all.slice(at)]
-        .join('\n')
-        .replace(/\n*$/, '\n');
+  const all = lines(text);
+  if (all.some((line) => line.trim() === UNRELEASED_HEADING)) return text;
+  const firstSection = all.findIndex((line) => SECTION_PATTERN.test(line));
+  const at = firstSection === -1 ? all.length : firstSection;
+  return [...all.slice(0, at), UNRELEASED_HEADING, '', ...all.slice(at)]
+      .join('\n')
+      .replace(/\n*$/, '\n');
 }
 
 /**
@@ -160,11 +179,11 @@ export function openUnreleased(text: string): string {
  * repository shares one version, so they are bumped together.
  */
 export const VERSIONED_FILES = [
-    'package.json',
-    'package-lock.json',
-    'docs-site/package.json',
-    'docs-site/package-lock.json',
-    'docker/signaling/package.json',
+  'package.json',
+  'package-lock.json',
+  'docs-site/package.json',
+  'docs-site/package-lock.json',
+  'docker/signaling/package.json',
 ] as const;
 
 /**
@@ -173,19 +192,19 @@ export const VERSIONED_FILES = [
  * A lockfile records the version twice: at the top and under `packages[""]`.
  */
 export function setPackageVersion(text: string, version: string): string {
-    const parsed = JSON.parse(text) as { lockfileVersion?: number };
-    // Top-level "version" is the first one at two-space indentation.
-    let next = text.replace(/^( {2}"version": ")[^"]*(")/m, `$1${version}$2`);
-    if (parsed.lockfileVersion !== undefined) {
-        next = next.replace(/(^ {4}"": \{\n(?: {6}.*\n)*? {6}"version": ")[^"]*(")/m, `$1${version}$2`);
-    }
-    const check = JSON.parse(next) as {
-        version?: string;
-        packages?: Record<string, { version?: string }>;
-    };
-    if (check.version !== version) throw new Error('could not set the top-level "version".');
-    if (parsed.lockfileVersion !== undefined && check.packages?.['']?.version !== version) {
-        throw new Error('could not set packages[""].version in the lockfile.');
-    }
-    return next;
+  const parsed = JSON.parse(text) as { lockfileVersion?: number };
+  // Top-level "version" is the first one at two-space indentation.
+  let next = text.replace(/^( {2}"version": ")[^"]*(")/m, `$1${version}$2`);
+  if (parsed.lockfileVersion !== undefined) {
+    next = next.replace(/(^ {4}"": \{\n(?: {6}.*\n)*? {6}"version": ")[^"]*(")/m, `$1${version}$2`);
+  }
+  const check = JSON.parse(next) as {
+    version?: string;
+    packages?: Record<string, { version?: string }>;
+  };
+  if (check.version !== version) throw new Error('could not set the top-level "version".');
+  if (parsed.lockfileVersion !== undefined && check.packages?.['']?.version !== version) {
+    throw new Error('could not set packages[""].version in the lockfile.');
+  }
+  return next;
 }
