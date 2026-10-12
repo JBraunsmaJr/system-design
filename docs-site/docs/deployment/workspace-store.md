@@ -24,7 +24,11 @@ The store is published alongside the editor and the relay, on each release:
 ```
 ghcr.io/jbraunsmajr/system-design-store:latest
 ghcr.io/jbraunsmajr/system-design-store:<yyyy-mm-dd>
+ghcr.io/jbraunsmajr/system-design-store:v<x.y.z>
 ```
+
+Pin to a release tag such as `v0.98.1` to stay on one version; `latest` moves with each
+release.
 
 Each release is tested against PostgreSQL and started once before it is
 published. A complete example - editor, relay, store, PostgreSQL and

@@ -290,6 +290,17 @@ for (const name of readdirSync(workflowDir).filter((n) => /\.ya?ml$/.test(n))) {
 for (const file of ['CHANGELOG.md', ...VERSIONED_FILES]) {
   check(releaseWorkflow.includes(` ${file}`), `release.yml commits ${file}`);
 }
+// Release images carry the release tag (v1.2.3) as well as the date and
+// `latest`, so a deployment can pin to a version.
+for (const name of readdirSync(workflowDir).filter((n) => /\.ya?ml$/.test(n))) {
+  const text = readFileSync(`${workflowDir}/${name}`, 'utf8');
+  if (!/push: true/.test(text) || !/\$IMAGE:latest/.test(text)) continue;
+  check(
+      /RELEASE_TAG: \$\{\{ github\.ref_type == 'tag' && github\.ref_name/.test(text) &&
+      /\$IMAGE:\$RELEASE_TAG/.test(text),
+      `${name} tags its image with the release tag`,
+  );
+}
 for (const name of dispatched) {
   check(readdirSync(workflowDir).includes(name), `${name}, dispatched by release.yml, exists`);
 }

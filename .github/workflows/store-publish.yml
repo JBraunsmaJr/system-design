@@ -94,8 +94,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Compute image name and date tag
+      - name: Compute image name and tags
         id: vars
+        env:
+          # Set when the run is for a release tag (a published release, or
+          # release.yml dispatching this workflow on the tag); empty for a
+          # manual run on a branch.
+          RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
         run: |
           IMAGE="ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')-store"
           DATE_TAG="$(date -u +'%Y-%m-%d')"
@@ -103,6 +108,9 @@ jobs:
           echo "date_tag=$DATE_TAG" >> "$GITHUB_OUTPUT"
           echo "tags<<EOF" >> "$GITHUB_OUTPUT"
           echo "$IMAGE:$DATE_TAG" >> "$GITHUB_OUTPUT"
+          if [ -n "$RELEASE_TAG" ]; then
+            echo "$IMAGE:$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          fi
           if [ "${{ github.event.release.prerelease }}" != "true" ]; then
             echo "$IMAGE:latest" >> "$GITHUB_OUTPUT"
           fi

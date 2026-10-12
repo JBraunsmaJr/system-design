@@ -59,6 +59,8 @@ A real run:
    against the tag. A release created by the workflow's own token does not trigger
    them by itself, so they are listed in `DOWNSTREAM_WORKFLOWS` in `release.yml`; add
    any new release-triggered workflow there (`npm test` fails until you do).
+   Each published image (editor, relay, store) is tagged with the release tag (`v1.2.3`), the date (`yyyy-mm-dd`) and
+   `latest`.
 5. Commits a new, empty `[Unreleased]` section to `main`.
 
 Publishing a release by hand on GitHub still works as before and triggers the same
