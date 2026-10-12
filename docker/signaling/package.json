@@ -1,7 +1,7 @@
 {
   "name": "system-design-signaling-server",
   "private": true,
-  "version": "0.98.0",
+  "version": "0.98.1",
   "description": "The session relay for the editor's live collaboration: scripts/relay-server.ts, which speaks y-webrtc's signaling protocol and can additionally require a room token from the workspace store (WS10-R6). With RELAY_TOKEN_SECRET unset it behaves exactly as y-webrtc's own server did. Only its runtime dependency lives here; the image is built from the repository root so the relay's own source is copied in rather than duplicated.",
   "dependencies": {
     "ws": "^8.21.3"

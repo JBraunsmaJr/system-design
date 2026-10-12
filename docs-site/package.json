@@ -1,6 +1,6 @@
 {
   "name": "system-design-docs",
-  "version": "0.98.0",
+  "version": "0.98.1",
   "description": "Documentation site for Engineers Notebook",
   "type": "module",
   "scripts": {

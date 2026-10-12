@@ -11,9 +11,9 @@ parts) and fails if there is none. Lines without a marker are still published. T
 markers are removed when the section becomes a release. See
 [docs/releasing.md](docs/releasing.md).
 
-## [Unreleased]
+## [0.98.1] - 2026-10-12
 
-[PATCH] Tweak to release pipeline
+Tweak to release pipeline
 
 ## [0.98.0] - 2026-10-12
 
