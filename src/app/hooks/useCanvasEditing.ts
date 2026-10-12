@@ -1,63 +1,67 @@
 import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type Dispatch,
-  type SetStateAction,
+    type Dispatch,
+    type SetStateAction,
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useRef,
+    useState,
 } from 'react';
-import type { Node, Edge, Connection, OnNodesChange, OnEdgesChange } from '@xyflow/react';
+import type {Connection, Edge, Node, OnEdgesChange, OnNodesChange} from '@xyflow/react';
+import {type DiagramStore, getNodesAtPath, populatedLevelCounts,} from '../../collab/stores/diagramStore';
+import type {UndoController} from '../../collab/stores/undoManager';
+import type {PresenceInfo} from '../../collab/sync/session';
+import {NODE_TYPES} from '../../domain/canvas/nodeRegistry';
+import {DEFAULT_GROUP_TYPE_ID, getGroupType, GROUP_TYPES,} from '../../domain/canvas/groupRegistry';
+import {planGroup} from '../../domain/canvas/grouping';
+import {globalShapeRegistry, SHAPE_TYPES} from '../../domain/canvas/shapeRegistry';
 import {
-  getNodesAtPath,
-  populatedLevelCounts,
-  type DiagramStore,
-} from '../../collab/stores/diagramStore';
-import type { UndoController } from '../../collab/stores/undoManager';
-import type { PresenceInfo } from '../../collab/sync/session';
-import { NODE_TYPES } from '../../domain/canvas/nodeRegistry';
-import { GROUP_TYPES } from '../../domain/canvas/groupRegistry';
-import { SHAPE_TYPES, globalShapeRegistry } from '../../domain/canvas/shapeRegistry';
-import {
-  isDescendantOf,
-  selectNodesToAdopt,
-  toAbsolutePosition,
-  toRelativePosition,
+    isDescendantOf,
+    selectNodesToAdopt,
+    toAbsolutePosition,
+    toRelativePosition,
 } from '../../domain/canvas/graphUtils';
-import type { DiagramPath } from '../../domain/canvas/subDiagramTree';
-import type { EdgeEndpoints } from '../../domain/canvas/edgeReconnect';
-import { applyZOrderCommand, type ZOrderCommand } from '../../domain/canvas/zOrder';
+import type {DiagramPath} from '../../domain/canvas/subDiagramTree';
+import type {EdgeEndpoints} from '../../domain/canvas/edgeReconnect';
+import {applyZOrderCommand, type ZOrderCommand} from '../../domain/canvas/zOrder';
 import {
-  mergeInFlight,
-  remoteInFlight,
-  toBroadcast,
-  NO_IN_FLIGHT,
-  type InFlightMap,
-  applyEdgeGesture,
-  edgeGestureWrites,
-  remoteEdgeGestures,
-  remoteEdgeLabels,
-  changesWaypoints,
-  type LabelPlacement,
-  NO_EDGE_GESTURES,
-  type EdgeGesture,
-  type EdgeGestureMap,
+    applyEdgeGesture,
+    changesWaypoints,
+    type EdgeGesture,
+    type EdgeGestureMap,
+    edgeGestureWrites,
+    type InFlightMap,
+    type LabelPlacement,
+    mergeInFlight,
+    NO_EDGE_GESTURES,
+    NO_IN_FLIGHT,
+    remoteEdgeGestures,
+    remoteEdgeLabels,
+    remoteInFlight,
+    toBroadcast,
 } from '../../domain/canvas/gestureGeometry';
 import {
-  classifyNodeChanges,
-  applySelectionChanges,
-  isAutoSizedNodeType,
-  type PendingNodeUpdate,
-  type CurrentNodeGeometry,
+    applySelectionChanges,
+    classifyNodeChanges,
+    type CurrentNodeGeometry,
+    isAutoSizedNodeType,
+    type PendingNodeUpdate,
 } from '../../domain/canvas/nodeChangeBatching';
-import type {
-  ArchNodeData,
-  ArchEdgeData,
-  ArchEdgeDataPatch,
-  EdgeWaypoint,
-} from '../../domain/canvas/types';
-import { projectCanvasElements } from '../canvasProjection';
+import type {ArchEdgeData, ArchEdgeDataPatch, ArchNodeData, EdgeWaypoint,} from '../../domain/canvas/types';
+import {projectBoundaryPorts, projectCanvasElements} from '../canvasProjection';
+import {
+    buildPortIndex,
+    findOrphanedPortEdges,
+    isPortOrientationValid,
+    orientPortConnection,
+    parsePortId,
+} from '../../domain/canvas/boundaryPorts';
+
+/** The tree level an element lives at - see DiagramStore. */
+function levelOf(item: { data?: unknown }): string[] | undefined {
+    return (item.data as { parentPath?: string[] } | undefined)?.parentPath;
+}
 
 export interface UseCanvasEditingOptions {
   diagramStore: DiagramStore;
@@ -182,6 +186,13 @@ export function useCanvasEditing({
     () => populatedLevelCounts(diagramSnapshot.nodes),
     [diagramSnapshot],
   );
+    // Boundary ports (domain/canvas/boundaryPorts.ts): one O(nodes + edges)
+    // pass per document change, like the level counts above. Never during a
+    // drag - in-flight geometry doesn't change the snapshot.
+    const portIndex = useMemo(
+        () => buildPortIndex(diagramSnapshot.nodes, diagramSnapshot.edges),
+        [diagramSnapshot],
+  );
   // PERFORMANCE: the body is projectCanvasElements (canvasProjection.ts),
   // moved there unchanged so it can be tested. The dependency list is the
   // one this memo always had; the input object is built only when it runs.
@@ -199,10 +210,12 @@ export function useCanvasEditing({
         edgeInFlight,
         peerEdgeInFlight,
         peerEdgeLabels,
+          portIndex,
       }),
     [
       diagramSnapshot,
       subDiagramLevelCounts,
+        portIndex,
       path,
       selectedNodeIds,
       selectedEdgeIds,
@@ -214,6 +227,14 @@ export function useCanvasEditing({
       peerEdgeLabels,
     ],
   );
+
+    /** The ports on this level's boundary, drawn by the canvas alongside
+     * `nodes` but deliberately NOT part of it: `nodes` is the document, and
+     * the Inspector, clipboard, scenarios and exports all read it as such. */
+    const portNodes = useMemo(
+        () => projectBoundaryPorts({portIndex, path, diagramSnapshot, measuredDimensions}),
+        [portIndex, path, diagramSnapshot, measuredDimensions],
+    );
 
   // Only position/dimensions changes need to reach the store - selection
   // changes are handled separately (and more robustly, since it's the
@@ -436,18 +457,61 @@ export function useCanvasEditing({
   );
 
   const onConnect = useCallback<(connection: Connection) => void>(
-    (connection) => {
+      (raw) => {
+          // A wire to or from a boundary port runs the way the port's own
+          // connection does, whichever end the drag started from.
+          const connection = orientPortConnection(raw);
+          if (!connection) return;
+          // ...and starts out as the same kind of connection it stands for.
+          const port = parsePortId(connection.source) ?? parsePortId(connection.target);
+          const outer = port
+              ? diagramStore.getSnapshot().edges.find((e) => e.id === port.edgeId)
+              : undefined;
       diagramStore.addEdge(
         path,
         connection.source,
         connection.target,
-        { edgeType: 'blank-solid', label: '', direction: 'forward', properties: {} },
+          {
+              edgeType: outer?.data?.edgeType ?? 'blank-solid',
+              label: '',
+              direction: 'forward',
+              // The port already names the connection; repeating the type's
+              // default label on every wire is noise. One click in the
+              // Inspector turns it back on.
+              ...(port ? {hideLabel: true} : {}),
+              properties: {},
+          },
         connection.sourceHandle,
         connection.targetHandle,
       );
     },
     [diagramStore, path],
   );
+
+    /**
+     * Deletes the wires a change is about to orphan (boundaryPorts.ts), in the
+     * same handler as the change so both land in one undo step and undoing
+     * brings the wires back with it. `simulate` describes the document as it
+     * will be afterwards; nothing is read back from the store mid-change.
+     */
+    const deleteOrphanedWires = useCallback(
+        (
+            simulate: (snapshot: { nodes: Node<ArchNodeData>[]; edges: Edge<ArchEdgeData>[] }) => {
+                nodes: Node<ArchNodeData>[];
+                edges: Edge<ArchEdgeData>[];
+            },
+        ) => {
+            const store = diagramStoreRef.current;
+            const after = simulate(store.getSnapshot());
+            const orphans = findOrphanedPortEdges(after.nodes, after.edges);
+            for (const id of orphans) store.deleteEdge(id);
+            if (orphans.length > 0) {
+                const gone = new Set(orphans);
+                setSelectedEdgeIds((cur) => cur.filter((e) => !gone.has(e)));
+            }
+        },
+        [setSelectedEdgeIds],
+    );
 
   const onAddNode = useCallback(
     (typeId: string, position: { x: number; y: number }) => {
@@ -605,6 +669,63 @@ export function useCanvasEditing({
     diagramStoreRef.current.updateNode(id, patch);
   }, []);
 
+    /**
+     * The same edit to several nodes at once - the multi-selection Inspector
+     * and the context menu. Each node gets its own patch (a text node's color
+     * lives in a different field than everyone else's), but all of them land
+     * in ONE transaction: one update for peers, and one undo step rather than
+     * one per node.
+     */
+    const onUpdateNodes = useCallback(
+        (updates: { id: string; patch: Partial<ArchNodeData> }[]) => {
+            if (updates.length === 0) return;
+            undo.transact(() => {
+                for (const {id, patch} of updates) diagramStoreRef.current.updateNode(id, patch);
+            });
+        },
+        [undo],
+    );
+
+    /** Locks or unlocks nodes - see ArchNodeData.locked. */
+    const onSetLocked = useCallback(
+        (ids: string[], locked: boolean) => {
+            // Stored as absent rather than false when unlocked, so a node that was
+            // locked and unlocked again is indistinguishable from one never locked.
+            onUpdateNodes(ids.map((id) => ({id, patch: {locked: locked ? true : undefined}})));
+        },
+        [onUpdateNodes],
+    );
+
+    /**
+     * Wraps the given nodes in a new plain boundary sized to fit them (see
+     * domain/canvas/grouping.ts), and selects it. One transaction, so it's
+     * one undo step and peers never see the empty boundary on its own.
+     */
+    const onGroup = useCallback(
+        (targetIds: string[]) => {
+            const plan = planGroup(targetIds, nodesRef.current);
+            if (!plan) return;
+            const store = diagramStoreRef.current;
+            let groupId = '';
+            undo.transact(() => {
+                groupId = store.addNode(path, 'group', plan.position, {
+                    nodeType: DEFAULT_GROUP_TYPE_ID,
+                    label: getGroupType(DEFAULT_GROUP_TYPE_ID)?.label ?? 'Group',
+                    description: '',
+                    properties: {},
+                    tags: [],
+                });
+                store.updateDimensions(groupId, plan.width, plan.height);
+                if (plan.parentId) store.updateParentId(groupId, plan.parentId, plan.position);
+                for (const member of plan.members)
+                    store.updateParentId(member.id, groupId, member.position);
+            });
+            setSelectedNodeIds([groupId]);
+            setSelectedEdgeIds([]);
+        },
+        [undo, path, setSelectedNodeIds, setSelectedEdgeIds],
+    );
+
   /**
    * Applies a z-order command to the current selection.
    *
@@ -644,6 +765,17 @@ export function useCanvasEditing({
     diagramStoreRef.current.updateEdge(id, patch);
   }, []);
 
+    /** onUpdateNodes for edges - one transaction, one undo step. */
+    const onUpdateEdges = useCallback(
+        (updates: { id: string; patch: ArchEdgeDataPatch }[]) => {
+            if (updates.length === 0) return;
+            undo.transact(() => {
+                for (const {id, patch} of updates) diagramStoreRef.current.updateEdge(id, patch);
+            });
+        },
+        [undo],
+    );
+
   /**
    * Edge manipulation - moving an edge's ends onto different nodes, and
    * bending its route with waypoints.
@@ -662,9 +794,27 @@ export function useCanvasEditing({
    * concurrent edits to it from merging. See DiagramStore for the full
    * reasoning.
    */
-  const onReconnectEdge = useCallback((edgeId: string, endpoints: EdgeEndpoints) => {
-    diagramStoreRef.current.reconnectEdge(edgeId, endpoints);
-  }, []);
+  const onReconnectEdge = useCallback(
+      (edgeId: string, endpoints: EdgeEndpoints) => {
+          // A wire can't be turned to run against its port's direction - it
+          // would be hidden as invalid, which reads as the edge vanishing.
+          if (!isPortOrientationValid(endpoints)) return;
+          // One transaction: one update for peers, and one undo step that
+          // brings the old endpoints and the cleaned-up wires back together.
+          undo.transact(() => {
+              // Orphans first, against the document as it will be: moving an
+              // outer edge off a node takes its port - and the wires to it -
+              // with it. First because it reads the store's snapshot, which
+              // only catches up with writes once the transaction ends.
+              deleteOrphanedWires(({nodes: n, edges: e}) => ({
+                  nodes: n,
+                  edges: e.map((edge) => (edge.id === edgeId ? {...edge, ...endpoints} : edge)),
+              }));
+              diagramStoreRef.current.reconnectEdge(edgeId, endpoints);
+          });
+      },
+      [undo, deleteOrphanedWires],
+  );
 
   /**
    * Bend drags are gestures (WS4-R1): adding and moving record into the edge's
@@ -773,6 +923,9 @@ export function useCanvasEditing({
     (id: string) => {
       const target = nodes.find((n) => n.id === id);
       if (!target) return;
+        // Locked means pinned: it stays until someone unlocks it first. This
+        // is also what makes Delete on a selection skip locked nodes.
+        if (target.data.locked) return;
       const nestedCount = getNodesAtPath(diagramStore.getSnapshot().nodes, [...path, id]).length;
       if (nestedCount > 0) {
         const ok = window.confirm(
@@ -793,28 +946,92 @@ export function useCanvasEditing({
       const live = getNodesAtPath(diagramStore.getSnapshot().nodes, path);
       const liveTarget = live.find((n) => n.id === id);
       const newParentId = liveTarget?.parentId;
-      for (const child of live) {
-        if (child.parentId !== id) continue;
-        const absolute = toAbsolutePosition(child, live, id);
-        diagramStore.updateParentId(
-          child.id,
-          newParentId,
-          toRelativePosition(absolute, live, newParentId),
-        );
-      }
-      diagramStore.deleteNode(id);
+        // Every edge touching this node goes with it, and so does every
+        // port those edges put on OTHER nodes' boundaries - wires to those
+        // would be orphaned. (Wires inside this node's own sub-diagram go
+        // with the cascade below anyway.)
+        const level = [...path, id];
+        const isInside = (p: string[] | undefined) =>
+            !!p && p.length >= level.length && level.every((seg, i) => p[i] === seg);
+        // One transaction for the whole deletion - wires, children, node - so
+        // peers get one update and a single undo restores all of it.
+        undo.transact(() => {
+            // Orphaned wires first: this reads the store's snapshot, which only
+            // catches up with writes once the transaction ends. Reparenting
+            // below cannot change which wires are orphaned.
+            deleteOrphanedWires(({nodes: n, edges: e}) => {
+                const removed = new Set(
+                    n.filter((node) => node.id === id || isInside(levelOf(node))).map((node) => node.id),
+                );
+                return {
+                    nodes: n.filter((node) => !removed.has(node.id)),
+                    edges: e.filter(
+                        (edge) =>
+                            !removed.has(edge.source) && !removed.has(edge.target) && !isInside(levelOf(edge)),
+                    ),
+                };
+        });
+            for (const child of live) {
+                if (child.parentId !== id) continue;
+                const absolute = toAbsolutePosition(child, live, id);
+                diagramStore.updateParentId(
+                    child.id,
+                    newParentId,
+                    toRelativePosition(absolute, live, newParentId),
+                );
+            }
+            diagramStore.deleteNode(id);
+        });
       setSelectedNodeIds((cur) => cur.filter((n) => n !== id));
     },
-    [nodes, path, diagramStore, setSelectedNodeIds],
+      [nodes, path, undo, diagramStore, setSelectedNodeIds, deleteOrphanedWires],
   );
 
   const onDeleteEdge = useCallback(
     (id: string) => {
-      diagramStore.deleteEdge(id);
+        // One transaction: one update for peers, one undo step for the edge
+        // and the port wires it orphans. Orphans first - see onReconnectEdge.
+        undo.transact(() => {
+            deleteOrphanedWires(({nodes: n, edges: e}) => ({
+                nodes: n,
+                edges: e.filter((edge) => edge.id !== id),
+        }));
+            diagramStore.deleteEdge(id);
+        });
       setSelectedEdgeIds((cur) => cur.filter((e) => e !== id));
     },
-    [diagramStore, setSelectedEdgeIds],
+      [undo, diagramStore, setSelectedEdgeIds, deleteOrphanedWires],
   );
+
+    /**
+     * Removes the given boundaries while keeping what's inside them - which
+     * is exactly what deleting a boundary already does (onDeleteNode hands its
+     * children to its own parent), so this is that, plus selecting the
+     * released nodes so they can be regrouped or moved straight away.
+     *
+     * One deletion per boundary rather than one shared transaction:
+     * onDeleteNode reads the store's snapshot, which only catches up once a
+     * transaction ends, and ungrouping a boundary and one nested inside it
+     * needs the second deletion to see the first.
+     */
+    const onUngroup = useCallback(
+        (targetIds: string[]) => {
+            const current = nodesRef.current;
+            const groupIds = new Set(
+                current
+                    .filter((n) => targetIds.includes(n.id) && n.type === 'group' && !n.data.locked)
+                    .map((n) => n.id),
+            );
+            if (groupIds.size === 0) return;
+            const released = current
+                .filter((n) => n.parentId && groupIds.has(n.parentId) && !groupIds.has(n.id))
+                .map((n) => n.id);
+            for (const id of groupIds) onDeleteNode(id);
+            setSelectedNodeIds(released);
+            setSelectedEdgeIds([]);
+        },
+        [onDeleteNode, setSelectedNodeIds, setSelectedEdgeIds],
+    );
 
   const onDeleteSelection = useCallback(() => {
     selectedEdgeIds.forEach(onDeleteEdge);
@@ -854,6 +1071,7 @@ export function useCanvasEditing({
   return {
     nodes,
     edges,
+      portNodes,
     onNodesChange,
     onEdgesChange,
     onConnect,
@@ -865,8 +1083,13 @@ export function useCanvasEditing({
     onReparentNode,
     onAdoptIntoGroup,
     onUpdateNode,
+      onUpdateNodes,
+      onSetLocked,
+      onGroup,
+      onUngroup,
     onZOrderCommand,
     onUpdateEdge,
+      onUpdateEdges,
     onReconnectEdge,
     onAddEdgeWaypoint,
     onMoveEdgeWaypoint,

@@ -22,6 +22,15 @@ Program Increments (PIs) provide multi-sprint planning intervals (typically 8–
 - **Adjusting Durations**: Modify a sprint's end date directly from the sprint header date picker.
 - **Automatic Cascading**: Start and end dates for subsequent sprints automatically adjust when an earlier sprint is lengthened or shortened, keeping the timeline perfectly contiguous without manual re-calculation.
 
+### Goals & Notes
+
+- **PI goal and notes**: Every PI card has a goal line under its header and a **Notes** toggle for longer context -
+  risks, decisions, dependencies.
+- **Sprint goal and notes**: Click the target icon on a sprint row to set that sprint's goal and notes. Sprints with a
+  goal show it under their name on the Sprint Timeline Board; hover it to read the notes.
+- Goals are carried into the SRD roadmap: PI goals are listed above the sprint table and each sprint's goal has its own
+  column.
+
 ---
 
 ## 2. Milestones & Date-Based Markers

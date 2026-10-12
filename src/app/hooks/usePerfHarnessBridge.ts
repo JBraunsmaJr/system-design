@@ -1,11 +1,11 @@
-import { useEffect, type Dispatch, type SetStateAction } from 'react';
+import {type Dispatch, type SetStateAction, useEffect} from 'react';
 import * as Y from 'yjs';
-import type { DiagramStore } from '../../collab/stores/diagramStore';
-import { createDocumentStores } from '../../collab/sync/localDocument';
-import { startCollabSession } from '../../collab/sync/session';
-import type { SubDiagram } from '../../domain/canvas/types';
-import { getStandardFixture, type FixtureName } from '../../perf/fixtures';
-import type { ActiveCollabSession } from './useCollabSession';
+import type {DiagramStore} from '../../collab/stores/diagramStore';
+import {createDocumentStores} from '../../collab/sync/localDocument';
+import {startCollabSession} from '../../collab/sync/session';
+import type {SubDiagram} from '../../domain/canvas/types';
+import {type FixtureName, getStandardFixture} from '../../perf/fixtures';
+import type {ActiveCollabSession} from './useCollabSession';
 
 export interface UsePerfHarnessBridgeOptions {
   diagramStore: DiagramStore;
@@ -73,6 +73,9 @@ export function usePerfHarnessBridge({
           { x: Math.random() * 400, y: Math.random() * 400 },
           { nodeType: 'service', label, properties: {}, tags: [] },
         );
+        // Every node and edge at every level, as stored - for browser suites
+        // that check what an edit actually wrote, not only what it drew.
+        perfObj.getDiagram = () => diagramStore.getSnapshot();
       perfObj.setPath = (newPath: string[]) => {
         setPath(newPath);
       };

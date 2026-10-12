@@ -30,6 +30,7 @@ const NODE_DATA_FIELDS = [
   'linkedRequirementIds',
   'linkedDocument',
   'zIndex',
+    'locked',
 ] as const;
 
 /**
@@ -44,6 +45,8 @@ const EDGE_DATA_FIELDS = [
   'direction',
   'hideLabel',
   'color',
+    'strokeWidth',
+    'routing',
   'labelAnchorT',
   'labelOffsetX',
   'labelOffsetY',

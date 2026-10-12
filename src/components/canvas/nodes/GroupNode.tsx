@@ -76,7 +76,7 @@ export function GroupNode({
           click-through. Same reasoning applies to EdgeHandles just
           below it. */}
       <NodeResizer
-        isVisible={selected}
+          isVisible={selected && !data.locked}
         minWidth={220}
         minHeight={140}
         lineClassName="node-resize-line"

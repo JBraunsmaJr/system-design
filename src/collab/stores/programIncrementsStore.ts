@@ -1,12 +1,14 @@
 import type {
-  ProgramIncrement,
   CapacityReservation,
+  PlanningDetailsPatch,
+  ProgramIncrement,
 } from '../../domain/timeline/programIncrements';
 import {
-  updateSprintEndDate,
-  updatePIStartDate,
-  getNextPIStartDate,
+  applyPlanningDetails,
   DEFAULT_SPRINT_DURATION_DAYS,
+  getNextPIStartDate,
+  updatePIStartDate,
+  updateSprintEndDate,
 } from '../../domain/timeline/programIncrements';
 
 /**
@@ -46,8 +48,16 @@ export interface ProgramIncrementsStore {
   updatePIStart(piId: string, startDate: string): void;
   deletePI(piId: string): void;
 
+  /** Sets or clears the PI's goal and/or notes. Keys absent from the patch
+   * are left alone; '' clears a field. */
+  updatePIDetails(piId: string, patch: PlanningDetailsPatch): void;
+
   addSprint(piId: string): void;
   updateSprintName(piId: string, sprintId: string, name: string): void;
+
+  /** Sets or clears a sprint's goal and/or notes - same patch semantics as
+   * updatePIDetails. */
+  updateSprintDetails(piId: string, sprintId: string, patch: PlanningDetailsPatch): void;
   /** Reuses the same updateSprintEndDate pure helper the app already
    * uses - converts the given end date into a new duration for this
    * sprint, silently no-op-ing on an invalid (zero or negative
@@ -121,6 +131,11 @@ export function createLocalProgramIncrementsStore(
       notify();
     },
 
+    updatePIDetails: (piId, patch) => {
+      pis = pis.map((pi) => (pi.id === piId ? applyPlanningDetails(pi, patch) : pi));
+      notify();
+    },
+
     addSprint: (piId) => {
       pis = pis.map((pi) =>
         pi.id === piId
@@ -145,6 +160,20 @@ export function createLocalProgramIncrementsStore(
         pi.id === piId
           ? { ...pi, sprints: pi.sprints.map((s) => (s.id === sprintId ? { ...s, name } : s)) }
           : pi,
+      );
+      notify();
+    },
+
+    updateSprintDetails: (piId, sprintId, patch) => {
+      pis = pis.map((pi) =>
+          pi.id === piId
+              ? {
+                  ...pi,
+                  sprints: pi.sprints.map((s) =>
+                      s.id === sprintId ? applyPlanningDetails(s, patch) : s,
+                  ),
+              }
+              : pi,
       );
       notify();
     },
@@ -255,6 +284,12 @@ export function createAdapterProgramIncrementsStore(
       setSnapshot((prev) => prev.filter((pi) => pi.id !== piId));
     },
 
+    updatePIDetails: (piId, patch) => {
+      setSnapshot((prev) =>
+          prev.map((pi) => (pi.id === piId ? applyPlanningDetails(pi, patch) : pi)),
+      );
+    },
+
     addSprint: (piId) => {
       setSnapshot((prev) =>
         prev.map((pi) =>
@@ -282,6 +317,21 @@ export function createAdapterProgramIncrementsStore(
             ? { ...pi, sprints: pi.sprints.map((s) => (s.id === sprintId ? { ...s, name } : s)) }
             : pi,
         ),
+      );
+    },
+
+    updateSprintDetails: (piId, sprintId, patch) => {
+      setSnapshot((prev) =>
+          prev.map((pi) =>
+              pi.id === piId
+                  ? {
+                      ...pi,
+                      sprints: pi.sprints.map((s) =>
+                          s.id === sprintId ? applyPlanningDetails(s, patch) : s,
+                      ),
+                  }
+                  : pi,
+          ),
       );
     },
 

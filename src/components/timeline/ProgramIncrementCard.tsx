@@ -1,22 +1,21 @@
-import { useMemo, useState } from 'react';
-import { CalendarRange, ChevronDown, ChevronRight, Plus, Trash2, ShieldAlert } from 'lucide-react';
+import {useMemo, useState} from 'react';
+import {CalendarRange, ChevronDown, ChevronRight, Plus, ShieldAlert, Trash2} from 'lucide-react';
 import {
   computeSprintDateRanges,
+  type PlanningDetailsPatch,
   type ProgramIncrement,
 } from '../../domain/timeline/programIncrements';
-import { isItemWorkable } from '../../domain/requirements/requirementsRegistry';
-import type { ScheduleConflictSeverity } from '../../domain/timeline/scheduleConflicts';
-import type {
-  RequirementItem,
-  RequirementsDocument,
-} from '../../domain/requirements/requirementsTypes';
-import type { ProgramIncrementsStore } from '../../collab/stores/programIncrementsStore';
-import type { Milestone } from '../../domain/timeline/milestones';
-import type { TeamDocument } from '../../domain/timeline/teamTypes';
-import { computePICapacities } from '../../domain/timeline/teamCapacity';
-import { ManageReservationsModal } from './ManageReservationsModal';
-import { SprintRow } from './SprintRow';
-import { SprintBoardColumn } from './SprintBoardColumn';
+import {isItemWorkable} from '../../domain/requirements/requirementsRegistry';
+import type {ScheduleConflictSeverity} from '../../domain/timeline/scheduleConflicts';
+import type {RequirementItem, RequirementsDocument,} from '../../domain/requirements/requirementsTypes';
+import type {ProgramIncrementsStore} from '../../collab/stores/programIncrementsStore';
+import type {Milestone} from '../../domain/timeline/milestones';
+import type {TeamDocument} from '../../domain/timeline/teamTypes';
+import {computePICapacities} from '../../domain/timeline/teamCapacity';
+import {ManageReservationsModal} from './ManageReservationsModal';
+import {SprintRow} from './SprintRow';
+import {SprintBoardColumn} from './SprintBoardColumn';
+import {PlanningDetailsFields} from './PlanningDetailsFields';
 
 interface ProgramIncrementCardProps {
   pi: ProgramIncrement;
@@ -42,10 +41,12 @@ interface ProgramIncrementCardProps {
   onUpdateItem: (id: string, patch: Partial<RequirementItem>) => void;
   onUpdateName: (name: string) => void;
   onUpdateStart: (startDate: string) => void;
+    onUpdateDetails: (patch: PlanningDetailsPatch) => void;
   onDelete: () => void;
   onAddSprint: () => void;
   onUpdateSprintName: (sprintId: string, name: string) => void;
   onUpdateSprintEnd: (sprintId: string, endDate: string) => void;
+    onUpdateSprintDetails: (sprintId: string, patch: PlanningDetailsPatch) => void;
   onDeleteSprint: (sprintId: string) => void;
   onMoveSprint: (sprintId: string, direction: 'up' | 'down') => void;
   programIncrementsStore: ProgramIncrementsStore;
@@ -78,10 +79,12 @@ export function ProgramIncrementCard({
   onUpdateItem,
   onUpdateName,
   onUpdateStart,
+                                         onUpdateDetails,
   onDelete,
   onAddSprint,
   onUpdateSprintName,
   onUpdateSprintEnd,
+                                         onUpdateSprintDetails,
   onDeleteSprint,
   onMoveSprint,
   programIncrementsStore,
@@ -262,6 +265,10 @@ export function ProgramIncrementCard({
         )}
       </div>
 
+        <div className="pi-card__details">
+            <PlanningDetailsFields details={pi} scope="PI" onChange={onUpdateDetails}/>
+        </div>
+
       <button
         type="button"
         className="pi-card__sprints-toggle"
@@ -286,6 +293,7 @@ export function ProgramIncrementCard({
                 isLast={index === pi.sprints.length - 1}
                 onUpdateName={(name) => onUpdateSprintName(sprint.id, name)}
                 onUpdateEnd={(endDate) => onUpdateSprintEnd(sprint.id, endDate)}
+                onUpdateDetails={(patch) => onUpdateSprintDetails(sprint.id, patch)}
                 onDelete={() => onDeleteSprint(sprint.id)}
                 onMoveUp={() => onMoveSprint(sprint.id, 'up')}
                 onMoveDown={() => onMoveSprint(sprint.id, 'down')}

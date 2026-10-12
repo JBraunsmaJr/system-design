@@ -1,16 +1,19 @@
 import * as Y from 'yjs';
-import { orderIdSet, pushIfAbsent } from '../sync/seedGuards.ts';
+import {orderIdSet, pushIfAbsent} from '../sync/seedGuards.ts';
 import type {
+  CapacityReservation,
+  PlanningDetails,
+  PlanningDetailsPatch,
   ProgramIncrement,
   Sprint,
-  CapacityReservation,
 } from '../../domain/timeline/programIncrements';
 import {
-  updateSprintEndDate,
-  getNextPIStartDate,
   DEFAULT_SPRINT_DURATION_DAYS,
+  getNextPIStartDate,
+  PLANNING_DETAIL_KEYS,
+  updateSprintEndDate,
 } from '../../domain/timeline/programIncrements';
-import type { ProgramIncrementsStore } from './programIncrementsStore';
+import type {ProgramIncrementsStore} from './programIncrementsStore';
 
 /** PI and sprint ids are purely internal (never displayed - see
  * programIncrementsStore.ts's doc comment), so there's no reason not to
@@ -21,6 +24,40 @@ import type { ProgramIncrementsStore } from './programIncrementsStore';
  * needing a repair pass. */
 function collisionResistantId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+/** Writes goal/notes onto a nested PI or sprint Y.Map one key at a time,
+ * so concurrent edits to the goal and the notes (or to the name) merge
+ * instead of overwriting each other. '' deletes the key, matching
+ * applyPlanningDetails. */
+function writePlanningDetails(m: Y.Map<unknown>, patch: PlanningDetailsPatch): void {
+  for (const key of PLANNING_DETAIL_KEYS) {
+    if (!(key in patch)) continue;
+    const value = patch[key];
+    if (typeof value === 'string' && value.trim() !== '') {
+      if (m.get(key) !== value) m.set(key, value);
+    } else if (m.has(key)) {
+      m.delete(key);
+    }
+  }
+}
+
+/** Seeding variant for a Y.Map not yet attached to a document: Yjs
+ * warns on reads from detached types, so this only writes. */
+function seedPlanningDetails(m: Y.Map<unknown>, details: PlanningDetails): void {
+  for (const key of PLANNING_DETAIL_KEYS) {
+    const value = details[key];
+    if (typeof value === 'string' && value.trim() !== '') m.set(key, value);
+  }
+}
+
+function readPlanningDetails(m: Y.Map<unknown>): PlanningDetails {
+  const out: PlanningDetails = {};
+  for (const key of PLANNING_DETAIL_KEYS) {
+    const value = m.get(key);
+    if (typeof value === 'string' && value !== '') out[key] = value;
+  }
+  return out;
 }
 
 /**
@@ -53,6 +90,7 @@ export function seedYjsProgramIncrementsDoc(doc: Y.Doc, initial: ProgramIncremen
         const sprintM = new Y.Map<unknown>();
         sprintM.set('name', sprint.name);
         sprintM.set('durationDays', sprint.durationDays);
+        seedPlanningDetails(sprintM, sprint);
         sprintsMap.set(sprint.id, sprintM);
         sprintOrderArr.push([sprint.id]);
       }
@@ -68,6 +106,7 @@ export function seedYjsProgramIncrementsDoc(doc: Y.Doc, initial: ProgramIncremen
       piM.set('sprintOrder', sprintOrderArr);
       piM.set('sprints', sprintsMap);
       piM.set('reservations', reservationsMap);
+      seedPlanningDetails(piM, pi);
 
       pis.set(pi.id, piM);
       pushIfAbsent(piOrder, seen, pi.id);
@@ -86,12 +125,14 @@ export function seedYjsProgramIncrementsDoc(doc: Y.Doc, initial: ProgramIncremen
  *    nested Y.Map (name, startDate patch independently via
  *    updatePIName/updatePIStart - the same "separate single-field patch
  *    operations exist" signal that means members and items needed
- *    nesting) holding THREE further keys:
+ *    nesting), optional "goal"/"notes" strings (absent when empty, each
+ *    its own key so they merge independently), and THREE further keys:
  *      - "sprintOrder": Y.Array<string>, sprint ids in order within
  *        this PI.
  *      - "sprints": Y.Map<string, Y.Map> - keyed by sprint id, each a
- *        further-nested Y.Map (name, durationDays - same reasoning,
- *        updateSprintName and updateSprintEnd are separate operations).
+ *        further-nested Y.Map (name, durationDays, optional goal/notes -
+ *        same reasoning, updateSprintName, updateSprintEnd and
+ *        updateSprintDetails are separate operations).
  *      - "reservations": Y.Map<string, CapacityReservation> - keyed by
  *        reservation id, PLAIN values. Unlike sprints/PIs, no operation
  *        ever patches a single field of an existing reservation -
@@ -105,7 +146,12 @@ export function createYjsProgramIncrementsStore(doc: Y.Doc): ProgramIncrementsSt
   const pis = doc.getMap<Y.Map<unknown>>('pis');
 
   function sprintMapToPlain(id: string, m: Y.Map<unknown>): Sprint {
-    return { id, name: m.get('name') as string, durationDays: m.get('durationDays') as number };
+    return {
+      id,
+      name: m.get('name') as string,
+      durationDays: m.get('durationDays') as number,
+      ...readPlanningDetails(m),
+    };
   }
 
   function piMapToPlain(id: string, m: Y.Map<unknown>): ProgramIncrement {
@@ -116,6 +162,7 @@ export function createYjsProgramIncrementsStore(doc: Y.Doc): ProgramIncrementsSt
       id,
       name: m.get('name') as string,
       startDate: m.get('startDate') as string,
+      ...readPlanningDetails(m),
       sprints: sprintOrder
         .toArray()
         .map((sid) => {
@@ -205,6 +252,11 @@ export function createYjsProgramIncrementsStore(doc: Y.Doc): ProgramIncrementsSt
       if (m) m.set('startDate', startDate);
     },
 
+    updatePIDetails: (piId, patch) => {
+      const m = getPIMap(piId);
+      if (m) doc.transact(() => writePlanningDetails(m, patch));
+    },
+
     deletePI: (piId) => {
       doc.transact(() => {
         pis.delete(piId);
@@ -233,6 +285,13 @@ export function createYjsProgramIncrementsStore(doc: Y.Doc): ProgramIncrementsSt
       const sprints = piM?.get('sprints') as Y.Map<Y.Map<unknown>> | undefined;
       const sprintM = sprints?.get(sprintId);
       if (sprintM) sprintM.set('name', name);
+    },
+
+    updateSprintDetails: (piId, sprintId, patch) => {
+      const piM = getPIMap(piId);
+      const sprints = piM?.get('sprints') as Y.Map<Y.Map<unknown>> | undefined;
+      const sprintM = sprints?.get(sprintId);
+      if (sprintM) doc.transact(() => writePlanningDetails(sprintM, patch));
     },
 
     // Reuses the exact same pure helper the local store and the rest of

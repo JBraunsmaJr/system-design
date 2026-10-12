@@ -1,12 +1,12 @@
 /**
  * Run with: npx tsx --tsconfig tsconfig.app.json src/domain/srdDataAggregator.verify.ts
  */
-import type { Node, Edge } from '@xyflow/react';
-import type { RequirementsDocument } from '../requirements/requirementsTypes';
-import type { Milestone } from '../timeline/milestones';
-import type { ProgramIncrement } from '../timeline/programIncrements';
-import type { TeamDocument } from '../timeline/teamTypes';
-import { aggregateSrdData } from './srdDataAggregator';
+import type {Edge, Node} from '@xyflow/react';
+import type {RequirementsDocument} from '../requirements/requirementsTypes';
+import type {Milestone} from '../timeline/milestones';
+import type {ProgramIncrement} from '../timeline/programIncrements';
+import type {TeamDocument} from '../timeline/teamTypes';
+import {aggregateSrdData} from './srdDataAggregator';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {
@@ -387,6 +387,50 @@ const mockTeam: TeamDocument = {
   assert(subRel !== undefined, 'Sub-diagram node included in traceability matrix');
 
   console.log('✓ Test 5: Sub-diagram node links and snapshots passed');
+}
+
+// --- Test 6: Every PI reaches the roadmap, with or without sprints ---
+{
+    const pis: ProgramIncrement[] = [
+        {
+            id: 'pi-a',
+            name: 'Platform',
+            goal: 'Ship SSO',
+            startDate: '2026-10-01',
+            sprints: [
+                {id: 'a-1', name: 'Sprint 1', durationDays: 14},
+                {id: 'a-2', name: 'Sprint 2', durationDays: 14},
+            ],
+        },
+        {id: 'pi-b', name: 'Platform', goal: 'Harden auth', startDate: '2027-01-01', sprints: []},
+        {id: 'pi-c', name: 'Mobile', startDate: '2027-04-01', sprints: []},
+    ];
+    const srdData = aggregateSrdData({
+        title: 'PIs',
+        nodes: mockNodes,
+        edges: mockEdges,
+        doc: mockDoc,
+        milestones: [],
+        programIncrements: pis,
+    });
+    const listed = srdData.roadmap.programIncrements;
+    assert(listed.map((p) => p.id).join() === 'pi-a,pi-b,pi-c', 'every PI is listed, in plan order');
+    const b = listed.find((p) => p.id === 'pi-b');
+    assert(
+        b !== undefined && b.goal === 'Harden auth' && b.sprintCount === 0,
+        'a PI with no sprints still carries its goal',
+    );
+    assert(listed.find((p) => p.id === 'pi-c')?.goal === undefined, 'a PI with no goal has none');
+    assert(
+        srdData.roadmap.sprints.map((sp) => sp.id).join() === 'a-1,a-2',
+        'sprint rows are unchanged: one per sprint',
+    );
+    assert(
+        srdData.roadmap.sprints.every((sp) => sp.piId === 'pi-a' && sp.piName === 'Platform'),
+        "each sprint row carries its PI's id as well as its name",
+    );
+
+    console.log('✓ Test 6: PIs independent of sprints passed');
 }
 
 if (failures > 0) {

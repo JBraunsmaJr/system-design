@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import type { ViewMode } from './useViewNavigation';
+import {useEffect} from 'react';
+import type {ViewMode} from './useViewNavigation';
 
 export interface UseKeyboardShortcutsOptions {
   isPresenting: boolean;
@@ -14,6 +14,16 @@ export interface UseKeyboardShortcutsOptions {
   onPresentNext: () => void;
   onPresentPrev: () => void;
   onExitPresenting: () => void;
+    /** Ctrl/Cmd+D. */
+    onDuplicate?: (nodeIds: string[]) => void;
+    /** Ctrl/Cmd+G. */
+    onGroup?: (nodeIds: string[]) => void;
+    /** Ctrl/Cmd+Shift+G. */
+    onUngroup?: (nodeIds: string[]) => void;
+    /** Ctrl/Cmd+Alt+C. */
+    onCopyStyle?: (nodeIds: string[], edgeIds: string[]) => void;
+    /** Ctrl/Cmd+Alt+V. */
+    onPasteStyle?: (nodeIds: string[], edgeIds: string[]) => void;
 }
 
 /**
@@ -39,6 +49,11 @@ export function useKeyboardShortcuts({
   onPresentNext,
   onPresentPrev,
   onExitPresenting,
+                                         onDuplicate,
+                                         onGroup,
+                                         onUngroup,
+                                         onCopyStyle,
+                                         onPasteStyle,
 }: UseKeyboardShortcutsOptions) {
   // Delete key: acts on whatever's currently multi-selected, but never while
   // presenting, and never while typing in a field.
@@ -71,6 +86,8 @@ export function useKeyboardShortcuts({
       if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return;
 
       const key = event.key.toLowerCase();
+        // Ctrl+Alt+C/V are copy/paste STYLE - handled below, not here.
+        if (event.altKey) return;
       if ((event.ctrlKey || event.metaKey) && key === 'c') {
         const selection = window.getSelection();
         const hasTextSelection = Boolean(
@@ -119,6 +136,57 @@ export function useKeyboardShortcuts({
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [isPresenting, viewMode, onUndo, onRedo]);
+
+    // Selection commands that mirror the context menu: duplicate, group,
+    // ungroup, and copy/paste style. Same guards as copy/paste. Matched on
+    // event.code for the style pair, because Alt changes event.key on macOS
+    // (Option+C types "ç").
+    useEffect(() => {
+        const handler = (event: KeyboardEvent) => {
+            if (isPresenting) return;
+            if (viewMode !== 'diagram') return;
+            const target = event.target as HTMLElement | null;
+            const tag = target?.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return;
+            if (!(event.ctrlKey || event.metaKey)) return;
+            if (event.altKey && event.code === 'KeyC' && onCopyStyle) {
+                if (selectedNodeIds.length === 0 && selectedEdgeIds.length === 0) return;
+                event.preventDefault();
+                onCopyStyle(selectedNodeIds, selectedEdgeIds);
+                return;
+            }
+            if (event.altKey && event.code === 'KeyV' && onPasteStyle) {
+                if (selectedNodeIds.length === 0 && selectedEdgeIds.length === 0) return;
+                event.preventDefault();
+                onPasteStyle(selectedNodeIds, selectedEdgeIds);
+                return;
+            }
+            if (event.altKey || selectedNodeIds.length === 0) return;
+            const key = event.key.toLowerCase();
+            if (key === 'd' && !event.shiftKey && onDuplicate) {
+                event.preventDefault(); // the browser's "bookmark this page"
+                onDuplicate(selectedNodeIds);
+            } else if (key === 'g' && event.shiftKey && onUngroup) {
+                event.preventDefault();
+                onUngroup(selectedNodeIds);
+            } else if (key === 'g' && !event.shiftKey && onGroup) {
+                event.preventDefault(); // the browser's "find next"
+                onGroup(selectedNodeIds);
+            }
+        };
+        window.addEventListener('keydown', handler);
+        return () => window.removeEventListener('keydown', handler);
+    }, [
+        isPresenting,
+        viewMode,
+        selectedNodeIds,
+        selectedEdgeIds,
+        onDuplicate,
+        onGroup,
+        onUngroup,
+        onCopyStyle,
+        onPasteStyle,
+    ]);
 
   // Presentation navigation: arrow keys / space / escape.
   useEffect(() => {

@@ -1,16 +1,11 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { Star, Clock, Sparkles, Ban } from 'lucide-react';
-import { globalIconRegistry } from '../../domain/canvas/iconRegistry';
-import { IconRenderer } from './IconRenderer';
-import { useOutsideClick } from '../../common/hooks/useOutsideClick';
-import { usePositionedDropdown } from '../../common/hooks/usePositionedDropdown';
-import {
-  addRecentIcon,
-  getFavoriteIcons,
-  getRecentIcons,
-  toggleFavoriteIcon,
-} from '../../domain/storage/assetLibrary';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
+import {createPortal} from 'react-dom';
+import {Ban, Clock, Sparkles, Star} from 'lucide-react';
+import {globalIconRegistry} from '../../domain/canvas/iconRegistry';
+import {IconRenderer} from './IconRenderer';
+import {useOutsideClick} from '../../common/hooks/useOutsideClick';
+import {usePositionedDropdown} from '../../common/hooks/usePositionedDropdown';
+import {addRecentIcon, getFavoriteIcons, getRecentIcons, toggleFavoriteIcon,} from '../../domain/storage/assetLibrary';
 
 const RESULT_LIMIT = 80;
 const DROPDOWN_WIDTH = 340;
@@ -21,6 +16,12 @@ export interface IconPickerProps {
   /** The node type's own default icon, shown when there's no override. */
   defaultValue?: string;
   onChange: (icon: string | undefined) => void;
+    /** A multi-selection whose nodes show different icons: the trigger says
+     * "Mixed" instead of pretending they share one. */
+    mixed?: boolean;
+    /** Whether "Reset" is offered - by default only when `value` is set. A
+     * multi-selection passes whether ANY of its nodes has an override. */
+    canReset?: boolean;
 }
 
 export interface IconPickerPanelProps {
@@ -368,7 +369,13 @@ export function IconPickerPanel({
   );
 }
 
-export function IconPicker({ value, defaultValue, onChange }: IconPickerProps) {
+export function IconPicker({
+                               value,
+                               defaultValue,
+                               onChange,
+                               mixed = false,
+                               canReset,
+                           }: IconPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -376,7 +383,11 @@ export function IconPicker({ value, defaultValue, onChange }: IconPickerProps) {
 
   const resolved = value !== undefined ? value : defaultValue;
   const isNone = !resolved || resolved === 'none';
-  const displayLabel = isNone ? 'None' : globalIconRegistry.getIcon(resolved)?.name || resolved;
+    const displayLabel = mixed
+        ? 'Mixed'
+        : isNone
+            ? 'None'
+            : globalIconRegistry.getIcon(resolved)?.name || resolved;
 
   const { position: dropdownPos } = usePositionedDropdown({
     triggerRef,
@@ -406,7 +417,7 @@ export function IconPicker({ value, defaultValue, onChange }: IconPickerProps) {
             onClick={() => setIsOpen((prev) => !prev)}
             aria-expanded={isOpen}
           >
-            {isNone ? (
+              {mixed ? null : isNone ? (
               <Ban size={15} style={{ opacity: 0.6 }} />
             ) : (
               <IconRenderer icon={resolved} size={15} />
@@ -415,7 +426,7 @@ export function IconPicker({ value, defaultValue, onChange }: IconPickerProps) {
               {displayLabel}
             </span>
           </button>
-          {value !== undefined && (
+            {(canReset ?? value !== undefined) && (
             <button
               type="button"
               className="color-field__reset"

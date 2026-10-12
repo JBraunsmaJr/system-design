@@ -527,7 +527,7 @@ export function updateItemReferencesInItems(
       const updated = updateItemReferencesInText(text, oldId, newId);
       if (updated !== text) (patch ??= {})[field] = updated;
     }
-    return patch ? {...item, ...patch} : item;
+      return patch ? {...item, ...patch} : item;
   });
 }
 

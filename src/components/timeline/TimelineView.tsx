@@ -1,35 +1,32 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import { GanttChartSquare, Plus, Diamond } from 'lucide-react';
-import { computeSprintDateRanges } from '../../domain/timeline/programIncrements';
-import { isItemWorkable } from '../../domain/requirements/requirementsRegistry';
+import {useEffect, useMemo, useState, useSyncExternalStore} from 'react';
+import {Diamond, GanttChartSquare, Plus} from 'lucide-react';
+import {computeSprintDateRanges} from '../../domain/timeline/programIncrements';
+import {isItemWorkable} from '../../domain/requirements/requirementsRegistry';
 import {
-  findScheduleConflicts,
   checkScheduleConflict,
   findBlockingItemIds,
+  findScheduleConflicts,
   type ScheduleConflictSeverity,
 } from '../../domain/timeline/scheduleConflicts';
-import type { RequirementItem } from '../../domain/requirements/requirementsTypes';
-import type { RequirementsStore } from '../../collab/stores/requirementsStore';
-import type { ProgramIncrementsStore } from '../../collab/stores/programIncrementsStore';
-import type { MilestonesStore } from '../../collab/stores/milestonesStore';
-import { createLocalMilestonesStore } from '../../collab/stores/milestonesStore';
-import type { Milestone } from '../../domain/timeline/milestones';
-import {
-  getAllEpicsWithInferredSchedule,
-  getChildItemsForParent,
-} from '../../domain/timeline/epicScheduling';
-import type { TeamDocument } from '../../domain/timeline/teamTypes';
-import type { SubDiagram } from '../../domain/canvas/types';
-import type { DiagramPath } from '../../domain/canvas/subDiagramTree';
-import type { PresenceInfo } from '../../collab/sync/session';
-import { RequirementDetailModal } from './RequirementDetailModal';
-import { MilestoneDetailModal } from './MilestoneDetailModal';
-import { AddMilestoneModal } from './AddMilestoneModal';
-import { GanttChart } from './GanttChart';
-import { PresenceAvatarStack } from './PresenceAvatarStack';
-import { MilestonesSection } from './MilestonesSection';
-import { BacklogSection } from './BacklogSection';
-import { ProgramIncrementCard } from './ProgramIncrementCard';
+import type {RequirementItem} from '../../domain/requirements/requirementsTypes';
+import type {RequirementsStore} from '../../collab/stores/requirementsStore';
+import type {ProgramIncrementsStore} from '../../collab/stores/programIncrementsStore';
+import type {MilestonesStore} from '../../collab/stores/milestonesStore';
+import {createLocalMilestonesStore} from '../../collab/stores/milestonesStore';
+import type {Milestone} from '../../domain/timeline/milestones';
+import {getAllEpicsWithInferredSchedule, getChildItemsForParent,} from '../../domain/timeline/epicScheduling';
+import type {TeamDocument} from '../../domain/timeline/teamTypes';
+import type {SubDiagram} from '../../domain/canvas/types';
+import type {DiagramPath} from '../../domain/canvas/subDiagramTree';
+import type {PresenceInfo} from '../../collab/sync/session';
+import {RequirementDetailModal} from './RequirementDetailModal';
+import {MilestoneDetailModal} from './MilestoneDetailModal';
+import {AddMilestoneModal} from './AddMilestoneModal';
+import {GanttChart} from './GanttChart';
+import {PresenceAvatarStack} from './PresenceAvatarStack';
+import {MilestonesSection} from './MilestonesSection';
+import {BacklogSection} from './BacklogSection';
+import {ProgramIncrementCard} from './ProgramIncrementCard';
 
 interface TimelineViewProps {
   programIncrementsStore: ProgramIncrementsStore;
@@ -485,11 +482,15 @@ export function TimelineView({
                 onUpdateItem={onUpdateItem}
                 onUpdateName={(name) => onUpdatePIName(pi.id, name)}
                 onUpdateStart={(startDate) => onUpdatePIStart(pi.id, startDate)}
+                onUpdateDetails={(patch) => programIncrementsStore.updatePIDetails(pi.id, patch)}
                 onDelete={() => onDeletePI(pi.id)}
                 onAddSprint={() => onAddSprint(pi.id)}
                 onUpdateSprintName={(sprintId, name) => onUpdateSprintName(pi.id, sprintId, name)}
                 onUpdateSprintEnd={(sprintId, endDate) =>
                   onUpdateSprintEnd(pi.id, sprintId, endDate)
+                }
+                onUpdateSprintDetails={(sprintId, patch) =>
+                    programIncrementsStore.updateSprintDetails(pi.id, sprintId, patch)
                 }
                 onDeleteSprint={(sprintId) => onDeleteSprint(pi.id, sprintId)}
                 onMoveSprint={(sprintId, direction) => onMoveSprint(pi.id, sprintId, direction)}

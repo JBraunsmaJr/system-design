@@ -1,10 +1,10 @@
 import {Fragment, type ReactNode} from 'react';
 import {Image, Text, View} from '@react-pdf/renderer';
 import type {
-  RequirementItemViewModel,
-  SrdDataContext,
-  SrdSectionConfig,
-  SrdTemplateConfig,
+    RequirementItemViewModel,
+    SrdDataContext,
+    SrdSectionConfig,
+    SrdTemplateConfig,
 } from '../../../../domain/srd/srdTypes';
 import {interpolateTokens} from '../../../../domain/srd/srdMarkdownExport';
 import {PdfMarkdown} from '../srdPdfMarkdown';

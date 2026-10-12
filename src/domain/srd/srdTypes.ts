@@ -104,10 +104,27 @@ export interface SrdDataContext {
       description?: string;
       relatedItemIds?: string[];
     }>;
+    /**
+     * Every program increment, whether or not it has sprints yet, in plan
+     * order - so a PI's goal reaches the document before its sprints exist.
+     * Keyed by id: two PIs may share a name.
+     */
+    programIncrements: Array<{
+      id: string;
+      name: string;
+      /** The PI's goal, if one was set. */
+      goal?: string;
+      startDate: string;
+      sprintCount: number;
+    }>;
     sprints: Array<{
       id: string;
+      /** The PI this sprint belongs to - its identity, as names may repeat. */
+      piId: string;
       piName: string;
       name: string;
+        /** The sprint's goal, if one was set. */
+        goal?: string;
       startDate: string;
       endDate: string;
       assignedItems: string[];

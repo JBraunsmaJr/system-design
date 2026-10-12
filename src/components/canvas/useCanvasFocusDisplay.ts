@@ -1,10 +1,8 @@
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
-import type { Edge } from '@xyflow/react';
-import type { ArchEdgeData } from '../../domain/canvas/types';
-import type { CanvasProps, CanvasFlow, FocusSet } from './Canvas';
-
-const DIMMED_NODE_OPACITY = 0.15;
-const DIMMED_EDGE_OPACITY = 0.12;
+import {useEffect, useLayoutEffect, useMemo, useRef} from 'react';
+import type {Edge} from '@xyflow/react';
+import type {ArchEdgeData} from '../../domain/canvas/types';
+import {applyPresentationFocusToEdges, applyPresentationFocusToNodes,} from '../../domain/canvas/presentationFocus';
+import type {CanvasFlow, CanvasProps, FocusSet} from './Canvas';
 
 /**
  * What React Flow is given to draw while something is in focus (dimmed or
@@ -47,14 +45,8 @@ export function useCanvasFocusDisplay({
     // there's no second pass over the array here - and the common case
     // returns the identical array it was given, which is what lets React
     // Flow skip re-adopting every node.
-    if (presentationFocus) {
-      const focusIds = new Set(presentationFocus.nodeIds);
-      return nodes.map((n) => ({
-        ...n,
-        className: focusIds.has(n.id) ? 'is-presentation-focus' : undefined,
-        style: { ...n.style, opacity: focusIds.has(n.id) ? 1 : DIMMED_NODE_OPACITY },
-      }));
-    }
+      // Shared with the scenario exporter, so an exported step looks the same.
+      if (presentationFocus) return applyPresentationFocusToNodes(nodes, presentationFocus);
     if (previewFocus) {
       const memberIds = new Set(previewFocus.nodeIds);
       return nodes.map((n) => {
@@ -71,12 +63,7 @@ export function useCanvasFocusDisplay({
 
   const displayEdges = useMemo(() => {
     if (presentationFocus) {
-      const focusIds = new Set(presentationFocus.edgeIds);
-      return edges.map((e) => ({
-        ...e,
-        animated: focusIds.has(e.id),
-        style: { ...e.style, opacity: focusIds.has(e.id) ? 1 : DIMMED_EDGE_OPACITY },
-      }));
+        return applyPresentationFocusToEdges(edges, presentationFocus, {animateEdges: true});
     }
     if (previewFocus) {
       /**

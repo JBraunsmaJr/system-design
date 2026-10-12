@@ -900,7 +900,7 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
             const text = itemMap.get(field) as string | undefined;
             if (!text) continue;
             let updated = text;
-            for (const {oldId, newId} of conversions) {
+              for (const {oldId, newId} of conversions) {
               if (updated.includes(`#${oldId}`) || updated.includes(`#ref:${oldId}`)) {
                 updated = updateItemReferencesInText(updated, oldId, newId);
               }

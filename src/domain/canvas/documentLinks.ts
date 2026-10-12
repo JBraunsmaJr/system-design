@@ -38,10 +38,10 @@ const MAX_TITLE_LENGTH = 200;
  */
 export function normalizeLinkedDocument(value: unknown): LinkedDocumentRef | undefined {
   if (!value || typeof value !== 'object') return undefined;
-  const {docId, title} = value as { docId?: unknown; title?: unknown };
+    const {docId, title} = value as { docId?: unknown; title?: unknown };
   if (!isValidDocumentId(docId)) return undefined;
   const cleanTitle = typeof title === 'string' ? title.trim().slice(0, MAX_TITLE_LENGTH) : '';
-  return {docId, title: cleanTitle};
+    return {docId, title: cleanTitle};
 }
 
 /** What a link reads as when nothing better is known. */

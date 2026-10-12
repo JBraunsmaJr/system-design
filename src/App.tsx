@@ -36,6 +36,9 @@ import {useScenarios} from './app/hooks/useScenarios';
 import {useViewNavigation} from './app/hooks/useViewNavigation';
 import {useCanvasEditing} from './app/hooks/useCanvasEditing';
 import {useClipboard} from './app/hooks/useClipboard';
+import {useStyleClipboard} from './app/hooks/useStyleClipboard';
+import type {CanvasContextActions} from './components/canvas/useCanvasContextMenu';
+import type {MultiSelectionActions} from './components/canvas/MultiSelectionInspector';
 import {useKeyboardShortcuts} from './app/hooks/useKeyboardShortcuts';
 import {useFileActions} from './app/hooks/useFileActions';
 import {usePerfHarnessBridge} from './app/hooks/usePerfHarnessBridge';
@@ -47,6 +50,11 @@ import './App.css';
 // Loaded on first visit: the SRD view carries the PDF exporter, which no
 // other view needs, so it stays out of the bundle every session downloads.
 const SrdView = lazy(() => import('./components/srd/SrdViewEntry'));
+// Loaded when a scenario is first exported: its encoders (react-pdf, gifenc,
+// Mediabunny) load later still, each only for its own format.
+const ScenarioExportDialog = lazy(
+    () => import('./components/canvas/scenarioExport/ScenarioExportDialog'),
+);
 
 /**
  * The editor shell: wires the app's hooks together and lays out the views.
@@ -261,6 +269,8 @@ function App() {
   const openSrdView = useCallback(() => setViewMode('srd'), [setViewMode]);
 
   const [isScenarioPanelOpen, setIsScenarioPanelOpen] = useState(false);
+  const [exportScenarioId, setExportScenarioId] = useState<string | null>(null);
+  const closeScenarioExport = useCallback(() => setExportScenarioId(null), []);
   const [isLibraryModalOpen, setIsLibraryModalOpen] = useState(false);
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [isPaletteCollapsed, setIsPaletteCollapsed] = useState(false);
@@ -270,6 +280,7 @@ function App() {
   const {
     nodes,
     edges,
+    portNodes,
     onNodesChange,
     onEdgesChange,
     onConnect,
@@ -281,8 +292,13 @@ function App() {
     onReparentNode,
     onAdoptIntoGroup,
     onUpdateNode,
+    onUpdateNodes,
+    onSetLocked,
+    onGroup,
+    onUngroup,
     onZOrderCommand,
     onUpdateEdge,
+    onUpdateEdges,
     onReconnectEdge,
     onAddEdgeWaypoint,
     onMoveEdgeWaypoint,
@@ -313,7 +329,7 @@ function App() {
     setActiveStepId,
   });
 
-  const { onCopy, onPaste } = useClipboard({
+  const {onCopy, onPaste, onDuplicate} = useClipboard({
     nodes,
     edges,
     selectedNodeIds,
@@ -321,6 +337,13 @@ function App() {
     path,
     setSelectedNodeIds,
     setSelectedEdgeIds,
+  });
+
+  const {copiedStyle, onCopyStyle, onPasteStyle} = useStyleClipboard({
+    nodes,
+    edges,
+    onUpdateNodes,
+    onUpdateEdges,
   });
 
   const onUndo = useCallback(() => {
@@ -350,6 +373,11 @@ function App() {
     onPresentNext,
     onPresentPrev,
     onExitPresenting,
+    onDuplicate,
+    onGroup,
+    onUngroup,
+    onCopyStyle,
+    onPasteStyle,
   });
 
   // --- Files and exports --------------------------------------------------
@@ -416,7 +444,49 @@ function App() {
   const selectedEdgeId = selectedEdgeIds[0] ?? null;
   const selectedNode = nodes.find((n) => n.id === selectedNodeId) ?? null;
   const selectedEdge = edges.find((e) => e.id === selectedEdgeId) ?? null;
-  const canAddStep = selectedNodeIds.length > 0 || selectedEdgeIds.length > 0;
+  // Every selected item, for the multi-selection Inspector - only worked
+  // out when there's more than one, which is the only time it's read.
+  const isMultiSelection = selectedNodeIds.length + selectedEdgeIds.length > 1;
+  const selectedNodes = useMemo(
+      () => (isMultiSelection ? nodes.filter((n) => selectedNodeIds.includes(n.id)) : []),
+      [isMultiSelection, nodes, selectedNodeIds],
+  );
+  const selectedEdges = useMemo(
+      () => (isMultiSelection ? edges.filter((e) => selectedEdgeIds.includes(e.id)) : []),
+      [isMultiSelection, edges, selectedEdgeIds],
+  );
+  const multiSelectionActions = useMemo<MultiSelectionActions>(
+      () => ({onUpdateNodes, onUpdateEdges, onSetLocked, onGroup, onUngroup, onDeleteSelection}),
+      [onUpdateNodes, onUpdateEdges, onSetLocked, onGroup, onUngroup, onDeleteSelection],
+  );
+  // Only ever read by the right-click menu, which Canvas renders while it's
+  // open - so this changing identity never reaches a node or edge.
+  const canvasContextActions = useMemo<CanvasContextActions>(
+      () => ({
+        onUpdateNodes,
+        onUpdateEdges,
+        onDuplicate,
+        onGroup,
+        onUngroup,
+        onSetLocked,
+        onCopyStyle,
+        onPasteStyle,
+        copiedStyle,
+        requirements: requirementsSnapshot,
+      }),
+      [
+        onUpdateNodes,
+        onUpdateEdges,
+        onDuplicate,
+        onGroup,
+        onUngroup,
+        onSetLocked,
+        onCopyStyle,
+        onPasteStyle,
+        copiedStyle,
+        requirementsSnapshot,
+      ],
+  );
   const onCanvasProfilerRender: ProfilerOnRenderCallback = useCallback(
     (_id, _phase, actualDuration) => {
       recordCommit(actualDuration);
@@ -428,6 +498,7 @@ function App() {
     <Canvas
       nodes={nodes}
       edges={edges}
+      portNodes={portNodes}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       peers={
@@ -470,37 +541,38 @@ function App() {
       onNavigateToPathIndex={onNavigateToPathIndex}
       isSelectMode={isSelectMode}
       onToggleSelectMode={() => setIsSelectMode((v) => !v)}
+      contextActions={canvasContextActions}
     />
   );
 
   const getDocumentState = useCallback(() => Y.encodeStateAsUpdate(openDoc.doc), [openDoc.doc]);
-    // The Inspector's "Linked document" picker reads the catalogue on demand:
-    // this browser's documents and, where there is a store, the workspace's
-    // (see linkableDocuments.ts). Either source failing leaves the other's
-    // documents available - the field is a convenience, and the Documents
-    // dialog is where storage problems are reported. Client and key storage
-    // are created once, and only the first time a node is inspected.
-    const workspaceReader = useRef<{
-        client: ReturnType<typeof createStoreClient>;
-        storage: ReturnType<typeof createIndexedDbDeviceKeyStorage>;
-    } | null>(null);
-    const listStoredDocuments = useCallback(
-        () =>
-            listLinkableDocuments({
-                listLocal: () =>
-                    documentStore.listDocuments().then((result) => (result.ok ? result.value : [])),
-                listWorkspace: storeUrl
-                    ? () => {
-                        workspaceReader.current ??= {
-                            client: createStoreClient({baseUrl: storeUrl}),
-                            storage: createIndexedDbDeviceKeyStorage(),
-                        };
-                        return listWorkspaceDocuments(workspaceReader.current);
-                    }
-                    : undefined,
-            }),
-        [documentStore, storeUrl],
-    );
+  // The Inspector's "Linked document" picker reads the catalogue on demand:
+  // this browser's documents and, where there is a store, the workspace's
+  // (see linkableDocuments.ts). Either source failing leaves the other's
+  // documents available - the field is a convenience, and the Documents
+  // dialog is where storage problems are reported. Client and key storage
+  // are created once, and only the first time a node is inspected.
+  const workspaceReader = useRef<{
+    client: ReturnType<typeof createStoreClient>;
+    storage: ReturnType<typeof createIndexedDbDeviceKeyStorage>;
+  } | null>(null);
+  const listStoredDocuments = useCallback(
+      () =>
+          listLinkableDocuments({
+            listLocal: () =>
+                documentStore.listDocuments().then((result) => (result.ok ? result.value : [])),
+            listWorkspace: storeUrl
+                ? () => {
+                  workspaceReader.current ??= {
+                    client: createStoreClient({baseUrl: storeUrl}),
+                    storage: createIndexedDbDeviceKeyStorage(),
+                  };
+                  return listWorkspaceDocuments(workspaceReader.current);
+                }
+                : undefined,
+          }),
+      [documentStore, storeUrl],
+  );
   const handleOpenWorkspaceDocument = useCallback(
     (docId: string) => {
       setIsDocumentManagerOpen(false);
@@ -676,7 +748,9 @@ function App() {
                     onDeleteStep={onDeleteStep}
                     onMoveStep={onMoveStep}
                     onPresent={onStartPresenting}
-                    canAddStep={canAddStep}
+                    onExport={setExportScenarioId}
+                    selectedNodeIds={selectedNodeIds}
+                    selectedEdgeIds={selectedEdgeIds}
                     activeStepId={activeStepId}
                     onSelectStep={onSelectStep}
                     diagramNodes={diagramSnapshot.nodes}
@@ -717,6 +791,9 @@ function App() {
                         onZOrderCommand={onZOrderCommand}
                         currentDocId={openDocId}
                         listDocuments={listStoredDocuments}
+                        selectedNodes={selectedNodes}
+                        selectedEdges={selectedEdges}
+                        multiSelection={multiSelectionActions}
                       />
                     )}
                   </>
@@ -828,6 +905,20 @@ function App() {
         isOpen={isLibraryModalOpen}
         onClose={() => setIsLibraryModalOpen(false)}
       />
+      {exportScenarioId &&
+          (() => {
+            const scenario = scenarios.find((sc) => sc.id === exportScenarioId);
+            return scenario ? (
+                <Suspense fallback={null}>
+                  <ScenarioExportDialog
+                      scenario={scenario}
+                      diagramSnapshot={diagramSnapshot}
+                      documentTitle={title}
+                      onClose={closeScenarioExport}
+                  />
+                </Suspense>
+            ) : null;
+          })()}
       {toast && (
         <Toast
           key={toast.id}

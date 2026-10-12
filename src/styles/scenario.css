@@ -142,15 +142,9 @@
   filter: brightness(1.08);
 }
 
-.scenario-panel__scenario-actions {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
-
 .scenario-panel__title-input {
-  flex: 1;
-  min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
   background: var(--chrome-bg);
   border: 1px solid var(--chrome-border);
   border-radius: var(--radius-sm);
@@ -167,8 +161,20 @@
 
 .scenario-panel__action-buttons {
   display: flex;
-  gap: 4px;
+    gap: 6px;
   align-items: center;
+}
+
+/* Present and Export share the row; Delete stays a small icon at its end. */
+.scenario-panel__action-buttons .scenario-panel__btn-present,
+.scenario-panel__action-buttons .scenario-panel__btn-export {
+    flex: 1;
+    justify-content: center;
+}
+
+/* Delete sits apart from Present and Export, at the far end of the row. */
+.scenario-panel__action-buttons .scenario-panel__btn-delete-scenario {
+    margin-left: auto;
 }
 
 .scenario-panel__btn-present {
@@ -192,6 +198,29 @@
 .scenario-panel__btn-present:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.scenario-panel__btn-export {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: transparent;
+    border: 1px solid var(--chrome-border);
+    color: var(--chrome-text);
+    border-radius: var(--radius-sm);
+    padding: 5px 10px;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.scenario-panel__btn-export:hover:not(:disabled) {
+    background: var(--chrome-bg-hover);
+}
+
+.scenario-panel__btn-export:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
 }
 
 .scenario-panel__btn-delete-scenario {
@@ -255,28 +284,102 @@
   color: var(--chrome-text-dim);
 }
 
-.scenario-panel__btn-add-step {
+/* ---------- Selection bar: the canvas selection's step actions ---------- */
+
+.scenario-selection-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px dashed var(--chrome-border);
+    border-radius: var(--radius-sm);
+    background: var(--chrome-bg);
+}
+
+.scenario-selection-bar.has-selection {
+    border-style: solid;
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--chrome-border));
+    background: color-mix(in srgb, var(--accent) 6%, var(--chrome-bg));
+}
+
+.scenario-selection-bar__hint {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    font-size: var(--text-xs);
+    color: var(--chrome-text-dim);
+}
+
+.scenario-selection-bar__summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: var(--text-xs);
+    color: var(--chrome-text);
+}
+
+.scenario-selection-bar__level {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--chrome-text-dim);
+    font-size: var(--text-2xs);
+}
+
+.scenario-selection-bar__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.scenario-selection-bar__actions button {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  background: var(--chrome-bg);
+    background: var(--chrome-bg-raised);
   border: 1px solid var(--chrome-border);
-  color: var(--chrome-text);
   border-radius: var(--radius-sm);
-  padding: 3px 8px;
-  font-size: var(--text-2xs-plus);
+    padding: 4px 8px;
+    font-size: var(--text-xs);
   font-weight: 500;
+    color: var(--chrome-text);
   cursor: pointer;
 }
 
-.scenario-panel__btn-add-step:hover:not(:disabled) {
+.scenario-selection-bar__actions button:hover:not(:disabled) {
   border-color: var(--accent);
   color: var(--accent);
 }
 
-.scenario-panel__btn-add-step:disabled {
+.scenario-selection-bar__actions button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* Creating a step is the main thing a selection is for: it fills the row. */
+.scenario-selection-bar__actions .scenario-selection-bar__primary {
+    flex: 1 0 100%;
+    justify-content: center;
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-text);
+    font-weight: 600;
+}
+
+.scenario-selection-bar__actions .scenario-selection-bar__primary:hover {
+    color: var(--accent-text);
+    filter: brightness(1.08);
+}
+
+.scenario-selection-bar__actions button:not(.scenario-selection-bar__primary) {
+    flex: 1 1 0;
+    justify-content: center;
 }
 
 .scenario-panel__empty-steps {
@@ -522,35 +625,6 @@
   color: var(--chrome-text-dim);
 }
 
-.scenario-step-editor__selection-actions {
-  display: flex;
-  gap: 5px;
-}
-
-.scenario-step-editor__selection-actions button {
-  flex: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  background: var(--chrome-bg-raised);
-  border: 1px solid var(--chrome-border);
-  border-radius: var(--radius-sm);
-  padding: 4px 6px;
-  font-size: var(--text-2xs);
-  color: var(--chrome-text);
-  cursor: pointer;
-}
-
-.scenario-step-editor__selection-actions button:hover:not(:disabled) {
-  border-color: var(--chrome-text-dim);
-}
-
-.scenario-step-editor__selection-actions button:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
 .scenario-step-editor--empty {
   border-style: dashed;
   padding: 12px;
@@ -577,4 +651,169 @@
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 200px;
+}
+
+/* ---------- Scenario export dialog ---------- */
+
+/* The offscreen canvas steps are rendered on for export. Offscreen rather
+   than hidden: html-to-image copies computed styles, so display: none or
+   visibility: hidden would capture nothing. Same as the SRD's surface. */
+.scenario-capture-surface {
+    position: fixed;
+    top: 0;
+    left: -100000px;
+    width: 1920px;
+    height: 1080px;
+    pointer-events: none;
+    contain: strict;
+}
+
+.scenario-export fieldset {
+    border: 0;
+    margin: 0 0 14px;
+    padding: 0;
+    min-width: 0;
+}
+
+.scenario-export__label {
+    padding: 0;
+    margin-bottom: 8px;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--chrome-text-dim);
+}
+
+.scenario-export__formats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.scenario-export__formats .scenario-export__label {
+    grid-column: 1 / -1;
+}
+
+.scenario-export__format {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--chrome-border);
+    border-radius: var(--radius-sm);
+    background: var(--chrome-bg);
+    cursor: pointer;
+    color: var(--chrome-text);
+}
+
+.scenario-export__format:hover {
+    background: var(--chrome-bg-hover);
+}
+
+.scenario-export__format.is-selected {
+    border-color: var(--accent);
+    background: var(--chrome-bg-active);
+}
+
+.scenario-export__format.is-unsupported {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.scenario-export__format input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.scenario-export__format:focus-within {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+.scenario-export__format svg {
+    flex-shrink: 0;
+    margin-top: 1px;
+    color: var(--chrome-text-dim);
+}
+
+.scenario-export__format.is-selected svg {
+    color: var(--accent);
+}
+
+.scenario-export__format-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.scenario-export__format-name {
+    font-size: var(--text-sm);
+    font-weight: 600;
+}
+
+.scenario-export__format-detail {
+    font-size: var(--text-xs);
+    color: var(--chrome-text-dim);
+}
+
+.scenario-export__options {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.scenario-export__check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--text-sm);
+    cursor: pointer;
+}
+
+.scenario-export__field {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: var(--text-sm);
+}
+
+.scenario-export__summary {
+    margin: 0;
+    font-size: var(--text-xs);
+    color: var(--chrome-text-dim);
+}
+
+.scenario-export__warning {
+    margin: 8px 0 0;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    font-size: var(--text-xs);
+    color: var(--chrome-text);
+    background: color-mix(in srgb, var(--warning) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--warning) 35%, transparent);
+}
+
+.scenario-export__status {
+    margin-top: 12px;
+    min-height: 20px;
+}
+
+.scenario-export__status-text {
+    font-size: var(--text-sm);
+    margin-bottom: 6px;
+}
+
+.scenario-export__progress {
+    width: 100%;
+    height: 6px;
+    accent-color: var(--accent);
+}
+
+.scenario-export__error {
+    font-size: var(--text-sm);
+    color: var(--danger);
 }

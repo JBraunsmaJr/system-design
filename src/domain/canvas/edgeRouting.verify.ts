@@ -3,19 +3,24 @@
  *
  * Run with: npx tsx --tsconfig tsconfig.app.json src/domain/edgeRouting.verify.ts
  */
-import { Position } from '@xyflow/react';
+import {Position} from '@xyflow/react';
 import {
+  buildCurvedSegments,
   buildOrthogonalRoute,
-  simplifyOrthogonalPoints,
-  roundedPolylinePath,
-  getSegmentInsertions,
-  polylineMidpoint,
-  snapWaypoint,
-  getWaypointNeighbors,
   createWaypointId,
+  cubicMidpoint,
+  getRoutedSegmentInsertions,
+  getRoutedWaypointPath,
+  getSegmentInsertions,
+  getWaypointNeighbors,
+  getWaypointPath,
   type Point,
+  polylineMidpoint,
+  roundedPolylinePath,
+  simplifyOrthogonalPoints,
+  snapWaypoint,
 } from './edgeRouting';
-import type { EdgeWaypoint } from './types';
+import type {EdgeWaypoint} from './types';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {
@@ -327,6 +332,99 @@ function passesThrough(points: Point[], p: Point): boolean {
     Date.now = originalDateNow;
     Math.random = originalMathRandom;
   }
+}
+
+// --- Straight and curved routing ------------------------------------------
+{
+    const source: Point = {x: 0, y: 0};
+    const target: Point = {x: 300, y: 200};
+    const bends: EdgeWaypoint[] = [{id: 'w1', x: 100, y: 150}];
+
+    const straight = getRoutedWaypointPath(
+        'straight',
+        source,
+        Position.Right,
+        bends,
+        target,
+        Position.Left,
+    );
+    assert(
+        straight === 'M 0,0 L 100,150 L 300,200',
+        'straight routing is a sharp polyline through every anchor',
+    );
+
+    const ortho = getRoutedWaypointPath(
+        'orthogonal',
+        source,
+        Position.Right,
+        bends,
+        target,
+        Position.Left,
+    );
+    assert(
+        ortho === getWaypointPath(source, Position.Right, bends, target, Position.Left),
+        'orthogonal routing is unchanged from before routing existed',
+    );
+
+    const curved = getRoutedWaypointPath(
+        'curved',
+        source,
+        Position.Right,
+        bends,
+        target,
+        Position.Left,
+    );
+    assert(curved.startsWith('M 0,0 C '), 'curved routing is cubic Beziers');
+    assert(curved.includes(' 100,150 C '), 'the curve passes through the bend, not just towards it');
+    assert(curved.endsWith(' 300,200'), 'the curve ends on the target');
+
+    const segments = buildCurvedSegments(source, Position.Right, bends, target, Position.Left);
+    assert(segments.length === 2, 'one curve segment per gap between anchors');
+    assert(
+        segments[0].c1.y === 0 && segments[0].c1.x > 0,
+        'the curve leaves a right-hand handle heading right',
+    );
+    const last = segments[segments.length - 1];
+    assert(
+        last.c2.y === 200 && last.c2.x < 300,
+        'the curve arrives at a left-hand handle heading right (from its left)',
+    );
+    // C1 continuity at the bend: incoming and outgoing tangents are parallel.
+    const inT = {x: segments[0].to.x - segments[0].c2.x, y: segments[0].to.y - segments[0].c2.y};
+    const outT = {
+        x: segments[1].c1.x - segments[1].from.x,
+        y: segments[1].c1.y - segments[1].from.y,
+    };
+    assert(Math.abs(inT.x * outT.y - inT.y * outT.x) < 1e-9, 'the curve is smooth through a bend');
+
+    const straightIns = getRoutedSegmentInsertions(
+        'straight',
+        source,
+        Position.Right,
+        bends,
+        target,
+        Position.Left,
+    );
+    assert(
+        straightIns.length === 2 &&
+        straightIns[0].x === 50 &&
+        straightIns[0].y === 75 &&
+        straightIns[1].index === 1,
+        'straight insertion handles sit at each segment midpoint',
+    );
+    const curvedIns = getRoutedSegmentInsertions(
+        'curved',
+        source,
+        Position.Right,
+        bends,
+        target,
+        Position.Left,
+    );
+    const mid = cubicMidpoint(segments[1]);
+    assert(
+        curvedIns.length === 2 && curvedIns[1].x === mid.x && curvedIns[1].y === mid.y,
+        'curved insertion handles sit on the curve',
+    );
 }
 
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);

@@ -7,6 +7,8 @@ import type {TeamDocument} from '../timeline/teamTypes';
 import {isItemWorkable} from '../requirements/requirementsRegistry';
 import {composeItemMarkdown} from '../requirements/decisionRecords';
 import {getAllEpicsWithInferredSchedule} from '../timeline/epicScheduling';
+import {buildPortIndex, parsePortId, resolvePortPeer} from '../canvas/boundaryPorts';
+import type {ArchEdgeData, ArchNodeData} from '../canvas/types';
 import type {
   RequirementItemViewModel,
   SrdArchitectureComponent,
@@ -133,15 +135,36 @@ export function aggregateSrdData(params: AggregateSrdDataParams): SrdDataContext
     });
   }
 
+    // A wire from a sub-diagram's boundary port has a port id at one end, not
+    // a node (domain/canvas/boundaryPorts.ts). Name it after the node at the
+    // far end of the connection, via the node whose boundary it crosses.
+    const portIndex = buildPortIndex(
+        nodes as unknown as Node<ArchNodeData>[],
+        edges as unknown as Edge<ArchEdgeData>[],
+    );
+    const endpointName = (edge: Edge<Record<string, unknown>>, end: 'source' | 'target') => {
+        const id = edge[end];
+        const port = parsePortId(id);
+        if (!port) {
+            const data = (nodeMap.get(id)?.data || {}) as Record<string, unknown>;
+            return (data.label as string) || id;
+        }
+        const outer = portIndex.edgesById.get(port.edgeId);
+        if (!outer) return id;
+        const {peerLabel} = resolvePortPeer(portIndex, outer, port.side);
+        const level = (edge.data as { parentPath?: string[] } | undefined)?.parentPath ?? [];
+        const container = nodeMap.get(level[level.length - 1] ?? '');
+        const containerLabel = (container?.data as Record<string, unknown> | undefined)?.label;
+        return containerLabel ? `${peerLabel} (via ${containerLabel as string})` : peerLabel;
+    };
+
   const connections: SrdArchitectureConnection[] = [];
   for (const edge of edges) {
-    const fromNode = nodeMap.get(edge.source);
-    const toNode = nodeMap.get(edge.target);
-    const fromData = (fromNode?.data || {}) as Record<string, unknown>;
-    const toData = (toNode?.data || {}) as Record<string, unknown>;
-
-    const fromName = (fromData.label as string) || edge.source;
-    const toName = (toData.label as string) || edge.target;
+      // Orphaned wires (their port no longer exists) aren't on the canvas
+      // either.
+      if (!portIndex.isValidEdge(edge.id)) continue;
+      const fromName = endpointName(edge, 'source');
+      const toName = endpointName(edge, 'target');
 
     const edgeData = (edge.data || {}) as Record<string, unknown>;
     const label = (edgeData.label as string) || (edge.label as string) || undefined;
@@ -349,6 +372,16 @@ export function aggregateSrdData(params: AggregateSrdDataParams): SrdDataContext
     relatedItemIds: m.relatedItemIds ?? m.relatedWorkableItemIds,
   }));
 
+    // Every PI, independently of its sprints: one with none planned yet still
+    // carries a goal the document should show.
+    const piList: SrdDataContext['roadmap']['programIncrements'] = programIncrements.map((pi) => ({
+        id: pi.id,
+        name: pi.name,
+        ...(pi.goal ? {goal: pi.goal} : {}),
+        startDate: pi.startDate,
+        sprintCount: pi.sprints.length,
+    }));
+
   const sprintsList: SrdDataContext['roadmap']['sprints'] = [];
   for (const pi of programIncrements) {
     const ranges = computeSprintDateRanges(pi);
@@ -365,8 +398,10 @@ export function aggregateSrdData(params: AggregateSrdDataParams): SrdDataContext
 
       sprintsList.push({
         id: sprint.id,
+          piId: pi.id,
         piName: pi.name,
         name: sprint.name,
+          ...(sprint.goal ? {goal: sprint.goal} : {}),
         startDate: range?.startDate || pi.startDate,
         endDate: range?.endDate || pi.startDate,
         assignedItems: itemsInSprint.map((i) => i.id),
@@ -383,6 +418,7 @@ export function aggregateSrdData(params: AggregateSrdDataParams): SrdDataContext
 
   const roadmap: SrdDataContext['roadmap'] = {
     milestones: milestoneList,
+      programIncrements: piList,
     sprints: sprintsList,
     epicSchedules,
   };

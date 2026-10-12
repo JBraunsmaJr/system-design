@@ -31,6 +31,9 @@ The editor is designed for rapid, low-friction diagramming with zero configurati
 - **Waypoints**: Click and drag mid-points on connection lines to insert bends and cleanly route edges around
   intervening components.
 - **Flow Direction**: Set edge flow semantics, which dynamically drive data-flow animations during scenario playback.
+- **Line Style**: In the Inspector, give an edge its own **Color** (the arrowheads follow it), **Thickness** (Thin to
+  Heavy), and **Routing** - **Orthogonal** (right-angled, the default), **Straight**, or **Curved**. Bends work with
+  every routing: a curved edge passes smoothly through each bend.
 
 ### Inspection & Customization
 
@@ -41,6 +44,30 @@ Select any component or edge to open the **Inspector Panel** on the right:
 - **Visual Styling**: Customize node accent colors, border styles, and Z-index layering.
 - **Custom Properties & Tags**: Attach arbitrary key-value metadata and tags for categorizing systems.
 - **Requirement Linking**: Bi-directionally link diagram elements directly to engineering requirements for traceability.
+- **Locking**: Tick **Locked** to pin a node in place - it can't be dragged, nudged, resized or deleted until it's
+  unlocked. Locked nodes show a small padlock.
+
+### Editing Many Items at Once
+
+Select several nodes and edges (Ctrl/⌘-click, or drag a selection box in select mode) and the Inspector edits **all of
+them together**: color, icon, text size, node or boundary type, tags, linked requirements and lock for the nodes; type,
+color, thickness, routing, direction and label visibility for the edges. A field whose items disagree shows **Mixed**
+until you change it. Each change is a single undo step, however many items it touched.
+
+### The Right-Click Menu
+
+Right-click a node, an edge, or a selection for:
+
+| Command                         | Shortcut         | What it does                                                                                                                      |
+|---------------------------------|------------------|-----------------------------------------------------------------------------------------------------------------------------------|
+| Change color / icon             |                  | Recolor (nodes and edges) or re-icon everything targeted.                                                                         |
+| Duplicate                       | Ctrl/⌘+D         | Copies the nodes (with their sub-diagrams and the edges between them) next to the originals, without touching the clipboard.      |
+| Group                           | Ctrl/⌘+G         | Wraps the nodes in a new boundary sized to fit them.                                                                              |
+| Ungroup                         | Ctrl/⌘+Shift+G   | Removes a boundary and keeps what was inside it.                                                                                  |
+| Lock / Unlock                   |                  | Pins nodes in place, or frees them again.                                                                                         |
+| Copy style / Paste style        | Ctrl/⌘+Alt+C / V | Copies one item's color, icon, text size, thickness and routing and applies them to others. Color pastes between nodes and edges. |
+| Link requirement                |                  | Searches requirements and toggles each one on every targeted node.                                                                |
+| Bring to front ... Send to back |                  | Stacking order.                                                                                                                   |
 
 ---
 
@@ -71,6 +98,24 @@ model high-level architectures at the root while encapsulating low-level impleme
 4. **Hierarchy Management**:
    - Deleting a parent node cleanly cascades and removes its underlying sub-diagram structure.
 
+### Keeping Levels Connected (Boundary Ports)
+
+Every connection to a node at its own level appears inside that node's sub-diagram as a **port** on the boundary,
+much like the input and output pins of a collapsed graph in Unreal Engine's Blueprints:
+
+- **Inbound ports** sit in a column on the left, one per edge pointing _at_ the node. **Outbound ports** sit on the
+  right, one per edge leaving it. Each names the node at the other end and the connection's label or type.
+- **Wire a port** by dragging from its pin to the node inside that handles the connection, or from that node onto the
+  port. The wire runs the right way whichever end you start from, and takes on the connection's type.
+- **Unwired ports** are drawn dashed in amber with a hollow pin. The parent node shows an amber badge with the number of
+  connections not yet wired inside, and the Inspector repeats it - so the levels can't quietly drift apart.
+- **Ports follow the level above.** Add an edge to the parent and a port appears inside; delete it (or move it to
+  another node) and the port goes, along with any wire to it. One undo brings both back.
+- **Wires carry on down.** A wire from a port into a node is itself a connection to that node, so if that node has its
+  own sub-diagram, the connection shows up as a port there too - named after the node it really comes from, however
+  many levels up.
+- **Double-click a port** to go up to the level it comes from.
+
 ---
 
 ## 3. Scenarios & Presentation Mode
@@ -85,12 +130,15 @@ Static diagrams often fail to convey runtime execution order, request lifecycles
 1. Click **Scenarios** (film icon) in the top toolbar or bottom tray to open the **Scenario Panel**.
 2. Click **+ New Scenario** and give your scenario a descriptive title (e.g., _"User Authentication & Token Refresh
    Flow"_ or _"Payment Processing with Circuit Breaking"_).
-3. Click **Add Step** to create a presentation sequence. Any selected node and edge wil be added to the step.
+3. Select the nodes and edges a step should highlight. The **Selection** bar under the step list shows how many are
+   selected; click **New step from selection** to create a step from them.
 
 ![scenario step configuration](../images/diagram/scenario-add-to.png)
 
-4. Click **Add Selection to Step** to add the currently selected nodes and edges to the step. The selected items will
-   highlight in the diagram to make it clear what would be added.
+4. To change an existing step, click it in the list to open it, select elements on the diagram, then click **Add to step
+   N** or **Remove from step N** in the Selection bar. Each button is only enabled when it would change
+   the step: Add when part of the selection isn't in the step yet, Remove when some of it is. While a step is open,
+   the elements it already highlights are marked on the diagram, as are selected elements that would be added.
 
 ![scenario add to step](../images/diagram/scenario-add-to-step.png)
 
@@ -101,7 +149,8 @@ Static diagrams often fail to convey runtime execution order, request lifecycles
 For each step in the sequence:
 
 - **Title & Narration**: Add an explanatory title and detailed speaker notes / walkthrough narration.
-- **Focus Elements**: Select the nodes and edges involved in this specific step, then click **Add Selection to Step**.
+- **Focus Elements**: With the step open, select nodes and edges on the diagram and use **Add to step N** or **Remove
+  from step N** in the Selection bar.
 - **Level Context**: Steps can span different sub-diagram depths. When stepping into a component, the scenario
   automatically transitions to the appropriate sub-diagram level.
 - **Reordering**: Use the **Up** / **Down** buttons in the step list to adjust sequencing.
@@ -120,6 +169,41 @@ Click **Present** to launch the presentation mode:
   detailed narration.
 - **Controls**: Use `← Prev`, `Next →` buttons (or keyboard arrow keys) to step through flows, and press `Esc` to return
   to the editor.
+
+### Exporting a Scenario
+
+Click **Export** next to **Present** to take a scenario outside the editor. Each step is drawn exactly as Presentation
+Mode shows it (the same framing, dimming and highlights), on a hidden canvas, so your own view never moves.
+
+| Format           | What you get                                                                            | Best for                                  |
+|------------------|-----------------------------------------------------------------------------------------|-------------------------------------------|
+| **PDF slides**   | A 16:9 deck: an optional title slide listing the steps, then one slide per step         | Review meetings, attaching to a ticket    |
+| **PNG images**   | One 1920×1080 image per step, numbered in order (`01-…png`), in a single `.zip`         | Pasting individual steps into other tools |
+| **Animated GIF** | A 960×540 loop that plays the steps in order                                            | READMEs, wikis, Jira and Confluence pages |
+| **MP4 video**    | A 1920×1080 H.264 video, which plays in browsers, PowerPoint, Keynote and media players | Embedding in slides, sharing in chat      |
+
+Options:
+
+- **Show the step title and narration**: adds a header (scenario, diagram level, step number) and a caption band with
+  the step's title and narration to images and video. PDF slides always include them, as selectable text.
+- **Time per step** (GIF and MP4): _Auto_ gives each step 3 to 15 seconds depending on how much there is to read; or
+  pick a fixed time.
+- **Fade between steps** (GIF and MP4): crossfades from one step to the next instead of cutting.
+
+Notes:
+
+- Narration longer than four lines is shortened with an ellipsis on slides, images and video. Keep the full text in the
+  narration for live presenting.
+- Focused edges are drawn highlighted but still: the flowing-dash animation is a live-presentation effect.
+- If a step highlights something that has since been deleted, or points at a sub-diagram that no longer exists, the
+  export dialog says so before you export, and those steps are exported without it.
+- MP4 export needs a browser with WebCodecs video encoding (current Chrome, Edge, Safari and desktop Firefox). Where
+  it isn't available the option is disabled; every other format works in any supported browser. If a browser can
+  encode video but not H.264, the video is made in another codec and the dialog tells you.
+
+Everything runs in your browser. The export uses only code and fonts served by your own deployment of the editor and
+the browser's built-in video encoder. It contacts no outside service or CDN, so it works the same on an isolated or
+air-gapped network.
 
 ---
 

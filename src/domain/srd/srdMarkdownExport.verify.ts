@@ -1,10 +1,10 @@
 /**
  * Run with: npx tsx --tsconfig tsconfig.app.json src/domain/srdMarkdownExport.verify.ts
  */
-import { generateSrdMarkdown, interpolateTokens } from './srdMarkdownExport';
-import { aggregateSrdData } from './srdDataAggregator';
-import { ENTERPRISE_FORMAL_TEMPLATE, AGILE_ENGINEERING_TEMPLATE } from './srdTemplatePresets';
-import type { RequirementsDocument } from '../requirements/requirementsTypes';
+import {generateSrdMarkdown, interpolateTokens} from './srdMarkdownExport';
+import {aggregateSrdData} from './srdDataAggregator';
+import {AGILE_ENGINEERING_TEMPLATE, ENTERPRISE_FORMAL_TEMPLATE} from './srdTemplatePresets';
+import type {RequirementsDocument} from '../requirements/requirementsTypes';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {
@@ -235,6 +235,62 @@ const srdData = aggregateSrdData({
   console.log(
     '✓ Test 4: Dual layouts, snapshot embeds, component and connections table toggles passed',
   );
+}
+
+// --- Test 5: PI goals - one per PI, keyed by identity, sprints or not ---
+{
+    const roadmapOnly = {
+        ...ENTERPRISE_FORMAL_TEMPLATE,
+        sections: ENTERPRISE_FORMAL_TEMPLATE.sections.map((sec) => ({
+            ...sec,
+            enabled: sec.id === 'roadmap',
+        })),
+    };
+    const withPis = (
+        programIncrements: Parameters<typeof aggregateSrdData>[0]['programIncrements'],
+    ) =>
+        generateSrdMarkdown(
+            aggregateSrdData({
+                title: 'PIs',
+                doc: mockDoc,
+                nodes: [],
+                edges: [],
+                milestones: [],
+                programIncrements,
+            }),
+            roadmapOnly,
+        );
+
+    const md = withPis([
+        {
+            id: 'pi-a',
+            name: 'Platform',
+            goal: 'Ship SSO',
+            startDate: '2026-10-01',
+            sprints: [
+                {id: 'a-1', name: 'Sprint 1', durationDays: 14},
+                {id: 'a-2', name: 'Sprint 2', durationDays: 14},
+            ],
+        },
+        {id: 'pi-b', name: 'Platform', goal: 'Harden auth', startDate: '2027-01-01', sprints: []},
+    ]);
+    assert(
+        md.includes('- **Platform goal:** Ship SSO') && md.includes('- **Platform goal:** Harden auth'),
+        'two PIs with the same name each show their own goal',
+    );
+    assert(md.split('Ship SSO').length - 1 === 1, "a PI's goal is listed once, not once per sprint");
+    assert(md.includes('| **Platform** | Sprint 2 |'), 'sprint rows still show the PI name');
+
+    const sprintless = withPis([
+        {id: 'pi-c', name: 'Mobile', goal: 'Offline mode', startDate: '2027-04-01', sprints: []},
+    ]);
+    assert(
+        sprintless.includes('- **Mobile goal:** Offline mode') &&
+        sprintless.includes('*No sprint iterations planned.*'),
+        'a PI with no sprints still shows its goal, above the empty-sprints note',
+    );
+
+    console.log('✓ Test 5: PI goals passed');
 }
 
 if (failures > 0) {

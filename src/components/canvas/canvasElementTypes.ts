@@ -6,6 +6,7 @@ import {GroupNode} from './nodes/GroupNode';
 import {TextNode} from './nodes/TextNode';
 import {ShapeNode} from './nodes/ShapeNode';
 import {CodeNode} from './nodes/CodeNode';
+import {PortNode} from './nodes/PortNode';
 
 /**
  * How diagram elements are drawn, shared by every React Flow instance that
@@ -26,6 +27,9 @@ export const CANVAS_NODE_TYPES: NodeTypes = {
   shape: memo(ShapeNode),
   text: memo(TextNode),
   code: memo(CodeNode),
+    // Boundary ports inside a sub-diagram (domain/canvas/boundaryPorts.ts).
+    // Never stored; only the editor's canvas adds them.
+    port: memo(PortNode),
 };
 
 export const CANVAS_EDGE_TYPES: EdgeTypes = {

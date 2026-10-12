@@ -1,6 +1,6 @@
-import type { SrdDataContext, SrdTemplateConfig } from './srdTypes';
-import { sanitizeFileName } from '../../common/utils/string';
-import { downloadFile } from '../../common/utils/download';
+import type {SrdDataContext, SrdTemplateConfig} from './srdTypes';
+import {sanitizeFileName} from '../../common/utils/string';
+import {downloadFile} from '../../common/utils/download';
 
 export function interpolateTokens(
   text: string,
@@ -249,14 +249,28 @@ export function generateSrdMarkdown(data: SrdDataContext, config: SrdTemplateCon
         }
 
         lines.push('### Program Increments & Sprints', '');
+          // PI goals are listed once, above the table, rather than repeated on
+          // every sprint row of that PI - and for every PI, including one with
+          // no sprints planned yet. Keyed by the PI's id, not its name: two PIs
+          // may share a name, and each still shows its own goal.
+          const piGoals = new Map<string, { name: string; goal: string }>();
+          for (const pi of data.roadmap.programIncrements) {
+              if (pi.goal?.trim() && !piGoals.has(pi.id))
+                  piGoals.set(pi.id, {name: pi.name, goal: pi.goal});
+          }
+          for (const {name, goal} of piGoals.values()) {
+              lines.push(`- **${name} goal:** ${goal.replace(/\r?\n/g, ' ').trim()}`);
+          }
+          if (piGoals.size > 0) lines.push('');
+
         if (data.roadmap.sprints.length === 0) {
           lines.push('*No sprint iterations planned.*', '');
         } else {
           lines.push(
-            '| Program Increment | Sprint | Start Date | End Date | Effort | Work Items |',
+              '| Program Increment | Sprint | Goal | Start Date | End Date | Effort | Work Items |',
           );
           lines.push(
-            '| ----------------- | ------ | ---------- | -------- | ------ | ---------- |',
+              '| ----------------- | ------ | ---- | ---------- | -------- | ------ | ---------- |',
           );
           for (const s of data.roadmap.sprints) {
             const itemsStr =
@@ -264,7 +278,7 @@ export function generateSrdMarkdown(data: SrdDataContext, config: SrdTemplateCon
                 ? `${s.assignedItems.length} items (${s.assignedItems.join(', ')})`
                 : '-';
             lines.push(
-              `| **${escapeTableCol(s.piName)}** | ${escapeTableCol(s.name)} | ${escapeTableCol(s.startDate)} | ${escapeTableCol(s.endDate)} | ${s.totalPoints} pts | ${escapeTableCol(itemsStr)} |`,
+                `| **${escapeTableCol(s.piName)}** | ${escapeTableCol(s.name)} | ${escapeTableCol(s.goal ?? '-')} | ${escapeTableCol(s.startDate)} | ${escapeTableCol(s.endDate)} | ${s.totalPoints} pts | ${escapeTableCol(itemsStr)} |`,
             );
           }
           lines.push('');

@@ -11,11 +11,12 @@
  * every change. The browser perf harness catches that too, but only after a
  * full build; this catches it in milliseconds, next to the code.
  */
-import type { Node, Edge } from '@xyflow/react';
-import { projectCanvasElements, type CanvasProjectionInput } from './canvasProjection';
-import { populatedLevelCounts } from '../collab/stores/diagramStore';
-import { NO_IN_FLIGHT, NO_EDGE_GESTURES, type InFlightMap } from '../domain/canvas/gestureGeometry';
-import type { ArchNodeData, ArchEdgeData } from '../domain/canvas/types';
+import type {Edge, Node} from '@xyflow/react';
+import {type CanvasProjectionInput, projectBoundaryPorts, projectCanvasElements,} from './canvasProjection';
+import {buildPortIndex, portId} from '../domain/canvas/boundaryPorts';
+import {populatedLevelCounts} from '../collab/stores/diagramStore';
+import {type InFlightMap, NO_EDGE_GESTURES, NO_IN_FLIGHT} from '../domain/canvas/gestureGeometry';
+import type {ArchEdgeData, ArchNodeData} from '../domain/canvas/types';
 
 let failures = 0;
 function assert(cond: boolean, msg: string) {
@@ -202,6 +203,83 @@ const first = projectCanvasElements(input());
     "a peer's in-flight bend is applied",
   );
   assert(byId(bent.edges, 'e2') === byId(unbent.edges, 'e2'), 'the other edge is reused');
+}
+
+// --- Boundary ports (domain/canvas/boundaryPorts.ts) ---
+{
+  // Root: outside -> box -> sink. Inside box: inner (+ a wire from the
+  // inbound port), plus an orphan wire to a port of an edge that is gone.
+  const outside = makeNode('outside', 0);
+  const box = makeNode('box', 200);
+  const sink = makeNode('sink', 400);
+  const inner = makeNode('inner', 50, ['box']);
+    const inEdge = {...makeEdge('in-e', 'outside', 'box')};
+  const outEdge = makeEdge('out-e', 'box', 'sink');
+  const wire: Edge<ArchEdgeData> = {
+    ...makeEdge('wire', portId('in-e', 'in'), 'inner'),
+      data: {...makeEdge('x', 'a', 'b').data!, parentPath: ['box']} as ArchEdgeData,
+  };
+  const orphan: Edge<ArchEdgeData> = {
+    ...makeEdge('orphan', portId('gone', 'in'), 'inner'),
+      data: {...makeEdge('x', 'a', 'b').data!, parentPath: ['box']} as ArchEdgeData,
+  };
+  const snapshot = {
+    nodes: [outside, box, sink, inner],
+    edges: [inEdge, outEdge, wire, orphan],
+  };
+  const portIndex = buildPortIndex(snapshot.nodes, snapshot.edges);
+
+    const root = projectCanvasElements(input({diagramSnapshot: snapshot, portIndex}));
+  assert(
+      byId(root.nodes, 'box').data.unwiredPortCount === 1,
+      'a node with a sub-diagram reports the one connection not wired inside',
+  );
+  assert(
+      byId(root.nodes, 'outside').data.unwiredPortCount === undefined,
+      'a node without a sub-diagram reports nothing',
+  );
+
+    const insideInput = input({diagramSnapshot: snapshot, portIndex, path: ['box']});
+  const inside = projectCanvasElements(insideInput);
+  assert(
+      inside.edges.some((e) => e.id === 'wire') && !inside.edges.some((e) => e.id === 'orphan'),
+      'a valid wire is drawn; an orphaned one is not',
+  );
+
+  const portArgs = {
+    portIndex,
+    path: ['box'],
+    diagramSnapshot: snapshot,
+    measuredDimensions: new Map<string, { width: number; height: number }>(),
+  };
+  const ports = projectBoundaryPorts(portArgs);
+  assert(ports.length === 2, 'one port per connection to the box');
+  const inPort = byId(ports, portId('in-e', 'in'));
+  const outPort = byId(ports, portId('out-e', 'out'));
+  assert(
+      inPort.position.x < inner.position.x && outPort.position.x > inner.position.x + 100,
+      'inbound ports sit left of everything inside, outbound ports right of it',
+  );
+  assert(
+      inPort.draggable === false && inPort.selectable === false && inPort.deletable === false,
+      'ports cannot be dragged, selected or deleted',
+  );
+  assert(inPort.className === 'nopan', 'ports are nopan, so a double-click reaches them');
+
+    const again = projectBoundaryPorts({...portArgs, measuredDimensions: new Map()});
+  assert(
+      byId(again, inPort.id) === inPort && byId(again, outPort.id) === outPort,
+      'unchanged ports are the same objects on the next projection',
+  );
+  const measured = projectBoundaryPorts({
+    ...portArgs,
+      measuredDimensions: new Map([[inPort.id, {width: 200, height: 44}]]),
+  });
+  assert(
+      byId(measured, inPort.id) !== inPort && byId(measured, inPort.id).measured?.height === 44,
+      "a port's measured size is re-attached",
+  );
+  assert(byId(measured, outPort.id) === outPort, 'and the other port is reused');
 }
 
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);

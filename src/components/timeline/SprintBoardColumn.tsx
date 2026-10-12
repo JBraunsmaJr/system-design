@@ -1,28 +1,22 @@
-import { useEffect, useMemo, useState, useRef } from 'react';
-import { AlertTriangle } from 'lucide-react';
+import {useEffect, useMemo, useRef, useState} from 'react';
+import {AlertTriangle, Target} from 'lucide-react';
 import {
+  type CapacityReservation,
   getSprintActiveReservations,
   type Sprint,
-  type CapacityReservation,
 } from '../../domain/timeline/programIncrements';
-import { getItemType, isItemWorkable } from '../../domain/requirements/requirementsRegistry';
-import {
-  checkScheduleConflict,
-  type ScheduleConflictSeverity,
-} from '../../domain/timeline/scheduleConflicts';
-import type {
-  RequirementItem,
-  RequirementsDocument,
-} from '../../domain/requirements/requirementsTypes';
-import type { Milestone } from '../../domain/timeline/milestones';
-import { getMilestoneColor, getMilestoneTypeLabel } from '../../domain/timeline/milestones';
-import { computeSprintMilestoneSummary } from '../../domain/timeline/sprintSummaries';
-import type { TeamDocument } from '../../domain/timeline/teamTypes';
-import { computeSprintCapacity } from '../../domain/timeline/teamCapacity';
-import { SprintCapacityBar } from '../team/SprintCapacityBar';
-import { MemberPicker } from '../team/MemberPicker';
-import { PointsPicker } from '../team/PointsPicker';
-import { SprintQuickAdd } from './SprintQuickAdd';
+import {getItemType, isItemWorkable} from '../../domain/requirements/requirementsRegistry';
+import {checkScheduleConflict, type ScheduleConflictSeverity,} from '../../domain/timeline/scheduleConflicts';
+import type {RequirementItem, RequirementsDocument,} from '../../domain/requirements/requirementsTypes';
+import type {Milestone} from '../../domain/timeline/milestones';
+import {getMilestoneColor, getMilestoneTypeLabel} from '../../domain/timeline/milestones';
+import {computeSprintMilestoneSummary} from '../../domain/timeline/sprintSummaries';
+import type {TeamDocument} from '../../domain/timeline/teamTypes';
+import {computeSprintCapacity} from '../../domain/timeline/teamCapacity';
+import {SprintCapacityBar} from '../team/SprintCapacityBar';
+import {MemberPicker} from '../team/MemberPicker';
+import {PointsPicker} from '../team/PointsPicker';
+import {SprintQuickAdd} from './SprintQuickAdd';
 
 interface SprintBoardColumnProps {
   sprint: Sprint;
@@ -206,6 +200,19 @@ export function SprintBoardColumn({
           </span>
           <span className="pi-board-column__duration">{sprint.durationDays}d</span>
         </div>
+          {sprint.goal && (
+              <div
+                  className="pi-board-column__goal"
+                  title={
+                      sprint.notes
+                          ? `Goal: ${sprint.goal}\n\nNotes:\n${sprint.notes}`
+                          : `Goal: ${sprint.goal}`
+                  }
+              >
+                  <Target size={11} aria-hidden="true"/>
+                  <span>{sprint.goal}</span>
+              </div>
+          )}
 
         {capacitySummary && <SprintCapacityBar summary={capacitySummary} compact={true} />}
       </div>

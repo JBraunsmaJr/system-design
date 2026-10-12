@@ -473,6 +473,11 @@
   margin-top: 8px;
 }
 
+.inspector__hint--warning {
+    color: var(--warning);
+    margin: 0 0 16px;
+}
+
 /* ---------- Inspector: color input ---------- */
 
 .inspector__field input[type='color'] {
@@ -968,4 +973,200 @@
 
 .inspector__doc-link-open:hover {
     text-decoration: underline;
+}
+
+/* ---------- Inspector: multi-selection ---------- */
+
+.inspector__multi-summary {
+    margin-top: -4px;
+    margin-bottom: 14px;
+}
+
+.inspector__section {
+    margin-bottom: 14px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--chrome-border);
+}
+
+.inspector__section-heading {
+    margin-bottom: 10px;
+    font-size: var(--text-2xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--chrome-text-dim);
+}
+
+/* "Mixed" beside a color swatch whose items disagree. */
+.inspector__mixed {
+    text-transform: none;
+    letter-spacing: normal;
+    font-size: var(--text-2xs);
+    font-style: italic;
+    color: var(--chrome-text-dim);
+}
+
+/* The lock toggle sits under the Arrange row in every node panel. */
+.inspector__z-order + .inspector__checkbox {
+    margin-top: 10px;
+}
+
+.inspector__lock-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.inspector__button-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.inspector__button-row button {
+    display: inline-flex;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 7px 8px;
+    background: transparent;
+    border: 1px solid var(--chrome-border);
+    border-radius: var(--radius-sm);
+    color: var(--chrome-text);
+    font-size: var(--text-xs-plus);
+    text-transform: none;
+    cursor: pointer;
+}
+
+.inspector__button-row button:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.inspector__delete:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.inspector__delete:disabled:hover {
+    background: transparent;
+    border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+}
+
+/* ---------- Inspector: segmented control (edge routing) ---------- */
+
+.inspector__segmented {
+    display: flex;
+    border: 1px solid var(--chrome-border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.inspector__segmented button {
+    flex: 1;
+    padding: 6px 4px;
+    background: var(--chrome-bg);
+    border: none;
+    border-right: 1px solid var(--chrome-border);
+    color: var(--chrome-text-dim);
+    font-size: var(--text-xs);
+    text-transform: none;
+    cursor: pointer;
+}
+
+.inspector__segmented button:last-child {
+    border-right: none;
+}
+
+.inspector__segmented button:hover {
+    color: var(--chrome-text);
+    background: var(--chrome-bg-hover);
+}
+
+.inspector__segmented button.is-active {
+    background: var(--chrome-bg-active);
+    color: var(--accent);
+}
+
+/* ---------- Context menu: shortcuts, disabled items ---------- */
+
+.canvas-context-menu__shortcut {
+    margin-left: auto;
+    padding-left: 10px;
+    font-family: inherit;
+    font-size: var(--text-3xs-plus);
+    color: var(--chrome-text-dim);
+}
+
+.canvas-context-menu button:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.canvas-context-menu button:disabled:hover {
+    background: transparent;
+    color: var(--chrome-text);
+}
+
+/* ---------- Context menu: "Link requirement" submenu ---------- */
+
+.requirement-link-panel {
+    z-index: 301;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 280px;
+    max-height: 340px;
+    padding: 8px;
+    background: var(--chrome-bg-raised);
+    border: 1px solid var(--chrome-border);
+    border-radius: var(--radius-md);
+    box-shadow: 0 12px 32px color-mix(in srgb, var(--black) 45%, transparent);
+}
+
+.requirement-link-panel__list {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+.requirement-link-panel__option {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    width: 100%;
+    padding: 5px 6px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-xs);
+    color: var(--chrome-text);
+    font-size: var(--text-xs);
+    text-align: left;
+    text-transform: none;
+    cursor: pointer;
+}
+
+.requirement-link-panel__option:hover {
+    background: var(--chrome-bg-hover);
+}
+
+.requirement-link-panel__check {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    border: 1px solid var(--chrome-border);
+    border-radius: var(--radius-xs);
+    color: var(--accent-text);
+}
+
+.requirement-link-panel__option.is-all .requirement-link-panel__check,
+.requirement-link-panel__option.is-some .requirement-link-panel__check {
+    background: var(--accent);
+    border-color: var(--accent);
 }
