@@ -200,15 +200,22 @@ console.log('=== The repository as it stands ===');
 const changelog = readFileSync('CHANGELOG.md', 'utf8');
 const rootVersion = (JSON.parse(readFileSync('package.json', 'utf8')) as { version: string })
     .version;
+// The release commit - the one the tag points at - has no [Unreleased]
+// section: the workflow adds the next one in a separate commit after the
+// release is published. So the section is optional, but there is never
+// more than one, and when present it comes first.
+const unreleasedCount = changelog
+    .split('\n')
+    .filter((line) => line.trim() === '## [Unreleased]').length;
+check(unreleasedCount <= 1, `CHANGELOG.md has at most one [Unreleased] section (${unreleasedCount})`);
 let body: string[] = [];
-check(
-    !throws(() => (body = unreleasedBody(changelog)), /./),
-    'CHANGELOG.md has exactly one [Unreleased] section',
-);
-check(
-    changelog.split('\n').find((line) => line.startsWith('## ')) === '## [Unreleased]',
-    '[Unreleased] is the first section',
-);
+if (unreleasedCount === 1) {
+  body = unreleasedBody(changelog);
+  check(
+      changelog.split('\n').find((line) => line.startsWith('## ')) === '## [Unreleased]',
+      '[Unreleased] is the first section',
+  );
+}
 check(
     latestReleasedVersion(changelog) === rootVersion,
     `the latest release in CHANGELOG.md matches package.json (${latestReleasedVersion(changelog)} vs ${rootVersion})`,
