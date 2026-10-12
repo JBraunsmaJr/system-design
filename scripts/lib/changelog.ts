@@ -19,10 +19,11 @@ export type Bump = 'major' | 'minor' | 'patch';
 export const UNRELEASED_HEADING = '## [Unreleased]';
 
 /**
- * A marker at the start of a list item (`- [MINOR] Something`) or of a
- * subheading inside the section (`### [MAJOR]`, `### [MAJOR] Breaking`).
+ * A marker at the start of a line in the section: a list item
+ * (`- [MINOR] Something`), a subheading (`### [MAJOR]`, `### [MAJOR] Breaking`)
+ * or a plain line with no subheading or bullet at all (`[PATCH] Something`).
  */
-const MARKER_PATTERN = /^(\s*[-*+]\s+|#{3,6}\s+)\[(MAJOR|MINOR|PATCH)\]\s*/;
+const MARKER_PATTERN = /^(\s*(?:[-*+]\s+|#{3,6}\s+)?)\[(MAJOR|MINOR|PATCH)\]\s*/;
 /** What a subheading that was only a marker reads as once it is stripped. */
 const BARE_HEADING_TITLES: Record<Bump, string> = {
   major: 'Major',
@@ -90,15 +91,19 @@ export function highestBump(body: string[]): Bump | null {
 
 /** The same lines with the [MAJOR]/[MINOR]/[PATCH] markers removed. */
 export function stripMarkers(body: string[]): string[] {
-  return body.map((line) => {
+  return body.flatMap((line) => {
     const match = MARKER_PATTERN.exec(line);
-    if (!match) return line;
+    if (!match) return [line];
     const rest = line.slice(match[0].length).trimEnd();
-    // `### [MAJOR]` on its own would strip to an empty heading; name it instead.
-    if (rest === '' && match[1].startsWith('#')) {
-      return `${match[1]}${BARE_HEADING_TITLES[match[2].toLowerCase() as Bump]}`;
+    if (rest === '') {
+      // `### [MAJOR]` on its own would strip to an empty heading; name it instead.
+      if (match[1].trimStart().startsWith('#')) {
+        return [`${match[1]}${BARE_HEADING_TITLES[match[2].toLowerCase() as Bump]}`];
+      }
+      // A bare `[PATCH]` line or `- [PATCH]` item says nothing once stripped.
+      return [];
     }
-    return match[1] + rest;
+    return [match[1] + rest];
   });
 }
 

@@ -38,8 +38,11 @@ Markers can also go on a subheading (`###` or deeper) to cover the items grouped
 When released, the marker is removed and the heading keeps its text (`### Breaking changes`).
 A heading that was only a marker is named after it instead (`### [PATCH]` becomes `### Patch`).
 
-Markers must be upper case and come right after the list bullet or the `###`. Items without a
-marker are still published; a release is refused only when no item has one.
+A line with no bullet or subheading can carry a marker too (`[PATCH] Tweak to the release pipeline`).
+
+Markers must be upper case and start the line, or come right after the list bullet or the `###`.
+Unmarked lines are still published. A release is refused only when nothing in `[Unreleased]` (its
+lines, list items or subheadings) has a marker.
 
 ## Cutting a release
 

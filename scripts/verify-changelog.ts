@@ -66,6 +66,40 @@ check(
     'stripping removes the marker and keeps the bullet and indentation',
 );
 
+console.log('=== Markers without subheadings or bullets ===');
+check(highestBump(['[PATCH] Tweak to release pipeline']) === 'patch', 'a plain line can carry a marker');
+check(
+    highestBump(['[PATCH] a', '', '### Other', '', '- [MINOR] b']) === 'minor',
+    'plain lines, list items and subheadings are weighed together',
+);
+check(highestBump(['Something [PATCH] mid-line']) === null, 'a plain line needs the marker first');
+check(
+    stripMarkers(['[PATCH] Tweak to release pipeline', '[MINOR]', '- [PATCH]']).join('|') ===
+    'Tweak to release pipeline',
+    'stripping a plain line keeps its text and drops lines left empty',
+);
+const plainRelease = cutRelease(
+    '# Changelog\n\n## [Unreleased]\n\n[PATCH] Tweak to release pipeline\n\n## [0.98.0] - 2026-10-12\n\n- x\n',
+    '0.98.0',
+    '2026-10-20',
+);
+check(
+    plainRelease.version === '0.98.1' && plainRelease.notes === 'Tweak to release pipeline\n',
+    'a section with only a plain marked line releases',
+);
+check(
+    throws(
+        () =>
+            cutRelease(
+                '# Changelog\n\n## [Unreleased]\n\n### Fixes\n\n- Tweak\n\nNotes\n\n## [0.98.0] - x\n',
+                '0.98.0',
+                'd',
+            ),
+        /no line .* is marked/,
+    ),
+    'no marker in the section, its subheadings or its items is refused',
+);
+
 console.log('=== Markers on subheadings ===');
 const grouped = [
   '### [MAJOR]',
