@@ -237,8 +237,14 @@ export function useScenarios({
             const copyId = nextId('step');
             setScenarios((s) => withStepDuplicated(s, scenarioId, stepId, copyId));
             setActiveStepId(copyId);
+            // The copy is on the same diagram level as its source, so go there -
+            // as selecting the step itself would (see onSelectStep).
+            const source = scenarios
+                .find((sc) => sc.id === scenarioId)
+                ?.steps.find((st) => st.id === stepId);
+            if (source && source.path) setPath(source.path);
         },
-        [setScenarios],
+        [scenarios, setScenarios, setPath],
     );
 
   const onMoveStep = useCallback(

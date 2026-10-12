@@ -5,6 +5,9 @@
  */
 import {copyTitle, duplicateScenario, withScenarioDuplicated, withStepDuplicated,} from './scenarioDuplication';
 import type {Scenario} from './types';
+import React from 'react';
+import {renderToStaticMarkup} from 'react-dom/server';
+import {useScenarios} from '../../app/hooks/useScenarios';
 
 let failures = 0;
 
@@ -62,6 +65,10 @@ function idGen(prefix: string) {
         'copying a numbered copy picks the next free number',
     );
     assert(copyTitle('', []) === '(copy)', 'an empty title still gets a distinct name');
+    assert(
+        copyTitle('(copy)', ['(copy)']) === '(copy 2)',
+        'copying a title that is only a copy suffix numbers it instead of stacking suffixes',
+    );
 }
 
 // --- duplicateScenario ---
@@ -137,6 +144,43 @@ function idGen(prefix: string) {
         withStepDuplicated(list, 'sc-1', 'missing', 'x')[0] === list[0],
         'an unknown step leaves its scenario as it was',
     );
+}
+
+// --- useScenarios: duplicating a step goes to the source step's level ---
+{
+    let paths: string[][] = [];
+    let list = sample();
+    let handlers: ReturnType<typeof useScenarios> | null = null;
+
+    function Probe() {
+        handlers = useScenarios({
+            scenarios: list,
+            setScenarios: (u) => {
+                list = typeof u === 'function' ? u(list) : u;
+            },
+            path: [],
+            setPath: (p) => {
+                paths = [...paths, typeof p === 'function' ? p([]) : p];
+            },
+            selectedNodeIds: [],
+            selectedEdgeIds: [],
+            setSelectedNodeIds: () => {
+            },
+            setSelectedEdgeIds: () => {
+            },
+        });
+        return null;
+    }
+
+    renderToStaticMarkup(React.createElement(Probe));
+    handlers!.onDuplicateStep('sc-1', 'st-2');
+    assert(
+        paths.length === 1 && paths[0].join('/') === 'n2',
+        "duplicating a step navigates to the source step's diagram level",
+    );
+    assert(list[0].steps.length === 3, 'and the copy is added');
+    handlers!.onDuplicateStep('sc-1', 'missing');
+    assert(paths.length === 1, 'an unknown step navigates nowhere');
 }
 
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);

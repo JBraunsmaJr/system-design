@@ -13,6 +13,10 @@ import {type DevServers, startDevServers} from './lib/devServers';
 
 // The shared fixture, plus a few more tickets to filter and bulk-edit.
 const fixture = JSON.parse(readFileSync(resolve('fixtures/schema-0.8.json'), 'utf-8'));
+// TICKET-1 starts Done - a status none of the bulk edits below sets - so
+// "kept its own status" can only pass if the bulk edit left it alone.
+const ticket1 = fixture.requirements.items.find((i: { id: string }) => i.id === 'TICKET-1');
+ticket1.status = 'done';
 fixture.requirements.items.push(
     {id: 'TICKET-2', typeId: 'type-ticket', title: 'Rate limits', body: '', status: 'todo'},
     {id: 'TICKET-3', typeId: 'type-ticket', title: 'Audit log', body: '', status: 'todo'},
@@ -145,6 +149,38 @@ async function run() {
                 : false,
             'the step copy is the open step',
         );
+        // Each row's controls are separate buttons, so the keyboard reaches
+        // and activates them one by one.
+        await p
+            .locator('.scenario-step-row')
+            .nth(3)
+            .locator('button[aria-label="Duplicate step"]')
+            .focus();
+        await p.keyboard.press('Enter');
+        await p.waitForTimeout(150);
+        const afterKey = await p.$$eval('.scenario-step-row__title', (els) =>
+            els.map((e) => e.textContent ?? ''),
+        );
+        check(
+            afterKey.length === 5 && afterKey[4] === 'Check credentials (copy)',
+            `Enter on a focused Duplicate step copies that step (${afterKey.join(' | ')})`,
+        );
+        check(
+            ((await p.textContent('.scenario-panel__level')) ?? '').includes('Auth Service'),
+            "the canvas goes to the duplicated step's diagram level",
+        );
+        await p.locator('.scenario-step-row').first().locator('.scenario-step-row__select').focus();
+        await p.keyboard.press('Space');
+        await p.waitForTimeout(150);
+        check(
+            (await p.textContent('.scenario-step-row.is-active .scenario-step-row__title')) ===
+            'Request arrives',
+            'Space on a focused step selects it',
+        );
+        check(
+            ((await p.textContent('.scenario-panel__level')) ?? '').includes('Root'),
+            'and goes back to its level',
+        );
         await p.selectOption('.scenario-panel__select', {index: 0});
         await p.waitForTimeout(150);
         check((await p.$$('.scenario-step-row')).length === 3, 'the original scenario is unchanged');
@@ -248,7 +284,7 @@ async function run() {
             (await p.getAttribute(
                 '[data-requirement-id="TICKET-1"] .status-picker__trigger',
                 'title',
-            )) === 'Status: In Progress',
+            )) === 'Status: Done',
             'TICKET-1 kept its own status',
         );
         await p.selectOption('select[aria-label="Move selected items to a sprint"]', 'sp-2');

@@ -401,6 +401,16 @@ const sampleScenarios: Scenario[] = [
         }),
     );
     assert(withDup.includes('aria-label="Duplicate scenario"'), 'renders Duplicate scenario');
+    assert(!withDup.includes('role="button"'), 'step rows are not themselves buttons');
+    assert(
+        !/<button[^>]*>(?:(?!<\/button>).)*<button/.test(withDup),
+        'no button is nested inside another (selecting, moving, duplicating and deleting are siblings)',
+    );
+    assert(
+        (withDup.match(/class="scenario-step-row__select"/g) ?? []).length ===
+        sampleScenarios[0].steps.length,
+        'each step is selected with its own button',
+    );
     assert(
         (withDup.match(/aria-label="Duplicate step"/g) ?? []).length === sampleScenarios[0].steps.length,
         'renders one Duplicate step button per step',

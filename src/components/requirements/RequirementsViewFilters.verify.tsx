@@ -152,9 +152,10 @@ console.log('=== Tags ===');
         normalizeTags('nope') === undefined && normalizeTags([]) === undefined,
         'no tags is undefined',
     );
+    const duplicate = withTagAdded(['Security', 'x'], 'SECURITY');
     assert(
-        withTagAdded(['a'], 'A') === undefined || withTagAdded(['a'], 'A')?.length === 1,
-        'adding an existing tag (any case) changes nothing',
+        duplicate !== undefined && JSON.stringify(duplicate) === JSON.stringify(['Security', 'x']),
+        'adding an existing tag (any case) keeps the tags exactly as they were, first spelling and all',
     );
     assert(withTagAdded(undefined, 'x')?.join() === 'x', 'adds to an untagged item');
     assert(withTagRemoved(['Security', 'x'], 'security')?.join() === 'x', 'removes ignoring case');

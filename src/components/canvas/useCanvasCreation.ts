@@ -59,7 +59,9 @@ export function useCanvasCreation({
 
         const fragmentId = event.dataTransfer.getData(FRAGMENT_DRAG_MIME_TYPE);
         if (fragmentId) {
-            onInsertFragment?.(fragmentId, position);
+            // Presenting shows the diagram, it doesn't edit it - a fragment
+            // dropped then is swallowed rather than handled as anything else.
+            if (!isPresenting) onInsertFragment?.(fragmentId, position);
             return;
         }
 
@@ -94,6 +96,7 @@ export function useCanvasCreation({
       }
     },
     [
+        isPresenting,
       screenToFlowPosition,
       onAddNode,
       onAddGroup,

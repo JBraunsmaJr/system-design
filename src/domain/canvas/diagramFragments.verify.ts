@@ -176,6 +176,28 @@ function sampleContents(): DiagramFragmentContents {
     const badPos = JSON.parse(JSON.stringify(good));
     badPos.contents.nodes[0].position = {x: 'a', y: 0};
     assert(validateFragment(badPos) === null, 'a malformed position is rejected');
+
+    const messy = JSON.parse(JSON.stringify(good));
+    messy.contents.nodes[0].data.properties = 'not an object';
+    messy.contents.nodes[0].data.tags = ['ok', 7];
+    messy.contents.nodes[1].data.properties = {keep: 'yes', drop: 3};
+    messy.contents.nodes[1].data.linkedRequirementIds = ['REQ-1'];
+    messy.contents.nodes[1].data.locked = true;
+    const cleaned = validateFragment(messy);
+    const [n0, n1] = cleaned?.contents.nodes ?? [];
+    assert(
+        cleaned !== null &&
+        JSON.stringify(n0.data.properties) === '{}' &&
+        Array.isArray(n0.data.tags) &&
+        n0.data.tags.length === 0,
+        'malformed stored properties and tags become empty rather than rejecting the fragment',
+    );
+    assert(
+        JSON.stringify(n1.data.properties) === '{"keep":"yes"}' &&
+        !('linkedRequirementIds' in n1.data) &&
+        !('locked' in n1.data),
+        'stored node data is cleaned like a newly saved fragment',
+    );
 }
 
 // --- the library ---

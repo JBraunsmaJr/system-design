@@ -62,11 +62,22 @@ const DOCUMENT_SPECIFIC_NODE_FIELDS = [
  * addEdge, so a fragment's edges are routed afresh where they land. */
 const DOCUMENT_SPECIFIC_EDGE_FIELDS = ['isStepMember', 'waypoints'] as const;
 
+/** Also used on fragments read back from storage, so `properties` and
+ * `tags` are checked rather than trusted: anything malformed becomes empty
+ * instead of reaching the canvas. */
 function cleanNodeData(data: ArchNodeData): ArchNodeData {
+    const rawProperties: unknown = data.properties;
+    const rawTags: unknown = data.tags;
     const copy: ArchNodeData = {
         ...data,
-        properties: {...(data.properties ?? {})},
-        tags: [...(data.tags ?? [])],
+        properties: isRecord(rawProperties)
+            ? Object.fromEntries(
+                Object.entries(rawProperties).filter(
+                    (entry): entry is [string, string] => typeof entry[1] === 'string',
+                ),
+            )
+            : {},
+        tags: isStringArray(rawTags) ? [...rawTags] : [],
     };
     for (const field of DOCUMENT_SPECIFIC_NODE_FIELDS) delete copy[field];
     // The flat stores tag every node with its level in the document's tree
@@ -240,7 +251,9 @@ export function validateFragment(value: unknown): DiagramFragment | null {
     if (!Array.isArray(contents.nodes) || !Array.isArray(contents.edges)) return null;
     if (!contents.nodes.every(isFragmentNode) || !contents.edges.every(isFragmentEdge)) return null;
     const typed: DiagramFragmentContents = {
-        nodes: contents.nodes,
+        // The same clean-up a fragment gets when it's saved, so a stored
+        // entry can't bring malformed or document-specific node data along.
+        nodes: contents.nodes.map((n) => ({...n, data: cleanNodeData(n.data)})),
         edges: contents.edges,
     };
     if (typed.nodes.length === 0 || !isSelfContained(typed)) return null;

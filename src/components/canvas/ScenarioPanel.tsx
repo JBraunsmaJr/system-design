@@ -333,40 +333,42 @@ export function ScenarioPanel({
                   const stepLocLabel = levelLabel(diagramNodes, step.path);
                   const isSubDiagram = step.path.length > 0;
                   return (
+                      // The row is a plain container: selecting the step is its own
+                      // button, beside the move, duplicate and delete buttons rather
+                      // than around them, so each control is reached and activated
+                      // (Enter / Space) on its own.
                     <div
                       key={step.id}
-                      role="button"
-                      tabIndex={0}
                       className={`scenario-step-row${isActive ? ' is-active' : ''}`}
-                      onClick={() => onSelectStep(step.id)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          onSelectStep(step.id);
-                        }
-                      }}
-                      title="Click to preview this step on the diagram and edit details"
                     >
-                      <span className="scenario-step-row__number">{index + 1}</span>
-                      <div className="scenario-step-row__info">
-                        <span className="scenario-step-row__title">
-                          {step.title || `Step ${index + 1}`}
-                        </span>
-                        <div className="scenario-step-row__meta">
-                          <span className="scenario-step-row__count">
-                            {count} {count === 1 ? 'item' : 'items'}
+                        <button
+                            type="button"
+                            className="scenario-step-row__select"
+                            onClick={() => onSelectStep(step.id)}
+                            aria-pressed={isActive}
+                            title="Click to preview this step on the diagram and edit details"
+                        >
+                            <span className="scenario-step-row__number">{index + 1}</span>
+                            <span className="scenario-step-row__info">
+                          <span className="scenario-step-row__title">
+                            {step.title || `Step ${index + 1}`}
                           </span>
-                          {isSubDiagram && (
-                            <span
-                              className="scenario-step-row__path-badge"
-                              title={`In subdiagram: ${stepLocLabel}`}
-                            >
-                              <MapPin size={9} /> {stepLocLabel}
+                          <span className="scenario-step-row__meta">
+                            <span className="scenario-step-row__count">
+                              {count} {count === 1 ? 'item' : 'items'}
                             </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="scenario-step-row__move" onClick={(e) => e.stopPropagation()}>
+                              {isSubDiagram && (
+                                  <span
+                                      className="scenario-step-row__path-badge"
+                                      title={`In subdiagram: ${stepLocLabel}`}
+                                  >
+                                <MapPin size={9}/> {stepLocLabel}
+                              </span>
+                              )}
+                          </span>
+                        </span>
+                        </button>
+                        <div className="scenario-step-row__move">
                         <button
                           type="button"
                           disabled={index === 0}
@@ -390,10 +392,7 @@ export function ScenarioPanel({
                             <button
                                 type="button"
                                 className="scenario-step-row__duplicate"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onDuplicateStep(active.id, step.id);
-                                }}
+                                onClick={() => onDuplicateStep(active.id, step.id)}
                                 aria-label="Duplicate step"
                                 title="Duplicate step - the copy goes right after this one"
                             >
@@ -403,10 +402,7 @@ export function ScenarioPanel({
                       <button
                         type="button"
                         className="scenario-step-row__delete"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDeleteStep(active.id, step.id);
-                        }}
+                        onClick={() => onDeleteStep(active.id, step.id)}
                         aria-label="Delete step"
                         title="Delete step"
                       >

@@ -18,7 +18,9 @@ import type {Scenario, ScenarioStep} from './types';
  * rather than "Login (copy) (copy)". */
 export function copyTitle(title: string, existing: Iterable<string>): string {
     const taken = new Set(existing);
-    const base = title.replace(/\s*\(copy(?: \d+)?\)$/, '').trim() || title.trim();
+    // Empty when the title is nothing but a copy suffix, so copying "(copy)"
+    // numbers it - "(copy 2)" - instead of appending another suffix.
+    const base = title.replace(/\s*\(copy(?: \d+)?\)$/, '').trim();
     const first = base ? `${base} (copy)` : '(copy)';
     if (!taken.has(first)) return first;
     for (let n = 2; ; n++) {
