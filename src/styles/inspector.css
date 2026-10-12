@@ -1170,3 +1170,71 @@
     background: var(--accent);
     border-color: var(--accent);
 }
+
+/* ---------- Align / distribute / match size ---------- */
+
+.arrange-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 14px;
+}
+
+.arrange-controls__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.arrange-controls__label {
+    font-size: var(--text-2xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--chrome-text-dim);
+}
+
+.arrange-controls__buttons {
+    display: flex;
+    gap: 2px;
+}
+
+.arrange-controls__buttons button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--chrome-border);
+    border-radius: var(--radius-xs);
+    color: var(--chrome-text);
+    cursor: pointer;
+}
+
+.arrange-controls__buttons button:hover:not(:disabled) {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.arrange-controls__buttons button:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+/* The same controls as a context-menu submenu. */
+.arrange-panel {
+    z-index: 301;
+    width: max-content;
+    padding: 10px 10px 0;
+    background: var(--chrome-bg-raised);
+    border: 1px solid var(--chrome-border);
+    border-radius: var(--radius-md);
+    box-shadow: 0 12px 32px color-mix(in srgb, var(--black) 45%, transparent);
+}
+
+.arrange-panel .arrange-controls {
+    margin-bottom: 10px;
+}

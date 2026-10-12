@@ -27,6 +27,8 @@ import {
     ZOrderControls,
 } from './InspectorFields';
 import {MIXED, sharedValue} from './mixedValue';
+import {ArrangeControls} from './ArrangeControls';
+import {type ArrangeCommand, canArrange} from '../../domain/canvas/arrange';
 
 /** What the multi-selection Inspector can do - all of it to every selected
  * item at once, each in a single transaction (see useCanvasEditing). */
@@ -37,6 +39,8 @@ export interface MultiSelectionActions {
     onGroup: (nodeIds: string[]) => void;
     onUngroup: (nodeIds: string[]) => void;
     onDeleteSelection: () => void;
+    /** Align / distribute / match size - see domain/canvas/arrange.ts. */
+    onArrange: (command: ArrangeCommand, nodeIds: string[]) => void;
 }
 
 const FONT_SIZES = [
@@ -155,6 +159,13 @@ function NodesSection({
     return (
         <section className="inspector__section">
             <div className="inspector__section-heading">Nodes</div>
+
+            {nodes.length > 1 && (
+                <ArrangeControls
+                    canRun={(command) => canArrange(command, ids, nodes)}
+                    onRun={(command) => actions.onArrange(command, ids)}
+                />
+            )}
 
             {kind === 'typed' && (
                 <Field label="Type">

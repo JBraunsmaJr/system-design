@@ -296,6 +296,7 @@ function App() {
     onSetLocked,
     onGroup,
     onUngroup,
+    onArrange,
     onZOrderCommand,
     onUpdateEdge,
     onUpdateEdges,
@@ -456,8 +457,16 @@ function App() {
       [isMultiSelection, edges, selectedEdgeIds],
   );
   const multiSelectionActions = useMemo<MultiSelectionActions>(
-      () => ({onUpdateNodes, onUpdateEdges, onSetLocked, onGroup, onUngroup, onDeleteSelection}),
-      [onUpdateNodes, onUpdateEdges, onSetLocked, onGroup, onUngroup, onDeleteSelection],
+      () => ({
+        onUpdateNodes,
+        onUpdateEdges,
+        onSetLocked,
+        onGroup,
+        onUngroup,
+        onDeleteSelection,
+        onArrange,
+      }),
+      [onUpdateNodes, onUpdateEdges, onSetLocked, onGroup, onUngroup, onDeleteSelection, onArrange],
   );
   // Only ever read by the right-click menu, which Canvas renders while it's
   // open - so this changing identity never reaches a node or edge.
@@ -473,6 +482,7 @@ function App() {
         onPasteStyle,
         copiedStyle,
         requirements: requirementsSnapshot,
+        onArrange,
       }),
       [
         onUpdateNodes,
@@ -485,6 +495,7 @@ function App() {
         onPasteStyle,
         copiedStyle,
         requirementsSnapshot,
+        onArrange,
       ],
   );
   const onCanvasProfilerRender: ProfilerOnRenderCallback = useCallback(

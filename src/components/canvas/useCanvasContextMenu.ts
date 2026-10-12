@@ -6,12 +6,13 @@ import {
     useLayoutEffect,
     useMemo,
     useRef,
-    useState
+    useState,
 } from 'react';
 import {type Edge, type Node} from '@xyflow/react';
 import {getEdgeType} from '../../domain/canvas/edgeRegistry';
 import {defaultNodeColor, defaultNodeIcon, nodeColorOverride, nodeColorPatch,} from '../../domain/canvas/nodeDefaults';
 import type {CopiedStyle} from '../../domain/canvas/styleClipboard';
+import type {ArrangeCommand} from '../../domain/canvas/arrange';
 import type {ArchEdgeData, ArchEdgeDataPatch, ArchNodeData} from '../../domain/canvas/types';
 import type {RequirementsDocument} from '../../domain/requirements/requirementsTypes';
 import type {CanvasProps} from './Canvas';
@@ -40,9 +41,11 @@ export interface CanvasContextActions {
     copiedStyle: CopiedStyle | null;
     /** For "Link requirement". */
     requirements: RequirementsDocument;
+    /** Align / distribute / match size - see domain/canvas/arrange.ts. */
+    onArrange: (command: ArrangeCommand, nodeIds: string[]) => void;
 }
 
-export type ContextSubmenu = 'color' | 'icon' | 'requirements';
+export type ContextSubmenu = 'color' | 'icon' | 'requirements' | 'arrange';
 
 /**
  * The right-click menu's state: what it targets, which submenu is open,

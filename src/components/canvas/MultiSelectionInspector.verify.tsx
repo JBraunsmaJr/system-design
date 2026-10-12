@@ -31,6 +31,7 @@ const actions: MultiSelectionActions = {
     onGroup: noop,
     onUngroup: noop,
     onDeleteSelection: noop,
+    onArrange: noop,
 };
 
 function node(id: string, data: Partial<ArchNodeData> = {}, type = 'typed'): Node<ArchNodeData> {
@@ -93,6 +94,32 @@ function render(props: {
     );
     assert(html.includes('Delete 3 items'), 'one delete for the whole selection');
     assert(!html.includes('Description'), 'per-item text fields are not offered');
+}
+
+// 1b. Align / distribute / match size: enabled by what the selection allows.
+{
+    const two = render({nodes: [node('a'), node('b')]});
+    assert(two.includes('aria-label="Align left"'), 'align controls are offered');
+    assert(
+        /<button[^>]*disabled=""[^>]*aria-label="Distribute horizontally/.test(two) ||
+        /aria-label="Distribute horizontally[^"]*"[^>]*disabled=""/.test(two),
+        'distribute needs three nodes',
+    );
+    assert(
+        /aria-label="Match width[^"]*"[^>]*disabled=""/.test(two) ||
+        /disabled=""[^>]*aria-label="Match width/.test(two),
+        'matching size needs a resizable node - two component nodes have none',
+    );
+    const shapes = render({
+        nodes: [node('s1', {}, 'shape'), node('s2', {}, 'shape'), node('s3', {}, 'shape')],
+    });
+    assert(
+        !/aria-label="Distribute horizontally[^"]*"[^>]*disabled=""/.test(shapes) &&
+        !/disabled=""[^>]*aria-label="Distribute horizontally/.test(shapes),
+        'three nodes can be distributed',
+    );
+    const oneNode = render({nodes: [node('a')], edges: [edge('e1')]});
+    assert(!oneNode.includes('aria-label="Align left"'), 'no align controls for a single node');
 }
 
 // 2. Nodes only, all of one kind: the type can be changed for all of them.

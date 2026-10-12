@@ -54,6 +54,22 @@ them together**: color, icon, text size, node or boundary type, tags, linked req
 color, thickness, routing, direction and label visibility for the edges. A field whose items disagree shows **Mixed**
 until you change it. Each change is a single undo step, however many items it touched.
 
+### Aligning, Distributing & Matching Sizes
+
+With two or more nodes selected, the **Align**, **Distribute** and **Match size** buttons at the top of the Inspector
+(also under **Align & distribute** in the right-click menu) tidy them up in one step:
+
+- **Align** left, center, right, top, middle or bottom - to the edge or center of the selection as a whole. Nodes
+  inside different boundaries line up on screen.
+- **Distribute** horizontally or vertically (three or more nodes) - the outermost two stay put and the rest are spaced
+  with equal gaps between them.
+- **Match** width, height or both - to the largest in the selection. Component nodes size to their content, so they
+  set the size to match but aren't resized themselves; shapes, boundaries, text and code are.
+
+Locked nodes never move or resize, but they still count: align a selection that includes a locked node and it acts
+as the anchor the rest line up with. Positions and sizes are rounded to whole pixels, so lines stay crisp in SRD
+exports, and each command is a single undo step.
+
 ### The Right-Click Menu
 
 Right-click a node, an edge, or a selection for:
@@ -61,6 +77,7 @@ Right-click a node, an edge, or a selection for:
 | Command                         | Shortcut         | What it does                                                                                                                      |
 |---------------------------------|------------------|-----------------------------------------------------------------------------------------------------------------------------------|
 | Change color / icon             |                  | Recolor (nodes and edges) or re-icon everything targeted.                                                                         |
+| Align & distribute              |                  | Align, distribute or match the size of the selected nodes (see above).                                                            |
 | Duplicate                       | Ctrl/⌘+D         | Copies the nodes (with their sub-diagrams and the edges between them) next to the originals, without touching the clipboard.      |
 | Group                           | Ctrl/⌘+G         | Wraps the nodes in a new boundary sized to fit them.                                                                              |
 | Ungroup                         | Ctrl/⌘+Shift+G   | Removes a boundary and keeps what was inside it.                                                                                  |

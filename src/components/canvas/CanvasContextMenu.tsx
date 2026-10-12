@@ -7,6 +7,7 @@ import {
     ClipboardPaste,
     Copy,
     Group,
+    LayoutGrid,
     Link2,
     Lock,
     LockOpen,
@@ -21,6 +22,8 @@ import type {Node} from '@xyflow/react';
 import {ColorPickerPanel} from './ColorPickerPanel';
 import {IconPickerPanel} from './IconPicker';
 import {RequirementLinkPanel} from './RequirementLinkPanel';
+import {ArrangeControls} from './ArrangeControls';
+import {canArrange} from '../../domain/canvas/arrange';
 import {type CanvasContextActions, CONTEXT_MENU_WIDTH, type useCanvasContextMenu,} from './useCanvasContextMenu';
 import type {CanvasProps} from './Canvas';
 import {nodeHasIcon} from '../../domain/canvas/nodeDefaults';
@@ -175,6 +178,10 @@ export function CanvasContextMenu({
                 {submenu('color', 'Change color', <Palette size={13}/>)}
                 {anyHasIcon && submenu('icon', 'Change icon', <Sparkles size={13}/>)}
 
+                {contextActions &&
+                    targetNodes.length > 1 &&
+                    submenu('arrange', 'Align & distribute', <LayoutGrid size={13}/>)}
+
                 {contextActions && hasNodes && (
                     <>
                         <div className="canvas-context-menu__divider"/>
@@ -266,6 +273,24 @@ export function CanvasContextMenu({
           style={{...besideMenu(340, 420), zIndex: 301}}
         />
       )}
+
+            {activeSubmenu === 'arrange' && contextActions && (
+                <div
+                    className="arrange-panel"
+                    role="dialog"
+                    aria-label="Align and distribute"
+                    style={besideMenu(240, 132)}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <ArrangeControls
+                        canRun={(cmd) => canArrange(cmd, targetIds, nodes)}
+                        onRun={(cmd) => {
+                            contextActions.onArrange(cmd, targetIds);
+                            closeContextMenu();
+                        }}
+                    />
+                </div>
+            )}
 
             {activeSubmenu === 'requirements' && contextActions && (
                 <RequirementLinkPanel

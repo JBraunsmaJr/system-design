@@ -15,6 +15,7 @@ import type {PresenceInfo} from '../../collab/sync/session';
 import {NODE_TYPES} from '../../domain/canvas/nodeRegistry';
 import {DEFAULT_GROUP_TYPE_ID, getGroupType, GROUP_TYPES,} from '../../domain/canvas/groupRegistry';
 import {planGroup} from '../../domain/canvas/grouping';
+import {type ArrangeCommand, planArrange} from '../../domain/canvas/arrange';
 import {globalShapeRegistry, SHAPE_TYPES} from '../../domain/canvas/shapeRegistry';
 import {
     isDescendantOf,
@@ -1004,6 +1005,26 @@ export function useCanvasEditing({
   );
 
     /**
+     * Align, distribute or match size (domain/canvas/arrange.ts). Every node
+     * it moves or resizes is written in ONE transaction - one update for
+     * peers, one undo step. Reads nodes through the ref, at call time, for
+     * the same reason onAdoptIntoGroup does, and because the measured sizes
+     * it needs live on the projected nodes rather than in the store.
+     */
+    const onArrange = useCallback(
+        (command: ArrangeCommand, targetIds: string[]) => {
+            const plan = planArrange(command, targetIds, nodesRef.current);
+            if (plan.positions.size === 0 && plan.sizes.size === 0) return;
+            const store = diagramStoreRef.current;
+            undo.transact(() => {
+                for (const [id, position] of plan.positions) store.updatePosition(id, position);
+                for (const [id, size] of plan.sizes) store.updateDimensions(id, size.width, size.height);
+            });
+        },
+        [undo],
+    );
+
+    /**
      * Removes the given boundaries while keeping what's inside them - which
      * is exactly what deleting a boundary already does (onDeleteNode hands its
      * children to its own parent), so this is that, plus selecting the
@@ -1087,6 +1108,7 @@ export function useCanvasEditing({
       onSetLocked,
       onGroup,
       onUngroup,
+      onArrange,
     onZOrderCommand,
     onUpdateEdge,
       onUpdateEdges,

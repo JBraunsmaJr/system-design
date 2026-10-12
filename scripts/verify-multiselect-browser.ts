@@ -387,6 +387,81 @@ async function run() {
         await p.keyboard.press('Control+d');
         await p.waitForTimeout(150);
         check((await rootNodes(p)).length === n0 + 1, 'Ctrl+D duplicates');
+
+        console.log('=== Align, distribute, match size ===');
+        // Built here and passed in: a named helper inside evaluate() would be
+        // compiled with tsx's __name wrapper, which doesn't exist in the page.
+        const shape = (id: string, x: number, y: number, width: number, height: number) => ({
+            id,
+            type: 'shape',
+            position: {x, y},
+            width,
+            height,
+            data: {nodeType: 'rectangle', label: id, properties: {}, tags: []},
+        });
+        await p.evaluate(
+            (diagram) =>
+                (
+                    window as unknown as { __PERF__: { setDiagram: (d: unknown) => void } }
+                ).__PERF__.setDiagram(diagram),
+            {
+                nodes: [
+                    shape('s1', 0, 40, 120, 60),
+                    shape('s2', 170, 0, 80, 100),
+                    shape('s3', 500, 90, 160, 40),
+                ],
+                edges: [],
+            },
+        );
+        await p.waitForTimeout(400);
+        type Placed = StoredNode & {
+            position: { x: number; y: number };
+            width?: number;
+            height?: number;
+        };
+        const placed = async (id: string) => (await nodeById(p, id)) as Placed;
+        await select(p, ['s1', 's2', 's3']);
+        await p.click('.inspector button[aria-label="Align top"]');
+        await p.waitForTimeout(150);
+        check(
+            (await placed('s1')).position.y === 0 &&
+            (await placed('s2')).position.y === 0 &&
+            (await placed('s3')).position.y === 0,
+            'align top lines every node up with the topmost',
+        );
+        await p.click('.inspector button[aria-label^="Distribute horizontally"]');
+        await p.waitForTimeout(150);
+        // span 0..660, widths 360 -> gap 150: s2 at 270
+        check((await placed('s2')).position.x === 270, 'distribute gives equal gaps between nodes');
+        await p.click('.inspector button[aria-label^="Match size"]');
+        await p.waitForTimeout(150);
+        const sized = await Promise.all(['s1', 's2', 's3'].map(placed));
+        check(
+            sized.every((n) => n.width === 160 && n.height === 100),
+            'match size grows every node to the largest width and height',
+        );
+        const rendered = await p.$eval('.react-flow__node[data-id="s1"]', (el) =>
+            Math.round(el.getBoundingClientRect().width),
+        );
+        check(rendered > 0, 'the resized node is drawn');
+
+        await p.waitForTimeout(700);
+        await p.keyboard.press('Control+z');
+        await p.waitForTimeout(200);
+        const undone = await placed('s1');
+        check(undone.width === 120 && undone.height === 60, 'one undo takes back the whole resize');
+
+        await select(p, ['s1', 's2', 's3']);
+        await rightClickNode(p, 's1');
+        await p.hover('.canvas-context-menu button:has(span:text-is("Align & distribute"))');
+        await p.waitForSelector('.arrange-panel');
+        await p.click('.arrange-panel button[aria-label="Align left"]');
+        await p.waitForTimeout(150);
+        check(
+            (await placed('s2')).position.x === 0 && (await placed('s3')).position.x === 0,
+            'the context menu aligns too',
+        );
+        check((await p.locator('.canvas-context-menu').count()) === 0, 'and closes afterwards');
     } finally {
         await browser?.close();
         servers?.stop();
