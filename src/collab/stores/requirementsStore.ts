@@ -1,21 +1,31 @@
 import type {
-  RequirementsDocument,
   RequirementItem,
   RequirementItemType,
+  RequirementsDocument,
 } from '../../domain/requirements/requirementsTypes';
-import { EMPTY_REQUIREMENTS_DOCUMENT } from '../../domain/requirements/requirementsTypes';
+import {EMPTY_REQUIREMENTS_DOCUMENT} from '../../domain/requirements/requirementsTypes';
 import {
+  addRelationship as addRelationshipPure,
+  buildChildItemParts,
+  countItemsUsingType,
+  createCategory,
+  defaultStatusForType,
   generateItemId,
   getNextAvailableIdForType,
+  isPrefixTaken,
   updateItemReferencesInItems,
   updateItemReferencesInRelationships,
-  createCategory,
-  addRelationship as addRelationshipPure,
-  defaultStatusForType,
-  isPrefixTaken,
-  countItemsUsingType,
-  buildChildItemParts,
 } from '../../domain/requirements/requirementsRegistry';
+
+/** updateItems' input as one patch per id - later entries for the same id
+ * win field by field, as calling updateItem for each in order would. */
+export function mergedPatches(
+    updates: { id: string; patch: Partial<RequirementItem> }[],
+): Map<string, Partial<RequirementItem>> {
+  const byId = new Map<string, Partial<RequirementItem>>();
+  for (const {id, patch} of updates) byId.set(id, {...byId.get(id), ...patch});
+  return byId;
+}
 
 /**
  * RequirementsStore is the same kind of seam TeamStore is (see
@@ -56,6 +66,13 @@ export interface RequirementsStore {
    * nothing) if the parent or the type doesn't exist. */
   addChildItem(parentId: string, typeId: string, title?: string): string | null;
   updateItem(id: string, patch: Partial<Omit<RequirementItem, 'id' | 'typeId'>>): void;
+
+  /** Several updateItem calls as ONE operation - a single undo step and a
+   * single change notification - for bulk edits from the Requirements
+   * view. Ids that don't exist are skipped. */
+  updateItems(
+      updates: { id: string; patch: Partial<Omit<RequirementItem, 'id' | 'typeId'>> }[],
+  ): void;
   /** Converts an existing item to a different type, adjusting its ID and workable fields as needed, retroactively updating all references */
   convertItemType(id: string, newTypeId: string): string | undefined;
   /** Converts all items using fromTypeId to toTypeId, regenerating their IDs and updating references, and returns the count of converted items */
@@ -178,6 +195,19 @@ export function createLocalRequirementsStore(
 
     updateItem: (id, patch) => {
       doc = { ...doc, items: doc.items.map((i) => (i.id === id ? { ...i, ...patch } : i)) };
+      notify();
+    },
+
+    updateItems: (updates) => {
+      if (updates.length === 0) return;
+      const patchById = mergedPatches(updates);
+      doc = {
+        ...doc,
+        items: doc.items.map((i) => {
+          const patch = patchById.get(i.id);
+          return patch ? {...i, ...patch} : i;
+        }),
+      };
       notify();
     },
 
@@ -431,6 +461,19 @@ export function createAdapterRequirementsStore(
       setSnapshot((prev) => ({
         ...prev,
         items: prev.items.map((i) => (i.id === id ? { ...i, ...patch } : i)),
+      }));
+    },
+
+    // One setSnapshot call: one undo step for the whole bulk edit.
+    updateItems: (updates) => {
+      if (updates.length === 0) return;
+      const patchById = mergedPatches(updates);
+      setSnapshot((prev) => ({
+        ...prev,
+        items: prev.items.map((i) => {
+          const patch = patchById.get(i.id);
+          return patch ? {...i, ...patch} : i;
+        }),
       }));
     },
 

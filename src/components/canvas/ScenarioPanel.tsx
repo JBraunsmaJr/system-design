@@ -1,6 +1,7 @@
 import {
     ChevronDown,
     ChevronUp,
+    CopyPlus,
     Download,
     Film,
     MapPin,
@@ -22,11 +23,16 @@ interface ScenarioPanelProps {
   onCreateScenario: () => void;
   onRenameScenario: (id: string, title: string) => void;
   onDeleteScenario: (id: string) => void;
+    /** Copies a scenario, steps and all, and opens the copy - the starting
+     * point for a variant. Optional: without it the button isn't shown. */
+    onDuplicateScenario?: (id: string) => void;
   onAddStep: (scenarioId: string) => void;
   onAddSelectionToStep: (scenarioId: string, stepId: string) => void;
   onRemoveSelectionFromStep: (scenarioId: string, stepId: string) => void;
   onUpdateStep: (scenarioId: string, stepId: string, patch: Partial<ScenarioStep>) => void;
   onDeleteStep: (scenarioId: string, stepId: string) => void;
+    /** Copies a step to directly after itself. Optional, like onDuplicateScenario. */
+    onDuplicateStep?: (scenarioId: string, stepId: string) => void;
   onMoveStep: (scenarioId: string, stepId: string, direction: 'up' | 'down') => void;
   onPresent: (scenarioId: string) => void;
   /** Opens the export dialog (PDF slides, PNGs, GIF, MP4) for a scenario. */
@@ -68,11 +74,13 @@ export function ScenarioPanel({
   onCreateScenario,
   onRenameScenario,
   onDeleteScenario,
+                                  onDuplicateScenario,
   onAddStep,
   onAddSelectionToStep,
   onRemoveSelectionFromStep,
   onUpdateStep,
   onDeleteStep,
+                                  onDuplicateStep,
   onMoveStep,
   onPresent,
                                   onExport,
@@ -200,6 +208,17 @@ export function ScenarioPanel({
                   >
                       <Download size={11}/> Export
                   </button>
+              )}
+                {onDuplicateScenario && (
+                    <button
+                        type="button"
+                        className="scenario-panel__btn-duplicate-scenario"
+                        onClick={() => onDuplicateScenario(active.id)}
+                        title="Duplicate scenario - copies every step, to start a variant from"
+                        aria-label="Duplicate scenario"
+                    >
+                        <CopyPlus size={12}/>
+                    </button>
               )}
               <button
                 type="button"
@@ -367,6 +386,20 @@ export function ScenarioPanel({
                           <ChevronDown size={12} />
                         </button>
                       </div>
+                        {onDuplicateStep && (
+                            <button
+                                type="button"
+                                className="scenario-step-row__duplicate"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onDuplicateStep(active.id, step.id);
+                                }}
+                                aria-label="Duplicate step"
+                                title="Duplicate step - the copy goes right after this one"
+                            >
+                                <CopyPlus size={12}/>
+                            </button>
+                        )}
                       <button
                         type="button"
                         className="scenario-step-row__delete"

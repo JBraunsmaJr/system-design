@@ -16,6 +16,7 @@ import {TypePicker} from './TypePicker';
 import {SprintPicker} from './SprintPicker';
 import {RelationshipManager} from './RelationshipManager';
 import {ChildQuickAdd} from './ChildQuickAdd';
+import {TagEditor} from './TagEditor';
 import {isEpicItem} from '../../domain/requirements/requirementsHierarchy';
 import {MemberPicker} from '../team/MemberPicker';
 import {PointsPicker} from '../team/PointsPicker';
@@ -101,7 +102,17 @@ interface RequirementCardProps {
   /** Shows an "Open" button that makes this item the focus of the split
    * view's detail pane - used for the children listed under an item. */
   onOpenItem?: (itemId: string) => void;
+    /** Every tag in the document, suggested by this card's tag editor. Must
+     * keep its identity while the set of tags is unchanged. */
+    tagSuggestions?: string[];
+    /** Selecting items for a bulk edit: when onToggleBulkSelected is given,
+     * the card shows a checkbox. The second argument is true for a
+     * shift-click, which extends the selection from the last one toggled. */
+    isBulkSelected?: boolean;
+    onToggleBulkSelected?: (itemId: string, extendRange: boolean) => void;
 }
+
+const NO_TAG_SUGGESTIONS: string[] = [];
 
 function RequirementCardImpl({
   item,
@@ -137,6 +148,9 @@ function RequirementCardImpl({
   preferredVerbKey,
   onVerbUsed,
   onOpenItem,
+                                 tagSuggestions = NO_TAG_SUGGESTIONS,
+                                 isBulkSelected = false,
+                                 onToggleBulkSelected,
 }: RequirementCardProps) {
     // Which markdown field is open in an editor: the body for most items, or
     // any of a decision's sections. One slot rather than a flag per section,
@@ -194,7 +208,9 @@ function RequirementCardImpl({
       data-section-key={sectionKey}
       className={`requirement-card${highlighted ? ' is-highlighted' : ''}${
         isSelected ? ' is-selected' : ''
-      }${isContext ? ' is-context' : ''}${collapsed ? ' is-collapsed' : ''}`}
+      }${isContext ? ' is-context' : ''}${collapsed ? ' is-collapsed' : ''}${
+          onToggleBulkSelected && isBulkSelected ? ' is-bulk-selected' : ''
+      }`}
       // Selection changes layout (the previously selected epic's
       // quick-add row disappears), so it must never happen between a mouse
       // press and its release - the content would shift under the pointer
@@ -228,6 +244,23 @@ function RequirementCardImpl({
     >
       <div className="requirement-card__header">
         <div className="requirement-card__header-row">
+            {onToggleBulkSelected && (
+                <input
+                    type="checkbox"
+                    className="requirement-card__bulk-check"
+                    checked={isBulkSelected}
+                    // The change itself is handled on click, which is where the
+                    // shift key that extends a range can be read.
+                    onChange={() => {
+                    }}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleBulkSelected(item.id, e.shiftKey);
+                    }}
+                    aria-label={`Select ${item.id}`}
+                    title="Select for bulk edit (Shift-click selects a range)"
+                />
+            )}
           {onToggleCollapsed && (
             <button
               type="button"
@@ -396,6 +429,13 @@ function RequirementCardImpl({
             <HighlightedTitle text={item.title} search={searchQuery} />
           </div>
         )}
+          <TagEditor
+              itemId={item.id}
+              tags={item.tags}
+              suggestions={tagSuggestions}
+              onChange={(tags) => onUpdateItem(item.id, {tags})}
+              searchQuery={searchQuery}
+          />
       </div>
       {!collapsed && (
         <>
@@ -526,6 +566,9 @@ function propsAreEqual(prev: RequirementCardProps, next: RequirementCardProps): 
     prev.preferredVerbKey === next.preferredVerbKey &&
     prev.onVerbUsed === next.onVerbUsed &&
     prev.onOpenItem === next.onOpenItem &&
+    prev.tagSuggestions === next.tagSuggestions &&
+    prev.isBulkSelected === next.isBulkSelected &&
+    prev.onToggleBulkSelected === next.onToggleBulkSelected &&
     // Not identity: peersHere is rebuilt by a filter on every parent
     // render, and its elements are rebuilt on every presence update -
     // including cursor movement, which no badge here renders. See

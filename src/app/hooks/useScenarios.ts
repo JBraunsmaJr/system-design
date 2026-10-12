@@ -1,6 +1,7 @@
-import { useCallback, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
-import type { Scenario, ScenarioStep } from '../../domain/canvas/types';
-import type { DiagramPath } from '../../domain/canvas/subDiagramTree';
+import {type Dispatch, type SetStateAction, useCallback, useMemo, useState} from 'react';
+import type {Scenario, ScenarioStep} from '../../domain/canvas/types';
+import type {DiagramPath} from '../../domain/canvas/subDiagramTree';
+import {withScenarioDuplicated, withStepDuplicated,} from '../../domain/canvas/scenarioDuplication';
 
 let idSeed = 0;
 const nextId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${idSeed++}`;
@@ -66,6 +67,20 @@ export function useScenarios({
     },
     [setScenarios],
   );
+
+    // A copy lands right after its original and becomes the open scenario,
+    // so building a variant is: duplicate, then edit what differs.
+    const onDuplicateScenario = useCallback(
+        (id: string) => {
+            const copyId = nextId('scenario');
+            setScenarios((s) =>
+                withScenarioDuplicated(s, id, {scenarioId: copyId, nextStepId: () => nextId('step')}),
+            );
+            setActiveScenarioId(copyId);
+            setActiveStepId(null);
+        },
+        [setScenarios],
+    );
 
   const onSelectScenario = useCallback((id: string) => {
     setActiveScenarioId(id);
@@ -214,6 +229,18 @@ export function useScenarios({
     [setScenarios],
   );
 
+    // The copy goes directly after the original and becomes the open step,
+    // which also previews it - the usual next move is adding or removing a
+    // few elements to make the following beat of the walkthrough.
+    const onDuplicateStep = useCallback(
+        (scenarioId: string, stepId: string) => {
+            const copyId = nextId('step');
+            setScenarios((s) => withStepDuplicated(s, scenarioId, stepId, copyId));
+            setActiveStepId(copyId);
+        },
+        [setScenarios],
+    );
+
   const onMoveStep = useCallback(
     (scenarioId: string, stepId: string, direction: 'up' | 'down') => {
       setScenarios((s) =>
@@ -293,6 +320,7 @@ export function useScenarios({
     onCreateScenario,
     onRenameScenario,
     onDeleteScenario,
+      onDuplicateScenario,
     onSelectScenario,
     onSelectStep,
     onAddStep,
@@ -300,6 +328,7 @@ export function useScenarios({
     onRemoveSelectionFromStep,
     onUpdateStep,
     onDeleteStep,
+      onDuplicateStep,
     onMoveStep,
     previewFocus,
     onStartPresenting,

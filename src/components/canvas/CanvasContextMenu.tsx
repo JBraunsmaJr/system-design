@@ -11,6 +11,7 @@ import {
     Link2,
     Lock,
     LockOpen,
+    PackagePlus,
     Paintbrush,
     Palette,
     SendToBack,
@@ -23,6 +24,7 @@ import {ColorPickerPanel} from './ColorPickerPanel';
 import {IconPickerPanel} from './IconPicker';
 import {RequirementLinkPanel} from './RequirementLinkPanel';
 import {ArrangeControls} from './ArrangeControls';
+import {SaveFragmentPanel} from './SaveFragmentPanel';
 import {canArrange} from '../../domain/canvas/arrange';
 import {type CanvasContextActions, CONTEXT_MENU_WIDTH, type useCanvasContextMenu,} from './useCanvasContextMenu';
 import type {CanvasProps} from './Canvas';
@@ -188,6 +190,8 @@ export function CanvasContextMenu({
                         {command('Duplicate', <Copy size={13}/>, () => contextActions.onDuplicate(targetIds), {
                             shortcut: `${MOD}D`,
                         })}
+                        {contextActions.onSaveFragment &&
+                            submenu('fragment', 'Save as fragment', <PackagePlus size={13}/>)}
                         {command('Group', <Group size={13}/>, () => contextActions.onGroup(targetIds), {
                             shortcut: `${MOD}G`,
                         })}
@@ -290,6 +294,19 @@ export function CanvasContextMenu({
                         }}
                     />
                 </div>
+            )}
+
+            {activeSubmenu === 'fragment' && contextActions?.onSaveFragment && (
+                <SaveFragmentPanel
+                    defaultName={targetNodes.length === 1 ? String(targetNodes[0].data.label ?? '') : ''}
+                    nodeCount={targetNodes.length}
+                    onSave={(name) => {
+                        contextActions.onSaveFragment?.(targetIds, name);
+                        closeContextMenu();
+                    }}
+                    onClose={closeContextMenu}
+                    style={besideMenu(260, 190)}
+                />
             )}
 
             {activeSubmenu === 'requirements' && contextActions && (

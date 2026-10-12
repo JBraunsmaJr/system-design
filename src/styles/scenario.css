@@ -172,9 +172,33 @@
     justify-content: center;
 }
 
-/* Delete sits apart from Present and Export, at the far end of the row. */
+/* Duplicate and Delete sit apart from Present and Export, at the far end
+   of the row. Whichever comes first takes the gap. */
+.scenario-panel__action-buttons .scenario-panel__btn-duplicate-scenario,
 .scenario-panel__action-buttons .scenario-panel__btn-delete-scenario {
     margin-left: auto;
+}
+
+.scenario-panel__action-buttons
+.scenario-panel__btn-duplicate-scenario
++ .scenario-panel__btn-delete-scenario {
+    margin-left: 0;
+}
+
+.scenario-panel__btn-duplicate-scenario {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid var(--chrome-border);
+    color: var(--chrome-text);
+    border-radius: var(--radius-sm);
+    padding: 5px 8px;
+    cursor: pointer;
+}
+
+.scenario-panel__btn-duplicate-scenario:hover {
+    background: var(--chrome-bg-hover);
 }
 
 .scenario-panel__btn-present {
@@ -515,6 +539,24 @@
 .scenario-step-row__move button:disabled {
   opacity: 0.25;
   cursor: not-allowed;
+}
+
+.scenario-step-row__duplicate {
+    background: transparent;
+    border: none;
+    color: var(--chrome-text-dim);
+    padding: 3px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    flex-shrink: 0;
+}
+
+.scenario-step-row__duplicate:hover {
+    color: var(--chrome-text);
+    background: var(--chrome-bg);
 }
 
 .scenario-step-row__delete {

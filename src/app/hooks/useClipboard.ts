@@ -4,6 +4,13 @@ import {type DiagramStore, getEdgesAtPath, getNodesAtPath,} from '../../collab/s
 import {getDescendantIds, toAbsolutePosition} from '../../domain/canvas/graphUtils';
 import type {DiagramPath} from '../../domain/canvas/subDiagramTree';
 import type {ArchEdgeData, ArchNodeData} from '../../domain/canvas/types';
+import {
+    type DiagramFragmentContents,
+    getFragment,
+    saveFragment,
+    type SaveFragmentResult,
+    translateFragmentContents,
+} from '../../domain/canvas/diagramFragments';
 
 /** A pasted or duplicated copy starts unlocked: it lands offset from the
  * original, and the first thing anyone does with it is move it. */
@@ -14,10 +21,9 @@ function withoutLock(data: ArchNodeData): ArchNodeData {
     return copy;
 }
 
-interface ClipboardContents {
-    nodes: (Node<ArchNodeData> & { relativePath: string[] })[];
-    edges: (Edge<ArchEdgeData> & { relativePath: string[] })[];
-}
+/** Same shape as a saved fragment's contents - a fragment is a clipboard
+ * that outlives the tab (see domain/canvas/diagramFragments.ts). */
+type ClipboardContents = DiagramFragmentContents;
 
 export interface UseClipboardOptions {
   nodes: Node<ArchNodeData>[];
@@ -264,5 +270,33 @@ export function useClipboard({
         [collect, insert],
     );
 
-    return {onCopy, onPaste, onDuplicate};
+    /**
+     * Saves `ids` (with everything copying them would bring along) as a
+     * reusable fragment in this browser's fragment library, where the
+     * palette offers it in every document.
+     */
+    const onSaveFragment = useCallback(
+        (ids: string[], name: string): SaveFragmentResult => {
+            const contents = collect(ids);
+            if (!contents || contents.nodes.length === 0) return {ok: false, reason: 'empty'};
+            return saveFragment(name, contents);
+        },
+        [collect],
+    );
+
+    /**
+     * Drops a saved fragment onto the current level with its top-left corner
+     * at `position` (flow coordinates), and selects it - the same insert a
+     * paste does, so nested sub-diagram content comes along too.
+     */
+    const onInsertFragment = useCallback(
+        (fragmentId: string, position: { x: number; y: number }) => {
+            const fragment = getFragment(fragmentId);
+            if (!fragment) return;
+            insert(translateFragmentContents(fragment.contents, position.x, position.y), 0);
+        },
+        [insert],
+    );
+
+    return {onCopy, onPaste, onDuplicate, onSaveFragment, onInsertFragment};
 }

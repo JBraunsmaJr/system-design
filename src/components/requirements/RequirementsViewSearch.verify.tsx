@@ -1,15 +1,12 @@
 /**
  * Run with: npx tsx --tsconfig tsconfig.app.json src/components/requirements/RequirementsViewSearch.verify.tsx
  */
-import { renderToStaticMarkup } from 'react-dom/server';
+import {renderToStaticMarkup} from 'react-dom/server';
 import React from 'react';
-import { RequirementsView } from './RequirementsView';
-import {
-  BUILT_IN_ITEM_TYPES,
-  BUILT_IN_RELATIONSHIP_TYPES,
-} from '../../domain/requirements/requirementsRegistry';
-import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
-import type { RequirementsStore } from '../../collab/stores/requirementsStore';
+import {RequirementsView} from './RequirementsView';
+import {BUILT_IN_ITEM_TYPES, BUILT_IN_RELATIONSHIP_TYPES,} from '../../domain/requirements/requirementsRegistry';
+import type {RequirementsDocument} from '../../domain/requirements/requirementsTypes';
+import type {RequirementsStore} from '../../collab/stores/requirementsStore';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {
@@ -59,6 +56,8 @@ function createMockStore(doc: RequirementsDocument): RequirementsStore {
     addItem: () => 'REQ-99',
     addChildItem: () => 'TICKET-99',
     updateItem: () => {},
+      updateItems: () => {
+      },
     deleteItem: () => {},
     convertItemType: () => {},
     convertAllItemsOfType: () => 0,
