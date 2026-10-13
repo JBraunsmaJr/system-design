@@ -15,6 +15,7 @@ import type {ArchEdgeData, ArchNodeData, EdgeWaypoint} from '../domain/canvas/ty
 import {
     type BoundaryPort,
     type BoundaryPortNodeData,
+    portAliasesForLevel,
     type PortIndex,
     portsForLevel,
     unwiredPortCounts,
@@ -51,7 +52,7 @@ const derivedNodes = new WeakMap<
 >();
 const derivedEdges = new WeakMap<
   Edge<ArchEdgeData>,
-  { selected: boolean; out: Edge<ArchEdgeData> }
+    { selected: boolean; source: string; target: string; out: Edge<ArchEdgeData> }
 >();
 /**
  * The `data` object handed to each node, kept separately so that a change to
@@ -65,6 +66,7 @@ const derivedNodeData = new WeakMap<
 >();
 
 const NO_COUNTS: ReadonlyMap<string, number> = new Map();
+const NO_ALIASES: ReadonlyMap<string, string> = new Map();
 
 export interface CanvasProjectionInput {
   diagramSnapshot: { nodes: Node<ArchNodeData>[]; edges: Edge<ArchEdgeData>[] };
@@ -120,6 +122,9 @@ export function projectCanvasElements(input: CanvasProjectionInput): {
   const levelEdges = getEdgesAtPath(diagramSnapshot.edges, path);
   const rawEdges = portIndex ? levelEdges.filter((e) => portIndex.isValidEdge(e.id)) : levelEdges;
   const unwiredByNode = portIndex ? unwiredPortCounts(portIndex, path) : NO_COUNTS;
+    // Ports leading to the same node are drawn as one (portsForLevel); a wire
+    // stored against one that was folded away is drawn from the survivor.
+    const portAliases = portIndex ? portAliasesForLevel(portIndex, path) : NO_ALIASES;
   /**
    * Keyed only on what the ordering actually depends on - id, size and
    * any explicit override. Position is deliberately excluded: the rule
@@ -210,13 +215,15 @@ export function projectCanvasElements(input: CanvasProjectionInput): {
     }),
     edges: rawEdges.map((e) => {
       const selected = selectedEdges.has(e.id);
+        const source = portAliases.get(e.source) ?? e.source;
+        const target = portAliases.get(e.target) ?? e.target;
       const hit = derivedEdges.get(e);
       let out: Edge<ArchEdgeData>;
-      if (hit && hit.selected === selected) {
+        if (hit && hit.selected === selected && hit.source === source && hit.target === target) {
         out = hit.out;
       } else {
-        out = { ...e, selected };
-        derivedEdges.set(e, { selected, out });
+            out = {...e, source, target, selected};
+            derivedEdges.set(e, {selected, source, target, out});
       }
       // In-flight bends and labels, this user's first; only those edges get
       // new objects.
@@ -301,6 +308,7 @@ export function projectBoundaryPorts(input: {
               port.color ?? '',
               port.edgeType,
               port.peerDepth,
+              port.mergedPortIds.join(','),
           ].join('|');
           const hit = derivedPorts.get(port.id);
           if (hit && hit.key === key) return hit.out;

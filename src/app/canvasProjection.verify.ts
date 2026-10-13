@@ -282,6 +282,39 @@ const first = projectCanvasElements(input());
   assert(byId(measured, outPort.id) === outPort, 'and the other port is reused');
 }
 
+// --- Duplicate boundary ports (two connections to the same node) ---
+{
+  const box = makeNode('box', 0);
+  const sink = makeNode('sink', 400);
+  const inner = makeNode('inner', 50, ['box']);
+  const first = makeEdge('out-1', 'box', 'sink');
+  const second = makeEdge('out-2', 'box', 'sink');
+  const wire: Edge<ArchEdgeData> = {
+    ...makeEdge('wire-2', 'inner', portId('out-2', 'out')),
+    data: {...makeEdge('x', 'a', 'b').data!, parentPath: ['box']} as ArchEdgeData,
+  };
+  const snapshot = {nodes: [box, sink, inner], edges: [first, second, wire]};
+  const portIndex = buildPortIndex(snapshot.nodes, snapshot.edges);
+  const ports = projectBoundaryPorts({
+    portIndex,
+    path: ['box'],
+    diagramSnapshot: snapshot,
+    measuredDimensions: new Map(),
+  });
+  assert(
+      ports.length === 1 && ports[0].id === portId('out-1', 'out'),
+      'the same node reached by two connections is drawn as one port',
+  );
+  const inside = projectCanvasElements(input({diagramSnapshot: snapshot, portIndex, path: ['box']}));
+  const drawn = byId(inside.edges, 'wire-2');
+  assert(
+      drawn.target === portId('out-1', 'out'),
+      'a wire to the folded port is drawn to the port that is on the canvas',
+  );
+  const again = projectCanvasElements(input({diagramSnapshot: snapshot, portIndex, path: ['box']}));
+  assert(byId(again.edges, 'wire-2') === drawn, 'the redirected wire is the same object next time');
+}
+
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);
 // scripts/run-tests.ts reads the exit status; printing FAIL is not enough.
 if (failures > 0) {

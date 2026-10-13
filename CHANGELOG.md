@@ -13,6 +13,8 @@ markers are removed when the section becomes a release. See
 
 ## [Unreleased]
 
+- [PATCH] Fixed duplicate ports in sub-diagrams when a node had multiple edges to the same node.
+
 ## [0.98.1] - 2026-10-12
 
 Tweak to release pipeline

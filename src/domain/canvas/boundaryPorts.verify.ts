@@ -11,6 +11,7 @@ import {
     isPortOrientationValid,
     orientPortConnection,
     parsePortId,
+    portAliasesForLevel,
     portId,
     portsForLevel,
     unwiredPortCounts,
@@ -126,6 +127,60 @@ const baseEdges = [
         'the wire Repo -> boundary shows up inside Repo as a port to Orders DB, two levels up',
     );
     assert(dbPort?.edgeType === 'sql', "a pass-through port carries the outermost connection's type");
+}
+
+// --- the same peer reached by more than one connection is one port ---
+{
+    const edges = [
+        ...baseEdges,
+        edge('e-db2', 'orders', 'db', [], {edgeType: 'sql', label: 'reads'}),
+        edge('e-web2', 'web', 'orders', []),
+        edge('w-out2', 'handler', portId('e-db2', 'out'), ['orders']),
+    ];
+    const index = buildPortIndex(nodes, edges);
+    const ports = portsForLevel(index, ['orders']);
+    assert(ports.length === 2, 'two connections to the same node give one port per direction');
+    const dbPort = ports.find((p) => p.side === 'out')!;
+    assert(
+        dbPort.id === portId('e-db', 'out') && dbPort.mergedPortIds.join() === portId('e-db2', 'out'),
+        'the first connection keeps its port; the second is folded into it',
+    );
+    assert(dbPort.bound, 'a wire to a folded port binds the surviving one');
+    assert(dbPort.connectionLabel.endsWith(', reads'),
+        'the surviving port lists every distinct connection label');
+    assert(
+        unwiredPortCounts(index, []).get('orders') === 1,
+        'merged connections count once: the DB port is wired, only the Web port is not',
+    );
+    const webWired = buildPortIndex(nodes, [
+        ...edges,
+        edge('w-in2', portId('e-web2', 'in'), 'handler', ['orders']),
+    ]);
+    assert(
+        !unwiredPortCounts(webWired, []).has('orders'),
+        'a wire to either of two merged ports leaves nothing unwired',
+    );
+    const aliases = portAliasesForLevel(index, ['orders']);
+    assert(
+        aliases.get(portId('e-db2', 'out')) === portId('e-db', 'out') &&
+        aliases.get(portId('e-web2', 'in')) === portId('e-web', 'in') &&
+        aliases.size === 2,
+        'folded ports alias to the one that is drawn',
+    );
+
+    // Wires through the parent that reach the same far-end node also merge.
+    const passThrough = [
+        ...baseEdges,
+        edge('e-db2', 'orders', 'db', []),
+        edge('w-a', 'repo', portId('e-db', 'out'), ['orders']),
+        edge('w-b', 'repo', portId('e-db2', 'out'), ['orders']),
+    ];
+    const repoOut = portsForLevel(buildPortIndex(nodes, passThrough), ['orders', 'repo'])
+        .filter((p) => p.side === 'out');
+    assert(
+        repoOut.length === 1 && repoOut[0].peerLabel === 'Orders DB' && repoOut[0].mergedPortIds.length === 1,
+        'pass-through wires to the same far-end node show it once inside the next level',
+    );
 }
 
 // --- orphans ---

@@ -1,0 +1,4706 @@
+{
+  "schemaVersion": "0.8",
+  "title": "Northwind Commerce Platform",
+  "nodes": [
+    {
+      "id": "g-region",
+      "type": "group",
+      "position": {
+        "x": 300,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "region",
+        "label": "AWS us-east-1",
+        "description": "",
+        "properties": {
+          "account": "northwind-prod"
+        },
+        "tags": [],
+        "linkedRequirementIds": [
+          "CON-2"
+        ]
+      },
+      "width": 2500,
+      "height": 1440
+    },
+    {
+      "id": "g-vpc",
+      "type": "group",
+      "position": {
+        "x": 40,
+        "y": 80
+      },
+      "data": {
+        "nodeType": "vpc",
+        "label": "Production VPC",
+        "description": "",
+        "properties": {
+          "cidr": "10.20.0.0/16"
+        },
+        "tags": []
+      },
+      "parentId": "g-region",
+      "width": 1960,
+      "height": 1300
+    },
+    {
+      "id": "g-pci",
+      "type": "group",
+      "position": {
+        "x": 520,
+        "y": 920
+      },
+      "data": {
+        "nodeType": "trust-boundary",
+        "label": "PCI DSS scope (CDE)",
+        "description": "",
+        "properties": {},
+        "tags": [],
+        "color": "#F0578C",
+        "linkedRequirementIds": [
+          "EPIC-4",
+          "REQ-9",
+          "GOAL-3"
+        ]
+      },
+      "parentId": "g-vpc",
+      "width": 440,
+      "height": 250
+    },
+    {
+      "id": "n-title",
+      "type": "text",
+      "position": {
+        "x": 300,
+        "y": -150
+      },
+      "data": {
+        "nodeType": "text",
+        "label": "Northwind Commerce - production architecture (Q4 2026)",
+        "description": "",
+        "properties": {},
+        "tags": [],
+        "textColor": "#e7e9ee",
+        "fontSize": 26,
+        "locked": true
+      }
+    },
+    {
+      "id": "n-subtitle",
+      "type": "text",
+      "position": {
+        "x": 300,
+        "y": -100
+      },
+      "data": {
+        "nodeType": "text",
+        "label": "Double-click Order Service, Catalog Service or Delivery Pipeline to drill into sub-diagrams.",
+        "description": "",
+        "properties": {},
+        "tags": [],
+        "textColor": "#8b90a0",
+        "fontSize": 14
+      }
+    },
+    {
+      "id": "n-pci-note",
+      "type": "text",
+      "position": {
+        "x": 20,
+        "y": 195
+      },
+      "data": {
+        "nodeType": "text",
+        "label": "No raw card data inside this boundary (#REQ-9)",
+        "description": "",
+        "properties": {},
+        "tags": [],
+        "textColor": "#F0578C",
+        "fontSize": 12
+      },
+      "parentId": "g-pci"
+    },
+    {
+      "id": "n-shopper",
+      "type": "shape",
+      "position": {
+        "x": -880,
+        "y": 470
+      },
+      "data": {
+        "nodeType": "uml.actor",
+        "label": "Shopper",
+        "description": "",
+        "properties": {},
+        "tags": [],
+        "color": "#F0578C"
+      },
+      "width": 80,
+      "height": 120
+    },
+    {
+      "id": "n-web",
+      "type": "typed",
+      "position": {
+        "x": -640,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "client",
+        "label": "Web Storefront",
+        "description": "",
+        "properties": {
+          "framework": "Next.js 15"
+        },
+        "tags": [
+          "frontend"
+        ],
+        "linkedRequirementIds": [
+          "REQ-1",
+          "GOAL-1"
+        ]
+      }
+    },
+    {
+      "id": "n-mobile",
+      "type": "typed",
+      "position": {
+        "x": -640,
+        "y": 760
+      },
+      "data": {
+        "nodeType": "client",
+        "label": "Mobile App",
+        "description": "",
+        "properties": {
+          "framework": "React Native"
+        },
+        "tags": [
+          "frontend"
+        ],
+        "linkedRequirementIds": [
+          "BUG-3"
+        ]
+      }
+    },
+    {
+      "id": "n-cdn",
+      "type": "typed",
+      "position": {
+        "x": -160,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "aws-cloudfront",
+        "label": "CloudFront CDN",
+        "description": "",
+        "properties": {
+          "waf": "enabled"
+        },
+        "tags": []
+      }
+    },
+    {
+      "id": "n-apigw",
+      "type": "typed",
+      "position": {
+        "x": 60,
+        "y": 500
+      },
+      "data": {
+        "nodeType": "api-gateway",
+        "label": "API Gateway",
+        "description": "",
+        "properties": {
+          "rateLimit": "2k rps"
+        },
+        "tags": [
+          "edge",
+          "tier-0"
+        ],
+        "linkedRequirementIds": [
+          "REQ-8",
+          "CON-2"
+        ]
+      },
+      "parentId": "g-vpc"
+    },
+    {
+      "id": "n-catalog",
+      "type": "typed",
+      "position": {
+        "x": 560,
+        "y": 290
+      },
+      "data": {
+        "nodeType": "microservice",
+        "label": "Catalog Service",
+        "description": "",
+        "properties": {
+          "runtime": "Go 1.23",
+          "replicas": "6"
+        },
+        "tags": [
+          "tier-1"
+        ],
+        "hasSubDiagram": true,
+        "linkedRequirementIds": [
+          "REQ-6",
+          "EPIC-3"
+        ],
+        "subDiagram": {
+          "nodes": [
+            {
+              "id": "cat-endpoint",
+              "type": "typed",
+              "position": {
+                "x": 0,
+                "y": 160
+              },
+              "data": {
+                "nodeType": "endpoint",
+                "label": "GET /v2/products/{sku}",
+                "description": "",
+                "properties": {
+                  "method": "GET",
+                  "path": "/v2/products/{sku}"
+                },
+                "tags": []
+              }
+            },
+            {
+              "id": "cat-cache",
+              "type": "typed",
+              "position": {
+                "x": 420,
+                "y": 160
+              },
+              "data": {
+                "nodeType": "cache-check",
+                "label": "Cache-aside lookup",
+                "description": "",
+                "properties": {
+                  "key": "product:{sku}",
+                  "ttl": "5m"
+                },
+                "tags": [],
+                "linkedRequirementIds": [
+                  "REQ-6",
+                  "ADR-8"
+                ]
+              }
+            },
+            {
+              "id": "cat-query",
+              "type": "typed",
+              "position": {
+                "x": 840,
+                "y": 340
+              },
+              "data": {
+                "nodeType": "query",
+                "label": "Load product",
+                "description": "",
+                "properties": {
+                  "source": "products"
+                },
+                "tags": []
+              }
+            },
+            {
+              "id": "cat-pricing",
+              "type": "typed",
+              "position": {
+                "x": 1260,
+                "y": 340
+              },
+              "data": {
+                "nodeType": "microservice",
+                "label": "Pricing Engine",
+                "description": "",
+                "properties": {
+                  "runtime": "Go 1.23"
+                },
+                "tags": []
+              }
+            },
+            {
+              "id": "cat-return",
+              "type": "typed",
+              "position": {
+                "x": 1260,
+                "y": 0
+              },
+              "data": {
+                "nodeType": "return",
+                "label": "200 OK",
+                "description": "",
+                "properties": {
+                  "status": "200"
+                },
+                "tags": []
+              }
+            },
+            {
+              "id": "cat-invalidate",
+              "type": "typed",
+              "position": {
+                "x": 420,
+                "y": 480
+              },
+              "data": {
+                "nodeType": "publish-event",
+                "label": "ProductUpdated",
+                "description": "Fix for #BUG-2",
+                "properties": {
+                  "event": "ProductUpdated"
+                },
+                "tags": [],
+                "linkedRequirementIds": [
+                  "BUG-2"
+                ]
+              }
+            }
+          ],
+          "edges": [
+            {
+              "id": "cat-e1",
+              "source": "cat-endpoint",
+              "target": "cat-cache",
+              "type": "typed",
+              "sourceHandle": "source-right",
+              "targetHandle": "target-left",
+              "data": {
+                "edgeType": "next",
+                "properties": {}
+              }
+            },
+            {
+              "id": "cat-e2",
+              "source": "cat-cache",
+              "target": "cat-return",
+              "type": "typed",
+              "sourceHandle": "source-top",
+              "targetHandle": "target-left",
+              "data": {
+                "edgeType": "true",
+                "label": "hit",
+                "properties": {}
+              }
+            },
+            {
+              "id": "cat-e3",
+              "source": "cat-cache",
+              "target": "cat-query",
+              "type": "typed",
+              "sourceHandle": "source-bottom",
+              "targetHandle": "target-left",
+              "data": {
+                "edgeType": "false",
+                "label": "miss",
+                "properties": {}
+              }
+            },
+            {
+              "id": "cat-e4",
+              "source": "cat-query",
+              "target": "cat-pricing",
+              "type": "typed",
+              "sourceHandle": "source-right",
+              "targetHandle": "target-left",
+              "data": {
+                "edgeType": "grpc",
+                "properties": {}
+              }
+            },
+            {
+              "id": "cat-e5",
+              "source": "cat-pricing",
+              "target": "cat-return",
+              "type": "typed",
+              "sourceHandle": "source-top",
+              "targetHandle": "target-bottom",
+              "data": {
+                "edgeType": "next",
+                "properties": {}
+              }
+            },
+            {
+              "id": "cat-e6",
+              "source": "cat-invalidate",
+              "target": "cat-cache",
+              "type": "typed",
+              "sourceHandle": "source-top",
+              "targetHandle": "target-bottom",
+              "data": {
+                "edgeType": "event-stream",
+                "label": "evict",
+                "properties": {}
+              }
+            }
+          ]
+        }
+      },
+      "parentId": "g-vpc"
+    },
+    {
+      "id": "n-order",
+      "type": "typed",
+      "position": {
+        "x": 560,
+        "y": 710
+      },
+      "data": {
+        "nodeType": "microservice",
+        "label": "Order Service",
+        "description": "",
+        "properties": {
+          "runtime": "Kotlin",
+          "replicas": "8"
+        },
+        "tags": [
+          "tier-0",
+          "checkout"
+        ],
+        "hasSubDiagram": true,
+        "zIndex": 5,
+        "linkedRequirementIds": [
+          "EPIC-2",
+          "REQ-2",
+          "REQ-7",
+          "ADR-2"
+        ],
+        "subDiagram": {
+          "nodes": [
+            {
+              "id": "os-writemodel",
+              "type": "group",
+              "position": {
+                "x": 1040,
+                "y": 220
+              },
+              "data": {
+                "nodeType": "bounded-context",
+                "label": "Write model (one transaction)",
+                "description": "",
+                "properties": {},
+                "tags": [],
+                "linkedRequirementIds": [
+                  "ADR-2"
+                ]
+              },
+              "width": 760,
+              "height": 220
+            },
+            {
+              "id": "os-endpoint",
+              "type": "typed",
+              "position": {
+                "x": 0,
+                "y": 0
+              },
+              "data": {
+                "nodeType": "endpoint",
+                "label": "POST /v2/orders",
+                "description": "",
+                "properties": {
+                  "method": "POST",
+                  "path": "/v2/orders"
+                },
+                "tags": []
+              }
+            },
+            {
+              "id": "os-idem",
+              "type": "typed",
+              "position": {
+                "x": 360,
+                "y": 0
+              },
+              "data": {
+                "nodeType": "cache-check",
+                "label": "Idempotency check",
+                "description": "",
+                "properties": {
+                  "key": "idem:{key}"
+                },
+                "tags": [],
+                "linkedRequirementIds": [
+                  "REQ-2",
+                  "TICKET-8"
+                ]
+              }
+            },
+            {
+              "id": "os-checkout",
+              "type": "typed",
+              "position": {
+                "x": 720,
+                "y": 0
+              },
+              "data": {
+                "nodeType": "step",
+                "label": "Checkout Handler",
+                "description": "Double-click to drill in",
+                "properties": {
+                  "owner": "checkout"
+                },
+                "tags": [],
+                "hasSubDiagram": true,
+                "subDiagram": {
+                  "nodes": [
+                    {
+                      "id": "ck-validate",
+                      "type": "typed",
+                      "position": {
+                        "x": 0,
+                        "y": 160
+                      },
+                      "data": {
+                        "nodeType": "validate",
+                        "label": "Validate cart",
+                        "description": "",
+                        "properties": {
+                          "rules": "cart schema"
+                        },
+                        "tags": []
+                      }
+                    },
+                    {
+                      "id": "ck-authz",
+                      "type": "typed",
+                      "position": {
+                        "x": 340,
+                        "y": 160
+                      },
+                      "data": {
+                        "nodeType": "authorize",
+                        "label": "Verify session",
+                        "description": "",
+                        "properties": {
+                          "permission": "orders:create"
+                        },
+                        "tags": [],
+                        "linkedRequirementIds": [
+                          "REQ-1"
+                        ]
+                      }
+                    },
+                    {
+                      "id": "ck-reserve",
+                      "type": "typed",
+                      "position": {
+                        "x": 680,
+                        "y": 160
+                      },
+                      "data": {
+                        "nodeType": "step",
+                        "label": "Reserve inventory",
+                        "description": "",
+                        "properties": {
+                          "ttl": "15m"
+                        },
+                        "tags": [],
+                        "linkedRequirementIds": [
+                          "REQ-4",
+                          "RISK-2"
+                        ]
+                      }
+                    },
+                    {
+                      "id": "ck-instock",
+                      "type": "typed",
+                      "position": {
+                        "x": 1020,
+                        "y": 160
+                      },
+                      "data": {
+                        "nodeType": "decision",
+                        "label": "Stock available?",
+                        "description": "",
+                        "properties": {
+                          "condition": "all held?"
+                        },
+                        "tags": []
+                      }
+                    },
+                    {
+                      "id": "ck-pay",
+                      "type": "typed",
+                      "position": {
+                        "x": 1360,
+                        "y": 0
+                      },
+                      "data": {
+                        "nodeType": "external-call",
+                        "label": "Authorize payment",
+                        "description": "",
+                        "properties": {
+                          "target": "Payment.Authorize",
+                          "timeout": "2s"
+                        },
+                        "tags": [],
+                        "linkedRequirementIds": [
+                          "REQ-3"
+                        ]
+                      }
+                    },
+                    {
+                      "id": "ck-persist",
+                      "type": "typed",
+                      "position": {
+                        "x": 1700,
+                        "y": 0
+                      },
+                      "data": {
+                        "nodeType": "persist",
+                        "label": "Persist order + outbox",
+                        "description": "",
+                        "properties": {
+                          "target": "orders, outbox"
+                        },
+                        "tags": [],
+                        "linkedRequirementIds": [
+                          "ADR-2"
+                        ]
+                      }
+                    },
+                    {
+                      "id": "ck-return",
+                      "type": "typed",
+                      "position": {
+                        "x": 2040,
+                        "y": 0
+                      },
+                      "data": {
+                        "nodeType": "return",
+                        "label": "201 Created",
+                        "description": "",
+                        "properties": {
+                          "status": "201"
+                        },
+                        "tags": []
+                      }
+                    },
+                    {
+                      "id": "ck-retry",
+                      "type": "typed",
+                      "position": {
+                        "x": 1360,
+                        "y": 320
+                      },
+                      "data": {
+                        "nodeType": "loop",
+                        "label": "Retry w/ backoff",
+                        "description": "",
+                        "properties": {
+                          "iterate": "max 3"
+                        },
+                        "tags": []
+                      }
+                    },
+                    {
+                      "id": "ck-release",
+                      "type": "typed",
+                      "position": {
+                        "x": 1700,
+                        "y": 320
+                      },
+                      "data": {
+                        "nodeType": "step",
+                        "label": "Release reservation",
+                        "description": "",
+                        "properties": {},
+                        "tags": []
+                      }
+                    },
+                    {
+                      "id": "ck-declined",
+                      "type": "typed",
+                      "position": {
+                        "x": 2040,
+                        "y": 320
+                      },
+                      "data": {
+                        "nodeType": "throw-error",
+                        "label": "402 Declined",
+                        "description": "",
+                        "properties": {
+                          "status": "402",
+                          "message": "Declined"
+                        },
+                        "tags": []
+                      }
+                    },
+                    {
+                      "id": "ck-oos",
+                      "type": "typed",
+                      "position": {
+                        "x": 1360,
+                        "y": 560
+                      },
+                      "data": {
+                        "nodeType": "throw-error",
+                        "label": "409 Out of stock",
+                        "description": "",
+                        "properties": {
+                          "status": "409",
+                          "message": "Out of stock"
+                        },
+                        "tags": []
+                      }
+                    },
+                    {
+                      "id": "ck-note",
+                      "type": "typed",
+                      "position": {
+                        "x": 0,
+                        "y": 420
+                      },
+                      "data": {
+                        "nodeType": "note",
+                        "label": "Idempotency",
+                        "description": "Runs behind the key check.",
+                        "properties": {},
+                        "tags": []
+                      }
+                    },
+                    {
+                      "id": "ck-code",
+                      "type": "code",
+                      "position": {
+                        "x": 340,
+                        "y": 400
+                      },
+                      "data": {
+                        "nodeType": "code",
+                        "label": "Idempotency-Key handling",
+                        "description": "",
+                        "properties": {},
+                        "tags": [],
+                        "codeLanguage": "typescript",
+                        "codeContent": "const key = req.header('Idempotency-Key');\nif (!key) return res.status(400).send('Idempotency-Key required');\n\nconst prior = await idempotency.find(key, req.customerId);\nif (prior) return res.status(prior.status).json(prior.body);\n\nconst result = await checkout(req.body);\nawait idempotency.save(key, req.customerId, result, { ttl: '24h' });\nreturn res.status(result.status).json(result.body);"
+                      },
+                      "width": 460,
+                      "height": 210
+                    }
+                  ],
+                  "edges": [
+                    {
+                      "id": "ck-e1",
+                      "source": "ck-validate",
+                      "target": "ck-authz",
+                      "type": "typed",
+                      "sourceHandle": "source-right",
+                      "targetHandle": "target-left",
+                      "data": {
+                        "edgeType": "next",
+                        "properties": {}
+                      }
+                    },
+                    {
+                      "id": "ck-e2",
+                      "source": "ck-authz",
+                      "target": "ck-reserve",
+                      "type": "typed",
+                      "sourceHandle": "source-right",
+                      "targetHandle": "target-left",
+                      "data": {
+                        "edgeType": "next",
+                        "properties": {}
+                      }
+                    },
+                    {
+                      "id": "ck-e3",
+                      "source": "ck-reserve",
+                      "target": "ck-instock",
+                      "type": "typed",
+                      "sourceHandle": "source-right",
+                      "targetHandle": "target-left",
+                      "data": {
+                        "edgeType": "next",
+                        "properties": {}
+                      }
+                    },
+                    {
+                      "id": "ck-e4",
+                      "source": "ck-instock",
+                      "target": "ck-pay",
+                      "type": "typed",
+                      "sourceHandle": "source-top",
+                      "targetHandle": "target-left",
+                      "data": {
+                        "edgeType": "true",
+                        "properties": {}
+                      }
+                    },
+                    {
+                      "id": "ck-e5",
+                      "source": "ck-instock",
+                      "target": "ck-oos",
+                      "type": "typed",
+                      "sourceHandle": "source-bottom",
+                      "targetHandle": "target-left",
+                      "data": {
+                        "edgeType": "false",
+                        "properties": {}
+                      }
+                    },
+                    {
+                      "id": "ck-e6",
+                      "source": "ck-pay",
+                      "target": "ck-persist",
+                      "type": "typed",
+                      "sourceHandle": "source-right",
+                      "targetHandle": "target-left",
+                      "data": {
+                        "edgeType": "next",
+                        "properties": {}
+                      }
+                    },
+                    {
+                      "id": "ck-e7",
+                      "source": "ck-persist",
+                      "target": "ck-return",
+                      "type": "typed",
+                      "sourceHandle": "source-right",
+                      "targetHandle": "target-left",
+                      "data": {
+                        "edgeType": "next",
+                        "properties": {}
+                      }
+                    },
+                    {
+                      "id": "ck-e8",
+                      "source": "ck-pay",
+                      "target": "ck-retry",
+                      "type": "typed",
+                      "sourceHandle": "source-bottom",
+                      "targetHandle": "target-top",
+                      "data": {
+                        "edgeType": "on-error",
+                        "label": "timeout",
+                        "properties": {}
+                      }
+                    },
+                    {
+                      "id": "ck-e9",
+                      "source": "ck-retry",
+                      "target": "ck-pay",
+                      "type": "typed",
+                      "sourceHandle": "source-left",
+                      "targetHandle": "target-left",
+                      "data": {
+                        "edgeType": "loop-back",
+                        "label": "retry",
+                        "waypoints": [
+                          {
+                            "id": "ck-wp-1",
+                            "x": 1320,
+                            "y": 370
+                          },
+                          {
+                            "id": "ck-wp-2",
+                            "x": 1320,
+                            "y": 45
+                          }
+                        ],
+                        "properties": {}
+                      }
+                    },
+                    {
+                      "id": "ck-e10",
+                      "source": "ck-retry",
+                      "target": "ck-release",
+                      "type": "typed",
+                      "sourceHandle": "source-right",
+                      "targetHandle": "target-left",
+                      "data": {
+                        "edgeType": "false",
+                        "label": "exhausted",
+                        "properties": {}
+                      }
+                    },
+                    {
+                      "id": "ck-e11",
+                      "source": "ck-release",
+                      "target": "ck-declined",
+                      "type": "typed",
+                      "sourceHandle": "source-right",
+                      "targetHandle": "target-left",
+                      "data": {
+                        "edgeType": "next",
+                        "properties": {}
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "os-repo",
+              "type": "typed",
+              "position": {
+                "x": 40,
+                "y": 80
+              },
+              "data": {
+                "nodeType": "persist",
+                "label": "Order Repository",
+                "description": "",
+                "properties": {
+                  "target": "orders"
+                },
+                "tags": []
+              },
+              "parentId": "os-writemodel"
+            },
+            {
+              "id": "os-db",
+              "type": "typed",
+              "position": {
+                "x": 400,
+                "y": 80
+              },
+              "data": {
+                "nodeType": "aws-rds",
+                "label": "orders schema",
+                "description": "",
+                "properties": {
+                  "engine": "Postgres 16"
+                },
+                "tags": []
+              },
+              "parentId": "os-writemodel"
+            },
+            {
+              "id": "os-relay",
+              "type": "typed",
+              "position": {
+                "x": 1940,
+                "y": 300
+              },
+              "data": {
+                "nodeType": "worker",
+                "label": "Outbox Relay",
+                "description": "",
+                "properties": {
+                  "poll": "250ms"
+                },
+                "tags": [],
+                "linkedRequirementIds": [
+                  "REQ-7"
+                ]
+              }
+            },
+            {
+              "id": "os-topic",
+              "type": "typed",
+              "position": {
+                "x": 1940,
+                "y": 0
+              },
+              "data": {
+                "nodeType": "event-stream",
+                "label": "order-events",
+                "description": "",
+                "properties": {
+                  "partitions": "24"
+                },
+                "tags": []
+              }
+            },
+            {
+              "id": "os-payclient",
+              "type": "typed",
+              "position": {
+                "x": 720,
+                "y": 520
+              },
+              "data": {
+                "nodeType": "external-call",
+                "label": "Payment client",
+                "description": "",
+                "properties": {
+                  "target": "Payment.Authorize"
+                },
+                "tags": []
+              }
+            }
+          ],
+          "edges": [
+            {
+              "id": "os-e1",
+              "source": "os-endpoint",
+              "target": "os-idem",
+              "type": "typed",
+              "sourceHandle": "source-right",
+              "targetHandle": "target-left",
+              "data": {
+                "edgeType": "next",
+                "properties": {}
+              }
+            },
+            {
+              "id": "os-e2",
+              "source": "os-idem",
+              "target": "os-checkout",
+              "type": "typed",
+              "sourceHandle": "source-right",
+              "targetHandle": "target-left",
+              "data": {
+                "edgeType": "next",
+                "label": "miss",
+                "properties": {}
+              }
+            },
+            {
+              "id": "os-e3",
+              "source": "os-checkout",
+              "target": "os-repo",
+              "type": "typed",
+              "sourceHandle": "source-bottom",
+              "targetHandle": "target-top",
+              "data": {
+                "edgeType": "next",
+                "properties": {}
+              }
+            },
+            {
+              "id": "os-e4",
+              "source": "os-repo",
+              "target": "os-db",
+              "type": "typed",
+              "sourceHandle": "source-right",
+              "targetHandle": "target-left",
+              "data": {
+                "edgeType": "sql",
+                "label": "INSERT",
+                "properties": {}
+              }
+            },
+            {
+              "id": "os-e5",
+              "source": "os-relay",
+              "target": "os-db",
+              "type": "typed",
+              "sourceHandle": "source-left",
+              "targetHandle": "target-right",
+              "data": {
+                "edgeType": "sql",
+                "label": "polls outbox",
+                "direction": "reverse",
+                "properties": {}
+              }
+            },
+            {
+              "id": "os-e6",
+              "source": "os-relay",
+              "target": "os-topic",
+              "type": "typed",
+              "sourceHandle": "source-top",
+              "targetHandle": "target-bottom",
+              "data": {
+                "edgeType": "event-stream",
+                "label": "publish",
+                "properties": {}
+              }
+            },
+            {
+              "id": "os-e7",
+              "source": "os-checkout",
+              "target": "os-payclient",
+              "type": "typed",
+              "sourceHandle": "source-bottom",
+              "targetHandle": "target-top",
+              "data": {
+                "edgeType": "grpc",
+                "label": "Authorize",
+                "properties": {}
+              }
+            }
+          ]
+        }
+      },
+      "parentId": "g-vpc"
+    },
+    {
+      "id": "n-payment",
+      "type": "typed",
+      "position": {
+        "x": 40,
+        "y": 70
+      },
+      "data": {
+        "nodeType": "microservice",
+        "label": "Payment Service",
+        "description": "",
+        "properties": {
+          "runtime": "Kotlin",
+          "pci": "in scope"
+        },
+        "tags": [
+          "tier-0",
+          "pci"
+        ],
+        "linkedRequirementIds": [
+          "REQ-3",
+          "REQ-9",
+          "ADR-5",
+          "CON-1"
+        ]
+      },
+      "parentId": "g-pci"
+    },
+    {
+      "id": "n-redis",
+      "type": "typed",
+      "position": {
+        "x": 1060,
+        "y": 80
+      },
+      "data": {
+        "nodeType": "cache",
+        "label": "Redis Cache",
+        "description": "",
+        "properties": {
+          "engine": "Redis 7"
+        },
+        "tags": [],
+        "linkedRequirementIds": [
+          "ADR-8",
+          "REQ-6"
+        ]
+      },
+      "parentId": "g-vpc"
+    },
+    {
+      "id": "n-catalogdb",
+      "type": "typed",
+      "position": {
+        "x": 1060,
+        "y": 290
+      },
+      "data": {
+        "nodeType": "aws-dynamodb",
+        "label": "Catalog Store",
+        "description": "",
+        "properties": {
+          "billing": "on-demand"
+        },
+        "tags": []
+      },
+      "parentId": "g-vpc"
+    },
+    {
+      "id": "n-search",
+      "type": "typed",
+      "position": {
+        "x": 1560,
+        "y": 290
+      },
+      "data": {
+        "nodeType": "search-index",
+        "label": "Product Search",
+        "description": "",
+        "properties": {
+          "engine": "OpenSearch 2.13"
+        },
+        "tags": [],
+        "linkedRequirementIds": [
+          "REQ-5",
+          "ADR-4",
+          "RISK-3"
+        ]
+      },
+      "parentId": "g-vpc"
+    },
+    {
+      "id": "n-ordersdb",
+      "type": "typed",
+      "position": {
+        "x": 1060,
+        "y": 710
+      },
+      "data": {
+        "nodeType": "aws-rds",
+        "label": "Orders DB",
+        "description": "",
+        "properties": {
+          "engine": "Postgres 16",
+          "multiAz": "true"
+        },
+        "tags": [
+          "tier-0",
+          "stateful"
+        ]
+      },
+      "parentId": "g-vpc"
+    },
+    {
+      "id": "n-events",
+      "type": "typed",
+      "position": {
+        "x": 1560,
+        "y": 710
+      },
+      "data": {
+        "nodeType": "event-stream",
+        "label": "Order Events",
+        "description": "",
+        "properties": {
+          "engine": "MSK 3.7"
+        },
+        "tags": [],
+        "linkedRequirementIds": [
+          "ADR-1",
+          "REQ-7",
+          "RISK-1"
+        ]
+      },
+      "parentId": "g-vpc"
+    },
+    {
+      "id": "n-fulfil",
+      "type": "typed",
+      "position": {
+        "x": 1560,
+        "y": 920
+      },
+      "data": {
+        "nodeType": "worker",
+        "label": "Fulfillment Worker",
+        "description": "",
+        "properties": {
+          "group": "fulfillment-v2"
+        },
+        "tags": []
+      },
+      "parentId": "g-vpc"
+    },
+    {
+      "id": "n-recs",
+      "type": "typed",
+      "position": {
+        "x": 1560,
+        "y": 1130
+      },
+      "data": {
+        "nodeType": "custom",
+        "label": "Recommendations ML",
+        "description": "",
+        "properties": {
+          "status": "planned"
+        },
+        "tags": [
+          "planned"
+        ],
+        "icon": "Sparkles",
+        "color": "#9061F9"
+      },
+      "parentId": "g-vpc"
+    },
+    {
+      "id": "n-cloudwatch",
+      "type": "typed",
+      "position": {
+        "x": 2100,
+        "y": 200
+      },
+      "data": {
+        "nodeType": "aws-cloudwatch",
+        "label": "CloudWatch + X-Ray",
+        "description": "",
+        "properties": {},
+        "tags": [],
+        "linkedRequirementIds": [
+          "EPIC-5",
+          "ADR-6"
+        ]
+      },
+      "parentId": "g-region"
+    },
+    {
+      "id": "n-logs",
+      "type": "typed",
+      "position": {
+        "x": 2100,
+        "y": 480
+      },
+      "data": {
+        "nodeType": "logging",
+        "label": "Central Logs",
+        "description": "",
+        "properties": {
+          "retention": "90d"
+        },
+        "tags": []
+      },
+      "parentId": "g-region"
+    },
+    {
+      "id": "n-okta",
+      "type": "typed",
+      "position": {
+        "x": 2950,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "identity-provider",
+        "label": "Okta",
+        "description": "",
+        "properties": {
+          "protocol": "OIDC"
+        },
+        "tags": [],
+        "linkedRequirementIds": [
+          "DEP-2",
+          "REQ-10"
+        ]
+      }
+    },
+    {
+      "id": "n-ship",
+      "type": "typed",
+      "position": {
+        "x": 2950,
+        "y": 1000
+      },
+      "data": {
+        "nodeType": "external-api",
+        "label": "ShipBridge API",
+        "description": "",
+        "properties": {
+          "protocol": "REST"
+        },
+        "tags": []
+      }
+    },
+    {
+      "id": "n-stripe",
+      "type": "typed",
+      "position": {
+        "x": 900,
+        "y": 1580
+      },
+      "data": {
+        "nodeType": "payment-processor",
+        "label": "Stripe",
+        "description": "",
+        "properties": {
+          "api": "PI v2"
+        },
+        "tags": [],
+        "linkedRequirementIds": [
+          "CON-1",
+          "DEP-1"
+        ]
+      }
+    },
+    {
+      "id": "n-pipeline",
+      "type": "typed",
+      "position": {
+        "x": -100,
+        "y": 1580
+      },
+      "data": {
+        "nodeType": "deploy",
+        "label": "Delivery Pipeline",
+        "description": "Drill in for the release path",
+        "properties": {
+          "tool": "GH Actions"
+        },
+        "tags": [],
+        "hasSubDiagram": true,
+        "linkedRequirementIds": [
+          "CON-3"
+        ],
+        "subDiagram": {
+          "nodes": [
+            {
+              "id": "pl-main",
+              "type": "typed",
+              "position": {
+                "x": 0,
+                "y": 0
+              },
+              "data": {
+                "nodeType": "branch",
+                "label": "main",
+                "description": "",
+                "properties": {
+                  "protected": "true"
+                },
+                "tags": []
+              }
+            },
+            {
+              "id": "pl-feature",
+              "type": "typed",
+              "position": {
+                "x": 0,
+                "y": 220
+              },
+              "data": {
+                "nodeType": "branch",
+                "label": "feature/checkout-v2",
+                "description": "",
+                "properties": {},
+                "tags": []
+              }
+            },
+            {
+              "id": "pl-commit",
+              "type": "typed",
+              "position": {
+                "x": 320,
+                "y": 220
+              },
+              "data": {
+                "nodeType": "commit",
+                "label": "feat: idempotency keys",
+                "description": "",
+                "properties": {},
+                "tags": []
+              }
+            },
+            {
+              "id": "pl-pr",
+              "type": "typed",
+              "position": {
+                "x": 640,
+                "y": 220
+              },
+              "data": {
+                "nodeType": "pull-request",
+                "label": "PR #482",
+                "description": "",
+                "properties": {
+                  "status": "open"
+                },
+                "tags": []
+              }
+            },
+            {
+              "id": "pl-review",
+              "type": "typed",
+              "position": {
+                "x": 960,
+                "y": 220
+              },
+              "data": {
+                "nodeType": "code-review",
+                "label": "Code review",
+                "description": "",
+                "properties": {
+                  "approvals": "2"
+                },
+                "tags": []
+              }
+            },
+            {
+              "id": "pl-merge",
+              "type": "typed",
+              "position": {
+                "x": 1280,
+                "y": 0
+              },
+              "data": {
+                "nodeType": "merge",
+                "label": "Squash merge",
+                "description": "",
+                "properties": {},
+                "tags": []
+              }
+            },
+            {
+              "id": "pl-tag",
+              "type": "typed",
+              "position": {
+                "x": 1280,
+                "y": -220
+              },
+              "data": {
+                "nodeType": "tag",
+                "label": "v2.0.0",
+                "description": "",
+                "properties": {},
+                "tags": []
+              }
+            },
+            {
+              "id": "pl-build",
+              "type": "typed",
+              "position": {
+                "x": 1600,
+                "y": 0
+              },
+              "data": {
+                "nodeType": "build",
+                "label": "Build & sign",
+                "description": "",
+                "properties": {},
+                "tags": []
+              }
+            },
+            {
+              "id": "pl-test",
+              "type": "typed",
+              "position": {
+                "x": 1920,
+                "y": 0
+              },
+              "data": {
+                "nodeType": "ci-test",
+                "label": "Unit + E2E",
+                "description": "",
+                "properties": {},
+                "tags": []
+              }
+            },
+            {
+              "id": "pl-staging",
+              "type": "typed",
+              "position": {
+                "x": 2240,
+                "y": 0
+              },
+              "data": {
+                "nodeType": "environment",
+                "label": "staging",
+                "description": "",
+                "properties": {},
+                "tags": []
+              }
+            },
+            {
+              "id": "pl-flag",
+              "type": "typed",
+              "position": {
+                "x": 2240,
+                "y": -220
+              },
+              "data": {
+                "nodeType": "feature-flag",
+                "label": "checkout_v2_enabled",
+                "description": "",
+                "properties": {
+                  "rollout": "5/25/100%"
+                },
+                "tags": [],
+                "linkedRequirementIds": [
+                  "TICKET-25"
+                ]
+              }
+            },
+            {
+              "id": "pl-canary",
+              "type": "typed",
+              "position": {
+                "x": 2560,
+                "y": 0
+              },
+              "data": {
+                "nodeType": "canary-release",
+                "label": "Canary 5%",
+                "description": "",
+                "properties": {},
+                "tags": []
+              }
+            },
+            {
+              "id": "pl-prod",
+              "type": "typed",
+              "position": {
+                "x": 2880,
+                "y": 0
+              },
+              "data": {
+                "nodeType": "environment",
+                "label": "production",
+                "description": "",
+                "properties": {},
+                "tags": []
+              }
+            },
+            {
+              "id": "pl-rollback",
+              "type": "typed",
+              "position": {
+                "x": 2560,
+                "y": 220
+              },
+              "data": {
+                "nodeType": "rollback",
+                "label": "Auto rollback",
+                "description": "On SLO burn (#TICKET-24)",
+                "properties": {},
+                "tags": []
+              }
+            }
+          ],
+          "edges": [
+            {
+              "id": "pl-e1",
+              "source": "pl-main",
+              "target": "pl-feature",
+              "type": "typed",
+              "sourceHandle": "source-bottom",
+              "targetHandle": "target-top",
+              "data": {
+                "edgeType": "branches-from",
+                "properties": {}
+              }
+            },
+            {
+              "id": "pl-e2",
+              "source": "pl-feature",
+              "target": "pl-commit",
+              "type": "typed",
+              "sourceHandle": "source-right",
+              "targetHandle": "target-left",
+              "data": {
+                "edgeType": "next",
+                "properties": {}
+              }
+            },
+            {
+              "id": "pl-e3",
+              "source": "pl-commit",
+              "target": "pl-pr",
+              "type": "typed",
+              "sourceHandle": "source-right",
+              "targetHandle": "target-left",
+              "data": {
+                "edgeType": "next",
+                "properties": {}
+              }
+            },
+            {
+              "id": "pl-e4",
+              "source": "pl-pr",
+              "target": "pl-review",
+              "type": "typed",
+              "sourceHandle": "source-right",
+              "targetHandle": "target-left",
+              "data": {
+                "edgeType": "next",
+                "properties": {}
+              }
+            },
+            {
+              "id": "pl-e5",
+              "source": "pl-review",
+              "target": "pl-merge",
+              "type": "typed",
+              "sourceHandle": "source-top",
+              "targetHandle": "target-left",
+              "data": {
+                "edgeType": "merges-into",
+                "properties": {}
+              }
+            },
+            {
+              "id": "pl-e6",
+              "source": "pl-merge",
+              "target": "pl-tag",
+              "type": "typed",
+              "sourceHandle": "source-top",
+              "targetHandle": "target-bottom",
+              "data": {
+                "edgeType": "tags",
+                "properties": {}
+              }
+            },
+            {
+              "id": "pl-e7",
+              "source": "pl-merge",
+              "target": "pl-build",
+              "type": "typed",
+              "sourceHandle": "source-right",
+              "targetHandle": "target-left",
+              "data": {
+                "edgeType": "next",
+                "properties": {}
+              }
+            },
+            {
+              "id": "pl-e8",
+              "source": "pl-build",
+              "target": "pl-test",
+              "type": "typed",
+              "sourceHandle": "source-right",
+              "targetHandle": "target-left",
+              "data": {
+                "edgeType": "next",
+                "properties": {}
+              }
+            },
+            {
+              "id": "pl-e9",
+              "source": "pl-test",
+              "target": "pl-staging",
+              "type": "typed",
+              "sourceHandle": "source-right",
+              "targetHandle": "target-left",
+              "data": {
+                "edgeType": "deploys-to",
+                "properties": {}
+              }
+            },
+            {
+              "id": "pl-e10",
+              "source": "pl-staging",
+              "target": "pl-canary",
+              "type": "typed",
+              "sourceHandle": "source-right",
+              "targetHandle": "target-left",
+              "data": {
+                "edgeType": "deploys-to",
+                "properties": {}
+              }
+            },
+            {
+              "id": "pl-e11",
+              "source": "pl-canary",
+              "target": "pl-prod",
+              "type": "typed",
+              "sourceHandle": "source-right",
+              "targetHandle": "target-left",
+              "data": {
+                "edgeType": "deploys-to",
+                "properties": {}
+              }
+            },
+            {
+              "id": "pl-e12",
+              "source": "pl-flag",
+              "target": "pl-canary",
+              "type": "typed",
+              "sourceHandle": "source-right",
+              "targetHandle": "target-top",
+              "data": {
+                "edgeType": "blank-dashed",
+                "label": "gates",
+                "properties": {}
+              }
+            },
+            {
+              "id": "pl-e13",
+              "source": "pl-canary",
+              "target": "pl-rollback",
+              "type": "typed",
+              "sourceHandle": "source-bottom",
+              "targetHandle": "target-top",
+              "data": {
+                "edgeType": "on-error",
+                "label": "SLO breach",
+                "properties": {}
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "n-event-schema",
+      "type": "code",
+      "position": {
+        "x": 1400,
+        "y": 1560
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "OrderPlaced v1 (JSON)",
+        "description": "",
+        "properties": {},
+        "tags": [],
+        "codeLanguage": "json",
+        "codeContent": "{\n  \"eventType\": \"OrderPlaced\",\n  \"schemaVersion\": 1,\n  \"orderId\": \"ord_01J9ZK3Q7T\",\n  \"customerId\": \"cus_guest_7f2a\",\n  \"idempotencyKey\": \"6c1e9b1e-4f0e-4f45-9c2b-4a1d5e3f2b10\",\n  \"totalMinor\": 12999,\n  \"currency\": \"USD\",\n  \"lines\": [\n    {\n      \"sku\": \"NW-TEE-BLK-M\",\n      \"qty\": 2,\n      \"unitMinor\": 4500\n    }\n  ],\n  \"placedAt\": \"2026-10-12T15:04:05Z\"\n}"
+      },
+      "width": 440,
+      "height": 300
+    },
+    {
+      "id": "n-runbook",
+      "type": "shape",
+      "position": {
+        "x": 1900,
+        "y": 1590
+      },
+      "data": {
+        "nodeType": "document",
+        "label": "Checkout runbook",
+        "description": "",
+        "properties": {},
+        "tags": [],
+        "color": "#F2994A"
+      },
+      "width": 140,
+      "height": 110
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-shop-web",
+      "source": "n-shopper",
+      "target": "n-web",
+      "type": "typed",
+      "sourceHandle": "source-right",
+      "targetHandle": "target-left",
+      "data": {
+        "edgeType": "blank-solid",
+        "label": "browses",
+        "properties": {}
+      }
+    },
+    {
+      "id": "e-shop-mobile",
+      "source": "n-shopper",
+      "target": "n-mobile",
+      "type": "typed",
+      "sourceHandle": "source-right",
+      "targetHandle": "target-left",
+      "data": {
+        "edgeType": "blank-dashed",
+        "label": "taps",
+        "properties": {}
+      }
+    },
+    {
+      "id": "e-web-cdn",
+      "source": "n-web",
+      "target": "n-cdn",
+      "type": "typed",
+      "sourceHandle": "source-right",
+      "targetHandle": "target-left",
+      "data": {
+        "edgeType": "http",
+        "label": "HTTPS",
+        "properties": {
+          "protocol": "HTTP/2",
+          "tls": "1.3"
+        }
+      }
+    },
+    {
+      "id": "e-mobile-gw",
+      "source": "n-mobile",
+      "target": "n-apigw",
+      "type": "typed",
+      "sourceHandle": "source-right",
+      "targetHandle": "target-bottom",
+      "data": {
+        "edgeType": "http",
+        "label": "HTTPS",
+        "labelAnchorT": 0.3,
+        "properties": {}
+      }
+    },
+    {
+      "id": "e-cdn-gw",
+      "source": "n-cdn",
+      "target": "n-apigw",
+      "type": "typed",
+      "sourceHandle": "source-right",
+      "targetHandle": "target-left",
+      "data": {
+        "edgeType": "http",
+        "label": "origin",
+        "properties": {}
+      }
+    },
+    {
+      "id": "e-gw-okta",
+      "source": "n-apigw",
+      "target": "n-okta",
+      "type": "typed",
+      "sourceHandle": "source-top",
+      "targetHandle": "target-left",
+      "data": {
+        "edgeType": "http",
+        "label": "JWKS",
+        "direction": "both",
+        "color": "#9061F9",
+        "waypoints": [
+          {
+            "id": "wp-1",
+            "x": 520,
+            "y": 40
+          },
+          {
+            "id": "wp-2",
+            "x": 2890,
+            "y": 40
+          }
+        ],
+        "labelAnchorT": 0.5,
+        "properties": {}
+      }
+    },
+    {
+      "id": "e-gw-catalog",
+      "source": "n-apigw",
+      "target": "n-catalog",
+      "type": "typed",
+      "sourceHandle": "source-right",
+      "targetHandle": "target-left",
+      "data": {
+        "edgeType": "grpc",
+        "label": "GetProduct",
+        "properties": {}
+      }
+    },
+    {
+      "id": "e-gw-order",
+      "source": "n-apigw",
+      "target": "n-order",
+      "type": "typed",
+      "sourceHandle": "source-right",
+      "targetHandle": "target-left",
+      "data": {
+        "edgeType": "grpc",
+        "label": "CreateOrder",
+        "strokeWidth": 3,
+        "properties": {
+          "deadline": "3s"
+        }
+      }
+    },
+    {
+      "id": "e-order-pay",
+      "source": "n-order",
+      "target": "n-payment",
+      "type": "typed",
+      "sourceHandle": "source-bottom",
+      "targetHandle": "target-top",
+      "data": {
+        "edgeType": "grpc",
+        "label": "Authorize",
+        "properties": {}
+      }
+    },
+    {
+      "id": "e-pay-stripe",
+      "source": "n-payment",
+      "target": "n-stripe",
+      "type": "typed",
+      "sourceHandle": "source-bottom",
+      "targetHandle": "target-top",
+      "data": {
+        "edgeType": "http",
+        "label": "Payment Intents",
+        "color": "#635BFF",
+        "strokeWidth": 3,
+        "properties": {
+          "timeout": "1.5s"
+        }
+      }
+    },
+    {
+      "id": "e-stripe-pay",
+      "source": "n-stripe",
+      "target": "n-payment",
+      "type": "typed",
+      "sourceHandle": "source-right",
+      "targetHandle": "target-right",
+      "data": {
+        "edgeType": "webhook",
+        "label": "webhook",
+        "properties": {}
+      }
+    },
+    {
+      "id": "e-catalog-redis",
+      "source": "n-catalog",
+      "target": "n-redis",
+      "type": "typed",
+      "sourceHandle": "source-right",
+      "targetHandle": "target-left",
+      "data": {
+        "edgeType": "tcp",
+        "label": "cache-aside",
+        "properties": {}
+      }
+    },
+    {
+      "id": "e-catalog-db",
+      "source": "n-catalog",
+      "target": "n-catalogdb",
+      "type": "typed",
+      "sourceHandle": "source-right",
+      "targetHandle": "target-left",
+      "data": {
+        "edgeType": "http",
+        "label": "read",
+        "properties": {}
+      }
+    },
+    {
+      "id": "e-catalog-search",
+      "source": "n-catalog",
+      "target": "n-search",
+      "type": "typed",
+      "sourceHandle": "source-top",
+      "targetHandle": "target-top",
+      "data": {
+        "edgeType": "http",
+        "label": "search",
+        "waypoints": [
+          {
+            "id": "wp-3",
+            "x": 1020,
+            "y": 325
+          },
+          {
+            "id": "wp-4",
+            "x": 2020,
+            "y": 325
+          }
+        ],
+        "properties": {}
+      }
+    },
+    {
+      "id": "e-db-search",
+      "source": "n-catalogdb",
+      "target": "n-search",
+      "type": "typed",
+      "sourceHandle": "source-right",
+      "targetHandle": "target-left",
+      "data": {
+        "edgeType": "replication",
+        "label": "streams",
+        "properties": {}
+      }
+    },
+    {
+      "id": "e-order-db",
+      "source": "n-order",
+      "target": "n-ordersdb",
+      "type": "typed",
+      "sourceHandle": "source-right",
+      "targetHandle": "target-left",
+      "data": {
+        "edgeType": "sql",
+        "label": "JDBC",
+        "properties": {}
+      }
+    },
+    {
+      "id": "e-ordersdb-events",
+      "source": "n-ordersdb",
+      "target": "n-events",
+      "type": "typed",
+      "sourceHandle": "source-right",
+      "targetHandle": "target-left",
+      "data": {
+        "edgeType": "event-stream",
+        "label": "outbox",
+        "properties": {
+          "semantics": "at-least-once"
+        }
+      }
+    },
+    {
+      "id": "e-events-fulfil",
+      "source": "n-events",
+      "target": "n-fulfil",
+      "type": "typed",
+      "sourceHandle": "source-bottom",
+      "targetHandle": "target-top",
+      "data": {
+        "edgeType": "event-stream",
+        "label": "OrderPlaced",
+        "properties": {}
+      }
+    },
+    {
+      "id": "e-events-recs",
+      "source": "n-events",
+      "target": "n-recs",
+      "type": "typed",
+      "sourceHandle": "source-right",
+      "targetHandle": "target-right",
+      "data": {
+        "edgeType": "event-stream",
+        "hideLabel": true,
+        "waypoints": [
+          {
+            "id": "wp-5",
+            "x": 2270,
+            "y": 835
+          },
+          {
+            "id": "wp-6",
+            "x": 2270,
+            "y": 1255
+          }
+        ],
+        "properties": {}
+      }
+    },
+    {
+      "id": "e-fulfil-ship",
+      "source": "n-fulfil",
+      "target": "n-ship",
+      "type": "typed",
+      "sourceHandle": "source-right",
+      "targetHandle": "target-left",
+      "data": {
+        "edgeType": "http",
+        "label": "create shipment",
+        "properties": {}
+      }
+    },
+    {
+      "id": "e-ship-fulfil",
+      "source": "n-ship",
+      "target": "n-fulfil",
+      "type": "typed",
+      "sourceHandle": "source-bottom",
+      "targetHandle": "target-bottom",
+      "data": {
+        "edgeType": "webhook",
+        "label": "tracking",
+        "waypoints": [
+          {
+            "id": "wp-7",
+            "x": 3050,
+            "y": 1160
+          },
+          {
+            "id": "wp-8",
+            "x": 2020,
+            "y": 1160
+          }
+        ],
+        "properties": {}
+      }
+    },
+    {
+      "id": "e-vpc-cw",
+      "source": "g-vpc",
+      "target": "n-cloudwatch",
+      "type": "typed",
+      "sourceHandle": "source-right",
+      "targetHandle": "target-left",
+      "data": {
+        "edgeType": "blank-dotted",
+        "label": "OTel",
+        "color": "#22B8CF",
+        "properties": {}
+      }
+    },
+    {
+      "id": "e-vpc-logs",
+      "source": "g-vpc",
+      "target": "n-logs",
+      "type": "typed",
+      "sourceHandle": "source-right",
+      "targetHandle": "target-left",
+      "data": {
+        "edgeType": "generic",
+        "label": "logs",
+        "properties": {}
+      }
+    },
+    {
+      "id": "e-pipeline-region",
+      "source": "n-pipeline",
+      "target": "g-region",
+      "type": "typed",
+      "sourceHandle": "source-top",
+      "targetHandle": "target-bottom",
+      "data": {
+        "edgeType": "deploys-to",
+        "label": "Argo CD",
+        "routing": "straight",
+        "properties": {}
+      }
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "sc-checkout",
+      "title": "Checkout - happy path",
+      "steps": [
+        {
+          "id": "sc1-1",
+          "title": "Shopper places an order",
+          "narration": "The storefront sends CreateOrder through CloudFront to the API Gateway with an Idempotency-Key header.",
+          "path": [],
+          "focusNodeIds": [
+            "n-shopper",
+            "n-web",
+            "n-cdn",
+            "n-apigw"
+          ],
+          "focusEdgeIds": [
+            "e-shop-web",
+            "e-web-cdn",
+            "e-cdn-gw"
+          ]
+        },
+        {
+          "id": "sc1-2",
+          "title": "Gateway routes to Order Service",
+          "narration": "Token validated against Okta JWKS, then routed over gRPC.",
+          "path": [],
+          "focusNodeIds": [
+            "n-apigw",
+            "n-okta",
+            "n-order"
+          ],
+          "focusEdgeIds": [
+            "e-gw-okta",
+            "e-gw-order"
+          ]
+        },
+        {
+          "id": "sc1-3",
+          "title": "Idempotency check",
+          "narration": "A replayed key returns the stored response; a new key continues into the handler.",
+          "path": [
+            "n-order"
+          ],
+          "focusNodeIds": [
+            "os-endpoint",
+            "os-idem",
+            "os-checkout"
+          ],
+          "focusEdgeIds": [
+            "os-e1",
+            "os-e2"
+          ]
+        },
+        {
+          "id": "sc1-4",
+          "title": "Reserve stock and authorize payment",
+          "narration": "Inventory is held for 15 minutes, then Payment Service authorizes the card via Stripe.",
+          "path": [
+            "n-order",
+            "os-checkout"
+          ],
+          "focusNodeIds": [
+            "ck-validate",
+            "ck-authz",
+            "ck-reserve",
+            "ck-instock",
+            "ck-pay"
+          ],
+          "focusEdgeIds": [
+            "ck-e1",
+            "ck-e2",
+            "ck-e3",
+            "ck-e4"
+          ]
+        },
+        {
+          "id": "sc1-5",
+          "title": "Commit order + outbox atomically",
+          "narration": "One database transaction writes the order and its OrderPlaced outbox row.",
+          "path": [
+            "n-order",
+            "os-checkout"
+          ],
+          "focusNodeIds": [
+            "ck-persist",
+            "ck-return"
+          ],
+          "focusEdgeIds": [
+            "ck-e6",
+            "ck-e7"
+          ]
+        },
+        {
+          "id": "sc1-6",
+          "title": "Event fan-out",
+          "narration": "The outbox relay publishes to MSK; fulfillment and (soon) recommendations consume it.",
+          "path": [],
+          "focusNodeIds": [
+            "n-ordersdb",
+            "n-events",
+            "n-fulfil",
+            "n-recs",
+            "n-ship"
+          ],
+          "focusEdgeIds": [
+            "e-ordersdb-events",
+            "e-events-fulfil",
+            "e-events-recs",
+            "e-fulfil-ship"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sc-decline",
+      "title": "Payment declined / timeout",
+      "steps": [
+        {
+          "id": "sc2-1",
+          "title": "Authorization fails",
+          "narration": "Stripe returns a decline, or the call times out after 1.5s.",
+          "path": [],
+          "focusNodeIds": [
+            "n-order",
+            "n-payment",
+            "n-stripe"
+          ],
+          "focusEdgeIds": [
+            "e-order-pay",
+            "e-pay-stripe"
+          ]
+        },
+        {
+          "id": "sc2-2",
+          "title": "Bounded retries",
+          "narration": "Transient failures retry up to 3 times with exponential backoff.",
+          "path": [
+            "n-order",
+            "os-checkout"
+          ],
+          "focusNodeIds": [
+            "ck-pay",
+            "ck-retry"
+          ],
+          "focusEdgeIds": [
+            "ck-e8",
+            "ck-e9"
+          ]
+        },
+        {
+          "id": "sc2-3",
+          "title": "Release the hold and return 402",
+          "narration": "Inventory is released immediately rather than waiting for the TTL (#RISK-2).",
+          "path": [
+            "n-order",
+            "os-checkout"
+          ],
+          "focusNodeIds": [
+            "ck-retry",
+            "ck-release",
+            "ck-declined"
+          ],
+          "focusEdgeIds": [
+            "ck-e10",
+            "ck-e11"
+          ]
+        },
+        {
+          "id": "sc2-4",
+          "title": "Async confirmation via webhook",
+          "narration": "3-D Secure flows complete later; Stripe notifies Payment Service by webhook.",
+          "path": [],
+          "focusNodeIds": [
+            "n-stripe",
+            "n-payment"
+          ],
+          "focusEdgeIds": [
+            "e-stripe-pay"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sc-release",
+      "title": "Shipping a change to production",
+      "steps": [
+        {
+          "id": "sc3-1",
+          "title": "Feature branch to PR",
+          "path": [
+            "n-pipeline"
+          ],
+          "focusNodeIds": [
+            "pl-feature",
+            "pl-commit",
+            "pl-pr",
+            "pl-review"
+          ],
+          "focusEdgeIds": [
+            "pl-e2",
+            "pl-e3",
+            "pl-e4"
+          ],
+          "narration": "Every change lands through a reviewed PR with CODEOWNERS approval."
+        },
+        {
+          "id": "sc3-2",
+          "title": "Merge, tag, build, test",
+          "path": [
+            "n-pipeline"
+          ],
+          "focusNodeIds": [
+            "pl-merge",
+            "pl-tag",
+            "pl-build",
+            "pl-test"
+          ],
+          "focusEdgeIds": [
+            "pl-e5",
+            "pl-e6",
+            "pl-e7",
+            "pl-e8"
+          ],
+          "narration": "Signed images are built once and promoted, never rebuilt per environment."
+        },
+        {
+          "id": "sc3-3",
+          "title": "Progressive delivery",
+          "path": [
+            "n-pipeline"
+          ],
+          "focusNodeIds": [
+            "pl-staging",
+            "pl-flag",
+            "pl-canary",
+            "pl-prod",
+            "pl-rollback"
+          ],
+          "focusEdgeIds": [
+            "pl-e9",
+            "pl-e10",
+            "pl-e11",
+            "pl-e12",
+            "pl-e13"
+          ],
+          "narration": "A 5% canary behind checkout_v2_enabled; an SLO breach rolls back automatically."
+        },
+        {
+          "id": "sc3-4",
+          "title": "Synced to the cluster",
+          "path": [],
+          "focusNodeIds": [
+            "n-pipeline",
+            "g-region"
+          ],
+          "focusEdgeIds": [
+            "e-pipeline-region"
+          ],
+          "narration": "Argo CD reconciles the region. Remember the holiday freeze (#CON-3)."
+        }
+      ]
+    }
+  ],
+  "requirements": {
+    "itemTypes": [
+      {
+        "id": "requirement",
+        "label": "Requirement",
+        "prefix": "REQ",
+        "color": "#5b7cfa",
+        "isBuiltIn": true,
+        "isWorkable": false
+      },
+      {
+        "id": "goal",
+        "label": "Goal",
+        "prefix": "GOAL",
+        "color": "#0FA36B",
+        "isBuiltIn": true,
+        "isWorkable": false
+      },
+      {
+        "id": "constraint",
+        "label": "Constraint",
+        "prefix": "CON",
+        "color": "#F2994A",
+        "isBuiltIn": true,
+        "isWorkable": false
+      },
+      {
+        "id": "assumption",
+        "label": "Assumption",
+        "prefix": "ASM",
+        "color": "#9061F9",
+        "isBuiltIn": true,
+        "isWorkable": false
+      },
+      {
+        "id": "risk",
+        "label": "Risk",
+        "prefix": "RISK",
+        "color": "#F0578C",
+        "isBuiltIn": true,
+        "isWorkable": false
+      },
+      {
+        "id": "epic",
+        "label": "Epic",
+        "prefix": "EPIC",
+        "color": "#8b5cf6",
+        "isBuiltIn": true,
+        "isWorkable": false
+      },
+      {
+        "id": "dependency",
+        "label": "Dependency",
+        "prefix": "DEP",
+        "color": "#f59e0b",
+        "isBuiltIn": true,
+        "isWorkable": false
+      },
+      {
+        "id": "ticket",
+        "label": "Ticket",
+        "prefix": "TICKET",
+        "color": "#22B8CF",
+        "isBuiltIn": true,
+        "isWorkable": true
+      },
+      {
+        "id": "decision",
+        "label": "Decision",
+        "prefix": "ADR",
+        "color": "#14B8A6",
+        "isBuiltIn": true,
+        "isWorkable": false
+      },
+      {
+        "id": "custom-1",
+        "label": "Spike",
+        "prefix": "SPIKE",
+        "color": "#EAB308",
+        "isBuiltIn": false,
+        "isWorkable": true
+      },
+      {
+        "id": "custom-2",
+        "label": "Bug",
+        "prefix": "BUG",
+        "color": "#EF4444",
+        "isBuiltIn": false,
+        "isWorkable": true
+      }
+    ],
+    "categories": [
+      {
+        "id": "cat-checkout",
+        "label": "Checkout & Payments",
+        "color": "#5B7CFA"
+      },
+      {
+        "id": "cat-catalog",
+        "label": "Catalog & Search",
+        "color": "#0FA36B"
+      },
+      {
+        "id": "cat-platform",
+        "label": "Platform & Reliability",
+        "color": "#F2994A"
+      },
+      {
+        "id": "cat-security",
+        "label": "Security & Compliance",
+        "color": "#F0578C"
+      },
+      {
+        "id": "cat-observability",
+        "label": "Observability",
+        "color": "#22B8CF"
+      },
+      {
+        "id": "cat-events",
+        "label": "Events & Fulfillment",
+        "color": "#9061F9"
+      }
+    ],
+    "items": [
+      {
+        "id": "GOAL-1",
+        "typeId": "goal",
+        "title": "Reduce checkout abandonment by 15%",
+        "body": "Baseline abandonment is **68%** (GA4, Q2 2026). Target **58%** by end of Q1 2027.\n\nPrimary levers: guest checkout (#REQ-1), faster payment authorization (#REQ-3).",
+        "categoryId": "cat-checkout",
+        "tags": [
+          "okr"
+        ]
+      },
+      {
+        "id": "GOAL-2",
+        "typeId": "goal",
+        "title": "99.95% availability on the checkout path",
+        "body": "Measured as successful `CreateOrder` responses / valid attempts over a rolling 28 days.\n\n| Window | Error budget |\n|---|---|\n| 28 days | 20m 9s |\n| Holiday peak week | 5m 2s |",
+        "categoryId": "cat-platform",
+        "tags": [
+          "okr",
+          "slo"
+        ]
+      },
+      {
+        "id": "GOAL-3",
+        "typeId": "goal",
+        "title": "PCI DSS 4.0 compliance before holiday peak",
+        "body": "Pass the QSA assessment by **Nov 13** so the CDE is certified before Black Friday. See #EPIC-4.",
+        "categoryId": "cat-security",
+        "tags": [
+          "okr",
+          "compliance"
+        ]
+      },
+      {
+        "id": "REQ-1",
+        "typeId": "requirement",
+        "title": "Guest checkout",
+        "body": "Shoppers can complete a purchase without creating an account.\n\n**Acceptance criteria**\n- [ ] Email is the only required identity field\n- [ ] Guest orders can be claimed after sign-up\n- [ ] Guest tokens are scoped to a single order",
+        "categoryId": "cat-checkout",
+        "tags": [
+          "mvp"
+        ]
+      },
+      {
+        "id": "REQ-2",
+        "typeId": "requirement",
+        "title": "Idempotent order creation",
+        "body": "Retrying `POST /v2/orders` with the same `Idempotency-Key` must never create a second order. Keys are retained for 24h. Root cause context: #BUG-1.",
+        "categoryId": "cat-checkout",
+        "tags": [
+          "correctness"
+        ]
+      },
+      {
+        "id": "REQ-3",
+        "typeId": "requirement",
+        "title": "Payment authorization p95 under 2s",
+        "body": "Measured from Order Service request to Stripe authorization result, excluding 3-D Secure challenges.",
+        "categoryId": "cat-checkout",
+        "tags": [
+          "performance",
+          "nfr"
+        ]
+      },
+      {
+        "id": "REQ-4",
+        "typeId": "requirement",
+        "title": "Real-time inventory reservation",
+        "body": "Stock is held at checkout for 15 minutes and released on payment failure or expiry. Mitigates #RISK-2.",
+        "categoryId": "cat-checkout"
+      },
+      {
+        "id": "REQ-5",
+        "typeId": "requirement",
+        "title": "Typo-tolerant product search",
+        "body": "Queries with up to two character edits return relevant results (e.g. `sneekers` -> sneakers).",
+        "categoryId": "cat-catalog",
+        "tags": [
+          "search"
+        ]
+      },
+      {
+        "id": "REQ-6",
+        "typeId": "requirement",
+        "title": "Catalog read latency p99 under 150ms",
+        "body": "For `GET /v2/products/{sku}` at 8x baseline traffic (#ASM-1).",
+        "categoryId": "cat-catalog",
+        "tags": [
+          "performance",
+          "nfr"
+        ]
+      },
+      {
+        "id": "REQ-7",
+        "typeId": "requirement",
+        "title": "Order events are published effectively-once",
+        "body": "Every committed order produces exactly one `OrderPlaced` event as observed by consumers (at-least-once delivery + consumer de-duplication).",
+        "categoryId": "cat-events"
+      },
+      {
+        "id": "REQ-8",
+        "typeId": "requirement",
+        "title": "Distributed tracing across the checkout path",
+        "body": "A single trace spans gateway -> order -> payment -> Stripe and continues through Kafka headers.",
+        "categoryId": "cat-observability"
+      },
+      {
+        "id": "REQ-9",
+        "typeId": "requirement",
+        "title": "Cardholder data never stored outside PCI scope",
+        "body": "PAN and CVV must not be logged, cached or persisted by any component outside the CDE trust boundary.",
+        "categoryId": "cat-security",
+        "tags": [
+          "pci"
+        ]
+      },
+      {
+        "id": "REQ-10",
+        "typeId": "requirement",
+        "title": "SSO for internal admin tools",
+        "body": "Admin console access via Okta OIDC with SCIM de-provisioning within 1 hour.",
+        "categoryId": "cat-security"
+      },
+      {
+        "id": "CON-1",
+        "typeId": "constraint",
+        "title": "Stripe is the payment processor",
+        "body": "Contractual through 2028. Any design must work within Stripe Payment Intents.",
+        "categoryId": "cat-checkout",
+        "tags": [
+          "contract"
+        ]
+      },
+      {
+        "id": "CON-2",
+        "typeId": "constraint",
+        "title": "US data residency",
+        "body": "All customer PII stays in us-east-1 / us-west-2.",
+        "categoryId": "cat-security",
+        "tags": [
+          "legal"
+        ]
+      },
+      {
+        "id": "CON-3",
+        "typeId": "constraint",
+        "title": "Holiday code freeze Nov 20 - Jan 2",
+        "body": "Only P1 fixes, approved by the incident commander, may deploy during the freeze.",
+        "categoryId": "cat-platform",
+        "tags": [
+          "process"
+        ]
+      },
+      {
+        "id": "ASM-1",
+        "typeId": "assumption",
+        "title": "Peak traffic is 8x baseline on Black Friday",
+        "body": "Based on 2024-2025 peaks (7.2x and 7.8x). Load tests target 8x with 25% headroom.",
+        "categoryId": "cat-platform"
+      },
+      {
+        "id": "ASM-2",
+        "typeId": "assumption",
+        "title": "Stripe API meets its 99.99% SLA",
+        "body": "Our 99.95% goal (#GOAL-2) assumes Stripe is not the dominant source of errors.",
+        "categoryId": "cat-checkout"
+      },
+      {
+        "id": "RISK-1",
+        "typeId": "risk",
+        "title": "Thin Kafka operational expertise",
+        "body": "**Likelihood:** medium | **Impact:** high\n\nOnly one engineer has run Kafka in production. Mitigation: managed MSK (#ADR-1), runbooks, game day (#TICKET-27).",
+        "categoryId": "cat-platform"
+      },
+      {
+        "id": "RISK-2",
+        "typeId": "risk",
+        "title": "Inventory oversell during flash sales",
+        "body": "**Likelihood:** high | **Impact:** medium\n\nMitigated by reservations (#REQ-4).",
+        "categoryId": "cat-checkout"
+      },
+      {
+        "id": "RISK-3",
+        "typeId": "risk",
+        "title": "Search reindex exceeds maintenance window",
+        "body": "A full reindex takes ~5h today. Mitigation: blue/green aliases (#TICKET-26).",
+        "categoryId": "cat-catalog"
+      },
+      {
+        "id": "DEP-1",
+        "typeId": "dependency",
+        "title": "Stripe Payment Intents v2 migration window",
+        "body": "Stripe deprecates v1 confirmation flow on **2027-03-01**. Sandbox access granted 2026-09-30.",
+        "categoryId": "cat-checkout",
+        "tags": [
+          "external"
+        ]
+      },
+      {
+        "id": "DEP-2",
+        "typeId": "dependency",
+        "title": "Okta SCIM provisioning from Corporate IT",
+        "body": "IT must enable the SCIM app integration (ticket IT-4471).",
+        "categoryId": "cat-security",
+        "tags": [
+          "external"
+        ]
+      },
+      {
+        "id": "EPIC-1",
+        "typeId": "epic",
+        "title": "Checkout Modernization",
+        "body": "Guest checkout, idempotency, Payment Intents v2 and the new address/shipping steps. GA target: **Nov 16**.",
+        "categoryId": "cat-checkout"
+      },
+      {
+        "id": "EPIC-2",
+        "typeId": "epic",
+        "title": "Event-Driven Order Pipeline",
+        "body": "Replace synchronous fulfillment calls with `OrderPlaced` events on MSK via a transactional outbox.",
+        "categoryId": "cat-events"
+      },
+      {
+        "id": "EPIC-3",
+        "typeId": "epic",
+        "title": "Search & Catalog Performance",
+        "body": "OpenSearch migration, caching and relevance work.",
+        "categoryId": "cat-catalog"
+      },
+      {
+        "id": "EPIC-4",
+        "typeId": "epic",
+        "title": "PCI Readiness",
+        "body": "Everything needed to pass the PCI DSS 4.0 assessment (#GOAL-3).",
+        "categoryId": "cat-security"
+      },
+      {
+        "id": "EPIC-5",
+        "typeId": "epic",
+        "title": "Observability Foundation",
+        "body": "OpenTelemetry tracing, SLOs and burn-rate alerting.",
+        "categoryId": "cat-observability"
+      },
+      {
+        "id": "ADR-1",
+        "typeId": "decision",
+        "title": "Use Amazon MSK (Kafka) for order events",
+        "body": "We need durable, replayable, ordered-per-order events for fulfillment and future analytics consumers. Team Kafka experience is limited (#RISK-1). Spike: #SPIKE-1.",
+        "categoryId": "cat-events",
+        "tags": [
+          "architecture"
+        ],
+        "decisionStatus": "accepted",
+        "decisionOptions": "1. **SNS + SQS** - simple, fully managed; no replay, no ordering beyond FIFO groups.\n2. **EventBridge** - schema registry, easy routing; 24h retry window, limited replay.\n3. **Self-managed Kafka** - full control; high ops burden.\n4. **Amazon MSK** - Kafka semantics, AWS-managed brokers.",
+        "decisionOutcome": "Chosen: **Amazon MSK**. Replay and per-key ordering are must-haves; MSK removes most of the broker operations risk.",
+        "decisionConsequences": "- Good: consumers can replay 7 days of events.\n- Good: per-order ordering via partition key.\n- Bad: higher baseline cost than SNS/SQS (~$1.9k/mo).\n- Neutral: need schema registry discipline."
+      },
+      {
+        "id": "ADR-2",
+        "typeId": "decision",
+        "title": "Transactional outbox for event publishing",
+        "body": "Dual writes (DB then Kafka) lose or duplicate events on partial failure, violating #REQ-7.",
+        "categoryId": "cat-events",
+        "tags": [
+          "architecture"
+        ],
+        "decisionStatus": "accepted",
+        "decisionOptions": "1. Dual write with retries\n2. Debezium CDC on the orders table\n3. Outbox table + polling relay",
+        "decisionOutcome": "Outbox table written in the same transaction as the order; a relay publishes and marks rows sent.",
+        "decisionConsequences": "- Good: atomic with the order write.\n- Bad: ~250ms publish latency from polling.\n- Revisit CDC if latency matters."
+      },
+      {
+        "id": "ADR-3",
+        "typeId": "decision",
+        "title": "Self-managed Elasticsearch on EC2 for search",
+        "body": "Original 2024 decision for product search.",
+        "categoryId": "cat-catalog",
+        "tags": [
+          "architecture"
+        ],
+        "decisionStatus": "superseded",
+        "decisionOptions": "1. Elasticsearch on EC2\n2. Algolia",
+        "decisionOutcome": "Elasticsearch on EC2 for cost.",
+        "decisionConsequences": "- Bad: patching and reindexing became a recurring burden (#RISK-3)."
+      },
+      {
+        "id": "ADR-4",
+        "typeId": "decision",
+        "title": "Use Amazon OpenSearch Service for product search",
+        "body": "Replaces #ADR-3. Operating our own cluster costs ~1 engineer-week per month.",
+        "categoryId": "cat-catalog",
+        "tags": [
+          "architecture"
+        ],
+        "decisionStatus": "accepted",
+        "decisionOptions": "1. Stay on self-managed Elasticsearch\n2. Amazon OpenSearch Service\n3. Algolia (SaaS)",
+        "decisionOutcome": "Amazon OpenSearch Service with blue/green index aliases.",
+        "decisionConsequences": "- Good: managed upgrades and snapshots.\n- Bad: some Elastic-only plugins unavailable."
+      },
+      {
+        "id": "ADR-5",
+        "typeId": "decision",
+        "title": "Tokenize cards with Stripe Elements",
+        "body": "Keep raw PAN out of our systems to shrink PCI scope (#REQ-9) within our Stripe contract (#CON-1).",
+        "categoryId": "cat-security",
+        "tags": [
+          "architecture",
+          "pci"
+        ],
+        "decisionStatus": "accepted",
+        "decisionOptions": "1. Server-side card collection\n2. Stripe Elements (hosted fields)\n3. Stripe Checkout redirect",
+        "decisionOutcome": "Stripe Elements: card data goes browser -> Stripe directly; we only see tokens.",
+        "decisionConsequences": "- Good: SAQ A-EP instead of SAQ D for the storefront.\n- Neutral: UI styling limited to Elements API."
+      },
+      {
+        "id": "ADR-6",
+        "typeId": "decision",
+        "title": "Adopt OpenTelemetry for tracing",
+        "body": "Needed for #REQ-8. Vendor-neutral instrumentation keeps the X-Ray vs Datadog decision open.",
+        "categoryId": "cat-observability",
+        "tags": [
+          "architecture"
+        ],
+        "decisionStatus": "proposed",
+        "decisionOptions": "1. AWS X-Ray SDK\n2. Datadog APM agent\n3. OpenTelemetry SDK + collector",
+        "decisionOutcome": "_Proposed:_ OpenTelemetry SDK, exporting to X-Ray via the ADOT collector.",
+        "decisionConsequences": "- Open question: sampling strategy at 8x peak."
+      },
+      {
+        "id": "ADR-7",
+        "typeId": "decision",
+        "title": "GraphQL BFF for the storefront",
+        "body": "Evaluated to reduce mobile round-trips.",
+        "categoryId": "cat-checkout",
+        "tags": [
+          "architecture"
+        ],
+        "decisionStatus": "rejected",
+        "decisionOptions": "1. GraphQL BFF\n2. REST with sparse fieldsets",
+        "decisionOutcome": "Rejected: team capacity; REST + sparse fieldsets is sufficient.",
+        "decisionConsequences": "- Revisit in 2027 if mobile payload size becomes a problem."
+      },
+      {
+        "id": "ADR-8",
+        "typeId": "decision",
+        "title": "Store idempotency keys in Redis",
+        "body": "Original approach for #REQ-2.",
+        "categoryId": "cat-checkout",
+        "tags": [
+          "architecture"
+        ],
+        "decisionStatus": "deprecated",
+        "decisionOptions": "1. Redis with TTL\n2. Postgres table",
+        "decisionOutcome": "Redis with 24h TTL.",
+        "decisionConsequences": "- Deprecated: Redis failover lost keys during a game day; keys now live in Postgres next to the order (#ADR-2)."
+      },
+      {
+        "id": "SPIKE-1",
+        "typeId": "custom-1",
+        "title": "Evaluate Kafka vs EventBridge vs SNS/SQS",
+        "body": "Timeboxed to 3 days. Outcome recorded in #ADR-1.",
+        "categoryId": "cat-events",
+        "tags": [
+          "research"
+        ],
+        "points": 3,
+        "status": "done",
+        "sprintId": "sp-26.3-1",
+        "assigneeId": "m-priya"
+      },
+      {
+        "id": "TICKET-1",
+        "typeId": "ticket",
+        "title": "Provision MSK cluster with Terraform",
+        "body": "Part of #EPIC-2.",
+        "categoryId": "cat-platform",
+        "tags": [
+          "infra"
+        ],
+        "points": 5,
+        "status": "done",
+        "sprintId": "sp-26.3-1",
+        "assigneeId": "m-amara"
+      },
+      {
+        "id": "TICKET-2",
+        "typeId": "ticket",
+        "title": "Outbox table + relay worker",
+        "body": "Part of #EPIC-2.",
+        "categoryId": "cat-events",
+        "points": 8,
+        "status": "done",
+        "sprintId": "sp-26.3-2",
+        "assigneeId": "m-marcus"
+      },
+      {
+        "id": "TICKET-3",
+        "typeId": "ticket",
+        "title": "OrderPlaced v1 schema in schema registry",
+        "body": "Part of #EPIC-2.",
+        "categoryId": "cat-events",
+        "points": 3,
+        "status": "done",
+        "sprintId": "sp-26.3-2",
+        "assigneeId": "m-sofia"
+      },
+      {
+        "id": "TICKET-4",
+        "typeId": "ticket",
+        "title": "Fulfillment worker consumes OrderPlaced",
+        "body": "Part of #EPIC-2.",
+        "categoryId": "cat-events",
+        "points": 5,
+        "status": "done",
+        "sprintId": "sp-26.3-3",
+        "assigneeId": "m-sofia"
+      },
+      {
+        "id": "TICKET-5",
+        "typeId": "ticket",
+        "title": "OpenSearch domain + index templates",
+        "body": "Part of #EPIC-3.",
+        "categoryId": "cat-catalog",
+        "tags": [
+          "infra"
+        ],
+        "points": 5,
+        "status": "done",
+        "sprintId": "sp-26.3-3",
+        "assigneeId": "m-amara"
+      },
+      {
+        "id": "BUG-1",
+        "typeId": "custom-2",
+        "title": "Duplicate orders when the client retries on timeout",
+        "body": "**Repro:** throttle network to 3G, submit, kill app, resubmit. Two orders created.\n\nLed to #REQ-2.",
+        "categoryId": "cat-checkout",
+        "tags": [
+          "p1"
+        ],
+        "points": 3,
+        "status": "done",
+        "sprintId": "sp-26.3-4",
+        "assigneeId": "m-sofia"
+      },
+      {
+        "id": "TICKET-6",
+        "typeId": "ticket",
+        "title": "Cache-aside for product reads",
+        "body": "Part of #EPIC-3.",
+        "categoryId": "cat-catalog",
+        "points": 5,
+        "status": "done",
+        "sprintId": "sp-26.3-4",
+        "assigneeId": "m-marcus"
+      },
+      {
+        "id": "TICKET-7",
+        "typeId": "ticket",
+        "title": "Guest checkout UI flow",
+        "body": "Part of #EPIC-1.",
+        "categoryId": "cat-checkout",
+        "tags": [
+          "frontend"
+        ],
+        "points": 8,
+        "status": "done",
+        "sprintId": "sp-26.3-5",
+        "assigneeId": "m-kenji"
+      },
+      {
+        "id": "TICKET-8",
+        "typeId": "ticket",
+        "title": "Idempotency-Key middleware on POST /orders",
+        "body": "Part of #EPIC-1.",
+        "categoryId": "cat-checkout",
+        "points": 5,
+        "status": "in-progress",
+        "sprintId": "sp-26.4-1",
+        "assigneeId": "m-marcus"
+      },
+      {
+        "id": "TICKET-9",
+        "typeId": "ticket",
+        "title": "Stripe Payment Intents v2 client",
+        "body": "Part of #EPIC-1.",
+        "categoryId": "cat-checkout",
+        "tags": [
+          "payments"
+        ],
+        "points": 8,
+        "status": "in-progress",
+        "sprintId": "sp-26.4-1",
+        "assigneeId": "m-sofia"
+      },
+      {
+        "id": "TICKET-10",
+        "typeId": "ticket",
+        "title": "Checkout v2 address & shipping step",
+        "body": "Part of #EPIC-1.",
+        "categoryId": "cat-checkout",
+        "tags": [
+          "frontend"
+        ],
+        "points": 5,
+        "status": "in-progress",
+        "sprintId": "sp-26.4-1",
+        "assigneeId": "m-kenji"
+      },
+      {
+        "id": "TICKET-11",
+        "typeId": "ticket",
+        "title": "OpenTelemetry SDK in Order & Payment services",
+        "body": "Part of #EPIC-5.",
+        "categoryId": "cat-observability",
+        "points": 5,
+        "status": "todo",
+        "sprintId": "sp-26.4-1",
+        "assigneeId": "m-amara"
+      },
+      {
+        "id": "TICKET-12",
+        "typeId": "ticket",
+        "title": "Contract tests for OrderPlaced consumers",
+        "body": "Part of #EPIC-2.",
+        "categoryId": "cat-events",
+        "tags": [
+          "testing"
+        ],
+        "points": 3,
+        "status": "done",
+        "sprintId": "sp-26.4-1",
+        "assigneeId": "m-liam"
+      },
+      {
+        "id": "TICKET-13",
+        "typeId": "ticket",
+        "title": "Inventory reservation API",
+        "body": "Part of #EPIC-1.",
+        "categoryId": "cat-checkout",
+        "points": 5,
+        "status": "todo",
+        "sprintId": "sp-26.4-1",
+        "assigneeId": "m-marcus"
+      },
+      {
+        "id": "SPIKE-2",
+        "typeId": "custom-1",
+        "title": "Typo tolerance: analyzer & fuzziness options",
+        "body": "Part of #EPIC-3.",
+        "categoryId": "cat-catalog",
+        "tags": [
+          "research"
+        ],
+        "points": 3,
+        "status": "in-progress",
+        "sprintId": "sp-26.4-1",
+        "assigneeId": "m-priya"
+      },
+      {
+        "id": "BUG-2",
+        "typeId": "custom-2",
+        "title": "Stale price served from catalog cache after update",
+        "body": "Cache key did not include price version. Fixed by evicting on `ProductUpdated`.",
+        "categoryId": "cat-catalog",
+        "tags": [
+          "p2"
+        ],
+        "points": 2,
+        "status": "done",
+        "sprintId": "sp-26.4-1",
+        "assigneeId": "m-amara"
+      },
+      {
+        "id": "TICKET-14",
+        "typeId": "ticket",
+        "title": "Tokenize cards with Stripe Elements",
+        "body": "Part of #EPIC-4.",
+        "categoryId": "cat-security",
+        "tags": [
+          "frontend",
+          "pci"
+        ],
+        "points": 8,
+        "status": "todo",
+        "sprintId": "sp-26.4-2",
+        "assigneeId": "m-kenji"
+      },
+      {
+        "id": "TICKET-15",
+        "typeId": "ticket",
+        "title": "Network segmentation for the CDE (SG + NACL)",
+        "body": "Part of #EPIC-4.",
+        "categoryId": "cat-security",
+        "tags": [
+          "infra",
+          "pci"
+        ],
+        "points": 8,
+        "status": "todo",
+        "sprintId": "sp-26.4-2",
+        "assigneeId": "m-amara"
+      },
+      {
+        "id": "TICKET-16",
+        "typeId": "ticket",
+        "title": "Payment webhook handler with signature verification",
+        "body": "Part of #EPIC-1.",
+        "categoryId": "cat-checkout",
+        "tags": [
+          "payments"
+        ],
+        "points": 5,
+        "status": "todo",
+        "sprintId": "sp-26.4-2",
+        "assigneeId": "m-sofia"
+      },
+      {
+        "id": "TICKET-17",
+        "typeId": "ticket",
+        "title": "Inventory reservation expiry job",
+        "body": "Part of #EPIC-1.",
+        "categoryId": "cat-checkout",
+        "points": 5,
+        "status": "todo",
+        "sprintId": "sp-26.4-2",
+        "assigneeId": "m-marcus"
+      },
+      {
+        "id": "TICKET-18",
+        "typeId": "ticket",
+        "title": "Trace propagation through Kafka headers",
+        "body": "Part of #EPIC-5.",
+        "categoryId": "cat-observability",
+        "points": 3,
+        "status": "todo",
+        "sprintId": "sp-26.4-2",
+        "assigneeId": "m-amara"
+      },
+      {
+        "id": "TICKET-19",
+        "typeId": "ticket",
+        "title": "Checkout v2 end-to-end regression suite",
+        "body": "Part of #EPIC-1.",
+        "categoryId": "cat-checkout",
+        "tags": [
+          "testing"
+        ],
+        "points": 8,
+        "status": "todo",
+        "sprintId": "sp-26.4-2",
+        "assigneeId": "m-liam"
+      },
+      {
+        "id": "TICKET-20",
+        "typeId": "ticket",
+        "title": "Search synonyms & typo tolerance",
+        "body": "Part of #EPIC-3.",
+        "categoryId": "cat-catalog",
+        "tags": [
+          "search"
+        ],
+        "points": 5,
+        "status": "todo",
+        "sprintId": "sp-26.4-2",
+        "assigneeId": "m-priya"
+      },
+      {
+        "id": "TICKET-21",
+        "typeId": "ticket",
+        "title": "Order status page driven by order events",
+        "body": "Part of #EPIC-2.",
+        "categoryId": "cat-events",
+        "tags": [
+          "frontend"
+        ],
+        "points": 5,
+        "status": "todo",
+        "sprintId": "sp-27.1-1",
+        "assigneeId": "m-kenji"
+      },
+      {
+        "id": "BUG-3",
+        "typeId": "custom-2",
+        "title": "Mobile app double-submits on slow networks",
+        "body": "",
+        "categoryId": "cat-checkout",
+        "tags": [
+          "mobile",
+          "p2"
+        ],
+        "points": 3,
+        "status": "todo",
+        "sprintId": "sp-26.4-3",
+        "assigneeId": "m-marcus"
+      },
+      {
+        "id": "TICKET-22",
+        "typeId": "ticket",
+        "title": "PCI evidence collection & ASV scan",
+        "body": "Part of #EPIC-4.",
+        "categoryId": "cat-security",
+        "tags": [
+          "pci"
+        ],
+        "points": 5,
+        "status": "todo",
+        "sprintId": "sp-26.4-3",
+        "assigneeId": "m-liam"
+      },
+      {
+        "id": "TICKET-23",
+        "typeId": "ticket",
+        "title": "Load test checkout at 8x baseline",
+        "body": "Part of #EPIC-1.",
+        "categoryId": "cat-platform",
+        "tags": [
+          "performance"
+        ],
+        "points": 8,
+        "status": "todo",
+        "sprintId": "sp-26.4-3",
+        "assigneeId": "m-amara"
+      },
+      {
+        "id": "TICKET-24",
+        "typeId": "ticket",
+        "title": "SLO dashboards & burn-rate alerts",
+        "body": "Part of #EPIC-5.",
+        "categoryId": "cat-observability",
+        "points": 5,
+        "status": "todo",
+        "sprintId": "sp-26.4-3",
+        "assigneeId": "m-priya"
+      },
+      {
+        "id": "TICKET-25",
+        "typeId": "ticket",
+        "title": "Roll out checkout_v2_enabled (5% -> 100%)",
+        "body": "Part of #EPIC-1.",
+        "categoryId": "cat-checkout",
+        "tags": [
+          "release"
+        ],
+        "points": 3,
+        "status": "todo",
+        "sprintId": "sp-26.4-3",
+        "assigneeId": "m-marcus"
+      },
+      {
+        "id": "TICKET-26",
+        "typeId": "ticket",
+        "title": "Zero-downtime OpenSearch reindex (blue/green aliases)",
+        "body": "Part of #EPIC-3.",
+        "categoryId": "cat-catalog",
+        "tags": [
+          "search"
+        ],
+        "points": 8,
+        "status": "todo",
+        "sprintId": "sp-26.4-3",
+        "assigneeId": "m-sofia"
+      },
+      {
+        "id": "TICKET-27",
+        "typeId": "ticket",
+        "title": "Holiday readiness game day",
+        "body": "Part of #EPIC-5.",
+        "categoryId": "cat-platform",
+        "tags": [
+          "resilience"
+        ],
+        "points": 5,
+        "status": "todo",
+        "sprintId": "sp-26.4-4",
+        "assigneeId": "m-amara"
+      },
+      {
+        "id": "TICKET-28",
+        "typeId": "ticket",
+        "title": "Admin console SSO via Okta",
+        "body": "Part of #EPIC-4.",
+        "categoryId": "cat-security",
+        "points": 5,
+        "status": "todo",
+        "sprintId": "sp-26.4-4",
+        "assigneeId": "m-kenji"
+      },
+      {
+        "id": "TICKET-29",
+        "typeId": "ticket",
+        "title": "Search relevance A/B test (staging)",
+        "body": "Part of #EPIC-3.",
+        "categoryId": "cat-catalog",
+        "tags": [
+          "search"
+        ],
+        "points": 5,
+        "status": "todo",
+        "sprintId": "sp-26.4-5",
+        "assigneeId": "m-priya"
+      },
+      {
+        "id": "TICKET-30",
+        "typeId": "ticket",
+        "title": "Recommendations service consumes order events",
+        "body": "Too big - split before PI 2027.1 planning. See the planned *Recommendations ML* node on the diagram.",
+        "categoryId": "cat-events",
+        "tags": [
+          "needs-refinement"
+        ],
+        "points": 13,
+        "status": "todo"
+      },
+      {
+        "id": "TICKET-31",
+        "typeId": "ticket",
+        "title": "Retire the legacy session store",
+        "body": "",
+        "categoryId": "cat-platform",
+        "tags": [
+          "tech-debt"
+        ],
+        "points": 8,
+        "status": "todo"
+      },
+      {
+        "id": "BUG-4",
+        "typeId": "custom-2",
+        "title": "iOS: order submitted twice after backgrounding",
+        "body": "Likely the same root cause as #BUG-3.",
+        "categoryId": "cat-checkout",
+        "tags": [
+          "mobile"
+        ],
+        "points": 2,
+        "status": "todo",
+        "assigneeId": "m-liam"
+      }
+    ],
+    "relationshipTypes": [
+      {
+        "id": "relates-to",
+        "label": "Relates to",
+        "inverseLabel": "Relates to",
+        "color": "#8b90a0",
+        "isBuiltIn": true,
+        "isBlocking": false
+      },
+      {
+        "id": "parent-of",
+        "label": "Parent of",
+        "inverseLabel": "Child of",
+        "color": "#8b5cf6",
+        "isBuiltIn": true,
+        "isBlocking": false
+      },
+      {
+        "id": "blocks",
+        "label": "Blocks",
+        "inverseLabel": "Is blocked by",
+        "color": "#F0578C",
+        "isBuiltIn": true,
+        "isBlocking": true
+      },
+      {
+        "id": "depends-on",
+        "label": "Depends on",
+        "inverseLabel": "Depended on by",
+        "color": "#f59e0b",
+        "isBuiltIn": true,
+        "isBlocking": true
+      },
+      {
+        "id": "duplicates",
+        "label": "Duplicates",
+        "inverseLabel": "Is duplicated by",
+        "color": "#F2994A",
+        "isBuiltIn": true,
+        "isBlocking": false
+      },
+      {
+        "id": "addresses",
+        "label": "Addresses",
+        "inverseLabel": "Is addressed by",
+        "color": "#14B8A6",
+        "isBuiltIn": true,
+        "isBlocking": false
+      },
+      {
+        "id": "supersedes",
+        "label": "Supersedes",
+        "inverseLabel": "Is superseded by",
+        "color": "#64748B",
+        "isBuiltIn": true,
+        "isBlocking": false
+      },
+      {
+        "id": "rel-type-implements",
+        "label": "Implements",
+        "inverseLabel": "Is implemented by",
+        "color": "#2563EB",
+        "isBuiltIn": false,
+        "isBlocking": false
+      },
+      {
+        "id": "rel-type-verifies",
+        "label": "Verifies",
+        "inverseLabel": "Is verified by",
+        "color": "#16A34A",
+        "isBuiltIn": false,
+        "isBlocking": false
+      },
+      {
+        "id": "rel-type-contributes",
+        "label": "Contributes to",
+        "inverseLabel": "Is contributed to by",
+        "color": "#0EA5E9",
+        "isBuiltIn": false,
+        "isBlocking": false
+      }
+    ],
+    "relationships": [
+      {
+        "id": "rel-1",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-2",
+        "toItemId": "SPIKE-1"
+      },
+      {
+        "id": "rel-2",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-2",
+        "toItemId": "TICKET-1"
+      },
+      {
+        "id": "rel-3",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-2",
+        "toItemId": "TICKET-2"
+      },
+      {
+        "id": "rel-4",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-2",
+        "toItemId": "TICKET-3"
+      },
+      {
+        "id": "rel-5",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-2",
+        "toItemId": "TICKET-4"
+      },
+      {
+        "id": "rel-6",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-3",
+        "toItemId": "TICKET-5"
+      },
+      {
+        "id": "rel-7",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-3",
+        "toItemId": "TICKET-6"
+      },
+      {
+        "id": "rel-8",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-1",
+        "toItemId": "TICKET-7"
+      },
+      {
+        "id": "rel-9",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-1",
+        "toItemId": "TICKET-8"
+      },
+      {
+        "id": "rel-10",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-1",
+        "toItemId": "TICKET-9"
+      },
+      {
+        "id": "rel-11",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-1",
+        "toItemId": "TICKET-10"
+      },
+      {
+        "id": "rel-12",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-5",
+        "toItemId": "TICKET-11"
+      },
+      {
+        "id": "rel-13",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-2",
+        "toItemId": "TICKET-12"
+      },
+      {
+        "id": "rel-14",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-1",
+        "toItemId": "TICKET-13"
+      },
+      {
+        "id": "rel-15",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-3",
+        "toItemId": "SPIKE-2"
+      },
+      {
+        "id": "rel-16",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-4",
+        "toItemId": "TICKET-14"
+      },
+      {
+        "id": "rel-17",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-4",
+        "toItemId": "TICKET-15"
+      },
+      {
+        "id": "rel-18",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-1",
+        "toItemId": "TICKET-16"
+      },
+      {
+        "id": "rel-19",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-1",
+        "toItemId": "TICKET-17"
+      },
+      {
+        "id": "rel-20",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-5",
+        "toItemId": "TICKET-18"
+      },
+      {
+        "id": "rel-21",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-1",
+        "toItemId": "TICKET-19"
+      },
+      {
+        "id": "rel-22",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-3",
+        "toItemId": "TICKET-20"
+      },
+      {
+        "id": "rel-23",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-2",
+        "toItemId": "TICKET-21"
+      },
+      {
+        "id": "rel-24",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-4",
+        "toItemId": "TICKET-22"
+      },
+      {
+        "id": "rel-25",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-1",
+        "toItemId": "TICKET-23"
+      },
+      {
+        "id": "rel-26",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-5",
+        "toItemId": "TICKET-24"
+      },
+      {
+        "id": "rel-27",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-1",
+        "toItemId": "TICKET-25"
+      },
+      {
+        "id": "rel-28",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-3",
+        "toItemId": "TICKET-26"
+      },
+      {
+        "id": "rel-29",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-5",
+        "toItemId": "TICKET-27"
+      },
+      {
+        "id": "rel-30",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-4",
+        "toItemId": "TICKET-28"
+      },
+      {
+        "id": "rel-31",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-3",
+        "toItemId": "TICKET-29"
+      },
+      {
+        "id": "rel-32",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-2",
+        "toItemId": "TICKET-30"
+      },
+      {
+        "id": "rel-33",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-1",
+        "toItemId": "REQ-1"
+      },
+      {
+        "id": "rel-34",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-1",
+        "toItemId": "REQ-2"
+      },
+      {
+        "id": "rel-35",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-1",
+        "toItemId": "REQ-3"
+      },
+      {
+        "id": "rel-36",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-1",
+        "toItemId": "REQ-4"
+      },
+      {
+        "id": "rel-37",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-2",
+        "toItemId": "REQ-7"
+      },
+      {
+        "id": "rel-38",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-3",
+        "toItemId": "REQ-5"
+      },
+      {
+        "id": "rel-39",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-3",
+        "toItemId": "REQ-6"
+      },
+      {
+        "id": "rel-40",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-4",
+        "toItemId": "REQ-9"
+      },
+      {
+        "id": "rel-41",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-4",
+        "toItemId": "REQ-10"
+      },
+      {
+        "id": "rel-42",
+        "typeId": "parent-of",
+        "fromItemId": "EPIC-5",
+        "toItemId": "REQ-8"
+      },
+      {
+        "id": "rel-43",
+        "typeId": "rel-type-contributes",
+        "fromItemId": "EPIC-1",
+        "toItemId": "GOAL-1"
+      },
+      {
+        "id": "rel-44",
+        "typeId": "rel-type-contributes",
+        "fromItemId": "EPIC-1",
+        "toItemId": "GOAL-2"
+      },
+      {
+        "id": "rel-45",
+        "typeId": "rel-type-contributes",
+        "fromItemId": "EPIC-2",
+        "toItemId": "GOAL-2"
+      },
+      {
+        "id": "rel-46",
+        "typeId": "rel-type-contributes",
+        "fromItemId": "EPIC-4",
+        "toItemId": "GOAL-3"
+      },
+      {
+        "id": "rel-47",
+        "typeId": "rel-type-contributes",
+        "fromItemId": "EPIC-5",
+        "toItemId": "GOAL-2"
+      },
+      {
+        "id": "rel-48",
+        "typeId": "rel-type-implements",
+        "fromItemId": "TICKET-7",
+        "toItemId": "REQ-1"
+      },
+      {
+        "id": "rel-49",
+        "typeId": "rel-type-implements",
+        "fromItemId": "TICKET-8",
+        "toItemId": "REQ-2"
+      },
+      {
+        "id": "rel-50",
+        "typeId": "rel-type-implements",
+        "fromItemId": "TICKET-9",
+        "toItemId": "REQ-3"
+      },
+      {
+        "id": "rel-51",
+        "typeId": "rel-type-implements",
+        "fromItemId": "TICKET-13",
+        "toItemId": "REQ-4"
+      },
+      {
+        "id": "rel-52",
+        "typeId": "rel-type-implements",
+        "fromItemId": "TICKET-17",
+        "toItemId": "REQ-4"
+      },
+      {
+        "id": "rel-53",
+        "typeId": "rel-type-implements",
+        "fromItemId": "TICKET-2",
+        "toItemId": "REQ-7"
+      },
+      {
+        "id": "rel-54",
+        "typeId": "rel-type-implements",
+        "fromItemId": "TICKET-20",
+        "toItemId": "REQ-5"
+      },
+      {
+        "id": "rel-55",
+        "typeId": "rel-type-implements",
+        "fromItemId": "TICKET-6",
+        "toItemId": "REQ-6"
+      },
+      {
+        "id": "rel-56",
+        "typeId": "rel-type-implements",
+        "fromItemId": "TICKET-11",
+        "toItemId": "REQ-8"
+      },
+      {
+        "id": "rel-57",
+        "typeId": "rel-type-implements",
+        "fromItemId": "TICKET-18",
+        "toItemId": "REQ-8"
+      },
+      {
+        "id": "rel-58",
+        "typeId": "rel-type-implements",
+        "fromItemId": "TICKET-14",
+        "toItemId": "REQ-9"
+      },
+      {
+        "id": "rel-59",
+        "typeId": "rel-type-implements",
+        "fromItemId": "TICKET-15",
+        "toItemId": "REQ-9"
+      },
+      {
+        "id": "rel-60",
+        "typeId": "rel-type-implements",
+        "fromItemId": "TICKET-28",
+        "toItemId": "REQ-10"
+      },
+      {
+        "id": "rel-61",
+        "typeId": "rel-type-verifies",
+        "fromItemId": "TICKET-12",
+        "toItemId": "REQ-7"
+      },
+      {
+        "id": "rel-62",
+        "typeId": "rel-type-verifies",
+        "fromItemId": "TICKET-19",
+        "toItemId": "REQ-1"
+      },
+      {
+        "id": "rel-63",
+        "typeId": "rel-type-verifies",
+        "fromItemId": "TICKET-23",
+        "toItemId": "REQ-3"
+      },
+      {
+        "id": "rel-64",
+        "typeId": "rel-type-verifies",
+        "fromItemId": "TICKET-23",
+        "toItemId": "REQ-6"
+      },
+      {
+        "id": "rel-65",
+        "typeId": "rel-type-verifies",
+        "fromItemId": "TICKET-22",
+        "toItemId": "REQ-9"
+      },
+      {
+        "id": "rel-66",
+        "typeId": "addresses",
+        "fromItemId": "ADR-1",
+        "toItemId": "REQ-7"
+      },
+      {
+        "id": "rel-67",
+        "typeId": "addresses",
+        "fromItemId": "ADR-1",
+        "toItemId": "RISK-1"
+      },
+      {
+        "id": "rel-68",
+        "typeId": "addresses",
+        "fromItemId": "ADR-2",
+        "toItemId": "REQ-7"
+      },
+      {
+        "id": "rel-69",
+        "typeId": "addresses",
+        "fromItemId": "ADR-2",
+        "toItemId": "REQ-2"
+      },
+      {
+        "id": "rel-70",
+        "typeId": "addresses",
+        "fromItemId": "ADR-4",
+        "toItemId": "REQ-5"
+      },
+      {
+        "id": "rel-71",
+        "typeId": "addresses",
+        "fromItemId": "ADR-4",
+        "toItemId": "RISK-3"
+      },
+      {
+        "id": "rel-72",
+        "typeId": "addresses",
+        "fromItemId": "ADR-5",
+        "toItemId": "REQ-9"
+      },
+      {
+        "id": "rel-73",
+        "typeId": "addresses",
+        "fromItemId": "ADR-5",
+        "toItemId": "CON-1"
+      },
+      {
+        "id": "rel-74",
+        "typeId": "addresses",
+        "fromItemId": "ADR-6",
+        "toItemId": "REQ-8"
+      },
+      {
+        "id": "rel-75",
+        "typeId": "addresses",
+        "fromItemId": "ADR-8",
+        "toItemId": "REQ-2"
+      },
+      {
+        "id": "rel-76",
+        "typeId": "addresses",
+        "fromItemId": "ADR-7",
+        "toItemId": "GOAL-1"
+      },
+      {
+        "id": "rel-77",
+        "typeId": "supersedes",
+        "fromItemId": "ADR-4",
+        "toItemId": "ADR-3"
+      },
+      {
+        "id": "rel-78",
+        "typeId": "supersedes",
+        "fromItemId": "ADR-2",
+        "toItemId": "ADR-8"
+      },
+      {
+        "id": "rel-79",
+        "typeId": "blocks",
+        "fromItemId": "TICKET-8",
+        "toItemId": "TICKET-9"
+      },
+      {
+        "id": "rel-80",
+        "typeId": "blocks",
+        "fromItemId": "TICKET-13",
+        "toItemId": "TICKET-17"
+      },
+      {
+        "id": "rel-81",
+        "typeId": "blocks",
+        "fromItemId": "TICKET-9",
+        "toItemId": "TICKET-16"
+      },
+      {
+        "id": "rel-82",
+        "typeId": "blocks",
+        "fromItemId": "TICKET-14",
+        "toItemId": "TICKET-22"
+      },
+      {
+        "id": "rel-83",
+        "typeId": "blocks",
+        "fromItemId": "TICKET-15",
+        "toItemId": "TICKET-22"
+      },
+      {
+        "id": "rel-84",
+        "typeId": "blocks",
+        "fromItemId": "TICKET-19",
+        "toItemId": "TICKET-25"
+      },
+      {
+        "id": "rel-85",
+        "typeId": "blocks",
+        "fromItemId": "TICKET-11",
+        "toItemId": "TICKET-18"
+      },
+      {
+        "id": "rel-86",
+        "typeId": "blocks",
+        "fromItemId": "TICKET-24",
+        "toItemId": "TICKET-25"
+      },
+      {
+        "id": "rel-87",
+        "typeId": "blocks",
+        "fromItemId": "TICKET-23",
+        "toItemId": "TICKET-27"
+      },
+      {
+        "id": "rel-88",
+        "typeId": "blocks",
+        "fromItemId": "TICKET-1",
+        "toItemId": "TICKET-2"
+      },
+      {
+        "id": "rel-89",
+        "typeId": "blocks",
+        "fromItemId": "TICKET-2",
+        "toItemId": "TICKET-4"
+      },
+      {
+        "id": "rel-90",
+        "typeId": "blocks",
+        "fromItemId": "TICKET-5",
+        "toItemId": "TICKET-26"
+      },
+      {
+        "id": "rel-91",
+        "typeId": "blocks",
+        "fromItemId": "TICKET-26",
+        "toItemId": "TICKET-20"
+      },
+      {
+        "id": "rel-92",
+        "typeId": "blocks",
+        "fromItemId": "TICKET-4",
+        "toItemId": "TICKET-21"
+      },
+      {
+        "id": "rel-93",
+        "typeId": "blocks",
+        "fromItemId": "TICKET-21",
+        "toItemId": "TICKET-30"
+      },
+      {
+        "id": "rel-94",
+        "typeId": "depends-on",
+        "fromItemId": "TICKET-9",
+        "toItemId": "DEP-1"
+      },
+      {
+        "id": "rel-95",
+        "typeId": "depends-on",
+        "fromItemId": "TICKET-28",
+        "toItemId": "DEP-2"
+      },
+      {
+        "id": "rel-96",
+        "typeId": "duplicates",
+        "fromItemId": "BUG-4",
+        "toItemId": "BUG-3"
+      },
+      {
+        "id": "rel-97",
+        "typeId": "relates-to",
+        "fromItemId": "RISK-2",
+        "toItemId": "REQ-4"
+      },
+      {
+        "id": "rel-98",
+        "typeId": "relates-to",
+        "fromItemId": "ASM-1",
+        "toItemId": "REQ-6"
+      },
+      {
+        "id": "rel-99",
+        "typeId": "relates-to",
+        "fromItemId": "ASM-1",
+        "toItemId": "TICKET-23"
+      },
+      {
+        "id": "rel-100",
+        "typeId": "relates-to",
+        "fromItemId": "CON-3",
+        "toItemId": "GOAL-3"
+      },
+      {
+        "id": "rel-101",
+        "typeId": "relates-to",
+        "fromItemId": "SPIKE-1",
+        "toItemId": "ADR-1"
+      },
+      {
+        "id": "rel-102",
+        "typeId": "relates-to",
+        "fromItemId": "SPIKE-2",
+        "toItemId": "TICKET-20"
+      },
+      {
+        "id": "rel-103",
+        "typeId": "relates-to",
+        "fromItemId": "BUG-1",
+        "toItemId": "REQ-2"
+      },
+      {
+        "id": "rel-104",
+        "typeId": "relates-to",
+        "fromItemId": "ASM-2",
+        "toItemId": "GOAL-2"
+      },
+      {
+        "id": "rel-105",
+        "typeId": "relates-to",
+        "fromItemId": "CON-2",
+        "toItemId": "REQ-9"
+      },
+      {
+        "id": "rel-106",
+        "typeId": "relates-to",
+        "fromItemId": "BUG-2",
+        "toItemId": "TICKET-6"
+      },
+      {
+        "id": "rel-107",
+        "typeId": "relates-to",
+        "fromItemId": "TICKET-31",
+        "toItemId": "ADR-8"
+      }
+    ],
+    "nextSequence": {
+      "goal": 4,
+      "requirement": 11,
+      "constraint": 4,
+      "assumption": 3,
+      "risk": 4,
+      "dependency": 3,
+      "epic": 6,
+      "decision": 9,
+      "custom-1": 3,
+      "ticket": 32,
+      "custom-2": 5
+    }
+  },
+  "programIncrements": [
+    {
+      "id": "pi-26-3",
+      "name": "PI 2026.3",
+      "startDate": "2026-07-13",
+      "goal": "Stand up the event-driven order pipeline and fix duplicate-order defects.",
+      "notes": "Retro: MSK provisioning took a sprint longer than planned (#RISK-1). Velocity ~38 pts/sprint.",
+      "sprints": [
+        {
+          "id": "sp-26.3-1",
+          "name": "Sprint 26.3.1",
+          "durationDays": 14,
+          "goal": "MSK cluster live in staging; Kafka vs EventBridge decision recorded (#ADR-1)."
+        },
+        {
+          "id": "sp-26.3-2",
+          "name": "Sprint 26.3.2",
+          "durationDays": 14,
+          "goal": "Transactional outbox shipping OrderPlaced v1."
+        },
+        {
+          "id": "sp-26.3-3",
+          "name": "Sprint 26.3.3",
+          "durationDays": 14,
+          "goal": "Fulfillment consumes events; OpenSearch domain provisioned."
+        },
+        {
+          "id": "sp-26.3-4",
+          "name": "Sprint 26.3.4",
+          "durationDays": 14,
+          "goal": "Cache-aside for catalog reads; duplicate-order bug fixed."
+        },
+        {
+          "id": "sp-26.3-5",
+          "name": "Sprint 26.3.5",
+          "durationDays": 14,
+          "goal": "Guest checkout UI behind a flag."
+        },
+        {
+          "id": "sp-26.3-ip",
+          "name": "26.3 IP Sprint",
+          "durationDays": 14,
+          "goal": "Innovation & planning: hackathon, PI planning, tech-debt paydown."
+        }
+      ],
+      "reservations": [
+        {
+          "id": "res-263-risk",
+          "name": "Risk buffer",
+          "unit": "percentage",
+          "value": 15,
+          "category": "risk"
+        }
+      ]
+    },
+    {
+      "id": "pi-26-4",
+      "name": "PI 2026.4",
+      "startDate": "2026-10-05",
+      "goal": "Ship Checkout v2 and pass the PCI DSS 4.0 assessment before the holiday code freeze.",
+      "notes": "**PI objectives**\n\n1. Checkout v2 GA by Nov 16 (#EPIC-1)\n2. PCI DSS 4.0 assessment passed (#EPIC-4)\n3. Tracing across checkout path (#EPIC-5)\n\n**Stretch**: typo-tolerant search (#EPIC-3)",
+      "sprints": [
+        {
+          "id": "sp-26.4-1",
+          "name": "Sprint 26.4.1",
+          "durationDays": 14,
+          "goal": "Idempotent order creation + Stripe Payment Intents v2 client."
+        },
+        {
+          "id": "sp-26.4-2",
+          "name": "Sprint 26.4.2",
+          "durationDays": 14,
+          "goal": "Card tokenization, PCI network segmentation, webhook handling.",
+          "notes": "Over-committed on purpose for the demo: Kenji is out at a conference and the offsite falls on the 29th. Also note #TICKET-20 is blocked by #TICKET-26, which is scheduled a sprint later - a schedule conflict the timeline flags."
+        },
+        {
+          "id": "sp-26.4-3",
+          "name": "Sprint 26.4.3",
+          "durationDays": 14,
+          "goal": "Load test at 8x, SLO alerting, checkout_v2 flag rollout."
+        },
+        {
+          "id": "sp-26.4-4",
+          "name": "Sprint 26.4.4",
+          "durationDays": 14,
+          "goal": "Holiday readiness. Code freeze starts Nov 20 - fixes only.",
+          "notes": "Only P1 fixes merge after Nov 20 (#CON-3)."
+        },
+        {
+          "id": "sp-26.4-5",
+          "name": "Sprint 26.4.5",
+          "durationDays": 14,
+          "goal": "Freeze continues; search relevance experiments in staging only."
+        },
+        {
+          "id": "sp-26.4-ip",
+          "name": "26.4 IP Sprint",
+          "durationDays": 21,
+          "goal": "Innovation & planning: hackathon, PI planning, tech-debt paydown."
+        }
+      ],
+      "reservations": [
+        {
+          "id": "res-264-risk",
+          "name": "Risk buffer",
+          "unit": "percentage",
+          "value": 10,
+          "category": "risk"
+        },
+        {
+          "id": "res-264-meet",
+          "name": "Ceremonies & PI events",
+          "unit": "percentage",
+          "value": 10,
+          "category": "meetings"
+        },
+        {
+          "id": "res-264-bugbash",
+          "name": "Checkout v2 bug bash",
+          "unit": "points",
+          "value": 6,
+          "sprintId": "sp-26.4-2",
+          "category": "bugs"
+        },
+        {
+          "id": "res-264-debt",
+          "name": "Legacy session store cleanup",
+          "unit": "points",
+          "value": 5,
+          "sprintId": "sp-26.4-3",
+          "category": "techdebt",
+          "note": "Precursor to #TICKET-31"
+        },
+        {
+          "id": "res-264-oncall",
+          "name": "Holiday on-call rotation",
+          "unit": "points",
+          "value": 8,
+          "sprintId": "sp-26.4-4",
+          "category": "other",
+          "note": "Two engineers on primary/secondary"
+        }
+      ]
+    },
+    {
+      "id": "pi-27-1",
+      "name": "PI 2027.1",
+      "startDate": "2027-01-04",
+      "goal": "Personalization: recommendations from order events; retire the legacy session store.",
+      "sprints": [
+        {
+          "id": "sp-27.1-1",
+          "name": "Sprint 27.1.1",
+          "durationDays": 14,
+          "goal": "Recommendations consumer MVP."
+        },
+        {
+          "id": "sp-27.1-2",
+          "name": "Sprint 27.1.2",
+          "durationDays": 14
+        },
+        {
+          "id": "sp-27.1-3",
+          "name": "Sprint 27.1.3",
+          "durationDays": 14
+        }
+      ]
+    }
+  ],
+  "team": {
+    "members": [
+      {
+        "id": "m-priya",
+        "name": "Priya Natarajan",
+        "role": "Tech Lead",
+        "avatarColor": "#5B7CFA",
+        "defaultPointsPerDay": 0.8,
+        "ptoSpans": [
+          {
+            "id": "pto-priya-1",
+            "startDate": "2026-11-23",
+            "endDate": "2026-11-25",
+            "startHalfDay": "full",
+            "endHalfDay": "full",
+            "note": "Thanksgiving travel"
+          }
+        ]
+      },
+      {
+        "id": "m-marcus",
+        "name": "Marcus Bell",
+        "role": "Senior Backend Engineer",
+        "avatarColor": "#0FA36B",
+        "defaultPointsPerDay": 1.2,
+        "ptoSpans": []
+      },
+      {
+        "id": "m-sofia",
+        "name": "Sofia Alvarez",
+        "role": "Backend Engineer",
+        "avatarColor": "#F2994A",
+        "defaultPointsPerDay": 1.0,
+        "ptoSpans": [
+          {
+            "id": "pto-sofia-1",
+            "startDate": "2026-10-22",
+            "endDate": "2026-10-23",
+            "startHalfDay": "afternoon",
+            "endHalfDay": "full",
+            "note": "Family event"
+          },
+          {
+            "id": "pto-sofia-2",
+            "startDate": "2026-12-21",
+            "endDate": "2026-12-31",
+            "startHalfDay": "full",
+            "endHalfDay": "full",
+            "note": "Winter break"
+          }
+        ]
+      },
+      {
+        "id": "m-kenji",
+        "name": "Kenji Watanabe",
+        "role": "Frontend Engineer",
+        "avatarColor": "#22B8CF",
+        "defaultPointsPerDay": 1.0,
+        "ptoSpans": [
+          {
+            "id": "pto-kenji-1",
+            "startDate": "2026-10-26",
+            "endDate": "2026-10-30",
+            "startHalfDay": "full",
+            "endHalfDay": "morning",
+            "note": "Conference (React Summit)"
+          }
+        ]
+      },
+      {
+        "id": "m-amara",
+        "name": "Amara Okafor",
+        "role": "Site Reliability Engineer",
+        "avatarColor": "#F0578C",
+        "defaultPointsPerDay": 0.9,
+        "ptoSpans": [
+          {
+            "id": "pto-amara-1",
+            "startDate": "2026-10-16",
+            "endDate": "2026-10-16",
+            "startHalfDay": "morning",
+            "endHalfDay": "morning",
+            "note": "Dentist"
+          }
+        ]
+      },
+      {
+        "id": "m-liam",
+        "name": "Liam O'Connor",
+        "role": "QA Engineer",
+        "avatarColor": "#9061F9",
+        "defaultPointsPerDay": 0.8,
+        "ptoSpans": []
+      },
+      {
+        "id": "m-dana",
+        "name": "Dana Kim",
+        "role": "Product Owner",
+        "avatarColor": "#64748B",
+        "defaultPointsPerDay": 0,
+        "ptoSpans": []
+      }
+    ],
+    "settings": {
+      "defaultPointsPerDay": 1,
+      "excludeUsHolidays": true,
+      "extraDaysOff": [
+        {
+          "id": "edo-offsite",
+          "name": "Engineering offsite",
+          "date": "2026-10-29",
+          "isHalfDay": false
+        },
+        {
+          "id": "edo-blackfriday",
+          "name": "Day after Thanksgiving",
+          "date": "2026-11-27",
+          "isHalfDay": false
+        },
+        {
+          "id": "edo-hack",
+          "name": "Hackathon demos",
+          "date": "2026-12-11",
+          "isHalfDay": true,
+          "note": "Afternoon demos, no planned work"
+        },
+        {
+          "id": "edo-xmaseve",
+          "name": "Christmas Eve",
+          "date": "2026-12-24",
+          "isHalfDay": false
+        }
+      ]
+    }
+  },
+  "milestones": [
+    {
+      "id": "ms-events-beta",
+      "type": "release",
+      "name": "Order events beta",
+      "scheduledAt": "2026-09-15",
+      "version": "1.4.0",
+      "description": "Fulfillment switched to `OrderPlaced` events in production.",
+      "relatedItemIds": [
+        "EPIC-2",
+        "TICKET-2",
+        "TICKET-4"
+      ]
+    },
+    {
+      "id": "ms-pi-26-4",
+      "type": "pi-boundary",
+      "name": "PI 2026.4 planning",
+      "scheduledAt": "2026-10-05",
+      "description": "Two-day PI planning; objectives committed."
+    },
+    {
+      "id": "ms-arch-review",
+      "type": "review",
+      "name": "Architecture review: checkout v2",
+      "scheduledAt": "2026-10-22",
+      "description": "Review #ADR-2, #ADR-5 and #ADR-6 with the architecture guild.",
+      "relatedItemIds": [
+        "ADR-2",
+        "ADR-5",
+        "ADR-6"
+      ]
+    },
+    {
+      "id": "ms-pci",
+      "type": "deadline",
+      "name": "PCI DSS 4.0 assessment",
+      "scheduledAt": "2026-11-13",
+      "description": "QSA on-site assessment. Evidence must be complete.",
+      "relatedItemIds": [
+        "EPIC-4",
+        "TICKET-14",
+        "TICKET-15",
+        "TICKET-22",
+        "TICKET-28"
+      ]
+    },
+    {
+      "id": "ms-checkout-ga",
+      "type": "release",
+      "name": "Checkout v2 GA",
+      "scheduledAt": "2026-11-16",
+      "version": "2.0.0",
+      "description": "100% of traffic on checkout v2.",
+      "color": "#5B7CFA",
+      "relatedItemIds": [
+        "EPIC-1",
+        "TICKET-19",
+        "TICKET-25",
+        "TICKET-23"
+      ]
+    },
+    {
+      "id": "ms-freeze",
+      "type": "code-freeze",
+      "name": "Holiday code freeze",
+      "scheduledAt": "2026-11-20",
+      "description": "See #CON-3.",
+      "relatedItemIds": [
+        "CON-3"
+      ]
+    },
+    {
+      "id": "ms-bf",
+      "type": "launch",
+      "name": "Black Friday peak",
+      "scheduledAt": "2026-11-27",
+      "description": "Expected 8x baseline (#ASM-1).",
+      "relatedItemIds": [
+        "ASM-1",
+        "TICKET-27"
+      ]
+    },
+    {
+      "id": "ms-pi-27-1",
+      "type": "pi-boundary",
+      "name": "PI 2027.1 planning",
+      "scheduledAt": "2027-01-04"
+    },
+    {
+      "id": "ms-search-v3",
+      "type": "release",
+      "name": "Search v3",
+      "scheduledAt": "2027-01-20",
+      "version": "3.0.0",
+      "description": "Typo tolerance and synonyms in production.",
+      "relatedItemIds": [
+        "EPIC-3",
+        "TICKET-20",
+        "TICKET-26",
+        "TICKET-29"
+      ]
+    }
+  ],
+  "srd": {
+    "presetId": "custom",
+    "templateId": "engineering",
+    "metadata": {
+      "title": "Northwind Commerce Platform - System Requirements Document",
+      "description": "Requirements, architecture and delivery plan for the Q4 2026 checkout modernization, event-driven order pipeline and PCI DSS 4.0 readiness.",
+      "version": "2.0.0-rc.1",
+      "organization": "Northwind Commerce, Inc.",
+      "authors": [
+        {
+          "name": "Priya Natarajan",
+          "role": "Tech Lead",
+          "email": "priya@northwind.example"
+        },
+        {
+          "name": "Dana Kim",
+          "role": "Product Owner",
+          "email": "dana@northwind.example"
+        },
+        {
+          "name": "Amara Okafor",
+          "role": "SRE"
+        }
+      ]
+    },
+    "requirementsLayout": "table",
+    "includeComponentTable": true,
+    "includeConnectionsTable": true,
+    "theme": {
+      "primaryColor": "#1E3A8A",
+      "secondaryColor": "#334155",
+      "accentColor": "#14B8A6",
+      "fontFamily": "Inter, system-ui, sans-serif",
+      "tableDense": false,
+      "pageOrientation": "portrait"
+    },
+    "headersAndFooters": {
+      "headerLeft": "Northwind Commerce",
+      "headerRight": "SRD v2.0.0-rc.1",
+      "footerLeft": "Owner: Checkout Squad",
+      "footerRight": "Generated from System Design",
+      "classificationBanner": "INTERNAL - CONFIDENTIAL",
+      "showPageNumbers": true
+    },
+    "sections": [
+      {
+        "id": "executive_summary",
+        "title": "Executive Summary",
+        "enabled": true,
+        "order": 1,
+        "customIntroText": "Northwind is modernizing checkout ahead of the 2026 holiday peak. This document captures the goals, requirements and architecture decisions behind that work, and the plan to deliver it in PI 2026.4."
+      },
+      {
+        "id": "architecture",
+        "title": "System Architecture",
+        "enabled": true,
+        "order": 2,
+        "customIntroText": "Production topology in us-east-1. The PCI cardholder-data environment is drawn as a trust boundary."
+      },
+      {
+        "id": "requirements",
+        "title": "Requirements & Decisions",
+        "enabled": true,
+        "order": 3
+      },
+      {
+        "id": "traceability",
+        "title": "Traceability Matrix",
+        "enabled": true,
+        "order": 4,
+        "customIntroText": "How epics, requirements, decisions and work items relate."
+      },
+      {
+        "id": "roadmap",
+        "title": "Delivery Roadmap",
+        "enabled": true,
+        "order": 5
+      }
+    ],
+    "framing": {
+      "@diagram": {
+        "offsetX": 0,
+        "offsetY": 20,
+        "zoom": 0.85
+      },
+      "REQ-9": {
+        "offsetX": 0,
+        "offsetY": -10,
+        "zoom": 1.4
+      },
+      "ADR-1": {
+        "offsetX": 40,
+        "offsetY": 0,
+        "zoom": 1.2
+      },
+      "ADR-8": {
+        "offsetX": 0,
+        "offsetY": 0,
+        "zoom": 1,
+        "hidden": true
+      }
+    }
+  },
+  "metadata": {
+    "updatedAt": "2026-10-12T20:30:00.000Z"
+  }
+}
