@@ -11,9 +11,9 @@ parts) and fails if there is none. Lines without a marker are still published. T
 markers are removed when the section becomes a release. See
 [docs/releasing.md](docs/releasing.md).
 
-## [Unreleased]
+## [0.98.2] - 2026-10-13
 
-- [PATCH] Fixed duplicate ports in sub-diagrams when a node had multiple edges to the same node.
+- Fixed duplicate ports in sub-diagrams when a node had multiple edges to the same node.
 
 ## [0.98.1] - 2026-10-12
 
