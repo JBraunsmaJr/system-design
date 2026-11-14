@@ -8,7 +8,6 @@ import {
   Palmtree,
   Settings,
   ShieldCheck,
-  ShieldAlert,
   ChevronDown,
   ChevronUp,
   CalendarRange,
@@ -28,12 +27,10 @@ import {
   computeSprintDateRanges,
   getSprintActiveReservations,
 } from '../../domain/timeline/programIncrements';
-import {
-  computeSprintCapacity,
-  calculateTotalPtoDays,
-  getUsFederalHolidays,
-} from '../../domain/timeline/teamCapacity';
+import { computeSprintCapacity, getUsFederalHolidays } from '../../domain/timeline/teamCapacity';
 import { ManageReservationsModal } from '../timeline/ManageReservationsModal';
+import { TeamMemberCard } from './TeamMemberCard';
+import { SprintCapacityMatrix } from './SprintCapacityMatrix';
 
 interface TeamViewProps {
   teamStore: TeamStore;
@@ -203,16 +200,6 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
     teamStore.deleteExtraDayOff(extraId);
   };
 
-  const getInitials = (name: string) => {
-    return name
-      .trim()
-      .split(/\s+/)
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
-
   // Compute all sprints summaries for the sprint capacity table
   const allSprintSummaries = useMemo(() => {
     const list: { pi: ProgramIncrement; summary: ReturnType<typeof computeSprintCapacity> }[] = [];
@@ -237,62 +224,37 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
 
   return (
     <div className="team-view">
-      {/* Top Banner & Header */}
+      {/* One line: what this is, the figures that used to be four cards, and
+          the one action. */}
       <div className="team-view__header">
-        <div className="team-view__title-group">
-          <div className="team-view__icon-box">
-            <Users size={20} />
-          </div>
-          <div>
-            <h1 className="team-view__title">Team & Capacity Management</h1>
-            <p className="team-view__subtitle">
-              Configure team members, granular 1/2-day PTO spans, US holidays, and track sprint
-              capacity.
-            </p>
-          </div>
-        </div>
-
-        <div className="team-view__header-actions">
-          <button
-            type="button"
-            className="team-view__primary-btn"
-            onClick={() => {
-              setIsAddingMember(true);
-              setActiveTab('members');
-            }}
-          >
-            <UserPlus size={14} />
-            <span>Add Member</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Metrics Bar */}
-      <div className="team-view__metrics-row">
-        <div className="team-metric-card">
-          <div className="team-metric-card__label">Team Size</div>
-          <div className="team-metric-card__value">{totalMembers}</div>
-          <div className="team-metric-card__hint">Active members</div>
-        </div>
-        <div className="team-metric-card">
-          <div className="team-metric-card__label">Default Rate</div>
-          <div className="team-metric-card__value">{team.settings.defaultPointsPerDay} pt/day</div>
-          <div className="team-metric-card__hint">1 per business day</div>
-        </div>
-        <div className="team-metric-card">
-          <div className="team-metric-card__label">Daily Team Capacity</div>
-          <div className="team-metric-card__value">{totalDailyPoints} pts/day</div>
-          <div className="team-metric-card__hint">Combined velocity baseline</div>
-        </div>
-        <div className="team-metric-card">
-          <div className="team-metric-card__label">US Holidays & Days Off</div>
-          <div className="team-metric-card__value">
-            {team.settings.excludeUsHolidays ? 'Excluded' : 'Included'}
-          </div>
-          <div className="team-metric-card__hint">
-            {team.settings.extraDaysOff.length} extra configured
-          </div>
-        </div>
+        <h1 className="team-view__title">Team capacity</h1>
+        <p className="team-view__summary">
+          {totalMembers} {totalMembers === 1 ? 'person' : 'people'}
+          <span aria-hidden="true"> &middot; </span>
+          <span title={`Default rate: ${team.settings.defaultPointsPerDay} pt a day per person`}>
+            {totalDailyPoints} pts a day
+          </span>
+          <span aria-hidden="true"> &middot; </span>
+          US holidays {team.settings.excludeUsHolidays ? 'excluded' : 'counted as working days'}
+          {team.settings.extraDaysOff.length > 0 && (
+            <>
+              <span aria-hidden="true"> &middot; </span>
+              {team.settings.extraDaysOff.length} extra{' '}
+              {team.settings.extraDaysOff.length === 1 ? 'day' : 'days'} off
+            </>
+          )}
+        </p>
+        <button
+          type="button"
+          className="team-view__primary-btn team-view__header-action"
+          onClick={() => {
+            setIsAddingMember(true);
+            setActiveTab('members');
+          }}
+        >
+          <UserPlus size={14} />
+          <span>Add Member</span>
+        </button>
       </div>
 
       {/* Navigation Tabs */}
@@ -303,7 +265,7 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
           onClick={() => setActiveTab('members')}
         >
           <Users size={14} />
-          <span>Team Members & PTO ({team.members.length})</span>
+          <span>Members and time off ({team.members.length})</span>
         </button>
         <button
           type="button"
@@ -311,7 +273,7 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
           onClick={() => setActiveTab('sprints')}
         >
           <CalendarRange size={14} />
-          <span>Sprint Capacity Matrix ({allSprintSummaries.length} sprints)</span>
+          <span>Capacity by sprint ({allSprintSummaries.length})</span>
         </button>
         <button
           type="button"
@@ -319,7 +281,7 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
           onClick={() => setActiveTab('settings')}
         >
           <Settings size={14} />
-          <span>Holidays & Point Settings</span>
+          <span>Holidays and points</span>
         </button>
       </div>
 
@@ -422,158 +384,17 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
               </div>
             ) : (
               <div className="team-members-grid">
-                {team.members.map((member) => {
-                  const totalPto = calculateTotalPtoDays(member);
-
-                  return (
-                    <div key={member.id} className="team-member-card">
-                      <div className="team-member-card__header">
-                        <div className="team-member-card__identity">
-                          <span
-                            className="team-member-card__avatar"
-                            style={{ backgroundColor: member.avatarColor ?? '#5b7cfa' }}
-                          >
-                            {getInitials(member.name)}
-                          </span>
-                          <div>
-                            <input
-                              className="team-member-card__name-input"
-                              value={member.name}
-                              onChange={(e) =>
-                                handleUpdateMember(member.id, { name: e.target.value })
-                              }
-                            />
-                            <input
-                              className="team-member-card__role-input"
-                              placeholder="Add role..."
-                              value={member.role ?? ''}
-                              onChange={(e) =>
-                                handleUpdateMember(member.id, { role: e.target.value || undefined })
-                              }
-                            />
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          className="team-member-card__delete-btn"
-                          onClick={() => handleDeleteMember(member.id)}
-                          title={`Remove ${member.name}`}
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-
-                      {/* Points / Rate Settings */}
-                      <div className="team-member-card__rate-row">
-                        <span className="team-member-card__rate-label">Capacity Rate:</span>
-                        <div className="team-member-card__rate-control">
-                          <input
-                            type="number"
-                            step="0.1"
-                            min="0"
-                            max="50"
-                            className="team-member-card__rate-input"
-                            value={member.defaultPointsPerDay ?? ''}
-                            placeholder={`${team.settings.defaultPointsPerDay}`}
-                            onChange={(e) => {
-                              const val = e.target.value.trim();
-                              handleUpdateMember(member.id, {
-                                defaultPointsPerDay: val !== '' ? parseFloat(val) : undefined,
-                              });
-                            }}
-                          />
-                          <span className="team-member-card__rate-unit">pts/day</span>
-                        </div>
-                        <span
-                          className="team-member-card__pto-total-badge"
-                          title="Total PTO days across all spans"
-                        >
-                          <Palmtree size={12} /> {totalPto}
-                        </span>
-                      </div>
-
-                      {/* PTO Spans List */}
-                      <div className="team-member-card__pto-section">
-                        <div className="team-member-card__pto-header">
-                          <span className="team-member-card__pto-title">
-                            <Palmtree size={13} />
-                            <span>PTO Spans ({member.ptoSpans.length})</span>
-                          </span>
-                          <button
-                            type="button"
-                            className="team-member-card__add-pto-btn"
-                            onClick={() => handleOpenPtoModal(member.id)}
-                          >
-                            <Plus size={12} /> Add PTO
-                          </button>
-                        </div>
-
-                        {member.ptoSpans.length === 0 ? (
-                          <div className="team-member-card__pto-empty">No PTO scheduled</div>
-                        ) : (
-                          <div className="team-member-card__pto-list">
-                            {member.ptoSpans.map((span) => {
-                              const isSingle = span.startDate === span.endDate;
-                              const isHalf =
-                                isSingle &&
-                                (span.startHalfDay === 'morning' ||
-                                  span.startHalfDay === 'afternoon');
-
-                              return (
-                                <div key={span.id} className="pto-span-chip">
-                                  <div className="pto-span-chip__info">
-                                    <div className="pto-span-chip__dates">
-                                      {isSingle ? (
-                                        <span>{span.startDate}</span>
-                                      ) : (
-                                        <span>
-                                          {span.startDate} → {span.endDate}
-                                        </span>
-                                      )}
-                                      <span
-                                        className={`pto-span-chip__badge${
-                                          isHalf ||
-                                          span.startHalfDay !== 'full' ||
-                                          span.endHalfDay !== 'full'
-                                            ? ' is-half'
-                                            : ''
-                                        }`}
-                                      >
-                                        {isSingle
-                                          ? span.startHalfDay === 'morning'
-                                            ? 'AM (0.5d)'
-                                            : span.startHalfDay === 'afternoon'
-                                              ? 'PM (0.5d)'
-                                              : 'Full Day (1d)'
-                                          : `${
-                                              span.startHalfDay === 'afternoon' ? 'Start PM • ' : ''
-                                            }${span.endHalfDay === 'morning' ? 'End AM' : 'Full'}`}
-                                      </span>
-                                    </div>
-                                    {span.note && (
-                                      <div className="pto-span-chip__note" title={span.note}>
-                                        {span.note}
-                                      </div>
-                                    )}
-                                  </div>
-                                  <button
-                                    type="button"
-                                    className="pto-span-chip__remove"
-                                    onClick={() => handleDeletePtoSpan(member.id, span.id)}
-                                    title="Delete PTO span"
-                                  >
-                                    <Trash2 size={11} />
-                                  </button>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                {team.members.map((member) => (
+                  <TeamMemberCard
+                    key={member.id}
+                    member={member}
+                    defaultPointsPerDay={team.settings.defaultPointsPerDay}
+                    onUpdate={(patch) => handleUpdateMember(member.id, patch)}
+                    onDelete={() => handleDeleteMember(member.id)}
+                    onAddPto={() => handleOpenPtoModal(member.id)}
+                    onDeletePto={(ptoSpanId) => handleDeletePtoSpan(member.id, ptoSpanId)}
+                  />
+                ))}
               </div>
             )}
           </div>
@@ -592,196 +413,11 @@ export function TeamView({ teamStore, programIncrementsStore, requirements }: Te
                 </p>
               </div>
             ) : (
-              <div className="sprint-matrix-table-wrap">
-                <table className="sprint-matrix-table">
-                  <thead>
-                    <tr>
-                      <th>Sprint & Timeline</th>
-                      <th>Business Days</th>
-                      <th>Gross Capacity</th>
-                      <th>Reserved</th>
-                      <th>Net Available</th>
-                      <th>Assigned Points</th>
-                      <th>Remaining</th>
-                      <th>Utilization</th>
-                      {team.members.map((m) => (
-                        <th key={m.id} className="sprint-matrix-table__member-col">
-                          <div className="sprint-matrix-table__member-header">
-                            <span
-                              className="sprint-matrix-table__avatar"
-                              style={{ backgroundColor: m.avatarColor ?? '#5b7cfa' }}
-                            >
-                              {getInitials(m.name)}
-                            </span>
-                            <span>{m.name}</span>
-                          </div>
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {allSprintSummaries.map(({ pi, summary }) => {
-                      const percent =
-                        summary.totalCapacityPoints > 0
-                          ? Math.round(
-                              (summary.totalAssignedPoints / summary.totalCapacityPoints) * 100,
-                            )
-                          : 0;
-                      const isOver =
-                        summary.totalAssignedPoints > summary.totalCapacityPoints &&
-                        summary.totalCapacityPoints > 0;
-
-                      return (
-                        <tr key={summary.sprintId}>
-                          <td>
-                            <div className="sprint-matrix-cell__sprint-info">
-                              <div className="sprint-matrix-cell__pi-row">
-                                <span className="sprint-matrix-cell__pi-badge">{pi.name}</span>
-                                <button
-                                  type="button"
-                                  className="sprint-matrix-cell__manage-res-btn"
-                                  onClick={() => setManagingReservationsPIId(pi.id)}
-                                  title={`Manage Capacity Reservations for ${pi.name}`}
-                                >
-                                  <ShieldAlert size={10} />
-                                  <span>
-                                    {pi.reservations?.length
-                                      ? `${pi.reservations.length} res`
-                                      : 'Reserve'}
-                                  </span>
-                                </button>
-                              </div>
-                              <strong className="sprint-matrix-cell__sprint-name">
-                                {summary.sprintName}
-                              </strong>
-                              <span className="sprint-matrix-cell__dates">
-                                {summary.startDate} → {summary.endDate}
-                              </span>
-                            </div>
-                          </td>
-                          <td>
-                            <strong>{summary.sprintBusinessDays}</strong> b-days
-                          </td>
-                          <td>
-                            <strong>{summary.grossCapacityPoints}</strong> pts
-                          </td>
-                          <td>
-                            {summary.totalReservedPoints > 0 ? (
-                              <div
-                                className="sprint-matrix-cell__reserved-box"
-                                title={summary.appliedReservations
-                                  .map(
-                                    (r) =>
-                                      `${r.name}: ${r.value}${r.unit === 'percentage' ? '%' : ' pts'}`,
-                                  )
-                                  .join(', ')}
-                              >
-                                <span className="sprint-matrix-cell__reserved-pill">
-                                  <ShieldAlert size={10} /> -{summary.totalReservedPoints} pts
-                                </span>
-                                <span className="sprint-matrix-cell__reserved-count">
-                                  {summary.appliedReservations.length} active
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="sprint-matrix-cell__dim-dash">—</span>
-                            )}
-                          </td>
-                          <td>
-                            <strong>{summary.totalCapacityPoints}</strong> pts
-                          </td>
-                          <td>
-                            <strong>{summary.totalAssignedPoints}</strong> pts
-                            {summary.unassignedPoints > 0 && (
-                              <span className="sprint-matrix-cell__unassigned">
-                                ({summary.unassignedPoints} unassigned)
-                              </span>
-                            )}
-                          </td>
-                          <td>
-                            <span
-                              className={`sprint-matrix-cell__available-badge${
-                                isOver
-                                  ? ' is-over'
-                                  : summary.remainingCapacityPoints === 0
-                                    ? ' is-zero'
-                                    : ' is-available'
-                              }`}
-                            >
-                              {isOver
-                                ? `${Math.abs(summary.remainingCapacityPoints)} pts over`
-                                : `${summary.remainingCapacityPoints} pts`}
-                            </span>
-                          </td>
-                          <td>
-                            <div className="sprint-matrix-cell__progress-wrap">
-                              <div className="sprint-matrix-cell__progress-bar">
-                                <div
-                                  className={`sprint-matrix-cell__progress-fill${
-                                    isOver
-                                      ? ' is-danger'
-                                      : percent >= 90
-                                        ? ' is-warning'
-                                        : ' is-normal'
-                                  }`}
-                                  style={{ width: `${Math.min(100, percent)}%` }}
-                                />
-                              </div>
-                              <span className="sprint-matrix-cell__percent">{percent}%</span>
-                            </div>
-                          </td>
-
-                          {/* Member specific cells */}
-                          {team.members.map((m) => {
-                            const mb = summary.memberBreakdown.find((x) => x.memberId === m.id);
-                            if (!mb) {
-                              return <td key={m.id}>—</td>;
-                            }
-                            const mbOver =
-                              mb.assignedPoints > mb.capacityPoints && mb.capacityPoints > 0;
-                            return (
-                              <td key={m.id} className="sprint-matrix-table__member-cell">
-                                <div className="member-capacity-cell">
-                                  <div className="member-capacity-cell__top">
-                                    <span>
-                                      <strong>{mb.assignedPoints}</strong> / {mb.capacityPoints} pts
-                                    </span>
-                                    <span
-                                      className={`member-capacity-cell__status${
-                                        mbOver ? ' is-over' : ' is-available'
-                                      }`}
-                                    >
-                                      {mbOver
-                                        ? `-${Math.abs(mb.remainingPoints)}`
-                                        : `+${mb.remainingPoints}`}
-                                    </span>
-                                  </div>
-                                  <div className="member-capacity-cell__meta">
-                                    <span>{mb.workingDays}d work</span>
-                                    {mb.ptoDays > 0 && (
-                                      <span className="member-capacity-cell__pto">
-                                        <Palmtree size={10} /> {mb.ptoDays}d PTO
-                                      </span>
-                                    )}
-                                    {mb.reservedPoints > 0 && (
-                                      <span
-                                        className="member-capacity-cell__res"
-                                        title={`Gross: ${mb.grossCapacityPoints} pts, Reserved: ${mb.reservedPoints} pts`}
-                                      >
-                                        -{mb.reservedPoints} res
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              <SprintCapacityMatrix
+                members={team.members}
+                sprintSummaries={allSprintSummaries}
+                onManageReservations={setManagingReservationsPIId}
+              />
             )}
           </div>
         )}

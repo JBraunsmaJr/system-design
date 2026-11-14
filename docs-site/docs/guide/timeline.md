@@ -160,6 +160,7 @@ Scheduling mistakes, such as scheduling a dependent ticket before its prerequisi
 ![Visualize Blockers](../images/timeline/visualize-blockers.png)
 
 - **Schedule Conflict Warnings**: If Ticket B depends on Ticket A, but Ticket B is placed in an earlier sprint than Ticket A, the system flags the conflict with a visual warning badge (`⚠️`).
+- **On the Gantt chart**: a blocked or at-risk item says why under its title in the item column, for example _Blocked by TICKET-26, not finished until 2026-11-15_. The banner above the chart counts them; click it for the full explanations and a link to each blocker.
 - **Risk Indicators**: Hovering over conflict badges displays the exact relationship chain and recommends re-scheduling adjustments.
 
 ![Visualize Risks](../images/timeline/visualize-risks.png)

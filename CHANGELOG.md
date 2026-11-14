@@ -16,6 +16,7 @@ markers are removed when the section becomes a release. See
 ### Development
 
 - CI now checks formatting, lint and types on every push. The 17 existing lint errors are fixed.
+- `TeamView` is split: the member card and the sprint capacity table are their own components.
 
 ### [MINOR] Plan tab
 
@@ -37,6 +38,10 @@ markers are removed when the section becomes a release. See
   days it has; each program increment shows what is planned, reserved and left. Click a sprint's capacity for the
   breakdown by person, as before. It is now a real button, so it works from the keyboard.
 - Markers are a strip of chips above the board instead of a block of cards. Click a chip to open the marker.
+- In the Gantt chart, each blocked or at-risk item says why on its own row, under its title. The list of warnings
+  above the chart is folded to its count by default; click it for the full sentences. The item column is wider, so
+  fewer titles are cut off.
+- The Team section's heading and four summary cards are one line: people, points a day, and how holidays are counted.
 
 ## [0.98.2] - 2026-10-13
 

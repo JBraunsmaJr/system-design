@@ -4,6 +4,7 @@ import { ChevronDown, ChevronUp, ShieldAlert } from 'lucide-react';
 import { useOutsideClick } from '../../common/hooks/useOutsideClick';
 import { usePositionedDropdown } from '../../common/hooks/usePositionedDropdown';
 import type { SprintCapacitySummary } from '../../domain/timeline/teamTypes';
+import { initials } from '../../common/utils/string';
 
 interface SprintCapacityBarProps {
   summary: SprintCapacitySummary;
@@ -68,16 +69,6 @@ export function SprintCapacityBar({ summary, compact = false }: SprintCapacityBa
   } else if (percent >= 90) {
     barColorClass = 'sprint-capacity-bar__fill--warning';
   }
-
-  const getInitials = (name: string) => {
-    return name
-      .trim()
-      .split(/\s+/)
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
 
   const daysLabel = `${sprintBusinessDays} ${sprintBusinessDays === 1 ? 'day' : 'days'}`;
   const summaryTitle = [
@@ -204,7 +195,7 @@ export function SprintCapacityBar({ summary, compact = false }: SprintCapacityBa
                             className="sprint-capacity-bar__member-avatar"
                             style={{ backgroundColor: m.avatarColor ?? '#5b7cfa' }}
                           >
-                            {getInitials(m.memberName)}
+                            {initials(m.memberName)}
                           </span>
                           <div className="sprint-capacity-bar__member-names">
                             <span className="sprint-capacity-bar__member-name">{m.memberName}</span>

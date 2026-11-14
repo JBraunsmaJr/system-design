@@ -17,7 +17,10 @@ import {
   type ProgramIncrement,
 } from '../../domain/timeline/programIncrements';
 import { getItemType, isItemWorkable } from '../../domain/requirements/requirementsRegistry';
-import { findScheduleConflicts } from '../../domain/timeline/scheduleConflicts';
+import {
+  describeConflictBriefly,
+  findScheduleConflicts,
+} from '../../domain/timeline/scheduleConflicts';
 import type {
   RequirementsDocument,
   RequirementItem,
@@ -51,7 +54,9 @@ interface GanttGroup {
 }
 
 const DAY_WIDTH = 14;
-const DEFAULT_LABEL_COLUMN_WIDTH = 220;
+// Wide enough for a ticket id and most titles without truncating; the
+// column's edge can still be dragged.
+const DEFAULT_LABEL_COLUMN_WIDTH = 300;
 
 function parseISODate(iso: string): number {
   const [y, m, d] = iso.split('-').map(Number);
@@ -273,7 +278,9 @@ export function GanttChart({
   onSelectMilestone,
   onNavigateToRequirement,
 }: GanttChartProps) {
-  const [isConflictsCollapsed, setIsConflictsCollapsed] = useState(false);
+  // Folded by default: each conflict is also described on its own row, so
+  // the full sentences are for reading through, not for finding the rows.
+  const [isConflictsCollapsed, setIsConflictsCollapsed] = useState(true);
   const [isEpicsCollapsed, setIsEpicsCollapsed] = useState(false);
   const [groupingMode, setGroupingMode] = useState<GanttGroupingMode>('none');
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(new Set());
@@ -647,6 +654,8 @@ export function GanttChart({
             type="button"
             className="gantt-conflicts__header"
             onClick={() => setIsConflictsCollapsed(!isConflictsCollapsed)}
+            aria-expanded={!isConflictsCollapsed}
+            title={isConflictsCollapsed ? 'Show the details' : 'Hide the details'}
           >
             <AlertTriangle size={14} />
             <span>
@@ -998,27 +1007,36 @@ export function GanttChart({
                         return (
                           <div key={item.id} className="gantt-chart__row">
                             <div
-                              className="gantt-chart__label"
+                              className="gantt-chart__label gantt-chart__label--item"
                               style={{ width: labelColumnWidth }}
                               title={itemFullTitle}
                             >
-                              <span
-                                className="gantt-chart__label-id"
-                                style={{ color: type?.color ?? 'var(--chrome-text-dim)' }}
-                              >
-                                {item.id}
-                              </span>
-                              <span
-                                className="gantt-chart__label-title"
-                                title={item.title || 'Untitled'}
-                              >
-                                {item.title || 'Untitled'}
-                              </span>
-                              {isConflicted && (
-                                <AlertTriangle size={11} className="gantt-chart__label-warning" />
-                              )}
-                              {isAtRisk && (
-                                <AlertTriangle size={11} className="gantt-chart__label-risk" />
+                              <div className="gantt-chart__label-main">
+                                <span
+                                  className="gantt-chart__label-id"
+                                  style={{ color: type?.color ?? 'var(--chrome-text-dim)' }}
+                                >
+                                  {item.id}
+                                </span>
+                                <span
+                                  className="gantt-chart__label-title"
+                                  title={item.title || 'Untitled'}
+                                >
+                                  {item.title || 'Untitled'}
+                                </span>
+                                {isConflicted && (
+                                  <AlertTriangle size={11} className="gantt-chart__label-warning" />
+                                )}
+                                {isAtRisk && (
+                                  <AlertTriangle size={11} className="gantt-chart__label-risk" />
+                                )}
+                              </div>
+                              {rowConflict && (
+                                <div
+                                  className={`gantt-chart__label-note${isAtRisk ? ' is-risk' : ''}`}
+                                >
+                                  {describeConflictBriefly(rowConflict)}
+                                </div>
                               )}
                             </div>
                             <div className="gantt-chart__track" style={{ width: totalWidth }}>

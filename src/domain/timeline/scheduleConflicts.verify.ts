@@ -5,6 +5,7 @@ import {
   findScheduleConflicts,
   checkScheduleConflict,
   findBlockingItemIds,
+  describeConflictBriefly,
 } from './scheduleConflicts';
 import type {
   RequirementItem,
@@ -320,6 +321,26 @@ const SPRINT_2 = { startDate: '2026-01-15', endDate: '2026-01-28' };
   assert(
     conflict === null,
     'a non-blocking relationship type never produces a conflict, workable or not',
+  );
+}
+
+// === Part 11: the one-line description of a conflict ===
+{
+  const blocker = item('TICKET-9', 'ticket');
+  assert(
+    describeConflictBriefly({ severity: 'risk', blocker, blockerRange: SPRINT_1 }) ===
+      'At risk: same sprint as its blocker TICKET-9',
+    'a same-sprint risk names the blocker and says why it is only a risk',
+  );
+  assert(
+    describeConflictBriefly({ severity: 'blocked', blocker, blockerRange: SPRINT_1 }) ===
+      `Blocked by TICKET-9, not finished until ${SPRINT_1.endDate}`,
+    'a blocked item says when its blocker finishes',
+  );
+  assert(
+    describeConflictBriefly({ severity: 'blocked', blocker, blockerRange: null }) ===
+      'Blocked by TICKET-9, which is not scheduled',
+    'a blocker with no sprint is described as not scheduled',
   );
 }
 

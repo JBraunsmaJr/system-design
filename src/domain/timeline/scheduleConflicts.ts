@@ -269,3 +269,20 @@ export function findBlockingItemIds(
 
   return blockers;
 }
+
+/**
+ * One line saying what is wrong with a conflicted item, short enough to sit
+ * under its title in a list (the Gantt's item column). The longer sentence,
+ * with both titles and a suggestion, stays with whoever renders the full
+ * list of conflicts.
+ */
+export function describeConflictBriefly(
+  conflict: Pick<ScheduleConflict, 'severity' | 'blocker' | 'blockerRange'>,
+): string {
+  if (conflict.severity === 'risk') {
+    return `At risk: same sprint as its blocker ${conflict.blocker.id}`;
+  }
+  return conflict.blockerRange
+    ? `Blocked by ${conflict.blocker.id}, not finished until ${conflict.blockerRange.endDate}`
+    : `Blocked by ${conflict.blocker.id}, which is not scheduled`;
+}

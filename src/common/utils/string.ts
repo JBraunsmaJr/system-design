@@ -11,3 +11,17 @@ export function sanitizeFileName(name: string, fallback: string = 'file'): strin
     .replace(/^-+|-+$/g, '');
   return sanitized || fallback;
 }
+
+/**
+ * Up to two upper-case initials for an avatar: the first letter of each of
+ * the first two words. An empty or blank name gives an empty string.
+ */
+export function initials(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .map((word) => word[0] ?? '')
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+}
