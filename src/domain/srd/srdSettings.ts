@@ -29,8 +29,18 @@ import type {
   SrdTemplateId,
   SrdTemplateTheme,
 } from './srdTypes';
-import {BUILTIN_SRD_TEMPLATES, DEFAULT_SRD_TEMPLATE, mergeTemplateWithDefaults,} from './srdTemplatePresets';
-import {isFiniteNumber, isPlainObject, isSafeFontFamily, isSafeHexColor, isSrdSectionId,} from './srdValidation';
+import {
+  BUILTIN_SRD_TEMPLATES,
+  DEFAULT_SRD_TEMPLATE,
+  mergeTemplateWithDefaults,
+} from './srdTemplatePresets';
+import {
+  isFiniteNumber,
+  isPlainObject,
+  isSafeFontFamily,
+  isSafeHexColor,
+  isSrdSectionId,
+} from './srdValidation';
 
 // --- Templates and presets ----------------------------------------------------
 

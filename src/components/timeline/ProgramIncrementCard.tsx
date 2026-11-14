@@ -1,21 +1,24 @@
-import {useMemo, useState} from 'react';
-import {CalendarRange, ChevronDown, ChevronRight, Plus, ShieldAlert, Trash2} from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { CalendarRange, ChevronDown, ChevronRight, Plus, ShieldAlert, Trash2 } from 'lucide-react';
 import {
   computeSprintDateRanges,
   type PlanningDetailsPatch,
   type ProgramIncrement,
 } from '../../domain/timeline/programIncrements';
-import {isItemWorkable} from '../../domain/requirements/requirementsRegistry';
-import type {ScheduleConflictSeverity} from '../../domain/timeline/scheduleConflicts';
-import type {RequirementItem, RequirementsDocument,} from '../../domain/requirements/requirementsTypes';
-import type {ProgramIncrementsStore} from '../../collab/stores/programIncrementsStore';
-import type {Milestone} from '../../domain/timeline/milestones';
-import type {TeamDocument} from '../../domain/timeline/teamTypes';
-import {computePICapacities} from '../../domain/timeline/teamCapacity';
-import {ManageReservationsModal} from './ManageReservationsModal';
-import {SprintRow} from './SprintRow';
-import {SprintBoardColumn} from './SprintBoardColumn';
-import {PlanningDetailsFields} from './PlanningDetailsFields';
+import { isItemWorkable } from '../../domain/requirements/requirementsRegistry';
+import type { ScheduleConflictSeverity } from '../../domain/timeline/scheduleConflicts';
+import type {
+  RequirementItem,
+  RequirementsDocument,
+} from '../../domain/requirements/requirementsTypes';
+import type { ProgramIncrementsStore } from '../../collab/stores/programIncrementsStore';
+import type { Milestone } from '../../domain/timeline/milestones';
+import type { TeamDocument } from '../../domain/timeline/teamTypes';
+import { computePICapacities } from '../../domain/timeline/teamCapacity';
+import { ManageReservationsModal } from './ManageReservationsModal';
+import { SprintRow } from './SprintRow';
+import { SprintBoardColumn } from './SprintBoardColumn';
+import { PlanningDetailsFields } from './PlanningDetailsFields';
 
 interface ProgramIncrementCardProps {
   pi: ProgramIncrement;
@@ -41,15 +44,19 @@ interface ProgramIncrementCardProps {
   onUpdateItem: (id: string, patch: Partial<RequirementItem>) => void;
   onUpdateName: (name: string) => void;
   onUpdateStart: (startDate: string) => void;
-    onUpdateDetails: (patch: PlanningDetailsPatch) => void;
+  onUpdateDetails: (patch: PlanningDetailsPatch) => void;
   onDelete: () => void;
   onAddSprint: () => void;
   onUpdateSprintName: (sprintId: string, name: string) => void;
   onUpdateSprintEnd: (sprintId: string, endDate: string) => void;
-    onUpdateSprintDetails: (sprintId: string, patch: PlanningDetailsPatch) => void;
+  onUpdateSprintDetails: (sprintId: string, patch: PlanningDetailsPatch) => void;
   onDeleteSprint: (sprintId: string) => void;
   onMoveSprint: (sprintId: string, direction: 'up' | 'down') => void;
   programIncrementsStore: ProgramIncrementsStore;
+  /** The sprint columns to show on the board, or null/undefined for all -
+   * see boardFilter.ts. Only the board is narrowed: the sprint list under
+   * "Edit sprints" and the PI's capacity totals always cover every sprint. */
+  visibleSprintIds?: Set<string> | null;
 }
 
 /**
@@ -79,21 +86,27 @@ export function ProgramIncrementCard({
   onUpdateItem,
   onUpdateName,
   onUpdateStart,
-                                         onUpdateDetails,
+  onUpdateDetails,
   onDelete,
   onAddSprint,
   onUpdateSprintName,
   onUpdateSprintEnd,
-                                         onUpdateSprintDetails,
+  onUpdateSprintDetails,
   onDeleteSprint,
   onMoveSprint,
   programIncrementsStore,
+  visibleSprintIds,
 }: ProgramIncrementCardProps) {
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
-  const [isSprintListCollapsed, setIsSprintListCollapsed] = useState(false);
+  // Folded by default: sprint names and dates are set up once per PI, and
+  // open they push the board itself most of a screen down the page.
+  const [isSprintListCollapsed, setIsSprintListCollapsed] = useState(true);
   const [isManagingReservations, setIsManagingReservations] = useState(false);
   const ranges = computeSprintDateRanges(pi);
   const rangeBySprintId = new Map(ranges.map((r) => [r.sprintId, r]));
+  const boardSprints = visibleSprintIds
+    ? pi.sprints.filter((s) => visibleSprintIds.has(s.id))
+    : pi.sprints;
 
   const reservationsCount = pi.reservations?.length ?? 0;
 
@@ -265,17 +278,21 @@ export function ProgramIncrementCard({
         )}
       </div>
 
-        <div className="pi-card__details">
-            <PlanningDetailsFields details={pi} scope="PI" onChange={onUpdateDetails}/>
-        </div>
+      <div className="pi-card__details">
+        <PlanningDetailsFields details={pi} scope="PI" onChange={onUpdateDetails} />
+      </div>
 
       <button
         type="button"
         className="pi-card__sprints-toggle"
         onClick={() => setIsSprintListCollapsed(!isSprintListCollapsed)}
+        aria-expanded={!isSprintListCollapsed}
       >
         {isSprintListCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
-        Edit sprint dates
+        Edit sprints
+        <span className="pi-card__sprints-toggle-count">
+          {pi.sprints.length} sprint{pi.sprints.length === 1 ? '' : 's'}
+        </span>
       </button>
 
       {!isSprintListCollapsed && (
@@ -312,9 +329,18 @@ export function ProgramIncrementCard({
         <div className="pi-card__board">
           <div className="pi-card__board-header">
             <span className="pi-card__board-title">Sprint Timeline Board</span>
+            {boardSprints.length < pi.sprints.length && (
+              <span className="pi-card__board-filter-note">
+                Showing {boardSprints.length} of {pi.sprints.length} sprints
+              </span>
+            )}
           </div>
-          <div className="pi-card__board-columns">
-            {pi.sprints.map((sprint) => (
+          <div
+            className={`pi-card__board-columns${
+              boardSprints.length < pi.sprints.length ? ' pi-card__board-columns--filtered' : ''
+            }`}
+          >
+            {boardSprints.map((sprint) => (
               <SprintBoardColumn
                 key={sprint.id}
                 sprint={sprint}

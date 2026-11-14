@@ -1,10 +1,15 @@
 import * as Y from 'yjs';
-import {orderIdSet, pushIfAbsent} from '../sync/seedGuards.ts';
-import type {Edge, Node} from '@xyflow/react';
-import type {ArchEdgeData, ArchNodeData, EdgeWaypoint, SubDiagram,} from '../../domain/canvas/types';
-import type {DiagramStore} from './diagramStore';
-import {flattenSubDiagramTree} from './diagramStore';
-import {recordSnapshotBuild, recordStoreWrite} from '../../perf/instrumentation';
+import { orderIdSet, pushIfAbsent } from '../sync/seedGuards.ts';
+import type { Edge, Node } from '@xyflow/react';
+import type {
+  ArchEdgeData,
+  ArchNodeData,
+  EdgeWaypoint,
+  SubDiagram,
+} from '../../domain/canvas/types';
+import type { DiagramStore } from './diagramStore';
+import { flattenSubDiagramTree } from './diagramStore';
+import { recordSnapshotBuild, recordStoreWrite } from '../../perf/instrumentation';
 
 /** Node and edge ids are purely internal (never displayed - React Flow
  * uses them as keys and connection endpoints, nothing more), so - same
@@ -30,7 +35,7 @@ const NODE_DATA_FIELDS = [
   'linkedRequirementIds',
   'linkedDocument',
   'zIndex',
-    'locked',
+  'locked',
 ] as const;
 
 /**
@@ -45,8 +50,8 @@ const EDGE_DATA_FIELDS = [
   'direction',
   'hideLabel',
   'color',
-    'strokeWidth',
-    'routing',
+  'strokeWidth',
+  'routing',
   'labelAnchorT',
   'labelOffsetX',
   'labelOffsetY',

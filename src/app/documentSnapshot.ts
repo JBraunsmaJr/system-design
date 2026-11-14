@@ -1,17 +1,20 @@
-import {type parseDiagramFile, toDiagramFile} from '../domain/canvas/serialization';
-import type {Scenario, SubDiagram} from '../domain/canvas/types';
-import {EMPTY_REQUIREMENTS_DOCUMENT, type RequirementsDocument,} from '../domain/requirements/requirementsTypes';
+import { type parseDiagramFile, toDiagramFile } from '../domain/canvas/serialization';
+import type { Scenario, SubDiagram } from '../domain/canvas/types';
+import {
+  EMPTY_REQUIREMENTS_DOCUMENT,
+  type RequirementsDocument,
+} from '../domain/requirements/requirementsTypes';
 import {
   BUILT_IN_ITEM_TYPES,
   BUILT_IN_RELATIONSHIP_TYPES,
   withMissingBuiltInRelationshipTypes,
   withMissingBuiltInTypes,
 } from '../domain/requirements/requirementsRegistry';
-import type {ProgramIncrement} from '../domain/timeline/programIncrements';
-import {EMPTY_TEAM_DOCUMENT, type TeamDocument} from '../domain/timeline/teamTypes';
-import type {Milestone} from '../domain/timeline/milestones';
-import {expandSrdFileValue} from '../domain/srd/srdSettings';
-import type {SrdDocumentState} from '../domain/srd/srdTypes';
+import type { ProgramIncrement } from '../domain/timeline/programIncrements';
+import { EMPTY_TEAM_DOCUMENT, type TeamDocument } from '../domain/timeline/teamTypes';
+import type { Milestone } from '../domain/timeline/milestones';
+import { expandSrdFileValue } from '../domain/srd/srdSettings';
+import type { SrdDocumentState } from '../domain/srd/srdTypes';
 
 /*
  * Moved unchanged from App.tsx. Pure functions and constants: nothing here

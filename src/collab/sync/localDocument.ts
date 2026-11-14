@@ -18,32 +18,46 @@
  * not a design.
  */
 import * as Y from 'yjs';
-import type {DiagramFile} from '../../domain/canvas/serialization.ts';
-import {attachPersistence, createNullPersistence, type DocPersistence, persistenceKeyForRoom,} from './persistence.ts';
-import {isYjsDocEmpty} from './seedGuards.ts';
-import {createYjsDiagramStore, seedYjsDiagramDoc} from '../stores/yjsDiagramStore.ts';
+import type { DiagramFile } from '../../domain/canvas/serialization.ts';
+import {
+  attachPersistence,
+  createNullPersistence,
+  type DocPersistence,
+  persistenceKeyForRoom,
+} from './persistence.ts';
+import { isYjsDocEmpty } from './seedGuards.ts';
+import { createYjsDiagramStore, seedYjsDiagramDoc } from '../stores/yjsDiagramStore.ts';
 import {
   createYjsRequirementsStore,
   seedYjsRequirementsDoc,
   topUpBuiltInTypes,
 } from '../stores/yjsRequirementsStore.ts';
-import {createYjsProgramIncrementsStore, seedYjsProgramIncrementsDoc,} from '../stores/yjsProgramIncrementsStore.ts';
-import {createYjsMilestonesStore, seedYjsMilestonesDoc} from '../stores/yjsMilestonesStore.ts';
-import {createYjsTeamStore} from '../stores/yjsTeamStore.ts';
+import {
+  createYjsProgramIncrementsStore,
+  seedYjsProgramIncrementsDoc,
+} from '../stores/yjsProgramIncrementsStore.ts';
+import { createYjsMilestonesStore, seedYjsMilestonesDoc } from '../stores/yjsMilestonesStore.ts';
+import { createYjsTeamStore } from '../stores/yjsTeamStore.ts';
 import {
   createYjsDocumentMetaStore,
   type DocumentMetaStore,
   META_MAP,
   seedYjsDocumentMeta,
 } from '../stores/yjsDocumentMetaStore.ts';
-import {createYjsSrdStore, seedYjsSrd, SRD_FRAMING_MAP, SRD_MAP, type SrdStore,} from '../stores/yjsSrdStore.ts';
-import {expandSrdFileValue} from '../../domain/srd/srdSettings.ts';
-import type {TeamStore} from '../stores/teamStore.ts';
-import {seedTeamStore} from '../stores/teamStore.ts';
-import type {DiagramStore} from '../stores/diagramStore.ts';
-import type {RequirementsStore} from '../stores/requirementsStore.ts';
-import type {ProgramIncrementsStore} from '../stores/programIncrementsStore.ts';
-import type {MilestonesStore} from '../stores/milestonesStore.ts';
+import {
+  createYjsSrdStore,
+  seedYjsSrd,
+  SRD_FRAMING_MAP,
+  SRD_MAP,
+  type SrdStore,
+} from '../stores/yjsSrdStore.ts';
+import { expandSrdFileValue } from '../../domain/srd/srdSettings.ts';
+import type { TeamStore } from '../stores/teamStore.ts';
+import { seedTeamStore } from '../stores/teamStore.ts';
+import type { DiagramStore } from '../stores/diagramStore.ts';
+import type { RequirementsStore } from '../stores/requirementsStore.ts';
+import type { ProgramIncrementsStore } from '../stores/programIncrementsStore.ts';
+import type { MilestonesStore } from '../stores/milestonesStore.ts';
 
 /** Namespaced apart from room keys so a document and a session can never
  * collide in IndexedDB, even if their identifiers happen to match. */

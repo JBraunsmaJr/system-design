@@ -1,22 +1,25 @@
-import type {Edge, Node} from '@xyflow/react';
-import type {ArchEdgeData, ArchNodeData, Scenario} from './types.ts';
-import type {RequirementsDocument} from '../requirements/requirementsTypes.ts';
-import {EMPTY_REQUIREMENTS_DOCUMENT} from '../requirements/requirementsTypes.ts';
-import {BUILT_IN_ITEM_TYPES, BUILT_IN_RELATIONSHIP_TYPES,} from '../requirements/requirementsRegistry.ts';
-import type {PlanningDetails, ProgramIncrement} from '../timeline/programIncrements.ts';
-import {DEFAULT_SPRINT_DURATION_DAYS} from '../timeline/programIncrements.ts';
-import type {TeamDocument} from '../timeline/teamTypes.ts';
-import {DEFAULT_TEAM_SETTINGS, EMPTY_TEAM_DOCUMENT} from '../timeline/teamTypes.ts';
-import type {Milestone} from '../timeline/milestones.ts';
-import {sanitizeRelatedItemIds, validateMilestone} from '../timeline/milestones.ts';
-import {globalShapeRegistry, type ShapeDefinition} from './shapeRegistry.ts';
-import {globalIconRegistry, type IconDefinition} from './iconRegistry.ts';
-import {migrateToCurrent, type RawDiagramFile} from '../storage/schemaMigrations.ts';
+import type { Edge, Node } from '@xyflow/react';
+import type { ArchEdgeData, ArchNodeData, Scenario } from './types.ts';
+import type { RequirementsDocument } from '../requirements/requirementsTypes.ts';
+import { EMPTY_REQUIREMENTS_DOCUMENT } from '../requirements/requirementsTypes.ts';
+import {
+  BUILT_IN_ITEM_TYPES,
+  BUILT_IN_RELATIONSHIP_TYPES,
+} from '../requirements/requirementsRegistry.ts';
+import type { PlanningDetails, ProgramIncrement } from '../timeline/programIncrements.ts';
+import { DEFAULT_SPRINT_DURATION_DAYS } from '../timeline/programIncrements.ts';
+import type { TeamDocument } from '../timeline/teamTypes.ts';
+import { DEFAULT_TEAM_SETTINGS, EMPTY_TEAM_DOCUMENT } from '../timeline/teamTypes.ts';
+import type { Milestone } from '../timeline/milestones.ts';
+import { sanitizeRelatedItemIds, validateMilestone } from '../timeline/milestones.ts';
+import { globalShapeRegistry, type ShapeDefinition } from './shapeRegistry.ts';
+import { globalIconRegistry, type IconDefinition } from './iconRegistry.ts';
+import { migrateToCurrent, type RawDiagramFile } from '../storage/schemaMigrations.ts';
 
-import {sanitizeFileName} from '../../common/utils/string.ts';
-import {downloadFile} from '../../common/utils/download.ts';
-import {compactSrdState, expandSrdFileValue, type SrdFileValue} from '../srd/srdSettings.ts';
-import type {SrdDocumentState} from '../srd/srdTypes.ts';
+import { sanitizeFileName } from '../../common/utils/string.ts';
+import { downloadFile } from '../../common/utils/download.ts';
+import { compactSrdState, expandSrdFileValue, type SrdFileValue } from '../srd/srdSettings.ts';
+import type { SrdDocumentState } from '../srd/srdTypes.ts';
 
 export const SCHEMA_VERSION = '0.8';
 
@@ -157,10 +160,10 @@ function parseRequirementsDocument(raw: unknown): RequirementsDocument {
 /** Keeps only non-empty string goal/notes; anything else is dropped so a
  * bad value never reaches the stores. */
 function parsePlanningDetails(raw: Record<string, unknown>): PlanningDetails {
-    const out: PlanningDetails = {};
-    if (typeof raw.goal === 'string' && raw.goal.trim() !== '') out.goal = raw.goal;
-    if (typeof raw.notes === 'string' && raw.notes.trim() !== '') out.notes = raw.notes;
-    return out;
+  const out: PlanningDetails = {};
+  if (typeof raw.goal === 'string' && raw.goal.trim() !== '') out.goal = raw.goal;
+  if (typeof raw.notes === 'string' && raw.notes.trim() !== '') out.notes = raw.notes;
+  return out;
 }
 
 /** A malformed individual PI (missing fields, sprints not an array, etc.)
@@ -197,7 +200,7 @@ function parseProgramIncrements(raw: unknown): ProgramIncrement[] {
           typeof s.durationDays === 'number' && s.durationDays > 0
             ? s.durationDays
             : DEFAULT_SPRINT_DURATION_DAYS,
-          ...parsePlanningDetails(s),
+        ...parsePlanningDetails(s),
       }));
 
     const reservations = Array.isArray(pi.reservations)
@@ -231,7 +234,7 @@ function parseProgramIncrements(raw: unknown): ProgramIncrement[] {
       name: pi.name,
       startDate: pi.startDate,
       sprints,
-        ...parsePlanningDetails(pi as Record<string, unknown>),
+      ...parsePlanningDetails(pi as Record<string, unknown>),
       ...(reservations && reservations.length > 0 ? { reservations } : {}),
     });
   }

@@ -28,19 +28,25 @@
  * refactor should produce an identical census; --compare exits non-zero if
  * any count differs.
  */
-import {type ChildProcess, spawn} from 'child_process';
-import {build, loadConfigFromFile, type PluginOption} from 'vite';
-import {mkdtempSync, readFileSync, writeFileSync} from 'fs';
-import {fileURLToPath} from 'url';
-import {tmpdir} from 'os';
-import {join, resolve} from 'path';
-import {chromium, type Page} from 'playwright';
-import {waitForPort} from './lib/devServers';
-import {toDiagramFile} from '../src/domain/canvas/serialization';
-import type {RequirementItem, RequirementRelationship,} from '../src/domain/requirements/requirementsTypes';
-import {BUILT_IN_ITEM_TYPES, BUILT_IN_RELATIONSHIP_TYPES,} from '../src/domain/requirements/requirementsRegistry';
-import type {ProgramIncrement} from '../src/domain/timeline/programIncrements';
-import type {Milestone} from '../src/domain/timeline/milestones';
+import { type ChildProcess, spawn } from 'child_process';
+import { build, loadConfigFromFile, type PluginOption } from 'vite';
+import { mkdtempSync, readFileSync, writeFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { tmpdir } from 'os';
+import { join, resolve } from 'path';
+import { chromium, type Page } from 'playwright';
+import { waitForPort } from './lib/devServers';
+import { toDiagramFile } from '../src/domain/canvas/serialization';
+import type {
+  RequirementItem,
+  RequirementRelationship,
+} from '../src/domain/requirements/requirementsTypes';
+import {
+  BUILT_IN_ITEM_TYPES,
+  BUILT_IN_RELATIONSHIP_TYPES,
+} from '../src/domain/requirements/requirementsRegistry';
+import type { ProgramIncrement } from '../src/domain/timeline/programIncrements';
+import type { Milestone } from '../src/domain/timeline/milestones';
 
 // ---------------------------------------------------------------------------
 // Arguments
@@ -390,14 +396,14 @@ const SCENARIOS: Scenario[] = [
   { id: 'req/collapse-all', run: (p) => p.click('button[aria-label="Collapse all cards"]') },
   { id: 'req/expand-all', run: (p) => p.click('button[aria-label="Expand all cards"]') },
   // --- Timeline view -----------------------------------------------------
-  { id: 'timeline/open', run: (p) => p.click('button[title="Timeline"]') },
+  { id: 'timeline/open', run: (p) => p.click('.toolbar__view-tabs button:has-text("Plan")') },
   {
     id: 'timeline/gantt',
-    run: (p) => p.click('.timeline-view__mode-toggle button:has-text("Gantt")'),
+    run: (p) => p.click('.plan-nav__item:has-text("Gantt")'),
   },
   {
     id: 'timeline/board',
-    run: (p) => p.click('.timeline-view__mode-toggle button:has-text("Board")'),
+    run: (p) => p.click('.plan-nav__item:has-text("Board")'),
   },
   {
     id: 'timeline/filter-epic',

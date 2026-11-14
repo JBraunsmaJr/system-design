@@ -14,8 +14,8 @@ import {
   stateWithPreset,
   toRenderConfig,
 } from './srdSettings';
-import {AGILE_ENGINEERING_TEMPLATE, ENTERPRISE_FORMAL_TEMPLATE} from './srdTemplatePresets';
-import type {SrdDataContext, SrdDocumentState} from './srdTypes';
+import { AGILE_ENGINEERING_TEMPLATE, ENTERPRISE_FORMAL_TEMPLATE } from './srdTemplatePresets';
+import type { SrdDataContext, SrdDocumentState } from './srdTypes';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {

@@ -143,7 +143,7 @@ function assert(cond: boolean, msg: string) {
     noViewOrFocus !== null &&
       noViewOrFocus.viewMode === null &&
       noViewOrFocus.focusedItemId === null,
-    "missing viewMode/focusedItemId default to null rather than being undefined or rejecting the peer - matches a peer on a view that doesn't track this (diagram/team/skill-tree), or the brief window before their first full broadcast",
+    "missing viewMode/focusedItemId default to null rather than being undefined or rejecting the peer - matches a peer on a view that doesn't track this (diagram/team/dependencies), or the brief window before their first full broadcast",
   );
 
   const malformedView = parsePresenceState(1, {

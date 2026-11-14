@@ -1,6 +1,6 @@
-import type {RequirementItem, RequirementsDocument} from './requirementsTypes';
-import {isItemWorkable} from './requirementsRegistry';
-import {withTagAdded, withTagRemoved} from './requirementTags';
+import type { RequirementItem, RequirementsDocument } from './requirementsTypes';
+import { isItemWorkable } from './requirementsRegistry';
+import { withTagAdded, withTagRemoved } from './requirementTags';
 
 /**
  * Bulk edits in the Requirements view, as the patches they make - see
@@ -17,48 +17,48 @@ export type BulkItemUpdate = { id: string; patch: Partial<RequirementItem> };
  * are left out, so the edit touches only what it changes.
  */
 export const bulkPatches = {
-    status(
-        doc: RequirementsDocument,
-        items: RequirementItem[],
-        status: RequirementItem['status'],
-    ): BulkItemUpdate[] {
-        return items
-            .filter((i) => isItemWorkable(doc, i) && (i.status ?? 'todo') !== status)
-            .map((i) => ({id: i.id, patch: {status}}));
-    },
-    sprint(
-        doc: RequirementsDocument,
-        items: RequirementItem[],
-        sprintId: string | undefined,
-    ): BulkItemUpdate[] {
-        return items
-            .filter((i) => isItemWorkable(doc, i) && i.sprintId !== sprintId)
-            .map((i) => ({id: i.id, patch: {sprintId}}));
-    },
-    assignee(
-        doc: RequirementsDocument,
-        items: RequirementItem[],
-        assigneeId: string | undefined,
-    ): BulkItemUpdate[] {
-        return items
-            .filter((i) => isItemWorkable(doc, i) && i.assigneeId !== assigneeId)
-            .map((i) => ({id: i.id, patch: {assigneeId}}));
-    },
-    category(items: RequirementItem[], categoryId: string | undefined): BulkItemUpdate[] {
-        return items
-            .filter((i) => i.categoryId !== categoryId)
-            .map((i) => ({id: i.id, patch: {categoryId}}));
-    },
-    addTag(items: RequirementItem[], tag: string): BulkItemUpdate[] {
-        return items.flatMap((i) => {
-            const tags = withTagAdded(i.tags, tag);
-            return (tags?.length ?? 0) === (i.tags?.length ?? 0) ? [] : [{id: i.id, patch: {tags}}];
-        });
-    },
-    removeTag(items: RequirementItem[], tag: string): BulkItemUpdate[] {
-        return items.flatMap((i) => {
-            const tags = withTagRemoved(i.tags, tag);
-            return (tags?.length ?? 0) === (i.tags?.length ?? 0) ? [] : [{id: i.id, patch: {tags}}];
-        });
-    },
+  status(
+    doc: RequirementsDocument,
+    items: RequirementItem[],
+    status: RequirementItem['status'],
+  ): BulkItemUpdate[] {
+    return items
+      .filter((i) => isItemWorkable(doc, i) && (i.status ?? 'todo') !== status)
+      .map((i) => ({ id: i.id, patch: { status } }));
+  },
+  sprint(
+    doc: RequirementsDocument,
+    items: RequirementItem[],
+    sprintId: string | undefined,
+  ): BulkItemUpdate[] {
+    return items
+      .filter((i) => isItemWorkable(doc, i) && i.sprintId !== sprintId)
+      .map((i) => ({ id: i.id, patch: { sprintId } }));
+  },
+  assignee(
+    doc: RequirementsDocument,
+    items: RequirementItem[],
+    assigneeId: string | undefined,
+  ): BulkItemUpdate[] {
+    return items
+      .filter((i) => isItemWorkable(doc, i) && i.assigneeId !== assigneeId)
+      .map((i) => ({ id: i.id, patch: { assigneeId } }));
+  },
+  category(items: RequirementItem[], categoryId: string | undefined): BulkItemUpdate[] {
+    return items
+      .filter((i) => i.categoryId !== categoryId)
+      .map((i) => ({ id: i.id, patch: { categoryId } }));
+  },
+  addTag(items: RequirementItem[], tag: string): BulkItemUpdate[] {
+    return items.flatMap((i) => {
+      const tags = withTagAdded(i.tags, tag);
+      return (tags?.length ?? 0) === (i.tags?.length ?? 0) ? [] : [{ id: i.id, patch: { tags } }];
+    });
+  },
+  removeTag(items: RequirementItem[], tag: string): BulkItemUpdate[] {
+    return items.flatMap((i) => {
+      const tags = withTagRemoved(i.tags, tag);
+      return (tags?.length ?? 0) === (i.tags?.length ?? 0) ? [] : [{ id: i.id, patch: { tags } }];
+    });
+  },
 };

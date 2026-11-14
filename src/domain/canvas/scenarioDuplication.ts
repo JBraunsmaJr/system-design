@@ -1,4 +1,4 @@
-import type {Scenario, ScenarioStep} from './types';
+import type { Scenario, ScenarioStep } from './types';
 
 /**
  * Copying scenarios and steps, so a variant of a walkthrough ("the same
@@ -17,27 +17,27 @@ import type {Scenario, ScenarioStep} from './types';
  * from its base name, so copying "Login (copy)" gives "Login (copy 2)"
  * rather than "Login (copy) (copy)". */
 export function copyTitle(title: string, existing: Iterable<string>): string {
-    const taken = new Set(existing);
-    // Empty when the title is nothing but a copy suffix, so copying "(copy)"
-    // numbers it - "(copy 2)" - instead of appending another suffix.
-    const base = title.replace(/\s*\(copy(?: \d+)?\)$/, '').trim();
-    const first = base ? `${base} (copy)` : '(copy)';
-    if (!taken.has(first)) return first;
-    for (let n = 2; ; n++) {
-        const candidate = base ? `${base} (copy ${n})` : `(copy ${n})`;
-        if (!taken.has(candidate)) return candidate;
-    }
+  const taken = new Set(existing);
+  // Empty when the title is nothing but a copy suffix, so copying "(copy)"
+  // numbers it - "(copy 2)" - instead of appending another suffix.
+  const base = title.replace(/\s*\(copy(?: \d+)?\)$/, '').trim();
+  const first = base ? `${base} (copy)` : '(copy)';
+  if (!taken.has(first)) return first;
+  for (let n = 2; ; n++) {
+    const candidate = base ? `${base} (copy ${n})` : `(copy ${n})`;
+    if (!taken.has(candidate)) return candidate;
+  }
 }
 
 /** A step with a new id and its own arrays; everything else as it was. */
 export function cloneStep(step: ScenarioStep, newId: string): ScenarioStep {
-    return {
-        ...step,
-        id: newId,
-        path: [...step.path],
-        focusNodeIds: [...step.focusNodeIds],
-        focusEdgeIds: [...step.focusEdgeIds],
-    };
+  return {
+    ...step,
+    id: newId,
+    path: [...step.path],
+    focusNodeIds: [...step.focusNodeIds],
+    focusEdgeIds: [...step.focusEdgeIds],
+  };
 }
 
 /**
@@ -45,16 +45,16 @@ export function cloneStep(step: ScenarioStep, newId: string): ScenarioStep {
  * so it can be told apart from the original in the scenario list.
  */
 export function duplicateScenario(
-    scenario: Scenario,
-    existingTitles: Iterable<string>,
-    ids: { scenarioId: string; nextStepId: () => string },
+  scenario: Scenario,
+  existingTitles: Iterable<string>,
+  ids: { scenarioId: string; nextStepId: () => string },
 ): Scenario {
-    return {
-        ...scenario,
-        id: ids.scenarioId,
-        title: copyTitle(scenario.title, existingTitles),
-        steps: scenario.steps.map((step) => cloneStep(step, ids.nextStepId())),
-    };
+  return {
+    ...scenario,
+    id: ids.scenarioId,
+    title: copyTitle(scenario.title, existingTitles),
+    steps: scenario.steps.map((step) => cloneStep(step, ids.nextStepId())),
+  };
 }
 
 /**
@@ -62,18 +62,18 @@ export function duplicateScenario(
  * Returns the list unchanged when there is no such scenario.
  */
 export function withScenarioDuplicated(
-    scenarios: Scenario[],
-    scenarioId: string,
-    ids: { scenarioId: string; nextStepId: () => string },
+  scenarios: Scenario[],
+  scenarioId: string,
+  ids: { scenarioId: string; nextStepId: () => string },
 ): Scenario[] {
-    const index = scenarios.findIndex((s) => s.id === scenarioId);
-    if (index === -1) return scenarios;
-    const copy = duplicateScenario(
-        scenarios[index],
-        scenarios.map((s) => s.title),
-        ids,
-    );
-    return [...scenarios.slice(0, index + 1), copy, ...scenarios.slice(index + 1)];
+  const index = scenarios.findIndex((s) => s.id === scenarioId);
+  if (index === -1) return scenarios;
+  const copy = duplicateScenario(
+    scenarios[index],
+    scenarios.map((s) => s.title),
+    ids,
+  );
+  return [...scenarios.slice(0, index + 1), copy, ...scenarios.slice(index + 1)];
 }
 
 /**
@@ -83,28 +83,28 @@ export function withScenarioDuplicated(
  * when the scenario or step doesn't exist.
  */
 export function withStepDuplicated(
-    scenarios: Scenario[],
-    scenarioId: string,
-    stepId: string,
-    newStepId: string,
+  scenarios: Scenario[],
+  scenarioId: string,
+  stepId: string,
+  newStepId: string,
 ): Scenario[] {
-    return scenarios.map((sc) => {
-        if (sc.id !== scenarioId) return sc;
-        const index = sc.steps.findIndex((st) => st.id === stepId);
-        if (index === -1) return sc;
-        const original = sc.steps[index];
-        const copy = cloneStep(original, newStepId);
-        // An untitled step shows as "Step N", so its copy stays untitled and
-        // picks up its own number from its new position.
-        if (original.title.trim()) {
-            copy.title = copyTitle(
-                original.title,
-                sc.steps.map((st) => st.title),
-            );
-        }
-        return {
-            ...sc,
-            steps: [...sc.steps.slice(0, index + 1), copy, ...sc.steps.slice(index + 1)],
-        };
-    });
+  return scenarios.map((sc) => {
+    if (sc.id !== scenarioId) return sc;
+    const index = sc.steps.findIndex((st) => st.id === stepId);
+    if (index === -1) return sc;
+    const original = sc.steps[index];
+    const copy = cloneStep(original, newStepId);
+    // An untitled step shows as "Step N", so its copy stays untitled and
+    // picks up its own number from its new position.
+    if (original.title.trim()) {
+      copy.title = copyTitle(
+        original.title,
+        sc.steps.map((st) => st.title),
+      );
+    }
+    return {
+      ...sc,
+      steps: [...sc.steps.slice(0, index + 1), copy, ...sc.steps.slice(index + 1)],
+    };
+  });
 }

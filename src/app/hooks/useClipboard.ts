@@ -1,24 +1,28 @@
-import {type Dispatch, type SetStateAction, useCallback, useState} from 'react';
-import type {Edge, Node} from '@xyflow/react';
-import {type DiagramStore, getEdgesAtPath, getNodesAtPath,} from '../../collab/stores/diagramStore';
-import {getDescendantIds, toAbsolutePosition} from '../../domain/canvas/graphUtils';
-import type {DiagramPath} from '../../domain/canvas/subDiagramTree';
-import type {ArchEdgeData, ArchNodeData} from '../../domain/canvas/types';
+import { type Dispatch, type SetStateAction, useCallback, useState } from 'react';
+import type { Edge, Node } from '@xyflow/react';
 import {
-    type DiagramFragmentContents,
-    getFragment,
-    saveFragment,
-    type SaveFragmentResult,
-    translateFragmentContents,
+  type DiagramStore,
+  getEdgesAtPath,
+  getNodesAtPath,
+} from '../../collab/stores/diagramStore';
+import { getDescendantIds, toAbsolutePosition } from '../../domain/canvas/graphUtils';
+import type { DiagramPath } from '../../domain/canvas/subDiagramTree';
+import type { ArchEdgeData, ArchNodeData } from '../../domain/canvas/types';
+import {
+  type DiagramFragmentContents,
+  getFragment,
+  saveFragment,
+  type SaveFragmentResult,
+  translateFragmentContents,
 } from '../../domain/canvas/diagramFragments';
 
 /** A pasted or duplicated copy starts unlocked: it lands offset from the
  * original, and the first thing anyone does with it is move it. */
 function withoutLock(data: ArchNodeData): ArchNodeData {
-    if (!data.locked) return data;
-    const copy = {...data};
-    delete copy.locked;
-    return copy;
+  if (!data.locked) return data;
+  const copy = { ...data };
+  delete copy.locked;
+  return copy;
 }
 
 /** Same shape as a saved fragment's contents - a fragment is a clipboard
@@ -80,223 +84,223 @@ export function useClipboard({
   // not in the node's own data field the way the old recursive-tree
   // model kept them) have to be gathered explicitly, one level at a
   // time, from the store's full snapshot.
-    const [clipboard, setClipboard] = useState<ClipboardContents | null>(null);
+  const [clipboard, setClipboard] = useState<ClipboardContents | null>(null);
   // Each consecutive paste (without re-copying) offsets a bit further, so
   // repeated pastes cascade diagonally instead of stacking exactly on top
   // of each other.
   const [pasteOffset, setPasteOffset] = useState(0);
 
-    /**
-     * Everything copying `ids` would put on the clipboard - shared by copy and
-     * duplicate, which is copy-then-paste without touching the clipboard.
-     */
-    const collect = useCallback(
-        (ids: string[]): ClipboardContents | null => {
-            if (ids.length === 0) return null;
-            const selectedSet = new Set(ids);
-            // Copying a boundary brings its contents along, even if they weren't
-            // individually selected - an empty duplicated boundary would feel broken.
-            // Boundaries nest, so that means everything inside it at any depth.
-            const containedIds = new Set<string>();
-            for (const n of nodes) {
-                if (!selectedSet.has(n.id) || n.type !== 'group') continue;
-                for (const d of getDescendantIds(n.id, nodes)) containedIds.add(d);
-            }
-            const childNodes = nodes.filter((n) => containedIds.has(n.id) && !selectedSet.has(n.id));
-            const toCopy = [...nodes.filter((n) => selectedSet.has(n.id)), ...childNodes];
-            const copiedIds = new Set(toCopy.map((n) => n.id));
+  /**
+   * Everything copying `ids` would put on the clipboard - shared by copy and
+   * duplicate, which is copy-then-paste without touching the clipboard.
+   */
+  const collect = useCallback(
+    (ids: string[]): ClipboardContents | null => {
+      if (ids.length === 0) return null;
+      const selectedSet = new Set(ids);
+      // Copying a boundary brings its contents along, even if they weren't
+      // individually selected - an empty duplicated boundary would feel broken.
+      // Boundaries nest, so that means everything inside it at any depth.
+      const containedIds = new Set<string>();
+      for (const n of nodes) {
+        if (!selectedSet.has(n.id) || n.type !== 'group') continue;
+        for (const d of getDescendantIds(n.id, nodes)) containedIds.add(d);
+      }
+      const childNodes = nodes.filter((n) => containedIds.has(n.id) && !selectedSet.has(n.id));
+      const toCopy = [...nodes.filter((n) => selectedSet.has(n.id)), ...childNodes];
+      const copiedIds = new Set(toCopy.map((n) => n.id));
 
-            // A node whose parent ISN'T also being copied (e.g. copying one child
-            // without its boundary) becomes a root item in the clipboard - convert
-            // its position to absolute first, since relative-to-parent coordinates
-            // are meaningless without that parent coming along.
-            const normalized = toCopy.map((n) => {
-                if (n.parentId && !copiedIds.has(n.parentId)) {
-                    const absolute = toAbsolutePosition(n, nodes, n.parentId);
-                    return {...n, parentId: undefined, position: absolute};
-                }
-                return n;
-            });
+      // A node whose parent ISN'T also being copied (e.g. copying one child
+      // without its boundary) becomes a root item in the clipboard - convert
+      // its position to absolute first, since relative-to-parent coordinates
+      // are meaningless without that parent coming along.
+      const normalized = toCopy.map((n) => {
+        if (n.parentId && !copiedIds.has(n.parentId)) {
+          const absolute = toAbsolutePosition(n, nodes, n.parentId);
+          return { ...n, parentId: undefined, position: absolute };
+        }
+        return n;
+      });
 
-            const topLevelEdges = edges.filter((e) => copiedIds.has(e.source) && copiedIds.has(e.target));
+      const topLevelEdges = edges.filter((e) => copiedIds.has(e.source) && copiedIds.has(e.target));
 
-            const {nodes: allNodes, edges: allEdges} = diagramStore.getSnapshot();
+      const { nodes: allNodes, edges: allEdges } = diagramStore.getSnapshot();
 
-            function gatherDescendants(
-                nodeId: string,
-                relativePath: string[],
-            ): {
-                nodes: (Node<ArchNodeData> & { relativePath: string[] })[];
-                edges: (Edge<ArchEdgeData> & { relativePath: string[] })[];
-            } {
-                const childPath = [...relativePath, nodeId];
-                const levelNodes = getNodesAtPath(allNodes, [...path, ...childPath]);
-                const levelEdges = getEdgesAtPath(allEdges, [...path, ...childPath]);
-                let result = {
-                    nodes: levelNodes.map((n) => ({...n, relativePath: childPath})),
-                    edges: levelEdges.map((e) => ({...e, relativePath: childPath})),
-                };
-                for (const child of levelNodes) {
-                    const deeper = gatherDescendants(child.id, childPath);
-                    result = {
-                        nodes: [...result.nodes, ...deeper.nodes],
-                        edges: [...result.edges, ...deeper.edges],
-                    };
-                }
-                return result;
-            }
+      function gatherDescendants(
+        nodeId: string,
+        relativePath: string[],
+      ): {
+        nodes: (Node<ArchNodeData> & { relativePath: string[] })[];
+        edges: (Edge<ArchEdgeData> & { relativePath: string[] })[];
+      } {
+        const childPath = [...relativePath, nodeId];
+        const levelNodes = getNodesAtPath(allNodes, [...path, ...childPath]);
+        const levelEdges = getEdgesAtPath(allEdges, [...path, ...childPath]);
+        let result = {
+          nodes: levelNodes.map((n) => ({ ...n, relativePath: childPath })),
+          edges: levelEdges.map((e) => ({ ...e, relativePath: childPath })),
+        };
+        for (const child of levelNodes) {
+          const deeper = gatherDescendants(child.id, childPath);
+          result = {
+            nodes: [...result.nodes, ...deeper.nodes],
+            edges: [...result.edges, ...deeper.edges],
+          };
+        }
+        return result;
+      }
 
-            let descendantNodes: (Node<ArchNodeData> & { relativePath: string[] })[] = [];
-            let descendantEdges: (Edge<ArchEdgeData> & { relativePath: string[] })[] = [];
-            for (const n of normalized) {
-                const gathered = gatherDescendants(n.id, []);
-                descendantNodes = [...descendantNodes, ...gathered.nodes];
-                descendantEdges = [...descendantEdges, ...gathered.edges];
-            }
+      let descendantNodes: (Node<ArchNodeData> & { relativePath: string[] })[] = [];
+      let descendantEdges: (Edge<ArchEdgeData> & { relativePath: string[] })[] = [];
+      for (const n of normalized) {
+        const gathered = gatherDescendants(n.id, []);
+        descendantNodes = [...descendantNodes, ...gathered.nodes];
+        descendantEdges = [...descendantEdges, ...gathered.edges];
+      }
 
-            return {
-                nodes: [...normalized.map((n) => ({...n, relativePath: []})), ...descendantNodes],
-                edges: [...topLevelEdges.map((e) => ({...e, relativePath: []})), ...descendantEdges],
-            };
-        },
-        [nodes, edges, diagramStore, path],
-    );
+      return {
+        nodes: [...normalized.map((n) => ({ ...n, relativePath: [] })), ...descendantNodes],
+        edges: [...topLevelEdges.map((e) => ({ ...e, relativePath: [] })), ...descendantEdges],
+      };
+    },
+    [nodes, edges, diagramStore, path],
+  );
 
-    const onCopy = useCallback(() => {
-        const contents = collect(selectedNodeIds);
-        if (!contents) return;
-        setClipboard(contents);
+  const onCopy = useCallback(() => {
+    const contents = collect(selectedNodeIds);
+    if (!contents) return;
+    setClipboard(contents);
     setPasteOffset(0);
-    }, [collect, selectedNodeIds]);
+  }, [collect, selectedNodeIds]);
 
-    /** Adds `contents` to the diagram `offset` down and right of where it
-     * was copied from, and selects the result. */
-    const insert = useCallback(
-        (contents: ClipboardContents, offset: number) => {
-            const clipboard = contents;
-            // A node depends on its relativePath ancestors (tree-level nesting)
-            // AND its parentId (group containment - a SAME-level dependency, one
-            // a depth-only sort can't correctly order: a group's own child could
-            // otherwise get processed before the group itself, if it happened to
-            // come first in the underlying storage order) both having their new
-            // ids assigned first. Repeatedly processing whatever's ready handles
-            // both kinds of dependency, and any depth, without needing a full
-            // topological sort. Always terminates: every parentId that survives
-            // into the clipboard is guaranteed to also be IN the clipboard -
-            // onCopy strips parentId whenever the parent isn't also being
-            // copied, and gatherDescendants always copies an entire nested level
-            // wholesale, so a node's own group (if any) at that level is never
-            // left out.
-            const remaining = [...clipboard.nodes];
-            const idMap = new Map<string, string>();
-            const remapPath = (relativePath: string[]) =>
-                relativePath.map((oldId) => idMap.get(oldId) ?? oldId);
+  /** Adds `contents` to the diagram `offset` down and right of where it
+   * was copied from, and selects the result. */
+  const insert = useCallback(
+    (contents: ClipboardContents, offset: number) => {
+      const clipboard = contents;
+      // A node depends on its relativePath ancestors (tree-level nesting)
+      // AND its parentId (group containment - a SAME-level dependency, one
+      // a depth-only sort can't correctly order: a group's own child could
+      // otherwise get processed before the group itself, if it happened to
+      // come first in the underlying storage order) both having their new
+      // ids assigned first. Repeatedly processing whatever's ready handles
+      // both kinds of dependency, and any depth, without needing a full
+      // topological sort. Always terminates: every parentId that survives
+      // into the clipboard is guaranteed to also be IN the clipboard -
+      // onCopy strips parentId whenever the parent isn't also being
+      // copied, and gatherDescendants always copies an entire nested level
+      // wholesale, so a node's own group (if any) at that level is never
+      // left out.
+      const remaining = [...clipboard.nodes];
+      const idMap = new Map<string, string>();
+      const remapPath = (relativePath: string[]) =>
+        relativePath.map((oldId) => idMap.get(oldId) ?? oldId);
 
-            const rootPastedIds: string[] = [];
-            while (remaining.length > 0) {
-                const readyIndex = remaining.findIndex(
-                    (n) =>
-                        n.relativePath.every((ancestorId) => idMap.has(ancestorId)) &&
-                        (!n.parentId || idMap.has(n.parentId)),
-                );
-                if (readyIndex === -1) break; // shouldn't happen - see comment above - but never hang if it somehow does
-                const [n] = remaining.splice(readyIndex, 1);
+      const rootPastedIds: string[] = [];
+      while (remaining.length > 0) {
+        const readyIndex = remaining.findIndex(
+          (n) =>
+            n.relativePath.every((ancestorId) => idMap.has(ancestorId)) &&
+            (!n.parentId || idMap.has(n.parentId)),
+        );
+        if (readyIndex === -1) break; // shouldn't happen - see comment above - but never hang if it somehow does
+        const [n] = remaining.splice(readyIndex, 1);
 
-                const isTopLevel = n.relativePath.length === 0;
-                const shouldOffset = isTopLevel && !n.parentId;
-                const position = shouldOffset
-                    ? {x: n.position.x + offset, y: n.position.y + offset}
-                    : n.position;
-                const newParentId = n.parentId ? idMap.get(n.parentId) : undefined;
-                const newId = diagramStore.addNode(
-                    [...path, ...remapPath(n.relativePath)],
-                    n.type ?? 'typed',
-                    position,
-                    withoutLock(n.data),
-                );
-                idMap.set(n.id, newId);
-                if (newParentId !== undefined) diagramStore.updateParentId(newId, newParentId, position);
-                if (n.width !== undefined || n.height !== undefined)
-                    diagramStore.updateDimensions(newId, n.width, n.height);
-                if (isTopLevel) rootPastedIds.push(newId);
-            }
+        const isTopLevel = n.relativePath.length === 0;
+        const shouldOffset = isTopLevel && !n.parentId;
+        const position = shouldOffset
+          ? { x: n.position.x + offset, y: n.position.y + offset }
+          : n.position;
+        const newParentId = n.parentId ? idMap.get(n.parentId) : undefined;
+        const newId = diagramStore.addNode(
+          [...path, ...remapPath(n.relativePath)],
+          n.type ?? 'typed',
+          position,
+          withoutLock(n.data),
+        );
+        idMap.set(n.id, newId);
+        if (newParentId !== undefined) diagramStore.updateParentId(newId, newParentId, position);
+        if (n.width !== undefined || n.height !== undefined)
+          diagramStore.updateDimensions(newId, n.width, n.height);
+        if (isTopLevel) rootPastedIds.push(newId);
+      }
 
-            const newEdgeIds: string[] = [];
-            for (const e of clipboard.edges) {
-                const newSource = idMap.get(e.source);
-                const newTarget = idMap.get(e.target);
-                if (!newSource || !newTarget) continue; // shouldn't happen - every edge's endpoints were copied along with it
-                const newEdgeId = diagramStore.addEdge(
-                    [...path, ...remapPath(e.relativePath)],
-                    newSource,
-                    newTarget,
-                    e.data ?? {edgeType: 'blank-solid', label: '', direction: 'forward', properties: {}},
-                    e.sourceHandle,
-                    e.targetHandle,
-                );
-                newEdgeIds.push(newEdgeId);
-            }
+      const newEdgeIds: string[] = [];
+      for (const e of clipboard.edges) {
+        const newSource = idMap.get(e.source);
+        const newTarget = idMap.get(e.target);
+        if (!newSource || !newTarget) continue; // shouldn't happen - every edge's endpoints were copied along with it
+        const newEdgeId = diagramStore.addEdge(
+          [...path, ...remapPath(e.relativePath)],
+          newSource,
+          newTarget,
+          e.data ?? { edgeType: 'blank-solid', label: '', direction: 'forward', properties: {} },
+          e.sourceHandle,
+          e.targetHandle,
+        );
+        newEdgeIds.push(newEdgeId);
+      }
 
-            // The pasted result becomes the new selection - matches how paste
-            // behaves elsewhere (Figma, PowerPoint, etc.), letting the person
-            // immediately nudge/move what they just pasted. Only top-level items
-            // are marked selected, matching how a normal click or rubber-band
-            // selection already treats a group (the group itself gets selected,
-            // not each individual child), relying on React Flow's built-in
-            // parent-child dragging to move a selected group's contents together.
-            setSelectedNodeIds(rootPastedIds);
-            setSelectedEdgeIds(newEdgeIds);
-        },
-        [diagramStore, path, setSelectedNodeIds, setSelectedEdgeIds],
-    );
+      // The pasted result becomes the new selection - matches how paste
+      // behaves elsewhere (Figma, PowerPoint, etc.), letting the person
+      // immediately nudge/move what they just pasted. Only top-level items
+      // are marked selected, matching how a normal click or rubber-band
+      // selection already treats a group (the group itself gets selected,
+      // not each individual child), relying on React Flow's built-in
+      // parent-child dragging to move a selected group's contents together.
+      setSelectedNodeIds(rootPastedIds);
+      setSelectedEdgeIds(newEdgeIds);
+    },
+    [diagramStore, path, setSelectedNodeIds, setSelectedEdgeIds],
+  );
 
-    const onPaste = useCallback(() => {
-        if (!clipboard || clipboard.nodes.length === 0) return;
-        insert(clipboard, 40 + pasteOffset);
+  const onPaste = useCallback(() => {
+    if (!clipboard || clipboard.nodes.length === 0) return;
+    insert(clipboard, 40 + pasteOffset);
     setPasteOffset((p) => p + 40);
-    }, [clipboard, pasteOffset, insert]);
+  }, [clipboard, pasteOffset, insert]);
 
-    /**
-     * Copy and paste in one step, leaving the clipboard alone - so duplicating
-     * something doesn't lose what was copied before. The copy lands one paste
-     * step down and right of the original, and becomes the selection.
-     */
-    const onDuplicate = useCallback(
-        (ids: string[]) => {
-            const contents = collect(ids);
-            if (!contents || contents.nodes.length === 0) return;
-            insert(contents, 40);
-        },
-        [collect, insert],
-    );
+  /**
+   * Copy and paste in one step, leaving the clipboard alone - so duplicating
+   * something doesn't lose what was copied before. The copy lands one paste
+   * step down and right of the original, and becomes the selection.
+   */
+  const onDuplicate = useCallback(
+    (ids: string[]) => {
+      const contents = collect(ids);
+      if (!contents || contents.nodes.length === 0) return;
+      insert(contents, 40);
+    },
+    [collect, insert],
+  );
 
-    /**
-     * Saves `ids` (with everything copying them would bring along) as a
-     * reusable fragment in this browser's fragment library, where the
-     * palette offers it in every document.
-     */
-    const onSaveFragment = useCallback(
-        (ids: string[], name: string): SaveFragmentResult => {
-            const contents = collect(ids);
-            if (!contents || contents.nodes.length === 0) return {ok: false, reason: 'empty'};
-            return saveFragment(name, contents);
-        },
-        [collect],
-    );
+  /**
+   * Saves `ids` (with everything copying them would bring along) as a
+   * reusable fragment in this browser's fragment library, where the
+   * palette offers it in every document.
+   */
+  const onSaveFragment = useCallback(
+    (ids: string[], name: string): SaveFragmentResult => {
+      const contents = collect(ids);
+      if (!contents || contents.nodes.length === 0) return { ok: false, reason: 'empty' };
+      return saveFragment(name, contents);
+    },
+    [collect],
+  );
 
-    /**
-     * Drops a saved fragment onto the current level with its top-left corner
-     * at `position` (flow coordinates), and selects it - the same insert a
-     * paste does, so nested sub-diagram content comes along too.
-     */
-    const onInsertFragment = useCallback(
-        (fragmentId: string, position: { x: number; y: number }) => {
-            const fragment = getFragment(fragmentId);
-            if (!fragment) return;
-            insert(translateFragmentContents(fragment.contents, position.x, position.y), 0);
-        },
-        [insert],
-    );
+  /**
+   * Drops a saved fragment onto the current level with its top-left corner
+   * at `position` (flow coordinates), and selects it - the same insert a
+   * paste does, so nested sub-diagram content comes along too.
+   */
+  const onInsertFragment = useCallback(
+    (fragmentId: string, position: { x: number; y: number }) => {
+      const fragment = getFragment(fragmentId);
+      if (!fragment) return;
+      insert(translateFragmentContents(fragment.contents, position.x, position.y), 0);
+    },
+    [insert],
+  );
 
-    return {onCopy, onPaste, onDuplicate, onSaveFragment, onInsertFragment};
+  return { onCopy, onPaste, onDuplicate, onSaveFragment, onInsertFragment };
 }

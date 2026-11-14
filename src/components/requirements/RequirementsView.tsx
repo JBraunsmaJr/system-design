@@ -1,49 +1,64 @@
-import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore,} from 'react';
 import {
-    ArrowLeft,
-    ChevronDown,
-    ChevronRight,
-    ChevronsDownUp,
-    ChevronsUpDown,
-    ChevronUp,
-    Columns2,
-    Filter,
-    LayoutList,
-    ListChecks,
-    ListTree,
-    Rows3,
-    Search,
-    Settings2,
-    Tags,
-    Waypoints,
-    X,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
+import {
+  ArrowLeft,
+  ChevronDown,
+  ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
+  ChevronUp,
+  Columns2,
+  Filter,
+  LayoutList,
+  ListChecks,
+  ListTree,
+  Rows3,
+  Search,
+  Settings2,
+  Tags,
+  Waypoints,
+  X,
 } from 'lucide-react';
-import {RequirementCard} from './RequirementCard';
-import {ManageTypesModal} from './ManageTypesModal';
-import {ManageRelationshipTypesModal} from './ManageRelationshipTypesModal';
-import {AddItemDropdown} from './AddItemDropdown';
-import {RequirementsFilterBar} from './RequirementsFilterBar';
-import {BulkEditBar} from './BulkEditBar';
-import type {BulkItemUpdate} from '../../domain/requirements/requirementsBulkEdit';
-import {collectTags} from '../../domain/requirements/requirementTags';
-import {activeFilterCount, type RequirementsFilter,} from '../../domain/requirements/requirementsFilter';
-import type {RequirementItem} from '../../domain/requirements/requirementsTypes';
-import type {ProgramIncrement} from '../../domain/timeline/programIncrements';
-import type {TeamDocument} from '../../domain/timeline/teamTypes';
-import type {SubDiagram} from '../../domain/canvas/types';
-import type {DiagramPath, LinkedNodeRef} from '../../domain/canvas/subDiagramTree';
-import type {RequirementsStore} from '../../collab/stores/requirementsStore';
-import type {PresenceInfo} from '../../collab/sync/session';
-import {countDescendants, type EpicTreeNode, isEpicItem,} from '../../domain/requirements/requirementsHierarchy';
+import { RequirementCard } from './RequirementCard';
+import { ManageTypesModal } from './ManageTypesModal';
+import { ManageRelationshipTypesModal } from './ManageRelationshipTypesModal';
+import { AddItemDropdown } from './AddItemDropdown';
+import { RequirementsFilterBar } from './RequirementsFilterBar';
+import { BulkEditBar } from './BulkEditBar';
+import type { BulkItemUpdate } from '../../domain/requirements/requirementsBulkEdit';
+import { collectTags } from '../../domain/requirements/requirementTags';
 import {
-    loadRequirementsViewPrefs,
-    type RequirementsGroupBy,
-    type RequirementsLayout,
-    saveRequirementsViewPrefs,
+  activeFilterCount,
+  type RequirementsFilter,
+} from '../../domain/requirements/requirementsFilter';
+import type { RequirementItem } from '../../domain/requirements/requirementsTypes';
+import type { ProgramIncrement } from '../../domain/timeline/programIncrements';
+import type { TeamDocument } from '../../domain/timeline/teamTypes';
+import type { SubDiagram } from '../../domain/canvas/types';
+import type { DiagramPath, LinkedNodeRef } from '../../domain/canvas/subDiagramTree';
+import type { RequirementsStore } from '../../collab/stores/requirementsStore';
+import type { PresenceInfo } from '../../collab/sync/session';
+import {
+  countDescendants,
+  type EpicTreeNode,
+  isEpicItem,
+} from '../../domain/requirements/requirementsHierarchy';
+import {
+  loadRequirementsViewPrefs,
+  type RequirementsGroupBy,
+  type RequirementsLayout,
+  saveRequirementsViewPrefs,
 } from '../../domain/requirements/requirementsViewPrefs';
-import {RequirementsOutline} from './RequirementsOutline';
-import {NO_EPIC_KEY, useRequirementGroups} from './useRequirementGroups';
-import {useRequirementStoreActions} from './useRequirementStoreActions';
+import { RequirementsOutline } from './RequirementsOutline';
+import { NO_EPIC_KEY, useRequirementGroups } from './useRequirementGroups';
+import { useRequirementStoreActions } from './useRequirementStoreActions';
 
 interface RequirementsViewProps {
   requirementsStore: RequirementsStore;

@@ -1,8 +1,8 @@
 import type { RequirementItem, RequirementsDocument } from '../requirements/requirementsTypes';
 
-export type SkillTreeNodeState = 'done' | 'in-progress' | 'unlocked' | 'locked';
+export type DependencyNodeState = 'done' | 'in-progress' | 'unlocked' | 'locked';
 
-export interface SkillTreeNode {
+export interface DependencyNode {
   item: RequirementItem;
   /** Layering rank - the length of the LONGEST chain of direct blocking
    * relationships (among workable items) ending at this item. Items with
@@ -10,7 +10,7 @@ export interface SkillTreeNode {
    * column a node is drawn in); has no bearing on lock state, which only
    * ever looks at DIRECT blockers - see `state`'s own reasoning below. */
   rank: number;
-  state: SkillTreeNodeState;
+  state: DependencyNodeState;
   /** True when the item is marked in-progress but at least one of its
    * direct blockers isn't done yet - a real signal worth surfacing (the
    * same underlying insight as the Gantt view's schedule-conflict
@@ -30,18 +30,18 @@ export interface SkillTreeNode {
   inCycle: boolean;
 }
 
-export interface SkillTreeEdge {
+export interface DependencyEdge {
   fromItemId: string;
   toItemId: string;
 }
 
-export interface SkillTree {
-  nodes: SkillTreeNode[];
-  edges: SkillTreeEdge[];
+export interface DependencyGraph {
+  nodes: DependencyNode[];
+  edges: DependencyEdge[];
 }
 
 /**
- * Builds the skill tree for every workable item in `doc`: which items are
+ * Builds the dependency graph for every workable item in `doc`: which items are
  * ready to start, which are blocked and by what, and a layering rank for
  * each so the tree can be drawn left-to-right in dependency order with
  * independent branches laid out in parallel.
@@ -64,7 +64,7 @@ export interface SkillTree {
  * non-workable blockers, custom blocking types, cycles in legacy data)
  * before this was ever wired into any UI.
  */
-export function computeSkillTree(doc: RequirementsDocument): SkillTree {
+export function computeDependencyGraph(doc: RequirementsDocument): DependencyGraph {
   const workableTypeIds = new Set(doc.itemTypes.filter((t) => t.isWorkable).map((t) => t.id));
   const workableItems = doc.items.filter((i) => workableTypeIds.has(i.typeId));
   const workableIds = new Set(workableItems.map((i) => i.id));
@@ -111,13 +111,13 @@ export function computeSkillTree(doc: RequirementsDocument): SkillTree {
   const maxProcessedRank = Math.max(0, ...[...processed].map((id) => rank.get(id) ?? 0));
   const itemById = new Map(doc.items.map((i) => [i.id, i]));
 
-  const nodes: SkillTreeNode[] = workableItems.map((item) => {
+  const nodes: DependencyNode[] = workableItems.map((item) => {
     const inCycle = !processed.has(item.id);
     const itemRank = inCycle ? maxProcessedRank + 1 : (rank.get(item.id) ?? 0);
     const blockerIds = blockedBy.get(item.id)!;
     const hasUndoneBlocker = blockerIds.some((bid) => itemById.get(bid)?.status !== 'done');
 
-    let state: SkillTreeNodeState;
+    let state: DependencyNodeState;
     if (item.status === 'done') state = 'done';
     else if (item.status === 'in-progress') state = 'in-progress';
     else if (hasUndoneBlocker) state = 'locked';
@@ -133,7 +133,7 @@ export function computeSkillTree(doc: RequirementsDocument): SkillTree {
     };
   });
 
-  const edges: SkillTreeEdge[] = [];
+  const edges: DependencyEdge[] = [];
   for (const item of workableItems) {
     for (const blockerId of blockedBy.get(item.id)!) {
       edges.push({ fromItemId: blockerId, toItemId: item.id });

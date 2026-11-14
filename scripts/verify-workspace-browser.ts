@@ -10,19 +10,19 @@
  * browser after approving it, and see the passthrough warning when the
  * store reads content.
  */
-import {type Browser, type BrowserContext, chromium, type Page} from 'playwright';
-import type {AddressInfo} from 'net';
-import {type DevServers, startDevServers} from './lib/devServers';
-import {startTestOidcProvider} from './lib/testIdentityProviders';
-import {createMemoryBlobStore, type MemoryTx} from '../store/src/blobStore';
-import {createDocumentService} from '../store/src/documentService';
-import {createHttpService, type StoreBackend} from '../store/src/httpService';
-import {createMemoryUserDirectory} from '../store/src/userDirectory';
-import {createMemoryWorkspaceIndex} from '../store/src/workspaceIndex';
-import {createSessionStore} from '../store/src/auth/sessions';
-import {createProvider} from '../store/src/auth/providers';
-import {exportPublicKey, generateWrappingKeyPair} from '../src/crypto/keys';
-import {toPem} from '../src/crypto/documentPackage';
+import { type Browser, type BrowserContext, chromium, type Page } from 'playwright';
+import type { AddressInfo } from 'net';
+import { type DevServers, startDevServers } from './lib/devServers';
+import { startTestOidcProvider } from './lib/testIdentityProviders';
+import { createMemoryBlobStore, type MemoryTx } from '../store/src/blobStore';
+import { createDocumentService } from '../store/src/documentService';
+import { createHttpService, type StoreBackend } from '../store/src/httpService';
+import { createMemoryUserDirectory } from '../store/src/userDirectory';
+import { createMemoryWorkspaceIndex } from '../store/src/workspaceIndex';
+import { createSessionStore } from '../store/src/auth/sessions';
+import { createProvider } from '../store/src/auth/providers';
+import { exportPublicKey, generateWrappingKeyPair } from '../src/crypto/keys';
+import { toPem } from '../src/crypto/documentPackage';
 
 let failures = 0;
 function check(condition: boolean, message: string) {
@@ -343,30 +343,30 @@ async function run() {
         timeout: 15000,
       });
       await linking.evaluate(`window.__PERF__.addNode("Shared platform")`);
-      const node = linking.locator('.react-flow__node', {hasText: 'Shared platform'}).first();
+      const node = linking.locator('.react-flow__node', { hasText: 'Shared platform' }).first();
       await node.click();
       const picker = linking.locator('select[aria-label="Link to another document"]');
-      await picker.waitFor({timeout: 10000});
+      await picker.waitFor({ timeout: 10000 });
       const optionLabels = () => picker.locator('option').allTextContents();
 
       // This browser has never opened the workspace document: its copy of
       // "local" is the empty default. The workspace is what knows the title.
       const listed = await linking
-          .waitForFunction(
-              () =>
-                  [
-                    ...document.querySelectorAll('select[aria-label="Link to another document"] option'),
-                  ].some((o) => o.textContent === 'Shared architecture'),
-              null,
-              {timeout: 20000},
-          )
-          .then(
-              () => true,
-              () => false,
-          );
+        .waitForFunction(
+          () =>
+            [
+              ...document.querySelectorAll('select[aria-label="Link to another document"] option'),
+            ].some((o) => o.textContent === 'Shared architecture'),
+          null,
+          { timeout: 20000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        );
       check(
-          listed,
-          `the picker offers the workspace document by its workspace title (${(await optionLabels()).join(', ')})`,
+        listed,
+        `the picker offers the workspace document by its workspace title (${(await optionLabels()).join(', ')})`,
       );
 
       // A document created in another tab appears when this tab regains
@@ -390,15 +390,15 @@ async function run() {
 
       // Picking the workspace document links it.
       const workspaceDocId = await picker
-          .locator('option', {hasText: 'Shared architecture'})
-          .getAttribute('value');
+        .locator('option', { hasText: 'Shared architecture' })
+        .getAttribute('value');
       await picker.selectOption(workspaceDocId!);
       const badge = node.locator('.linked-doc-badge');
-      await badge.waitFor({timeout: 10000});
+      await badge.waitFor({ timeout: 10000 });
       check(
-          (await badge.getAttribute('href'))?.endsWith(`?doc=${workspaceDocId}`) === true &&
+        (await badge.getAttribute('href'))?.endsWith(`?doc=${workspaceDocId}`) === true &&
           (await badge.textContent())?.trim() === 'Shared architecture',
-          'and choosing it links the node to it',
+        'and choosing it links the node to it',
       );
 
       // Or an id can be entered directly - here, pasted as an editor link.
@@ -407,15 +407,15 @@ async function run() {
       const idField = linking.locator('input[aria-label="Document id or editor link"]');
       await idField.fill('not a document');
       check(
-          await linking.locator('.inspector__doc-id-actions button:has-text("Link")').isDisabled(),
-          'an entry that is not a document id cannot be linked',
+        await linking.locator('.inspector__doc-id-actions button:has-text("Link")').isDisabled(),
+        'an entry that is not a document id cannot be linked',
       );
       await idField.fill(`${appOrigin}/system-design/?doc=pasted-by-link#room=r&key=k`);
       await idField.press('Enter');
-      await badge.waitFor({timeout: 10000});
+      await badge.waitFor({ timeout: 10000 });
       check(
-          (await badge.getAttribute('href'))?.endsWith('?doc=pasted-by-link') === true,
-          'a pasted editor link links its document, without the session part',
+        (await badge.getAttribute('href'))?.endsWith('?doc=pasted-by-link') === true,
+        'a pasted editor link links its document, without the session part',
       );
       await linking.close();
       await second.bringToFront();

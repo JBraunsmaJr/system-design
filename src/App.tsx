@@ -1,50 +1,61 @@
-import {lazy, Profiler, type ProfilerOnRenderCallback, Suspense, useCallback, useMemo, useRef, useState,} from 'react';
-import {ChevronLeft, ChevronRight} from 'lucide-react';
-import {ReactFlowProvider} from '@xyflow/react';
+import {
+  lazy,
+  Profiler,
+  type ProfilerOnRenderCallback,
+  Suspense,
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ReactFlowProvider } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import * as Y from 'yjs';
-import {Toolbar} from './components/canvas/Toolbar';
-import {CollabPanel} from './components/workspace/CollabPanel';
-import {Palette} from './components/canvas/Palette';
-import {Canvas} from './components/canvas/Canvas';
-import {Inspector} from './components/canvas/Inspector';
-import {ScenarioPanel} from './components/canvas/ScenarioPanel';
-import {LibraryManagerModal} from './components/workspace/LibraryManagerModal';
-import {RequirementsView} from './components/requirements/RequirementsView';
-import {TimelineView} from './components/timeline/TimelineView';
-import {TeamView} from './components/team/TeamView';
-import {SkillTreeView} from './components/skilltree/SkillTreeView';
-import {DocumentManager} from './components/workspace/DocumentManager';
-import {DurabilityIndicator} from './components/workspace/DurabilityIndicator';
-import {LeaveGuardDialog} from './components/workspace/LeaveGuardDialog';
-import {WorkspacePanel} from './components/workspace/WorkspacePanel';
-import {AccessRequestNotice} from './components/workspace/AccessRequestNotice';
-import {Toast, type ToastType} from './common/components/toast/Toast';
-import {useFileSaving} from './hooks/useFileSaving';
-import {useAccessRequests} from './collab/hooks/useAccessRequests';
-import {getStoreUrl} from './domain/storage/storeConfig';
-import {isSoleReplicaHolder} from './domain/storage/durability';
-import {isPerfInstrumentationActive, recordCommit} from './perf/instrumentation';
-import {useOpenDocument} from './app/hooks/useOpenDocument';
-import {useStoreSignIn} from './app/hooks/useStoreSignIn';
-import {useCollabSession} from './app/hooks/useCollabSession';
-import {useDocumentStores} from './app/hooks/useDocumentStores';
-import {useWorkspaceSession} from './app/hooks/useWorkspaceSession';
-import {useDocumentPersistence} from './app/hooks/useDocumentPersistence';
-import {useDiagramSelection} from './app/hooks/useDiagramSelection';
-import {useScenarios} from './app/hooks/useScenarios';
-import {useViewNavigation} from './app/hooks/useViewNavigation';
-import {useCanvasEditing} from './app/hooks/useCanvasEditing';
-import {useClipboard} from './app/hooks/useClipboard';
-import {useStyleClipboard} from './app/hooks/useStyleClipboard';
-import type {CanvasContextActions} from './components/canvas/useCanvasContextMenu';
-import type {MultiSelectionActions} from './components/canvas/MultiSelectionInspector';
-import {useKeyboardShortcuts} from './app/hooks/useKeyboardShortcuts';
-import {useFileActions} from './app/hooks/useFileActions';
-import {usePerfHarnessBridge} from './app/hooks/usePerfHarnessBridge';
-import {listLinkableDocuments, listWorkspaceDocuments} from './collab/sync/linkableDocuments';
-import {createStoreClient} from './collab/access/storeClient';
-import {createIndexedDbDeviceKeyStorage} from './collab/access/deviceIdentity';
+import { Toolbar } from './components/canvas/Toolbar';
+import { CollabPanel } from './components/workspace/CollabPanel';
+import { Palette } from './components/canvas/Palette';
+import { Canvas } from './components/canvas/Canvas';
+import { Inspector } from './components/canvas/Inspector';
+import { ScenarioPanel } from './components/canvas/ScenarioPanel';
+import { LibraryManagerModal } from './components/workspace/LibraryManagerModal';
+import { RequirementsView } from './components/requirements/RequirementsView';
+import { TimelineView } from './components/timeline/TimelineView';
+import { TeamView } from './components/team/TeamView';
+import { PlanNav } from './components/plan/PlanNav';
+import { planSectionFor } from './app/planNavigation';
+import { DependenciesView } from './components/dependencies/DependenciesView';
+import { DocumentManager } from './components/workspace/DocumentManager';
+import { DurabilityIndicator } from './components/workspace/DurabilityIndicator';
+import { LeaveGuardDialog } from './components/workspace/LeaveGuardDialog';
+import { WorkspacePanel } from './components/workspace/WorkspacePanel';
+import { AccessRequestNotice } from './components/workspace/AccessRequestNotice';
+import { Toast, type ToastType } from './common/components/toast/Toast';
+import { useFileSaving } from './hooks/useFileSaving';
+import { useAccessRequests } from './collab/hooks/useAccessRequests';
+import { getStoreUrl } from './domain/storage/storeConfig';
+import { isSoleReplicaHolder } from './domain/storage/durability';
+import { isPerfInstrumentationActive, recordCommit } from './perf/instrumentation';
+import { useOpenDocument } from './app/hooks/useOpenDocument';
+import { useStoreSignIn } from './app/hooks/useStoreSignIn';
+import { useCollabSession } from './app/hooks/useCollabSession';
+import { useDocumentStores } from './app/hooks/useDocumentStores';
+import { useWorkspaceSession } from './app/hooks/useWorkspaceSession';
+import { useDocumentPersistence } from './app/hooks/useDocumentPersistence';
+import { useDiagramSelection } from './app/hooks/useDiagramSelection';
+import { useScenarios } from './app/hooks/useScenarios';
+import { useViewNavigation } from './app/hooks/useViewNavigation';
+import { useCanvasEditing } from './app/hooks/useCanvasEditing';
+import { useClipboard } from './app/hooks/useClipboard';
+import { useStyleClipboard } from './app/hooks/useStyleClipboard';
+import type { CanvasContextActions } from './components/canvas/useCanvasContextMenu';
+import type { MultiSelectionActions } from './components/canvas/MultiSelectionInspector';
+import { useKeyboardShortcuts } from './app/hooks/useKeyboardShortcuts';
+import { useFileActions } from './app/hooks/useFileActions';
+import { usePerfHarnessBridge } from './app/hooks/usePerfHarnessBridge';
+import { listLinkableDocuments, listWorkspaceDocuments } from './collab/sync/linkableDocuments';
+import { createStoreClient } from './collab/access/storeClient';
+import { createIndexedDbDeviceKeyStorage } from './collab/access/deviceIdentity';
 import './App.css';
 
 // Loaded on first visit: the SRD view carries the PDF exporter, which no
@@ -53,7 +64,7 @@ const SrdView = lazy(() => import('./components/srd/SrdViewEntry'));
 // Loaded when a scenario is first exported: its encoders (react-pdf, gifenc,
 // Mediabunny) load later still, each only for its own format.
 const ScenarioExportDialog = lazy(
-    () => import('./components/canvas/scenarioExport/ScenarioExportDialog'),
+  () => import('./components/canvas/scenarioExport/ScenarioExportDialog'),
 );
 
 /**
@@ -249,6 +260,9 @@ function App() {
   const {
     viewMode,
     setViewMode,
+    planChartMode,
+    openPlan,
+    openPlanSection,
     diagramTree,
     setFocusedItemId,
     pendingRequirementFocus,
@@ -332,7 +346,7 @@ function App() {
     setActiveStepId,
   });
 
-  const {onCopy, onPaste, onDuplicate, onSaveFragment, onInsertFragment} = useClipboard({
+  const { onCopy, onPaste, onDuplicate, onSaveFragment, onInsertFragment } = useClipboard({
     nodes,
     edges,
     selectedNodeIds,
@@ -345,20 +359,20 @@ function App() {
   // Saving a fragment says where it went, since nothing on the canvas
   // changes; read only by the right-click menu, like onDuplicate.
   const onSaveFragmentWithToast = useCallback(
-      (nodeIds: string[], name: string) => {
-        const result = onSaveFragment(nodeIds, name);
-        if (result.ok) {
-          showToast(`Saved "${result.fragment.name}" to Fragments in the palette`);
-        } else if (result.reason === 'too-large') {
-          showToast('That selection is too large to save as a fragment', 'error');
-        } else if (result.reason === 'storage') {
-          showToast('The fragment could not be saved in this browser', 'error');
-        }
-      },
-      [onSaveFragment, showToast],
+    (nodeIds: string[], name: string) => {
+      const result = onSaveFragment(nodeIds, name);
+      if (result.ok) {
+        showToast(`Saved "${result.fragment.name}" to Fragments in the palette`);
+      } else if (result.reason === 'too-large') {
+        showToast('That selection is too large to save as a fragment', 'error');
+      } else if (result.reason === 'storage') {
+        showToast('The fragment could not be saved in this browser', 'error');
+      }
+    },
+    [onSaveFragment, showToast],
   );
 
-  const {copiedStyle, onCopyStyle, onPasteStyle} = useStyleClipboard({
+  const { copiedStyle, onCopyStyle, onPasteStyle } = useStyleClipboard({
     nodes,
     edges,
     onUpdateNodes,
@@ -467,56 +481,56 @@ function App() {
   // out when there's more than one, which is the only time it's read.
   const isMultiSelection = selectedNodeIds.length + selectedEdgeIds.length > 1;
   const selectedNodes = useMemo(
-      () => (isMultiSelection ? nodes.filter((n) => selectedNodeIds.includes(n.id)) : []),
-      [isMultiSelection, nodes, selectedNodeIds],
+    () => (isMultiSelection ? nodes.filter((n) => selectedNodeIds.includes(n.id)) : []),
+    [isMultiSelection, nodes, selectedNodeIds],
   );
   const selectedEdges = useMemo(
-      () => (isMultiSelection ? edges.filter((e) => selectedEdgeIds.includes(e.id)) : []),
-      [isMultiSelection, edges, selectedEdgeIds],
+    () => (isMultiSelection ? edges.filter((e) => selectedEdgeIds.includes(e.id)) : []),
+    [isMultiSelection, edges, selectedEdgeIds],
   );
   const multiSelectionActions = useMemo<MultiSelectionActions>(
-      () => ({
-        onUpdateNodes,
-        onUpdateEdges,
-        onSetLocked,
-        onGroup,
-        onUngroup,
-        onDeleteSelection,
-        onArrange,
-      }),
-      [onUpdateNodes, onUpdateEdges, onSetLocked, onGroup, onUngroup, onDeleteSelection, onArrange],
+    () => ({
+      onUpdateNodes,
+      onUpdateEdges,
+      onSetLocked,
+      onGroup,
+      onUngroup,
+      onDeleteSelection,
+      onArrange,
+    }),
+    [onUpdateNodes, onUpdateEdges, onSetLocked, onGroup, onUngroup, onDeleteSelection, onArrange],
   );
   // Only ever read by the right-click menu, which Canvas renders while it's
   // open - so this changing identity never reaches a node or edge.
   const canvasContextActions = useMemo<CanvasContextActions>(
-      () => ({
-        onUpdateNodes,
-        onUpdateEdges,
-        onDuplicate,
-        onSaveFragment: onSaveFragmentWithToast,
-        onGroup,
-        onUngroup,
-        onSetLocked,
-        onCopyStyle,
-        onPasteStyle,
-        copiedStyle,
-        requirements: requirementsSnapshot,
-        onArrange,
-      }),
-      [
-        onUpdateNodes,
-        onUpdateEdges,
-        onDuplicate,
-        onSaveFragmentWithToast,
-        onGroup,
-        onUngroup,
-        onSetLocked,
-        onCopyStyle,
-        onPasteStyle,
-        copiedStyle,
-        requirementsSnapshot,
-        onArrange,
-      ],
+    () => ({
+      onUpdateNodes,
+      onUpdateEdges,
+      onDuplicate,
+      onSaveFragment: onSaveFragmentWithToast,
+      onGroup,
+      onUngroup,
+      onSetLocked,
+      onCopyStyle,
+      onPasteStyle,
+      copiedStyle,
+      requirements: requirementsSnapshot,
+      onArrange,
+    }),
+    [
+      onUpdateNodes,
+      onUpdateEdges,
+      onDuplicate,
+      onSaveFragmentWithToast,
+      onGroup,
+      onUngroup,
+      onSetLocked,
+      onCopyStyle,
+      onPasteStyle,
+      copiedStyle,
+      requirementsSnapshot,
+      onArrange,
+    ],
   );
   const onCanvasProfilerRender: ProfilerOnRenderCallback = useCallback(
     (_id, _phase, actualDuration) => {
@@ -589,21 +603,21 @@ function App() {
     storage: ReturnType<typeof createIndexedDbDeviceKeyStorage>;
   } | null>(null);
   const listStoredDocuments = useCallback(
-      () =>
-          listLinkableDocuments({
-            listLocal: () =>
-                documentStore.listDocuments().then((result) => (result.ok ? result.value : [])),
-            listWorkspace: storeUrl
-                ? () => {
-                  workspaceReader.current ??= {
-                    client: createStoreClient({baseUrl: storeUrl}),
-                    storage: createIndexedDbDeviceKeyStorage(),
-                  };
-                  return listWorkspaceDocuments(workspaceReader.current);
-                }
-                : undefined,
-          }),
-      [documentStore, storeUrl],
+    () =>
+      listLinkableDocuments({
+        listLocal: () =>
+          documentStore.listDocuments().then((result) => (result.ok ? result.value : [])),
+        listWorkspace: storeUrl
+          ? () => {
+              workspaceReader.current ??= {
+                client: createStoreClient({ baseUrl: storeUrl }),
+                storage: createIndexedDbDeviceKeyStorage(),
+              };
+              return listWorkspaceDocuments(workspaceReader.current);
+            }
+          : undefined,
+      }),
+    [documentStore, storeUrl],
   );
   const handleOpenWorkspaceDocument = useCallback(
     (docId: string) => {
@@ -612,6 +626,8 @@ function App() {
     },
     [openDocumentInTab],
   );
+
+  const planSection = planSectionFor(viewMode, planChartMode);
 
   return (
     <div className="app">
@@ -636,6 +652,7 @@ function App() {
           canRedo={canRedo}
           viewMode={viewMode}
           onSetViewMode={setViewMode}
+          onOpenPlan={openPlan}
           onExportRequirementsMarkdown={onExportRequirementsMarkdown}
           canExportRequirements={requirementsSnapshot.items.length > 0}
           onManageLibraries={() => setIsLibraryModalOpen(true)}
@@ -851,26 +868,47 @@ function App() {
             documentId={activeDocId}
           />
         )}
-        {viewMode === 'timeline' && (
-          <TimelineView
-            programIncrementsStore={programIncrementsStore}
-            requirementsStore={requirementsStore}
-            milestonesStore={milestonesStore}
-            team={teamSnapshot}
-            diagramRoot={diagramTree}
-            onNavigateToNode={onNavigateToNode}
-            onCreateLinkedNode={onCreateLinkedNode}
-            onNavigateToRequirement={onNavigateToRequirement}
-            peers={activeSession ? presencePeers.filter((p) => p.viewMode === 'timeline') : []}
-            onFocusedItemChange={setFocusedItemId}
-          />
-        )}
-        {viewMode === 'team' && (
-          <TeamView
-            teamStore={teamStore}
-            programIncrementsStore={programIncrementsStore}
-            requirements={requirementsSnapshot}
-          />
+        {planSection && (
+          // One column for the whole Plan tab: its section links, then
+          // whichever section is showing. The sections are unchanged
+          // children; only the wrapper is new.
+          <div className="plan-view">
+            <PlanNav section={planSection} onSelect={openPlanSection} />
+            {viewMode === 'timeline' && (
+              <TimelineView
+                programIncrementsStore={programIncrementsStore}
+                requirementsStore={requirementsStore}
+                milestonesStore={milestonesStore}
+                team={teamSnapshot}
+                diagramRoot={diagramTree}
+                onNavigateToNode={onNavigateToNode}
+                onCreateLinkedNode={onCreateLinkedNode}
+                onNavigateToRequirement={onNavigateToRequirement}
+                peers={activeSession ? presencePeers.filter((p) => p.viewMode === 'timeline') : []}
+                onFocusedItemChange={setFocusedItemId}
+                chartMode={planChartMode}
+                documentId={activeDocId}
+              />
+            )}
+            {viewMode === 'team' && (
+              <TeamView
+                teamStore={teamStore}
+                programIncrementsStore={programIncrementsStore}
+                requirements={requirementsSnapshot}
+              />
+            )}
+            {viewMode === 'dependencies' && (
+              <DependenciesView
+                requirementsStore={requirementsStore}
+                programIncrements={programIncrementsSnapshot}
+                team={teamSnapshot}
+                diagramRoot={diagramTree}
+                onNavigateToNode={onNavigateToNode}
+                onCreateLinkedNode={onCreateLinkedNode}
+                onNavigateToRequirement={onNavigateToRequirement}
+              />
+            )}
+          </div>
         )}
         {viewMode === 'srd' && (
           <Suspense fallback={null}>
@@ -884,17 +922,6 @@ function App() {
               teamSnapshot={teamSnapshot}
             />
           </Suspense>
-        )}
-        {viewMode === 'skill-tree' && (
-          <SkillTreeView
-            requirementsStore={requirementsStore}
-            programIncrements={programIncrementsSnapshot}
-            team={teamSnapshot}
-            diagramRoot={diagramTree}
-            onNavigateToNode={onNavigateToNode}
-            onCreateLinkedNode={onCreateLinkedNode}
-            onNavigateToRequirement={onNavigateToRequirement}
-          />
         )}
       </div>
       <LeaveGuardDialog
@@ -940,19 +967,19 @@ function App() {
         onClose={() => setIsLibraryModalOpen(false)}
       />
       {exportScenarioId &&
-          (() => {
-            const scenario = scenarios.find((sc) => sc.id === exportScenarioId);
-            return scenario ? (
-                <Suspense fallback={null}>
-                  <ScenarioExportDialog
-                      scenario={scenario}
-                      diagramSnapshot={diagramSnapshot}
-                      documentTitle={title}
-                      onClose={closeScenarioExport}
-                  />
-                </Suspense>
-            ) : null;
-          })()}
+        (() => {
+          const scenario = scenarios.find((sc) => sc.id === exportScenarioId);
+          return scenario ? (
+            <Suspense fallback={null}>
+              <ScenarioExportDialog
+                scenario={scenario}
+                diagramSnapshot={diagramSnapshot}
+                documentTitle={title}
+                onClose={closeScenarioExport}
+              />
+            </Suspense>
+          ) : null;
+        })()}
       {toast && (
         <Toast
           key={toast.id}

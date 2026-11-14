@@ -21,21 +21,31 @@
  * operation and deliberately not this one.
  */
 import * as Y from 'yjs';
-import type {SubDiagram} from '../../domain/canvas/types';
-import type {Milestone} from '../../domain/timeline/milestones';
-import type {ProgramIncrement} from '../../domain/timeline/programIncrements';
-import type {RequirementsDocument} from '../../domain/requirements/requirementsTypes';
-import type {TeamDocument} from '../../domain/timeline/teamTypes';
-import {createYjsDiagramStore, seedYjsDiagramDoc} from '../stores/yjsDiagramStore.ts';
-import {createYjsMilestonesStore, seedYjsMilestonesDoc} from '../stores/yjsMilestonesStore.ts';
-import {createYjsProgramIncrementsStore, seedYjsProgramIncrementsDoc,} from '../stores/yjsProgramIncrementsStore.ts';
-import {createYjsRequirementsStore, seedYjsRequirementsDoc,} from '../stores/yjsRequirementsStore.ts';
-import {createYjsTeamStore} from '../stores/yjsTeamStore.ts';
-import {seedTeamStore} from '../stores/teamStore.ts';
-import {unflattenToSubDiagram} from '../stores/diagramStore.ts';
-import {createYjsDocumentMetaStore, type DocumentMeta, seedYjsDocumentMeta,} from '../stores/yjsDocumentMetaStore.ts';
-import {createYjsSrdStore, seedYjsSrd} from '../stores/yjsSrdStore.ts';
-import type {SrdDocumentState} from '../../domain/srd/srdTypes.ts';
+import type { SubDiagram } from '../../domain/canvas/types';
+import type { Milestone } from '../../domain/timeline/milestones';
+import type { ProgramIncrement } from '../../domain/timeline/programIncrements';
+import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
+import type { TeamDocument } from '../../domain/timeline/teamTypes';
+import { createYjsDiagramStore, seedYjsDiagramDoc } from '../stores/yjsDiagramStore.ts';
+import { createYjsMilestonesStore, seedYjsMilestonesDoc } from '../stores/yjsMilestonesStore.ts';
+import {
+  createYjsProgramIncrementsStore,
+  seedYjsProgramIncrementsDoc,
+} from '../stores/yjsProgramIncrementsStore.ts';
+import {
+  createYjsRequirementsStore,
+  seedYjsRequirementsDoc,
+} from '../stores/yjsRequirementsStore.ts';
+import { createYjsTeamStore } from '../stores/yjsTeamStore.ts';
+import { seedTeamStore } from '../stores/teamStore.ts';
+import { unflattenToSubDiagram } from '../stores/diagramStore.ts';
+import {
+  createYjsDocumentMetaStore,
+  type DocumentMeta,
+  seedYjsDocumentMeta,
+} from '../stores/yjsDocumentMetaStore.ts';
+import { createYjsSrdStore, seedYjsSrd } from '../stores/yjsSrdStore.ts';
+import type { SrdDocumentState } from '../../domain/srd/srdTypes.ts';
 
 export interface DocumentContents {
   root: SubDiagram;

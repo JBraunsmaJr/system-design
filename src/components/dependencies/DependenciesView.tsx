@@ -1,6 +1,6 @@
 import { useMemo, useState, useSyncExternalStore } from 'react';
 import { AlertTriangle, CheckCircle2, CircleDot, Lock, Unlock } from 'lucide-react';
-import { computeSkillTree, type SkillTreeNode } from '../../domain/timeline/skillTree';
+import { computeDependencyGraph, type DependencyNode } from '../../domain/timeline/dependencyGraph';
 import { getItemType } from '../../domain/requirements/requirementsRegistry';
 import { RequirementDetailModal } from '../timeline/RequirementDetailModal';
 import type { RequirementItem } from '../../domain/requirements/requirementsTypes';
@@ -10,7 +10,7 @@ import type { SubDiagram } from '../../domain/canvas/types';
 import type { DiagramPath } from '../../domain/canvas/subDiagramTree';
 import type { RequirementsStore } from '../../collab/stores/requirementsStore';
 
-interface SkillTreeViewProps {
+interface DependenciesViewProps {
   requirementsStore: RequirementsStore;
   programIncrements: ProgramIncrement[];
   team?: TeamDocument;
@@ -24,7 +24,7 @@ const RANK_WIDTH = 260;
 const CARD_HEIGHT = 92;
 const CARD_WIDTH = 220;
 
-function stateIcon(node: SkillTreeNode) {
+function stateIcon(node: DependencyNode) {
   if (node.state === 'done') return <CheckCircle2 size={13} />;
   if (node.state === 'in-progress') return <CircleDot size={13} />;
   if (node.state === 'locked') return <Lock size={13} />;
@@ -39,9 +39,9 @@ function stateIcon(node: SkillTreeNode) {
  * i.e. creation order, rather than an unstable sort like item id string
  * order which would put "TICKET-10" before "TICKET-2").
  */
-function useSkillTreeLayout(nodes: SkillTreeNode[]) {
+function useDependencyLayout(nodes: DependencyNode[]) {
   return useMemo(() => {
-    const byRank = new Map<number, SkillTreeNode[]>();
+    const byRank = new Map<number, DependencyNode[]>();
     for (const node of nodes) {
       const list = byRank.get(node.rank) ?? [];
       list.push(node);
@@ -74,7 +74,7 @@ function useSkillTreeLayout(nodes: SkillTreeNode[]) {
  * truth for both, so drawing the lines is just arithmetic on numbers
  * this component already has.
  */
-export function SkillTreeView({
+export function DependenciesView({
   requirementsStore,
   programIncrements,
   team,
@@ -82,15 +82,15 @@ export function SkillTreeView({
   onNavigateToNode,
   onCreateLinkedNode,
   onNavigateToRequirement,
-}: SkillTreeViewProps) {
+}: DependenciesViewProps) {
   const requirements = useSyncExternalStore(
     requirementsStore.subscribe,
     requirementsStore.getSnapshot,
   );
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 
-  const tree = useMemo(() => computeSkillTree(requirements), [requirements]);
-  const { positions, totalWidth, totalHeight } = useSkillTreeLayout(tree.nodes);
+  const tree = useMemo(() => computeDependencyGraph(requirements), [requirements]);
+  const { positions, totalWidth, totalHeight } = useDependencyLayout(tree.nodes);
   // Edge rendering below needs to look up the blocked-side node's state for
   // every edge (to color the path). Without this, tree.nodes.find(...)
   // inside the edges.map would be a linear search per edge - O(edges *
@@ -141,7 +141,7 @@ export function SkillTreeView({
 
   if (tree.nodes.length === 0) {
     return (
-      <div className="skill-tree__empty">
+      <div className="dependencies__empty">
         <p>
           No workable items yet - add a Ticket (or any type marked "Workable" in Manage Types) from
           the Requirements tab to see it here.
@@ -151,11 +151,11 @@ export function SkillTreeView({
   }
 
   return (
-    <div className="skill-tree">
+    <div className="dependencies">
       {(blockedDespiteProgress.length > 0 || cycleWarnings.length > 0) && (
-        <div className="skill-tree__warnings">
+        <div className="dependencies__warnings">
           {blockedDespiteProgress.length > 0 && (
-            <div className="skill-tree__warning-row">
+            <div className="dependencies__warning-row">
               <AlertTriangle size={13} />
               <span>
                 {blockedDespiteProgress.length} in-progress{' '}
@@ -165,7 +165,7 @@ export function SkillTreeView({
             </div>
           )}
           {cycleWarnings.length > 0 && (
-            <div className="skill-tree__warning-row">
+            <div className="dependencies__warning-row">
               <AlertTriangle size={13} />
               <span>
                 {cycleWarnings.length} {cycleWarnings.length === 1 ? 'item is' : 'items are'} part
@@ -177,9 +177,9 @@ export function SkillTreeView({
         </div>
       )}
 
-      <div className="skill-tree__scroll">
-        <div className="skill-tree__canvas" style={{ width: totalWidth, height: totalHeight }}>
-          <svg className="skill-tree__edges" width={totalWidth} height={totalHeight}>
+      <div className="dependencies__scroll">
+        <div className="dependencies__canvas" style={{ width: totalWidth, height: totalHeight }}>
+          <svg className="dependencies__edges" width={totalWidth} height={totalHeight}>
             {tree.edges.map((edge, i) => {
               const from = positions.get(edge.fromItemId);
               const to = positions.get(edge.toItemId);
@@ -195,7 +195,7 @@ export function SkillTreeView({
                 <path
                   key={i}
                   d={`M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`}
-                  className={`skill-tree__edge-path${isActivePath ? ' is-active' : ''}`}
+                  className={`dependencies__edge-path${isActivePath ? ' is-active' : ''}`}
                   fill="none"
                 />
               );
@@ -210,28 +210,28 @@ export function SkillTreeView({
               <button
                 key={node.item.id}
                 type="button"
-                className={`skill-tree__card is-${node.state}`}
+                className={`dependencies__card is-${node.state}`}
                 style={{ left: pos.x, top: pos.y, width: CARD_WIDTH }}
                 onClick={() => setSelectedItemId(node.item.id)}
                 title={`${node.item.id}: ${node.item.title || 'Untitled'}`}
               >
-                <div className="skill-tree__card-top">
+                <div className="dependencies__card-top">
                   <span
-                    className="skill-tree__card-id"
+                    className="dependencies__card-id"
                     style={{ color: type?.color ?? 'var(--chrome-text-dim)' }}
                   >
                     {node.item.id}
                   </span>
-                  <span className="skill-tree__card-state-icon">{stateIcon(node)}</span>
+                  <span className="dependencies__card-state-icon">{stateIcon(node)}</span>
                   {node.isBlockedDespiteProgress && (
                     <AlertTriangle
                       size={12}
-                      className="skill-tree__card-warning"
+                      className="dependencies__card-warning"
                       aria-label="Blocked by unfinished work"
                     />
                   )}
                 </div>
-                <div className="skill-tree__card-title">{node.item.title || 'Untitled'}</div>
+                <div className="dependencies__card-title">{node.item.title || 'Untitled'}</div>
               </button>
             );
           })}

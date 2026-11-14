@@ -1,5 +1,5 @@
 import * as Y from 'yjs';
-import {orderIdSet, pushIfAbsent} from '../sync/seedGuards.ts';
+import { orderIdSet, pushIfAbsent } from '../sync/seedGuards.ts';
 import type {
   RelationshipType,
   RequirementCategory,
@@ -20,8 +20,8 @@ import {
   PARENT_OF_RELATIONSHIP_TYPE_ID,
   updateItemReferencesInText,
 } from '../../domain/requirements/requirementsRegistry';
-import {mergedPatches, type RequirementsStore} from './requirementsStore';
-import {normalizeTags} from '../../domain/requirements/requirementTags';
+import { mergedPatches, type RequirementsStore } from './requirementsStore';
+import { normalizeTags } from '../../domain/requirements/requirementTags';
 
 /** Item storage keys are purely internal - never displayed, never
  * referenced by anything outside this file (see this file's top doc
@@ -173,7 +173,7 @@ export function topUpBuiltInTypes(doc: Y.Doc): boolean {
   }));
   const missingItemTypes = builtInTypesToAdd(existing);
   const missingRelationshipTypes = BUILT_IN_RELATIONSHIP_TYPES.filter(
-      (t) => !relationshipTypes.has(t.id),
+    (t) => !relationshipTypes.has(t.id),
   );
   if (missingItemTypes.length === 0 && missingRelationshipTypes.length === 0) return false;
 
@@ -928,7 +928,7 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
             const text = itemMap.get(field) as string | undefined;
             if (!text) continue;
             let updated = text;
-              for (const {oldId, newId} of conversions) {
+            for (const { oldId, newId } of conversions) {
               if (updated.includes(`#${oldId}`) || updated.includes(`#ref:${oldId}`)) {
                 updated = updateItemReferencesInText(updated, oldId, newId);
               }

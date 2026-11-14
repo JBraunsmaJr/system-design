@@ -16,8 +16,14 @@
  * When run inside GitHub Actions, `prepare` also writes `version`, `tag`
  * and `bump` to $GITHUB_OUTPUT.
  */
-import {appendFileSync, readFileSync, writeFileSync} from 'fs';
-import {cutRelease, openUnreleased, type Release, setPackageVersion, VERSIONED_FILES,} from './lib/changelog';
+import { appendFileSync, readFileSync, writeFileSync } from 'fs';
+import {
+  cutRelease,
+  openUnreleased,
+  type Release,
+  setPackageVersion,
+  VERSIONED_FILES,
+} from './lib/changelog';
 
 const CHANGELOG = 'CHANGELOG.md';
 
@@ -65,8 +71,8 @@ function prepare(args: string[]) {
 
   if (process.env.GITHUB_OUTPUT) {
     appendFileSync(
-        process.env.GITHUB_OUTPUT,
-        `version=${release.version}\ntag=v${release.version}\nbump=${release.bump}\n`,
+      process.env.GITHUB_OUTPUT,
+      `version=${release.version}\ntag=v${release.version}\nbump=${release.bump}\n`,
     );
   }
 }

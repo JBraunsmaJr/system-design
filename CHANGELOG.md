@@ -13,6 +13,23 @@ markers are removed when the section becomes a release. See
 
 ## [Unreleased]
 
+### [MINOR] Plan tab
+
+- Timeline, Team and Skill Tree are now one **Plan** tab with four sections: **Board**, **Gantt**, **Dependencies** and
+  **Team**. The Board/Gantt toggle that used to sit in the Timeline toolbar is two of those sections. The Plan tab
+  reopens on the section you last used.
+- **Skill Tree** is renamed **Dependencies**, which is what it shows.
+- The backlog is a column on the left of the board instead of a strip above it, so cards are dragged a short distance
+  rather than up and down the page. Its header arrow folds it to a narrow rail; dropping a card on it, folded or not,
+  unschedules the card. It is shown even when empty, so there is always somewhere to drop a card to unschedule it.
+- **Show** in the board toolbar narrows the board to one program increment, and then to any sprints within it: one
+  sprint, several side by side, or all. Only the board's columns change; capacity totals and the Gantt chart still
+  cover every sprint.
+- Sprint names and dates are folded under **Edit sprints** on each program increment by default, so the board starts
+  higher on the page.
+- The sprint selection and whether the backlog is folded are remembered per document in your browser and are not
+  shared with collaborators.
+
 ## [0.98.2] - 2026-10-13
 
 - Fixed duplicate ports in sub-diagrams when a node had multiple edges to the same node.

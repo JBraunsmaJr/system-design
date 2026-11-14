@@ -1,32 +1,44 @@
-import {useEffect, useMemo, useState, useSyncExternalStore} from 'react';
-import {Diamond, GanttChartSquare, Plus} from 'lucide-react';
-import {computeSprintDateRanges} from '../../domain/timeline/programIncrements';
-import {isItemWorkable} from '../../domain/requirements/requirementsRegistry';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { Diamond, Plus } from 'lucide-react';
+import { computeSprintDateRanges } from '../../domain/timeline/programIncrements';
+import { isItemWorkable } from '../../domain/requirements/requirementsRegistry';
 import {
   checkScheduleConflict,
   findBlockingItemIds,
   findScheduleConflicts,
   type ScheduleConflictSeverity,
 } from '../../domain/timeline/scheduleConflicts';
-import type {RequirementItem} from '../../domain/requirements/requirementsTypes';
-import type {RequirementsStore} from '../../collab/stores/requirementsStore';
-import type {ProgramIncrementsStore} from '../../collab/stores/programIncrementsStore';
-import type {MilestonesStore} from '../../collab/stores/milestonesStore';
-import {createLocalMilestonesStore} from '../../collab/stores/milestonesStore';
-import type {Milestone} from '../../domain/timeline/milestones';
-import {getAllEpicsWithInferredSchedule, getChildItemsForParent,} from '../../domain/timeline/epicScheduling';
-import type {TeamDocument} from '../../domain/timeline/teamTypes';
-import type {SubDiagram} from '../../domain/canvas/types';
-import type {DiagramPath} from '../../domain/canvas/subDiagramTree';
-import type {PresenceInfo} from '../../collab/sync/session';
-import {RequirementDetailModal} from './RequirementDetailModal';
-import {MilestoneDetailModal} from './MilestoneDetailModal';
-import {AddMilestoneModal} from './AddMilestoneModal';
-import {GanttChart} from './GanttChart';
-import {PresenceAvatarStack} from './PresenceAvatarStack';
-import {MilestonesSection} from './MilestonesSection';
-import {BacklogSection} from './BacklogSection';
-import {ProgramIncrementCard} from './ProgramIncrementCard';
+import type { RequirementItem } from '../../domain/requirements/requirementsTypes';
+import type { RequirementsStore } from '../../collab/stores/requirementsStore';
+import type { ProgramIncrementsStore } from '../../collab/stores/programIncrementsStore';
+import type { MilestonesStore } from '../../collab/stores/milestonesStore';
+import { createLocalMilestonesStore } from '../../collab/stores/milestonesStore';
+import type { Milestone } from '../../domain/timeline/milestones';
+import {
+  getAllEpicsWithInferredSchedule,
+  getChildItemsForParent,
+} from '../../domain/timeline/epicScheduling';
+import type { TeamDocument } from '../../domain/timeline/teamTypes';
+import type { SubDiagram } from '../../domain/canvas/types';
+import type { DiagramPath } from '../../domain/canvas/subDiagramTree';
+import type { PresenceInfo } from '../../collab/sync/session';
+import type { PlanChartMode } from '../../app/planNavigation';
+import {
+  SHOW_EVERYTHING,
+  visibleProgramIncrements,
+  visibleSprintIds,
+  type BoardFilter,
+} from '../../domain/timeline/boardFilter';
+import { loadPlanBoardPrefs, savePlanBoardPrefs } from '../../domain/timeline/planBoardPrefs';
+import { RequirementDetailModal } from './RequirementDetailModal';
+import { MilestoneDetailModal } from './MilestoneDetailModal';
+import { AddMilestoneModal } from './AddMilestoneModal';
+import { GanttChart } from './GanttChart';
+import { PresenceAvatarStack } from './PresenceAvatarStack';
+import { MilestonesSection } from './MilestonesSection';
+import { BacklogPanel } from './BacklogPanel';
+import { BoardFilterBar } from './BoardFilterBar';
+import { ProgramIncrementCard } from './ProgramIncrementCard';
 
 interface TimelineViewProps {
   programIncrementsStore: ProgramIncrementsStore;
@@ -45,6 +57,12 @@ interface TimelineViewProps {
   /** Reports which item this person currently has open, for presence
    * broadcasting - null when nothing's selected. */
   onFocusedItemChange?: (itemId: string | null) => void;
+  /** Board or Gantt - chosen in the Plan tab's section links, which sit
+   * above this view. Defaults to the board. */
+  chartMode?: PlanChartMode;
+  /** Keys the per-person board preferences (which sprints are showing,
+   * whether the backlog is folded) - see planBoardPrefs.ts. */
+  documentId?: string;
 }
 
 export function TimelineView({
@@ -58,6 +76,8 @@ export function TimelineView({
   onNavigateToRequirement,
   peers = [],
   onFocusedItemChange,
+  chartMode = 'board',
+  documentId,
 }: TimelineViewProps) {
   const fallbackMilestonesStore = useMemo(() => createLocalMilestonesStore([]), []);
   const activeMilestonesStore = milestonesStore ?? fallbackMilestonesStore;
@@ -82,7 +102,34 @@ export function TimelineView({
   const [selectedMilestoneId, setSelectedMilestoneId] = useState<string | null>(null);
   const [isAddingMilestone, setIsAddingMilestone] = useState(false);
   const [addMilestoneDate, setAddMilestoneDate] = useState<string | undefined>(undefined);
-  const [chartMode, setChartMode] = useState<'board' | 'gantt'>('board');
+  // Board preferences are this person's, per document, and never part of
+  // the document itself (see planBoardPrefs.ts).
+  const [prefsDocumentId, setPrefsDocumentId] = useState(documentId);
+  const [boardFilter, setBoardFilterState] = useState<BoardFilter>(
+    () => loadPlanBoardPrefs(documentId).filter ?? SHOW_EVERYTHING,
+  );
+  const [isBacklogCollapsed, setIsBacklogCollapsed] = useState(
+    () => loadPlanBoardPrefs(documentId).backlogCollapsed ?? false,
+  );
+  // Opening another document while this view is showing keeps it mounted,
+  // so its preferences are swapped in here - during render, which React
+  // handles by re-rendering before anything is painted, rather than in an
+  // effect that would show one frame of the previous document's filter.
+  if (prefsDocumentId !== documentId) {
+    const prefs = loadPlanBoardPrefs(documentId);
+    setPrefsDocumentId(documentId);
+    setBoardFilterState(prefs.filter ?? SHOW_EVERYTHING);
+    setIsBacklogCollapsed(prefs.backlogCollapsed ?? false);
+  }
+  const setBoardFilter = (filter: BoardFilter) => {
+    setBoardFilterState(filter);
+    savePlanBoardPrefs(documentId, { filter });
+  };
+  const toggleBacklogCollapsed = () => {
+    const next = !isBacklogCollapsed;
+    setIsBacklogCollapsed(next);
+    savePlanBoardPrefs(documentId, { backlogCollapsed: next });
+  };
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [filterEpicId, setFilterEpicId] = useState<string>('all');
 
@@ -374,23 +421,13 @@ export function TimelineView({
           <Diamond size={13} />
           Marker
         </button>
-        <div className="timeline-view__mode-toggle">
-          <button
-            type="button"
-            className={chartMode === 'board' ? 'active' : undefined}
-            onClick={() => setChartMode('board')}
-          >
-            Board
-          </button>
-          <button
-            type="button"
-            className={chartMode === 'gantt' ? 'active' : undefined}
-            onClick={() => setChartMode('gantt')}
-          >
-            <GanttChartSquare size={12} />
-            Gantt
-          </button>
-        </div>
+        {chartMode === 'board' && (
+          <BoardFilterBar
+            programIncrements={programIncrements}
+            filter={boardFilter}
+            onChange={setBoardFilter}
+          />
+        )}
 
         {epicsWithSchedule.length > 0 && (
           <div className="timeline-view__epic-filter">
@@ -427,77 +464,80 @@ export function TimelineView({
           onNavigateToRequirement={onNavigateToRequirement}
         />
       ) : (
-        <div className="timeline-view__content">
-          {/* Scheduled Releases & Milestones Overview Section (FR-003, AC-002, AC-009) */}
-          <MilestonesSection
-            milestones={milestones}
-            onSelectMilestone={(id) => setSelectedMilestoneId(id)}
-            onAddMilestone={() => {
-              setAddMilestoneDate(undefined);
-              setIsAddingMilestone(true);
-            }}
+        <div className="timeline-view__board">
+          <BacklogPanel
+            items={backlogItems}
+            requirements={requirements}
+            team={team}
+            draggedItemId={draggedItemId}
+            blockingItemIds={blockingItemIds}
+            parentEpicByItemId={parentEpicByItemId}
+            filteredChildItemIds={filteredChildItemIds}
+            onSelectItem={(id) => setSelectedItemId(id)}
+            onDragStartItem={(id) => setDraggedItemId(id)}
+            onDragEndItem={() => setDraggedItemId(null)}
+            onDropItem={onUnassignItem}
+            onUpdateItem={onUpdateItem}
+            isCollapsed={isBacklogCollapsed}
+            onToggleCollapsed={toggleBacklogCollapsed}
           />
-
-          {backlogItems.length > 0 && (
-            <BacklogSection
-              items={backlogItems}
-              requirements={requirements}
-              team={team}
-              draggedItemId={draggedItemId}
-              blockingItemIds={blockingItemIds}
-              parentEpicByItemId={parentEpicByItemId}
-              filteredChildItemIds={filteredChildItemIds}
-              onSelectItem={(id) => setSelectedItemId(id)}
-              onDragStartItem={(id) => setDraggedItemId(id)}
-              onDragEndItem={() => setDraggedItemId(null)}
-              onDropItem={onUnassignItem}
-              onUpdateItem={onUpdateItem}
+          <div className="timeline-view__content">
+            {/* Scheduled Releases & Milestones Overview Section (FR-003, AC-002, AC-009) */}
+            <MilestonesSection
+              milestones={milestones}
+              onSelectMilestone={(id) => setSelectedMilestoneId(id)}
+              onAddMilestone={() => {
+                setAddMilestoneDate(undefined);
+                setIsAddingMilestone(true);
+              }}
             />
-          )}
-          {programIncrements.length === 0 ? (
-            <p className="timeline-view__empty">
-              No program increments yet - add one above to start defining sprints.
-            </p>
-          ) : (
-            programIncrements.map((pi) => (
-              <ProgramIncrementCard
-                key={pi.id}
-                pi={pi}
-                requirements={requirements}
-                milestones={milestones}
-                team={team}
-                itemsBySprintId={itemsBySprintId}
-                backlogItems={backlogItems}
-                conflictSeverityByItemId={conflictSeverityByItemId}
-                draggedItemId={draggedItemId}
-                blockingItemIds={blockingItemIds}
-                sprintRangesByItemId={sprintRangesByItemId}
-                parentEpicByItemId={parentEpicByItemId}
-                filteredChildItemIds={filteredChildItemIds}
-                onSelectItem={(id) => setSelectedItemId(id)}
-                onSelectMilestone={(id) => setSelectedMilestoneId(id)}
-                onDragStartItem={(id) => setDraggedItemId(id)}
-                onDragEndItem={() => setDraggedItemId(null)}
-                onDropItem={onMoveItemToSprint}
-                onUpdateItem={onUpdateItem}
-                onUpdateName={(name) => onUpdatePIName(pi.id, name)}
-                onUpdateStart={(startDate) => onUpdatePIStart(pi.id, startDate)}
-                onUpdateDetails={(patch) => programIncrementsStore.updatePIDetails(pi.id, patch)}
-                onDelete={() => onDeletePI(pi.id)}
-                onAddSprint={() => onAddSprint(pi.id)}
-                onUpdateSprintName={(sprintId, name) => onUpdateSprintName(pi.id, sprintId, name)}
-                onUpdateSprintEnd={(sprintId, endDate) =>
-                  onUpdateSprintEnd(pi.id, sprintId, endDate)
-                }
-                onUpdateSprintDetails={(sprintId, patch) =>
+
+            {programIncrements.length === 0 ? (
+              <p className="timeline-view__empty">
+                No program increments yet - add one above to start defining sprints.
+              </p>
+            ) : (
+              visibleProgramIncrements(programIncrements, boardFilter).map((pi) => (
+                <ProgramIncrementCard
+                  key={pi.id}
+                  pi={pi}
+                  visibleSprintIds={visibleSprintIds(pi, boardFilter)}
+                  requirements={requirements}
+                  milestones={milestones}
+                  team={team}
+                  itemsBySprintId={itemsBySprintId}
+                  backlogItems={backlogItems}
+                  conflictSeverityByItemId={conflictSeverityByItemId}
+                  draggedItemId={draggedItemId}
+                  blockingItemIds={blockingItemIds}
+                  sprintRangesByItemId={sprintRangesByItemId}
+                  parentEpicByItemId={parentEpicByItemId}
+                  filteredChildItemIds={filteredChildItemIds}
+                  onSelectItem={(id) => setSelectedItemId(id)}
+                  onSelectMilestone={(id) => setSelectedMilestoneId(id)}
+                  onDragStartItem={(id) => setDraggedItemId(id)}
+                  onDragEndItem={() => setDraggedItemId(null)}
+                  onDropItem={onMoveItemToSprint}
+                  onUpdateItem={onUpdateItem}
+                  onUpdateName={(name) => onUpdatePIName(pi.id, name)}
+                  onUpdateStart={(startDate) => onUpdatePIStart(pi.id, startDate)}
+                  onUpdateDetails={(patch) => programIncrementsStore.updatePIDetails(pi.id, patch)}
+                  onDelete={() => onDeletePI(pi.id)}
+                  onAddSprint={() => onAddSprint(pi.id)}
+                  onUpdateSprintName={(sprintId, name) => onUpdateSprintName(pi.id, sprintId, name)}
+                  onUpdateSprintEnd={(sprintId, endDate) =>
+                    onUpdateSprintEnd(pi.id, sprintId, endDate)
+                  }
+                  onUpdateSprintDetails={(sprintId, patch) =>
                     programIncrementsStore.updateSprintDetails(pi.id, sprintId, patch)
-                }
-                onDeleteSprint={(sprintId) => onDeleteSprint(pi.id, sprintId)}
-                onMoveSprint={(sprintId, direction) => onMoveSprint(pi.id, sprintId, direction)}
-                programIncrementsStore={programIncrementsStore}
-              />
-            ))
-          )}
+                  }
+                  onDeleteSprint={(sprintId) => onDeleteSprint(pi.id, sprintId)}
+                  onMoveSprint={(sprintId, direction) => onMoveSprint(pi.id, sprintId, direction)}
+                  programIncrementsStore={programIncrementsStore}
+                />
+              ))
+            )}
+          </div>
         </div>
       )}
 

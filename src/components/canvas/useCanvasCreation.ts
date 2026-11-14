@@ -1,22 +1,22 @@
 import {
-    type Dispatch,
-    type DragEvent,
-    type MouseEvent as ReactMouseEvent,
-    type SetStateAction,
-    useCallback
+  type Dispatch,
+  type DragEvent,
+  type MouseEvent as ReactMouseEvent,
+  type SetStateAction,
+  useCallback,
 } from 'react';
-import {NODE_TYPES} from '../../domain/canvas/nodeRegistry';
-import {GROUP_TYPES} from '../../domain/canvas/groupRegistry';
-import {globalShapeRegistry, SHAPE_TYPES} from '../../domain/canvas/shapeRegistry';
+import { NODE_TYPES } from '../../domain/canvas/nodeRegistry';
+import { GROUP_TYPES } from '../../domain/canvas/groupRegistry';
+import { globalShapeRegistry, SHAPE_TYPES } from '../../domain/canvas/shapeRegistry';
 import {
-    CODE_DRAG_MIME_TYPE,
-    DRAG_MIME_TYPE,
-    FRAGMENT_DRAG_MIME_TYPE,
-    GROUP_DRAG_MIME_TYPE,
-    SHAPE_DRAG_MIME_TYPE,
-    TEXT_DRAG_MIME_TYPE,
+  CODE_DRAG_MIME_TYPE,
+  DRAG_MIME_TYPE,
+  FRAGMENT_DRAG_MIME_TYPE,
+  GROUP_DRAG_MIME_TYPE,
+  SHAPE_DRAG_MIME_TYPE,
+  TEXT_DRAG_MIME_TYPE,
 } from './Palette';
-import type {CanvasFlow, CanvasProps} from './Canvas';
+import type { CanvasFlow, CanvasProps } from './Canvas';
 
 /**
  * Creating things on the canvas: dropping from the palette, and
@@ -37,11 +37,11 @@ export function useCanvasCreation({
   onAddShape,
   onAddCode,
   onAddText,
-                                      onInsertFragment,
+  onInsertFragment,
   setEditingLabelNodeId,
-                                  }: Pick<
-    CanvasProps,
-    'onAddNode' | 'onAddGroup' | 'onAddShape' | 'onAddCode' | 'onAddText' | 'onInsertFragment'
+}: Pick<
+  CanvasProps,
+  'onAddNode' | 'onAddGroup' | 'onAddShape' | 'onAddCode' | 'onAddText' | 'onInsertFragment'
 > & {
   screenToFlowPosition: CanvasFlow['screenToFlowPosition'];
   isPresenting: boolean;
@@ -57,13 +57,13 @@ export function useCanvasCreation({
       event.preventDefault();
       const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
 
-        const fragmentId = event.dataTransfer.getData(FRAGMENT_DRAG_MIME_TYPE);
-        if (fragmentId) {
-            // Presenting shows the diagram, it doesn't edit it - a fragment
-            // dropped then is swallowed rather than handled as anything else.
-            if (!isPresenting) onInsertFragment?.(fragmentId, position);
-            return;
-        }
+      const fragmentId = event.dataTransfer.getData(FRAGMENT_DRAG_MIME_TYPE);
+      if (fragmentId) {
+        // Presenting shows the diagram, it doesn't edit it - a fragment
+        // dropped then is swallowed rather than handled as anything else.
+        if (!isPresenting) onInsertFragment?.(fragmentId, position);
+        return;
+      }
 
       const nodeTypeId = event.dataTransfer.getData(DRAG_MIME_TYPE);
       if (nodeTypeId && NODE_TYPES.some((n) => n.id === nodeTypeId)) {
@@ -96,14 +96,14 @@ export function useCanvasCreation({
       }
     },
     [
-        isPresenting,
+      isPresenting,
       screenToFlowPosition,
       onAddNode,
       onAddGroup,
       onAddShape,
       onAddCode,
       onAddText,
-        onInsertFragment,
+      onInsertFragment,
       setEditingLabelNodeId,
     ],
   );

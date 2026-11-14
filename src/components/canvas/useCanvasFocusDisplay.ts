@@ -1,8 +1,11 @@
-import {useEffect, useLayoutEffect, useMemo, useRef} from 'react';
-import type {Edge} from '@xyflow/react';
-import type {ArchEdgeData} from '../../domain/canvas/types';
-import {applyPresentationFocusToEdges, applyPresentationFocusToNodes,} from '../../domain/canvas/presentationFocus';
-import type {CanvasFlow, CanvasProps, FocusSet} from './Canvas';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import type { Edge } from '@xyflow/react';
+import type { ArchEdgeData } from '../../domain/canvas/types';
+import {
+  applyPresentationFocusToEdges,
+  applyPresentationFocusToNodes,
+} from '../../domain/canvas/presentationFocus';
+import type { CanvasFlow, CanvasProps, FocusSet } from './Canvas';
 
 /**
  * What React Flow is given to draw while something is in focus (dimmed or
@@ -45,8 +48,8 @@ export function useCanvasFocusDisplay({
     // there's no second pass over the array here - and the common case
     // returns the identical array it was given, which is what lets React
     // Flow skip re-adopting every node.
-      // Shared with the scenario exporter, so an exported step looks the same.
-      if (presentationFocus) return applyPresentationFocusToNodes(nodes, presentationFocus);
+    // Shared with the scenario exporter, so an exported step looks the same.
+    if (presentationFocus) return applyPresentationFocusToNodes(nodes, presentationFocus);
     if (previewFocus) {
       const memberIds = new Set(previewFocus.nodeIds);
       return nodes.map((n) => {
@@ -63,7 +66,7 @@ export function useCanvasFocusDisplay({
 
   const displayEdges = useMemo(() => {
     if (presentationFocus) {
-        return applyPresentationFocusToEdges(edges, presentationFocus, {animateEdges: true});
+      return applyPresentationFocusToEdges(edges, presentationFocus, { animateEdges: true });
     }
     if (previewFocus) {
       /**

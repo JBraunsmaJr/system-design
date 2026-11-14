@@ -1,13 +1,13 @@
-import {useMemo} from 'react';
+import { useMemo } from 'react';
 import type {
   RequirementItem,
   RequirementItemType,
   RequirementsDocument,
 } from '../../domain/requirements/requirementsTypes';
-import type {SubDiagram} from '../../domain/canvas/types';
-import {findAllLinkedNodes} from '../../domain/canvas/subDiagramTree';
+import type { SubDiagram } from '../../domain/canvas/types';
+import { findAllLinkedNodes } from '../../domain/canvas/subDiagramTree';
 import plur from 'plur';
-import {itemTextMatches} from '../../domain/requirements/decisionRecords';
+import { itemTextMatches } from '../../domain/requirements/decisionRecords';
 import {
   buildEpicTree,
   buildHierarchyIndex,
@@ -16,7 +16,7 @@ import {
   filterEpicTree,
   flattenEpicTreeMatches,
 } from '../../domain/requirements/requirementsHierarchy';
-import type {RequirementsGroupBy} from '../../domain/requirements/requirementsViewPrefs';
+import type { RequirementsGroupBy } from '../../domain/requirements/requirementsViewPrefs';
 import {
   EMPTY_REQUIREMENTS_FILTER,
   isFilterActive,
@@ -50,14 +50,14 @@ export interface UseRequirementGroupsOptions {
   search: string;
   groupBy: RequirementsGroupBy;
   diagramRoot?: SubDiagram;
-    /** Status/assignee/sprint/tag narrowing, applied together with the
-     * search - see requirementsFilter.ts. */
-    filter?: RequirementsFilter;
-    /** For the filter's "backlog" and "unassigned" values: a sprint or
-     * member id that no longer exists counts as none. Both must be stable
-     * (memoized by the caller). */
-    existingSprintIds?: ReadonlySet<string>;
-    existingMemberIds?: ReadonlySet<string>;
+  /** Status/assignee/sprint/tag narrowing, applied together with the
+   * search - see requirementsFilter.ts. */
+  filter?: RequirementsFilter;
+  /** For the filter's "backlog" and "unassigned" values: a sprint or
+   * member id that no longer exists counts as none. Both must be stable
+   * (memoized by the caller). */
+  existingSprintIds?: ReadonlySet<string>;
+  existingMemberIds?: ReadonlySet<string>;
 }
 
 const NO_IDS: ReadonlySet<string> = new Set();
@@ -83,11 +83,11 @@ export function useRequirementGroups({
   search,
   groupBy,
   diagramRoot,
-                                         filter = EMPTY_REQUIREMENTS_FILTER,
-                                         existingSprintIds = NO_IDS,
-                                         existingMemberIds,
+  filter = EMPTY_REQUIREMENTS_FILTER,
+  existingSprintIds = NO_IDS,
+  existingMemberIds,
 }: UseRequirementGroupsOptions) {
-    const filterActive = isFilterActive(filter);
+  const filterActive = isFilterActive(filter);
   /**
    * Computed once for every item here, rather than each RequirementCard
    * independently walking the whole diagram tree for just its own item -
@@ -107,21 +107,21 @@ export function useRequirementGroups({
 
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
-      if (!q && !filterActive) return doc.items;
-      const context = {doc, existingSprintIds, existingMemberIds};
-      const textMatches = (item: RequirementItem) => {
+    if (!q && !filterActive) return doc.items;
+    const context = { doc, existingSprintIds, existingMemberIds };
+    const textMatches = (item: RequirementItem) => {
       if (item.id.toLowerCase().includes(q)) return true;
       if (item.title.toLowerCase().includes(q)) return true;
-        // The body, and a decision's own sections too.
-        if (itemTextMatches(item, q)) return true;
-          if (item.tags?.some((t) => t.toLowerCase().includes(q))) return true;
+      // The body, and a decision's own sections too.
+      if (itemTextMatches(item, q)) return true;
+      if (item.tags?.some((t) => t.toLowerCase().includes(q))) return true;
       const category = doc.categories.find((c) => c.id === item.categoryId);
       return category ? category.label.toLowerCase().includes(q) : false;
-      };
-      return doc.items.filter(
-          (item) =>
-              (!filterActive || itemMatchesFilter(item, filter, context)) && (!q || textMatches(item)),
-      );
+    };
+    return doc.items.filter(
+      (item) =>
+        (!filterActive || itemMatchesFilter(item, filter, context)) && (!q || textMatches(item)),
+    );
   }, [doc, search, filter, filterActive, existingSprintIds, existingMemberIds]);
 
   /**
@@ -141,17 +141,17 @@ export function useRequirementGroups({
       { items: docItems, itemTypes: docItemTypes, relationships: docRelationships },
       hierarchyIndex,
     );
-      if (!search.trim() && !filterActive) return tree;
+    if (!search.trim() && !filterActive) return tree;
     return filterEpicTree(tree, new Set(filteredItems.map((i) => i.id)));
   }, [
-      groupBy,
-      docItems,
-      docItemTypes,
-      docRelationships,
-      hierarchyIndex,
-      filteredItems,
-      search,
-      filterActive,
+    groupBy,
+    docItems,
+    docItemTypes,
+    docRelationships,
+    hierarchyIndex,
+    filteredItems,
+    search,
+    filterActive,
   ]);
 
   /** A distinct DOM id for every copy of every item in the epic tree: the
@@ -259,6 +259,6 @@ export function useRequirementGroups({
     visibleItems,
     outlineSectionOf,
     itemCountsByType,
-      filterActive,
+    filterActive,
   };
 }

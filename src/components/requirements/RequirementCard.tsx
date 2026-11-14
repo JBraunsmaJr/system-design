@@ -1,31 +1,34 @@
-import {memo, useCallback, useEffect, useRef, useState} from 'react';
-import {ChevronDown, ChevronRight, ListPlus, Maximize2, Trash2} from 'lucide-react';
-import type {ItemMarkdownField} from '../../domain/requirements/requirementsRegistry';
-import {getItemType, isItemWorkable} from '../../domain/requirements/requirementsRegistry';
-import type {DiagramPath, LinkedNodeRef} from '../../domain/canvas/subDiagramTree';
-import {RequirementBody} from './RequirementBody';
-import {peerBadgesAreEqual} from '../../domain/network/presenceComparison';
-import {LinkedDiagramsSection} from './LinkedDiagramsSection';
-import {RequirementEditor} from './RequirementEditor';
-import {CategoryPicker} from './CategoryPicker';
-import {StatusPicker} from './StatusPicker';
-import {DecisionStatusPicker} from './DecisionStatusPicker';
-import {DecisionSections} from './DecisionSections';
-import {isDecisionItem} from '../../domain/requirements/decisionRecords';
-import {TypePicker} from './TypePicker';
-import {SprintPicker} from './SprintPicker';
-import {RelationshipManager} from './RelationshipManager';
-import {ChildQuickAdd} from './ChildQuickAdd';
-import {TagEditor} from './TagEditor';
-import {isEpicItem} from '../../domain/requirements/requirementsHierarchy';
-import {MemberPicker} from '../team/MemberPicker';
-import {PointsPicker} from '../team/PointsPicker';
-import {HighlightedText, HighlightedTitle} from '../../common/components/highlight/HighlightText';
-import type {RequirementItem, RequirementsDocument,} from '../../domain/requirements/requirementsTypes';
-import type {ProgramIncrement} from '../../domain/timeline/programIncrements';
-import type {TeamDocument} from '../../domain/timeline/teamTypes';
-import type {SubDiagram} from '../../domain/canvas/types';
-import type {PresenceInfo} from '../../collab/sync/session';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { ChevronDown, ChevronRight, ListPlus, Maximize2, Trash2 } from 'lucide-react';
+import type { ItemMarkdownField } from '../../domain/requirements/requirementsRegistry';
+import { getItemType, isItemWorkable } from '../../domain/requirements/requirementsRegistry';
+import type { DiagramPath, LinkedNodeRef } from '../../domain/canvas/subDiagramTree';
+import { RequirementBody } from './RequirementBody';
+import { peerBadgesAreEqual } from '../../domain/network/presenceComparison';
+import { LinkedDiagramsSection } from './LinkedDiagramsSection';
+import { RequirementEditor } from './RequirementEditor';
+import { CategoryPicker } from './CategoryPicker';
+import { StatusPicker } from './StatusPicker';
+import { DecisionStatusPicker } from './DecisionStatusPicker';
+import { DecisionSections } from './DecisionSections';
+import { isDecisionItem } from '../../domain/requirements/decisionRecords';
+import { TypePicker } from './TypePicker';
+import { SprintPicker } from './SprintPicker';
+import { RelationshipManager } from './RelationshipManager';
+import { ChildQuickAdd } from './ChildQuickAdd';
+import { TagEditor } from './TagEditor';
+import { isEpicItem } from '../../domain/requirements/requirementsHierarchy';
+import { MemberPicker } from '../team/MemberPicker';
+import { PointsPicker } from '../team/PointsPicker';
+import { HighlightedText, HighlightedTitle } from '../../common/components/highlight/HighlightText';
+import type {
+  RequirementItem,
+  RequirementsDocument,
+} from '../../domain/requirements/requirementsTypes';
+import type { ProgramIncrement } from '../../domain/timeline/programIncrements';
+import type { TeamDocument } from '../../domain/timeline/teamTypes';
+import type { SubDiagram } from '../../domain/canvas/types';
+import type { PresenceInfo } from '../../collab/sync/session';
 
 interface RequirementCardProps {
   item: RequirementItem;
@@ -102,14 +105,14 @@ interface RequirementCardProps {
   /** Shows an "Open" button that makes this item the focus of the split
    * view's detail pane - used for the children listed under an item. */
   onOpenItem?: (itemId: string) => void;
-    /** Every tag in the document, suggested by this card's tag editor. Must
-     * keep its identity while the set of tags is unchanged. */
-    tagSuggestions?: string[];
-    /** Selecting items for a bulk edit: when onToggleBulkSelected is given,
-     * the card shows a checkbox. The second argument is true for a
-     * shift-click, which extends the selection from the last one toggled. */
-    isBulkSelected?: boolean;
-    onToggleBulkSelected?: (itemId: string, extendRange: boolean) => void;
+  /** Every tag in the document, suggested by this card's tag editor. Must
+   * keep its identity while the set of tags is unchanged. */
+  tagSuggestions?: string[];
+  /** Selecting items for a bulk edit: when onToggleBulkSelected is given,
+   * the card shows a checkbox. The second argument is true for a
+   * shift-click, which extends the selection from the last one toggled. */
+  isBulkSelected?: boolean;
+  onToggleBulkSelected?: (itemId: string, extendRange: boolean) => void;
 }
 
 const NO_TAG_SUGGESTIONS: string[] = [];
@@ -148,19 +151,19 @@ function RequirementCardImpl({
   preferredVerbKey,
   onVerbUsed,
   onOpenItem,
-                                 tagSuggestions = NO_TAG_SUGGESTIONS,
-                                 isBulkSelected = false,
-                                 onToggleBulkSelected,
+  tagSuggestions = NO_TAG_SUGGESTIONS,
+  isBulkSelected = false,
+  onToggleBulkSelected,
 }: RequirementCardProps) {
-    // Which markdown field is open in an editor: the body for most items, or
-    // any of a decision's sections. One slot rather than a flag per section,
-    // so presence ("editing this item") and collapsing treat them all alike.
-    const [editingField, setEditingField] = useState<ItemMarkdownField | null>(null);
-    const isEditingBody = editingField !== null;
-    const setIsEditingBody = useCallback(
-        (editing: boolean) => setEditingField(editing ? 'body' : null),
-        [],
-    );
+  // Which markdown field is open in an editor: the body for most items, or
+  // any of a decision's sections. One slot rather than a flag per section,
+  // so presence ("editing this item") and collapsing treat them all alike.
+  const [editingField, setEditingField] = useState<ItemMarkdownField | null>(null);
+  const isEditingBody = editingField !== null;
+  const setIsEditingBody = useCallback(
+    (editing: boolean) => setEditingField(editing ? 'body' : null),
+    [],
+  );
   const cardRef = useRef<HTMLDivElement>(null);
   const pointerIsDownRef = useRef(false);
   const selectionKey = cardKey ?? item.id;
@@ -189,7 +192,7 @@ function RequirementCardImpl({
   const canAddChildren =
     Boolean(onAddChildItem) && Boolean(defaultChildTypeId) && isEpicItem(doc, item);
   const collapsed = isCollapsed && Boolean(onToggleCollapsed);
-    const isDecision = isDecisionItem(item);
+  const isDecision = isDecisionItem(item);
 
   // A collapsed card has no body editor, whoever collapsed it
   const editingBody = isEditingBody && !collapsed;
@@ -209,7 +212,7 @@ function RequirementCardImpl({
       className={`requirement-card${highlighted ? ' is-highlighted' : ''}${
         isSelected ? ' is-selected' : ''
       }${isContext ? ' is-context' : ''}${collapsed ? ' is-collapsed' : ''}${
-          onToggleBulkSelected && isBulkSelected ? ' is-bulk-selected' : ''
+        onToggleBulkSelected && isBulkSelected ? ' is-bulk-selected' : ''
       }`}
       // Selection changes layout (the previously selected epic's
       // quick-add row disappears), so it must never happen between a mouse
@@ -244,23 +247,22 @@ function RequirementCardImpl({
     >
       <div className="requirement-card__header">
         <div className="requirement-card__header-row">
-            {onToggleBulkSelected && (
-                <input
-                    type="checkbox"
-                    className="requirement-card__bulk-check"
-                    checked={isBulkSelected}
-                    // The change itself is handled on click, which is where the
-                    // shift key that extends a range can be read.
-                    onChange={() => {
-                    }}
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onToggleBulkSelected(item.id, e.shiftKey);
-                    }}
-                    aria-label={`Select ${item.id}`}
-                    title="Select for bulk edit (Shift-click selects a range)"
-                />
-            )}
+          {onToggleBulkSelected && (
+            <input
+              type="checkbox"
+              className="requirement-card__bulk-check"
+              checked={isBulkSelected}
+              // The change itself is handled on click, which is where the
+              // shift key that extends a range can be read.
+              onChange={() => {}}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleBulkSelected(item.id, e.shiftKey);
+              }}
+              aria-label={`Select ${item.id}`}
+              title="Select for bulk edit (Shift-click selects a range)"
+            />
+          )}
           {onToggleCollapsed && (
             <button
               type="button"
@@ -317,12 +319,12 @@ function RequirementCardImpl({
               onChange={(status) => onUpdateItem(item.id, { status })}
             />
           )}
-            {isDecision && (
-                <DecisionStatusPicker
-                    status={item.decisionStatus}
-                    onChange={(decisionStatus) => onUpdateItem(item.id, {decisionStatus})}
-                />
-            )}
+          {isDecision && (
+            <DecisionStatusPicker
+              status={item.decisionStatus}
+              onChange={(decisionStatus) => onUpdateItem(item.id, { decisionStatus })}
+            />
+          )}
           <CategoryPicker
             doc={doc}
             categoryId={item.categoryId}
@@ -429,27 +431,27 @@ function RequirementCardImpl({
             <HighlightedTitle text={item.title} search={searchQuery} />
           </div>
         )}
-          <TagEditor
-              itemId={item.id}
-              tags={item.tags}
-              suggestions={tagSuggestions}
-              onChange={(tags) => onUpdateItem(item.id, {tags})}
-              searchQuery={searchQuery}
-          />
+        <TagEditor
+          itemId={item.id}
+          tags={item.tags}
+          suggestions={tagSuggestions}
+          onChange={(tags) => onUpdateItem(item.id, { tags })}
+          searchQuery={searchQuery}
+        />
       </div>
       {!collapsed && (
         <>
-            {isDecision ? (
-                <DecisionSections
-                    item={item}
-                    doc={doc}
-                    editingField={editingField}
-                    onEditField={setEditingField}
-                    onUpdateItem={onUpdateItem}
-                    onNavigateToItem={navigateFromHere}
-                    searchQuery={searchQuery}
-                />
-            ) : editingBody ? (
+          {isDecision ? (
+            <DecisionSections
+              item={item}
+              doc={doc}
+              editingField={editingField}
+              onEditField={setEditingField}
+              onUpdateItem={onUpdateItem}
+              onNavigateToItem={navigateFromHere}
+              searchQuery={searchQuery}
+            />
+          ) : editingBody ? (
             <RequirementEditor
               value={item.body}
               onChange={(body) => onUpdateItem(item.id, { body })}

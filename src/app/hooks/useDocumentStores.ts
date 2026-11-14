@@ -1,8 +1,8 @@
-import {useCallback, useMemo, useSyncExternalStore} from 'react';
+import { useCallback, useMemo, useSyncExternalStore } from 'react';
 import type * as Y from 'yjs';
-import {undoableStore, undoControllerFor} from '../../collab/stores/undoManager';
-import type {OpenDocument, OpenDocumentStores} from '../../collab/sync/localDocument';
-import type {Scenario} from '../../domain/canvas/types';
+import { undoableStore, undoControllerFor } from '../../collab/stores/undoManager';
+import type { OpenDocument, OpenDocumentStores } from '../../collab/sync/localDocument';
+import type { Scenario } from '../../domain/canvas/types';
 
 export interface UseDocumentStoresOptions {
   /** The joined session's document and stores, when in one. */

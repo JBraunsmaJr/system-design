@@ -11,12 +11,16 @@
  * every change. The browser perf harness catches that too, but only after a
  * full build; this catches it in milliseconds, next to the code.
  */
-import type {Edge, Node} from '@xyflow/react';
-import {type CanvasProjectionInput, projectBoundaryPorts, projectCanvasElements,} from './canvasProjection';
-import {buildPortIndex, portId} from '../domain/canvas/boundaryPorts';
-import {populatedLevelCounts} from '../collab/stores/diagramStore';
-import {type InFlightMap, NO_EDGE_GESTURES, NO_IN_FLIGHT} from '../domain/canvas/gestureGeometry';
-import type {ArchEdgeData, ArchNodeData} from '../domain/canvas/types';
+import type { Edge, Node } from '@xyflow/react';
+import {
+  type CanvasProjectionInput,
+  projectBoundaryPorts,
+  projectCanvasElements,
+} from './canvasProjection';
+import { buildPortIndex, portId } from '../domain/canvas/boundaryPorts';
+import { populatedLevelCounts } from '../collab/stores/diagramStore';
+import { type InFlightMap, NO_EDGE_GESTURES, NO_IN_FLIGHT } from '../domain/canvas/gestureGeometry';
+import type { ArchEdgeData, ArchNodeData } from '../domain/canvas/types';
 
 let failures = 0;
 function assert(cond: boolean, msg: string) {
@@ -213,15 +217,15 @@ const first = projectCanvasElements(input());
   const box = makeNode('box', 200);
   const sink = makeNode('sink', 400);
   const inner = makeNode('inner', 50, ['box']);
-    const inEdge = {...makeEdge('in-e', 'outside', 'box')};
+  const inEdge = { ...makeEdge('in-e', 'outside', 'box') };
   const outEdge = makeEdge('out-e', 'box', 'sink');
   const wire: Edge<ArchEdgeData> = {
     ...makeEdge('wire', portId('in-e', 'in'), 'inner'),
-      data: {...makeEdge('x', 'a', 'b').data!, parentPath: ['box']} as ArchEdgeData,
+    data: { ...makeEdge('x', 'a', 'b').data!, parentPath: ['box'] } as ArchEdgeData,
   };
   const orphan: Edge<ArchEdgeData> = {
     ...makeEdge('orphan', portId('gone', 'in'), 'inner'),
-      data: {...makeEdge('x', 'a', 'b').data!, parentPath: ['box']} as ArchEdgeData,
+    data: { ...makeEdge('x', 'a', 'b').data!, parentPath: ['box'] } as ArchEdgeData,
   };
   const snapshot = {
     nodes: [outside, box, sink, inner],
@@ -229,21 +233,21 @@ const first = projectCanvasElements(input());
   };
   const portIndex = buildPortIndex(snapshot.nodes, snapshot.edges);
 
-    const root = projectCanvasElements(input({diagramSnapshot: snapshot, portIndex}));
+  const root = projectCanvasElements(input({ diagramSnapshot: snapshot, portIndex }));
   assert(
-      byId(root.nodes, 'box').data.unwiredPortCount === 1,
-      'a node with a sub-diagram reports the one connection not wired inside',
+    byId(root.nodes, 'box').data.unwiredPortCount === 1,
+    'a node with a sub-diagram reports the one connection not wired inside',
   );
   assert(
-      byId(root.nodes, 'outside').data.unwiredPortCount === undefined,
-      'a node without a sub-diagram reports nothing',
+    byId(root.nodes, 'outside').data.unwiredPortCount === undefined,
+    'a node without a sub-diagram reports nothing',
   );
 
-    const insideInput = input({diagramSnapshot: snapshot, portIndex, path: ['box']});
+  const insideInput = input({ diagramSnapshot: snapshot, portIndex, path: ['box'] });
   const inside = projectCanvasElements(insideInput);
   assert(
-      inside.edges.some((e) => e.id === 'wire') && !inside.edges.some((e) => e.id === 'orphan'),
-      'a valid wire is drawn; an orphaned one is not',
+    inside.edges.some((e) => e.id === 'wire') && !inside.edges.some((e) => e.id === 'orphan'),
+    'a valid wire is drawn; an orphaned one is not',
   );
 
   const portArgs = {
@@ -257,27 +261,27 @@ const first = projectCanvasElements(input());
   const inPort = byId(ports, portId('in-e', 'in'));
   const outPort = byId(ports, portId('out-e', 'out'));
   assert(
-      inPort.position.x < inner.position.x && outPort.position.x > inner.position.x + 100,
-      'inbound ports sit left of everything inside, outbound ports right of it',
+    inPort.position.x < inner.position.x && outPort.position.x > inner.position.x + 100,
+    'inbound ports sit left of everything inside, outbound ports right of it',
   );
   assert(
-      inPort.draggable === false && inPort.selectable === false && inPort.deletable === false,
-      'ports cannot be dragged, selected or deleted',
+    inPort.draggable === false && inPort.selectable === false && inPort.deletable === false,
+    'ports cannot be dragged, selected or deleted',
   );
   assert(inPort.className === 'nopan', 'ports are nopan, so a double-click reaches them');
 
-    const again = projectBoundaryPorts({...portArgs, measuredDimensions: new Map()});
+  const again = projectBoundaryPorts({ ...portArgs, measuredDimensions: new Map() });
   assert(
-      byId(again, inPort.id) === inPort && byId(again, outPort.id) === outPort,
-      'unchanged ports are the same objects on the next projection',
+    byId(again, inPort.id) === inPort && byId(again, outPort.id) === outPort,
+    'unchanged ports are the same objects on the next projection',
   );
   const measured = projectBoundaryPorts({
     ...portArgs,
-      measuredDimensions: new Map([[inPort.id, {width: 200, height: 44}]]),
+    measuredDimensions: new Map([[inPort.id, { width: 200, height: 44 }]]),
   });
   assert(
-      byId(measured, inPort.id) !== inPort && byId(measured, inPort.id).measured?.height === 44,
-      "a port's measured size is re-attached",
+    byId(measured, inPort.id) !== inPort && byId(measured, inPort.id).measured?.height === 44,
+    "a port's measured size is re-attached",
   );
   assert(byId(measured, outPort.id) === outPort, 'and the other port is reused');
 }
@@ -291,9 +295,9 @@ const first = projectCanvasElements(input());
   const second = makeEdge('out-2', 'box', 'sink');
   const wire: Edge<ArchEdgeData> = {
     ...makeEdge('wire-2', 'inner', portId('out-2', 'out')),
-    data: {...makeEdge('x', 'a', 'b').data!, parentPath: ['box']} as ArchEdgeData,
+    data: { ...makeEdge('x', 'a', 'b').data!, parentPath: ['box'] } as ArchEdgeData,
   };
-  const snapshot = {nodes: [box, sink, inner], edges: [first, second, wire]};
+  const snapshot = { nodes: [box, sink, inner], edges: [first, second, wire] };
   const portIndex = buildPortIndex(snapshot.nodes, snapshot.edges);
   const ports = projectBoundaryPorts({
     portIndex,
@@ -302,16 +306,20 @@ const first = projectCanvasElements(input());
     measuredDimensions: new Map(),
   });
   assert(
-      ports.length === 1 && ports[0].id === portId('out-1', 'out'),
-      'the same node reached by two connections is drawn as one port',
+    ports.length === 1 && ports[0].id === portId('out-1', 'out'),
+    'the same node reached by two connections is drawn as one port',
   );
-  const inside = projectCanvasElements(input({diagramSnapshot: snapshot, portIndex, path: ['box']}));
+  const inside = projectCanvasElements(
+    input({ diagramSnapshot: snapshot, portIndex, path: ['box'] }),
+  );
   const drawn = byId(inside.edges, 'wire-2');
   assert(
-      drawn.target === portId('out-1', 'out'),
-      'a wire to the folded port is drawn to the port that is on the canvas',
+    drawn.target === portId('out-1', 'out'),
+    'a wire to the folded port is drawn to the port that is on the canvas',
   );
-  const again = projectCanvasElements(input({diagramSnapshot: snapshot, portIndex, path: ['box']}));
+  const again = projectCanvasElements(
+    input({ diagramSnapshot: snapshot, portIndex, path: ['box'] }),
+  );
   assert(byId(again.edges, 'wire-2') === drawn, 'the redirected wire is the same object next time');
 }
 

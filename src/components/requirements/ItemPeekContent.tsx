@@ -1,4 +1,4 @@
-import {ArrowRight} from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import {
   getItemType,
   getRelationshipLabelForItem,
@@ -7,9 +7,9 @@ import {
   getStatusMeta,
   isItemWorkable,
 } from '../../domain/requirements/requirementsRegistry';
-import type {RequirementsDocument} from '../../domain/requirements/requirementsTypes';
-import {ItemPeekBody} from './ItemPeekBody';
-import {getDecisionStatusMeta, isDecisionItem} from '../../domain/requirements/decisionRecords';
+import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
+import { ItemPeekBody } from './ItemPeekBody';
+import { getDecisionStatusMeta, isDecisionItem } from '../../domain/requirements/decisionRecords';
 
 /** The body of the hover preview - see useItemPeek. */
 export function ItemPeekContent({
@@ -26,14 +26,14 @@ export function ItemPeekContent({
   const type = getItemType(doc, item.typeId);
   const isDecision = isDecisionItem(item);
   const status = isDecision
-      ? getDecisionStatusMeta(item.decisionStatus)
-      : isItemWorkable(doc, item)
-          ? getStatusMeta(item.status)
-          : null;
+    ? getDecisionStatusMeta(item.decisionStatus)
+    : isItemWorkable(doc, item)
+      ? getStatusMeta(item.status)
+      : null;
   // A decision's peek leads with what was decided - the answer to "why is
   // it built this way" - and falls back to its context until that's written.
   const previewMarkdown =
-      isDecision && item.decisionOutcome?.trim() ? item.decisionOutcome : item.body;
+    isDecision && item.decisionOutcome?.trim() ? item.decisionOutcome : item.body;
 
   // "Parent of 3 · Blocks 1" - counts per direction-correct verb.
   const counts = new Map<string, { color: string; count: number }>();
@@ -60,7 +60,7 @@ export function ItemPeekContent({
         )}
       </div>
       <div className="item-peek__title">{item.title || 'Untitled'}</div>
-        <ItemPeekBody markdown={previewMarkdown} doc={doc}/>
+      <ItemPeekBody markdown={previewMarkdown} doc={doc} />
       {counts.size > 0 && (
         <div className="item-peek__relationships">
           {[...counts.entries()].map(([label, { color, count }]) => (

@@ -91,7 +91,7 @@ exports, and each command is a single undo step.
 Right-click a node, an edge, or a selection for:
 
 | Command                         | Shortcut         | What it does                                                                                                                      |
-|---------------------------------|------------------|-----------------------------------------------------------------------------------------------------------------------------------|
+| ------------------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | Change color / icon             |                  | Recolor (nodes and edges) or re-icon everything targeted.                                                                         |
 | Align & distribute              |                  | Align, distribute or match the size of the selected nodes (see above).                                                            |
 | Duplicate                       | Ctrl/⌘+D         | Copies the nodes (with their sub-diagrams and the edges between them) next to the originals, without touching the clipboard.      |
@@ -218,7 +218,7 @@ Click **Export** next to **Present** to take a scenario outside the editor. Each
 Mode shows it (the same framing, dimming and highlights), on a hidden canvas, so your own view never moves.
 
 | Format           | What you get                                                                            | Best for                                  |
-|------------------|-----------------------------------------------------------------------------------------|-------------------------------------------|
+| ---------------- | --------------------------------------------------------------------------------------- | ----------------------------------------- |
 | **PDF slides**   | A 16:9 deck: an optional title slide listing the steps, then one slide per step         | Review meetings, attaching to a ticket    |
 | **PNG images**   | One 1920×1080 image per step, numbered in order (`01-…png`), in a single `.zip`         | Pasting individual steps into other tools |
 | **Animated GIF** | A 960×540 loop that plays the steps in order                                            | READMEs, wikis, Jira and Confluence pages |

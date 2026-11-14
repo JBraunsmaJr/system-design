@@ -8,16 +8,21 @@ import {
   useRef,
   useState,
 } from 'react';
-import type {Edge, Node} from '@xyflow/react';
+import type { Edge, Node } from '@xyflow/react';
 import type * as Y from 'yjs';
-import {unflattenToSubDiagram} from '../../collab/stores/diagramStore';
-import type {UndoController} from '../../collab/stores/undoManager';
-import {type OpenDocument, replaceDocumentContents} from '../../collab/sync/localDocument';
-import type {ToastType} from '../../common/components/toast/Toast';
-import {downloadDiagram, downloadDiagramAs, parseDiagramFile, toDiagramFile,} from '../../domain/canvas/serialization';
-import {exportDiagramAsPng, exportDiagramAsSvg} from '../../domain/canvas/imageExport';
-import {downloadRequirementsMarkdown} from '../../domain/requirements/requirementsExport';
-import {newDocumentId} from '../../domain/storage/documentStore';
+import { unflattenToSubDiagram } from '../../collab/stores/diagramStore';
+import type { UndoController } from '../../collab/stores/undoManager';
+import { type OpenDocument, replaceDocumentContents } from '../../collab/sync/localDocument';
+import type { ToastType } from '../../common/components/toast/Toast';
+import {
+  downloadDiagram,
+  downloadDiagramAs,
+  parseDiagramFile,
+  toDiagramFile,
+} from '../../domain/canvas/serialization';
+import { exportDiagramAsPng, exportDiagramAsSvg } from '../../domain/canvas/imageExport';
+import { downloadRequirementsMarkdown } from '../../domain/requirements/requirementsExport';
+import { newDocumentId } from '../../domain/storage/documentStore';
 import {
   isCopyDue,
   loadTimedCopies,
@@ -26,16 +31,16 @@ import {
   type TimedCopiesSettings,
   timedCopyFileName,
 } from '../../domain/storage/timedCopies';
-import type {FileSaving} from '../../hooks/useFileSaving';
-import {isPerfInstrumentationActive} from '../../perf/instrumentation';
-import type {DiagramPath} from '../../domain/canvas/subDiagramTree';
-import type {ArchEdgeData, ArchNodeData, Scenario} from '../../domain/canvas/types';
-import type {RequirementsDocument} from '../../domain/requirements/requirementsTypes';
-import type {ProgramIncrement} from '../../domain/timeline/programIncrements';
-import type {TeamDocument} from '../../domain/timeline/teamTypes';
-import type {Milestone} from '../../domain/timeline/milestones';
-import type {SrdDocumentState} from '../../domain/srd/srdTypes';
-import {diagramFileToSnapshot, snapshotToDiagramFile} from '../documentSnapshot';
+import type { FileSaving } from '../../hooks/useFileSaving';
+import { isPerfInstrumentationActive } from '../../perf/instrumentation';
+import type { DiagramPath } from '../../domain/canvas/subDiagramTree';
+import type { ArchEdgeData, ArchNodeData, Scenario } from '../../domain/canvas/types';
+import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
+import type { ProgramIncrement } from '../../domain/timeline/programIncrements';
+import type { TeamDocument } from '../../domain/timeline/teamTypes';
+import type { Milestone } from '../../domain/timeline/milestones';
+import type { SrdDocumentState } from '../../domain/srd/srdTypes';
+import { diagramFileToSnapshot, snapshotToDiagramFile } from '../documentSnapshot';
 
 export interface UseFileActionsOptions {
   openDocumentInTab: (docId: string) => void;

@@ -10,15 +10,15 @@
  * CHROMIUM_PATH may point at a Chromium build other than Playwright's own.
  * SCENARIO_EXPORT_OUT=<dir> keeps the exported files there, to look at.
  */
-import {type Browser, chromium, type Page} from 'playwright';
-import {mkdtempSync, readFileSync, writeFileSync} from 'fs';
-import {createHash} from 'crypto';
-import {unzipSync} from 'fflate';
-import {BufferSource, Input, MP4} from 'mediabunny';
-import {getDocument} from 'pdfjs-dist/legacy/build/pdf.mjs';
-import {tmpdir} from 'os';
-import {join, resolve} from 'path';
-import {type DevServers, startDevServers} from './lib/devServers';
+import { type Browser, chromium, type Page } from 'playwright';
+import { mkdtempSync, readFileSync, writeFileSync } from 'fs';
+import { createHash } from 'crypto';
+import { unzipSync } from 'fflate';
+import { BufferSource, Input, MP4 } from 'mediabunny';
+import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { tmpdir } from 'os';
+import { join, resolve } from 'path';
+import { type DevServers, startDevServers } from './lib/devServers';
 
 // The 0.8 fixture's "Login flow": two root steps, then one inside n-auth's
 // sub-diagram - so a level change is exported too.
@@ -45,7 +45,7 @@ async function exportAs(p: Page, format: string, setup?: () => Promise<void>): P
   await p.click(`.scenario-export__format:has(input[value="${format}"])`);
   await setup?.();
   const [download] = await Promise.all([
-      p.waitForEvent('download', {timeout: 120000}),
+    p.waitForEvent('download', { timeout: 120000 }),
     p.click('.scenario-export button:has-text("Export")'),
   ]);
   await p.waitForSelector('.scenario-export__status-text:has-text("Saved")');
@@ -53,13 +53,13 @@ async function exportAs(p: Page, format: string, setup?: () => Promise<void>): P
   const name = download.suggestedFilename();
   if (process.env.SCENARIO_EXPORT_OUT)
     writeFileSync(join(process.env.SCENARIO_EXPORT_OUT, name), bytes);
-    return {bytes, name};
+  return { bytes, name };
 }
 
 /** Width and height from a PNG's IHDR chunk. */
 function pngSize(bytes: Uint8Array): { width: number; height: number } {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-    return {width: view.getUint32(16), height: view.getUint32(20)};
+  return { width: view.getUint32(16), height: view.getUint32(20) };
 }
 
 /** A GIF's logical screen size and how many image frames it has. */
@@ -91,7 +91,7 @@ function gifInfo(bytes: Buffer): { width: number; height: number; frames: number
       skipSubBlocks();
     } else break;
   }
-    return {width, height, frames, loops};
+  return { width, height, frames, loops };
 }
 
 /**
@@ -110,7 +110,7 @@ async function drawnFraction(p: Page, png: Uint8Array): Promise<number> {
     const g = c.getContext('2d')!;
     g.drawImage(img, 0, 0);
     // The diagram band: below the header, above the caption.
-      const {data: px} = g.getImageData(0, 120, img.width, 500);
+    const { data: px } = g.getImageData(0, 120, img.width, 500);
     const [r0, g0, b0] = [px[0], px[1], px[2]];
     let drawn = 0;
     for (let i = 0; i < px.length; i += 16) {
@@ -125,13 +125,13 @@ async function run() {
   let browser: Browser | undefined;
   try {
     // Ports no other suite uses, so suites never collide when run together.
-      servers = await startDevServers({vitePort: 5204, signalingPort: 14490, quiet: true});
+    servers = await startDevServers({ vitePort: 5204, signalingPort: 14490, quiet: true });
     const appOrigin = new URL(servers.appUrl).origin;
     browser = await chromium.launch({
       headless: true,
       executablePath: process.env.CHROMIUM_PATH || undefined,
     });
-      const context = await browser.newContext({acceptDownloads: true});
+    const context = await browser.newContext({ acceptDownloads: true });
     const p = await context.newPage();
     p.on('pageerror', (e) => {
       failures++;
@@ -154,8 +154,8 @@ async function run() {
     const encoderLibs = /fflate|gifenc|mediabunny|react-pdf/;
     const beforeExport = requests.length;
     check(
-        !requests.some((u) => encoderLibs.test(u)),
-        'no encoder library is loaded before an export is started',
+      !requests.some((u) => encoderLibs.test(u)),
+      'no encoder library is loaded before an export is started',
     );
 
     console.log('=== The export dialog ===');
@@ -167,8 +167,8 @@ async function run() {
     await p.click('.scenario-panel__btn-export');
     await p.waitForSelector('.scenario-export');
     check(
-        (await p.textContent('.scenario-export__summary'))?.includes(`${STEPS} steps`) ?? false,
-        'the dialog summarizes the scenario',
+      (await p.textContent('.scenario-export__summary'))?.includes(`${STEPS} steps`) ?? false,
+      'the dialog summarizes the scenario',
     );
 
     console.log('=== PNG per step ===');
@@ -177,16 +177,16 @@ async function run() {
     const files = unzipSync(new Uint8Array(zip.bytes));
     const names = Object.keys(files).sort();
     check(
-        names.join(',') ===
+      names.join(',') ===
         ['01-request-arrives.png', '02-validate.png', '03-check-credentials.png'].join(','),
-        `one numbered PNG per step (${names.join(', ')})`,
+      `one numbered PNG per step (${names.join(', ')})`,
     );
     check(
-        names.every((n) => {
-            const {width, height} = pngSize(files[n]);
-            return width === 1920 && height === 1080;
-        }),
-        'each PNG is 1920x1080',
+      names.every((n) => {
+        const { width, height } = pngSize(files[n]);
+        return width === 1920 && height === 1080;
+      }),
+      'each PNG is 1920x1080',
     );
     const digests = new Set(names.map((n) => createHash('sha1').update(files[n]).digest('hex')));
     check(digests.size === STEPS, 'every step renders differently');
@@ -198,24 +198,24 @@ async function run() {
     console.log('=== PDF slides ===');
     const pdf = await exportAs(p, 'pdf');
     check(pdf.name === 'login-flow.pdf', `named after the scenario (${pdf.name})`);
-      const doc = await getDocument({data: new Uint8Array(pdf.bytes)}).promise;
+    const doc = await getDocument({ data: new Uint8Array(pdf.bytes) }).promise;
     check(doc.numPages === STEPS + 1, `a title slide plus one slide per step (${doc.numPages})`);
     const page = await doc.getPage(2);
     const [, , w, h] = page.view;
     check(Math.round(w) === 960 && Math.round(h) === 540, `slides are 16:9 (${w}x${h} pt)`);
     const text = (await page.getTextContent()).items
-        .map((i) => ('str' in i ? i.str : ''))
-        .join(' ');
+      .map((i) => ('str' in i ? i.str : ''))
+      .join(' ');
     check(
-        text.includes('Request arrives') && text.includes('Client hits the gateway'),
-        'the step title and narration are real text on the slide',
+      text.includes('Request arrives') && text.includes('Client hits the gateway'),
+      'the step title and narration are real text on the slide',
     );
     const last = (await (await doc.getPage(STEPS + 1)).getTextContent()).items
-        .map((i) => ('str' in i ? i.str : ''))
-        .join(' ');
+      .map((i) => ('str' in i ? i.str : ''))
+      .join(' ');
     check(
-        last.includes('Auth Service'),
-        `the sub-diagram step names its level (${last.slice(0, 80)})`,
+      last.includes('Auth Service'),
+      `the sub-diagram step names its level (${last.slice(0, 80)})`,
     );
 
     console.log('=== Animated GIF ===');
@@ -227,8 +227,8 @@ async function run() {
     check(info.frames === STEPS + (STEPS - 1) * 4, `holds plus crossfades (${info.frames} frames)`);
     check(info.loops, 'loops forever');
     check(
-        gif.bytes.length < 5 * 1024 * 1024,
-        `a reasonable size (${(gif.bytes.length / 1024).toFixed(0)} KB)`,
+      gif.bytes.length < 5 * 1024 * 1024,
+      `a reasonable size (${(gif.bytes.length / 1024).toFixed(0)} KB)`,
     );
 
     console.log('=== MP4 video ===');
@@ -244,12 +244,12 @@ async function run() {
     check(track !== null, 'has a video track');
     if (track) {
       check(
-          track.displayWidth === 1920 && track.displayHeight === 1080,
-          `1920x1080 (${track.displayWidth}x${track.displayHeight})`,
+        track.displayWidth === 1920 && track.displayHeight === 1080,
+        `1920x1080 (${track.displayWidth}x${track.displayHeight})`,
       );
       check(
-          (await track.getCodec()) === 'avc',
-          `H.264, for PowerPoint and Keynote (${await track.getCodec()})`,
+        (await track.getCodec()) === 'avc',
+        `H.264, for PowerPoint and Keynote (${await track.getCodec()})`,
       );
     }
     const duration = await input.computeDuration();
@@ -258,18 +258,18 @@ async function run() {
     if (track) {
       const stats = await track.computePacketStats();
       check(
-          Math.abs(stats.packetCount - Math.round(duration * 30)) <= 1,
-          `a constant 30 fps, not one long frame per step (${stats.packetCount} frames)`,
+        Math.abs(stats.packetCount - Math.round(duration * 30)) <= 1,
+        `a constant 30 fps, not one long frame per step (${stats.packetCount} frames)`,
       );
     }
     check(
-        Math.abs(duration - STEPS * 3) < 0.2,
-        `three steps of 3 seconds (${duration.toFixed(2)}s)`,
+      Math.abs(duration - STEPS * 3) < 0.2,
+      `three steps of 3 seconds (${duration.toFixed(2)}s)`,
     );
     const note = await p.textContent('.scenario-export__status-text');
     check(
-        !/can't encode H\.264/.test(note ?? ''),
-        'no codec fallback note when H.264 is available',
+      !/can't encode H\.264/.test(note ?? ''),
+      'no codec fallback note when H.264 is available',
     );
 
     console.log('=== Air-gapped: nothing leaves the app ===');
@@ -284,10 +284,10 @@ async function run() {
     check(outside.length === 0, `no request to any other host (${outside.slice(0, 3).join(', ')})`);
     const exportRequests = requests.slice(beforeExport);
     check(
-        ['fflate', 'gifenc', 'mediabunny', 'react-pdf'].every((lib) =>
-            exportRequests.some((u) => u.includes(lib)),
-        ),
-        'each encoder loads from the app itself, once its format is used',
+      ['fflate', 'gifenc', 'mediabunny', 'react-pdf'].every((lib) =>
+        exportRequests.some((u) => u.includes(lib)),
+      ),
+      'each encoder loads from the app itself, once its format is used',
     );
 
     console.log("=== The user's canvas never moves ===");
@@ -295,8 +295,8 @@ async function run() {
     const viewportAfter = await p.$eval('.react-flow__viewport', (el) => el.getAttribute('style'));
     check(viewportAfter === viewportBefore, 'the canvas viewport is unchanged after exporting');
     check(
-        (await p.$$eval('.scenario-capture-surface .react-flow', (els) => els.length)) === 0,
-        'the offscreen surface releases its canvas when done',
+      (await p.$$eval('.scenario-capture-surface .react-flow', (els) => els.length)) === 0,
+      'the offscreen surface releases its canvas when done',
     );
   } catch (err) {
     failures++;

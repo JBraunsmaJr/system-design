@@ -1,12 +1,21 @@
-import {type Dispatch, type SetStateAction, useCallback, useEffect, useMemo, useState,} from 'react';
-import type {Edge, Node} from '@xyflow/react';
-import {type DiagramStore, unflattenToSubDiagram} from '../../collab/stores/diagramStore';
-import type {PresenceInfo} from '../../collab/sync/session';
-import {EMPTY_DIAGRAM} from '../documentSnapshot';
-import type {DiagramPath} from '../../domain/canvas/subDiagramTree';
-import type {ArchEdgeData, ArchNodeData} from '../../domain/canvas/types';
+import {
+  type Dispatch,
+  type SetStateAction,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import type { Edge, Node } from '@xyflow/react';
+import { type DiagramStore, unflattenToSubDiagram } from '../../collab/stores/diagramStore';
+import type { PresenceInfo } from '../../collab/sync/session';
+import { EMPTY_DIAGRAM } from '../documentSnapshot';
+import type { DiagramPath } from '../../domain/canvas/subDiagramTree';
+import type { ArchEdgeData, ArchNodeData } from '../../domain/canvas/types';
+import { type PlanChartMode, type PlanSection, planTargetFor } from '../planNavigation';
 
-export type ViewMode = 'diagram' | 'requirements' | 'timeline' | 'team' | 'skill-tree' | 'srd';
+export type ViewMode = 'diagram' | 'requirements' | 'timeline' | 'team' | 'dependencies' | 'srd';
 
 export interface UseViewNavigationOptions {
   activeSession: object | null;
@@ -20,8 +29,9 @@ export interface UseViewNavigationOptions {
 }
 
 /**
- * Which page is showing (diagram, requirements, timeline, team, skill
- * tree), and jumping between a requirement and the nodes linked to it.
+ * Which page is showing (diagram, requirements, the Plan tab's timeline,
+ * team and dependencies, srd), and jumping between a requirement and the
+ * nodes linked to it.
  * Moved unchanged from App.tsx; the only edits are the state setters
  * received as parameters, now listed in the dependency arrays that use them
  * (React setters, so this changes no identity).
@@ -48,14 +58,14 @@ export function useViewNavigation({
   const [viewMode, setViewModeRaw] = useState<ViewMode>('diagram');
   /**
    * The recursive tree, for the views still written against it
-   * (requirements, timeline, skill tree - all to find linked nodes).
+   * (requirements, timeline, dependencies - all to find linked nodes).
    *
    * Built only while one of them is showing. None of them is mounted in the
    * diagram view, which is where editing and remote bursts happen, so the
    * common path never pays for an unflatten (WS1-R3).
    */
   const viewNeedsTree =
-    viewMode === 'requirements' || viewMode === 'timeline' || viewMode === 'skill-tree';
+    viewMode === 'requirements' || viewMode === 'timeline' || viewMode === 'dependencies';
   const diagramTree = useMemo(
     () =>
       viewNeedsTree
@@ -66,7 +76,7 @@ export function useViewNavigation({
 
   // Which requirements/timeline item this peer currently has open -
   // null when browsing a list without anything specific focused, or on
-  // a view that doesn't track this at all (diagram/team/skill-tree).
+  // a view that doesn't track this at all (diagram/team/dependencies).
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
 
   // Resets focusedItemId at the actual point viewMode changes (a real
@@ -80,6 +90,24 @@ export function useViewNavigation({
     setViewModeRaw(mode);
     setFocusedItemId(null);
   }, []);
+
+  // The Plan tab groups timeline, team and dependencies (see
+  // planNavigation.ts). Board/Gantt used to be TimelineView's own state;
+  // it lives here so the sub-navigation can switch to Gantt from Team or
+  // Dependencies, where TimelineView is not mounted to be told.
+  const [planChartMode, setPlanChartMode] = useState<PlanChartMode>('board');
+  // Where the Plan tab reopens. A ref, not state: nothing renders from it.
+  const lastPlanViewRef = useRef<ViewMode>('timeline');
+  const openPlanSection = useCallback(
+    (section: PlanSection) => {
+      const target = planTargetFor(section);
+      if (target.chartMode) setPlanChartMode(target.chartMode);
+      lastPlanViewRef.current = target.viewMode;
+      setViewMode(target.viewMode);
+    },
+    [setViewMode],
+  );
+  const openPlan = useCallback(() => setViewMode(lastPlanViewRef.current), [setViewMode]);
 
   // Rebroadcasts viewMode/focusedItemId whenever either changes - two
   // separate effects (rather than one watching both) since they change
@@ -162,6 +190,9 @@ export function useViewNavigation({
   return {
     viewMode,
     setViewMode,
+    planChartMode,
+    openPlan,
+    openPlanSection,
     diagramTree,
     setFocusedItemId,
     pendingRequirementFocus,

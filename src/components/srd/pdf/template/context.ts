@@ -1,5 +1,10 @@
-import {createContext, useContext} from 'react';
-import type {SrdPdfSlots, SrdPdfSlotsByPlacement, SrdPdfTemplateFeatures, SrdPlacement,} from './types';
+import { createContext, useContext } from 'react';
+import type {
+  SrdPdfSlots,
+  SrdPdfSlotsByPlacement,
+  SrdPdfTemplateFeatures,
+  SrdPlacement,
+} from './types';
 
 export interface SrdPdfTemplateContextValue {
   slotsFor: SrdPdfSlotsByPlacement;

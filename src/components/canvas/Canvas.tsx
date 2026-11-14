@@ -26,13 +26,18 @@ import {
   useUpdateNodeInternals,
   ViewportPortal,
 } from '@xyflow/react';
-import {MousePointer2} from 'lucide-react';
-import {CANVAS_EDGE_TYPES, CANVAS_NODE_TYPES, DEFAULT_EDGE_OPTIONS, PRO_OPTIONS,} from './canvasElementTypes';
-import {PresentationOverlay} from './PresentationOverlay';
-import {Breadcrumb} from './Breadcrumb';
-import {DocumentationPopup} from '../documentation/DocumentationPopup';
-import {useDiagramHoverDocumentation} from '../documentation/useDiagramHoverDocumentation';
-import type {ZOrderCommand} from '../../domain/canvas/zOrder';
+import { MousePointer2 } from 'lucide-react';
+import {
+  CANVAS_EDGE_TYPES,
+  CANVAS_NODE_TYPES,
+  DEFAULT_EDGE_OPTIONS,
+  PRO_OPTIONS,
+} from './canvasElementTypes';
+import { PresentationOverlay } from './PresentationOverlay';
+import { Breadcrumb } from './Breadcrumb';
+import { DocumentationPopup } from '../documentation/DocumentationPopup';
+import { useDiagramHoverDocumentation } from '../documentation/useDiagramHoverDocumentation';
+import type { ZOrderCommand } from '../../domain/canvas/zOrder';
 import type {
   ArchEdgeData,
   ArchEdgeDataPatch,
@@ -41,19 +46,19 @@ import type {
   Scenario,
   ScenarioStep,
 } from '../../domain/canvas/types';
-import type {EdgeEndpoints} from '../../domain/canvas/edgeReconnect';
-import {EdgeConnectionLine} from './edges/EdgeConnectionLine';
-import type {PresenceInfo} from '../../collab/sync/session';
-import {CanvasContext, type CanvasContextValue} from './CanvasContext';
-import {recordCanvasRender, registerPerfViewportFramer} from '../../perf/instrumentation';
-import {nodeToAlignBox} from './nodeAlignBox';
-import {CanvasContextMenu} from './CanvasContextMenu';
-import {useCanvasFocusSets} from './useCanvasFocusSets';
-import {useEdgeConnectionGestures} from './useEdgeConnectionGestures';
-import {useCanvasCreation} from './useCanvasCreation';
-import {useNodeDragInteractions} from './useNodeDragInteractions';
-import {type CanvasContextActions, useCanvasContextMenu} from './useCanvasContextMenu';
-import {useCanvasFocusDisplay} from './useCanvasFocusDisplay';
+import type { EdgeEndpoints } from '../../domain/canvas/edgeReconnect';
+import { EdgeConnectionLine } from './edges/EdgeConnectionLine';
+import type { PresenceInfo } from '../../collab/sync/session';
+import { CanvasContext, type CanvasContextValue } from './CanvasContext';
+import { recordCanvasRender, registerPerfViewportFramer } from '../../perf/instrumentation';
+import { nodeToAlignBox } from './nodeAlignBox';
+import { CanvasContextMenu } from './CanvasContextMenu';
+import { useCanvasFocusSets } from './useCanvasFocusSets';
+import { useEdgeConnectionGestures } from './useEdgeConnectionGestures';
+import { useCanvasCreation } from './useCanvasCreation';
+import { useNodeDragInteractions } from './useNodeDragInteractions';
+import { type CanvasContextActions, useCanvasContextMenu } from './useCanvasContextMenu';
+import { useCanvasFocusDisplay } from './useCanvasFocusDisplay';
 
 export interface PresentationState {
   scenario: Scenario;
@@ -154,9 +159,9 @@ export interface CanvasProps {
    * coordinates (not screen pixels) because every peer's own viewport
    * (pan/zoom) is independent. */
   onCursorMove: (position: { x: number; y: number } | null) => void;
-    /** Duplicate, group, lock, style and requirement commands for the
-     * right-click menu - see CanvasContextActions. */
-    contextActions?: CanvasContextActions;
+  /** Duplicate, group, lock, style and requirement commands for the
+   * right-click menu - see CanvasContextActions. */
+  contextActions?: CanvasContextActions;
 }
 
 export function Canvas({
@@ -197,8 +202,8 @@ export function Canvas({
   onToggleSelectMode,
   peers,
   onCursorMove,
-                           portNodes = NO_PORT_NODES,
-                           contextActions,
+  portNodes = NO_PORT_NODES,
+  contextActions,
 }: CanvasProps) {
   recordCanvasRender();
   const { screenToFlowPosition, getIntersectingNodes, fitView } =
@@ -303,12 +308,12 @@ export function Canvas({
   }, [nodes, portNodes]);
 
   const { handleConnectEnd, handleReconnectStart, handleReconnect, handleReconnectEnd } =
-      useEdgeConnectionGestures({
-          screenToFlowPosition,
-          onConnect,
-          onReconnectEdge,
-          nodesRef: connectableNodesRef,
-      });
+    useEdgeConnectionGestures({
+      screenToFlowPosition,
+      onConnect,
+      onReconnectEdge,
+      nodesRef: connectableNodesRef,
+    });
 
   const { onDragOver, onDrop, onCanvasDoubleClick } = useCanvasCreation({
     screenToFlowPosition,
@@ -349,7 +354,7 @@ export function Canvas({
         return;
       onDrillInto(node.id);
     },
-      [isPresenting, onDrillInto, breadcrumbDepth, onNavigateToRoot, onNavigateToPathIndex],
+    [isPresenting, onDrillInto, breadcrumbDepth, onNavigateToRoot, onNavigateToPathIndex],
   );
 
   const {
@@ -365,15 +370,15 @@ export function Canvas({
     targetDefaultIcon,
     onNodeContextMenu,
     onSelectionContextMenu,
-      onEdgeContextMenu,
+    onEdgeContextMenu,
   } = useCanvasContextMenu({
-      isPresenting,
-      nodes,
-      edges,
-      nodesRef,
-      onUpdateNode,
-      onUpdateEdge,
-      contextActions,
+    isPresenting,
+    nodes,
+    edges,
+    nodesRef,
+    onUpdateNode,
+    onUpdateEdge,
+    contextActions,
   });
 
   const { displayNodes, displayEdges } = useCanvasFocusDisplay({
@@ -391,20 +396,20 @@ export function Canvas({
   // What React Flow draws: the document's nodes, then this level's ports.
   // Only rebuilt when either changes, which is when it would change anyway.
   const flowNodes = useMemo(
-      () => (portNodes.length > 0 ? [...displayNodes, ...portNodes] : displayNodes),
-      [displayNodes, portNodes],
+    () => (portNodes.length > 0 ? [...displayNodes, ...portNodes] : displayNodes),
+    [displayNodes, portNodes],
   );
 
   // Ports have nothing to recolor or reorder - keep the node menu off them.
   const handleNodeContextMenu = useCallback(
-      (event: ReactMouseEvent, node: Node<ArchNodeData>) => {
-          if (node.type === 'port') {
-              event.preventDefault();
-              return;
-          }
-          onNodeContextMenu(event, node);
-      },
-      [onNodeContextMenu],
+    (event: ReactMouseEvent, node: Node<ArchNodeData>) => {
+      if (node.type === 'port') {
+        event.preventDefault();
+        return;
+      }
+      onNodeContextMenu(event, node);
+    },
+    [onNodeContextMenu],
   );
 
   const levelLabel = breadcrumbLabels.length === 0 ? 'Root' : breadcrumbLabels.join(' › ');
@@ -463,7 +468,7 @@ export function Canvas({
         onDoubleClick={onCanvasDoubleClick}
       >
         <ReactFlow
-            nodes={flowNodes}
+          nodes={flowNodes}
           edges={displayEdges}
           nodeTypes={CANVAS_NODE_TYPES}
           edgeTypes={CANVAS_EDGE_TYPES}
@@ -479,9 +484,9 @@ export function Canvas({
           // mode, which has nothing to complete against now that no handle
           // is a drop target - connections are drag-only.
           connectOnClick={false}
-            onNodeContextMenu={handleNodeContextMenu}
+          onNodeContextMenu={handleNodeContextMenu}
           onSelectionContextMenu={onSelectionContextMenu}
-            onEdgeContextMenu={onEdgeContextMenu}
+          onEdgeContextMenu={onEdgeContextMenu}
           onNodeMouseEnter={docHover.handleNodeMouseEnter}
           onNodeMouseMove={docHover.handleNodeMouseMove}
           onNodeMouseLeave={docHover.handleNodeMouseLeave}

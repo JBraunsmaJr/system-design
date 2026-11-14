@@ -15,10 +15,10 @@
  *    clear history (WS3-R4);
  *  - New clears the canvas.
  */
-import {type Browser, chromium, type Page} from 'playwright';
-import {readFileSync} from 'fs';
-import {join, resolve} from 'path';
-import {type DevServers, startDevServers} from './lib/devServers';
+import { type Browser, chromium, type Page } from 'playwright';
+import { readFileSync } from 'fs';
+import { join, resolve } from 'path';
+import { type DevServers, startDevServers } from './lib/devServers';
 
 const FIXTURE = resolve(join('fixtures', 'schema-0.7.json'));
 const fixture = JSON.parse(readFileSync(FIXTURE, 'utf8')) as {
@@ -105,8 +105,8 @@ async function run() {
     // short when the whole suite loads the machine.
     await a
       .waitForFunction(
-          ([n, sel]) => document.querySelectorAll(sel).length === n,
-          [NESTED.data.subDiagram!.nodes.length, DOC_NODE] as const,
+        ([n, sel]) => document.querySelectorAll(sel).length === n,
+        [NESTED.data.subDiagram!.nodes.length, DOC_NODE] as const,
         { timeout: 5000 },
       )
       .catch(() => {});
@@ -117,8 +117,8 @@ async function run() {
     await a.evaluate(`window.__PERF__.setPath([])`);
     await a
       .waitForFunction(
-          ([n, sel]) => document.querySelectorAll(sel).length === n,
-          [fixture.nodes.length, DOC_NODE] as const,
+        ([n, sel]) => document.querySelectorAll(sel).length === n,
+        [fixture.nodes.length, DOC_NODE] as const,
         { timeout: 5000 },
       )
       .catch(() => {});

@@ -1,5 +1,5 @@
-import {useEffect, useRef} from 'react';
-import {fitHeightToContent} from '../../common/utils/autoSizeTextarea';
+import { useEffect, useRef } from 'react';
+import { fitHeightToContent } from '../../common/utils/autoSizeTextarea';
 
 interface AutoResizeTextareaProps {
   value: string;

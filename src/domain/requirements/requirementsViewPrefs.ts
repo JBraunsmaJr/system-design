@@ -4,7 +4,7 @@
 // layout must not change anyone else's view. Same namespacing and "a
 // convenience, never a blocker" error handling as presenceIdentity.ts.
 
-import {normalizeFilter, type RequirementsFilter} from './requirementsFilter';
+import { normalizeFilter, type RequirementsFilter } from './requirementsFilter';
 
 export type RequirementsGroupBy = 'type' | 'category' | 'epic';
 export type RequirementsLayout = 'list' | 'split';
@@ -25,10 +25,10 @@ export interface RequirementsViewPrefs {
   /** The relationship verb ("<typeId>::forward|backward") last used from a
    * card of each item type, so the Add relationship picker opens on it. */
   lastVerbByTypeId?: Record<string, string>;
-    /** The status/assignee/sprint/tag filter - see requirementsFilter.ts.
-     * Per person like everything else here: narrowing your own view must
-     * not narrow a collaborator's. */
-    filter?: RequirementsFilter;
+  /** The status/assignee/sprint/tag filter - see requirementsFilter.ts.
+   * Per person like everything else here: narrowing your own view must
+   * not narrow a collaborator's. */
+  filter?: RequirementsFilter;
 }
 
 const KEY_PREFIX = 'system-design-editor:requirements-view:';
@@ -72,7 +72,7 @@ export function loadRequirementsViewPrefs(documentId?: string): RequirementsView
         ),
       );
     }
-      if ('filter' in parsed) prefs.filter = normalizeFilter(parsed.filter);
+    if ('filter' in parsed) prefs.filter = normalizeFilter(parsed.filter);
     return prefs;
   } catch {
     return {};
