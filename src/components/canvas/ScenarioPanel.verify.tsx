@@ -144,7 +144,7 @@ const sampleScenarios: Scenario[] = [
     currentActiveStep: string | null,
     scenario: Scenario,
   ) => {
-    let nextStepId: string | null = null;
+    let nextStepId: string | null;
     if (currentActiveStep === stepId) {
       nextStepId = null;
     } else {

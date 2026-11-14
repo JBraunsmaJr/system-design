@@ -21,14 +21,18 @@ export interface StoreAuthInfo {
   providers: string[];
 }
 
+const SIGNED_OUT: StoreAuthInfo = { identity: null, providers: [] };
+
 export function useStoreAuth(storeUrl: string | null): StoreAuthInfo {
-  const [auth, setAuth] = useState<StoreAuthInfo>({ identity: null, providers: [] });
+  // What was learned, and from which store. Keeping the two together means
+  // an answer is only ever shown for the store it came from: with no store,
+  // or after pointing at a different one, this reads as signed out until
+  // the new store answers - without an effect having to reset anything.
+  const [answer, setAnswer] = useState<{ storeUrl: string; auth: StoreAuthInfo } | null>(null);
 
   useEffect(() => {
-    if (!storeUrl) {
-      setAuth({ identity: null, providers: [] });
-      return;
-    }
+    if (!storeUrl) return;
+    const setAuth = (auth: StoreAuthInfo) => setAnswer({ storeUrl, auth });
     let cancelled = false;
     const client = createStoreClient({ baseUrl: storeUrl });
     const ask = async () => {
@@ -64,7 +68,7 @@ export function useStoreAuth(storeUrl: string | null): StoreAuthInfo {
     };
   }, [storeUrl]);
 
-  return auth;
+  return answer && answer.storeUrl === storeUrl ? answer.auth : SIGNED_OUT;
 }
 
 export function useStoreIdentity(storeUrl: string | null): StoreIdentity | null {

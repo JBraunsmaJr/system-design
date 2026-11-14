@@ -63,6 +63,9 @@ export function useDiagramHoverDocumentation({
   // Close documentation and clear timers when disabled (e.g. presentation starts)
   useEffect(() => {
     if (disabled) {
+      // Closing also cancels the hover and leave timers, so this is cleanup
+      // of something outside React, not state derived from a prop.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       closeDocumentation();
     }
   }, [disabled, closeDocumentation]);
@@ -107,6 +110,9 @@ export function useDiagramHoverDocumentation({
   // If active target no longer has documentation, hide popup
   useEffect(() => {
     if (isOpen && activeTarget && !currentDoc) {
+      // The target's documentation was removed while its popup was open (an
+      // edit, possibly a collaborator's): close the popup that describes it.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsOpen(false);
       setActiveTarget(null);
     }

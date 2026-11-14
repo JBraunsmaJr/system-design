@@ -1,4 +1,5 @@
-import { useEffect, useState, useRef } from 'react';
+import { useState } from 'react';
+import { useDragOverState } from './useDragOverState';
 import { ChevronLeft, ChevronRight, Inbox } from 'lucide-react';
 import { getItemType, isItemWorkable } from '../../domain/requirements/requirementsRegistry';
 import type {
@@ -62,30 +63,18 @@ export function BacklogPanel({
   isCollapsed,
   onToggleCollapsed,
 }: BacklogPanelProps) {
-  const [isDragOver, setIsDragOver] = useState(false);
+  const dragOver = useDragOverState(draggedItemId);
+  const isDragOver = dragOver.isDragOver;
   const [query, setQuery] = useState('');
-  const dragCounter = useRef(0);
-
-  useEffect(() => {
-    if (!draggedItemId) {
-      dragCounter.current = 0;
-      setIsDragOver(false);
-    }
-  }, [draggedItemId]);
 
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
-    dragCounter.current += 1;
-    setIsDragOver(true);
+    dragOver.enter();
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
-    dragCounter.current -= 1;
-    if (dragCounter.current <= 0) {
-      dragCounter.current = 0;
-      setIsDragOver(false);
-    }
+    dragOver.leave();
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -95,8 +84,7 @@ export function BacklogPanel({
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    dragCounter.current = 0;
-    setIsDragOver(false);
+    dragOver.reset();
     onDragEndItem();
     const itemId = e.dataTransfer.getData('text/plain') || draggedItemId;
     if (itemId) {

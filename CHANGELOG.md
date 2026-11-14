@@ -13,6 +13,10 @@ markers are removed when the section becomes a release. See
 
 ## [Unreleased]
 
+### Development
+
+- CI now checks formatting, lint and types on every push. The 17 existing lint errors are fixed.
+
 ### [MINOR] Plan tab
 
 - Timeline, Team and Skill Tree are now one **Plan** tab with four sections: **Board**, **Gantt**, **Dependencies** and

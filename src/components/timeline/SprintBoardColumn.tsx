@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import { useDragOverState } from './useDragOverState';
 import { AlertTriangle, Target } from 'lucide-react';
 import {
   type CapacityReservation,
@@ -78,17 +79,10 @@ export function SprintBoardColumn({
   onDropItem,
   onUpdateItem,
 }: SprintBoardColumnProps) {
-  const [isDragOver, setIsDragOver] = useState(false);
-  const dragCounter = useRef(0);
+  const dragOver = useDragOverState(draggedItemId);
+  const isDragOver = dragOver.isDragOver;
   const [dropError, setDropError] = useState<string | null>(null);
   const dropErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (!draggedItemId) {
-      dragCounter.current = 0;
-      setIsDragOver(false);
-    }
-  }, [draggedItemId]);
 
   const sprintSummary = useMemo(() => {
     return computeSprintMilestoneSummary(sprint, range, milestones, requirements);
@@ -139,17 +133,12 @@ export function SprintBoardColumn({
 
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
-    dragCounter.current += 1;
-    setIsDragOver(true);
+    dragOver.enter();
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
-    dragCounter.current -= 1;
-    if (dragCounter.current <= 0) {
-      dragCounter.current = 0;
-      setIsDragOver(false);
-    }
+    dragOver.leave();
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -163,8 +152,7 @@ export function SprintBoardColumn({
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    dragCounter.current = 0;
-    setIsDragOver(false);
+    dragOver.reset();
     onDragEndItem();
     const itemId = e.dataTransfer.getData('text/plain') || draggedItemId;
     if (itemId) {

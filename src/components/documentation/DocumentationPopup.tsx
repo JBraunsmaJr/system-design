@@ -56,6 +56,9 @@ export function DocumentationPopup({
   // Compute position dynamically when anchor, documentation, or size changes (FR-009)
   useLayoutEffect(() => {
     if (!shouldShow || !anchor) {
+      // Positioning depends on measuring the rendered popup, which can only
+      // happen in a layout effect; clearing it belongs with setting it.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPos(null);
       return;
     }

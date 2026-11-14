@@ -113,6 +113,14 @@ npm run build      # editor + docs site, output in dist/
 npm run preview    # serve the production build locally
 ```
 
+Before pushing, run the checks CI runs on every push:
+
+```bash
+npm run format:check   # Prettier; fix with `npm run format`
+npm run lint           # ESLint; warnings are allowed, errors are not
+npm run typecheck      # TypeScript, no emit
+```
+
 Pushing to `main` builds and deploys to GitHub Pages. For a first-time setup on a fork, set **Settings → Pages → Source** to **GitHub Actions**. The Vite `base` in `vite.config.ts` is `/system-design/` to match the repo name; update it if you rename the repo.
 
 ### Stack

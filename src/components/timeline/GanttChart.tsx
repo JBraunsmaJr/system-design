@@ -192,7 +192,7 @@ function useGanttLayout(
       .map(({ epic, schedule }) => {
         const startDays = parseISODate(schedule.startDate!);
         const left = (startDays - originDays) * DAY_WIDTH;
-        let width = 0;
+        let width: number;
         if (schedule.endDate) {
           const endDays = parseISODate(schedule.endDate);
           width = Math.max(DAY_WIDTH, (endDays - startDays + 1) * DAY_WIDTH);
