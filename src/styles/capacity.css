@@ -10,8 +10,15 @@
 
 .sprint-capacity-bar__header {
   display: flex;
-  align-items: center;
-  padding: 6px 8px;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+  padding: 7px 8px 6px;
+  border: none;
+  border-radius: 0;
+  text-align: left;
+  font: inherit;
+  color: var(--chrome-text);
   cursor: pointer;
   background: color-mix(in srgb, var(--white) 2%, transparent);
   transition: background 0.15s;
@@ -21,42 +28,13 @@
   background: color-mix(in srgb, var(--white) 5%, transparent);
 }
 
-.sprint-capacity-bar__stats {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.sprint-capacity-bar__title-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: var(--text-xs);
-}
-
-.sprint-capacity-bar__label {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-weight: 600;
-  color: var(--chrome-text-dim);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  font-size: var(--text-2xs-plus);
-}
-
-.sprint-capacity-bar__points {
-  font-size: var(--text-xs-plus);
-  color: var(--chrome-text);
-}
-
-.sprint-capacity-bar__points strong {
-  color: var(--chrome-text);
+.sprint-capacity-bar__header:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .sprint-capacity-bar__track {
+  display: block;
   height: 5px;
   background: color-mix(in srgb, var(--white) 8%, transparent);
   border-radius: var(--radius-pill);
@@ -64,6 +42,7 @@
 }
 
 .sprint-capacity-bar__fill {
+  display: block;
   height: 100%;
   border-radius: var(--radius-pill);
   transition: width 0.25s ease;
@@ -85,25 +64,38 @@
   background: linear-gradient(90deg, var(--danger), var(--danger));
 }
 
-.sprint-capacity-bar__meta-row {
+/* "8 of 33 pts" on the left, "12 reserved · 10 days" on the right. */
+.sprint-capacity-bar__summary {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  font-size: var(--text-2xs-plus);
+  gap: 2px 6px;
+  font-size: var(--text-xs);
 }
 
-.sprint-capacity-bar__available-text {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  color: var(--success);
-  font-weight: 500;
+/* Never broken mid-phrase: in a narrow column the context drops to a
+   second line instead. */
+.sprint-capacity-bar__points {
+  flex: 1 0 auto;
+  white-space: nowrap;
+  color: var(--chrome-text);
+}
+
+.sprint-capacity-bar__points strong {
+  font-weight: 700;
+}
+
+.sprint-capacity-bar__context {
+  flex-shrink: 0;
+  color: var(--chrome-text-dim);
+  white-space: nowrap;
+}
+
+.sprint-capacity-bar__reserved {
+  color: var(--warning);
 }
 
 .sprint-capacity-bar__danger-text {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
   color: var(--danger);
   font-weight: 600;
 }
@@ -112,24 +104,9 @@
   color: var(--chrome-text-dim);
 }
 
-.sprint-capacity-bar__days-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
+.sprint-capacity-bar__chevron {
+  flex-shrink: 0;
   color: var(--chrome-text-dim);
-}
-
-.sprint-capacity-bar__b-days {
-  padding-top: 3px;
-}
-
-.sprint-capacity-bar__toggle-btn {
-  background: transparent;
-  border: none;
-  color: var(--chrome-text-dim);
-  padding: 4px;
-  cursor: pointer;
-  margin-left: 4px;
 }
 
 .sprint-capacity-bar__breakdown {
@@ -305,20 +282,6 @@
   background: color-mix(in srgb, var(--warning) 10%, transparent);
   border-color: color-mix(in srgb, var(--warning) 35%, transparent);
   color: var(--warning);
-}
-
-.sprint-capacity-bar__reserved-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  background: color-mix(in srgb, var(--warning) 12%, transparent);
-  color: var(--warning);
-  border: 1px solid color-mix(in srgb, var(--warning) 25%, transparent);
-  border-radius: var(--radius-pill);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  padding: 1px 6px;
-  margin-left: 5px;
 }
 
 .sprint-capacity-bar__reservations-summary {

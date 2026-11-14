@@ -33,6 +33,10 @@ markers are removed when the section becomes a release. See
   higher on the page.
 - The sprint selection and whether the backlog is folded are remembered per document in your browser and are not
   shared with collaborators.
+- Capacity reads as one line and one bar. Each sprint shows "8 of 45 pts", then what is reserved and how many working
+  days it has; each program increment shows what is planned, reserved and left. Click a sprint's capacity for the
+  breakdown by person, as before. It is now a real button, so it works from the keyboard.
+- Markers are a strip of chips above the board instead of a block of cards. Click a chip to open the marker.
 
 ## [0.98.2] - 2026-10-13
 

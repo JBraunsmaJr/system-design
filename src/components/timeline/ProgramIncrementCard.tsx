@@ -174,66 +174,45 @@ export function ProgramIncrementCard({
         </label>
 
         {team && piCapacityTotals && (
+          // One line and one bar for the whole PI: what is planned against
+          // what the team can take on once reservations are set aside.
           <div
-            className="pi-card__capacity-totals"
-            title={`PI Capacity: ${piCapacityTotals.totalAssignedPoints} used / ${piCapacityTotals.totalCapacityPoints} total available (${piCapacityTotals.totalReservedPoints} reserved, ${piCapacityTotals.grossCapacityPoints} gross)`}
+            className="pi-card__capacity"
+            title={`${piCapacityTotals.totalAssignedPoints} pts planned of ${piCapacityTotals.totalCapacityPoints} available (${piCapacityTotals.grossCapacityPoints} gross, ${piCapacityTotals.totalReservedPoints} reserved)`}
           >
-            <div
-              className="pi-card__cap-pill pi-card__cap-pill--used"
-              title={`Used Capacity: ${piCapacityTotals.totalAssignedPoints} points`}
-            >
-              <span className="pi-card__cap-label">Used:</span>
-              <strong className="pi-card__cap-val">{piCapacityTotals.totalAssignedPoints}</strong>
-              <span className="pi-card__cap-unit">pts</span>
-            </div>
-
-            <div
-              className="pi-card__cap-pill pi-card__cap-pill--total"
-              title={`Total Available Capacity: ${piCapacityTotals.totalCapacityPoints} points (Gross: ${piCapacityTotals.grossCapacityPoints} pts)`}
-            >
-              <span className="pi-card__cap-label">Total:</span>
-              <strong className="pi-card__cap-val">{piCapacityTotals.totalCapacityPoints}</strong>
-              <span className="pi-card__cap-unit">pts</span>
-            </div>
-
-            <div
-              className={`pi-card__cap-pill pi-card__cap-pill--reserved${piCapacityTotals.totalReservedPoints === 0 ? ' is-zero' : ''}`}
-              title={
-                piCapacityTotals.totalReservedPoints > 0
-                  ? `Reserved Capacity: ${piCapacityTotals.totalReservedPoints} points`
-                  : 'No capacity reserved'
-              }
-            >
-              {piCapacityTotals.totalReservedPoints > 0 && <ShieldAlert size={12} />}
-              <span className="pi-card__cap-label">Reserved:</span>
-              <strong className="pi-card__cap-val">{piCapacityTotals.totalReservedPoints}</strong>
-              <span className="pi-card__cap-unit">pts</span>
-            </div>
-
-            {piCapacityTotals.hasCapacity && (
-              <div
-                className="pi-card__cap-progress-wrap"
-                title={`${piCapacityTotals.percent}% committed (${piCapacityTotals.remainingCapacityPoints} pts available)`}
-              >
-                <div className="pi-card__cap-progress-bar">
-                  <div
-                    className={`pi-card__cap-progress-fill${
-                      piCapacityTotals.isOverCapacity
-                        ? ' is-danger'
-                        : piCapacityTotals.percent >= 90
-                          ? ' is-warning'
-                          : ' is-normal'
-                    }`}
-                    style={{ width: `${Math.min(100, piCapacityTotals.percent)}%` }}
-                  />
-                </div>
+            <div className="pi-card__capacity-line">
+              <span className="pi-card__capacity-planned">
+                <strong>{piCapacityTotals.totalAssignedPoints}</strong> of{' '}
+                {piCapacityTotals.totalCapacityPoints} pts planned
+              </span>
+              {piCapacityTotals.totalReservedPoints > 0 && (
+                <span className="pi-card__capacity-reserved">
+                  <ShieldAlert size={11} />
+                  {piCapacityTotals.totalReservedPoints} reserved
+                </span>
+              )}
+              {piCapacityTotals.hasCapacity && (
                 <span
-                  className={`pi-card__cap-progress-text${piCapacityTotals.isOverCapacity ? ' is-danger' : ''}`}
+                  className={`pi-card__capacity-left${piCapacityTotals.isOverCapacity ? ' is-danger' : ''}`}
                 >
                   {piCapacityTotals.isOverCapacity
-                    ? `+${Math.abs(piCapacityTotals.remainingCapacityPoints)} over`
+                    ? `${Math.abs(piCapacityTotals.remainingCapacityPoints)} over`
                     : `${piCapacityTotals.remainingCapacityPoints} left`}
                 </span>
+              )}
+            </div>
+            {piCapacityTotals.hasCapacity && (
+              <div className="pi-card__capacity-bar">
+                <div
+                  className={`pi-card__capacity-fill${
+                    piCapacityTotals.isOverCapacity
+                      ? ' is-danger'
+                      : piCapacityTotals.percent >= 90
+                        ? ' is-warning'
+                        : ' is-normal'
+                  }`}
+                  style={{ width: `${Math.min(100, piCapacityTotals.percent)}%` }}
+                />
               </div>
             )}
           </div>

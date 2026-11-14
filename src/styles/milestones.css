@@ -4,32 +4,29 @@
 
 /* ---------- Milestones Board Section ---------- */
 
+/* One wrapping strip: the label, a chip per marker, then "Add Marker". */
 .milestones-section {
   flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
   background: var(--chrome-bg-raised);
   border: 1px solid var(--chrome-border);
   border-radius: var(--radius-md);
-  margin-bottom: 0;
-  overflow: hidden;
-}
-
-.milestones-section__header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  background: color-mix(in srgb, var(--violet) 5%, transparent);
-  border-bottom: 1px solid var(--chrome-border);
+  padding: 8px 12px;
 }
 
 .milestones-section__collapse-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   background: none;
   border: none;
   color: var(--chrome-text-dim);
   cursor: pointer;
-  padding: 2px;
-  display: flex;
-  align-items: center;
+  padding: 2px 4px 2px 0;
+  margin-right: 4px;
 }
 
 .milestones-section__icon {
@@ -37,9 +34,11 @@
 }
 
 .milestones-section__title {
-  font-size: var(--text-base);
+  font-size: var(--text-xs);
   font-weight: 700;
-  color: var(--chrome-text);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--chrome-text-dim);
 }
 
 .milestones-section__count {
@@ -63,11 +62,10 @@
   background: transparent;
   border: 1px dashed color-mix(in srgb, var(--violet) 40%, transparent);
   color: var(--violet);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-pill);
   padding: 4px 10px;
-  font-size: var(--text-xs-plus);
+  font-size: var(--text-xs);
   font-weight: 600;
-  margin-left: auto;
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -77,105 +75,60 @@
   border-color: var(--violet);
 }
 
-.milestones-section__items {
-  display: flex;
-  flex-wrap: wrap;
-  align-content: flex-start;
-  gap: 10px;
-  padding: 12px 14px;
-  min-height: 56px;
-  max-height: 280px;
-  overflow-y: auto;
-}
-
 .milestones-section__empty {
   font-size: var(--text-sm);
   color: var(--chrome-text-dim);
-  margin: 4px 0;
 }
 
-.milestones-section__card {
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+.milestones-section__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
   background: var(--chrome-bg);
   border: 1px solid var(--chrome-border);
-  border-left-width: 4px;
-  border-radius: var(--radius-sm);
-  padding: 8px 10px;
-  min-width: 170px;
-  max-width: 260px;
-  text-align: left;
+  border-radius: var(--radius-pill);
+  padding: 4px 10px;
+  font-size: var(--text-xs);
+  color: var(--chrome-text);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background 0.15s ease;
 }
 
-.milestones-section__card:hover {
+.milestones-section__chip:hover {
   background: var(--chrome-bg-hover);
-  border-color: var(--accent);
-  transform: translateY(-1px);
 }
 
-.milestones-section__card-header {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: var(--text-2xs);
-  font-weight: 600;
+.milestones-section__chip-date {
+  font-family: var(--mono);
+  color: var(--chrome-text-dim);
 }
 
-.milestones-section__card-shape {
-  font-size: var(--text-3xs);
-}
-
-.milestones-section__card-type {
+.milestones-section__chip-type {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-size: var(--text-2xs);
 }
 
-.milestones-section__card-version {
-  background: color-mix(in srgb, var(--white) 7%, transparent);
-  border: 1px solid var(--chrome-border);
-  border-radius: var(--radius-xs);
-  padding: 0 4px;
-  font-size: var(--text-2xs-plus);
-  color: var(--chrome-text-dim);
-  margin-left: auto;
-  font-family: var(--mono);
-}
-
-.milestones-section__card-name {
-  font-size: var(--text-sm-plus);
-  font-weight: 600;
-  color: var(--chrome-text);
+.milestones-section__chip-name {
+  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.milestones-section__card-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  font-size: var(--text-xs);
-  color: var(--chrome-text-dim);
-  margin-top: 2px;
-}
-
-.milestones-section__card-date {
+.milestones-section__chip-version {
   font-family: var(--mono);
-  font-size: var(--text-xs);
+  font-size: var(--text-2xs-plus);
+  color: var(--chrome-text-dim);
 }
 
-.milestones-section__card-work-badge {
+.milestones-section__chip-count {
   background: color-mix(in srgb, var(--accent) 12%, transparent);
   color: var(--accent);
-  border-radius: var(--radius-xs);
-  padding: 1px 5px;
+  border-radius: var(--radius-pill);
+  padding: 0 6px;
   font-size: var(--text-2xs-plus);
   font-weight: 600;
 }
