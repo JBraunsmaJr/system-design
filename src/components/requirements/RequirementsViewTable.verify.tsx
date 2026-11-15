@@ -10,6 +10,7 @@ import React from 'react';
 import { RequirementsView } from './RequirementsView';
 import { RequirementsCoverageBar } from './RequirementsCoverageBar';
 import { RequirementRowDetail } from './RequirementRowDetail';
+import { RequirementSplitDetail } from './RequirementSplitDetail';
 import {
   BUILT_IN_ITEM_TYPES,
   BUILT_IN_RELATIONSHIP_TYPES,
@@ -321,6 +322,73 @@ console.log('\n=== An open row ===');
     />,
   );
   assert(blank.includes('the-editor'), 'a new item opens in the editor');
+}
+
+console.log("\n=== The split view's detail pane ===");
+{
+  const split = render({ initialLayout: 'split', initialGroupBy: 'type' });
+  // With nothing chosen the first item is open: the epic.
+  assert(
+    split.includes('class="requirement-page"') && split.includes('requirement-page__title'),
+    'the open item is shown as a page',
+  );
+  assert(!split.includes('class="requirement-card'), 'not as a card');
+
+  const base = {
+    doc,
+    onUpdateItem: () => undefined,
+    onNavigateToItem: () => undefined,
+    onNavigateToNode: () => undefined,
+    renderEditor: () => <div className="the-editor" />,
+  };
+  const html = renderPlain(
+    <RequirementSplitDetail
+      {...base}
+      item={doc.items.find((i) => i.id === 'REQ-1')!}
+      linkedNodes={[{ nodeId: 'n1', label: 'Order Service', path: [], hasSubDiagram: false }]}
+    />,
+  );
+  assert(/requirement-page__title">Guest checkout</.test(html), 'the title heads the page');
+  assert(html.includes('Show on diagram'), 'with the way to the diagram');
+  for (const panel of ['Acceptance criteria', 'Verification', 'On the diagram', 'Relationships']) {
+    assert(html.includes(`requirement-panel__title">${panel}<`), `has a ${panel} panel`);
+  }
+  assert(html.includes('>1 of 2 met<'), 'criteria are counted');
+  assert(
+    html.includes('aria-label="Add an acceptance criterion to REQ-1"'),
+    'and one can be added',
+  );
+  assert(html.includes('title="Verification: Test - Verified'), 'verification is set in its panel');
+  assert(!html.includes('the-editor'), 'the full card stays out of the way until Edit');
+
+  const req2 = renderPlain(
+    <RequirementSplitDetail
+      {...base}
+      item={doc.items.find((i) => i.id === 'REQ-2')!}
+      linkedNodes={[]}
+    />,
+  );
+  assert(!req2.includes('Show on diagram'), 'an unlinked item has no way to the diagram');
+  assert(req2.includes('No component is linked to this'), 'and says what is missing');
+
+  const ticket = renderPlain(
+    <RequirementSplitDetail
+      {...base}
+      item={doc.items.find((i) => i.id === 'TICKET-1')!}
+      linkedNodes={[]}
+      sprintName="Sprint 1"
+      assigneeName="Ana Ruiz"
+    />,
+  );
+  assert(
+    ticket.includes('Sprint 1') && ticket.includes('Ana Ruiz') && ticket.includes('In Progress'),
+    'a ticket shows its status, sprint and assignee',
+  );
+  assert(
+    !ticket.includes('requirement-panel__title">Verification<') &&
+      !ticket.includes('requirement-panel__title">On the diagram<'),
+    'and has no verification or diagram panel',
+  );
 }
 
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);

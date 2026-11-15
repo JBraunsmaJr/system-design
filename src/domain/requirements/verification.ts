@@ -218,6 +218,29 @@ export function toggleAcceptanceCriterion(body: string, index: number): string {
     .join('\n');
 }
 
+/**
+ * `body` with one more unticked criterion: after the last one there is, or
+ * at the end of the description when there are none yet. A blank `text`
+ * adds nothing.
+ */
+export function addAcceptanceCriterion(body: string, text: string): string {
+  const criterion = text.replace(/\s+/g, ' ').trim();
+  if (!criterion) return body;
+  const lines = body.split('\n');
+  let last = -1;
+  let inFence = false;
+  lines.forEach((line, index) => {
+    if (FENCE.test(line)) inFence = !inFence;
+    else if (!inFence && CRITERION.test(line)) last = index;
+  });
+  if (last >= 0) {
+    lines.splice(last + 1, 0, `- [ ] ${criterion}`);
+    return lines.join('\n');
+  }
+  const prose = body.trimEnd();
+  return prose ? `${prose}\n\n- [ ] ${criterion}` : `- [ ] ${criterion}`;
+}
+
 /** How a verification reads at a glance, and how loud it should be. */
 export interface VerificationSummary {
   label: string;

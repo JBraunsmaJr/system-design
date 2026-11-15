@@ -63,6 +63,8 @@ import { RequirementsOutline } from './RequirementsOutline';
 import { NO_EPIC_KEY, useRequirementGroups } from './useRequirementGroups';
 import { RequirementsCoverageBar } from './RequirementsCoverageBar';
 import { RequirementRowDetail } from './RequirementRowDetail';
+import { RequirementSplitDetail } from './RequirementSplitDetail';
+import { isDecisionItem } from '../../domain/requirements/decisionRecords';
 import {
   RequirementsTable,
   type RequirementsTableRow,
@@ -899,6 +901,27 @@ export function RequirementsView({
   /** The split view's right-hand side: the open item in full, the path of
    * parents above it, and its children beneath - so an epic and its
    * tickets are on screen together. */
+  const sprintNameById = useMemo(
+    () =>
+      new Map(
+        programIncrements.flatMap((pi) =>
+          pi.sprints.map((sp) => [sp.id, sp.name || 'Unnamed sprint'] as const),
+        ),
+      ),
+    [programIncrements],
+  );
+  const memberNameById = useMemo(
+    () => new Map((team?.members ?? []).map((m) => [m.id, m.name || 'Unnamed'] as const)),
+    [team],
+  );
+
+  const detailCard = (item: RequirementItem) =>
+    renderCard(item, {
+      sectionKey: DETAIL_KEY,
+      cardKey: `detail:${item.id}`,
+      collapsible: false,
+    });
+
   const renderDetail = () => {
     const item = selectedItemId ? doc.items.find((i) => i.id === selectedItemId) : undefined;
     if (!item) {
@@ -953,11 +976,28 @@ export function RequirementsView({
             )}
           </nav>
         )}
-        {renderCard(item, {
-          sectionKey: DETAIL_KEY,
-          cardKey: `detail:${item.id}`,
-          collapsible: false,
-        })}
+        {isDecisionItem(item) ? (
+          // A decision's sections are its content; it has no reading layout
+          // of its own yet, so it is shown as the card it is edited in.
+          detailCard(item)
+        ) : (
+          <RequirementSplitDetail
+            // Remounts for a different item, so "editing" never carries over.
+            key={item.id}
+            doc={doc}
+            item={item}
+            linkedNodes={linkedNodesByItemId.get(item.id) ?? EMPTY_LINKED_NODES}
+            sprintName={item.sprintId ? sprintNameById.get(item.sprintId) : undefined}
+            assigneeName={item.assigneeId ? memberNameById.get(item.assigneeId) : undefined}
+            onUpdateItem={onUpdateItem}
+            onNavigateToItem={(itemId) => onNavigateToItem(itemId, undefined, item.id)}
+            onNavigateToNode={onNavigateToNode}
+            startEditing={!item.title && !item.body}
+            searchQuery={trimmedSearch}
+            sectionKey={DETAIL_KEY}
+            renderEditor={() => detailCard(item)}
+          />
+        )}
         {children.length > 0 && (
           <section className="requirements-split__children">
             <h3 className="requirements-view__group-title requirements-split__children-title">
@@ -992,20 +1032,6 @@ export function RequirementsView({
       </>
     );
   };
-
-  const sprintNameById = useMemo(
-    () =>
-      new Map(
-        programIncrements.flatMap((pi) =>
-          pi.sprints.map((sp) => [sp.id, sp.name || 'Unnamed sprint'] as const),
-        ),
-      ),
-    [programIncrements],
-  );
-  const memberNameById = useMemo(
-    () => new Map((team?.members ?? []).map((m) => [m.id, m.name || 'Unnamed'] as const)),
-    [team],
-  );
 
   /** The table's lines: the same groups and epic tree the cards use,
    * flattened, with folded epics and collapsed sections left out. */
@@ -1084,7 +1110,8 @@ export function RequirementsView({
       onNavigateToItem={(itemId) => onNavigateToItem(itemId, row.item.id)}
       onNavigateToNode={onNavigateToNode}
       // A new item has nothing to read yet: it opens ready to be written.
-      startEditing={!row.item.title && !row.item.body}
+      // So does a decision, whose sections only the card shows.
+      startEditing={(!row.item.title && !row.item.body) || isDecisionItem(row.item)}
       searchQuery={trimmedSearch}
       renderEditor={() =>
         renderCard(row.item, {

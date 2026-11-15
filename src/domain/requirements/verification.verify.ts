@@ -4,6 +4,7 @@
  *   npx tsx src/domain/requirements/verification.verify.ts
  */
 import {
+  addAcceptanceCriterion,
   describeVerification,
   getVerificationStatusMeta,
   isVerifiable,
@@ -99,6 +100,29 @@ console.log('\n=== Statement and criteria ===');
   assert(
     toggleAcceptanceCriterion(fenced, 0) === '```\n- [ ] not one\n```\n- [x] real',
     'a line in a code block is not counted',
+  );
+}
+
+console.log('\n=== Adding a criterion ===');
+{
+  assert(addAcceptanceCriterion('', 'First') === '- [ ] First', 'to an empty description');
+  assert(
+    addAcceptanceCriterion('Prose.\n', 'First') === 'Prose.\n\n- [ ] First',
+    'after the prose, with a blank line between',
+  );
+  assert(
+    addAcceptanceCriterion('Prose.\n\n- [x] One\n\nMore prose.', 'Two') ===
+      'Prose.\n\n- [x] One\n- [ ] Two\n\nMore prose.',
+    'after the last criterion, not at the very end',
+  );
+  assert(addAcceptanceCriterion('Prose.', '   ') === 'Prose.', 'a blank one adds nothing');
+  assert(
+    addAcceptanceCriterion('', 'two\nlines').split('\n').length === 1,
+    'a criterion is always one line',
+  );
+  assert(
+    splitAcceptanceCriteria(addAcceptanceCriterion('- [ ] a', 'b')).criteria.length === 2,
+    'and reads back as a criterion',
   );
 }
 

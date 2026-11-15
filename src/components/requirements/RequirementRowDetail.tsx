@@ -6,19 +6,16 @@ import type {
 } from '../../domain/requirements/requirementsTypes';
 import type { DiagramPath, LinkedNodeRef } from '../../domain/canvas/subDiagramTree';
 import {
-  getItemType,
-  getOtherItemId,
-  getRelationshipLabelForItem,
   getRelationshipsForItem,
   getStatusMeta,
   isItemWorkable,
 } from '../../domain/requirements/requirementsRegistry';
+import { CriteriaList, RelationshipChips } from './RequirementDetailParts';
 import {
   getVerificationMethodMeta,
   getVerificationStatusMeta,
   isVerifiable,
   splitAcceptanceCriteria,
-  toggleAcceptanceCriterion,
 } from '../../domain/requirements/verification';
 import { isExpectedOnDiagram } from '../../domain/requirements/requirementsFilter';
 import { RequirementBody } from './RequirementBody';
@@ -84,7 +81,7 @@ export function RequirementRowDetail({
   const verifiable = isVerifiable(doc, item);
   const onDiagram = isExpectedOnDiagram(doc, item) || linkedNodes.length > 0;
   const workable = isItemWorkable(doc, item);
-  const relationships = getRelationshipsForItem(doc, item.id);
+  const relationshipCount = getRelationshipsForItem(doc, item.id).length;
   const method = getVerificationMethodMeta(item.verificationMethod);
   const status = getVerificationStatusMeta(item.verificationStatus);
 
@@ -118,66 +115,17 @@ export function RequirementRowDetail({
                 None yet. Edit the description and add a line like "- [ ] what must hold".
               </p>
             ) : (
-              <ul className="requirement-detail__criteria">
-                {criteria.map((criterion, index) => (
-                  <li key={index}>
-                    <button
-                      type="button"
-                      role="checkbox"
-                      aria-checked={criterion.met}
-                      className={`requirement-detail__criterion${criterion.met ? ' is-met' : ''}`}
-                      onClick={() =>
-                        onUpdateItem(item.id, {
-                          body: toggleAcceptanceCriterion(item.body, index),
-                        })
-                      }
-                    >
-                      <span className="requirement-detail__box" aria-hidden>
-                        {criterion.met && <Check size={10} strokeWidth={3} />}
-                      </span>
-                      <span>{criterion.text}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              <CriteriaList item={item} criteria={criteria} onUpdateItem={onUpdateItem} />
             )}
           </section>
         )}
       </div>
 
       <div className="requirement-detail__column">
-        {relationships.length > 0 && (
+        {relationshipCount > 0 && (
           <section className="requirement-detail__section">
-            <h4 className="requirement-detail__label">Relationships · {relationships.length}</h4>
-            <div className="requirement-detail__chips">
-              {relationships.map((relationship) => {
-                const other = doc.items.find((i) => i.id === getOtherItemId(relationship, item.id));
-                const type = doc.relationshipTypes.find((t) => t.id === relationship.typeId);
-                if (!other || !type) return null;
-                return (
-                  <button
-                    key={relationship.id}
-                    type="button"
-                    className="requirement-detail__relation"
-                    onClick={() => onNavigateToItem(other.id)}
-                    title={`Go to ${other.id}`}
-                  >
-                    <span className="requirement-detail__relation-kind">
-                      {getRelationshipLabelForItem(relationship, type, item.id).toLowerCase()}
-                    </span>
-                    <span
-                      className="requirement-detail__relation-id"
-                      style={{ color: getItemType(doc, other.typeId)?.color }}
-                    >
-                      {other.id}
-                    </span>
-                    <span className="requirement-detail__relation-title">
-                      {other.title || 'Untitled'}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+            <h4 className="requirement-detail__label">Relationships · {relationshipCount}</h4>
+            <RelationshipChips doc={doc} item={item} onNavigateToItem={onNavigateToItem} />
           </section>
         )}
 

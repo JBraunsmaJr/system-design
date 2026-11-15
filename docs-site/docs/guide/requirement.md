@@ -95,8 +95,10 @@ Toggle between two organization modes using the toolbar controls:
   its verification. **Edit** swaps in the full card, where every field can be changed; **Done** goes back. When
   grouping by epic, children are indented under their epic and the count beside an epic's title folds them away.
 - **Cards**: every item as a full card in one scrolling column.
-- **Split**: an outline on the left and the open item, with its children, on the right. Outline rows show whether a
-  descriptive item is on the diagram, and the status of work items and decisions.
+- **Split**: an outline on the left and the open item as a page on the right, with its children below. The page has a
+  panel each for acceptance criteria (tick them, or type a new one and press Enter), verification, the components the
+  item is on and its relationships; **Edit** opens the full card. Outline rows show whether a descriptive item is on
+  the diagram, and the status of work items, decisions and verification.
 
 Your layout is remembered for each document in this browser.
 

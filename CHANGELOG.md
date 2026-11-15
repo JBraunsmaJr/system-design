@@ -29,6 +29,14 @@ markers are removed when the section becomes a release. See
 - `ADMIN_GROUPS` makes the members of an identity-provider group store administrators in that API.
   `WORKSPACE_CREATION` sets who may create workspaces there.
 
+### [MINOR] Requirements: the split view opens an item as a page
+
+- The split view's right-hand pane shows the selected item as a page: its id, kind and title with **Show on diagram**,
+  its statement, and a panel each for acceptance criteria, verification, the components it is on and its
+  relationships.
+- Criteria can be ticked and added in their panel, and verification set in its panel, without opening the editor.
+  **Edit** swaps in the full card for everything else. Decisions still open as their card.
+
 ### [MINOR] Requirements: a table row opens for reading
 
 - Opening a line in the table shows the item laid out to read rather than as a form: its statement, its acceptance
