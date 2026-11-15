@@ -321,6 +321,99 @@ console.log('\n=== The published example (docs-site/docs/files/workspace) ===');
   );
 }
 
+/**
+ * The proxy config that goes with a compose example: where each public
+ * path is sent. Read with a pattern rather than a parser because the
+ * example is kept to plain `location <path> { ... proxy_pass <target>; }`
+ * blocks; the syntax itself is nginx's to check.
+ */
+function readProxyLocations(text: string) {
+  const withoutComments = text.replace(/#[^\n]*/g, '');
+  const locations: Record<string, { target: string; body: string }> = {};
+  for (const match of withoutComments.matchAll(/location\s+(\S+)\s*\{([^}]*)\}/g)) {
+    const body = match[2];
+    const setVariables = Object.fromEntries(
+      [...body.matchAll(/set\s+(\$\w+)\s+([^;\s]+)\s*;/g)].map((m) => [m[1], m[2]]),
+    );
+    const raw = /proxy_pass\s+"?([^";\s]+)"?\s*;/.exec(body)?.[1] ?? '';
+    locations[match[1]] = { target: setVariables[raw] ?? raw, body };
+  }
+  return locations;
+}
+
+/** The path part of a URL written with compose placeholders in its host. */
+function pathOf(url: string): string {
+  return url.replace(/^[a-z]+:\/\/[^/]+/, '') || '/';
+}
+
+console.log('\n=== The proxy sends each address where compose says it lives ===');
+for (const example of ['workspace', 'core']) {
+  const dir = `docs-site/docs/files/${example}`;
+  if (!existsSync(`${dir}/nginx.conf`)) continue;
+  const locations = readProxyLocations(readFileSync(`${dir}/nginx.conf`, 'utf8'));
+  const services = readComposeExample(readFileSync(`${dir}/compose.yml`, 'utf8')).services;
+  const env = services.editor.environment;
+
+  // The editor: served where APP_URL says people open it.
+  const appPath = pathOf(env.APP_URL);
+  check(
+    locations[appPath]?.target.startsWith('http://editor:80') === true,
+    `${example}: the editor is proxied at ${appPath}, where APP_URL says it is`,
+  );
+
+  // The relay: RELAY's path, with the prefix stripped (both sides end in
+  // a slash) and the WebSocket upgrade passed on.
+  const relayPath = pathOf(env.RELAY);
+  const relay = locations[relayPath];
+  check(
+    relay?.target === 'http://relay:4444/' && relayPath.endsWith('/'),
+    `${example}: the relay is proxied at ${relayPath}, where RELAY points, with the prefix removed`,
+  );
+  check(
+    /proxy_http_version\s+1\.1\s*;/.test(relay?.body ?? '') &&
+      /proxy_set_header\s+Upgrade\s+\$http_upgrade\s*;/.test(relay?.body ?? '') &&
+      /proxy_set_header\s+Connection\s+\$connection_upgrade\s*;/.test(relay?.body ?? ''),
+    `${example}: and WebSocket upgrades reach it (HTTP/1.1 with the Upgrade and Connection headers)`,
+  );
+
+  if (env.STORE_URL) {
+    // The store: STORE_URL's path plus a slash, stripped, so /store/v1/...
+    // arrives as /v1/....
+    const storePath = `${pathOf(env.STORE_URL)}/`;
+    check(
+      locations[storePath]?.target === 'http://store:8080/',
+      `${example}: the store is proxied at ${storePath}, where STORE_URL points, with the prefix removed`,
+    );
+    check(
+      pathOf(services.store.environment.PUBLIC_URL) === pathOf(env.STORE_URL),
+      `${example}: and the store is told the same public address`,
+    );
+    check(
+      pathOf(services.store.environment.AFTER_LOGIN_URL) === appPath,
+      `${example}: people land back on the editor after signing in`,
+    );
+  }
+
+  const overlayPath = `${dir}/compose.keycloak.yml`;
+  if (existsSync(overlayPath)) {
+    const keycloakEnv = readComposeExample(readFileSync(overlayPath, 'utf8')).services.keycloak
+      .environment;
+    const authPath = `${keycloakEnv.KC_HTTP_RELATIVE_PATH}/`;
+    const auth = locations[authPath];
+    // Keycloak's port unless the overlay moves it.
+    const port = keycloakEnv.KC_HTTP_PORT ?? '8080';
+    check(
+      auth?.target === `http://keycloak:${port}`,
+      `${example}: Keycloak is proxied at ${authPath} on the port it listens on (${port}), path unchanged`,
+    );
+    check(
+      /proxy_pass\s+\$\w+\s*;/.test(auth?.body ?? '') &&
+        /resolver\s+127\.0\.0\.11/.test(auth?.body ?? ''),
+      `${example}: and is looked up per request, so the proxy still starts when Keycloak is not deployed`,
+    );
+  }
+}
+
 if (failures > 0) {
   console.error(`\n${failures} check(s) failed`);
   process.exit(1);

@@ -29,6 +29,20 @@ markers are removed when the section becomes a release. See
 - `ADMIN_GROUPS` makes the members of an identity-provider group store administrators in that API.
   `WORKSPACE_CREATION` sets who may create workspaces there.
 
+### Deployment: installs and the workspace proxy example fixed
+
+- `npm ci` failed, which broke every image build and every CI job: `typescript-eslint` had been lowered to `^8.36.0`,
+  a version that does not accept ESLint 10, and the lockfile pinned that pair. It and `vite-plugin-pwa` are back at
+  the ranges of the last release (`^8.70.0`, `^1.3.0`) with that release's lockfile.
+- The workspace example's `nginx.conf` did not match its `compose.yml`:
+  - the editor was proxied at `/editor/` while everything else (`APP_URL`, the address people land on after signing
+    in, the guide) says `/`, so the root address answered 404;
+  - the relay block had lost `proxy_http_version 1.1`, which WebSocket upgrades need;
+  - Keycloak was proxied to port 8001, but it listens on 8080;
+  - Keycloak's address was fixed in the file, so the proxy refused to start when Keycloak was not deployed, although
+    the comment said otherwise. It is now looked up per request.
+- The deployment check compares each example's proxy config with its compose file, so these cannot drift again.
+
 ### Requirements: one menu style, and a dot on lines being edited
 
 - The bulk edit bar's Status, Sprint, Category, Assignee and Remove tag menus, and the toolbar's **Group by**, use the
