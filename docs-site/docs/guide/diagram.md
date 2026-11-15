@@ -14,9 +14,11 @@ The editor is designed for rapid, low-friction diagramming with zero configurati
 
 ### Adding Components & Shapes
 
-- **Palette**: Drag nodes and components directly from the left sidebar onto the canvas.
+- **Palette**: Drag nodes and components directly from the left sidebar onto the canvas. The buttons down its left
+  edge switch between palettes (System, Cloud, Shapes, Code, Git, Fragments); click the open one to fold the list away.
 - **Search**: Type in the box at the top of the palette (or press `/`) to search every palette at once; each result
-  shows where it is filed and drags onto the canvas. `Escape` clears the search.
+  shows where it is filed. Press `Enter` to add the first match to the middle of the canvas, or drag any match where
+  you want it. `Escape` clears the search.
 - **Recently used**: The last six things you dropped are listed at the top of the palette.
 - **Architectural Nodes**: Choose from pre-configured system components (Microservices, Databases, Caches, Gateways,
   Message Queues, Clients, and Compute nodes).

@@ -4,6 +4,8 @@ import {
   type MouseEvent as ReactMouseEvent,
   type SetStateAction,
   useCallback,
+  useEffect,
+  useRef,
 } from 'react';
 import { NODE_TYPES } from '../../domain/canvas/nodeRegistry';
 import { GROUP_TYPES } from '../../domain/canvas/groupRegistry';
@@ -17,6 +19,21 @@ import {
   TEXT_DRAG_MIME_TYPE,
 } from './Palette';
 import type { CanvasFlow, CanvasProps } from './Canvas';
+import { onPaletteAddRequest } from '../../domain/canvas/paletteAddRequests';
+
+/** How far each item added from the keyboard lands from the one before, so
+ * several in a row don't stack exactly on top of each other. */
+const KEYBOARD_ADD_STEP = 28;
+const KEYBOARD_ADD_STEPS = 6;
+
+const PALETTE_MIME_TYPES = [
+  FRAGMENT_DRAG_MIME_TYPE,
+  DRAG_MIME_TYPE,
+  GROUP_DRAG_MIME_TYPE,
+  SHAPE_DRAG_MIME_TYPE,
+  CODE_DRAG_MIME_TYPE,
+  TEXT_DRAG_MIME_TYPE,
+];
 
 /**
  * Creating things on the canvas: dropping from the palette, and
@@ -52,52 +69,43 @@ export function useCanvasCreation({
     event.dataTransfer.dropEffect = 'move';
   }, []);
 
-  const onDrop = useCallback(
-    (event: DragEvent) => {
-      event.preventDefault();
-      const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
-
-      const fragmentId = event.dataTransfer.getData(FRAGMENT_DRAG_MIME_TYPE);
-      if (fragmentId) {
-        // Presenting shows the diagram, it doesn't edit it - a fragment
-        // dropped then is swallowed rather than handled as anything else.
-        if (!isPresenting) onInsertFragment?.(fragmentId, position);
-        return;
-      }
-
-      const nodeTypeId = event.dataTransfer.getData(DRAG_MIME_TYPE);
-      if (nodeTypeId && NODE_TYPES.some((n) => n.id === nodeTypeId)) {
-        onAddNode(nodeTypeId, position);
-        return;
-      }
-
-      const groupTypeId = event.dataTransfer.getData(GROUP_DRAG_MIME_TYPE);
-      if (groupTypeId && GROUP_TYPES.some((g) => g.id === groupTypeId)) {
-        onAddGroup(groupTypeId, position);
-        return;
-      }
-
-      const shapeTypeId = event.dataTransfer.getData(SHAPE_DRAG_MIME_TYPE);
-      if (
-        shapeTypeId &&
-        (SHAPE_TYPES.some((s) => s.id === shapeTypeId) || globalShapeRegistry.getShape(shapeTypeId))
-      ) {
-        onAddShape(shapeTypeId, position);
-        return;
-      }
-
-      if (event.dataTransfer.getData(CODE_DRAG_MIME_TYPE)) {
-        setEditingLabelNodeId(onAddCode(position));
-        return;
-      }
-
-      if (event.dataTransfer.getData(TEXT_DRAG_MIME_TYPE)) {
-        setEditingLabelNodeId(onAddText(position));
+  /** Creates what a palette entry stands for at `position`. Returns false
+   * for a type or id nothing here recognises. */
+  const createFromPalette = useCallback(
+    (mimeType: string, id: string, position: { x: number; y: number }): boolean => {
+      if (!id) return false;
+      switch (mimeType) {
+        case FRAGMENT_DRAG_MIME_TYPE:
+          // Presenting shows the diagram, it doesn't edit it - a fragment
+          // dropped then is swallowed rather than handled as anything else.
+          if (!isPresenting) onInsertFragment?.(id, position);
+          return true;
+        case DRAG_MIME_TYPE:
+          if (!NODE_TYPES.some((n) => n.id === id)) return false;
+          onAddNode(id, position);
+          return true;
+        case GROUP_DRAG_MIME_TYPE:
+          if (!GROUP_TYPES.some((g) => g.id === id)) return false;
+          onAddGroup(id, position);
+          return true;
+        case SHAPE_DRAG_MIME_TYPE:
+          if (!SHAPE_TYPES.some((s) => s.id === id) && !globalShapeRegistry.getShape(id)) {
+            return false;
+          }
+          onAddShape(id, position);
+          return true;
+        case CODE_DRAG_MIME_TYPE:
+          setEditingLabelNodeId(onAddCode(position));
+          return true;
+        case TEXT_DRAG_MIME_TYPE:
+          setEditingLabelNodeId(onAddText(position));
+          return true;
+        default:
+          return false;
       }
     },
     [
       isPresenting,
-      screenToFlowPosition,
       onAddNode,
       onAddGroup,
       onAddShape,
@@ -107,6 +115,39 @@ export function useCanvasCreation({
       setEditingLabelNodeId,
     ],
   );
+
+  const onDrop = useCallback(
+    (event: DragEvent) => {
+      event.preventDefault();
+      const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+      // In this order: the first type the drag carries decides what it is.
+      for (const mimeType of PALETTE_MIME_TYPES) {
+        const id = event.dataTransfer.getData(mimeType);
+        if (id) {
+          createFromPalette(mimeType, id, position);
+          return;
+        }
+      }
+    },
+    [screenToFlowPosition, createFromPalette],
+  );
+
+  // Enter on a palette search result: the item goes to the middle of what
+  // is on screen, each one a step down and right of the last.
+  const keyboardAddCount = useRef(0);
+  useEffect(() => {
+    if (isPresenting) return;
+    return onPaletteAddRequest(({ mimeType, id }) => {
+      const rect = document.querySelector('.canvas')?.getBoundingClientRect();
+      if (!rect) return;
+      const offset = (keyboardAddCount.current % KEYBOARD_ADD_STEPS) * KEYBOARD_ADD_STEP;
+      const position = screenToFlowPosition({
+        x: rect.left + rect.width / 2 + offset,
+        y: rect.top + rect.height / 2 + offset,
+      });
+      if (createFromPalette(mimeType, id, position)) keyboardAddCount.current += 1;
+    });
+  }, [isPresenting, screenToFlowPosition, createFromPalette]);
 
   // Double-clicking truly empty canvas creates a text annotation right
   // there and drops straight into editing it - checking that the event

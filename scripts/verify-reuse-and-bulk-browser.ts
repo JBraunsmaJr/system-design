@@ -211,8 +211,7 @@ async function run() {
     );
 
     console.log('=== Drop it from the palette ===');
-    await p.click('.palette__mode-trigger');
-    await p.click('.palette__mode-option:has-text("Fragments")');
+    await p.click('.palette-rail__button[aria-label="Fragments"]');
     const item = p.locator('.palette__item--fragment', { hasText: 'Gateway pair' });
     check((await item.count()) === 1, 'the palette lists the fragment');
     await item.dragTo(p.locator('.react-flow__pane'), { targetPosition: { x: 900, y: 650 } });
@@ -231,9 +230,8 @@ async function run() {
     check(nested.length > 0, 'the sub-diagram came along under the new copy');
 
     await p.reload();
-    await p.waitForSelector('.palette__mode-trigger');
-    await p.click('.palette__mode-trigger');
-    await p.click('.palette__mode-option:has-text("Fragments")');
+    await p.waitForSelector('.palette-rail');
+    await p.click('.palette-rail__button[aria-label="Fragments"]');
     check(
       (await p.locator('.palette__item--fragment', { hasText: 'Gateway pair' }).count()) === 1,
       'the fragment is still there after a reload',
@@ -263,7 +261,16 @@ async function run() {
       await hit.dragTo(p.locator('.react-flow__pane'), { targetPosition: { x: 700, y: 300 } });
       await p.waitForTimeout(400);
       check((await rootNodes(p)).length === countBefore + 1, 'a result drags onto the canvas');
+      // Enter adds the first match without a drag.
       await p.keyboard.press('/');
+      await p.keyboard.type('cache');
+      await p.locator('.palette__item.is-top-result').waitFor();
+      await p.keyboard.press('Enter');
+      await p.waitForTimeout(400);
+      check(
+        (await rootNodes(p)).length === countBefore + 2,
+        'Enter adds the first match to the canvas',
+      );
       await p.keyboard.press('Escape');
       await p.waitForSelector('.palette__group--recent');
       check(
@@ -271,6 +278,13 @@ async function run() {
           1,
         'Escape clears the search, and what was dropped is listed under Recently used',
       );
+      await p.click('.palette-rail__button.is-active');
+      await p.waitForSelector('.palette__list', { state: 'detached' });
+      check(true, "the open palette's rail button folds it away");
+      await p.keyboard.press('/');
+      await p.waitForSelector('.palette__search-input:focus');
+      check(true, 'and "/" opens it again on the search box');
+      await p.keyboard.press('Escape');
     }
 
     await p.click('button[title="Requirements"]');

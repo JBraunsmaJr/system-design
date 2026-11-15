@@ -773,18 +773,7 @@ function App() {
               <div
                 className={`app__sidebar-wrap app__sidebar-wrap--left${isPaletteCollapsed ? ' is-collapsed' : ''}`}
               >
-                {!isPaletteCollapsed && <Palette />}
-                <button
-                  type="button"
-                  className="app__sidebar-toggle app__sidebar-toggle--left"
-                  onClick={() => setIsPaletteCollapsed((v) => !v)}
-                  title={isPaletteCollapsed ? 'Show component palette' : 'Hide component palette'}
-                  aria-label={
-                    isPaletteCollapsed ? 'Show component palette' : 'Hide component palette'
-                  }
-                >
-                  {isPaletteCollapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
-                </button>
+                <Palette collapsed={isPaletteCollapsed} onCollapsedChange={setIsPaletteCollapsed} />
               </div>
             )}
             <div className="app__canvas-column" style={{ position: 'relative' }}>

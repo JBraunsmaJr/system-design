@@ -29,13 +29,15 @@ markers are removed when the section becomes a release. See
 - `ADMIN_GROUPS` makes the members of an identity-provider group store administrators in that API.
   `WORKSPACE_CREATION` sets who may create workspaces there.
 
-### [MINOR] Palette: search and recently used
+### [MINOR] Palette: rail, search and recently used
 
-- A search box at the top of the palette looks through every palette at once (system, cloud, shapes, code, git,
+- The palette is a narrow rail of buttons (search, System, Cloud, Shapes, Code, Git, Fragments) with the open palette's
+  list beside it. Clicking the open palette's button folds the list away and leaves the rail; this replaces the
+  dropdown and the separate hide control.
+- A search box at the top of the list looks through every palette at once (system, cloud, shapes, code, git,
   boundaries and saved fragments) and shows where each result is filed. Press `/` to jump to it and `Escape` to clear
-  it. Results drag onto the canvas like any palette item.
-- The last six things you dropped on a canvas are listed under **Recently used** at the top of the palette, remembered
-  in this browser.
+  it. `Enter` adds the first match to the middle of the canvas; any match can also be dragged.
+- The last six things you added to a canvas are listed under **Recently used**, remembered in this browser.
 - Palette rows are slightly tighter.
 
 ### [MINOR] Inspector: header and sections
