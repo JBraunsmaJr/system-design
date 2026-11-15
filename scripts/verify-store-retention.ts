@@ -77,6 +77,15 @@ async function postgres(): Promise<Backend> {
       return store as unknown as Service;
     },
     async dispose() {
+      // Leave nothing behind: a held document left in the shared database
+      // makes the next suite's own clean-up fail when it tries to purge it.
+      const last = stores[stores.length - 1] as unknown as Service | undefined;
+      if (last) {
+        for (const record of await last.list({ includeDeleted: true })) {
+          await last.setLegalHold(record.docId, null).catch(() => {});
+          await last.purge(record.docId).catch(() => {});
+        }
+      }
       for (const store of stores) await store.close();
     },
   };

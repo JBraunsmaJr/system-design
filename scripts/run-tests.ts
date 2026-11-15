@@ -58,9 +58,12 @@ const TSX_CLI = join(rootDir, 'node_modules', 'tsx', 'dist', 'cli.mjs');
 const testPattern = /\.(verify|test|spec)\.(ts|tsx|js|jsx|mjs)$/;
 const srcFiles = findFiles(join(rootDir, 'src'), testPattern);
 const scriptFiles = findFiles(join(rootDir, 'scripts'), /^verify-.*\.(ts|js)$/);
+// The store's own suites (store/src/*.verify.ts). They sat outside src/ and
+// scripts/, so for a time nothing ran them.
+const storeFiles = findFiles(join(rootDir, 'store'), testPattern);
 const rootTestFiles = findFiles(rootDir, /^test-.*\.(mjs|js|ts)$/);
 
-let allTestFiles = [...srcFiles, ...scriptFiles, ...rootTestFiles].sort();
+let allTestFiles = [...srcFiles, ...storeFiles, ...scriptFiles, ...rootTestFiles].sort();
 
 if (filterArg) {
   allTestFiles = allTestFiles.filter((f) => f.toLowerCase().includes(filterArg.toLowerCase()));
@@ -91,7 +94,9 @@ const suites: Suite[] = allTestFiles.map((file) => {
   const source = readFileSync(file, 'utf-8');
   const lanes: Lane[] = [];
   if (/from ['"]playwright['"]|startDevServers/.test(source)) lanes.push('browser');
-  if (/DATABASE_URL/.test(source)) lanes.push('postgres');
+  // Suites built on lib/joinHarness.ts reach PostgreSQL through it, without
+  // naming DATABASE_URL themselves.
+  if (/DATABASE_URL|joinHarness/.test(source)) lanes.push('postgres');
   return { file, relPath: relative(rootDir, file), lanes };
 });
 

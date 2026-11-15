@@ -260,3 +260,54 @@ ALTER TABLE workspace_access_rules ADD COLUMN IF NOT EXISTS rotation_lease_until
 
 -- WS14-R40: why a member was removed: sign-in, rule-change or by-member.
 ALTER TABLE workspace_memberships ADD COLUMN IF NOT EXISTS removed_cause TEXT;
+
+-- ---------------------------------------------------------------------------
+-- Trusted store: workspaces, members and group mappings.
+--
+-- In the trusted store the server decides access (store/src/permissions.ts).
+-- A person's role in a workspace is the highest of their individual role
+-- here, the role of any identity-provider group of theirs mapped here, and
+-- owner if they are a store administrator. Group membership itself is never
+-- stored: it is read from each sign-in.
+--
+-- These tables are additive. The key-based tables above are still used by
+-- the current API and are removed when it is.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS workspaces (
+    workspace_id TEXT PRIMARY KEY,
+    name         TEXT        NOT NULL,
+    -- Kept when the creator's account is removed; the workspace outlives them.
+    created_by   TEXT        REFERENCES users (user_id) ON DELETE SET NULL,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- Hidden from members and read-only while set.
+    archived_at  TIMESTAMPTZ
+);
+
+-- Two workspaces must not look the same in a list.
+CREATE UNIQUE INDEX IF NOT EXISTS workspaces_name_idx ON workspaces (lower(name));
+
+-- People added individually. Someone who is in only through a group has no
+-- row here.
+CREATE TABLE IF NOT EXISTS workspace_members (
+    workspace_id TEXT        NOT NULL REFERENCES workspaces (workspace_id) ON DELETE CASCADE,
+    user_id      TEXT        NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
+    role         TEXT        NOT NULL CHECK (role IN ('viewer', 'editor', 'owner')),
+    -- NULL when the store added them itself (the creator of a workspace).
+    added_by     TEXT        REFERENCES users (user_id) ON DELETE SET NULL,
+    added_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (workspace_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS workspace_members_user_idx ON workspace_members (user_id);
+
+-- Identity-provider group -> role. The group is stored exactly as the
+-- provider issues it and matched exactly, case included.
+CREATE TABLE IF NOT EXISTS workspace_group_roles (
+    workspace_id TEXT        NOT NULL REFERENCES workspaces (workspace_id) ON DELETE CASCADE,
+    group_name   TEXT        NOT NULL,
+    role         TEXT        NOT NULL CHECK (role IN ('viewer', 'editor', 'owner')),
+    added_by     TEXT        REFERENCES users (user_id) ON DELETE SET NULL,
+    added_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (workspace_id, group_name)
+);

@@ -17,6 +17,9 @@ markers are removed when the section becomes a release. See
 
 - CI now checks formatting, lint and types on every push. The 17 existing lint errors are fixed.
 - `TeamView` is split: the member card and the sprint capacity table are their own components.
+- Groundwork for the trusted store (see `docs/trusted-store.md`): workspace roles and permission rules, and storage
+  for workspaces, members and group mappings. Nothing uses them yet; the store's API is unchanged.
+- `npm test` now runs the store's own suites in `store/src`, which it had been skipping.
 
 ### [MINOR] Plan tab
 
