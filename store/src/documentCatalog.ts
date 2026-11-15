@@ -15,6 +15,7 @@
  * postgresDocumentCatalog.ts have the same contract;
  * scripts/verify-workspaces-contract.ts runs one suite against both.
  */
+import { randomBytes } from 'crypto';
 
 export interface CatalogEntry {
   docId: string;
@@ -98,6 +99,18 @@ export interface DocumentCatalog {
   move(docId: string, workspaceId: string): Promise<CatalogEntry>;
   /** False when it was not in the catalog. */
   remove(docId: string): Promise<boolean>;
+  /**
+   * The secret a document's live session is derived from, made the first
+   * time it is asked for and the same ever after. Never part of a
+   * CatalogEntry: an entry is what the API returns, and this is given only
+   * to people who may edit the document (see v2/sessions.ts).
+   */
+  sessionSecret(docId: string): Promise<string>;
+}
+
+/** 32 random bytes, as text. */
+export function newSessionSecret(): string {
+  return randomBytes(32).toString('base64url');
 }
 
 /** The order both catalogs list in. */
@@ -122,6 +135,7 @@ export function createMemoryDocumentCatalog(
 ): DocumentCatalog {
   const now = options.now ?? (() => new Date());
   const entries = new Map<string, CatalogEntry>();
+  const secrets = new Map<string, string>();
 
   async function assertWorkspace(workspaceId: string) {
     if (options.workspaceExists && !(await options.workspaceExists(workspaceId))) {
@@ -180,7 +194,18 @@ export function createMemoryDocumentCatalog(
     },
 
     async remove(docId) {
+      secrets.delete(docId);
       return entries.delete(docId);
+    },
+
+    async sessionSecret(docId) {
+      existing(docId);
+      let secret = secrets.get(docId);
+      if (!secret) {
+        secret = newSessionSecret();
+        secrets.set(docId, secret);
+      }
+      return secret;
     },
   };
 }

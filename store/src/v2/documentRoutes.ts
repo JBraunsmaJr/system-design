@@ -10,6 +10,7 @@
  *   GET    /v2/documents/:docId/updates?since=     updates after a version
  *   POST   /v2/documents/:docId/updates            append one
  *   POST   /v2/documents/:docId/compact            replace the log with a snapshot
+ *   GET    /v2/documents/:docId/session            its live session (editors)
  *   PUT    /v2/documents/:docId/hold               (administrators)
  *   DELETE /v2/documents/:docId/hold               (administrators)
  *   POST   /v2/documents/:docId/purge              (administrators)
@@ -24,6 +25,8 @@
 import type { DocumentRecord } from '../documentService.ts';
 import { fromBase64, positiveInt, positiveIntHeader, toBase64 } from '../httpService.ts';
 import { canMoveDocument } from '../permissions.ts';
+import { mintRoomToken } from '../auth/roomTokens.ts';
+import { documentSession } from './sessions.ts';
 import { requireDocId, type CatalogEntry } from '../documentCatalog.ts';
 import {
   documentFor,
@@ -264,6 +267,30 @@ export async function documentRoutes(context: V2Context): Promise<void> {
     });
     await audit('document.compact');
     return context.send(200, { document: compacted }, compacted.version);
+  }
+
+  if (tail === 'session') {
+    if (method !== 'GET') methodNotAllowed(context);
+    context.describeForAudit('document.session', docId);
+    // Editors only. A peer in a session can send changes to the others
+    // directly, so reading the document is not enough to be in it.
+    await documentFor(context, docId, 'document.write');
+    const session = documentSession(await deps.catalog.sessionSecret(docId));
+    const relay = deps.relayTokenSecret
+      ? mintRoomToken({
+          room: session.room,
+          subject: caller.subject,
+          secret: deps.relayTokenSecret,
+        })
+      : null;
+    await audit('document.session');
+    return context.send(200, {
+      session: {
+        ...session,
+        relayToken: relay?.token ?? null,
+        relayTokenExpiresAt: relay ? new Date(relay.expiresAt).toISOString() : null,
+      },
+    });
   }
 
   if (tail === 'hold') {

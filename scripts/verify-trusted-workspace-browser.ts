@@ -29,6 +29,8 @@ import { createProvider } from '../store/src/auth/providers';
 import { createMemoryWorkspaceStore } from '../store/src/workspaces';
 import { createMemoryDocumentCatalog } from '../store/src/documentCatalog';
 import { createV2Api } from '../store/src/v2/api';
+import { documentSession } from '../store/src/v2/sessions';
+import { verifyRoomToken } from '../store/src/auth/roomTokens';
 
 let failures = 0;
 function check(condition: boolean, message: string) {
@@ -51,6 +53,9 @@ async function eventually(test: () => Promise<boolean>, timeoutMs = 20000): Prom
 }
 
 const ADMIN_GROUP = 'notebook-admin';
+/** The development relay admits anyone, so this only decides whether the
+ * store hands tokens out - which is what is checked here. */
+const RELAY_SECRET = 'trusted-browser-suite-relay-secret-0123456789';
 
 async function startStore(appOrigin: string) {
   const blobs = createMemoryBlobStore();
@@ -89,7 +94,9 @@ async function startStore(appOrigin: string) {
     publicUrl: () => origin,
     afterLoginUrl: `${appOrigin}/system-design/`,
     allowedOrigins: [appOrigin],
+    relayTokenSecret: RELAY_SECRET,
     v2: createV2Api({
+      relayTokenSecret: RELAY_SECRET,
       workspaces,
       catalog,
       documents: documents as unknown as StoreBackend,
@@ -128,15 +135,23 @@ async function run() {
     store = await startStore(appOrigin);
     const theStore = store;
 
+    const relayConnections = new Map<Page, string[]>();
     /** A browser that knows where the store is: a separate person. */
     const openBrowser = async (): Promise<Page> => {
       const context = await browser!.newContext();
       await context.addInitScript({
-        content: `window.__APP_CONFIG__ = Object.assign({}, window.__APP_CONFIG__, { STORE_URL: ${JSON.stringify(theStore.origin)} });`,
+        // The relay too: a workspace document opens a live session, and
+        // without one there is nobody to see.
+        content: `window.__APP_CONFIG__ = Object.assign({}, window.__APP_CONFIG__, { STORE_URL: ${JSON.stringify(theStore.origin)}, RELAY: ${JSON.stringify(servers!.relayUrl)} });`,
       });
       contexts.push(context);
       const page = await context.newPage();
       page.on('pageerror', (error) => check(false, `page threw: ${error.message}`));
+      // Every relay connection this person's browser opens, to see what
+      // it carried.
+      const sockets: string[] = [];
+      relayConnections.set(page, sockets);
+      page.on('websocket', (socket) => sockets.push(socket.url()));
       await page.goto(`${appOrigin}/system-design/`);
       await ready(page);
       return page;
@@ -369,6 +384,69 @@ async function run() {
         (await titleOf(ada)) === 'Shared architecture, revised',
       "a viewer's edit stays in their browser: the store and other people are unchanged",
     );
+
+    // --- The live session ------------------------------------------------------
+    console.log('\n=== The live session ===');
+    {
+      const inSession = (page: Page) =>
+        page.waitForSelector('button[title^="In session"]', { timeout: 30000 }).then(
+          () => true,
+          () => false,
+        );
+      check(
+        (await inSession(ada)) && (await inSession(ben)),
+        'opening the document puts both editors in its session, with no link passed between them',
+      );
+      const peersOf = async (page: Page) => {
+        if (!(await page.locator('.collab-panel__peer').count())) {
+          await page.click('button[title^="In session"]');
+        }
+        return page
+          .waitForFunction(
+            () => document.querySelectorAll('.collab-panel__peer').length > 0,
+            null,
+            {
+              timeout: 30000,
+            },
+          )
+          .then(
+            () => true,
+            () => false,
+          );
+      };
+      check((await peersOf(ada)) && (await peersOf(ben)), 'and each sees the other in it');
+      await ada.keyboard.press('Escape');
+      await ben.keyboard.press('Escape');
+
+      const session = documentSession(await theStore.catalog.sessionSecret(docId));
+      const tokenOf = (page: Page) =>
+        (relayConnections.get(page) ?? [])
+          // The development server's own socket carries a token too.
+          .filter((url) => url.startsWith(servers!.relayUrl))
+          .map((url) => new URL(url).searchParams.get('token'))
+          .find((token) => token !== null) ?? null;
+      const admits = (token: string | null, subject: string) => {
+        try {
+          return (
+            token !== null &&
+            verifyRoomToken(token, { room: session.room, secret: RELAY_SECRET }).subject.endsWith(
+              `#${subject}`,
+            )
+          );
+        } catch {
+          return false;
+        }
+      };
+      check(
+        admits(tokenOf(ada), 'ada') && admits(tokenOf(ben), 'ben'),
+        "each connected to the relay with their own token for this document's room",
+      );
+
+      check(
+        (await vic.locator('button[title^="In session"]').count()) === 0 && tokenOf(vic) === null,
+        'the viewer is not in the session and was given nothing for the relay',
+      );
+    }
 
     // --- Someone in no group ----------------------------------------------------
     console.log('\n=== Someone in no workspace ===');

@@ -38,6 +38,14 @@ export interface TrustedDocument {
   legalHold: { reason: string; placedAt: string } | null;
 }
 
+export interface TrustedDocumentSession {
+  room: string;
+  key: string;
+  /** Null where the relay admits anyone who knows the room. */
+  relayToken: string | null;
+  relayTokenExpiresAt: string | null;
+}
+
 export interface TrustedMe {
   user: { userId: string; displayName: string | null };
   groups: string[];
@@ -299,6 +307,17 @@ export function createTrustedStoreClient(options: TrustedStoreClientOptions) {
     async restoreDocument(docId: string): Promise<TrustedDocument> {
       const { body } = await request(`/documents/${id(docId)}/restore`, { method: 'POST' });
       return body.document as TrustedDocument;
+    },
+
+    /**
+     * The document's live session: the relay room and the key that
+     * encrypts it between browsers, with a token for the relay where it
+     * asks for one. Given to people who may edit the document; a viewer is
+     * refused (`forbidden`) and follows along through the store instead.
+     */
+    async documentSession(docId: string): Promise<TrustedDocumentSession> {
+      const { body } = await request(`/documents/${id(docId)}/session`);
+      return body.session as TrustedDocumentSession;
     },
 
     // --- Retention (store administrators) -----------------------------------

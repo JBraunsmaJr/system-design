@@ -11,6 +11,7 @@ import pg from 'pg';
 import {
   CatalogError,
   byCreation,
+  newSessionSecret,
   normalizeTitle,
   requireDocId,
   type CatalogEntry,
@@ -128,6 +129,20 @@ export function createPostgresDocumentCatalog(
     async remove(docId) {
       const result = await pool.query(`DELETE FROM workspace_documents WHERE doc_id = $1`, [docId]);
       return (result.rowCount ?? 0) > 0;
+    },
+
+    async sessionSecret(docId) {
+      // One statement: two people opening a document at the same moment
+      // must be given the same secret, or they would be in different rooms.
+      const result = await pool.query<{ session_secret: string }>(
+        `UPDATE workspace_documents
+            SET session_secret = COALESCE(session_secret, $2)
+          WHERE doc_id = $1
+          RETURNING session_secret`,
+        [docId, newSessionSecret()],
+      );
+      if (result.rowCount === 0) throw new CatalogError(`No document ${docId}.`, 'not-found');
+      return result.rows[0].session_secret;
     },
   };
 }

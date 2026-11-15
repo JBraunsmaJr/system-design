@@ -131,6 +131,7 @@ async function main() {
     access,
     autoAccess: config.autoAccess,
     v2: createV2Api({
+      relayTokenSecret: config.relayTokenSecret,
       workspaces,
       catalog,
       documents: store,

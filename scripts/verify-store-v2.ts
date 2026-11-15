@@ -33,6 +33,7 @@ import { createPostgresUserDirectory } from '../store/src/postgresUserDirectory.
 import { createPostgresWorkspaceStore } from '../store/src/postgresWorkspaces.ts';
 import { createPostgresDocumentCatalog } from '../store/src/postgresDocumentCatalog.ts';
 import { createV2Api } from '../store/src/v2/api.ts';
+import { verifyRoomToken } from '../store/src/auth/roomTokens.ts';
 
 let failures = 0;
 function check(condition: boolean, message: string) {
@@ -45,6 +46,7 @@ function check(condition: boolean, message: string) {
 
 const DATABASE_URL = process.env.DATABASE_URL ?? '';
 const ISSUER = 'https://store-v2.test';
+const RELAY_SECRET = 'verify-store-v2-relay-secret-0123456789abcdef';
 const ADMIN_GROUP = 'notebook-admin';
 const EDITOR_ORIGIN = 'https://editor.example';
 
@@ -148,7 +150,9 @@ async function run(label: string, backend: Backend) {
     directory: backend.directory,
     publicUrl: () => origin,
     allowedOrigins: [EDITOR_ORIGIN],
+    relayTokenSecret: RELAY_SECRET,
     v2: createV2Api({
+      relayTokenSecret: RELAY_SECRET,
       workspaces: backend.workspaces,
       catalog: backend.catalog,
       documents: backend.documents,
@@ -319,6 +323,7 @@ async function run(label: string, backend: Backend) {
         body: { bytes: b64('tamper') },
         needs: 'editor',
       },
+      { method: 'GET', path: `/documents/${D1}/session`, needs: 'editor' },
       { method: 'PUT', path: `/documents/${D1}/hold`, body: { reason: 'x' }, needs: 'admin' },
       { method: 'DELETE', path: `/documents/${D1}/hold`, needs: 'admin' },
       { method: 'POST', path: `/documents/${D1}/purge`, needs: 'admin' },
@@ -799,6 +804,70 @@ async function run(label: string, backend: Backend) {
     // --- The rest of the service is untouched ------------------------------------------------
     const v1 = await fetch(`${origin}/v1/health`);
     check(v1.status === 200, 'the existing /v1 API still answers');
+
+    // --- Live sessions ---------------------------------------------------------------------
+    type Session = { room: string; key: string; relayToken: string | null };
+    const sessionOf = async (actor: Actor, docId: string) =>
+      (await call(actor, 'GET', `/documents/${docId}/session`)).body.session as Session;
+    const edSession = await sessionOf(ed, D2);
+    const gilSession = await sessionOf(olive, D2);
+    check(
+      edSession.room === gilSession.room && edSession.key === gilSession.key,
+      'two people who can edit a document are given the same room and key',
+    );
+    check(
+      /^wsdoc-[0-9a-f]{32}$/.test(edSession.room) &&
+        edSession.key.length >= 43 &&
+        !edSession.key.includes(edSession.room.slice(6)),
+      'the room is marked as a document room, and its name does not give the key away',
+    );
+    const again = await sessionOf(ed, D2);
+    check(
+      again.room === edSession.room && again.key === edSession.key,
+      'and the same ones every time, so people arriving later join the same session',
+    );
+    const D3 = 'v2t-d3';
+    await call(ed, 'POST', `/workspaces/${A}/documents`, { docId: D3, title: 'Another' });
+    const admins = await sessionOf(admin, D3);
+    check(
+      admins.room !== edSession.room && admins.key !== edSession.key,
+      'another document has another room and another key',
+    );
+    const claims = verifyRoomToken(edSession.relayToken ?? '', {
+      room: edSession.room,
+      secret: RELAY_SECRET,
+    });
+    check(
+      claims.room === edSession.room && claims.subject.endsWith('#ed'),
+      'where the relay requires tokens, the session comes with one for that room and that person',
+    );
+    let wrongRoom = false;
+    try {
+      verifyRoomToken(edSession.relayToken ?? '', { room: admins.room, secret: RELAY_SECRET });
+    } catch {
+      wrongRoom = true;
+    }
+    check(wrongRoom, 'which admits them to no other room');
+    const viaGeneralRoute = await fetch(
+      `${origin}/v1/rooms/${encodeURIComponent(edSession.room)}/token`,
+      { method: 'POST', headers: { cookie: out.cookie } },
+    );
+    check(
+      viaGeneralRoute.status === 403,
+      'the general room-token route refuses a document room, so knowing its name is not a way in',
+    );
+    const adHoc = await fetch(`${origin}/v1/rooms/session-abc123/token`, {
+      method: 'POST',
+      headers: { cookie: out.cookie },
+    });
+    check(adHoc.ok, 'and still issues tokens for sessions people start themselves');
+    check(
+      !JSON.stringify((await call(ed, 'GET', `/documents/${D2}`)).body).includes(edSession.key) &&
+        !JSON.stringify((await call(vic, 'GET', `/workspaces/${A}/documents`)).body).includes(
+          edSession.key,
+        ),
+      'nothing a viewer can read contains the key',
+    );
 
     // --- Nothing is cacheable ----------------------------------------------------------------
     // A browser that kept "that document is deleted" went on showing it

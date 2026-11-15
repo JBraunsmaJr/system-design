@@ -114,7 +114,8 @@ A document's workspace comes from the store's catalog (`store/src/documentCatalo
    - **Done: managing a workspace.** In the same panel, everyone in a workspace can see its members and mapped groups. Owners add people by name, map groups, change roles, remove either, and rename the workspace. Administrators archive and restore, and see archived workspaces in the list. A change that would cost the person making it their own access, or leave the workspace with no owner, is confirmed first (`src/collab/trusted/accessChanges.ts`).
    - **Done: choosing a store.** File > Documents shows which store the browser uses and lets someone point the editor at one. The address is checked before it is remembered, and the choice made in a browser wins over the one a deployment built in. Signing in returns to the page it started from.
    - **Done: deleted documents.** Editors and owners see what a workspace has deleted and how long it is kept, and can restore it. Administrators can place and release a hold, and remove a document for good.
-   - **Next:** live sessions.
+   - **Done: live sessions.** Opening a workspace document puts everyone who may edit it in one session through the relay, so they see each other's cursors and changes as they happen. Viewers are not in it and follow through the store.
+   - **Next:** nothing the encrypted mode did is now missing. What remains is the editor shell (one save status, Share in place of Collaborate, a canvas that is locked for viewers) and an OpenAPI description of `/v2`.
 4. **Last: removal.** The encrypted API, its tables, `src/crypto`, device enrolment, recovery, rotation, and their tests and documentation. The last release with encryption is tagged first.
 
 ## An editor hosted somewhere else
@@ -126,6 +127,15 @@ An editor does not have to be served by the organization that runs the store: th
 - The browser allows that cookie. Browsers that block third-party cookies will sign in and then appear signed out. Serving the editor and the store under one site avoids this, and is the arrangement to prefer.
 
 After signing in, the store sends the browser back to the page that started the sign-in (`returnTo`), if that page is on the store's own origin or an allowed one. Anything else is refused before the sign-in begins.
+
+## Live sessions
+
+A session needs two things: the name of a room on the relay, and a key that encrypts what passes through it. `GET /v2/documents/:id/session` gives both to someone who may edit the document, and refuses anyone else. A peer in a session can send changes straight to the others, so being able to read a document is not enough to be in its session.
+
+- Both are derived from a random secret kept with the document (`workspace_documents.session_secret`), made the first time anyone asks. Everyone is given the same room, and the store keeps no record of who is in it.
+- Where the relay requires tokens (`RELAY_TOKEN_SECRET` on the store and the relay), the reply includes one for that room and that person. The general route for room tokens refuses a document's room, so remembering a room's name is not a way back in.
+- **Set `RELAY_TOKEN_SECRET` in a trusted deployment.** Without it the relay admits anyone who knows a room and its key, and someone removed from a workspace who kept both could rejoin the live session. They could not read or change what the store holds, but they would see edits as they were made. With it, they are refused at the relay. The secret is not rotated when membership changes: doing so would split people already in the session.
+- A relay token lasts ten minutes and is used when the connection is made. A browser that loses its connection for longer reconnects with the token it had, and is refused until the document is reopened. The encrypted mode behaves the same way.
 
 ## Things the editor relies on
 
@@ -141,6 +151,5 @@ There is no migration tool. Before upgrading, each team opens its documents in t
 
 ## Open questions
 
-- **Live sessions.** The relay admits peers with a token the store issues. In this model the store should issue one only to editors of the document, since a peer in a live session can send edits to the others directly. Viewers follow along through the store instead.
 - **Group changes during a session.** Groups are read at sign-in, so a change takes effect at the next sign-in. The session lifetime (eight hours by default) is therefore the longest someone keeps access after being removed from a group.
 - **The last owner.** The store does not stop a workspace's only owner being removed, because an administrator can always manage it. The editor warns before it happens. If deployments run without administrators, the store needs a guard too.

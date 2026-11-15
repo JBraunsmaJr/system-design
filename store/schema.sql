@@ -330,5 +330,9 @@ CREATE TABLE IF NOT EXISTS workspace_documents (
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- What a document's live session (its relay room and the key that encrypts
+-- it between browsers) is derived from. Made the first time an editor asks.
+ALTER TABLE workspace_documents ADD COLUMN IF NOT EXISTS session_secret TEXT;
+
 CREATE INDEX IF NOT EXISTS workspace_documents_workspace_idx
     ON workspace_documents (workspace_id);

@@ -47,6 +47,9 @@ export interface V2Dependencies {
    * from. A request that changes something must come from one of them. */
   publicUrl: () => string;
   allowedOrigins: readonly string[];
+  /** Set where the relay only admits people carrying a token from this
+   * store (RELAY_TOKEN_SECRET). A document's session then comes with one. */
+  relayTokenSecret?: string | null;
 }
 
 export interface Caller {

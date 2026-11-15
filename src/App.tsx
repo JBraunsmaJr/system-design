@@ -45,6 +45,7 @@ import { useStoreSignIn } from './app/hooks/useStoreSignIn';
 import { useCollabSession } from './app/hooks/useCollabSession';
 import { useDocumentStores } from './app/hooks/useDocumentStores';
 import { useWorkspaceSession } from './app/hooks/useWorkspaceSession';
+import { useDocumentSessionJoin } from './app/hooks/useDocumentSessionJoin';
 import { useDocumentPersistence } from './app/hooks/useDocumentPersistence';
 import { useDiagramSelection } from './app/hooks/useDiagramSelection';
 import { useScenarios } from './app/hooks/useScenarios';
@@ -136,6 +137,17 @@ function App() {
    * than only from inside File > Documents (WS7-R8). */
   const accessRequests = useAccessRequests({ storeUrl: legacyStoreUrl });
 
+  /**
+   * A relay token for the open document's room, where a trusted store
+   * gives them out with the document. Filled in further down, once the
+   * hook that knows the document's session has run; stable, so the session
+   * code can hold on to it.
+   */
+  const documentRelayToken = useRef<((room: string) => Promise<string | null | undefined>) | null>(
+    null,
+  );
+  const relayTokenFor = useCallback(async (room: string) => documentRelayToken.current?.(room), []);
+
   const {
     activeSession,
     setActiveSession,
@@ -161,7 +173,7 @@ function App() {
     startNewSession,
     joinSession,
     leaveSession,
-  } = useCollabSession({ openDoc, storeUrl, signedInName, showToast });
+  } = useCollabSession({ openDoc, storeUrl, signedInName, showToast, relayTokenFor });
 
   const appVersion = useMemo(
     () => (import.meta.env.VITE_APP_VERSION as string | undefined) ?? 'Development',
@@ -214,6 +226,19 @@ function App() {
     doc: openDoc.doc,
     title,
   });
+  useDocumentSessionJoin({
+    session: trustedWorkspaceSync.session,
+    // The session code is set up before the hook above runs, so it
+    // reaches that hook's answer through this ref.
+    relayTokenRef: documentRelayToken,
+    relayTokenProvider: trustedStoreUrl ? trustedWorkspaceSync.relayTokenFor : null,
+    openDocId,
+    signalingUrls,
+    activeSessionRef,
+    autoJoinedRoomRef: autoJoinedRoom,
+    startNewSession,
+  });
+
   // Whichever store is in use. Both report the same shape, so saving,
   // the durability indicator and the unload guard do not care which.
   const workspaceSync = trustedStoreUrl ? trustedWorkspaceSync : legacyWorkspaceSync;

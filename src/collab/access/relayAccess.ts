@@ -21,6 +21,14 @@ export interface RelayAccessOptions {
   room: string;
   urls: string[];
   client?: StoreClient;
+  /**
+   * Asked first. A workspace document's room on a trusted store is not
+   * open to everyone signed in: its token comes with the document, for
+   * people who may edit it. Returns the token, null when this room needs
+   * none, or undefined when the room is not one it knows - in which case
+   * the store is asked in the ordinary way.
+   */
+  tokenForRoom?: (room: string) => Promise<string | null | undefined>;
 }
 
 export interface RelayAccess {
@@ -38,6 +46,22 @@ const withToken = (url: string, token: string): string => {
 export async function authorizeRelayUrls(options: RelayAccessOptions): Promise<RelayAccess> {
   const { storeUrl, room, urls } = options;
   if (!storeUrl || urls.length === 0) return { urls, note: null };
+  if (options.tokenForRoom) {
+    try {
+      const token = await options.tokenForRoom(room);
+      if (token === null) return { urls, note: null };
+      if (token !== undefined) {
+        return { urls: urls.map((url) => withToken(url, token)), note: null };
+      }
+    } catch {
+      // As below: go ahead without one, and let the relay say so if it
+      // needed it.
+      return {
+        urls,
+        note: "This document's live session could not be authorized. You can keep working; changes are still saved to the workspace.",
+      };
+    }
+  }
   const client = options.client ?? createStoreClient({ baseUrl: storeUrl });
 
   try {

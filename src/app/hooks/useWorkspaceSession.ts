@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState, type RefObject } from 'react';
+import { useCallback, useState, type RefObject } from 'react';
 import * as Y from 'yjs';
 import { useWorkspaceSync } from '../../collab/hooks/useWorkspaceSync';
 import { saveDocumentToWorkspace } from '../../collab/sync/workspacePersistence';
 import { createStoreClient } from '../../collab/access/storeClient';
 import type { OpenDocument } from '../../collab/sync/localDocument';
 import type { ToastType } from '../../common/components/toast/Toast';
+import { useDocumentSessionJoin } from './useDocumentSessionJoin';
 
 export interface UseWorkspaceSessionOptions {
   storeUrl: string | null;
@@ -24,7 +25,7 @@ export interface UseWorkspaceSessionOptions {
 
 /**
  * Keeping a workspace document in step with the store (WS8-R2), saving to
- * it, and joining its room when it is opened. Moved unchanged from App.tsx.
+ * it, and joining its room when it is opened (useDocumentSessionJoin).
  *
  * Performance contract (see src/app/README.md): this hook runs inside App's
  * render, so it adds no component, no render and no commit. Every value it
@@ -75,44 +76,14 @@ export function useWorkspaceSession({
     }
   }, [storeUrl, openDoc.doc, openDocId, title, showToast]);
 
-  /**
-   * Opening a workspace document joins its room. Everyone holding the
-   * key computes the same one, so no link changes hands, and the session
-   * is what makes an edit legible: who is here, where their cursor is,
-   * what they just changed (WS3).
-   *
-   * The document is saved to the workspace throughout, by its own sync -
-   * the session is how people see each other, not how work is kept.
-   */
-  useEffect(() => {
-    const room = workspaceSync.session?.room ?? null;
-    const key = workspaceSync.session?.key ?? null;
-    if (!room || !key) return;
-    // A deployment with no relay has no live sessions at all. The
-    // document still saves to the workspace; people just do not see each
-    // other, which is the behavior before any of this existed.
-    if (signalingUrls.length === 0) return;
-    // Someone in a session they chose - started, or joined by link - is
-    // left in it.
-    if (activeSessionRef.current || autoJoinedRoomRef.current === room) return;
-    autoJoinedRoomRef.current = room;
-    void startNewSession(key, room, { autoJoined: true });
-  }, [
-    workspaceSync.session?.room,
-    workspaceSync.session?.key,
+  useDocumentSessionJoin({
+    session: workspaceSync.session,
+    openDocId,
     signalingUrls,
-    startNewSession,
     activeSessionRef,
     autoJoinedRoomRef,
-  ]);
-
-  // Leaving the document, or taking it out of the workspace, ends the
-  // session it joined on its behalf.
-  useEffect(() => {
-    return () => {
-      autoJoinedRoomRef.current = null;
-    };
-  }, [openDocId, autoJoinedRoomRef]);
+    startNewSession,
+  });
 
   return { workspaceSync, handleSaveToWorkspace, isSavingToWorkspace };
 }

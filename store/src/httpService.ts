@@ -46,6 +46,7 @@ import {
 import { DirectoryError, verificationCodeFor, type UserDirectory } from './userDirectory.ts';
 import { IndexError, type WorkspaceIndexStore } from './workspaceIndex.ts';
 import { mintRoomToken } from './auth/roomTokens.ts';
+import { isDocumentRoom } from './v2/sessions.ts';
 import {
   SESSION_COOKIE,
   expiredSessionCookie,
@@ -668,6 +669,17 @@ export function createHttpService(options: HttpServiceOptions): Server {
         }
         const room = decodeURIComponent(parts[2] ?? '');
         if (!room) throw new HttpError(400, 'bad-request', 'Name the room.');
+        // A workspace document's room is given out with the document, to
+        // people who may edit it (/v2/documents/:id/session). Handing a
+        // token for one to anyone signed in would let a person who has
+        // been removed, but remembers the room, back into it.
+        if (options.v2 && isDocumentRoom(room)) {
+          throw new HttpError(
+            403,
+            'forbidden',
+            'That room belongs to a workspace document. Open the document to join its session.',
+          );
+        }
         const minted = mintRoomToken({
           room,
           subject: subject ?? 'anonymous',

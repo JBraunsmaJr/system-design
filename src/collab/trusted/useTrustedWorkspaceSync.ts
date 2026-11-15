@@ -67,12 +67,15 @@ export function useTrustedWorkspaceSync(options: TrustedWorkspaceSyncOptions) {
   /** The title the store's catalog holds, once known. */
   const storedTitle = useRef<string | null>(null);
   const canWrite = useRef(false);
+  /** The live session's room, once this person is known to be in it. */
+  const sessionRoom = useRef<string | null>(null);
 
   const stop = useCallback(() => {
     sync.current?.stop();
     sync.current = null;
     storedTitle.current = null;
     canWrite.current = false;
+    sessionRoom.current = null;
   }, []);
 
   /** Is this document in a workspace this person can see? */
@@ -97,6 +100,21 @@ export function useTrustedWorkspaceSync(options: TrustedWorkspaceSyncOptions) {
         ? { workspaceId: mine.workspaceId, name: mine.name, role: mine.role }
         : null;
       const readOnly = !mine || mine.role === 'viewer';
+      // The live session, for people who may edit. Not having one is not a
+      // failure: the document still saves, and others' changes still
+      // arrive, through the store.
+      let session: { room: string; key: string } | null = null;
+      if (!readOnly) {
+        try {
+          const granted = await client.documentSession(docId);
+          session = { room: granted.room, key: granted.key };
+          // Before the first status goes out: that is what makes the
+          // editor join, and joining asks for this room's relay token.
+          sessionRoom.current = granted.room;
+        } catch (error) {
+          console.warn('No live session for this document:', error);
+        }
+      }
       const started = createDocumentSync({
         log: client.documentLog(docId),
         doc,
@@ -104,8 +122,9 @@ export function useTrustedWorkspaceSync(options: TrustedWorkspaceSyncOptions) {
         onStatus: (status, detail) =>
           setState({
             status: status === 'starting' ? 'saving' : status,
-            // Live sessions through the relay are not part of this API yet.
-            session: null,
+            // Carried through every status change, so the editor can join
+            // the room as soon as the document is known to be shared.
+            session,
             version: started.version(),
             message:
               detail ??
@@ -210,8 +229,23 @@ export function useTrustedWorkspaceSync(options: TrustedWorkspaceSyncOptions) {
     };
   }, [client, docId, title]);
 
+  /**
+   * A relay token for this document's room, asked for afresh each time
+   * since tokens are short-lived. Undefined for any other room, which is
+   * not this hook's to answer for. Stable, so it can be handed to the
+   * session code once.
+   */
+  const relayTokenFor = useCallback(
+    async (room: string): Promise<string | null | undefined> => {
+      if (!client || room !== sessionRoom.current) return undefined;
+      return (await client.documentSession(docId)).relayToken;
+    },
+    [client, docId],
+  );
+
   return {
     ...state,
+    relayTokenFor,
     /** Sends anything outstanding now, for a caller about to close. */
     flush: async () => sync.current?.flush(),
     refresh: check,

@@ -185,6 +185,30 @@ async function runCatalog(
     'moving an unknown document is refused',
   );
 
+  // The secret a document's live session is derived from.
+  const [first, second, other] = await Promise.all([
+    catalog.sessionSecret('doc-a'),
+    catalog.sessionSecret('doc-a'),
+    catalog.sessionSecret('doc-b'),
+  ]);
+  check(
+    first === second && first.length >= 43,
+    'a document has one session secret, even when two people ask at once',
+  );
+  check(
+    (await catalog.sessionSecret('doc-a')) === first && other !== first,
+    'it stays the same, and differs between documents',
+  );
+  check(
+    !JSON.stringify(await catalog.get('doc-a')).includes(first) &&
+      !JSON.stringify(await catalog.listByWorkspace(one.workspaceId)).includes(first),
+    'and is not part of what the catalog returns about a document',
+  );
+  check(
+    (await reasonOf(() => catalog.sessionSecret('doc-missing'))) === 'not-found',
+    'an unknown document has none',
+  );
+
   check(
     (await catalog.remove('doc-c')) === true && (await catalog.remove('doc-c')) === false,
     'a document is removed from the catalog once',

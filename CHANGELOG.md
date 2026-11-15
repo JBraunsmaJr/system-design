@@ -59,6 +59,13 @@ markers are removed when the section becomes a release. See
   the workspace panel.
 - [PATCH] Store: every reply now carries `Cache-Control: no-store`. A browser could keep an error reply, such as "that
   document is deleted", and go on showing it after the document was restored.
+- Opening a workspace document puts everyone who can edit it in one live session, so you see each other's cursors
+  and changes as they happen, without sharing a link. Viewers are not in the session; changes reach them through the
+  store a few seconds later.
+- Store: `GET /v2/documents/:id/session` gives a document's relay room and key to people who may edit it, with a relay
+  token where `RELAY_TOKEN_SECRET` is set. The general room-token route refuses a document's room. Set
+  `RELAY_TOKEN_SECRET` on the store and the relay so that someone removed from a workspace cannot rejoin a session
+  they remember.
 - Against a store without the workspace API, nothing changes.
 - Store: compacting a document through `/v2` must name the version it read, and is refused if the document has moved
   on, so a concurrent edit can no longer be erased by a compaction. The id `local` is refused for workspace documents.
