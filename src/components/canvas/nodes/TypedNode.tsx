@@ -44,6 +44,9 @@ export function TypedNode({ id, data, selected, onDrillInto: propOnDrillInto }: 
   return (
     <div
       className={`typed-node${selected ? ' is-selected' : ''}`}
+      // Drawn large over the node when the canvas is zoomed out to its
+      // overview level - see levelOfDetail.ts and nodes.css.
+      data-label={data.label}
       style={{ borderLeftColor: accent }}
     >
       <EdgeHandles />

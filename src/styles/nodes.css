@@ -1150,3 +1150,50 @@
     var(--chrome-bg-raised);
   pointer-events: none;
 }
+
+/* ---------- Overview level of detail (see domain/canvas/levelOfDetail.ts) ----------
+
+   Zoomed out far enough that a node's text can't be read, the canvas
+   carries data-lod="overview" and --lod-scale. Each node then shows only
+   its name, drawn over its existing box and scaled up to stay legible.
+   Everything hidden here uses visibility, never display: a node must keep
+   its size, or every edge attached to it would move. */
+
+/* Overwritten on the element as the zoom changes. */
+.canvas {
+  --lod-scale: 1;
+}
+
+.canvas[data-lod='overview'] .typed-node {
+  position: relative;
+}
+
+.canvas[data-lod='overview'] .typed-node > :not(.react-flow__handle):not(.edge-grab) {
+  visibility: hidden;
+}
+
+.canvas[data-lod='overview'] .typed-node::after {
+  content: attr(data-label);
+  position: absolute;
+  inset: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  /* Centred vertically: the box is the node's own, the text one or two lines. */
+  align-content: center;
+  padding: 0 10px;
+  font-weight: 600;
+  font-size: calc(var(--text-sm-plus) * var(--lod-scale, 1));
+  line-height: 1.12;
+  color: var(--chrome-text);
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+
+/* A boundary's name is a chip on its border; it only needs to grow. */
+.canvas[data-lod='overview'] .group-node__label {
+  font-size: calc(var(--text-xs) * var(--lod-scale, 1));
+  top: calc(-11px * var(--lod-scale, 1));
+  padding: calc(2px * var(--lod-scale, 1)) calc(10px * var(--lod-scale, 1));
+}

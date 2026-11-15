@@ -28,6 +28,11 @@ The editor is designed for rapid, low-friction diagramming with zero configurati
   in-place.
 - **Fragments**: Your own reusable groups of nodes - see [Reusable Fragments](#reusable-fragments) below.
 
+### Zooming Out
+
+Below 60% zoom the canvas shows an overview: each component displays only its name, enlarged so it stays readable, and
+its subtitle, properties and badges are hidden until you zoom back in. Exported images always use full detail.
+
 ### Reusable Fragments
 
 A fragment is a group of nodes saved for reuse, like a "service + database + cache" trio you draw in every design.

@@ -29,6 +29,13 @@ markers are removed when the section becomes a release. See
 - `ADMIN_GROUPS` makes the members of an identity-provider group store administrators in that API.
   `WORKSPACE_CREATION` sets who may create workspaces there.
 
+### [MINOR] Diagram: names stay readable when zoomed out
+
+- Below 60% zoom the canvas switches to an overview: each component shows only its name, drawn larger the further out
+  you are, and boundary names grow with it. Subtitles, property chips and badges, which can't be read at that size,
+  are hidden until you zoom back in. Nodes keep their size, so edges don't move.
+- Exported images are always drawn at full detail, whatever the editor's zoom. Presenting is unaffected.
+
 ### [MINOR] Palette: rail, search and recently used
 
 - The palette is a narrow rail of buttons (search, System, Cloud, Shapes, Code, Git, Fragments) with the open palette's

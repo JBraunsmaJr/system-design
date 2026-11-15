@@ -239,6 +239,49 @@ async function run() {
 
     await p.setInputFiles('input[type="file"][accept="application/json"]', FILE);
     await p.waitForSelector('.react-flow__node[data-id="n-gateway"]');
+    console.log('=== Overview level of detail ===');
+    {
+      const lod = () =>
+        p.evaluate(() => document.querySelector<HTMLElement>('.canvas')?.dataset.lod);
+      const gatewaySize = () =>
+        p.evaluate(() => {
+          const el = document.querySelector<HTMLElement>('[data-id="n-gateway"] .typed-node');
+          return el ? `${el.offsetWidth}x${el.offsetHeight}` : '';
+        });
+      const sizeBefore = await gatewaySize();
+      for (let i = 0; i < 12 && (await lod()) !== 'overview'; i++) {
+        await p.click('.react-flow__controls-zoomout');
+        await p.waitForTimeout(250);
+      }
+      check((await lod()) === 'overview', 'zooming out switches the canvas to its overview level');
+      check(
+        sizeBefore !== '' && (await gatewaySize()) === sizeBefore,
+        'a node keeps its size there, so its edges stay put',
+      );
+      check(
+        await p.evaluate(() => {
+          const node = document.querySelector('[data-id="n-gateway"] .typed-node');
+          const type = node?.querySelector('.typed-node__type');
+          return (
+            node !== null &&
+            node !== undefined &&
+            getComputedStyle(node, '::after').content.includes(
+              node.getAttribute('data-label') ?? '?',
+            ) &&
+            type !== null &&
+            type !== undefined &&
+            getComputedStyle(type).visibility === 'hidden'
+          );
+        }),
+        'it shows its name alone, drawn over the node',
+      );
+      for (let i = 0; i < 12 && (await lod()) !== 'detail'; i++) {
+        await p.click('.react-flow__controls-zoomin');
+        await p.waitForTimeout(250);
+      }
+      check((await lod()) === 'detail', 'zooming back in restores full detail');
+    }
+
     console.log('=== Palette search ===');
     {
       await p.keyboard.press('Escape');

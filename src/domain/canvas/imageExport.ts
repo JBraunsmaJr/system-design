@@ -1,5 +1,6 @@
 import { getNodesBounds, getViewportForBounds, type Node } from '@xyflow/react';
 import { toCanvas, toJpeg, toPng, toSvg } from 'html-to-image';
+import { withFullDetail } from './levelOfDetail';
 import { findNodesContainedInRect, getDescendantIds, toAbsolutePosition } from './graphUtils';
 
 const EXPORT_WIDTH = 1600;
@@ -48,8 +49,10 @@ function encode(
   element: HTMLElement,
   options: Parameters<typeof toPng>[1],
 ): Promise<string> {
-  if (format === 'jpeg') return toJpeg(element, { ...options, quality: JPEG_QUALITY });
-  return format === 'png' ? toPng(element, options) : toSvg(element, options);
+  return withFullDetail(element, () => {
+    if (format === 'jpeg') return toJpeg(element, { ...options, quality: JPEG_QUALITY });
+    return format === 'png' ? toPng(element, options) : toSvg(element, options);
+  });
 }
 
 /**
@@ -200,19 +203,21 @@ async function captureInTiles(
       const height = Math.min(tileHeight, EXPORT_HEIGHT - top);
       // The same view, shifted so this tile's region lands at its origin.
       const frame = { x: view.x - left, y: view.y - top, zoom: view.zoom, width, height };
-      const tile = await toCanvas(viewportEl, {
-        backgroundColor: EXPORT_BACKGROUND,
-        width,
-        height,
-        pixelRatio: ratio,
-        fontEmbedCSS: target.fontEmbedCSS,
-        filter: keepNodesInFrame(nodes, frame),
-        style: {
-          width: `${width}px`,
-          height: `${height}px`,
-          transform: `translate(${frame.x}px, ${frame.y}px) scale(${frame.zoom})`,
-        },
-      });
+      const tile = await withFullDetail(viewportEl, () =>
+        toCanvas(viewportEl, {
+          backgroundColor: EXPORT_BACKGROUND,
+          width,
+          height,
+          pixelRatio: ratio,
+          fontEmbedCSS: target.fontEmbedCSS,
+          filter: keepNodesInFrame(nodes, frame),
+          style: {
+            width: `${width}px`,
+            height: `${height}px`,
+            transform: `translate(${frame.x}px, ${frame.y}px) scale(${frame.zoom})`,
+          },
+        }),
+      );
       ctx.drawImage(tile, Math.round(left * ratio), Math.round(top * ratio));
     }
   }

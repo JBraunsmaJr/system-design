@@ -28,6 +28,7 @@ import {
 } from '@xyflow/react';
 import { Map as MapIcon, MousePointer2 } from 'lucide-react';
 import { loadShowMinimap, saveShowMinimap } from '../../domain/canvas/canvasPrefs';
+import { useCanvasLevelOfDetail } from './useCanvasLevelOfDetail';
 import {
   CANVAS_EDGE_TYPES,
   CANVAS_NODE_TYPES,
@@ -260,6 +261,8 @@ export function Canvas({
    * Which node (text annotation or shape) is being label-edited inline right now.
    */
   const [editingLabelNodeId, setEditingLabelNodeId] = useState<string | null>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  useCanvasLevelOfDetail(canvasRef, isPresenting);
   const [showMinimap, setShowMinimap] = useState(loadShowMinimap);
   const toggleMinimap = useCallback(() => {
     setShowMinimap((shown) => {
@@ -474,6 +477,7 @@ export function Canvas({
   return (
     <CanvasContext.Provider value={canvasContextValue}>
       <div
+        ref={canvasRef}
         className={`canvas${isSelectMode ? ' is-select-mode' : ''}`}
         onDragOver={onDragOver}
         onDrop={onDrop}
