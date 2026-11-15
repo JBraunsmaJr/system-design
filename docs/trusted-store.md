@@ -57,11 +57,59 @@ Access is per workspace only. There is no per-document sharing; if two groups ne
 
 Route handlers must not decide access themselves. They load the grants with `grantsFor` and ask `canInWorkspace`.
 
+## The API
+
+Served under `/v2`, beside the existing API, which is unchanged. Sign-in still goes through `/v1/auth/...`; both APIs share one session.
+
+| Route                                            | Needs         | What it does                                              |
+| ------------------------------------------------ | ------------- | --------------------------------------------------------- |
+| `GET /v2/health`                                 | nothing       | Says the store is in trusted mode. No sign-in needed.     |
+| `GET /v2/me`                                     | signed in     | The caller, their groups, and what they may do store-wide |
+| `GET /v2/workspaces`                             | signed in     | The caller's workspaces, each with their role             |
+| `POST /v2/workspaces`                            | administrator | Create one. The creator becomes its first owner.          |
+| `GET /v2/workspaces/:id`                         | viewer        | One workspace                                             |
+| `PATCH /v2/workspaces/:id`                       | owner         | Rename it                                                 |
+| `POST /v2/workspaces/:id/archive`, `/restore`    | administrator | Hide it from its members, or bring it back                |
+| `GET /v2/workspaces/:id/members`                 | viewer        | Members and group mappings                                |
+| `PUT`, `DELETE /v2/workspaces/:id/members/:user` | owner         | Add someone, change their role, remove them               |
+| `PUT`, `DELETE /v2/workspaces/:id/groups/:group` | owner         | Map a group to a role, change it, remove it               |
+| `GET /v2/workspaces/:id/people?query=`           | owner         | Find people to add, by name                               |
+| `GET /v2/workspaces/:id/documents`               | viewer        | List documents (`?deleted=true` needs editor)             |
+| `POST /v2/workspaces/:id/documents`              | editor        | Create a document                                         |
+| `GET /v2/documents/:doc`                         | viewer        | The document and every update                             |
+| `PATCH /v2/documents/:doc`                       | editor        | Retitle it, or move it to another workspace               |
+| `DELETE /v2/documents/:doc`, `POST .../restore`  | editor        | Soft-delete it; restore it while it is retained           |
+| `GET /v2/documents/:doc/updates?since=`          | viewer        | Updates after a version                                   |
+| `POST /v2/documents/:doc/updates`, `.../compact` | editor        | Append an update; replace the log with a snapshot         |
+| `PUT`, `DELETE /v2/documents/:doc/hold`          | administrator | Place or release a legal hold                             |
+| `POST /v2/documents/:doc/purge`                  | administrator | Remove a document for good                                |
+
+With `WORKSPACE_CREATION=anyone`, any signed-in person may create a workspace.
+
+**Refusals.** Someone with no role in a workspace gets 404 for it and for its documents, the same reply as for something that does not exist. Someone in the workspace whose role is not enough gets 403 with the reason. Store-wide actions are 403 for everyone but administrators.
+
+**Where a request comes from.** A request that changes something must carry no `Origin`, the store's own origin, or one of `ALLOWED_ORIGINS`, and any body must be `application/json`. A page on another site therefore cannot spend a signed-in person's session.
+
+**Administrators** are the people listed in `ADMIN_SUBJECTS` and the members of any group in `ADMIN_GROUPS`.
+
+**Without sign-in** (development only) every request is the same local administrator.
+
+A document's workspace comes from the store's catalog (`store/src/documentCatalog.ts`), never from the request. Document ids are chosen by the editor and are unique across the whole store.
+
+| File                              | What it is                                                          |
+| --------------------------------- | ------------------------------------------------------------------- |
+| `store/src/v2/api.ts`             | Entry point: origin check, who is asking, routing                   |
+| `store/src/v2/context.ts`         | `workspaceFor` and `documentFor`: the only places access is decided |
+| `store/src/v2/workspaceRoutes.ts` | Workspaces, members, group mappings                                 |
+| `store/src/v2/documentRoutes.ts`  | Documents                                                           |
+| `store/src/documentCatalog.ts`    | Which workspace a document is in, and its title                     |
+| `scripts/verify-store-v2.ts`      | Every route refused to everyone below its minimum, then exercised   |
+
 ## Progress
 
-1. **Done: rules and storage.** Permissions, workspaces, members, group mappings, with both storage implementations. Additive: nothing calls them yet and the existing API is untouched.
-2. **Next: the API.** Routes under `/v2` for workspaces, members, group mappings, and documents within a workspace, served beside the existing API. Every route gets a test that someone outside the workspace is refused. Administrators come from an identity-provider group or role, replacing the `ADMIN_SUBJECTS` list. Documents gain a workspace and a plain title.
-3. **Then: the editor.** A store client without keys, a workspace list and switcher, members and group mappings, an administration page, and the store address in settings.
+1. **Done: rules and storage.** Permissions, workspaces, members, group mappings, with both storage implementations.
+2. **Done: the API.** The routes above, with a refusal test for every one, against memory and PostgreSQL. Administrators can come from an identity-provider group. Documents have a workspace and a plain title. Not yet done: tokens for live sessions through the relay, and an OpenAPI description.
+3. **Next: the editor.** A store client without keys, a workspace list and switcher, members and group mappings, an administration page, and the store address in settings.
 4. **Last: removal.** The encrypted API, its tables, `src/crypto`, device enrolment, recovery, rotation, and their tests and documentation. The last release with encryption is tagged first.
 
 ## Moving from an encrypted store
@@ -70,6 +118,6 @@ There is no migration tool. Before upgrading, each team opens its documents in t
 
 ## Open questions
 
-- **Who may create workspaces.** `permissions.ts` supports "administrators only" and "anyone signed in". The default will be administrators only unless teams say otherwise.
+- **Live sessions.** The relay admits peers with a token the store issues. In this model the store should issue one only to editors of the document, since a peer in a live session can send edits to the others directly. Viewers follow along through the store instead.
 - **Group changes during a session.** Groups are read at sign-in, so a change takes effect at the next sign-in. The session lifetime (eight hours by default) is therefore the longest someone keeps access after being removed from a group.
 - **The last owner.** Nothing stops a workspace's only owner being removed, because an administrator can always manage it. If deployments run without administrators, this needs a guard.

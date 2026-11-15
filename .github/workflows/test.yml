@@ -145,6 +145,11 @@ jobs:
         env:
           DATABASE_URL: postgresql://store:store@localhost:5432/store
 
+      - name: Run the workspace API against PostgreSQL
+        run: npx tsx scripts/verify-store-v2.ts
+        env:
+          DATABASE_URL: postgresql://store:store@localhost:5432/store
+
       - name: Run the store client against PostgreSQL
         run: npx tsx scripts/verify-store-client.ts
         env:

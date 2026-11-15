@@ -215,7 +215,32 @@ export interface HttpServiceOptions {
   access?: AccessStore;
   /** WS14-R36: AUTO_ACCESS. Defaults to on when `access` is given. */
   autoAccess?: boolean;
+  /**
+   * The workspace API, served under /v2 (docs/trusted-store.md). It shares
+   * this service's sessions, CORS, audit trail and error replies, and
+   * decides everything else itself. Absent, /v2 answers 404.
+   */
+  v2?: V2Handler;
 }
+
+/** What this service hands the workspace API for one request. */
+export interface V2Request {
+  request: IncomingMessage;
+  url: URL;
+  method: string;
+  /** The path after /v2, split on slashes. Segments are still URL-encoded. */
+  parts: string[];
+  session: Session | null;
+  readJson(): Promise<Record<string, unknown>>;
+  /** `version` sets the x-document-version header. */
+  send(status: number, body: unknown, version?: number): void;
+  record(entry: Omit<AuditEntry, 'at'>): Promise<void>;
+  /** Names the operation (and document) for the audit entry written if the
+   * request is refused or fails after this point. */
+  describeForAudit(operation: string, docId?: string | null): void;
+}
+
+export type V2Handler = (request: V2Request) => Promise<void>;
 
 /** The workspace every deployment has until multi-workspace lands. The
  * legacy /v1/workspace/... routes act on it. */
@@ -268,7 +293,7 @@ const STATUS: Record<string, number> = {
   unauthenticated: 401,
 };
 
-class HttpError extends Error {
+export class HttpError extends Error {
   status: number;
   reason: string;
 
@@ -279,11 +304,11 @@ class HttpError extends Error {
   }
 }
 
-function toBase64(bytes: Uint8Array): string {
+export function toBase64(bytes: Uint8Array): string {
   return Buffer.from(bytes).toString('base64');
 }
 
-function fromBase64(value: unknown, field: string): Uint8Array {
+export function fromBase64(value: unknown, field: string): Uint8Array {
   if (typeof value !== 'string' || value.length === 0) {
     throw new HttpError(400, 'bad-request', `${field} must be a base64 string.`);
   }
@@ -294,7 +319,7 @@ function fromBase64(value: unknown, field: string): Uint8Array {
   return new Uint8Array(bytes);
 }
 
-function positiveInt(value: string | null, field: string): number | undefined {
+export function positiveInt(value: string | null, field: string): number | undefined {
   if (value === null) return undefined;
   const parsed = Number(value);
   if (!Number.isSafeInteger(parsed) || parsed < 0) {
@@ -484,7 +509,7 @@ export function createHttpService(options: HttpServiceOptions): Server {
     applyCors(request, response);
     if (request.method === 'OPTIONS') {
       response.writeHead(204, {
-        'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'access-control-allow-methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
         'access-control-allow-headers': 'content-type, if-document-version, x-device-id',
         'access-control-max-age': '600',
       });
@@ -518,6 +543,23 @@ export function createHttpService(options: HttpServiceOptions): Server {
           signIn: [...providers.keys()].map((provider) => `/v1/auth/${provider}/start`),
           editor: options.afterLoginUrl ?? null,
           note: 'This is the storage service, not the editor.',
+        });
+      }
+
+      if (parts[0] === 'v2' && options.v2) {
+        return await options.v2({
+          request,
+          url,
+          method,
+          parts: parts.slice(1),
+          session,
+          readJson: () => readJson(request),
+          send: (status, body, version) => send(response, status, body, version),
+          record,
+          describeForAudit(name, id) {
+            operation = name;
+            if (id !== undefined) docId = id;
+          },
         });
       }
 
@@ -2088,7 +2130,7 @@ export function createHttpService(options: HttpServiceOptions): Server {
   }
 }
 
-function positiveIntHeader(request: IncomingMessage, header: string): number | undefined {
+export function positiveIntHeader(request: IncomingMessage, header: string): number | undefined {
   const raw = request.headers[header];
   if (typeof raw !== 'string') return undefined;
   const parsed = Number(raw);

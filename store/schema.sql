@@ -311,3 +311,21 @@ CREATE TABLE IF NOT EXISTS workspace_group_roles (
     added_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (workspace_id, group_name)
 );
+
+-- Which workspace each document is in, and its title (documentCatalog.ts).
+-- The workspace decides who may touch the document; the title is plain text
+-- so a workspace's documents can be listed without opening them. A document
+-- with no row here is not reachable through the workspace API.
+CREATE TABLE IF NOT EXISTS workspace_documents (
+    -- Purging a document removes its catalog row with it.
+    doc_id       TEXT PRIMARY KEY REFERENCES documents (doc_id) ON DELETE CASCADE,
+    -- Workspaces are archived, never deleted, so a document cannot lose its
+    -- workspace from under it.
+    workspace_id TEXT        NOT NULL REFERENCES workspaces (workspace_id) ON DELETE RESTRICT,
+    title        TEXT        NOT NULL,
+    created_by   TEXT        REFERENCES users (user_id) ON DELETE SET NULL,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS workspace_documents_workspace_idx
+    ON workspace_documents (workspace_id);

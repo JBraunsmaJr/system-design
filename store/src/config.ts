@@ -27,6 +27,15 @@ export interface StoreConfig {
   providers: ProviderConfig[];
   /** `issuer#subject` for each administrator (WS10-R2). */
   admins: string[];
+  /**
+   * ADMIN_GROUPS: identity-provider groups whose members are store
+   * administrators in the workspace API. Read from each sign-in, like every
+   * other group, so adding or removing an administrator is done at the
+   * provider and takes effect when they next sign in.
+   */
+  adminGroups: string[];
+  /** WORKSPACE_CREATION: who may create workspaces in the workspace API. */
+  workspaceCreation: 'admins' | 'anyone';
   retention: RetentionPeriod;
   cryptoMode: 'webcrypto' | 'passthrough';
   /**
@@ -223,6 +232,13 @@ export function loadStoreConfig(env: Env = process.env): StoreConfig {
   }
   const joinEvidenceRetentionMs = parseEvidenceRetention(env.JOIN_EVIDENCE_RETENTION);
 
+  const workspaceCreation = (env.WORKSPACE_CREATION ?? 'admins').trim().toLowerCase();
+  if (workspaceCreation !== 'admins' && workspaceCreation !== 'anyone') {
+    throw new ConfigError(
+      `WORKSPACE_CREATION must be "admins" or "anyone", not "${env.WORKSPACE_CREATION}".`,
+    );
+  }
+
   return {
     port: positive(env, 'PORT', 8080),
     databaseUrl: env.DATABASE_URL?.trim() || null,
@@ -231,6 +247,8 @@ export function loadStoreConfig(env: Env = process.env): StoreConfig {
     afterLoginUrl,
     providers,
     admins: list(env.ADMIN_SUBJECTS),
+    adminGroups: list(env.ADMIN_GROUPS),
+    workspaceCreation,
     retention: parseRetentionPeriod(env.RETENTION_PERIOD),
     cryptoMode,
     recoveryPublicKeyPem,
@@ -292,9 +310,19 @@ export function describeConfig(config: StoreConfig): string[] {
       ? `Editor origins: ${config.allowedOrigins.join(', ')}`
       : 'Editor origins: same origin only',
     `After signing in, people are sent to ${config.afterLoginUrl}`,
-    config.admins.length
-      ? `Administrators: ${config.admins.length}`
+    config.admins.length || config.adminGroups.length
+      ? `Administrators: ${[
+          config.admins.length ? `${config.admins.length} listed` : '',
+          config.adminGroups.length ? `members of ${config.adminGroups.join(', ')}` : '',
+        ]
+          .filter(Boolean)
+          .join(', and ')}`
       : 'Administrators: none configured - holds and purges are refused to everyone',
+    `Workspaces: ${
+      config.workspaceCreation === 'anyone'
+        ? 'anyone signed in can create one'
+        : 'only administrators can create one'
+    }`,
     describeRetention(config.retention),
     config.cryptoMode === 'passthrough'
       ? 'Crypto mode: PASSTHROUGH - documents are stored unencrypted and this server can read them'

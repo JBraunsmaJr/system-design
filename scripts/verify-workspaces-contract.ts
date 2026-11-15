@@ -20,6 +20,12 @@ import { createPostgresWorkspaceStore } from '../store/src/postgresWorkspaces.ts
 import { createPostgresStore } from '../store/src/postgresStore.ts';
 import { createPostgresUserDirectory } from '../store/src/postgresUserDirectory.ts';
 import { canInWorkspace, type Principal } from '../store/src/permissions.ts';
+import {
+  CatalogError,
+  createMemoryDocumentCatalog,
+  type DocumentCatalog,
+} from '../store/src/documentCatalog.ts';
+import { createPostgresDocumentCatalog } from '../store/src/postgresDocumentCatalog.ts';
 
 let failures = 0;
 function check(condition: boolean, message: string) {
@@ -39,7 +45,9 @@ async function reasonOf(fn: () => Promise<unknown>): Promise<string> {
     await fn();
     return 'no-error';
   } catch (error) {
-    return error instanceof WorkspaceError ? error.reason : `other (${String(error)})`;
+    return error instanceof WorkspaceError || error instanceof CatalogError
+      ? error.reason
+      : `other (${String(error)})`;
   }
 }
 
@@ -57,6 +65,131 @@ const person = (userId: string, overrides: Partial<Principal> = {}): Principal =
   isAdmin: false,
   ...overrides,
 });
+
+/**
+ * The document catalog. `createDocument` makes the document the catalog row
+ * will point at: PostgreSQL requires it to exist, memory does not care.
+ */
+async function runCatalog(
+  label: string,
+  store: WorkspaceStore,
+  catalog: DocumentCatalog,
+  users: Users,
+  createDocument: (docId: string) => Promise<void>,
+) {
+  console.log(`\n=== ${label}: document catalog ===`);
+  const { ada, ben } = users;
+  const one = await store.createWorkspace({ name: 'Catalog one', createdBy: ada });
+  const two = await store.createWorkspace({ name: 'Catalog two', createdBy: ben });
+  for (const id of ['doc-a', 'doc-b', 'doc-c']) await createDocument(id);
+
+  const a = await catalog.add({
+    docId: 'doc-a',
+    workspaceId: one.workspaceId,
+    title: '  Northwind   Commerce ',
+    createdBy: ada,
+  });
+  check(a.title === 'Northwind Commerce', 'a title is trimmed and its inner spaces collapsed');
+  check(
+    a.workspaceId === one.workspaceId && a.createdBy === ada,
+    'a document is added to a workspace',
+  );
+  const b = await catalog.add({
+    docId: 'doc-b',
+    workspaceId: one.workspaceId,
+    title: '   ',
+    createdBy: ada,
+  });
+  check(b.title === 'Untitled', 'a blank title becomes Untitled');
+  await catalog.add({
+    docId: 'doc-c',
+    workspaceId: two.workspaceId,
+    title: 'Elsewhere',
+    createdBy: ben,
+  });
+
+  check(
+    (await reasonOf(() =>
+      catalog.add({ docId: 'doc-a', workspaceId: two.workspaceId, title: 'Again', createdBy: ben }),
+    )) === 'conflict',
+    'an id already in the catalog is refused, even for another workspace',
+  );
+  check(
+    (await catalog.get('doc-a'))?.workspaceId === one.workspaceId,
+    'and the refused attempt did not move the original',
+  );
+  for (const bad of ['', 'has space', '../etc', 'x'.repeat(129), '-leading']) {
+    check(
+      (await reasonOf(() =>
+        catalog.add({ docId: bad, workspaceId: one.workspaceId, title: 'x', createdBy: ada }),
+      )) === 'invalid',
+      `the id ${JSON.stringify(bad.length > 20 ? `${bad.slice(0, 8)}...` : bad)} is refused`,
+    );
+  }
+  check(
+    (await reasonOf(() =>
+      catalog.add({
+        docId: 'doc-a',
+        workspaceId: one.workspaceId,
+        title: 'x'.repeat(201),
+        createdBy: ada,
+      }),
+    )) === 'invalid',
+    'a title over 200 characters is refused',
+  );
+
+  check(
+    (await catalog.listByWorkspace(one.workspaceId)).map((e) => e.docId).join(',') ===
+      'doc-a,doc-b',
+    'a workspace lists its own documents, in the order they were added',
+  );
+  check(
+    (await catalog.listByWorkspace(two.workspaceId)).map((e) => e.docId).join(',') === 'doc-c',
+    "and not another workspace's",
+  );
+  check(
+    (await catalog.listByWorkspace('ws_missing')).length === 0,
+    'an unknown workspace lists none',
+  );
+  check((await catalog.get('doc-missing')) === null, 'an unknown document finds nothing');
+
+  const retitled = await catalog.setTitle('doc-b', 'Checkout review');
+  check(
+    retitled.title === 'Checkout review' && retitled.createdAt === b.createdAt,
+    'a title can be changed, and nothing else changes',
+  );
+  check(
+    (await reasonOf(() => catalog.setTitle('doc-missing', 'x'))) === 'not-found',
+    'retitling an unknown document is refused',
+  );
+
+  const moved = await catalog.move('doc-b', two.workspaceId);
+  check(
+    moved.workspaceId === two.workspaceId && moved.title === 'Checkout review',
+    'a document can be moved',
+  );
+  check(
+    (await catalog.listByWorkspace(one.workspaceId)).map((e) => e.docId).join(',') === 'doc-a' &&
+      (await catalog.listByWorkspace(two.workspaceId)).map((e) => e.docId).join(',') ===
+        'doc-b,doc-c',
+    'and is then listed by the new workspace only, still in the order it was added',
+  );
+  check(
+    (await reasonOf(() => catalog.move('doc-b', 'ws_missing'))) === 'not-found',
+    'a document cannot be moved to a workspace that does not exist',
+  );
+  check((await catalog.get('doc-b'))?.workspaceId === two.workspaceId, 'and stays where it was');
+  check(
+    (await reasonOf(() => catalog.move('doc-missing', one.workspaceId))) === 'not-found',
+    'moving an unknown document is refused',
+  );
+
+  check(
+    (await catalog.remove('doc-c')) === true && (await catalog.remove('doc-c')) === false,
+    'a document is removed from the catalog once',
+  );
+  check((await catalog.get('doc-c')) === null, 'and is then gone');
+}
 
 async function run(label: string, store: WorkspaceStore, users: Users) {
   console.log(`\n=== ${label} ===`);
@@ -390,10 +523,17 @@ function clock() {
 {
   const users: Users = { ada: 'u-ada', ben: 'u-ben', cy: 'u-cy', nobody: 'u-nobody' };
   const known = new Set([users.ada, users.ben, users.cy]);
-  await run(
+  const store = createMemoryWorkspaceStore({ now: clock(), userExists: (id) => known.has(id) });
+  await run('memory', store, users);
+  await runCatalog(
     'memory',
-    createMemoryWorkspaceStore({ now: clock(), userExists: (id) => known.has(id) }),
+    store,
+    createMemoryDocumentCatalog({
+      now: clock(),
+      workspaceExists: async (id) => (await store.getWorkspace(id)) !== null,
+    }),
     users,
+    async () => {},
   );
 }
 
@@ -404,6 +544,8 @@ if (DATABASE_URL) {
   const pool = new pg.Pool({ connectionString: DATABASE_URL });
   const ISSUER = 'https://workspaces-contract.test';
   const cleanUp = async () => {
+    await pool.query(`DELETE FROM documents WHERE doc_id IN ('doc-a', 'doc-b', 'doc-c')`);
+    await pool.query('DELETE FROM workspace_documents');
     await pool.query('DELETE FROM workspaces');
     await pool.query('DELETE FROM users WHERE issuer = $1', [ISSUER]);
   };
@@ -418,7 +560,45 @@ if (DATABASE_URL) {
       cy: await make('cy'),
       nobody: 'u-nobody',
     };
-    await run('postgres', createPostgresWorkspaceStore(pool, { now: clock() }), users);
+    const contractStore = createPostgresWorkspaceStore(pool, { now: clock() });
+    await run('postgres', contractStore, users);
+    await runCatalog(
+      'postgres',
+      contractStore,
+      createPostgresDocumentCatalog(pool, { now: clock() }),
+      users,
+      async (docId) => {
+        await documents.create({ docId, keys: { wrappedForWorkspace: '' } });
+      },
+    );
+
+    console.log('\n=== postgres: what the database enforces for the catalog ===');
+    const catalog = createPostgresDocumentCatalog(pool, { now: clock() });
+    const anyWorkspaceId = (await contractStore.listWorkspaces())[0].workspaceId;
+    check(
+      (await reasonOf(() =>
+        catalog.add({
+          docId: 'doc-never-created',
+          workspaceId: anyWorkspaceId,
+          title: 'x',
+          createdBy: users.ada,
+        }),
+      )) === 'not-found',
+      'a catalog row cannot be added for a document the document service does not have',
+    );
+    await documents.purge('doc-a');
+    check(
+      (await catalog.get('doc-a')) === null,
+      'purging a document removes its catalog row with it',
+    );
+    const occupiedWorkspaceId = (await catalog.get('doc-b'))?.workspaceId;
+    check(
+      occupiedWorkspaceId !== undefined &&
+        (await reasonOf(() =>
+          pool.query('DELETE FROM workspaces WHERE workspace_id = $1', [occupiedWorkspaceId]),
+        )) !== 'no-error',
+      'a workspace that still holds documents cannot be deleted from under them',
+    );
 
     console.log('\n=== postgres: what the database itself enforces ===');
     const store = createPostgresWorkspaceStore(pool, { now: clock() });

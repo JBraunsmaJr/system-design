@@ -20,6 +20,11 @@ import { createSessionStore } from './auth/sessions.ts';
 import { createPostgresSessionStore } from './auth/postgresSessions.ts';
 import { createProvider } from './auth/providers.ts';
 import { ConfigError, describeConfig, loadStoreConfig } from './config.ts';
+import { createMemoryWorkspaceStore, type WorkspaceStore } from './workspaces.ts';
+import { createPostgresWorkspaceStore } from './postgresWorkspaces.ts';
+import { createMemoryDocumentCatalog, type DocumentCatalog } from './documentCatalog.ts';
+import { createPostgresDocumentCatalog } from './postgresDocumentCatalog.ts';
+import { createV2Api } from './v2/api.ts';
 import pg from 'pg';
 
 async function main() {
@@ -44,6 +49,9 @@ async function main() {
   let audit;
   let sessions;
   let access: AccessStore;
+  // The workspace API (docs/trusted-store.md).
+  let workspaces: WorkspaceStore;
+  let catalog: DocumentCatalog;
   let close = async () => {};
 
   if (config.databaseUrl) {
@@ -64,6 +72,8 @@ async function main() {
     // sign everyone out (WS10-R1).
     sessions = createPostgresSessionStore(pool);
     access = createPostgresAccessStore(pool);
+    workspaces = createPostgresWorkspaceStore(pool);
+    catalog = createPostgresDocumentCatalog(pool);
     close = async () => {
       await pool.end();
       await postgres.close();
@@ -85,9 +95,24 @@ async function main() {
     audit = createMemoryAuditSink();
     sessions = createSessionStore();
     access = createMemoryAccessStore();
+    // PostgreSQL enforces these two with foreign keys; in memory they are
+    // checked against the directory and the workspace store.
+    const memoryDirectory = directory;
+    const memoryWorkspaces = createMemoryWorkspaceStore({
+      userExists: (userId) =>
+        memoryDirectory.getUser(userId).then(
+          () => true,
+          () => false,
+        ),
+    });
+    workspaces = memoryWorkspaces;
+    catalog = createMemoryDocumentCatalog({
+      workspaceExists: async (id) => (await memoryWorkspaces.getWorkspace(id)) !== null,
+    });
   }
 
   const admins = new Set(config.admins);
+  const adminGroups = new Set(config.adminGroups);
   const server = createHttpService({
     store,
     directory,
@@ -105,6 +130,20 @@ async function main() {
     isAdmin: (subject) => admins.has(subject),
     access,
     autoAccess: config.autoAccess,
+    v2: createV2Api({
+      workspaces,
+      catalog,
+      documents: store,
+      directory,
+      // An administrator is someone listed in ADMIN_SUBJECTS, or in one of
+      // ADMIN_GROUPS at their last sign-in.
+      isAdmin: ({ issuer, subject, groups }) =>
+        admins.has(`${issuer}#${subject}`) || groups.some((group) => adminGroups.has(group)),
+      workspaceCreation: config.workspaceCreation,
+      allowUnauthenticated: config.allowUnauthenticated,
+      publicUrl: () => config.publicUrl,
+      allowedOrigins: config.allowedOrigins,
+    }),
   });
 
   // The purge sweep (WS10-R4). Held documents and anything still inside its

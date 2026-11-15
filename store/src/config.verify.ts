@@ -179,6 +179,30 @@ console.log('\n=== Retention and limits ===');
     'a records schedule and administrators are read',
   );
   assert(
+    strict.adminGroups.length === 0 && strict.workspaceCreation === 'admins',
+    'with nothing set there are no administrator groups, and only administrators create workspaces',
+  );
+  const grouped = loadStoreConfig({
+    ...WORKING,
+    ADMIN_GROUPS: 'notebook-admin, platform-leads',
+    WORKSPACE_CREATION: 'Anyone',
+  });
+  assert(
+    grouped.adminGroups.join('|') === 'notebook-admin|platform-leads' &&
+      grouped.workspaceCreation === 'anyone',
+    'administrator groups and the workspace creation policy are read',
+  );
+  assert(
+    /members of notebook-admin, platform-leads/.test(describeConfig(grouped).join('\n')) &&
+      /anyone signed in can create one/.test(describeConfig(grouped).join('\n')),
+    'and both are announced at startup',
+  );
+  refuses(
+    { ...WORKING, WORKSPACE_CREATION: 'nobody' },
+    /WORKSPACE_CREATION must be "admins" or "anyone"/,
+    'an unknown workspace creation policy is refused',
+  );
+  assert(
     /PASSTHROUGH/.test(describeConfig(strict).join('\n')),
     'and passthrough is announced loudly',
   );

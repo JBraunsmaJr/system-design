@@ -21,6 +21,14 @@ markers are removed when the section becomes a release. See
   for workspaces, members and group mappings. Nothing uses them yet; the store's API is unchanged.
 - `npm test` now runs the store's own suites in `store/src`, which it had been skipping.
 
+### [MINOR] Store: workspace API
+
+- The store serves a second API under `/v2`, beside the existing one, in which the server decides access: workspaces,
+  members with viewer, editor and owner roles, identity-provider groups mapped to roles, and documents inside a
+  workspace. The editor does not use it yet. See `docs/trusted-store.md`.
+- `ADMIN_GROUPS` makes the members of an identity-provider group store administrators in that API.
+  `WORKSPACE_CREATION` sets who may create workspaces there.
+
 ### [MINOR] Plan tab
 
 - Timeline, Team and Skill Tree are now one **Plan** tab with four sections: **Board**, **Gantt**, **Dependencies** and
