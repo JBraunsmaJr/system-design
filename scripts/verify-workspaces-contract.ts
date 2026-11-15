@@ -19,6 +19,11 @@ import {
 import { createPostgresWorkspaceStore } from '../store/src/postgresWorkspaces.ts';
 import { createPostgresStore } from '../store/src/postgresStore.ts';
 import { createPostgresUserDirectory } from '../store/src/postgresUserDirectory.ts';
+import {
+  createMemoryUserDirectory,
+  DirectoryError,
+  type UserDirectory,
+} from '../store/src/userDirectory.ts';
 import { canInWorkspace, type Principal } from '../store/src/permissions.ts';
 import {
   CatalogError,
@@ -45,7 +50,9 @@ async function reasonOf(fn: () => Promise<unknown>): Promise<string> {
     await fn();
     return 'no-error';
   } catch (error) {
-    return error instanceof WorkspaceError || error instanceof CatalogError
+    return error instanceof WorkspaceError ||
+      error instanceof CatalogError ||
+      error instanceof DirectoryError
       ? error.reason
       : `other (${String(error)})`;
   }
@@ -214,6 +221,54 @@ async function runCatalog(
     'a document is removed from the catalog once',
   );
   check((await catalog.get('doc-c')) === null, 'and is then gone');
+}
+
+/** The people who have signed in: found or created by (issuer, subject). */
+async function runDirectory(label: string, directory: UserDirectory, issuer: string) {
+  console.log(`\n=== ${label}: the user directory ===`);
+  const first = await directory.upsertUser({ issuer, subject: 'dir-dee', displayName: 'Dee' });
+  const again = await directory.upsertUser({ issuer, subject: 'dir-dee' });
+  check(
+    again.userId === first.userId && again.displayName === 'Dee',
+    'signing in again finds the same person, and a sign-in without a name keeps the one on record',
+  );
+  const renamed = await directory.upsertUser({
+    issuer,
+    subject: 'dir-dee',
+    displayName: 'Dee Okafor',
+  });
+  check(
+    renamed.userId === first.userId && renamed.displayName === 'Dee Okafor',
+    'a new name from the provider replaces the old one',
+  );
+  const elsewhere = await directory.upsertUser({
+    issuer: `${issuer}/other`,
+    subject: 'dir-dee',
+    displayName: 'Another Dee',
+  });
+  check(
+    elsewhere.userId !== first.userId,
+    'the same subject from another issuer is another person',
+  );
+  check(
+    (await directory.getUser(first.userId)).displayName === 'Dee Okafor',
+    'a person is read back by id',
+  );
+  check(
+    (await reasonOf(() => directory.getUser('usr-missing'))) === 'not-found',
+    'an unknown id is not found',
+  );
+  const listed = (await directory.listUsers()).map((user) => user.userId);
+  check(
+    listed.includes(first.userId) &&
+      listed.includes(elsewhere.userId) &&
+      listed.indexOf(first.userId) < listed.indexOf(elsewhere.userId),
+    'everyone is listed, in the order they first signed in',
+  );
+  check(
+    Object.keys(first).sort().join(',') === 'displayName,issuer,subject,userId',
+    'and a record holds an identity and a name, nothing else',
+  );
 }
 
 async function run(label: string, store: WorkspaceStore, users: Users) {
@@ -550,6 +605,7 @@ function clock() {
   const known = new Set([users.ada, users.ben, users.cy]);
   const store = createMemoryWorkspaceStore({ now: clock(), userExists: (id) => known.has(id) });
   await run('memory', store, users);
+  await runDirectory('memory', createMemoryUserDirectory(), 'https://workspaces-contract.test');
   await runCatalog(
     'memory',
     store,
@@ -572,7 +628,10 @@ if (DATABASE_URL) {
     await pool.query(`DELETE FROM documents WHERE doc_id IN ('doc-a', 'doc-b', 'doc-c')`);
     await pool.query('DELETE FROM workspace_documents');
     await pool.query('DELETE FROM workspaces');
-    await pool.query('DELETE FROM users WHERE issuer = $1', [ISSUER]);
+    await pool.query('DELETE FROM users WHERE issuer = $1 OR issuer = $2', [
+      ISSUER,
+      `${ISSUER}/other`,
+    ]);
   };
   try {
     await cleanUp();
@@ -587,6 +646,7 @@ if (DATABASE_URL) {
     };
     const contractStore = createPostgresWorkspaceStore(pool, { now: clock() });
     await run('postgres', contractStore, users);
+    await runDirectory('postgres', directory, ISSUER);
     await runCatalog(
       'postgres',
       contractStore,

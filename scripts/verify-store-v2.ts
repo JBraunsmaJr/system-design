@@ -143,7 +143,6 @@ async function run(label: string, backend: Backend) {
   const audit = createMemoryAuditSink();
   let origin = '';
   const server: Server = createHttpService({
-    store: backend.documents,
     audit,
     providers: [noProvider],
     sessions,
@@ -914,8 +913,7 @@ async function run(label: string, backend: Backend) {
 /** A service built without the workspace API does not serve it. */
 async function withoutV2() {
   console.log('\n=== a store without the workspace API ===');
-  const backend = memoryBackend();
-  const server = createHttpService({ store: backend.documents, allowUnauthenticated: true });
+  const server = createHttpService({ allowUnauthenticated: true });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   try {
@@ -930,7 +928,6 @@ async function withoutSignIn() {
   console.log('\n=== a store run without sign-in ===');
   const backend = memoryBackend();
   const server = createHttpService({
-    store: backend.documents,
     allowUnauthenticated: true,
     directory: backend.directory,
     v2: createV2Api({

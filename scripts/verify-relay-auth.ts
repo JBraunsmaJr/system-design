@@ -272,25 +272,14 @@ console.log('\n=== The client asking for a token ===');
 {
   // What the editor does before joining: ask the store whether the relay
   // needs a token, and get one for this room if it does.
-  const { createMemoryBlobStore } = await import('../store/src/blobStore.ts');
-  const { createDocumentService } = await import('../store/src/documentService.ts');
   const { createHttpService } = await import('../store/src/httpService.ts');
   const { authorizeRelayUrls } = await import('../src/collab/access/relayAccess.ts');
 
-  const blobs = createMemoryBlobStore();
-  const store = createDocumentService({
-    blobs,
-    begin: () => blobs.begin(),
-    commit: (tx) => blobs.commit(tx),
-    rollback: (tx) => blobs.rollback(tx),
-  });
-
   const withRelayAuth = createHttpService({
-    store: store as never,
     allowUnauthenticated: true,
     relayTokenSecret: SECRET,
   });
-  const open = createHttpService({ store: store as never, allowUnauthenticated: true });
+  const open = createHttpService({ allowUnauthenticated: true });
   await new Promise<void>((resolve) => withRelayAuth.listen(14473, '127.0.0.1', resolve));
   await new Promise<void>((resolve) => open.listen(14474, '127.0.0.1', resolve));
 

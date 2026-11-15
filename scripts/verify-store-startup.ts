@@ -60,6 +60,10 @@ console.log('=== It starts, serves, and stops ===');
     PUBLIC_URL: `http://localhost:${PORT}`,
     ALLOW_UNAUTHENTICATED: 'true',
     RETENTION_PERIOD: '7y',
+    // Left behind by a deployment that ran the encrypted workspace. The
+    // key file does not exist: nothing may try to read it.
+    CRYPTO_MODE: 'passthrough',
+    RECOVERY_PUBLIC_KEY_FILE: '/nowhere/recovery.pub',
     ...(process.env.DATABASE_URL ? { DATABASE_URL: process.env.DATABASE_URL } : {}),
   });
   const health = await waitForHealth(PORT);
@@ -67,16 +71,30 @@ console.log('=== It starts, serves, and stops ===');
   if (health) {
     const body = (await health.json()) as {
       status: string;
-      cryptoMode: string;
       authentication: string;
     };
-    check(body.status === 'ok' && body.cryptoMode === 'webcrypto', 'reporting its mode');
+    check(body.status === 'ok', 'reporting that it is up');
     check(
       body.authentication === 'none',
       'and that this one has no sign-in, which it was told to allow',
     );
   }
+  const workspaceApi = await fetch(`http://127.0.0.1:${PORT}/v2/health`).then(
+    (response) => response.json() as Promise<{ mode?: string }>,
+    () => ({}) as { mode?: string },
+  );
+  check(workspaceApi.mode === 'trusted', 'the workspace API is served by the running process');
+  const made = await fetch(`http://127.0.0.1:${PORT}/v2/workspaces`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name: `Startup check ${Date.now()}` }),
+  });
+  check(made.status === 201, `and a workspace can be created through it (${made.status})`);
   const printed = running.output();
+  check(
+    /No longer used, and safe to remove: CRYPTO_MODE, RECOVERY_PUBLIC_KEY_FILE/.test(printed),
+    'settings of the encrypted workspace do not stop it starting, and are named as unused',
+  );
   check(
     /Deleted documents are kept.*7y/.test(printed),
     `startup prints the retention it will apply (${/(Deleted documents[^\n]*)/.exec(printed)?.[1] ?? 'nothing'})`,

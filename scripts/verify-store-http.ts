@@ -1,19 +1,18 @@
 /**
- * The store's HTTP routes (WS8-R2), over both backends.
+ * The store's HTTP service on its own: what every request passes through,
+ * and the few routes that are not the workspace API.
  *
- * Every route, including its error paths: what status a client gets, what it
- * can branch on, and that a rolled-back response is refused rather than
- * served (WS8-R15). Set DATABASE_URL to include PostgreSQL, as CI does.
+ * Workspaces and documents are verify-store-v2.ts; sign-in is
+ * verify-store-auth.ts; relay tokens against a real relay are
+ * verify-relay-auth.ts. This covers what is left, and that the routes the
+ * encrypted workspace had are gone rather than half-working.
+ *
+ * Run with: npx tsx scripts/verify-store-http.ts
  */
-import { createMemoryBlobStore, type MemoryTx } from '../store/src/blobStore.ts';
-import { createDocumentService } from '../store/src/documentService.ts';
-import { createPostgresStore } from '../store/src/postgresStore.ts';
-import {
-  createHttpService,
-  createMemoryAuditSink,
-  type StoreBackend,
-} from '../store/src/httpService.ts';
 import type { AddressInfo } from 'net';
+import type { Server } from 'http';
+import { createHttpService, createMemoryAuditSink, HttpError } from '../store/src/httpService.ts';
+import { verifyRoomToken } from '../store/src/auth/roomTokens.ts';
 
 let failures = 0;
 function check(condition: boolean, message: string) {
@@ -24,369 +23,256 @@ function check(condition: boolean, message: string) {
   }
 }
 
-const base64 = (value: string) => Buffer.from(value).toString('base64');
-// A store with encryption on refuses documents that carry no recovery wrap
-// (WS7-R4), so every document here carries one.
-const KEYS = { wrappedForWorkspace: base64('workspace'), wrappedForRecovery: base64('recovery') };
-const RECOVERY_PEM = '-----BEGIN PUBLIC KEY-----\ntest\n-----END PUBLIC KEY-----';
-const DATABASE_URL = process.env.DATABASE_URL ?? '';
+const EDITOR = 'https://editor.example';
+const SECRET = 'verify-store-http-relay-secret-0123456789abcdef';
 
-interface Backend {
-  name: string;
-  store: StoreBackend;
-  /** The backend's own audit sink, where it has one, so audit rows are
-   * exercised against the real table rather than only in memory. */
-  auditRows?: () => Promise<unknown[]>;
-  persistAudit?: {
-    record(entry: {
-      at: string;
-      subject: string | null;
-      docId: string | null;
-      operation: string;
-      outcome: string;
-      detail?: Record<string, unknown>;
-    }): Promise<void>;
-  };
-  reset(): Promise<void>;
-  dispose(): Promise<void>;
-}
-
-async function memoryBackend(): Promise<Backend> {
-  let blobs = createMemoryBlobStore();
-  let service = createDocumentService<MemoryTx>({
-    blobs,
-    begin: () => blobs.begin(),
-    commit: (tx) => blobs.commit(tx),
-    rollback: (tx) => blobs.rollback(tx),
-  });
-  const backend: Backend = {
-    name: 'memory',
-    get store() {
-      return service as unknown as StoreBackend;
-    },
-    async reset() {
-      blobs = createMemoryBlobStore();
-      service = createDocumentService<MemoryTx>({
-        blobs,
-        begin: () => blobs.begin(),
-        commit: (tx) => blobs.commit(tx),
-        rollback: (tx) => blobs.rollback(tx),
-      });
-    },
-    async dispose() {},
-  };
-  return backend;
-}
-
-async function postgresBackend(): Promise<Backend> {
-  const store = createPostgresStore({ connectionString: DATABASE_URL });
-  await store.migrate();
-  const clear = async () => {
-    for (const record of await store.list({ includeDeleted: true })) {
-      // A hold blocks purge, which is the point of it (WS10-R8); releasing
-      // first is how a test fixture cleans up after itself.
-      if (record.legalHold) await store.setLegalHold(record.docId, null);
-      await store.purge(record.docId);
-    }
-  };
-  await clear();
-  return {
-    name: 'postgres',
-    store: store as unknown as StoreBackend,
-    persistAudit: store.audit,
-    auditRows: () => store.audit.recent(200),
-    reset: clear,
-    async dispose() {
-      await clear();
-      await store.close();
-    },
-  };
-}
-
-interface Response {
-  status: number;
-  version: number | null;
-  body: Record<string, never> & {
-    error?: { reason: string; message: string };
-    [key: string]: unknown;
-  };
-}
-
-async function run(backend: Backend) {
-  await backend.reset();
-  const audit = createMemoryAuditSink();
-  const sink = backend.persistAudit
-    ? {
-        record: async (entry: Parameters<typeof audit.record>[0]) => {
-          audit.record(entry);
-          await backend.persistAudit!.record(entry);
-        },
-      }
-    : audit;
-  const server = createHttpService({
-    store: backend.store,
-    audit: sink,
-    allowUnauthenticated: true,
-    recoveryPublicKeyPem: RECOVERY_PEM,
-    // Unauthenticated development mode signs requests as "anonymous"; here
-    // that subject is the administrator, so the admin routes are exercised.
-    isAdmin: (subject) => subject === 'anonymous',
-  });
+async function listen(server: Server): Promise<string> {
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const port = (server.address() as AddressInfo).port;
-  const origin = `http://127.0.0.1:${port}`;
+  return `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+}
+const close = (server: Server) => new Promise<void>((resolve) => server.close(() => resolve()));
 
-  const call = async (
-    method: string,
-    path: string,
-    body?: unknown,
-    headers: Record<string, string> = {},
-  ): Promise<Response> => {
-    const response = await fetch(`${origin}${path}`, {
-      method,
-      headers: {
-        ...(body === undefined ? {} : { 'content-type': 'application/json' }),
-        ...headers,
-      },
-      body: body === undefined ? undefined : typeof body === 'string' ? body : JSON.stringify(body),
-    });
-    const text = await response.text();
-    const versionHeader = response.headers.get('x-document-version');
+interface Body {
+  [key: string]: unknown;
+  error?: { reason?: string; message?: string };
+  providers?: string[];
+  token?: string;
+}
+type Reply = { status: number; body: Body; headers: Headers };
+const parse = (text: string): Body => {
+  try {
+    return text ? (JSON.parse(text) as Body) : {};
+  } catch {
+    return { unparsed: text };
+  }
+};
+const caller =
+  (origin: string) =>
+  async (method: string, path: string, init: RequestInit = {}): Promise<Reply> => {
+    const response = await fetch(`${origin}${path}`, { method, ...init });
     return {
       status: response.status,
-      version: versionHeader === null ? null : Number(versionHeader),
-      body: text ? JSON.parse(text) : {},
+      body: parse(await response.text()),
+      headers: response.headers,
     };
   };
 
-  try {
-    console.log('  -- documents');
-    check((await call('GET', '/v1/health')).status === 200, 'health answers');
-    {
-      // Someone opening the store in a browser should learn what it is,
-      // not read "No route for /".
-      const root = await call('GET', '/');
-      check(
-        root.status === 200 && typeof root.body.service === 'string',
-        `the root says what this service is (${root.status})`,
-      );
-      check(/not the editor/i.test(JSON.stringify(root.body)), 'and that it is not the editor');
-    }
-    const created = await call('POST', '/v1/docs', { docId: 'doc-http', keys: KEYS });
-    check(
-      created.status === 201 && created.version === 1,
-      `creating a document returns 201 and its version (${created.status}, v${created.version})`,
-    );
-    check(
-      (await call('POST', '/v1/docs', { docId: 'doc-http', keys: KEYS })).status === 409,
-      'creating it again is 409',
-    );
-    check(
-      (await call('POST', '/v1/docs', { docId: 'x' })).status === 400,
-      'a document without wrapped keys is 400',
-    );
-    const unescrowed = await call('POST', '/v1/docs', {
-      docId: 'doc-unescrowed',
-      keys: { wrappedForWorkspace: base64('workspace') },
-    });
-    check(
-      unescrowed.status === 400 && unescrowed.body.error?.reason === 'escrow-required',
-      'and one with no recovery wrap is refused (WS7-R4)',
-    );
-    check((await call('GET', '/v1/docs')).status === 200, 'listing works');
-
-    console.log('  -- updates');
-    const appended = await call('POST', '/v1/docs/doc-http/updates', {
-      kind: 'update',
-      bytes: base64('first'),
-    });
-    check(
-      appended.status === 201 && appended.version === 2,
-      `appending returns 201 and the new version (v${appended.version})`,
-    );
-    await call('POST', '/v1/docs/doc-http/updates', { kind: 'update', bytes: base64('second') });
-    const read = await call('GET', '/v1/docs/doc-http');
-    const blobs = (read.body.blobs as { bytes: string }[]) ?? [];
-    check(read.status === 200 && blobs.length === 2, 'reading returns every blob');
-    check(
-      Buffer.from(blobs[0].bytes, 'base64').toString() === 'first' &&
-        Buffer.from(blobs[1].bytes, 'base64').toString() === 'second',
-      'blobs come back byte for byte, in order',
-    );
-    const since = await call('GET', '/v1/docs/doc-http/updates?since=2');
-    check(
-      ((since.body.blobs as unknown[]) ?? []).length === 1,
-      '?since= returns only what the client has not seen',
-    );
-    check(
-      (await call('GET', '/v1/docs/doc-http/updates?since=-1')).status === 400,
-      'a nonsense ?since= is 400',
-    );
-    check(
-      (await call('POST', '/v1/docs/doc-http/updates', { bytes: 'not base64!' })).status === 400,
-      'a body that is not base64 is 400',
-    );
-    check(
-      (await call('POST', '/v1/docs/doc-http/updates', '{ broken')).status === 400,
-      'a body that is not JSON is 400',
-    );
-    check(
-      (await call('POST', '/v1/docs/doc-http/updates', { bytes: base64('x'), expectedVersion: 1 }))
-        .status === 409,
-      'appending against a stale version is 409',
-    );
-
-    console.log('  -- versions never go backwards (WS8-R15)');
-    const current = (await call('GET', '/v1/docs/doc-http')).version ?? 0;
-    check(
-      (
-        await call('GET', '/v1/docs/doc-http', undefined, {
-          'if-document-version': String(current),
-        })
-      ).status === 200,
-      'a read at the version already seen is served',
-    );
-    const rolledBack = await call('GET', '/v1/docs/doc-http', undefined, {
-      'if-document-version': String(current + 5),
-    });
-    check(
-      rolledBack.status === 409 && rolledBack.body.error?.reason === 'stale-version',
-      'a response older than the client has seen is refused with a reason it can act on',
-    );
-    check(
-      (await call('GET', '/v1/docs/doc-http', undefined, { 'if-document-version': 'soon' }))
-        .status === 400,
-      'a malformed version header is 400',
-    );
-
-    console.log('  -- metadata, compaction, deletion');
-    check(
-      (await call('PUT', '/v1/docs/doc-http/meta', { meta: base64('sealed title') })).status ===
-        200,
-      'sealed metadata is stored',
-    );
-    const meta = await call('GET', '/v1/docs/doc-http/meta');
-    check(
-      Buffer.from(meta.body.meta as string, 'base64').toString() === 'sealed title',
-      'and returned unchanged',
-    );
-    const compacted = await call('POST', '/v1/docs/doc-http/compact', {
-      bytes: base64('snapshot'),
-    });
-    check(
-      compacted.status === 200 &&
-        ((await call('GET', '/v1/docs/doc-http')).body.blobs as unknown[]).length === 1,
-      'compaction leaves one blob',
-    );
-    check((await call('DELETE', '/v1/docs/doc-http')).status === 200, 'deleting succeeds');
-    const afterDelete = await call('GET', '/v1/docs/doc-http');
-    check(
-      afterDelete.status === 410 && afterDelete.body.error?.reason === 'deleted',
-      'a deleted document reads as 410 gone, distinct from 404',
-    );
-    check(
-      ((await call('GET', '/v1/docs')).body.documents as unknown[]).length === 0,
-      'and is absent from the list',
-    );
-    check(
-      ((await call('GET', '/v1/docs?includeDeleted=true')).body.documents as unknown[]).length ===
-        1,
-      'but present for an administrator',
-    );
-    check((await call('POST', '/v1/docs/doc-http/restore')).status === 200, 'restoring succeeds');
-    check((await call('GET', '/v1/docs/doc-http')).status === 200, 'and the document reads again');
-
-    console.log('  -- holds and purging (WS10-R4, R8)');
-    const held = await call('PUT', '/v1/docs/doc-http/hold', { reason: 'FOIA request 2026-114' });
-    check(held.status === 200, 'an administrator can place a legal hold');
-    check(
-      (await call('POST', '/v1/docs/doc-http/purge')).status === 409,
-      'and a held document cannot be purged',
-    );
-    check(
-      (await call('DELETE', '/v1/docs/doc-http/hold')).status === 200,
-      'the hold can be released',
-    );
-    check(
-      ((await call('POST', '/v1/admin/purge-due')).body.purged as unknown[]).length >= 0,
-      'the purge sweep runs',
-    );
-    {
-      // Without an administrator configured, nobody may do any of this.
-      const locked = createHttpService({
-        store: backend.store,
-        allowUnauthenticated: true,
-        recoveryPublicKeyPem: RECOVERY_PEM,
-      });
-      await new Promise<void>((resolve) => locked.listen(0, '127.0.0.1', resolve));
-      const lockedPort = (locked.address() as AddressInfo).port;
-      const attempt = await fetch(`http://127.0.0.1:${lockedPort}/v1/docs/doc-http/hold`, {
-        method: 'PUT',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ reason: 'x' }),
-      });
-      check(
-        attempt.status === 403,
-        'a store with no administrators configured refuses these routes to everyone',
-      );
-      await new Promise<void>((resolve) => locked.close(() => resolve()));
-    }
-
-    console.log('  -- unknown things');
-    check((await call('GET', '/v1/docs/nope')).status === 404, 'an unknown document is 404');
-    check((await call('GET', '/v1/nonsense')).status === 404, 'an unknown route is 404');
-    check(
-      (await call('PATCH', '/v1/docs/doc-http')).status === 405,
-      'an unsupported method is 405',
-    );
-
-    console.log('  -- the audit trail (WS10-R3)');
-    const entries = audit.all();
-    check(
-      entries.length > 0 && entries.every((entry) => entry.at && entry.operation && entry.outcome),
-      'every request is recorded with an operation and an outcome',
-    );
-    check(
-      entries.some((entry) => entry.operation === 'append' && entry.docId === 'doc-http'),
-      'including which document was written',
-    );
-    check(
-      entries.some((entry) => entry.outcome === 'denied'),
-      'and refusals, not only successes',
-    );
-    if (backend.auditRows) {
-      const rows = await backend.auditRows();
-      check(
-        rows.length >= entries.length,
-        `and they are written to audit_log, not only held in memory (${rows.length} rows)`,
-      );
-    }
-  } finally {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
-  }
-}
-
-console.log('=== Refusing to start without authentication ===');
+console.log('=== Refusing to start without sign-in ===');
 {
-  const backend = await memoryBackend();
   let threw = false;
   try {
-    createHttpService({ store: backend.store, allowUnauthenticated: false });
+    createHttpService({});
   } catch {
     threw = true;
   }
   check(threw, 'the service refuses to start unauthenticated unless the caller says so explicitly');
 }
 
-const backends: Backend[] = [await memoryBackend()];
-if (DATABASE_URL) backends.push(await postgresBackend());
-else console.log('\n(DATABASE_URL is not set: PostgreSQL is not covered by this run)');
+console.log('\n=== What it answers on its own ===');
+{
+  const audit = createMemoryAuditSink();
+  const calls: string[] = [];
+  const server = createHttpService({
+    allowUnauthenticated: true,
+    audit,
+    allowedOrigins: [EDITOR],
+    relayTokenSecret: SECRET,
+    maxRequestBytes: 64,
+    // Stands in for the workspace API, to see what it is handed.
+    v2: async (request) => {
+      calls.push(`${request.method} /${request.parts.join('/')}`);
+      if (request.parts[0] === 'echo') return request.send(200, await request.readJson(), 7);
+      if (request.parts[0] === 'refuse') {
+        request.describeForAudit('test.refuse', 'doc-1');
+        throw new HttpError(403, 'forbidden', 'Not you.');
+      }
+      if (request.parts[0] === 'break') throw new Error('a bug, with details nobody should see');
+      return request.send(204, {});
+    },
+  });
+  const origin = await listen(server);
+  const call = caller(origin);
+  try {
+    const health = await call('GET', '/v1/health');
+    check(
+      health.status === 200 &&
+        health.body.status === 'ok' &&
+        health.body.authentication === 'none' &&
+        health.body.relayAuthentication === 'required',
+      'health says it is up, whether it wants sign-in, and whether the relay wants tokens',
+    );
+    check(
+      !('cryptoMode' in health.body) && !('escrow' in health.body),
+      'and no longer speaks of encryption modes or escrow',
+    );
+    const root = await call('GET', '/');
+    check(
+      root.status === 200 && root.body.workspaces === '/v2/workspaces',
+      'the root says what this is and where its API is',
+    );
 
-for (const backend of backends) {
-  console.log(`\n########## ${backend.name} ##########`);
-  await run(backend);
+    // --- Gone ----------------------------------------------------------------
+    const gone: [string, string][] = [
+      ['GET', '/v1/docs'],
+      ['POST', '/v1/docs'],
+      ['GET', '/v1/docs/some-document'],
+      ['GET', '/v1/recovery-key'],
+      ['GET', '/v1/users/me'],
+      ['GET', '/v1/users/me/devices'],
+      ['GET', '/v1/workspace/members'],
+      ['GET', '/v1/workspaces/default'],
+      ['GET', '/v1/workspaces/default/access-rule'],
+      ['GET', '/v1/workspaces/default/join-requests'],
+      ['POST', '/v1/join-requests'],
+      ['GET', '/v1/admin/users'],
+      ['POST', '/v1/admin/purge-due'],
+    ];
+    const stillThere = [];
+    for (const [method, path] of gone) {
+      const reply = await call(method, path);
+      if (reply.status !== 404) stillThere.push(`${method} ${path} (${reply.status})`);
+    }
+    check(
+      stillThere.length === 0,
+      `every route of the encrypted workspace answers 404${stillThere.length ? `: ${stillThere.join(', ')}` : ''}`,
+    );
+    check((await call('GET', '/nonsense')).status === 404, 'as does any unknown path');
+
+    // --- The hand-off to the workspace API -----------------------------------
+    const echoed = await call('POST', '/v2/echo/a%20b', {
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ n: 1 }),
+    });
+    check(
+      echoed.status === 200 &&
+        echoed.body.n === 1 &&
+        echoed.headers.get('x-document-version') === '7' &&
+        calls.includes('POST /echo/a%20b'),
+      'a /v2 request reaches the workspace API with its path, body and a way to reply with a version',
+    );
+    const tooLarge = await call('POST', '/v2/echo', {
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ padding: 'x'.repeat(200) }),
+    });
+    check(
+      tooLarge.status === 413 && tooLarge.body.error?.reason === 'too-large',
+      'a body over the limit is refused',
+    );
+    const malformed = await call('POST', '/v2/echo', {
+      headers: { 'content-type': 'application/json' },
+      body: '{ broken',
+    });
+    check(
+      malformed.status === 400 && malformed.body.error?.reason === 'bad-request',
+      'a body that is not JSON is a 400, not a failure',
+    );
+    const refused = await call('GET', '/v2/refuse');
+    check(
+      refused.status === 403 && refused.body.error?.message === 'Not you.',
+      'a refusal from the workspace API is replied to as it was raised',
+    );
+    const broken = await call('GET', '/v2/break');
+    check(
+      broken.status === 500 &&
+        broken.body.error?.reason === 'internal' &&
+        !JSON.stringify(broken.body).includes('nobody should see'),
+      'an unexpected failure is a 500 that gives nothing away',
+    );
+    const entries = audit.all();
+    check(
+      entries.some(
+        (entry) =>
+          entry.operation === 'test.refuse' &&
+          entry.docId === 'doc-1' &&
+          entry.outcome === 'denied',
+      ) && entries.some((entry) => entry.outcome === 'error'),
+      'refusals and failures are in the audit trail, named as the workspace API named them',
+    );
+
+    // --- Replies ---------------------------------------------------------------
+    const cors = await call('GET', '/v1/health', { headers: { origin: EDITOR } });
+    check(
+      cors.headers.get('access-control-allow-origin') === EDITOR &&
+        cors.headers.get('access-control-allow-credentials') === 'true',
+      'an allowed editor origin may read replies and send its cookie',
+    );
+    const stranger = await call('GET', '/v1/health', {
+      headers: { origin: 'https://elsewhere.example' },
+    });
+    check(
+      stranger.headers.get('access-control-allow-origin') === null,
+      'any other origin is given no such permission',
+    );
+    const preflight = await call('OPTIONS', '/v2/echo', { headers: { origin: EDITOR } });
+    check(
+      preflight.status === 204 &&
+        (preflight.headers.get('access-control-allow-methods') ?? '').includes('PATCH') &&
+        !(preflight.headers.get('access-control-allow-headers') ?? '').includes('x-device-id'),
+      'a preflight allows the methods the API uses, and no headers it no longer reads',
+    );
+    check(
+      [health, root, refused, broken, preflight].every(
+        (reply) => reply.headers.get('cache-control') === 'no-store',
+      ),
+      'and nothing is cacheable',
+    );
+
+    // --- Relay tokens for sessions people start themselves -------------------
+    const token = await call('POST', '/v1/rooms/session-abc123/token');
+    check(
+      token.status === 200 &&
+        verifyRoomToken(token.body.token ?? '', { room: 'session-abc123', secret: SECRET }).room ===
+          'session-abc123',
+      'a room token is issued for a session started by link',
+    );
+    check(
+      (await call('POST', `/v1/rooms/wsdoc-${'0'.repeat(32)}/token`)).status === 403,
+      "but not for a workspace document's room, with or without a workspace API behind it",
+    );
+  } finally {
+    await close(server);
+  }
 }
-for (const backend of backends) await backend.dispose();
+
+console.log('\n=== With sign-in required, and no relay secret ===');
+{
+  const server = createHttpService({
+    providers: [
+      {
+        id: 'none',
+        describe: () => ({ kind: 'oidc' as const, clientId: 'x' }),
+        begin: async () => {
+          throw new Error('not used');
+        },
+        complete: async () => {
+          throw new Error('not used');
+        },
+      },
+    ],
+    sessions: (await import('../store/src/auth/sessions.ts')).createSessionStore(),
+  });
+  const origin = await listen(server);
+  const call = caller(origin);
+  try {
+    const health = await call('GET', '/v1/health');
+    check(
+      health.body.authentication === 'required' && health.body.relayAuthentication === 'none',
+      'health stays open, and says sign-in is required and the relay is not guarded',
+    );
+    check(
+      (await call('GET', '/v1/auth/providers')).body.providers?.[0] === 'none',
+      'the ways to sign in are listed without signing in',
+    );
+    check((await call('GET', '/v1/auth/session')).status === 401, 'nobody is signed in');
+    const token = await call('POST', '/v1/rooms/session-abc123/token');
+    check(
+      token.status === 401 && token.body.error?.reason === 'unauthenticated',
+      'a room token is refused to someone who has not signed in',
+    );
+  } finally {
+    await close(server);
+  }
+}
 
 if (failures > 0) {
   console.error(`\n${failures} check(s) failed`);

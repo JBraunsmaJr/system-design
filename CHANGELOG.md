@@ -29,6 +29,23 @@ markers are removed when the section becomes a release. See
 - `ADMIN_GROUPS` makes the members of an identity-provider group store administrators in that API.
   `WORKSPACE_CREATION` sets who may create workspaces there.
 
+### [MAJOR] The encrypted workspace is removed from the store
+
+- The store no longer serves the encrypted workspace: the `/v1` routes for documents, the workspace index, keys,
+  devices, recovery, join requests, access rules and administration answer 404. Workspaces and documents are served
+  under `/v2`. `/v1/health`, `/v1/auth/...` and `/v1/rooms/:room/token` are unchanged in address.
+- `/v1/health` no longer reports `cryptoMode` or `escrow`. `/v1/auth/providers` no longer reports `providerDetails`
+  or `autoAccess`, and `/v1/auth/session` no longer reports `hasEvidence` or `evidenceIat`.
+- `CRYPTO_MODE`, `RECOVERY_PUBLIC_KEY`, `RECOVERY_PUBLIC_KEY_FILE`, `AUTO_ACCESS` and `JOIN_EVIDENCE_RETENTION` are no
+  longer read. A store that still sets them starts normally and lists them at startup as safe to remove.
+- The retention sweep still runs on its timer. `POST /v1/admin/purge-due`, which ran it on demand, is removed;
+  administrators remove a single deleted document from the workspace panel.
+- **An existing database is not changed.** The tables and documents of the encrypted workspace are left as they are
+  and are no longer created in a new database. `docs/trusted-store.md` has the statements to remove them once nothing
+  in them is needed.
+- The store image no longer includes `src/crypto`. `store/openapi.yaml`, which described only the removed routes, is
+  deleted; the routes are listed in `docs/trusted-store.md`.
+
 ### [MAJOR] The encrypted workspace is removed from the editor
 
 - The editor no longer works with a store from before workspaces. Documents in such a store were encrypted in the

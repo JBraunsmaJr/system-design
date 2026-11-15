@@ -1,5 +1,5 @@
 /**
- * The store, as a process (WS8-R9).
+ * The store, as a process.
  *
  *   node --experimental-strip-types store/src/main.ts
  *
@@ -9,12 +9,9 @@
  */
 import { createMemoryBlobStore, type MemoryTx } from './blobStore.ts';
 import { createDocumentService } from './documentService.ts';
-import { createPostgresStore, createPostgresWorkspaceIndex } from './postgresStore.ts';
+import { createPostgresStore } from './postgresStore.ts';
 import { createPostgresUserDirectory } from './postgresUserDirectory.ts';
 import { createMemoryUserDirectory } from './userDirectory.ts';
-import { createMemoryWorkspaceIndex } from './workspaceIndex.ts';
-import { createMemoryAccessStore, type AccessStore } from './access.ts';
-import { createPostgresAccessStore } from './postgresAccess.ts';
 import { createHttpService, createMemoryAuditSink, type StoreBackend } from './httpService.ts';
 import { createSessionStore } from './auth/sessions.ts';
 import { createPostgresSessionStore } from './auth/postgresSessions.ts';
@@ -45,11 +42,8 @@ async function main() {
 
   let store: StoreBackend;
   let directory;
-  let index;
   let audit;
   let sessions;
-  let access: AccessStore;
-  // The workspace API (docs/trusted-store.md).
   let workspaces: WorkspaceStore;
   let catalog: DocumentCatalog;
   let close = async () => {};
@@ -66,12 +60,10 @@ async function main() {
     const pool = new pg.Pool({ connectionString: config.databaseUrl });
     store = postgres as unknown as StoreBackend;
     directory = createPostgresUserDirectory(pool);
-    index = createPostgresWorkspaceIndex(pool);
     audit = postgres.audit;
     // Sessions in the database, so a restart or a second instance does not
-    // sign everyone out (WS10-R1).
+    // sign everyone out.
     sessions = createPostgresSessionStore(pool);
-    access = createPostgresAccessStore(pool);
     workspaces = createPostgresWorkspaceStore(pool);
     catalog = createPostgresDocumentCatalog(pool);
     close = async () => {
@@ -91,10 +83,8 @@ async function main() {
       maxTotalBytes: config.maxTotalBytes,
     }) as unknown as StoreBackend;
     directory = createMemoryUserDirectory();
-    index = createMemoryWorkspaceIndex();
     audit = createMemoryAuditSink();
     sessions = createSessionStore();
-    access = createMemoryAccessStore();
     // PostgreSQL enforces these two with foreign keys; in memory they are
     // checked against the directory and the workspace store.
     const memoryDirectory = directory;
@@ -114,9 +104,7 @@ async function main() {
   const admins = new Set(config.admins);
   const adminGroups = new Set(config.adminGroups);
   const server = createHttpService({
-    store,
     directory,
-    workspaceIndex: index,
     audit,
     sessions,
     providers: config.providers.map((provider) => createProvider(provider)),
@@ -124,12 +112,7 @@ async function main() {
     allowedOrigins: config.allowedOrigins,
     afterLoginUrl: config.afterLoginUrl,
     allowUnauthenticated: config.allowUnauthenticated,
-    cryptoMode: config.cryptoMode,
-    recoveryPublicKeyPem: config.recoveryPublicKeyPem,
     relayTokenSecret: config.relayTokenSecret,
-    isAdmin: (subject) => admins.has(subject),
-    access,
-    autoAccess: config.autoAccess,
     v2: createV2Api({
       relayTokenSecret: config.relayTokenSecret,
       workspaces,
@@ -147,8 +130,9 @@ async function main() {
     }),
   });
 
-  // The purge sweep (WS10-R4). Held documents and anything still inside its
-  // retention are left alone; see WS10-R8.
+  // The retention sweep: deleted documents past their retention are
+  // removed. Held documents, and anything still inside its retention, are
+  // left alone.
   const sweep = setInterval(() => {
     void (store as unknown as { purgeDue?: () => Promise<string[]> })
       .purgeDue?.()
@@ -157,13 +141,6 @@ async function main() {
           console.log(`Purged ${purged.length} document(s) past their retention.`);
       })
       .catch((error) => console.error('Purge sweep failed:', error));
-    // WS14-R18: raw ID tokens are dropped once past their retention.
-    void access
-      .expireEvidence(new Date(Date.now() - config.joinEvidenceRetentionMs))
-      .then((expired) => {
-        if (expired > 0) console.log(`Dropped sign-in evidence from ${expired} join request(s).`);
-      })
-      .catch((error) => console.error('Evidence sweep failed:', error));
   }, config.purgeIntervalMs);
 
   server.listen(config.port, () => console.log(`Ready on port ${config.port}.`));

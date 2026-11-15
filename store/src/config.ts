@@ -1,12 +1,11 @@
 /**
- * The store's configuration (WS8-R9).
+ * The store's configuration.
  *
  * Everything comes from the environment, and anything unusable stops
  * startup with a sentence saying what to set. The alternative - starting
  * with a quiet default - is how a deployment ends up unauthenticated, or
  * keeping records for thirty days when it meant seven years.
  */
-import { readFileSync } from 'fs';
 import { parseRetentionPeriod, describeRetention, type RetentionPeriod } from './retention.ts';
 import type { ProviderConfig } from './auth/providers.ts';
 
@@ -16,7 +15,7 @@ export interface StoreConfig {
   /** The store's own public address: where providers send people back to,
    * and what decides whether its cookie is marked Secure. */
   publicUrl: string;
-  /** Origins the editor is served from (WS10-R1). */
+  /** Origins the editor is served from. */
   allowedOrigins: string[];
   /**
    * Where the browser is sent once it has signed in - the editor, not the
@@ -25,7 +24,7 @@ export interface StoreConfig {
    */
   afterLoginUrl: string;
   providers: ProviderConfig[];
-  /** `issuer#subject` for each administrator (WS10-R2). */
+  /** ADMIN_SUBJECTS: `issuer#subject` for each administrator. */
   admins: string[];
   /**
    * ADMIN_GROUPS: identity-provider groups whose members are store
@@ -37,16 +36,8 @@ export interface StoreConfig {
   /** WORKSPACE_CREATION: who may create workspaces in the workspace API. */
   workspaceCreation: 'admins' | 'anyone';
   retention: RetentionPeriod;
-  cryptoMode: 'webcrypto' | 'passthrough';
   /**
-   * The organization's recovery public key, PEM (WS7-R4, R10). Clients wrap
-   * every document key to it, and the store refuses documents that arrive
-   * without that wrap. Its private half is generated once at first-run
-   * setup and kept offline; the store never holds it.
-   */
-  recoveryPublicKeyPem: string | null;
-  /**
-   * WS10-R6, R7: shared with the relay, which admits only peers carrying a
+   * RELAY_TOKEN_SECRET: shared with the relay, which admits only peers carrying a
    * room token signed with it. Absent means an open relay. It has to reach
    * the store as well as the relay: a relay that requires tokens beside a
    * store that cannot issue them admits nobody at all.
@@ -55,15 +46,15 @@ export interface StoreConfig {
   maxBlobBytes: number;
   maxBlobsPerDocument: number;
   maxTotalBytes: number;
-  /** How often the purge sweep runs (WS10-R4). */
+  /** How often the retention sweep runs. */
   purgeIntervalMs: number;
   /** Development only: no sign-in at all. */
   allowUnauthenticated: boolean;
-  /** WS14-R36: AUTO_ACCESS. Off stops automatic access at once. */
-  autoAccess: boolean;
-  /** WS14-R18: JOIN_EVIDENCE_RETENTION, the ceiling on keeping a raw ID
-   * token for a join request. */
-  joinEvidenceRetentionMs: number;
+  /**
+   * Settings found in the environment that this version no longer reads.
+   * Named at startup, so nobody goes on believing they do something.
+   */
+  retiredSettings: string[];
 }
 
 export class ConfigError extends Error {}
@@ -137,7 +128,8 @@ export function loadStoreConfig(env: Env = process.env): StoreConfig {
           'the client secret; it stays on the server.',
         ),
         scopes: list(env.OIDC_SCOPES).length ? list(env.OIDC_SCOPES) : undefined,
-        // WS14-R6: the ID-token claim holding groups.
+        // The ID-token claim holding groups, which workspace roles and
+        // ADMIN_GROUPS are matched against.
         groupsClaim: env.OIDC_GROUPS_CLAIM?.trim() || 'groups',
         groupsClaimAbsent: parseGroupsClaimAbsent(env.OIDC_GROUPS_CLAIM_ABSENT),
       });
@@ -179,21 +171,6 @@ export function loadStoreConfig(env: Env = process.env): StoreConfig {
     );
   }
 
-  const recoveryPublicKeyPem = (() => {
-    const inline = env.RECOVERY_PUBLIC_KEY?.trim();
-    const path = env.RECOVERY_PUBLIC_KEY_FILE?.trim();
-    if (inline && path)
-      throw new ConfigError('Set RECOVERY_PUBLIC_KEY or RECOVERY_PUBLIC_KEY_FILE, not both.');
-    const pem = inline ?? (path ? readFileSync(path, 'utf8') : '');
-    if (!pem.trim()) return null;
-    if (!/-----BEGIN PUBLIC KEY-----/.test(pem)) {
-      throw new ConfigError(
-        `The recovery key does not look like a PEM public key. It must be the PUBLIC half - the private half is kept offline and never given to the store (WS7-R5). Generate a pair with: npx tsx scripts/generate-recovery-key.ts`,
-      );
-    }
-    return pem.trim();
-  })();
-
   // Only somewhere this deployment already trusts: an arbitrary address
   // here would be an open redirect off the back of a real sign-in.
   const configuredAfterLogin = env.AFTER_LOGIN_URL?.trim();
@@ -221,17 +198,6 @@ export function loadStoreConfig(env: Env = process.env): StoreConfig {
     );
   }
 
-  const cryptoMode = (env.CRYPTO_MODE ?? 'webcrypto').trim();
-  if (cryptoMode !== 'webcrypto' && cryptoMode !== 'passthrough') {
-    throw new ConfigError(`CRYPTO_MODE must be "webcrypto" or "passthrough", not "${cryptoMode}".`);
-  }
-
-  const autoAccessRaw = (env.AUTO_ACCESS ?? 'on').trim().toLowerCase();
-  if (autoAccessRaw !== 'on' && autoAccessRaw !== 'off') {
-    throw new ConfigError(`AUTO_ACCESS must be "on" or "off", not "${env.AUTO_ACCESS}".`);
-  }
-  const joinEvidenceRetentionMs = parseEvidenceRetention(env.JOIN_EVIDENCE_RETENTION);
-
   const workspaceCreation = (env.WORKSPACE_CREATION ?? 'admins').trim().toLowerCase();
   if (workspaceCreation !== 'admins' && workspaceCreation !== 'anyone') {
     throw new ConfigError(
@@ -250,16 +216,13 @@ export function loadStoreConfig(env: Env = process.env): StoreConfig {
     adminGroups: list(env.ADMIN_GROUPS),
     workspaceCreation,
     retention: parseRetentionPeriod(env.RETENTION_PERIOD),
-    cryptoMode,
-    recoveryPublicKeyPem,
     relayTokenSecret,
     maxBlobBytes: positive(env, 'MAX_BLOB_BYTES', 8 * 1024 * 1024),
     maxBlobsPerDocument: positive(env, 'MAX_BLOBS_PER_DOCUMENT', 100_000),
     maxTotalBytes: positive(env, 'MAX_TOTAL_BYTES', Number.POSITIVE_INFINITY),
     purgeIntervalMs: positive(env, 'PURGE_INTERVAL_MINUTES', 60) * 60_000,
     allowUnauthenticated,
-    autoAccess: autoAccessRaw === 'on',
-    joinEvidenceRetentionMs,
+    retiredSettings: RETIRED_SETTINGS.filter((name) => env[name]?.trim()),
   };
 }
 
@@ -273,23 +236,19 @@ function parseGroupsClaimAbsent(raw: string | undefined): 'no-groups' | 'unknown
   return value;
 }
 
-const EVIDENCE_UNITS: Record<string, number> = { h: 3_600_000, d: 86_400_000, w: 604_800_000 };
-const EVIDENCE_RETENTION_MAX_MS = 30 * 86_400_000;
-
-/** WS14-R18: `12h`, `7d`, `2w`; default 7d, at most 30d. An ID token names a
- * person and their groups, so it is kept no longer than it is useful. */
-function parseEvidenceRetention(raw: string | undefined): number {
-  const value = (raw ?? '7d').trim().toLowerCase();
-  const match = /^(\d+)\s*([hdw])$/.exec(value);
-  if (!match || Number(match[1]) === 0)
-    throw new ConfigError(
-      `JOIN_EVIDENCE_RETENTION must be a duration such as 12h, 7d or 2w, not "${raw}".`,
-    );
-  const ms = Number(match[1]) * EVIDENCE_UNITS[match[2]];
-  if (ms > EVIDENCE_RETENTION_MAX_MS)
-    throw new ConfigError(`JOIN_EVIDENCE_RETENTION may be at most 30d, not "${raw}".`);
-  return ms;
-}
+/**
+ * Settings of the encrypted workspace this store used to keep. Documents
+ * are no longer encrypted in the browser, so there is no key to escrow, no
+ * mode to choose, and no approval to automate: a workspace's members and
+ * mapped groups decide access.
+ */
+const RETIRED_SETTINGS = [
+  'CRYPTO_MODE',
+  'RECOVERY_PUBLIC_KEY',
+  'RECOVERY_PUBLIC_KEY_FILE',
+  'AUTO_ACCESS',
+  'JOIN_EVIDENCE_RETENTION',
+];
 
 /** What the store prints at startup, so an operator can see what it is. */
 export function describeConfig(config: StoreConfig): string[] {
@@ -324,21 +283,19 @@ export function describeConfig(config: StoreConfig): string[] {
         : 'only administrators can create one'
     }`,
     describeRetention(config.retention),
-    config.cryptoMode === 'passthrough'
-      ? 'Crypto mode: PASSTHROUGH - documents are stored unencrypted and this server can read them'
-      : 'Crypto mode: webcrypto - documents arrive sealed and this server cannot read them',
+    'Documents: stored as the editor sends them. This server and its administrators can read them.',
     config.relayTokenSecret
       ? 'Relay: sessions require a token from this store (set the same RELAY_TOKEN_SECRET on the relay)'
       : 'Relay: OPEN - anyone who can reach it and knows a room name can join a session',
-    config.cryptoMode === 'passthrough'
-      ? 'Recovery escrow: not applicable in passthrough mode'
-      : config.recoveryPublicKeyPem
-        ? "Recovery escrow: configured - every document is also recoverable with the organization's offline key"
-        : 'Recovery escrow: NOT CONFIGURED - documents will be refused (WS7-R4). Set RECOVERY_PUBLIC_KEY_FILE.',
-    !config.providers.some((provider) => provider.kind === 'oidc')
-      ? 'Automatic access: unavailable - it needs OIDC sign-in'
-      : config.autoAccess
-        ? `Automatic access: on - groups read from the "${config.providers.find((provider) => provider.kind === 'oidc')?.groupsClaim ?? 'groups'}" claim (${config.providers.find((provider) => provider.kind === 'oidc')?.groupsClaimAbsent === 'unknown' ? 'a token without it tells nothing' : 'a token without it means no groups'}), sign-in evidence kept at most ${Math.round(config.joinEvidenceRetentionMs / 3_600_000)}h`
-        : 'Automatic access: OFF (AUTO_ACCESS=off) - everyone is let in by hand',
+    ...(config.providers.some((provider) => provider.kind === 'oidc')
+      ? [
+          `Groups: read from the "${config.providers.find((provider) => provider.kind === 'oidc')?.groupsClaim ?? 'groups'}" claim at sign-in, for workspace roles and ADMIN_GROUPS (${config.providers.find((provider) => provider.kind === 'oidc')?.groupsClaimAbsent === 'unknown' ? 'a token without it tells nothing' : 'a token without it means no groups'})`,
+        ]
+      : []),
+    ...(config.retiredSettings.length
+      ? [
+          `No longer used, and safe to remove: ${config.retiredSettings.join(', ')}. Documents are not encrypted in the browser any more; see docs/trusted-store.md.`,
+        ]
+      : []),
   ];
 }

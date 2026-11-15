@@ -79,7 +79,6 @@ async function startStore(appOrigin: string) {
   const idp = await startTestOidcProvider({ subject: 'ada' });
   let origin = '';
   const server = createHttpService({
-    store: documents as unknown as StoreBackend,
     directory,
     sessions: createSessionStore(),
     providers: [
@@ -801,14 +800,9 @@ async function run() {
     // --- A store from before workspaces --------------------------------------
     console.log('\n=== An outdated store ===');
     {
-      const blobs = createMemoryBlobStore();
+      // What is left of one, as far as the editor can tell: it answers its
+      // health check and has no workspace API.
       const old = createHttpService({
-        store: createDocumentService<MemoryTx>({
-          blobs,
-          begin: () => blobs.begin(),
-          commit: (tx) => blobs.commit(tx),
-          rollback: (tx) => blobs.rollback(tx),
-        }) as unknown as StoreBackend,
         allowUnauthenticated: true,
         allowedOrigins: [appOrigin],
       });

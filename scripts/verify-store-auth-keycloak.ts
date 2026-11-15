@@ -21,9 +21,7 @@
  */
 import { chromium } from 'playwright';
 import type { AddressInfo } from 'net';
-import { createMemoryBlobStore, type MemoryTx } from '../store/src/blobStore.ts';
-import { createDocumentService } from '../store/src/documentService.ts';
-import { createHttpService, type StoreBackend } from '../store/src/httpService.ts';
+import { createHttpService } from '../store/src/httpService.ts';
 import { createMemoryUserDirectory } from '../store/src/userDirectory.ts';
 import { createSessionStore } from '../store/src/auth/sessions.ts';
 import { createProvider } from '../store/src/auth/providers.ts';
@@ -55,17 +53,8 @@ const clientSecret = process.env.KEYCLOAK_CLIENT_SECRET ?? standIn?.clientSecret
 const username = process.env.KEYCLOAK_USERNAME ?? 'tester';
 const password = process.env.KEYCLOAK_PASSWORD ?? 'anything';
 
-const blobs = createMemoryBlobStore();
-const store = createDocumentService<MemoryTx>({
-  blobs,
-  begin: () => blobs.begin(),
-  commit: (tx) => blobs.commit(tx),
-  rollback: (tx) => blobs.rollback(tx),
-}) as unknown as StoreBackend;
-
 let origin = '';
 const server = createHttpService({
-  store,
   directory: createMemoryUserDirectory(),
   sessions: createSessionStore(),
   providers: [createProvider({ id: 'oidc', kind: 'oidc', issuer, clientId, clientSecret })],
@@ -187,13 +176,13 @@ try {
   const sessionCookie = cookies.find((cookie) => cookie.name === 'sd_session');
   check(!!sessionCookie?.httpOnly, 'the session cookie is HttpOnly');
   const listed = await page.evaluate(async (base) => {
-    const response = await fetch(`${base}/v1/docs`, { credentials: 'include' });
+    const response = await fetch(`${base}/v1/auth/session`, { credentials: 'include' });
     return response.status;
   }, origin);
   check(listed === 200, 'store routes accept the session');
   const loggedOut = await page.evaluate(async (base) => {
     await fetch(`${base}/v1/auth/logout`, { method: 'POST', credentials: 'include' });
-    return (await fetch(`${base}/v1/docs`, { credentials: 'include' })).status;
+    return (await fetch(`${base}/v1/auth/session`, { credentials: 'include' })).status;
   }, origin);
   check(loggedOut === 401, 'and stop as soon as it is ended');
 } catch (error) {

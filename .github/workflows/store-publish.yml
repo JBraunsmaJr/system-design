@@ -78,8 +78,6 @@ jobs:
         run: |
           npx tsx scripts/verify-workspaces-contract.ts
           npx tsx scripts/verify-store-v2.ts
-      - name: The administration guide, performed
-        run: npx tsx scripts/verify-admin-docs.ts
       - name: The store as a process
         run: npx tsx scripts/verify-store-startup.ts
 

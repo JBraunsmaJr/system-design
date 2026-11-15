@@ -15,13 +15,7 @@
  *  - every attempt, successful or not, is audited (WS10-R3)
  */
 import type { AddressInfo } from 'net';
-import { createMemoryBlobStore, type MemoryTx } from '../store/src/blobStore.ts';
-import { createDocumentService } from '../store/src/documentService.ts';
-import {
-  createHttpService,
-  createMemoryAuditSink,
-  type StoreBackend,
-} from '../store/src/httpService.ts';
+import { createHttpService, createMemoryAuditSink } from '../store/src/httpService.ts';
 import { createProvider } from '../store/src/auth/providers.ts';
 import { createSessionStore, SESSION_COOKIE } from '../store/src/auth/sessions.ts';
 import { verifyIdToken, TokenError } from '../store/src/auth/jwt.ts';
@@ -38,16 +32,6 @@ function check(condition: boolean, message: string) {
     failures++;
     console.error(`  FAIL: ${message}`);
   }
-}
-
-function newStore(): StoreBackend {
-  const blobs = createMemoryBlobStore();
-  return createDocumentService<MemoryTx>({
-    blobs,
-    begin: () => blobs.begin(),
-    commit: (tx) => blobs.commit(tx),
-    rollback: (tx) => blobs.rollback(tx),
-  }) as unknown as StoreBackend;
 }
 
 const idp = await startTestOidcProvider();
@@ -75,7 +59,6 @@ const providers = [
 ];
 
 const server = createHttpService({
-  store: newStore(),
   audit,
   sessions,
   providers,
@@ -86,7 +69,6 @@ const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 // The store must be told its own address, since that is where the provider
 // sends the browser back to.
 const serverWithUrl = createHttpService({
-  store: newStore(),
   audit,
   sessions,
   providers,
@@ -130,20 +112,20 @@ try {
   {
     let threw = false;
     try {
-      createHttpService({ store: newStore() });
+      createHttpService({});
     } catch {
       threw = true;
     }
     check(threw, 'refuses to start with neither providers nor an explicit development flag');
     check(
-      !!createHttpService({ store: newStore(), allowUnauthenticated: true }),
+      !!createHttpService({ allowUnauthenticated: true }),
       'starts unauthenticated only when the caller says so',
     );
   }
 
   console.log('\n=== Before signing in ===');
   {
-    const anonymous = await call('/v1/docs');
+    const anonymous = await call('/v1/auth/session');
     check(anonymous.status === 401, 'every store route needs a session (401)');
     check(
       (await (await call('/v1/auth/session')).json()).error?.reason === 'unauthenticated',
@@ -206,12 +188,12 @@ try {
       'the session reports (issuer, subject), not an email address',
     );
     check(session.session?.displayName === 'Alice Example', 'and a display name for the interface');
-    check((await call('/v1/docs', cookie)).status === 200, 'store routes now work');
+    check((await call('/v1/auth/session', cookie)).status === 200, 'store routes now work');
 
     const logout = await call('/v1/auth/logout', cookie, { method: 'POST' });
     check(logout.status === 204, 'logging out succeeds');
     check(
-      (await call('/v1/docs', cookie)).status === 401,
+      (await call('/v1/auth/session', cookie)).status === 401,
       'and the cookie stops working immediately',
     );
   }
@@ -281,7 +263,10 @@ try {
       "the subject is GitHub's numeric account id, not the login name that can be reused",
     );
     check(session.session?.issuer === github.origin, 'and the issuer identifies GitHub');
-    check((await call('/v1/docs', cookie)).status === 200, 'the session works on store routes');
+    check(
+      (await call('/v1/auth/session', cookie)).status === 200,
+      'the session works on store routes',
+    );
 
     // Same login name, different account: a different person.
     github.setAccount({ id: 12345, login: 'octocat', name: 'Impostor' });
@@ -348,7 +333,6 @@ try {
     let splitOrigin = '';
     const splitServer = createHttpService({
       publicUrl: () => splitOrigin,
-      store: newStore(),
       sessions: splitSessions,
       providers: [
         createProvider({
@@ -404,7 +388,6 @@ try {
     // What a misconfigured container network produces. It must not surface
     // as "the store failed to handle this request".
     const unreachable = createHttpService({
-      store: newStore(),
       sessions: createSessionStore(),
       providers: [
         createProvider({

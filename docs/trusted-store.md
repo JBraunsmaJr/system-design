@@ -118,7 +118,8 @@ A document's workspace comes from the store's catalog (`store/src/documentCatalo
    - **Next:** nothing the encrypted mode did is now missing. What remains is the editor shell (one save status, Share in place of Collaborate, a canvas that is locked for viewers) and an OpenAPI description of `/v2`.
 4. **In progress: removal.**
    - **Done: the editor.** The encrypted mode is gone from the editor: `src/crypto` (except what the store still imports until the next step), device enrolment, the comparison code, recovery, key rotation, automatic access, the key-based store client, and their panels and tests. An editor pointed at a store without `/v2` works on its own and says the store needs upgrading.
-   - **Next: the store.** The `/v1` document, index, key, device, join and access-rule routes, their tables, and `ESCROW`, `CRYPTO_MODE` and the automatic-access settings. Sign-in (`/v1/auth`), health and relay tokens stay where they are.
+   - **Done: the store's API.** The `/v1` document, index, key, device, recovery, join-request, access-rule and administration routes are gone, with the modules behind them. What `/v1` still serves is about the person, not their documents: health, sign-in, and relay tokens for sessions started by link. `CRYPTO_MODE`, `RECOVERY_PUBLIC_KEY`, `RECOVERY_PUBLIC_KEY_FILE`, `AUTO_ACCESS` and `JOIN_EVIDENCE_RETENTION` are no longer read; a store that still sets them starts, and names them at startup.
+   - **Next: the store's storage.** The document service still accepts wrapped keys and sealed metadata, and sessions still have columns for sign-in evidence. Nothing writes them any more.
    - **Then: the documentation.** The deployment and security guides still describe the encrypted mode.
 
 ## An editor hosted somewhere else
@@ -147,6 +148,29 @@ A session needs two things: the name of a room on the relay, and a key that encr
 - **No reply is cacheable.** Every response carries `Cache-Control: no-store`. Browsers may otherwise reuse an error such as "that document is deleted" after it stops being true, which is how this was found.
 - **A tab that is not syncing looks again when someone returns to it.** Whether a document is in a workspace can change elsewhere (restored by a colleague, or access granted), and nothing pushes that to the browser.
 - **Viewers are read-only in the store, not yet in the editor.** A viewer can still change their own copy on screen; nothing they change is sent, and the store would refuse it. Locking the canvas for viewers comes with the editor shell work.
+
+## Upgrading a database that held an encrypted workspace
+
+The schema is applied at every startup and only ever adds. It no longer creates the encrypted workspace's tables, and it does not drop them from a database that has them: dropping is not something a service should do to data on its own, and until every team has exported what it needs, those tables and the old documents are the only copy.
+
+Left in place they cost nothing but space. The documents of the encrypted workspace stay in `documents` and `blobs`, unreachable through the API because no workspace lists them, and are not swept by retention unless they had already been deleted.
+
+When nothing in the old workspace is needed any more, an administrator of the database can remove what is left:
+
+```sql
+BEGIN;
+-- Documents that are in no workspace: everything the encrypted workspace held.
+DELETE FROM documents d
+ WHERE NOT EXISTS (SELECT 1 FROM workspace_documents w WHERE w.doc_id = d.doc_id);
+DROP TABLE IF EXISTS join_requests, workspace_memberships, workspace_access_rules,
+                     workspace_index, workspace_keys, user_recovery, devices;
+ALTER TABLE users DROP COLUMN IF EXISTS user_public_key,
+                  DROP COLUMN IF EXISTS last_groups,
+                  DROP COLUMN IF EXISTS last_groups_at;
+COMMIT;
+```
+
+Take a backup first. The `DELETE` cannot be undone, and it removes legal holds on those documents with them.
 
 ## Moving from an encrypted store
 
