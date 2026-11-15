@@ -118,7 +118,8 @@ async function runCatalog(
     (await catalog.get('doc-a'))?.workspaceId === one.workspaceId,
     'and the refused attempt did not move the original',
   );
-  for (const bad of ['', 'has space', '../etc', 'x'.repeat(129), '-leading']) {
+  // 'local' is the id every browser gives its own first document.
+  for (const bad of ['', 'has space', '../etc', 'x'.repeat(129), '-leading', 'local']) {
     check(
       (await reasonOf(() =>
         catalog.add({ docId: bad, workspaceId: one.workspaceId, title: 'x', createdBy: ada }),

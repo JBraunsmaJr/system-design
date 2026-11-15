@@ -21,17 +21,59 @@
  */
 import * as Y from 'yjs';
 import type { StoreClient } from '../access/storeClient.ts';
-import { StoreClientError } from '../access/storeClient.ts';
+import { StoreClientError } from '../access/storeErrors.ts';
 
 /** Marks updates that came from the store, so they are not echoed back
  * and undo leaves them alone. */
 export const WORKSPACE_ORIGIN = Symbol('workspace');
 
-export interface DocumentSyncOptions {
-  client: StoreClient;
-  docId: string;
-  documentKey: string;
+/**
+ * A document's update log in a store, as the sync needs it. The sync only
+ * merges CRDT updates and counts versions; how they are stored - sealed
+ * with a document key, or as they are - is the log's business.
+ */
+export interface DocumentLog {
+  all(): Promise<{ version: number; blobs: { kind: string; bytes: Uint8Array }[] }>;
+  since(version: number): Promise<{ version: number; updates: Uint8Array[] }>;
+  /** Returns the document's new version. Refused (`conflict`) when
+   * `expectedVersion` is no longer current. */
+  append(
+    update: Uint8Array,
+    expectedVersion: number,
+    options?: { keepalive?: boolean },
+  ): Promise<number>;
+  compact(state: Uint8Array, expectedVersion: number): Promise<number>;
+}
+
+/** The key-based API's log: every blob sealed with the document's key. */
+export function sealedDocumentLog(
+  client: StoreClient,
+  docId: string,
+  documentKey: string,
+): DocumentLog {
+  return {
+    all: () => client.allUpdates(docId, documentKey),
+    since: (version) => client.updatesSince(docId, documentKey, version),
+    append: (update, expectedVersion, options) =>
+      client.appendUpdate(docId, documentKey, update, expectedVersion, options),
+    compact: (state, expectedVersion) =>
+      client.compactDocument(docId, documentKey, state, expectedVersion),
+  };
+}
+
+/** Where the document's log is: given directly, or - as callers of the
+ * key-based API have always passed it - a client, an id and a key. */
+type DocumentSyncTarget =
+  | { log: DocumentLog; client?: undefined; docId?: undefined; documentKey?: undefined }
+  | { log?: undefined; client: StoreClient; docId: string; documentKey: string };
+
+export type DocumentSyncOptions = DocumentSyncTarget & {
   doc: Y.Doc;
+  /**
+   * Follow the store without ever sending to it, for someone who may read a
+   * document but not change it. Their local edits stay in their browser.
+   */
+  readOnly?: boolean;
   /** How often to look for other people's changes. */
   pollMs?: number;
   /** Local changes are batched for this long before being appended. */
@@ -39,7 +81,7 @@ export interface DocumentSyncOptions {
   /** Collapse the log once it holds more than this many blobs (WS8-R5). */
   compactAfterBlobs?: number;
   onStatus?: (status: DocumentSyncStatus, detail?: string) => void;
-}
+};
 
 export type DocumentSyncStatus = 'starting' | 'saving' | 'saved' | 'offline' | 'error';
 
@@ -63,7 +105,9 @@ export interface DocumentSync {
 }
 
 export function createDocumentSync(options: DocumentSyncOptions): DocumentSync {
-  const { client, docId, documentKey, doc } = options;
+  const { doc } = options;
+  const log = options.log ?? sealedDocumentLog(options.client, options.docId, options.documentKey);
+  const readOnly = options.readOnly ?? false;
   const pollMs = options.pollMs ?? 4000;
   const debounceMs = options.debounceMs ?? 800;
   const compactAfterBlobs = options.compactAfterBlobs ?? 200;
@@ -90,7 +134,7 @@ export function createDocumentSync(options: DocumentSyncOptions): DocumentSync {
   function onLocalUpdate(_update: Uint8Array, origin: unknown) {
     // Remote updates arrive with our own origin; sending them back would
     // be a loop, and they are already in the store.
-    if (origin === WORKSPACE_ORIGIN || stopped) return;
+    if (origin === WORKSPACE_ORIGIN || stopped || readOnly) return;
     dirty = true;
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => void send(), debounceMs);
@@ -115,7 +159,7 @@ export function createDocumentSync(options: DocumentSyncOptions): DocumentSync {
         const update = Y.encodeStateAsUpdate(doc, Y.encodeStateVector(mirror));
         dirty = false;
         if (update.length > 0) {
-          version = await client.appendUpdate(docId, documentKey, update, version);
+          version = await log.append(update, version);
           Y.applyUpdate(mirror, update, WORKSPACE_ORIGIN);
           blobCount += 1;
         }
@@ -147,7 +191,7 @@ export function createDocumentSync(options: DocumentSyncOptions): DocumentSync {
 
   /** Other people's updates, applied here. */
   async function pull(): Promise<void> {
-    const { version: current, updates } = await client.updatesSince(docId, documentKey, version);
+    const { version: current, updates } = await log.since(version);
     for (const update of updates) {
       // The CRDT merges them; applying the same update twice is harmless,
       // which is what makes a missed response safe to retry.
@@ -163,14 +207,14 @@ export function createDocumentSync(options: DocumentSyncOptions): DocumentSync {
     // keeps its identity and its version history; only storage shrinks.
     // Written from the mirror: only what the store has agreed to hold.
     const state = Y.encodeStateAsUpdate(mirror);
-    version = await client.compactDocument(docId, documentKey, state, version);
+    version = await log.compact(state, version);
     blobCount = 1;
   }
 
   return {
     async start() {
       say('starting');
-      const { version: current, blobs } = await client.allUpdates(docId, documentKey);
+      const { version: current, blobs } = await log.all();
       for (const blob of blobs) {
         if (blob.kind === 'update' || blob.kind === 'snapshot') {
           // A snapshot here is a compacted state, not a diagram file: both
@@ -183,8 +227,8 @@ export function createDocumentSync(options: DocumentSyncOptions): DocumentSync {
       blobCount = blobs.length;
       // Anything this browser already has that the store does not - work
       // done offline, or a document being added to the workspace - is now
-      // a difference to send.
-      dirty = true;
+      // a difference to send. Someone who may only read sends nothing.
+      dirty = !readOnly;
       doc.on('update', onLocalUpdate);
       poller = setInterval(() => {
         void pull().catch(() => {
@@ -208,8 +252,8 @@ export function createDocumentSync(options: DocumentSyncOptions): DocumentSync {
       // Sealing is asynchronous, but short; the request it leads to is
       // marked keepalive so the browser finishes it after the page has
       // gone. Nothing is awaited here - an unloading page cannot wait.
-      void client
-        .appendUpdate(docId, documentKey, update, version, { keepalive: true })
+      void log
+        .append(update, version, { keepalive: true })
         .then((next) => {
           version = next;
           Y.applyUpdate(mirror, update, WORKSPACE_ORIGIN);

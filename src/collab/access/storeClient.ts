@@ -32,31 +32,8 @@ export interface StoreClientOptions {
   mode?: CryptoMode;
 }
 
-export type StoreClientErrorReason =
-  | 'unauthenticated'
-  | 'not-found'
-  | 'deleted'
-  | 'conflict'
-  | 'rolled-back'
-  | 'quota'
-  | 'too-large'
-  | 'offline'
-  | 'unreadable'
-  /** WS14-R31: this person was removed from the workspace. */
-  | 'removed'
-  | 'store-error';
-
-export class StoreClientError extends Error {
-  reason: StoreClientErrorReason;
-  status?: number;
-
-  constructor(message: string, reason: StoreClientErrorReason, status?: number) {
-    super(message);
-    this.name = 'StoreClientError';
-    this.reason = reason;
-    this.status = status;
-  }
-}
+export { StoreClientError, type StoreClientErrorReason } from './storeErrors.ts';
+import { StoreClientError, type StoreClientErrorReason } from './storeErrors.ts';
 
 export interface IndexEntry {
   docId: string;

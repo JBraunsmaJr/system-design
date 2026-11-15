@@ -29,6 +29,19 @@ markers are removed when the section becomes a release. See
 - `ADMIN_GROUPS` makes the members of an identity-provider group store administrators in that API.
   `WORKSPACE_CREATION` sets who may create workspaces there.
 
+### [MINOR] Workspaces on a trusted store
+
+- When the store it points at serves the workspace API, the editor shows **Workspaces** in the document manager: sign
+  in, pick a workspace, create one if you are allowed to, add a copy of the open document to it, and open or delete its
+  documents. A workspace document saves to the store as you edit and picks up other people's changes. There are no
+  keys, devices or approvals: your role comes from the workspace's members and your identity-provider groups.
+- Adding a document to a workspace makes a copy under a new id and opens the copy; the original stays in your browser.
+- Viewers receive changes and send none. The canvas is not locked for them yet, so a viewer's own edits stay on their
+  screen only.
+- Against a store without the workspace API, nothing changes.
+- Store: compacting a document through `/v2` must name the version it read, and is refused if the document has moved
+  on, so a concurrent edit can no longer be erased by a compaction. The id `local` is refused for workspace documents.
+
 ### [MINOR] Plan tab
 
 - Timeline, Team and Skill Tree are now one **Plan** tab with four sections: **Board**, **Gantt**, **Dependencies** and

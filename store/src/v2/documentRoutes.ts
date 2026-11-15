@@ -258,6 +258,9 @@ export async function documentRoutes(context: V2Context): Promise<void> {
     const compacted = await deps.documents.compact(docId, {
       kind: typeof body.kind === 'string' ? body.kind : 'snapshot',
       bytes: fromBase64(body.bytes, 'bytes'),
+      // Without this a snapshot made a moment ago would erase an update
+      // someone else appended since.
+      expectedVersion: typeof body.expectedVersion === 'number' ? body.expectedVersion : undefined,
     });
     await audit('document.compact');
     return context.send(200, { document: compacted }, compacted.version);

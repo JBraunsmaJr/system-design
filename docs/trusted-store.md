@@ -109,8 +109,16 @@ A document's workspace comes from the store's catalog (`store/src/documentCatalo
 
 1. **Done: rules and storage.** Permissions, workspaces, members, group mappings, with both storage implementations.
 2. **Done: the API.** The routes above, with a refusal test for every one, against memory and PostgreSQL. Administrators can come from an identity-provider group. Documents have a workspace and a plain title. Not yet done: tokens for live sessions through the relay, and an OpenAPI description.
-3. **Next: the editor.** A store client without keys, a workspace list and switcher, members and group mappings, an administration page, and the store address in settings.
+3. **In progress: the editor.**
+   - **Done: opening and saving.** The editor asks the store which API it serves (`/v2/health`) before it first renders, and remembers the answer. Against a trusted store it shows a workspace panel in the document manager: sign in, choose a workspace, create one, add a copy of the open document, open and delete documents. A workspace document saves to the store as it is edited and picks up other people's changes; a viewer's copy follows along and sends nothing. Against a store without `/v2` the editor behaves as before.
+   - **Next:** members and group mappings, an administration page, the store address in settings, and live sessions.
 4. **Last: removal.** The encrypted API, its tables, `src/crypto`, device enrolment, recovery, rotation, and their tests and documentation. The last release with encryption is tagged first.
+
+## Things the editor relies on
+
+- **A browser's first document is never a workspace document.** Its id is `local` in every browser, so the store refuses that id and the editor never looks it up. Adding the open document to a workspace makes a copy under a new id and opens the copy.
+- **Compaction names the version it read.** Replacing a document's update log with one snapshot is refused with a conflict if anything was appended since, so a concurrent edit is never erased. The encrypted API's compaction does not have this check.
+- **Viewers are read-only in the store, not yet in the editor.** A viewer can still change their own copy on screen; nothing they change is sent, and the store would refuse it. Locking the canvas for viewers comes with the editor shell work.
 
 ## Moving from an encrypted store
 

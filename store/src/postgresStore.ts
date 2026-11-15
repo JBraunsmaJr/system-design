@@ -475,12 +475,24 @@ export function createPostgresStore(options: PostgresStoreOptions) {
       });
     },
 
+    /** See documentService.ts: `expectedVersion` guards against erasing
+     * updates appended since the snapshot was made. Checked under the
+     * document's row lock, so the check and the replacement are one step. */
     async compact(
       docId: string,
-      snapshot: { kind: string; bytes: Uint8Array },
+      snapshot: { kind: string; bytes: Uint8Array; expectedVersion?: number },
     ): Promise<DocumentRecord> {
       return inTransaction(async (tx) => {
         const row = await lockDocument(tx, docId);
+        if (
+          snapshot.expectedVersion !== undefined &&
+          snapshot.expectedVersion !== Number(row.version)
+        ) {
+          throw new StoreError(
+            `Expected version ${snapshot.expectedVersion}, but ${docId} is at ${Number(row.version)}.`,
+            'conflict',
+          );
+        }
         const at = now();
         const version = Number(row.version) + 1;
         const blobId = `b${(++blobCounter).toString(36)}${Date.now().toString(36)}`;

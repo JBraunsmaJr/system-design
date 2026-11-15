@@ -348,3 +348,117 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ---------- Trusted store: workspaces inside File > Documents ---------- */
+
+.trusted-workspace__notice {
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--warning);
+  line-height: 1.45;
+}
+
+.trusted-workspace__notice svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.trusted-workspace__status {
+  margin: 0;
+  color: var(--chrome-text-dim);
+  line-height: 1.45;
+}
+
+.trusted-workspace__status strong {
+  color: var(--chrome-text);
+}
+
+.trusted-workspace__error {
+  margin: 0;
+  color: var(--danger);
+  line-height: 1.45;
+}
+
+.trusted-workspace__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.trusted-workspace__row label {
+  color: var(--chrome-text-dim);
+}
+
+.trusted-workspace__select,
+.trusted-workspace__input {
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  padding: 5px 8px;
+  color: var(--chrome-text);
+  font-size: var(--text-xs);
+  max-width: 260px;
+}
+
+.trusted-workspace__input {
+  flex: 1 1 160px;
+}
+
+.trusted-workspace__role {
+  color: var(--chrome-text-dim);
+}
+
+.trusted-workspace__link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.trusted-workspace__documents {
+  display: grid;
+  gap: 2px;
+}
+
+.trusted-workspace__document {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.trusted-workspace__document:hover {
+  background: var(--chrome-bg-hover);
+}
+
+.trusted-workspace__document.is-current {
+  background: var(--chrome-bg-active);
+}
+
+.trusted-workspace__document-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.trusted-workspace__document-title {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--chrome-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trusted-workspace__document-meta {
+  color: var(--chrome-text-dim);
+}

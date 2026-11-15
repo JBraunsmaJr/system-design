@@ -125,7 +125,7 @@ export interface StoreBackend {
 
   compact(
     docId: string,
-    snapshot: { kind: string; bytes: Uint8Array },
+    snapshot: { kind: string; bytes: Uint8Array; expectedVersion?: number },
   ): Promise<{ version: number }>;
 
   softDelete(docId: string): Promise<{ version: number }>;

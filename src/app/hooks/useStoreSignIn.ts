@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { startSignIn } from '../../collab/access/joinFlow.ts';
+import { createStoreClient } from '../../collab/access/storeClient.ts';
 import { useStoreAuth } from '../../collab/hooks/useStoreIdentity';
 
 /**
@@ -13,7 +14,13 @@ import { useStoreAuth } from '../../collab/hooks/useStoreIdentity';
  * on the individual members - never on the returned object, which is new on
  * every render.
  */
-export function useStoreSignIn(storeUrl: string | null) {
+export function useStoreSignIn(
+  storeUrl: string | null,
+  /** A trusted store has no keys to commit to: signing in is a plain
+   * redirect to the provider. */
+  options: { plain?: boolean } = {},
+) {
+  const plain = options.plain ?? false;
   const { identity: storeIdentity, providers: storeProviders } = useStoreAuth(storeUrl);
 
   const isOidcAvailable = Boolean(
@@ -23,9 +30,13 @@ export function useStoreSignIn(storeUrl: string | null) {
   const handleLoginOidc = useCallback(() => {
     if (!storeUrl) return;
     const provider = storeProviders.includes('oidc') ? 'oidc' : (storeProviders[0] ?? 'oidc');
+    if (plain) {
+      globalThis.location.assign(createStoreClient({ baseUrl: storeUrl }).signInUrl(provider));
+      return;
+    }
     // WS14-R2: commits to a key first where automatic access can use it.
     void startSignIn(storeUrl, provider);
-  }, [storeUrl, storeProviders]);
+  }, [storeUrl, storeProviders, plain]);
 
   const signedInName = storeIdentity?.displayName?.trim() || null;
 

@@ -29,6 +29,9 @@ import { DocumentManager } from './components/workspace/DocumentManager';
 import { DurabilityIndicator } from './components/workspace/DurabilityIndicator';
 import { LeaveGuardDialog } from './components/workspace/LeaveGuardDialog';
 import { WorkspacePanel } from './components/workspace/WorkspacePanel';
+import { TrustedWorkspacePanel } from './components/workspace/TrustedWorkspacePanel';
+import { useTrustedWorkspaceSync } from './collab/trusted/useTrustedWorkspaceSync';
+import { getStoreMode } from './collab/trusted/storeMode';
 import { AccessRequestNotice } from './components/workspace/AccessRequestNotice';
 import { Toast, type ToastType } from './common/components/toast/Toast';
 import { useFileSaving } from './hooks/useFileSaving';
@@ -98,6 +101,16 @@ function App() {
   /** Where the workspace is, if this deployment has one. Absent means the
    * editor behaves exactly as it does with no store at all. */
   const [storeUrl] = useState(() => getStoreUrl());
+  /**
+   * Which API that store speaks, settled before the first render (see
+   * storeMode.ts). A trusted store is wired through the workspace API's
+   * hooks and panel, a legacy one through the key-based ones; each set is
+   * given a null address when it is not the one in use, which is what
+   * every one of them already treats as "no store".
+   */
+  const [storeMode] = useState(() => getStoreMode(storeUrl));
+  const trustedStoreUrl = storeMode === 'trusted' ? storeUrl : null;
+  const legacyStoreUrl = storeMode === 'trusted' ? null : storeUrl;
 
   const [toast, setToast] = useState<{
     id?: number;
@@ -114,11 +127,13 @@ function App() {
   );
 
   // --- Workspace sign-in and collaboration --------------------------------
-  const { storeIdentity, isOidcAvailable, handleLoginOidc, signedInName } =
-    useStoreSignIn(storeUrl);
+  const { storeIdentity, isOidcAvailable, handleLoginOidc, signedInName } = useStoreSignIn(
+    storeUrl,
+    { plain: storeMode === 'trusted' },
+  );
   /** People waiting to be let into the workspace, noticed from here rather
    * than only from inside File > Documents (WS7-R8). */
-  const accessRequests = useAccessRequests({ storeUrl });
+  const accessRequests = useAccessRequests({ storeUrl: legacyStoreUrl });
 
   const {
     activeSession,
@@ -176,8 +191,12 @@ function App() {
     milestonesSnapshot,
   } = useDocumentStores({ activeSession, openDoc });
 
-  const { workspaceSync, handleSaveToWorkspace, isSavingToWorkspace } = useWorkspaceSession({
-    storeUrl,
+  const {
+    workspaceSync: legacyWorkspaceSync,
+    handleSaveToWorkspace,
+    isSavingToWorkspace,
+  } = useWorkspaceSession({
+    storeUrl: legacyStoreUrl,
     openDocId,
     openDoc,
     title,
@@ -187,6 +206,16 @@ function App() {
     autoJoinedRoomRef: autoJoinedRoom,
     startNewSession,
   });
+
+  const trustedWorkspaceSync = useTrustedWorkspaceSync({
+    storeUrl: trustedStoreUrl,
+    docId: openDocId,
+    doc: openDoc.doc,
+    title,
+  });
+  // Whichever store is in use. Both report the same shape, so saving,
+  // the durability indicator and the unload guard do not care which.
+  const workspaceSync = trustedStoreUrl ? trustedWorkspaceSync : legacyWorkspaceSync;
 
   const { hasAutosaved, durabilitySignals, resumableSession, activeDocId } = useDocumentPersistence(
     {
@@ -607,17 +636,17 @@ function App() {
       listLinkableDocuments({
         listLocal: () =>
           documentStore.listDocuments().then((result) => (result.ok ? result.value : [])),
-        listWorkspace: storeUrl
+        listWorkspace: legacyStoreUrl
           ? () => {
               workspaceReader.current ??= {
-                client: createStoreClient({ baseUrl: storeUrl }),
+                client: createStoreClient({ baseUrl: legacyStoreUrl }),
                 storage: createIndexedDbDeviceKeyStorage(),
               };
               return listWorkspaceDocuments(workspaceReader.current);
             }
           : undefined,
       }),
-    [documentStore, storeUrl],
+    [documentStore, legacyStoreUrl],
   );
   const handleOpenWorkspaceDocument = useCallback(
     (docId: string) => {
@@ -675,7 +704,7 @@ function App() {
               onLoginOidc={!storeIdentity && isOidcAvailable ? handleLoginOidc : undefined}
               isLoggedIn={storeIdentity !== null}
               onSaveToWorkspace={
-                storeUrl && storeIdentity !== null ? handleSaveToWorkspace : undefined
+                legacyStoreUrl && storeIdentity !== null ? handleSaveToWorkspace : undefined
               }
               isSavingToWorkspace={isSavingToWorkspace}
             />
@@ -946,9 +975,18 @@ function App() {
         timedCopies={timedCopies}
         onTimedCopiesChange={setTimedCopies}
         workspace={
-          storeUrl ? (
+          trustedStoreUrl ? (
+            <TrustedWorkspacePanel
+              storeUrl={trustedStoreUrl}
+              currentDocId={openDocId}
+              currentTitle={title}
+              onOpenDocument={handleOpenWorkspaceDocument}
+              getDocumentState={getDocumentState}
+              onSignIn={isOidcAvailable ? handleLoginOidc : undefined}
+            />
+          ) : legacyStoreUrl ? (
             <WorkspacePanel
-              storeUrl={storeUrl}
+              storeUrl={legacyStoreUrl}
               currentDocId={openDocId}
               currentTitle={title}
               // What a workspace document holds: this document's CRDT

@@ -581,8 +581,18 @@ async function run(label: string, backend: Backend) {
       ).status === 409,
       'an append against a version that has moved on is 409',
     );
+    const staleCompact = await call(ed, 'POST', `/documents/${D1}/compact`, {
+      bytes: b64('made from an old state'),
+      expectedVersion: 2,
+    });
+    check(
+      staleCompact.status === 409 &&
+        ((await call(vic, 'GET', `/documents/${D1}`)).body.blobs as unknown[]).length === 2,
+      'a snapshot made from a version that has moved on is 409, and erases nothing',
+    );
     const compacted = await call(ed, 'POST', `/documents/${D1}/compact`, {
       bytes: b64('snapshot'),
+      expectedVersion: 3,
     });
     const afterCompact = await call(vic, 'GET', `/documents/${D1}`);
     check(

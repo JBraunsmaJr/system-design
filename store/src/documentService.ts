@@ -366,11 +366,25 @@ export function createDocumentService<Tx>(options: DocumentServiceOptions<Tx>) {
      * identity and version history are untouched; this is compaction, never
      * a rebase.
      */
+    /**
+     * Replaces the log with one snapshot. With `expectedVersion`, refused
+     * (`conflict`) when the document has moved on: a snapshot made from an
+     * older state would otherwise erase whatever was appended since.
+     */
     async compact(
       docId: string,
-      snapshot: { kind: string; bytes: Uint8Array },
+      snapshot: { kind: string; bytes: Uint8Array; expectedVersion?: number },
     ): Promise<DocumentRecord> {
       const row = require(docId);
+      if (
+        snapshot.expectedVersion !== undefined &&
+        snapshot.expectedVersion !== row.record.version
+      ) {
+        throw new StoreError(
+          `Expected version ${snapshot.expectedVersion}, but ${docId} is at ${row.record.version}.`,
+          'conflict',
+        );
+      }
       const blobId = `b${(++blobCounter).toString(36)}`;
       const superseded = row.blobIds.map((id) => ({ docId, blobId: id }));
       const tx = options.begin();

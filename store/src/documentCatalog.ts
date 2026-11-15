@@ -59,7 +59,20 @@ export function normalizeTitle(title: unknown): string {
  */
 const DOC_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 
+/**
+ * The id the editor gives a browser's first, unsaved document - the same in
+ * every browser. A workspace document under it would be taken by every
+ * browser for its own first document, so it is never accepted.
+ */
+export const RESERVED_DOC_IDS: readonly string[] = ['local'];
+
 export function requireDocId(docId: unknown): string {
+  if (typeof docId === 'string' && RESERVED_DOC_IDS.includes(docId)) {
+    throw new CatalogError(
+      `"${docId}" is the id every browser gives its own first document, so it cannot name a workspace document. Give the document a new id.`,
+      'invalid',
+    );
+  }
   if (typeof docId !== 'string' || !DOC_ID_PATTERN.test(docId)) {
     throw new CatalogError(
       'A document id is 1 to 128 letters, digits, dots, underscores, colons or hyphens, starting with a letter or digit.',
