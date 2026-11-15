@@ -336,20 +336,29 @@ async function run() {
     check((await p.$$('.requirements-table__row')).length === 5, 'the view opens as a table');
     check((await p.$('.requirement-card')) === null, 'with no item open');
     await p.click('.requirements-table__title');
+    await p.waitForSelector('.requirements-table__detail .requirement-detail');
+    check(
+      (await p.$('.requirement-card')) === null,
+      'clicking a line opens the item beneath it, laid out for reading',
+    );
+    await p.click('.requirement-detail__action:has-text("Edit")');
     await p.waitForSelector('.requirements-table__detail .requirement-card');
-    check(true, 'clicking a line opens the item beneath it');
-    await p.click('.requirements-table__title');
+    check(true, 'Edit swaps in the full card');
+    await p.click('.requirement-detail__action:has-text("Done")');
     await p.waitForSelector('.requirement-card', { state: 'detached' });
-    check(true, 'and clicking it again closes it');
-    const gap = await p.$('.requirements-coverage__measure--button');
+    check(true, 'and Done goes back');
+    await p.click('.requirements-table__title');
+    await p.waitForSelector('.requirement-detail', { state: 'detached' });
+    check(true, 'clicking the line again closes it');
+    const gap = await p.$('.requirements-view__gap');
     if (gap) {
       const before = (await p.$$('.requirements-table__row')).length;
       await gap.click();
-      await p.waitForSelector('.requirements-coverage__measure--button.is-active');
+      await p.waitForSelector('.requirements-view__gap.is-active');
       const narrowed = (await p.$$('.requirements-table__row')).length;
       check(narrowed > 0 && narrowed < before, 'a coverage count narrows the table to its gap');
-      await p.click('.requirements-coverage__measure--button.is-active');
-      await p.waitForSelector('.requirements-coverage__measure--button.is-active', {
+      await p.click('.requirements-view__gap.is-active');
+      await p.waitForSelector('.requirements-view__gap.is-active', {
         state: 'detached',
       });
       check((await p.$$('.requirements-table__row')).length === before, 'and back again');

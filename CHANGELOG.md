@@ -29,6 +29,17 @@ markers are removed when the section becomes a release. See
 - `ADMIN_GROUPS` makes the members of an identity-provider group store administrators in that API.
   `WORKSPACE_CREATION` sets who may create workspaces there.
 
+### [MINOR] Requirements: a table row opens for reading
+
+- Opening a line in the table shows the item laid out to read rather than as a form: its statement, its acceptance
+  criteria as boxes you can tick in place, its relationships, the components linked to it and how it is verified.
+  **Edit** swaps in the full card; a new item opens straight into it.
+- The table's columns are now ID, title, type, status, components and verification. Verification reads at a glance
+  ("Test passing", "Inspection", "Test failing", "No method"). Sprint and assignee moved into the open row.
+- Each group's heading shows how much of the group is verified.
+- The gap filters are buttons with counts at the right of the coverage line (Not on diagram, Not verified, No
+  acceptance criteria, No description); the coverage figures themselves now only report.
+
 ### [MINOR] Requirements: verification and acceptance criteria
 
 - Requirements and constraints (and items of your own descriptive types) have a verification control in their header:

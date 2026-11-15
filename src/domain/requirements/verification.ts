@@ -128,6 +128,8 @@ export interface AcceptanceCriteria {
 /** A task-list line: a list marker, then [ ] or [x], then some text. */
 const CRITERION = /^[ \t]*(?:[-*+]|\d+[.)])[ \t]+\[([ xX])\][ \t]+\S/;
 const FENCE = /^[ \t]*(```|~~~)/;
+const CRITERIA_HEADING =
+  /^[ \t]*(?:#{1,6}[ \t]*)?[*_]{0,2}acceptance criteria:?[*_]{0,2}:?[ \t]*$/i;
 
 /**
  * Counts the acceptance criteria in a description: its task-list lines,
@@ -149,6 +151,99 @@ export function parseAcceptanceCriteria(body: string): AcceptanceCriteria {
     if (match[1] !== ' ') criteria.met += 1;
   }
   return criteria;
+}
+
+export interface AcceptanceCriterion {
+  text: string;
+  met: boolean;
+}
+
+/**
+ * A description split into what it states and what must hold: the prose
+ * with the task-list lines taken out, and those lines as criteria. The
+ * Requirements view shows the two apart - the statement as text, the
+ * criteria as boxes to tick - while the description stays one piece of
+ * Markdown underneath.
+ */
+export function splitAcceptanceCriteria(body: string): {
+  statement: string;
+  criteria: AcceptanceCriterion[];
+} {
+  const statement: string[] = [];
+  const criteria: AcceptanceCriterion[] = [];
+  let inFence = false;
+  for (const line of body.split('\n')) {
+    if (FENCE.test(line)) inFence = !inFence;
+    const match = inFence || FENCE.test(line) ? null : CRITERION.exec(line);
+    if (!match) {
+      // A heading that only announces the list ("## Acceptance criteria",
+      // "**Acceptance criteria:**") would be shown twice: the view gives
+      // the criteria their own heading.
+      if (!inFence && CRITERIA_HEADING.test(line)) continue;
+      statement.push(line);
+      continue;
+    }
+    criteria.push({
+      text: line.replace(/^[ \t]*(?:[-*+]|\d+[.)])[ \t]+\[[ xX]\][ \t]+/, '').trimEnd(),
+      met: match[1] !== ' ',
+    });
+  }
+  return {
+    statement: statement
+      .join('\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim(),
+    criteria,
+  };
+}
+
+/** `body` with its `index`-th criterion ticked or unticked. Only the box
+ * changes - the rest of the line and of the description is untouched, so
+ * the edit merges cleanly with someone else's change to the prose. */
+export function toggleAcceptanceCriterion(body: string, index: number): string {
+  let seen = -1;
+  let inFence = false;
+  return body
+    .split('\n')
+    .map((line) => {
+      if (FENCE.test(line)) {
+        inFence = !inFence;
+        return line;
+      }
+      if (inFence || !CRITERION.test(line)) return line;
+      seen += 1;
+      if (seen !== index) return line;
+      return line.replace(/\[([ xX])\]/, (_, mark: string) => (mark === ' ' ? '[x]' : '[ ]'));
+    })
+    .join('\n');
+}
+
+/** How a verification reads at a glance, and how loud it should be. */
+export interface VerificationSummary {
+  label: string;
+  tone: 'ok' | 'warning' | 'failing' | 'neutral';
+}
+
+/**
+ * "Test passing", "Inspection", "Test failing", "Test not run", "No
+ * method": the one phrase a table row has room for. The method leads
+ * because it is what differs between rows that are all fine.
+ */
+export function summarizeVerification(
+  item: Pick<RequirementItem, 'verificationMethod' | 'verificationStatus'>,
+): VerificationSummary {
+  const method = getVerificationMethodMeta(item.verificationMethod);
+  const status = getVerificationStatusMeta(item.verificationStatus).id;
+  if (status === 'failing') {
+    return { label: method ? `${method.label} failing` : 'Failing', tone: 'failing' };
+  }
+  if (status === 'passing') {
+    if (!method) return { label: 'Verified', tone: 'ok' };
+    return { label: method.id === 'test' ? 'Test passing' : method.label, tone: 'ok' };
+  }
+  return method
+    ? { label: `${method.label} not run`, tone: 'neutral' }
+    : { label: 'No method', tone: 'warning' };
 }
 
 /** "Test - Verified", "Not verified": what the export and tooltips say. */

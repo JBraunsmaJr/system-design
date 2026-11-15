@@ -9,6 +9,9 @@ import {
   isVerifiable,
   isVerified,
   parseAcceptanceCriteria,
+  splitAcceptanceCriteria,
+  summarizeVerification,
+  toggleAcceptanceCriterion,
 } from './verification.ts';
 import { computeCoverage } from './requirementsCoverage.ts';
 import { itemHasGap, itemMatchesFilter, normalizeFilter } from './requirementsFilter.ts';
@@ -55,6 +58,62 @@ console.log('=== Acceptance criteria ===');
     'a line inside a fenced code block is text',
   );
   assert(count('- [x] a\r\n- [ ] b\r\n') === '1/2', 'Windows line endings are fine');
+}
+
+console.log('\n=== Statement and criteria ===');
+{
+  const body = 'It must hold.\n\n- [x] First thing\n- [ ] Second thing\n\nA closing note.';
+  const split = splitAcceptanceCriteria(body);
+  assert(
+    split.statement === 'It must hold.\n\nA closing note.',
+    'the statement is the prose alone',
+  );
+  assert(
+    split.criteria.map((c) => `${c.met ? 'x' : ' '}:${c.text}`).join('|') ===
+      'x:First thing| :Second thing',
+    'the criteria are the task-list lines, in order',
+  );
+  assert(splitAcceptanceCriteria('Only prose.').criteria.length === 0, 'prose alone has none');
+  for (const heading of [
+    '## Acceptance criteria',
+    '**Acceptance criteria:**',
+    'Acceptance Criteria:',
+  ]) {
+    assert(
+      splitAcceptanceCriteria(`Prose.\n\n${heading}\n- [ ] one`).statement === 'Prose.',
+      `a "${heading}" line announcing the list is left out of the statement`,
+    );
+  }
+  assert(
+    splitAcceptanceCriteria('The acceptance criteria are strict.').statement.includes('strict'),
+    'a sentence that merely mentions them is kept',
+  );
+
+  const ticked = toggleAcceptanceCriterion(body, 1);
+  assert(ticked.includes('- [x] Second thing'), 'ticking a criterion marks its box');
+  assert(ticked.replace('- [x] Second', '- [ ] Second') === body, 'and changes nothing else');
+  assert(toggleAcceptanceCriterion(ticked, 1) === body, 'unticking restores it');
+  assert(toggleAcceptanceCriterion(body, 0).includes('- [ ] First thing'), 'a ticked one unticks');
+  assert(toggleAcceptanceCriterion(body, 7) === body, 'an index past the end changes nothing');
+  const fenced = '```\n- [ ] not one\n```\n- [ ] real';
+  assert(
+    toggleAcceptanceCriterion(fenced, 0) === '```\n- [ ] not one\n```\n- [x] real',
+    'a line in a code block is not counted',
+  );
+}
+
+console.log('\n=== At a glance ===');
+{
+  const say = (method?: 'test' | 'inspection', status?: 'passing' | 'failing' | 'not-verified') => {
+    const s = summarizeVerification({ verificationMethod: method, verificationStatus: status });
+    return `${s.label}/${s.tone}`;
+  };
+  assert(say() === 'No method/warning', 'nothing chosen: no method');
+  assert(say('test') === 'Test not run/neutral', 'a method but no result');
+  assert(say('test', 'passing') === 'Test passing/ok', 'a passing test');
+  assert(say('inspection', 'passing') === 'Inspection/ok', 'verified by inspection');
+  assert(say('test', 'failing') === 'Test failing/failing', 'a failing test');
+  assert(say(undefined, 'passing') === 'Verified/ok', 'verified with no method named');
 }
 
 const items: RequirementItem[] = [

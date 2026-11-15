@@ -9,6 +9,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import React from 'react';
 import { RequirementsView } from './RequirementsView';
 import { RequirementsCoverageBar } from './RequirementsCoverageBar';
+import { RequirementRowDetail } from './RequirementRowDetail';
 import {
   BUILT_IN_ITEM_TYPES,
   BUILT_IN_RELATIONSHIP_TYPES,
@@ -16,6 +17,11 @@ import {
 import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
 import { createLocalRequirementsStore } from '../../collab/stores/requirementsStore';
 import type { SubDiagram } from '../../domain/canvas/types';
+
+/** React separates adjacent text pieces with empty comments; they only get
+ * in the way of reading the markup as text. */
+const renderPlain = (element: React.ReactElement) =>
+  renderToStaticMarkup(element).replaceAll('<!-- -->', '');
 
 let failures = 0;
 function assert(condition: boolean, message: string) {
@@ -98,7 +104,7 @@ const team = {
 } as unknown as React.ComponentProps<typeof RequirementsView>['team'];
 
 function render(props: Partial<React.ComponentProps<typeof RequirementsView>> = {}): string {
-  return renderToStaticMarkup(
+  return renderPlain(
     <RequirementsView
       requirementsStore={createLocalRequirementsStore(doc)}
       programIncrements={programIncrements}
@@ -125,10 +131,8 @@ console.log('=== The table is where the view opens ===');
 
   const ticket = rowOf(html, 'TICKET-1');
   assert(ticket.includes('In Progress'), 'a ticket shows its status');
-  assert(ticket.includes('Sprint 1') && ticket.includes('Ana Ruiz'), 'its sprint and assignee');
   assert(!ticket.includes('Not linked'), 'and is not expected on the diagram');
   assert(!rowOf(html, 'EPIC-1').includes('Not linked'), 'neither is an epic');
-  assert(rowOf(html, 'EPIC-1').includes('title="2 relationships"'), 'relationships are counted');
 }
 
 console.log('\n=== Grouped by epic ===');
@@ -197,25 +201,37 @@ console.log('\n=== Coverage ===');
   const html = render({ initialGroupBy: 'type' });
   assert(html.includes('requirements-coverage'), 'the coverage line is shown');
   assert(/On the diagram.*?>1<.*?\/2</s.test(html), 'one of two requirements is on the diagram');
-  assert(/Described.*?>3<.*?\/4</s.test(html), 'three of four items are described');
   assert(/Work done.*?>0<.*?\/1</s.test(html), 'none of the one ticket is done');
   assert(/Acceptance criteria.*?>1<.*?\/2</s.test(html), 'one of two requirements has criteria');
   assert(/Verified.*?>1<.*?\/2</s.test(html), 'and one of two is verified');
-  assert(count(html, 'requirements-coverage__measure--button') === 4, 'four gaps can be opened');
+
+  /** The count on the gap chip labelled `label`, or null if it isn't shown. */
+  const chip = (label: string) =>
+    new RegExp(`requirements-view__gap"[^>]*>${label}<span[^>]*>(\\d+)<`).exec(html)?.[1] ?? null;
+  assert(chip('Not on diagram') === '1', 'a chip offers the one requirement not on the diagram');
+  assert(chip('Not verified') === '1', 'the one not verified');
+  assert(chip('No acceptance criteria') === '1', 'the one with no criteria');
+  assert(chip('No description') === '1', 'and the one item with nothing written');
+  assert(!html.includes('aria-pressed="true" class="requirements-view__gap'), 'none is on yet');
 
   const req1 = rowOf(html, 'REQ-1');
   assert(
-    req1.includes('Verified') && req1.includes('>1/2<'),
-    'a verified requirement shows its status and its criteria',
+    req1.includes('is-ok') && req1.includes('Test passing') && req1.includes('>1/2<'),
+    'a verified requirement shows how it is verified and its criteria',
   );
   const req2 = rowOf(html, 'REQ-2');
   assert(
-    req2.includes('Not verified') && req2.includes('no criteria'),
-    'an unverified one with no criteria says so',
+    req2.includes('is-warning') && req2.includes('No method'),
+    'one with no method chosen says so',
   );
-  assert(!rowOf(html, 'TICKET-1').includes('erified'), 'a ticket has no verification');
+  assert(
+    !rowOf(html, 'TICKET-1').includes('requirements-table__verification is-'),
+    'a ticket has no verification',
+  );
+  assert(/Requirements<.*?50% verified/s.test(html), 'a group says how much of it is verified');
+  assert(count(html, '% verified') === 1, 'a group with nothing to verify does not');
 
-  const empty = renderToStaticMarkup(
+  const empty = renderPlain(
     <RequirementsView
       requirementsStore={createLocalRequirementsStore({ ...doc, items: [], relationships: [] })}
       programIncrements={[]}
@@ -223,7 +239,7 @@ console.log('\n=== Coverage ===');
   );
   assert(!empty.includes('requirements-coverage'), 'an empty document shows no coverage line');
 
-  const complete = renderToStaticMarkup(
+  const complete = renderPlain(
     <RequirementsCoverageBar
       coverage={{
         total: 2,
@@ -236,31 +252,75 @@ console.log('\n=== Coverage ===');
         withCriteria: 0,
         verified: 0,
       }}
-      activeGaps={[]}
-      onToggleGap={() => undefined}
     />,
   );
-  assert(!complete.includes('<button'), 'a measure with nothing missing is not a button');
-  assert(!complete.includes('Work done'), 'and with no work items there is no work measure');
+  assert(!complete.includes('Work done'), 'with no work items there is no work measure');
+  assert(!complete.includes('Verified'), 'and with nothing to verify, no verification measures');
+}
 
-  const active = renderToStaticMarkup(
-    <RequirementsCoverageBar
-      coverage={{
-        total: 2,
-        described: 1,
-        descriptive: 2,
-        onDiagram: 1,
-        workable: 0,
-        done: 0,
-        verifiable: 0,
-        withCriteria: 0,
-        verified: 0,
-      }}
-      activeGaps={['not-on-diagram']}
-      onToggleGap={() => undefined}
+console.log('\n=== An open row ===');
+{
+  const base = {
+    doc,
+    linkedNodes: [],
+    onUpdateItem: () => undefined,
+    onNavigateToItem: () => undefined,
+    onNavigateToNode: () => undefined,
+    renderEditor: () => <div className="the-editor" />,
+  };
+  const req1 = doc.items.find((i) => i.id === 'REQ-1')!;
+  const html = renderPlain(
+    <RequirementRowDetail
+      {...base}
+      item={req1}
+      linkedNodes={[{ nodeId: 'n1', label: 'Order Service', path: [], hasSubDiagram: false }]}
     />,
   );
-  assert(count(active, 'aria-pressed="true"') === 1, 'the gap being shown is marked pressed');
+  assert(html.includes('>Statement<') && html.includes('Described.'), 'shows the statement');
+  assert(
+    !/requirement-detail__statement[^]*No account needed[^]*Acceptance criteria/.test(html),
+    'without the criteria in it',
+  );
+  assert(html.includes('1 of 2 met'), 'counts the criteria');
+  assert(count(html, 'role="checkbox"') === 2, 'each one is a box to tick');
+  assert(
+    /aria-checked="true"[^>]*>.*?No account needed/s.test(html) &&
+      /aria-checked="false"[^>]*>.*?Works on mobile/s.test(html),
+    'ticked or not as the description says',
+  );
+  assert(
+    html.includes('child of') && html.includes('EPIC-1'),
+    'lists its relationships as seen from this item',
+  );
+  assert(html.includes('Order Service') && html.includes('Show on diagram'), 'and its components');
+  assert(html.includes('>Test<') || html.includes('Test'), 'and how it is verified');
+  assert(!html.includes('the-editor'), 'the editor is not shown until asked for');
+
+  const ticket = renderPlain(
+    <RequirementRowDetail
+      {...base}
+      item={doc.items.find((i) => i.id === 'TICKET-1')!}
+      sprintName="Sprint 1"
+      assigneeName="Ana Ruiz"
+    />,
+  );
+  assert(
+    ticket.includes('In Progress') && ticket.includes('Sprint 1') && ticket.includes('Ana Ruiz'),
+    'a ticket shows its planning instead',
+  );
+  assert(
+    !ticket.includes('>Verification<') && !ticket.includes('>On the diagram'),
+    'and neither verification nor the diagram',
+  );
+
+  const blank = renderPlain(
+    <RequirementRowDetail
+      {...base}
+      item={{ id: 'REQ-9', typeId: 'requirement', title: '', body: '' }}
+      startEditing
+    />,
+  );
+  assert(blank.includes('the-editor'), 'a new item opens in the editor');
 }
 
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);

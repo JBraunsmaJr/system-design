@@ -62,13 +62,16 @@ import {
 import { RequirementsOutline } from './RequirementsOutline';
 import { NO_EPIC_KEY, useRequirementGroups } from './useRequirementGroups';
 import { RequirementsCoverageBar } from './RequirementsCoverageBar';
+import { RequirementRowDetail } from './RequirementRowDetail';
 import {
   RequirementsTable,
   type RequirementsTableRow,
   type RequirementsTableSection,
 } from './RequirementsTable';
-import { computeCoverage } from '../../domain/requirements/requirementsCoverage';
-import { getRelationshipsForItem } from '../../domain/requirements/requirementsRegistry';
+import {
+  computeCoverage,
+  type RequirementsCoverage,
+} from '../../domain/requirements/requirementsCoverage';
 import { useRequirementStoreActions } from './useRequirementStoreActions';
 
 interface RequirementsViewProps {
@@ -126,7 +129,42 @@ const EMPTY_LINKED_NODES: LinkedNodeRef[] = [];
  */
 const EMPTY_PEERS: PresenceInfo[] = [];
 const NO_GAPS: readonly RequirementGap[] = [];
+
 const EPIC_SECTION_KEY = '__epics__';
+
+/** The gaps offered as one-click filters beside the coverage line, each
+ * with how many items have it. */
+const GAP_CHIPS: {
+  gap: RequirementGap;
+  label: string;
+  title: string;
+  count: (coverage: RequirementsCoverage) => number;
+}[] = [
+  {
+    gap: 'not-on-diagram',
+    label: 'Not on diagram',
+    title: 'Requirements, goals and other descriptive items no component is linked to',
+    count: (c) => c.descriptive - c.onDiagram,
+  },
+  {
+    gap: 'not-verified',
+    label: 'Not verified',
+    title: 'Requirements and constraints not marked verified',
+    count: (c) => c.verifiable - c.verified,
+  },
+  {
+    gap: 'no-acceptance-criteria',
+    label: 'No acceptance criteria',
+    title: 'Requirements and constraints with no task-list line saying what must hold',
+    count: (c) => c.verifiable - c.withCriteria,
+  },
+  {
+    gap: 'no-description',
+    label: 'No description',
+    title: 'Items of any kind with nothing written in them',
+    count: (c) => c.total - c.described,
+  },
+];
 const DETAIL_KEY = '__detail__';
 const DETAIL_CHILDREN_KEY = '__detail-children__';
 const MAX_NAV_HISTORY = 20;
@@ -968,11 +1006,6 @@ export function RequirementsView({
     () => new Map((team?.members ?? []).map((m) => [m.id, m.name || 'Unnamed'] as const)),
     [team],
   );
-  const relationshipCountByItemId = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const item of doc.items) counts.set(item.id, getRelationshipsForItem(doc, item.id).length);
-    return counts;
-  }, [doc]);
 
   /** The table's lines: the same groups and epic tree the cards use,
    * flattened, with folded epics and collapsed sections left out. */
@@ -1037,14 +1070,33 @@ export function RequirementsView({
     isNarrowed,
   ]);
 
-  const renderTableDetail = (row: RequirementsTableRow) =>
-    renderCard(row.item, {
-      sectionKey: row.sectionKey,
-      cardKey: `table:${row.key}`,
-      domId: row.domId,
-      isContext: row.isContext,
-      collapsible: false,
-    });
+  const renderTableDetail = (row: RequirementsTableRow) => (
+    <RequirementRowDetail
+      // Remounts for a different item, so one row's "editing" never
+      // carries over to another.
+      key={row.item.id}
+      doc={doc}
+      item={row.item}
+      linkedNodes={linkedNodesByItemId.get(row.item.id) ?? EMPTY_LINKED_NODES}
+      sprintName={row.item.sprintId ? sprintNameById.get(row.item.sprintId) : undefined}
+      assigneeName={row.item.assigneeId ? memberNameById.get(row.item.assigneeId) : undefined}
+      onUpdateItem={onUpdateItem}
+      onNavigateToItem={(itemId) => onNavigateToItem(itemId, row.item.id)}
+      onNavigateToNode={onNavigateToNode}
+      // A new item has nothing to read yet: it opens ready to be written.
+      startEditing={!row.item.title && !row.item.body}
+      searchQuery={trimmedSearch}
+      renderEditor={() =>
+        renderCard(row.item, {
+          sectionKey: row.sectionKey,
+          cardKey: `table:${row.key}`,
+          domId: row.domId,
+          isContext: row.isContext,
+          collapsible: false,
+        })
+      }
+    />
+  );
 
   const backEntry = navHistory[navHistory.length - 1];
   const backButton = backEntry ? (
@@ -1138,11 +1190,6 @@ export function RequirementsView({
               </button>
             )}
           </div>
-          {!search.trim() && !filterActive && doc.items.length > 0 && (
-            <span className="requirements-view__count-badge">
-              {doc.items.length} {doc.items.length === 1 ? 'item' : 'items'}
-            </span>
-          )}
           <div className="requirements-view__group-toggle requirements-view__tools-toggle">
             <button
               type="button"
@@ -1292,11 +1339,28 @@ export function RequirementsView({
         </div>
       </div>
 
-      <RequirementsCoverageBar
-        coverage={coverage}
-        activeGaps={filter.gaps ?? NO_GAPS}
-        onToggleGap={onToggleGap}
-      />
+      <RequirementsCoverageBar coverage={coverage}>
+        <div className="requirements-view__gaps" role="group" aria-label="Show only gaps">
+          {GAP_CHIPS.map(({ gap, label, title, count }) => {
+            const missing = count(coverage);
+            const active = (filter.gaps ?? NO_GAPS).includes(gap);
+            if (missing === 0 && !active) return null;
+            return (
+              <button
+                key={gap}
+                type="button"
+                className={`requirements-view__gap${active ? ' is-active' : ''}`}
+                aria-pressed={active}
+                onClick={() => onToggleGap(gap)}
+                title={title}
+              >
+                {label}
+                <span className="requirements-view__gap-count">{missing}</span>
+              </button>
+            );
+          })}
+        </div>
+      </RequirementsCoverageBar>
       {(isFilterBarOpen || filterActive) && (
         <RequirementsFilterBar
           filter={filter}
@@ -1385,9 +1449,6 @@ export function RequirementsView({
                 doc={doc}
                 sections={tableSections}
                 linkedNodesByItemId={linkedNodesByItemId}
-                sprintNameById={sprintNameById}
-                memberNameById={memberNameById}
-                relationshipCountByItemId={relationshipCountByItemId}
                 expandedIds={expandedIds}
                 onToggleExpanded={onToggleExpanded}
                 renderExpanded={renderTableDetail}

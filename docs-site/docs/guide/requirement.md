@@ -89,9 +89,11 @@ Toggle between two organization modes using the toolbar controls:
 
 **View** in the toolbar chooses how the items are laid out:
 
-- **Table** (the default): one line per item with its type, status, sprint, assignee, the components linked to it and
-  how many relationships it has. Click a line to open the full item beneath it; click again to close it. When grouping
-  by epic, children are indented under their epic and the count beside an epic's title folds them away.
+- **Table** (the default): one line per item with its type, status, the components linked to it and how it is
+  verified. Each group's heading shows how much of it is verified. Click a line to open the item beneath it, laid out
+  for reading: its statement, its acceptance criteria (click one to tick it), its relationships, its components and
+  its verification. **Edit** swaps in the full card, where every field can be changed; **Done** goes back. When
+  grouping by epic, children are indented under their epic and the count beside an epic's title folds them away.
 - **Cards**: every item as a full card in one scrolling column.
 - **Split**: an outline on the left and the open item, with its children, on the right. Outline rows show whether a
   descriptive item is on the diagram, and the status of work items and decisions.
@@ -104,13 +106,13 @@ The line above the items shows how complete the document is:
 
 - **On the diagram**: how many requirements, goals and other descriptive items have a component linked to them. Work
   items and epics are not counted, since they aren't expected on the diagram.
-- **Described**: how many items have a description.
 - **Acceptance criteria**: how many requirements and constraints have at least one acceptance criterion.
 - **Verified**: how many requirements and constraints are marked verified.
 - **Work done**: how many work items are done.
 
-When something is missing, every measure except **Work done** is a button: click one to show only the items with that
-gap, and again to show everything. In the table, a descriptive item with no component reads **Not linked**.
+At the right of that line is a button for each gap that exists, with how many items have it: **Not on diagram**,
+**Not verified**, **No acceptance criteria** and **No description**. Click one to show only those items, and again to
+show everything. In the table, a descriptive item with no component reads **Not linked**.
 
 ### Verification and Acceptance Criteria
 
@@ -118,8 +120,8 @@ Requirements and constraints, and items of any descriptive type you add yourself
 assumptions, decisions, epics and work items are not.
 
 - **Acceptance criteria** are task-list lines in the description. Write `- [ ] Checkout completes without an account`
-  for each thing that must hold, and change `[ ]` to `[x]` when it does. The item's header shows how many are ticked,
-  or **No criteria** when there are none.
+  for each thing that must hold. Tick one by clicking it in the table's open row, or by changing `[ ]` to `[x]` in the
+  description. The item's header shows how many are ticked, or **No criteria** when there are none.
 - **Verification** is the control beside the type in the item's header. Choose where it stands (**Not verified**,
   **Verified** or **Failing**) and how it is checked (**Test**, **Demonstration**, **Inspection** or **Analysis**).
 

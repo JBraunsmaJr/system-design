@@ -1,5 +1,5 @@
 import { Fragment, memo, type ReactNode } from 'react';
-import { ChevronDown, ChevronRight, TriangleAlert } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Eye, TriangleAlert, X } from 'lucide-react';
 import type {
   RequirementItem,
   RequirementsDocument,
@@ -10,10 +10,13 @@ import { HighlightedText } from '../../common/components/highlight/HighlightText
 import {
   type AcceptanceCriteria,
   describeVerification,
-  getVerificationStatusMeta,
   isVerifiable,
+  isVerified,
   parseAcceptanceCriteria,
+  summarizeVerification,
+  type VerificationSummary,
 } from '../../domain/requirements/verification';
+import { percentOf } from '../../domain/requirements/requirementsCoverage';
 import { isExpectedOnDiagram } from '../../domain/requirements/requirementsFilter';
 import { getDecisionStatusMeta, isDecisionItem } from '../../domain/requirements/decisionRecords';
 
@@ -50,9 +53,6 @@ interface RequirementsTableProps {
   doc: RequirementsDocument;
   sections: RequirementsTableSection[];
   linkedNodesByItemId: ReadonlyMap<string, LinkedNodeRef[]>;
-  sprintNameById: ReadonlyMap<string, string>;
-  memberNameById: ReadonlyMap<string, string>;
-  relationshipCountByItemId: ReadonlyMap<string, number>;
   /** Open items, by item id: an item shown under two epics opens in both. */
   expandedIds: ReadonlySet<string>;
   onToggleExpanded: (itemId: string) => void;
@@ -76,13 +76,10 @@ interface RowProps {
   typeLabel: string;
   typeColor: string;
   status?: { label: string; color: string };
-  sprintName?: string;
-  assigneeName?: string;
   /** Undefined for work and epics, which aren't expected on the diagram. */
   linkedNodes?: LinkedNodeRef[];
   /** Undefined for an item that isn't verified - see isVerifiable. */
-  verification?: { label: string; color: string; title: string; criteria: AcceptanceCriteria };
-  relationshipCount: number;
+  verification?: { summary: VerificationSummary; title: string; criteria: AcceptanceCriteria };
   isExpanded: boolean;
   isHighlighted: boolean;
   isBulkSelected: boolean;
@@ -98,11 +95,8 @@ const Row = memo(function Row({
   typeLabel,
   typeColor,
   status,
-  sprintName,
-  assigneeName,
   linkedNodes,
   verification,
-  relationshipCount,
   isExpanded,
   isHighlighted,
   isBulkSelected,
@@ -196,12 +190,6 @@ const Row = memo(function Row({
           dash
         )}
       </span>
-      <span role="cell" className="requirements-table__text" title={sprintName}>
-        {sprintName ?? dash}
-      </span>
-      <span role="cell" className="requirements-table__text" title={assigneeName}>
-        {assigneeName ?? dash}
-      </span>
       <span role="cell" className="requirements-table__nodes">
         {linkedNodes === undefined ? (
           dash
@@ -236,35 +224,26 @@ const Row = memo(function Row({
           </>
         )}
       </span>
-      <span role="cell" className="requirements-table__verification" title={verification?.title}>
+      <span
+        role="cell"
+        className={`requirements-table__verification${
+          verification ? ` is-${verification.summary.tone}` : ''
+        }`}
+        title={verification?.title}
+      >
         {verification ? (
           <>
-            <span
-              className="requirements-table__status-dot"
-              style={{ borderColor: verification.color }}
-              aria-hidden
-            />
-            {verification.label}
-            <span
-              className={`requirements-table__criteria${
-                verification.criteria.total === 0 ? ' is-missing' : ''
-              }`}
-            >
-              {verification.criteria.total === 0
-                ? 'no criteria'
-                : `${verification.criteria.met}/${verification.criteria.total}`}
-            </span>
+            {VERIFICATION_ICON[verification.summary.tone]}
+            {verification.summary.label}
+            {verification.criteria.total > 0 && (
+              <span className="requirements-table__criteria">
+                {verification.criteria.met}/{verification.criteria.total}
+              </span>
+            )}
           </>
         ) : (
           dash
         )}
-      </span>
-      <span
-        role="cell"
-        className="requirements-table__count"
-        title={`${relationshipCount} ${relationshipCount === 1 ? 'relationship' : 'relationships'}`}
-      >
-        {relationshipCount > 0 ? relationshipCount : dash}
       </span>
     </div>
   );
@@ -281,9 +260,6 @@ export function RequirementsTable({
   doc,
   sections,
   linkedNodesByItemId,
-  sprintNameById,
-  memberNameById,
-  relationshipCountByItemId,
   expandedIds,
   onToggleExpanded,
   renderExpanded,
@@ -304,21 +280,12 @@ export function RequirementsTable({
         <span role="columnheader">Title</span>
         <span role="columnheader">Type</span>
         <span role="columnheader">Status</span>
-        <span role="columnheader">Sprint</span>
-        <span role="columnheader">Assignee</span>
         <span role="columnheader">On the diagram</span>
         <span
           role="columnheader"
           title="Whether a requirement is verified, and how many of its acceptance criteria are ticked"
         >
           Verification
-        </span>
-        <span
-          role="columnheader"
-          className="requirements-table__count"
-          title="Relationships to other items"
-        >
-          Links
         </span>
       </div>
       {sections.map((section) => (
@@ -338,6 +305,7 @@ export function RequirementsTable({
               />
               <span className="requirements-table__section-label">{section.label}</span>
               <span className="requirements-table__section-count">{section.rows.length}</span>
+              <SectionProgress doc={doc} rows={section.rows} />
             </button>
           )}
           {!section.isCollapsed &&
@@ -359,15 +327,12 @@ export function RequirementsTable({
                     typeLabel={type?.label ?? 'Unknown'}
                     typeColor={type?.color ?? 'var(--chrome-text-dim)'}
                     status={status}
-                    sprintName={item.sprintId ? sprintNameById.get(item.sprintId) : undefined}
-                    assigneeName={item.assigneeId ? memberNameById.get(item.assigneeId) : undefined}
                     linkedNodes={
                       isExpectedOnDiagram(doc, item)
                         ? (linkedNodesByItemId.get(item.id) ?? NONE)
                         : undefined
                     }
                     verification={verification}
-                    relationshipCount={relationshipCountByItemId.get(item.id) ?? 0}
                     isExpanded={isExpanded}
                     isHighlighted={highlightedId === item.id}
                     isBulkSelected={bulkSelectedIds.has(item.id)}
@@ -391,12 +356,42 @@ export function RequirementsTable({
 
 const NONE: LinkedNodeRef[] = [];
 
+const VERIFICATION_ICON: Record<VerificationSummary['tone'], React.ReactNode> = {
+  ok: <Check size={12} aria-hidden />,
+  warning: <TriangleAlert size={12} aria-hidden />,
+  failing: <X size={12} aria-hidden />,
+  neutral: <Eye size={12} aria-hidden />,
+};
+
+/** How much of a section is verified, at the right of its heading. Left
+ * out where nothing in the section is the kind of thing that gets verified. */
+function SectionProgress({
+  doc,
+  rows,
+}: {
+  doc: RequirementsDocument;
+  rows: RequirementsTableRow[];
+}) {
+  const verifiable = rows.filter((row) => isVerifiable(doc, row.item));
+  if (verifiable.length === 0) return null;
+  const percent = percentOf(
+    verifiable.filter((row) => isVerified(row.item)).length,
+    verifiable.length,
+  );
+  return (
+    <span className="requirements-table__section-progress">
+      {percent}% verified
+      <span className="requirements-table__section-bar" aria-hidden>
+        <span style={{ width: `${percent}%` }} />
+      </span>
+    </span>
+  );
+}
+
 function verificationCell(item: RequirementItem): NonNullable<RowProps['verification']> {
-  const status = getVerificationStatusMeta(item.verificationStatus);
   const criteria = parseAcceptanceCriteria(item.body);
   return {
-    label: status.label,
-    color: status.color,
+    summary: summarizeVerification(item),
     criteria,
     title: `${describeVerification(item)}. ${
       criteria.total === 0
