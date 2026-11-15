@@ -132,6 +132,9 @@ export interface CanvasProps {
    * happened to be selected beforehand. */
   onZOrderCommand: (command: ZOrderCommand, targetIds: string[]) => void;
   presentation: PresentationState | null;
+  /** The document can be read here but not changed: nothing is offered for
+   * dragging or connecting. Edits are refused at the document regardless. */
+  viewOnly?: boolean;
   previewFocus: FocusSet | null;
   /** Set (once) to zoom/pan the camera onto a specific node - used for
    * "jump to this node" navigation from a requirement's linked-nodes list,
@@ -188,6 +191,7 @@ export function Canvas({
   onAdoptIntoGroup,
   onZOrderCommand,
   presentation,
+  viewOnly = false,
   previewFocus,
   focusNodeId,
   onFocusHandled,
@@ -505,9 +509,9 @@ export function Canvas({
           onPaneMouseLeave={handlePaneMouseLeave}
           defaultEdgeOptions={DEFAULT_EDGE_OPTIONS}
           deleteKeyCode={null}
-          nodesDraggable={!isPresenting}
-          nodesConnectable={!isPresenting}
-          edgesReconnectable={!isPresenting}
+          nodesDraggable={!isPresenting && !viewOnly}
+          nodesConnectable={!isPresenting && !viewOnly}
+          edgesReconnectable={!isPresenting && !viewOnly}
           // Raise the selected edge above the rest. React Flow renders endpoint
           // updaters for every edge, and where two edges meet at one handle the
           // later edge's updater covered the selected edge's - so dragging the

@@ -374,14 +374,85 @@ async function run() {
       await eventually(async () => (await nodeCount(vic)) === nodesAfterEdit),
       'and can open a document and read it',
     );
+    await vic.waitForSelector('.toolbar__view-only');
+    check(
+      /View only/.test((await vic.textContent('.toolbar__view-only')) ?? '') &&
+        (await vic.getAttribute('[aria-label="Diagram title"]', 'readonly')) !== null,
+      'the toolbar says the document is view only, and the title cannot be typed into',
+    );
     const versionBefore = (await record(docId)).version;
-    await vic.fill('[aria-label="Diagram title"]', 'Defaced by a viewer');
-    await sleep(4000);
+    const stateOf = (page: Page) =>
+      page.evaluate(() =>
+        JSON.stringify(
+          [...document.querySelectorAll<HTMLElement>('.react-flow__node')].map((node) => [
+            node.dataset.id,
+            node.style.transform,
+          ]),
+        ),
+      );
+    // Dragging a node, then deleting it from the keyboard.
+    const fit = vic.locator('.react-flow__controls-fitview');
+    if (await fit.count()) await fit.click();
+    await sleep(500);
+    const before = await stateOf(vic);
+    const at = await vic.evaluate(() => {
+      for (const node of document.querySelectorAll<HTMLElement>('.react-flow__node')) {
+        const box = node.getBoundingClientRect();
+        const x = box.x + box.width / 2;
+        const y = box.y + box.height / 2;
+        // In view, and the topmost thing where it will be pressed.
+        if (
+          x > 0 &&
+          y > 0 &&
+          x < window.innerWidth &&
+          y < window.innerHeight &&
+          node.contains(document.elementFromPoint(x, y))
+        ) {
+          return { x, y };
+        }
+      }
+      return null;
+    });
+    check(at !== null, 'a node is in view to try to change');
+    if (at) {
+      await vic.mouse.move(at.x, at.y);
+      await vic.mouse.down();
+      await vic.mouse.move(at.x + 160, at.y + 90, { steps: 8 });
+      await vic.mouse.up();
+      await vic.mouse.click(at.x, at.y);
+    }
+    await vic.keyboard.press('Delete');
+    await vic.keyboard.press('Backspace');
+    // And the way every other edit is made: through the document's stores.
+    await vic.evaluate(() => {
+      const bridge = (window as unknown as { __PERF__?: { loadFixture?: (name: string) => void } })
+        .__PERF__;
+      try {
+        bridge?.loadFixture?.('small');
+      } catch {
+        // Refused, or no such fixture: either way nothing should change.
+      }
+    });
+    check(
+      await vic
+        .waitForSelector('.app-toast__message:has-text("view only")', { timeout: 5000 })
+        .then(
+          () => true,
+          () => false,
+        ),
+      'they are told the document is view only when they try',
+    );
+    await sleep(3000);
+    check(
+      (await stateOf(vic)) === before && (await nodeCount(vic)) === nodesAfterEdit,
+      'dragging, deleting and loading over the document change nothing on their screen',
+    );
     check(
       (await record(docId)).version === versionBefore &&
         (await theStore.catalog.get(docId))?.title === 'Shared architecture, revised' &&
+        (await titleOf(vic)) === 'Shared architecture, revised' &&
         (await titleOf(ada)) === 'Shared architecture, revised',
-      "a viewer's edit stays in their browser: the store and other people are unchanged",
+      'nor in the store, nor for anyone else',
     );
 
     // --- The live session ------------------------------------------------------

@@ -101,7 +101,11 @@ function wrapAll(stores: OpenDocumentStores, undo: UndoController): OpenDocument
   ) as unknown as OpenDocumentStores;
 }
 
-const EXEMPT = new Set(['getSnapshot', 'subscribe', 'destroy', 'replaceAll']);
+// Passed through untouched. `replaceAll` is no longer one of them: it is not
+// run under undo, but it is a write, so it is wrapped to be refused on a
+// read-only document (undoReadOnly.verify.ts).
+const EXEMPT = new Set(['getSnapshot', 'subscribe', 'destroy']);
+const NOT_UNDOABLE = new Set(['replaceAll']);
 
 console.log('=== Every mutating method of every store is wrapped ===');
 {
@@ -114,10 +118,25 @@ console.log('=== Every mutating method of every store is wrapped ===');
       ([, v]) => typeof v === 'function',
     );
     const unwrapped = entries.filter(([k, v]) => !EXEMPT.has(k) && w[k] === v).map(([k]) => k);
+    // A whole-document replacement must still stay out of undo history.
+    for (const [k] of entries.filter(([key]) => NOT_UNDOABLE.has(key))) {
+      let underUndo = false;
+      const probe = undoableStore(
+        { [k]: () => undefined },
+        {
+          transact: (fn) => {
+            underUndo = true;
+            return fn();
+          },
+        },
+      ) as Record<string, () => void>;
+      probe[k]();
+      assert(!underUndo, `${name}.${k} is wrapped, but not run under undo`);
+    }
     const rewrapped = entries.filter(([k, v]) => EXEMPT.has(k) && w[k] !== v).map(([k]) => k);
     assert(
       unwrapped.length === 0 && rewrapped.length === 0 && entries.length === Object.keys(w).length,
-      `${name}: ${entries.filter(([k]) => !EXEMPT.has(k)).length} edits wrapped, read/lifecycle methods passed through by identity`,
+      `${name}: ${entries.filter(([k]) => !EXEMPT.has(k) && !NOT_UNDOABLE.has(k)).length} edits wrapped, read/lifecycle methods passed through by identity`,
     );
   }
   destroyDocumentStores(raw);

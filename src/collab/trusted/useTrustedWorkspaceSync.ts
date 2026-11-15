@@ -10,8 +10,9 @@
  * this is checked.
  *
  * Someone with the viewer role follows the document without sending
- * anything: the store would refuse their changes, so they stay in this
- * browser and `readOnly` says so.
+ * anything. `readOnly` says so, and the editor then refuses their edits
+ * before they are made (useViewOnly), so their copy stays what the
+ * workspace holds.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type * as Y from 'yjs';
@@ -122,11 +123,7 @@ export function useTrustedWorkspaceSync(options: TrustedWorkspaceSyncOptions) {
             // the room as soon as the document is known to be shared.
             session,
             version: started.version(),
-            message:
-              detail ??
-              (readOnly
-                ? 'You can view this document. Changes you make here are not saved to the workspace.'
-                : null),
+            message: detail ?? (readOnly ? 'You can view this document but not change it.' : null),
             workspace,
             readOnly,
           }),

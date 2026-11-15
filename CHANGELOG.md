@@ -89,8 +89,10 @@ markers are removed when the section becomes a release. See
   documents. A workspace document saves to the store as you edit and picks up other people's changes. There are no
   keys, devices or approvals: your role comes from the workspace's members and your identity-provider groups.
 - Adding a document to a workspace makes a copy under a new id and opens the copy; the original stays in your browser.
-- Viewers receive changes and send none. The canvas is not locked for them yet, so a viewer's own edits stay on their
-  screen only.
+- Viewers see a workspace document and cannot change it. The toolbar shows **View only**, the title cannot be typed
+  into, nodes cannot be dragged or connected, and every other edit - from any view, the keyboard, or loading a file
+  over the document - is refused before it is made, with a notice saying why. A viewer's copy is always exactly what
+  the workspace holds.
 - **Members** in the workspace panel shows who is in a workspace and which identity-provider groups are mapped to a
   role. Owners can add someone by name, map a group, change a role, remove either, and rename the workspace. People
   can be found once they have signed in to the store for the first time. Everyone in a mapped group gets its role when

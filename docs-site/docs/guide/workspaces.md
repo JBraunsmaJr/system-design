@@ -99,8 +99,10 @@ while disconnected keeps those changes too, and they are merged when they
 come back.
 
 **Viewers** are not in the live session. They see changes a few seconds
-after they are made, and anything they change on their own screen stays
-there: it is not sent to the workspace.
+after they are made. The toolbar shows **View only**, and the document
+cannot be changed from their browser: nothing can be dragged, typed or
+deleted, and trying says why. To change a document, ask one of the
+workspace's owners for the editor role.
 
 ## Deleting, and getting a document back
 

@@ -3,6 +3,7 @@ import {
   BookOpen,
   CalendarRange,
   Check,
+  Eye,
   FileDown,
   FileText,
   ListChecks,
@@ -24,6 +25,9 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 interface ToolbarProps {
   title: string;
   onTitleChange: (title: string) => void;
+  /** The workspace this document is in, when it can be read here but not
+   * changed. */
+  viewOnlyIn?: string | null;
   onNew: () => void;
   onOpenDocuments?: () => void;
   onSave: () => void;
@@ -74,6 +78,7 @@ function navigateToGithubSource() {
 export function Toolbar({
   title,
   onTitleChange,
+  viewOnlyIn = null,
   onNew,
   onOpenDocuments,
   onSave,
@@ -110,8 +115,18 @@ export function Toolbar({
           className="toolbar__title"
           value={title}
           onChange={(e) => onTitleChange(e.target.value)}
+          readOnly={viewOnlyIn !== null}
           aria-label="Diagram title"
         />
+        {viewOnlyIn !== null && (
+          <span
+            className="toolbar__view-only"
+            title={`You can open documents in ${viewOnlyIn} but not change them. An owner of the workspace can make you an editor.`}
+          >
+            <Eye size={13} aria-hidden="true" />
+            View only
+          </span>
+        )}
         {hasAutosaved && (
           <span
             className="toolbar__autosave-indicator"

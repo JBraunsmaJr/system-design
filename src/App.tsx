@@ -39,6 +39,7 @@ import { isSoleReplicaHolder } from './domain/storage/durability';
 import { isPerfInstrumentationActive, recordCommit } from './perf/instrumentation';
 import { useOpenDocument } from './app/hooks/useOpenDocument';
 import { useStoreSignIn } from './app/hooks/useStoreSignIn';
+import { useViewOnly } from './app/hooks/useViewOnly';
 import { useCollabSession } from './app/hooks/useCollabSession';
 import { useDocumentStores } from './app/hooks/useDocumentStores';
 import { useDocumentSessionJoin } from './app/hooks/useDocumentSessionJoin';
@@ -203,6 +204,13 @@ function App() {
     doc: openDoc.doc,
     title,
   });
+  // The workspace this document is in, when this person may read it but
+  // not change it. Edits are then refused at the document (useViewOnly),
+  // and the toolbar and canvas stop offering the obvious ones.
+  const viewOnlyIn = workspaceSync.readOnly
+    ? (workspaceSync.workspace?.name ?? 'this workspace')
+    : null;
+  useViewOnly({ doc: openDoc.doc, viewOnlyIn, showToast });
   useDocumentSessionJoin({
     session: workspaceSync.session,
     // The session code is set up before the hook above runs, so it
@@ -603,6 +611,7 @@ function App() {
       onAdoptIntoGroup={onAdoptIntoGroup}
       onZOrderCommand={onZOrderCommand}
       presentation={presentation}
+      viewOnly={viewOnlyIn !== null}
       previewFocus={previewFocus}
       focusNodeId={pendingNodeFocus}
       onFocusHandled={onFocusNodeHandled}
@@ -658,6 +667,7 @@ function App() {
         <Toolbar
           title={title}
           onTitleChange={setTitle}
+          viewOnlyIn={viewOnlyIn}
           onNew={onNew}
           onOpenDocuments={() => setIsDocumentManagerOpen(true)}
           onSave={onSave}
