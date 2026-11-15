@@ -225,7 +225,7 @@
 }
 
 .react-flow__controls-button.is-active {
-  background: var(--accent);
+  background: var(--accent-fill);
   color: var(--white);
 }
 

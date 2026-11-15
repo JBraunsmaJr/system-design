@@ -61,7 +61,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: var(--accent);
+  background: var(--accent-fill);
   border: 1px solid var(--accent);
   border-right: none;
   color: var(--accent-text);
@@ -85,7 +85,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--accent);
+  background: var(--accent-fill);
   border: 1px solid var(--accent);
   border-left: 1px solid color-mix(in srgb, var(--white) 25%, transparent);
   color: var(--accent-text);
@@ -2022,7 +2022,7 @@ mark.search-highlight--ellipsis {
   height: 16px;
   padding: 0 4px;
   border-radius: var(--radius-pill);
-  background: var(--accent);
+  background: var(--accent-fill);
   color: var(--white);
   font-size: var(--text-3xs);
   font-weight: 700;

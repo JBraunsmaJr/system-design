@@ -224,25 +224,23 @@ function App() {
     startNewSession,
   });
 
-  const { hasAutosaved, durabilitySignals, resumableSession, activeDocId } = useDocumentPersistence(
-    {
-      fileSaving,
-      workspaceSync,
-      documentStore,
-      activeSession,
-      openDocId,
-      title,
-      scenarios,
-      diagramSnapshot,
-      requirementsSnapshot,
-      programIncrementsSnapshot,
-      teamSnapshot,
-      milestonesSnapshot,
-      srdSnapshot,
-      sessionPersistence,
-      presencePeers,
-    },
-  );
+  const { durabilitySignals, resumableSession, activeDocId } = useDocumentPersistence({
+    fileSaving,
+    workspaceSync,
+    documentStore,
+    activeSession,
+    openDocId,
+    title,
+    scenarios,
+    diagramSnapshot,
+    requirementsSnapshot,
+    programIncrementsSnapshot,
+    teamSnapshot,
+    milestonesSnapshot,
+    srdSnapshot,
+    sessionPersistence,
+    presencePeers,
+  });
 
   // --- Diagram level, selection, scenarios and views ----------------------
   const {
@@ -688,7 +686,6 @@ function App() {
           onExportRequirementsMarkdown={onExportRequirementsMarkdown}
           canExportRequirements={requirementsSnapshot.items.length > 0}
           onManageLibraries={() => setIsLibraryModalOpen(true)}
-          hasAutosaved={hasAutosaved}
           durabilityIndicator={
             <DurabilityIndicator
               signals={durabilitySignals}
@@ -733,6 +730,14 @@ function App() {
                       isSynced: () => activeSession.session.isSynced(),
                       relayConnected,
                       peers: presencePeers,
+                    }
+                  : null
+              }
+              workspace={
+                workspaceSync.workspace
+                  ? {
+                      name: workspaceSync.workspace.name,
+                      onManage: () => setIsDocumentManagerOpen(true),
                     }
                   : null
               }

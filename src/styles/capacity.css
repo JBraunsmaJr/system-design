@@ -981,7 +981,7 @@
 }
 
 .manage-reservations-modal__done-btn {
-  background: var(--accent);
+  background: var(--accent-fill);
   color: var(--white);
   border: none;
   font-weight: 600;

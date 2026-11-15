@@ -168,7 +168,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: var(--accent);
+  background: var(--accent-fill);
   color: var(--accent-text);
   border: none;
   border-radius: var(--radius-sm);
@@ -897,7 +897,7 @@
 }
 
 .sprint-quick-add__trigger:hover {
-  background: var(--accent);
+  background: var(--accent-fill);
   color: var(--accent-text);
 }
 

@@ -88,6 +88,15 @@ interface CollabPanelProps {
   onShowPeerCursorsChange: (show: boolean) => void;
   /** Optional callback invoked when the session link is copied to clipboard. */
   onCopyLink?: (link: string) => void;
+  /**
+   * The workspace the open document is in, if it is in one. Its live
+   * session is then the workspace's doing: everyone who may edit the
+   * document is put in it, and who that is is decided by the workspace's
+   * members. The session's link is not offered, because it carries the
+   * session's key - handing it to someone outside the workspace would let
+   * them watch the document being edited.
+   */
+  workspace?: { name: string; onManage: () => void } | null;
 }
 
 /**
@@ -120,6 +129,7 @@ export function CollabPanel({
   showPeerCursors,
   onShowPeerCursorsChange,
   onCopyLink,
+  workspace = null,
 }: CollabPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [joinRoomName, setJoinRoomName] = useState('');
@@ -234,10 +244,14 @@ export function CollabPanel({
         type="button"
         className={`collab-panel__trigger${activeSession ? ' is-active' : ''}`}
         onClick={() => setIsOpen((prev) => !prev)}
-        title={activeSession ? `In session: ${activeSession.roomName}` : 'Collaborate'}
+        title={
+          activeSession
+            ? `In session: ${workspace ? `everyone editing in ${workspace.name}` : activeSession.roomName}`
+            : 'Share'
+        }
       >
         <Users size={14} />
-        <span className="toolbar__label">{activeSession ? 'Session Active' : 'Collaborate'}</span>
+        <span className="toolbar__label">{activeSession ? 'Sharing live' : 'Share'}</span>
       </button>
 
       {isOpen &&
@@ -255,11 +269,39 @@ export function CollabPanel({
             }}
           >
             <div className="collab-panel__header">
-              <span>Collaborative Session</span>
+              <span>Share</span>
               <button type="button" className="collab-panel__close" onClick={close}>
                 <X size={14} />
               </button>
             </div>
+
+            {workspace && (
+              <div className="collab-panel__workspace">
+                <p className="collab-panel__hint">
+                  This document is in <strong>{workspace.name}</strong>.{' '}
+                  {activeSession
+                    ? 'Everyone who can edit it there joins this session when they open it.'
+                    : 'Who can open it is decided by the workspace.'}{' '}
+                  To share it with someone, add them to the workspace.
+                </p>
+                <button
+                  type="button"
+                  className="collab-panel__primary-action collab-panel__manage"
+                  onClick={() => {
+                    workspace.onManage();
+                    close();
+                  }}
+                >
+                  Members of {workspace.name}...
+                </button>
+              </div>
+            )}
+
+            {!activeSession && workspace && (
+              <p className="collab-panel__hint collab-panel__or">
+                Or share a live session by link, with people who are not in the workspace:
+              </p>
+            )}
 
             {!activeSession && (
               <>
@@ -385,20 +427,24 @@ export function CollabPanel({
                         : 'Relay unreachable - check the URL in Settings, and that the server is running and reachable from this network'}
                   </span>
                 </div>
-                <p className="collab-panel__hint">
-                  Share this link with anyone you want to collaborate with:
-                </p>
-                <div className="collab-panel__room-code">
-                  <code>{activeSession.roomName}</code>
-                  <button
-                    type="button"
-                    className="collab-panel__copy-button"
-                    onClick={handleCopy}
-                    title={copied ? 'Link copied!' : 'Copy session link'}
-                  >
-                    {copied ? <Check size={13} /> : <Copy size={13} />}
-                  </button>
-                </div>
+                {!workspace && (
+                  <>
+                    <p className="collab-panel__hint">
+                      Share this link with anyone you want to collaborate with:
+                    </p>
+                    <div className="collab-panel__room-code">
+                      <code>{activeSession.roomName}</code>
+                      <button
+                        type="button"
+                        className="collab-panel__copy-button"
+                        onClick={handleCopy}
+                        title={copied ? 'Link copied!' : 'Copy session link'}
+                      >
+                        {copied ? <Check size={13} /> : <Copy size={13} />}
+                      </button>
+                    </div>
+                  </>
+                )}
                 {activeSession.peers.length > 0 && (
                   <div className="collab-panel__peers">
                     <div className="collab-panel__peers-label">In this session</div>
@@ -413,17 +459,21 @@ export function CollabPanel({
                     ))}
                   </div>
                 )}
-                <button
-                  type="button"
-                  className="collab-panel__leave-button"
-                  onClick={() => {
-                    onLeaveSession();
-                    close();
-                  }}
-                >
-                  <LogOut size={13} />
-                  Leave session
-                </button>
+                {/* A workspace document's session is rejoined whenever the
+                    document is open, so there is nothing to leave. */}
+                {!workspace && (
+                  <button
+                    type="button"
+                    className="collab-panel__leave-button"
+                    onClick={() => {
+                      onLeaveSession();
+                      close();
+                    }}
+                  >
+                    <LogOut size={13} />
+                    Leave session
+                  </button>
+                )}
               </>
             )}
 

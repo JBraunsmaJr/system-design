@@ -127,7 +127,7 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  background: var(--accent);
+  background: var(--accent-fill);
   border: 1px solid var(--accent);
   color: var(--white);
   border-radius: var(--radius-sm);
@@ -205,7 +205,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  background: var(--accent);
+  background: var(--accent-fill);
   border: 1px solid var(--accent);
   color: var(--white);
   border-radius: var(--radius-sm);
@@ -390,8 +390,8 @@
 .scenario-selection-bar__actions .scenario-selection-bar__primary {
   flex: 1 0 100%;
   justify-content: center;
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--accent-fill);
+  border-color: var(--accent-fill);
   color: var(--accent-text);
   font-weight: 600;
 }
@@ -479,7 +479,7 @@
   width: 18px;
   height: 18px;
   border-radius: var(--radius-round);
-  background: var(--accent);
+  background: var(--accent-fill);
   color: var(--white);
   font-size: var(--text-3xs-plus);
   font-weight: 700;

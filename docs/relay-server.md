@@ -143,7 +143,7 @@ order:
 
 1. **The user's own setting**, saved in their browser's `localStorage`
    under `system-design-editor:signaling-urls`. Set in the app via
-   **Collaborate → Relay Server URL**.
+   **Share → Settings → Relay server URL**.
 2. **The deployment default**, baked in at build time from the
    `VITE_SIGNALING_URL` environment variable.
 
@@ -268,7 +268,7 @@ default, overridable per browser at runtime:
 VITE_ICE_SERVERS="stun:stun.internal:3478" npm run build
 ```
 
-or in the app under **Collaborate → ICE Servers**. The runtime setting
+or in the app under **Share → Settings → ICE servers**. The runtime setting
 wins, and is stored under `system-design-editor:ice-servers`.
 
 The format is a comma-separated list. TURN servers need credentials,

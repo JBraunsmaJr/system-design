@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 import {
   BookOpen,
   CalendarRange,
-  Check,
   Eye,
   FileDown,
   FileText,
@@ -49,7 +48,6 @@ interface ToolbarProps {
   onExportRequirementsMarkdown: () => void;
   canExportRequirements: boolean;
   onManageLibraries?: () => void;
-  hasAutosaved: boolean;
   /** Whether a collaborative session is currently active - disables
    * Open (loading a file replaces the LOCAL, frozen state, which
    * wouldn't even be visible until the session ends, since the
@@ -99,7 +97,6 @@ export function Toolbar({
   onExportRequirementsMarkdown,
   canExportRequirements,
   onManageLibraries,
-  hasAutosaved,
   isInSession,
   collabPanel,
   durabilityIndicator,
@@ -125,14 +122,6 @@ export function Toolbar({
           >
             <Eye size={13} aria-hidden="true" />
             View only
-          </span>
-        )}
-        {hasAutosaved && (
-          <span
-            className="toolbar__autosave-indicator"
-            title="Your work is automatically saved in this browser"
-          >
-            <Check size={14} />
           </span>
         )}
         <div className="toolbar__actions">

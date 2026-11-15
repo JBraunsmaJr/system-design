@@ -1294,7 +1294,7 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  background: var(--accent);
+  background: var(--accent-fill);
   border: 1px solid var(--accent);
   color: var(--white);
   border-radius: var(--radius-sm);

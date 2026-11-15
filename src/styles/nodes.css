@@ -480,8 +480,8 @@
 }
 
 .typed-node__drill:hover {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--accent-fill);
+  border-color: var(--accent-fill);
   color: var(--white);
 }
 

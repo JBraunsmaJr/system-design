@@ -26,6 +26,11 @@
   --node-border: #2c3140;
 
   --accent: #5b7cfa;
+  /* Behind white text. --accent itself is tuned to read as text and line on
+     the dark chrome, where it has to be light; white on it is 3.7:1, short
+     of the 4.5:1 that body-size text needs. This is 5.1:1. Use --accent for
+     text, borders and marks, and --accent-fill for a filled control. */
+  --accent-fill: #4a63e0;
   --accent-text: #ffffff;
 
   /* Status / hue palette - one token per hue. Need a lighter, darker,

@@ -621,7 +621,7 @@
 }
 
 .milestone-detail-modal__btn--save {
-  background: var(--accent);
+  background: var(--accent-fill);
   color: var(--white);
 }
 

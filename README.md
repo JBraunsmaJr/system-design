@@ -70,7 +70,7 @@ Start a relay:
 docker run -d -p 4444:4444 ghcr.io/jbraunsmajr/system-design-relay:latest
 ```
 
-Then either set **Collaborate → Relay Server URL** to `ws://localhost:4444` in the editor, or bake in a default at build time:
+Then either set **Share → Settings → Relay server URL** to `ws://localhost:4444` in the editor, or bake in a default at build time:
 
 ```bash
 VITE_SIGNALING_URL="wss://relay.example.com" npm run build

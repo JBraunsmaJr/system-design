@@ -289,5 +289,5 @@ export function useDocumentPersistence({
     return () => guard.release();
   }, []);
 
-  return { hasAutosaved, durabilitySignals, resumableSession, activeDocId };
+  return { durabilitySignals, resumableSession, activeDocId };
 }

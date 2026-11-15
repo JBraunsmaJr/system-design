@@ -141,7 +141,7 @@ A relay URL can come from three places, checked in this order:
 
 1. **The person's own setting**, saved in their browser under
    `system-design-editor:signaling-urls`. Set in the editor under
-   **Collaborate → Settings → Relay server URL**.
+   **Share → Settings → Relay server URL**.
 2. **The deployment default**, from the editor container's `RELAY`
    variable (`RELAY_URL` and `SIGNALING_URL` also work):
 
@@ -279,7 +279,7 @@ falling back to the host candidates that were sufficient all along.
 
 ICE servers are configured exactly like the relay URL: a deployment
 default from the editor container's `ICE_SERVERS` variable, overridable per
-browser under **Collaborate → Settings → ICE servers**. A browser's own
+browser under **Share → Settings → ICE servers**. A browser's own
 setting wins, and is stored under `system-design-editor:ice-servers`.
 
 ```yaml

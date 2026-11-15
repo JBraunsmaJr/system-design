@@ -130,7 +130,7 @@ editor; the book icon in the toolbar opens this documentation from your own
 server.
 
 To check live sessions, open the editor in two browsers, start a session in
-one (**Collaborate → Start a new session**), and open its link in the other.
+one (**Share → Start a new session**), and open its link in the other.
 
 ## Keeping it running
 

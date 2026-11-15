@@ -485,6 +485,23 @@ async function run() {
           );
       };
       check((await peersOf(ada)) && (await peersOf(ben)), 'and each sees the other in it');
+      const panel = (await ada.textContent('.collab-panel__dropdown')) ?? '';
+      check(
+        /This document is in Platform Team/.test(panel) &&
+          (await ada.locator('.collab-panel__copy-button').count()) === 0 &&
+          (await ada.locator('.collab-panel__room-code').count()) === 0 &&
+          (await ada.locator('.collab-panel__leave-button').count()) === 0,
+        "the Share panel says the workspace decides who is here, and does not offer the session's link, which carries its key",
+      );
+      await ada.click('.collab-panel__manage');
+      check(
+        await ada.waitForSelector('.trusted-workspace', { timeout: 5000 }).then(
+          () => true,
+          () => false,
+        ),
+        'and leads to the workspace, where people are added',
+      );
+      await closeManager(ada);
       await ada.keyboard.press('Escape');
       await ben.keyboard.press('Escape');
 

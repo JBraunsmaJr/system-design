@@ -273,9 +273,9 @@
 }
 
 .points-picker__preset-btn.is-active {
-  background: var(--accent);
+  background: var(--accent-fill);
   color: var(--accent-text);
-  border-color: var(--accent);
+  border-color: var(--accent-fill);
 }
 
 .points-picker__custom {
@@ -306,9 +306,9 @@
 }
 
 .points-picker__custom button:hover {
-  background: var(--accent);
+  background: var(--accent-fill);
   color: var(--accent-text);
-  border-color: var(--accent);
+  border-color: var(--accent-fill);
 }
 
 /* Card footer integration for Sprint board and backlog */
@@ -364,7 +364,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: var(--accent);
+  background: var(--accent-fill);
   color: var(--accent-text);
   border: 1px solid var(--accent);
   border-radius: var(--radius-sm);

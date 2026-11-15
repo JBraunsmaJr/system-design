@@ -29,6 +29,18 @@ markers are removed when the section becomes a release. See
 - `ADMIN_GROUPS` makes the members of an identity-provider group store administrators in that API.
   `WORKSPACE_CREATION` sets who may create workspaces there.
 
+### [MINOR] Toolbar: Share, one save status, readable buttons
+
+- **Collaborate** is now **Share**. For a document in a workspace, the panel says which workspace it is in and that
+  everyone who can edit it there joins its live session, and **Members of …** opens the workspace to add people.
+- [PATCH] The Share panel no longer offers a session link for a workspace document. That link carries the session's
+  key, so sending it to someone outside the workspace would have let them watch the document being edited wherever
+  the relay does not require tokens. A session you start yourself on a document of your own still has its link.
+- The toolbar shows one save status. The separate tick that said work was saved in the browser is removed; the save
+  indicator already says where your work is.
+- Filled buttons are darker (`--accent-fill`, #4a63e0), so their white text has a contrast of 5.1:1 instead of 3.7:1.
+  Links, outlines and marks keep the lighter accent, which is what reads on the dark background.
+
 ### Store: storage no longer carries keys
 
 - Documents are created without wrapped keys, and the store no longer keeps sealed metadata or sign-in evidence. This

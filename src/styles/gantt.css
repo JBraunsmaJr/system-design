@@ -668,7 +668,7 @@
 }
 
 .gantt-chart__group-btn.is-active {
-  background: var(--accent);
+  background: var(--accent-fill);
   color: var(--white);
 }
 

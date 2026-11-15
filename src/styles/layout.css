@@ -141,20 +141,6 @@
   outline: none;
 }
 
-.toolbar__autosave-indicator {
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--chrome-text-dim);
-  font-size: var(--text-sm);
-  font-weight: 500;
-  white-space: nowrap;
-  flex-shrink: 0;
-  padding: 0 4px;
-  box-sizing: border-box;
-}
-
 .toolbar__view-only {
   height: 24px;
   display: inline-flex;
@@ -169,11 +155,6 @@
   white-space: nowrap;
   flex-shrink: 0;
   cursor: default;
-}
-
-.toolbar__autosave-indicator svg {
-  color: var(--success);
-  flex-shrink: 0;
 }
 
 .toolbar__actions {
@@ -240,14 +221,14 @@
 }
 
 .toolbar__actions button.primary {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--accent-fill);
+  border-color: var(--accent-fill);
   color: var(--accent-text);
 }
 
 .toolbar__actions button.primary:hover {
   filter: brightness(1.08);
-  background: var(--accent);
+  background: var(--accent-fill);
 }
 
 .toolbar__actions button.active {
