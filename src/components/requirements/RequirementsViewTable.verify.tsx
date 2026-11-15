@@ -9,8 +9,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import React from 'react';
 import { RequirementsView } from './RequirementsView';
 import { RequirementsCoverageBar } from './RequirementsCoverageBar';
-import { RequirementRowDetail } from './RequirementRowDetail';
-import { RequirementSplitDetail } from './RequirementSplitDetail';
+import { type ItemViewContext, RequirementItemView } from './RequirementItemView';
 import {
   BUILT_IN_ITEM_TYPES,
   BUILT_IN_RELATIONSHIP_TYPES,
@@ -268,160 +267,125 @@ console.log('\n=== Coverage ===');
   assert(!complete.includes('Verified'), 'and with nothing to verify, no verification measures');
 }
 
-console.log('\n=== An open row ===');
-{
-  const base = {
-    doc,
-    linkedNodes: [],
-    onUpdateItem: () => undefined,
-    onNavigateToItem: () => undefined,
-    onNavigateToNode: () => undefined,
-    members: [{ id: 'm-1', name: 'Ana Ruiz' }],
-    milestones: [{ id: 'ms-1', name: 'Release 2.4' }],
-    renderEditor: () => <div className="the-editor" />,
-  };
-  const req1 = doc.items.find((i) => i.id === 'REQ-1')!;
-  const html = renderPlain(
-    <RequirementRowDetail
-      {...base}
-      item={req1}
-      linkedNodes={[{ nodeId: 'n1', label: 'Order Service', path: [], hasSubDiagram: false }]}
+const context: ItemViewContext = {
+  doc,
+  programIncrements,
+  team,
+  members: [{ id: 'm-1', name: 'Ana Ruiz' }],
+  milestones: [{ id: 'ms-1', name: 'Release 2.4' }],
+  tagSuggestions: [],
+  onUpdateItem: () => undefined,
+  onDeleteItem: () => undefined,
+  onCreateAndAssignCategory: () => undefined,
+  onDeleteCategory: () => undefined,
+  onAddRelationship: () => null,
+  onDeleteRelationship: () => undefined,
+  onNavigateToNode: () => undefined,
+  onCreateLinkedNode: () => undefined,
+  preferredVerbKeyFor: () => undefined,
+};
+const open = (id: string, variant: 'row' | 'page', linked = false) =>
+  renderPlain(
+    <RequirementItemView
+      variant={variant}
+      item={doc.items.find((i) => i.id === id)!}
+      linkedNodes={
+        linked ? [{ nodeId: 'n1', label: 'Order Service', path: [], hasSubDiagram: false }] : []
+      }
+      context={context}
+      onNavigateToItem={() => undefined}
     />,
   );
-  assert(html.includes('>Statement<') && html.includes('Described.'), 'shows the statement');
-  assert(
-    !/requirement-detail__statement[^]*No account needed[^]*Acceptance criteria/.test(html),
-    'without the criteria in it',
-  );
-  assert(html.includes('1 of 2 met'), 'counts the criteria');
-  assert(count(html, 'role="checkbox"') === 2, 'each one is a box to tick');
-  assert(
-    /aria-checked="true"[^>]*>.*?No account needed/s.test(html) &&
-      /aria-checked="false"[^>]*>.*?Works on mobile/s.test(html),
-    'ticked or not as the description says',
-  );
-  assert(
-    html.includes('child of') && html.includes('EPIC-1'),
-    'lists its relationships as seen from this item',
-  );
-  assert(html.includes('Order Service') && html.includes('Show on diagram'), 'and its components');
-  assert(
-    html.includes('Test') && html.includes('checkout-e2e'),
-    'how it is verified, with the note',
-  );
-  assert(html.includes('requirement-attributes'), 'and its status, priority, owner and target');
-  assert(!html.includes('the-editor'), 'the editor is not shown until asked for');
+/** What the menu labelled `label` shows as chosen. */
+const chosen = (html: string, label: string) =>
+  new RegExp(`aria-label="${label}: ([^"]*)"`).exec(html)?.[1];
 
-  const ticket = renderPlain(
-    <RequirementRowDetail
-      {...base}
-      item={doc.items.find((i) => i.id === 'TICKET-1')!}
-      sprintName="Sprint 1"
-      assigneeName="Ana Ruiz"
-    />,
+console.log('\n=== An opened item is edited where it stands ===');
+for (const variant of ['row', 'page'] as const) {
+  const html = open('REQ-1', variant, true);
+  assert(!html.includes('class="requirement-card'), `${variant}: it is not a card`);
+  assert(!/>\s*(Edit|Done)\s*</.test(html), `${variant}: there is no edit mode to enter or leave`);
+  assert(
+    /<input[^>]*class="requirement-item__title[^"]*"[^>]*value="Guest checkout"/.test(html),
+    `${variant}: the title is a text box`,
   );
   assert(
-    ticket.includes('In Progress') && ticket.includes('Sprint 1') && ticket.includes('Ana Ruiz'),
-    'a ticket shows its planning instead',
+    html.includes('type-picker') && html.includes('aria-label="Delete REQ-1"'),
+    `${variant}: its type can be changed and it can be deleted`,
   );
   assert(
-    !ticket.includes('>Verification<') && !ticket.includes('>On the diagram'),
-    'and neither verification nor the diagram',
+    html.includes('>Statement') && html.includes('Described.'),
+    `${variant}: shows the statement`,
   );
-
-  const blank = renderPlain(
-    <RequirementRowDetail
-      {...base}
-      item={{ id: 'REQ-9', typeId: 'requirement', title: '', body: '' }}
-      startEditing
-    />,
-  );
-  assert(blank.includes('the-editor'), 'a new item opens in the editor');
-}
-
-console.log("\n=== The split view's detail pane ===");
-{
-  const split = render({ initialLayout: 'split', initialGroupBy: 'type' });
-  // With nothing chosen the first item is open: the epic.
   assert(
-    split.includes('class="requirement-page"') && split.includes('requirement-page__title'),
-    'the open item is shown as a page',
+    html.includes('aria-label="Edit the description of REQ-1"'),
+    `${variant}: which can be edited`,
   );
-  assert(!split.includes('class="requirement-card'), 'not as a card');
-
-  const base = {
-    doc,
-    onUpdateItem: () => undefined,
-    onNavigateToItem: () => undefined,
-    onNavigateToNode: () => undefined,
-    members: [{ id: 'm-1', name: 'Ana Ruiz' }],
-    milestones: [{ id: 'ms-1', name: 'Release 2.4' }],
-    renderEditor: () => <div className="the-editor" />,
-  };
-  const html = renderPlain(
-    <RequirementSplitDetail
-      {...base}
-      item={doc.items.find((i) => i.id === 'REQ-1')!}
-      linkedNodes={[{ nodeId: 'n1', label: 'Order Service', path: [], hasSubDiagram: false }]}
-    />,
-  );
-  assert(/requirement-page__title">Guest checkout</.test(html), 'the title heads the page');
-  assert(html.includes('Show on diagram'), 'with the way to the diagram');
-  for (const panel of ['Acceptance criteria', 'Verification', 'On the diagram', 'Relationships']) {
-    assert(html.includes(`requirement-panel__title">${panel}<`), `has a ${panel} panel`);
-  }
-  assert(html.includes('>1 of 2 met<'), 'criteria are counted');
-  const chosen = (label: string) =>
-    new RegExp(`<span>${label}</span>.*?<option value="[^"]*" selected="">([^<]*)<`, 's').exec(
-      html,
-    )?.[1];
-  assert(chosen('Status') === 'Approved', 'its status is set from the page');
-  assert(chosen('Priority') === 'Must', 'its priority');
-  assert(chosen('Owner') === 'Ana Ruiz', 'its owner, a team member');
-  assert(chosen('Target') === 'Release 2.4', 'and its target milestone');
-  assert(html.includes('value="checkout-e2e"'), 'the verification note is editable in its panel');
+  assert(html.includes('1 of 2 met'), `${variant}: counts the criteria`);
+  assert(count(html, 'role="checkbox"') === 2, `${variant}: each is a box to tick`);
+  assert(count(html, 'aria-label="Remove the criterion') === 2, `${variant}: and can be removed`);
   assert(
     html.includes('aria-label="Add an acceptance criterion to REQ-1"'),
-    'and one can be added',
+    `${variant}: one can be added`,
   );
-  assert(html.includes('title="Verification: Test - Verified'), 'verification is set in its panel');
-  assert(!html.includes('the-editor'), 'the full card stays out of the way until Edit');
+  assert(html.includes('Add relationship'), `${variant}: relationships are added in place`);
+  assert(
+    html.includes('Order Service') && html.includes('New component'),
+    `${variant}: components are listed, and one can be created`,
+  );
+  assert(
+    html.includes('title="Verification: Test - Verified'),
+    `${variant}: verification is set in place`,
+  );
+  assert(html.includes('value="checkout-e2e"'), `${variant}: with its note`);
+  assert(chosen(html, 'Status') === 'Approved', `${variant}: status`);
+  assert(chosen(html, 'Priority') === 'Must', `${variant}: priority`);
+  assert(chosen(html, 'Owner') === 'Ana Ruiz', `${variant}: owner, a team member`);
+  assert(chosen(html, 'Target') === 'Release 2.4', `${variant}: target milestone`);
+  assert(!html.includes('<select'), `${variant}: the menus are the app's own, not the browser's`);
+}
+{
+  const page = open('REQ-1', 'page', true);
+  assert(page.includes('Show on diagram'), 'the page has the way to the diagram');
+  for (const panel of ['Acceptance criteria', 'Verification', 'On the diagram', 'Relationships']) {
+    assert(page.includes(`requirement-panel__title">${panel}<`), `the page has a ${panel} panel`);
+  }
 
-  const req2 = renderPlain(
-    <RequirementSplitDetail
-      {...base}
-      item={doc.items.find((i) => i.id === 'REQ-2')!}
-      linkedNodes={[]}
-    />,
-  );
+  const req2 = open('REQ-2', 'page');
   assert(!req2.includes('Show on diagram'), 'an unlinked item has no way to the diagram');
+  assert(req2.includes('No component is linked to this yet'), 'and says what is missing');
+  assert(req2.includes('Write a description'), 'an item with nothing written offers to write it');
   assert(
-    /<span>Status<\/span>.*?selected="">Draft</s.test(req2) &&
-      /<span>Priority<\/span>.*?selected="">Not set</s.test(req2) &&
-      /<span>Owner<\/span>.*?selected="">No owner</s.test(req2),
-    'with nothing set it reads as a draft with no priority or owner',
+    chosen(req2, 'Status') === 'Draft' &&
+      chosen(req2, 'Priority') === 'Not set' &&
+      chosen(req2, 'Owner') === 'No owner' &&
+      chosen(req2, 'Target') === 'No target',
+    'with nothing set it reads as a draft with no priority, owner or target',
   );
-  assert(req2.includes('No component is linked to this'), 'and says what is missing');
 
-  const ticket = renderPlain(
-    <RequirementSplitDetail
-      {...base}
-      item={doc.items.find((i) => i.id === 'TICKET-1')!}
-      linkedNodes={[]}
-      sprintName="Sprint 1"
-      assigneeName="Ana Ruiz"
-    />,
-  );
+  const ticket = open('TICKET-1', 'row');
   assert(
-    ticket.includes('Sprint 1') && ticket.includes('Ana Ruiz') && ticket.includes('In Progress'),
-    'a ticket shows its status, sprint and assignee',
+    ticket.includes('In Progress') && ticket.includes('Sprint 1') && ticket.includes('Ana Ruiz'),
+    'a ticket has its status, sprint and assignee pickers',
   );
   assert(
     !ticket.includes('requirement-attributes') &&
-      !ticket.includes('requirement-panel__title">Verification<') &&
-      !ticket.includes('requirement-panel__title">On the diagram<'),
-    'and has no verification or diagram panel',
+      !ticket.includes('title="Verification:') &&
+      !ticket.includes('On the diagram'),
+    'and no requirement values, verification or diagram part',
   );
+
+  const split = render({ initialLayout: 'split', initialGroupBy: 'type' });
+  assert(
+    split.includes('class="requirement-page"') && !split.includes('class="requirement-card'),
+    'the split view opens the item as a page, with no card anywhere',
+  );
+  const epic = render({ initialLayout: 'split', initialGroupBy: 'epic' });
+  assert(
+    epic.includes('requirement-children__row') && epic.includes('title="Open REQ-1"'),
+    "an epic's children are listed as rows that open",
+  );
+  assert(epic.includes('class="child-quick-add"'), 'and a child can be added under it');
 }
 
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);

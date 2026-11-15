@@ -241,6 +241,25 @@ export function addAcceptanceCriterion(body: string, text: string): string {
   return prose ? `${prose}\n\n- [ ] ${criterion}` : `- [ ] ${criterion}`;
 }
 
+/** `body` without its `index`-th criterion. The line goes; nothing else
+ * changes. */
+export function removeAcceptanceCriterion(body: string, index: number): string {
+  let seen = -1;
+  let inFence = false;
+  return body
+    .split('\n')
+    .filter((line) => {
+      if (FENCE.test(line)) {
+        inFence = !inFence;
+        return true;
+      }
+      if (inFence || !CRITERION.test(line)) return true;
+      seen += 1;
+      return seen !== index;
+    })
+    .join('\n');
+}
+
 /** How a verification reads at a glance, and how loud it should be. */
 export interface VerificationSummary {
   label: string;

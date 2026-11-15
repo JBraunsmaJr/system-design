@@ -346,15 +346,53 @@ async function run() {
     await p.click('.requirements-table__title');
     await p.waitForSelector('.requirements-table__detail .requirement-detail');
     check(
-      (await p.$('.requirement-card')) === null,
-      'clicking a line opens the item beneath it, laid out for reading',
+      (await p.$('.requirement-card')) === null &&
+        (await p.$('.requirement-detail__action')) === null,
+      'clicking a line opens the item beneath it, with no card and no edit mode',
     );
-    await p.click('.requirement-detail__action:has-text("Edit")');
-    await p.waitForSelector('.requirements-table__detail .requirement-card');
-    check(true, 'Edit swaps in the full card');
-    await p.click('.requirement-detail__action:has-text("Done")');
-    await p.waitForSelector('.requirement-card', { state: 'detached' });
-    check(true, 'and Done goes back');
+    {
+      // Everything is changed where it stands.
+      const titleBox = p.locator('.requirements-table__detail .requirement-item__title');
+      const original = await titleBox.inputValue();
+      await titleBox.fill(`${original} (edited)`);
+      await p.waitForFunction(
+        (expected) =>
+          document.querySelector('.requirements-table__row.is-expanded .requirements-table__title')
+            ?.textContent === expected,
+        `${original} (edited)`,
+      );
+      check(true, 'typing in the title changes the line above as you type');
+      await titleBox.fill(original);
+
+      await p.click('.requirements-table__detail .status-picker__trigger[aria-label^="Priority"]');
+      await p.click('.status-picker__dropdown .status-picker__option:has-text("Must")');
+      await p.waitForSelector(
+        '.requirements-table__detail .status-picker__trigger[aria-label="Priority: Must"]',
+      );
+      check(true, "priority is set from the app's own menu");
+
+      const add = p.locator('.requirements-table__detail .requirement-detail__add input');
+      const hadAdd = (await add.count()) === 1;
+      if (hadAdd) {
+        const before = await p.locator('.requirements-table__detail [role="checkbox"]').count();
+        await add.fill('It can be ticked');
+        await add.press('Enter');
+        await p.waitForFunction(
+          (n) =>
+            document.querySelectorAll('.requirements-table__detail [role="checkbox"]').length ===
+            n + 1,
+          before,
+        );
+        const box = p.locator('.requirements-table__detail [role="checkbox"]').last();
+        await box.click();
+        await p.waitForSelector(
+          '.requirements-table__detail [role="checkbox"][aria-checked="true"]',
+        );
+        check(true, 'a criterion is added and ticked in place');
+      } else {
+        check(true, 'the first item is not one that has criteria');
+      }
+    }
     await p.click('.requirements-table__title');
     await p.waitForSelector('.requirement-detail', { state: 'detached' });
     check(true, 'clicking the line again closes it');

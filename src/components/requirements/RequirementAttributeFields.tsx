@@ -2,12 +2,12 @@ import { useState } from 'react';
 import type { RequirementItem } from '../../domain/requirements/requirementsTypes';
 import {
   getLifecycleMeta,
-  getPriorityMeta,
   LIFECYCLES,
   ownerMemberPatch,
   ownerNamePatch,
   PRIORITIES,
 } from '../../domain/requirements/requirementAttributes';
+import { MenuPicker, type MenuOption } from './MenuPicker';
 
 export interface AttributeOption {
   id: string;
@@ -21,15 +21,20 @@ interface RequirementAttributeFieldsProps {
   onUpdateItem: (id: string, patch: Partial<RequirementItem>) => void;
 }
 
+const NONE = '__none__';
 const OTHER_OWNER = '__other__';
+
+const PRIORITY_OPTIONS: MenuOption[] = [
+  ...PRIORITIES,
+  { id: NONE, label: 'Not set', description: 'No priority' },
+];
 
 /**
  * The four values set on a requirement - status, priority, owner, target -
- * as a row of labelled menus, each written the moment it changes. Shared
- * by the table's open row and the split view's page.
+ * as a row of labelled menus, each written the moment it changes.
  *
  * Owner is a team member or, for a stakeholder outside the team, a typed
- * name: "Someone else..." turns the menu's neighbour into a text box.
+ * name: "Someone else..." puts a text box beside the menu.
  */
 export function RequirementAttributeFields({
   item,
@@ -37,22 +42,11 @@ export function RequirementAttributeFields({
   milestones,
   onUpdateItem,
 }: RequirementAttributeFieldsProps) {
-  const lifecycle = getLifecycleMeta(item.lifecycle);
-  const priority = getPriorityMeta(item.priority);
   // Typing a name for someone outside the team: on when one is stored, or
   // when "Someone else..." was just chosen and nothing is typed yet.
   const [isNamingOwner, setIsNamingOwner] = useState(false);
   const [ownerDraft, setOwnerDraft] = useState(item.ownerName ?? '');
   const namingOwner = isNamingOwner || (item.ownerName !== undefined && !item.ownerId);
-  const ownerValue = namingOwner
-    ? OTHER_OWNER
-    : item.ownerId && members.some((m) => m.id === item.ownerId)
-      ? item.ownerId
-      : '';
-  const targetValue =
-    item.targetMilestoneId && milestones.some((m) => m.id === item.targetMilestoneId)
-      ? item.targetMilestoneId
-      : '';
   const commitOwnerName = () => {
     if (ownerDraft.trim() !== (item.ownerName ?? '')) {
       onUpdateItem(item.id, ownerNamePatch(ownerDraft));
@@ -60,84 +54,68 @@ export function RequirementAttributeFields({
     if (!ownerDraft.trim()) setIsNamingOwner(false);
   };
 
+  const ownerOptions: MenuOption[] = [
+    ...members.map((m) => ({ id: m.id, label: m.name })),
+    { id: OTHER_OWNER, label: 'Someone else...', description: 'A person or team outside this one' },
+    { id: NONE, label: 'No owner' },
+  ];
+  const targetOptions: MenuOption[] = [
+    ...milestones.map((m) => ({ id: m.id, label: m.name })),
+    { id: NONE, label: 'No target' },
+  ];
+
   return (
     <div className="requirement-attributes">
-      <label className="requirement-attributes__field">
+      <div className="requirement-attributes__field">
         <span>Status</span>
-        <span className="requirement-attributes__control">
-          <span
-            className="requirement-attributes__dot requirement-attributes__dot--ring"
-            style={{ borderColor: lifecycle.color }}
-            aria-hidden
-          />
-          <select
-            value={lifecycle.id}
-            title={lifecycle.description}
-            onChange={(e) =>
-              onUpdateItem(item.id, { lifecycle: e.target.value as RequirementItem['lifecycle'] })
-            }
-          >
-            {LIFECYCLES.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.label}
-              </option>
-            ))}
-          </select>
-        </span>
-      </label>
+        <MenuPicker
+          label="Status"
+          value={getLifecycleMeta(item.lifecycle).id}
+          options={LIFECYCLES}
+          placeholder="Draft"
+          onChange={(id) =>
+            onUpdateItem(item.id, { lifecycle: id as RequirementItem['lifecycle'] })
+          }
+        />
+      </div>
 
-      <label className="requirement-attributes__field">
+      <div className="requirement-attributes__field">
         <span>Priority</span>
-        <span className="requirement-attributes__control">
-          <span
-            className="requirement-attributes__dot"
-            style={{ background: priority?.color ?? 'transparent' }}
-            aria-hidden
-          />
-          <select
-            value={priority?.id ?? ''}
-            title={priority?.description ?? 'No priority set'}
-            onChange={(e) =>
-              onUpdateItem(item.id, {
-                priority: (e.target.value || undefined) as RequirementItem['priority'],
-              })
-            }
-          >
-            <option value="">Not set</option>
-            {PRIORITIES.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.label}
-              </option>
-            ))}
-          </select>
-        </span>
-      </label>
+        <MenuPicker
+          label="Priority"
+          value={item.priority ?? ''}
+          options={PRIORITY_OPTIONS}
+          placeholder="Not set"
+          width={150}
+          onChange={(id) =>
+            onUpdateItem(item.id, {
+              priority: id === NONE ? undefined : (id as RequirementItem['priority']),
+            })
+          }
+        />
+      </div>
 
-      <label className="requirement-attributes__field">
-        <span>Owner</span>
-        <span className="requirement-attributes__control">
-          <select
-            value={ownerValue}
-            title="The stakeholder accountable for this: who says whether it is right and whether it has been met"
-            onChange={(e) => {
-              const value = e.target.value;
-              if (value === OTHER_OWNER) {
-                setOwnerDraft('');
+      <div className="requirement-attributes__field">
+        <span title="The stakeholder accountable for this: who says whether it is right and whether it has been met">
+          Owner
+        </span>
+        <span className="requirement-attributes__owner">
+          <MenuPicker
+            label="Owner"
+            value={namingOwner ? OTHER_OWNER : (item.ownerId ?? '')}
+            options={ownerOptions}
+            placeholder="No owner"
+            width={210}
+            onChange={(id) => {
+              if (id === OTHER_OWNER) {
+                setOwnerDraft(item.ownerName ?? '');
                 setIsNamingOwner(true);
                 return;
               }
               setIsNamingOwner(false);
-              onUpdateItem(item.id, ownerMemberPatch(value || undefined));
+              onUpdateItem(item.id, ownerMemberPatch(id === NONE ? undefined : id));
             }}
-          >
-            <option value="">No owner</option>
-            {members.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
-            <option value={OTHER_OWNER}>Someone else...</option>
-          </select>
+          />
           {namingOwner && (
             <input
               type="text"
@@ -154,27 +132,23 @@ export function RequirementAttributeFields({
             />
           )}
         </span>
-      </label>
+      </div>
 
-      <label className="requirement-attributes__field">
-        <span>Target</span>
-        <span className="requirement-attributes__control">
-          <select
-            value={targetValue}
-            title="The milestone this is due for"
-            onChange={(e) =>
-              onUpdateItem(item.id, { targetMilestoneId: e.target.value || undefined })
-            }
-          >
-            <option value="">{milestones.length === 0 ? 'No milestones yet' : 'No target'}</option>
-            {milestones.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
-          </select>
+      <div className="requirement-attributes__field">
+        <span title="The milestone this is due for. Milestones are created on the Plan tab.">
+          Target
         </span>
-      </label>
+        <MenuPicker
+          label="Target"
+          value={item.targetMilestoneId ?? ''}
+          options={targetOptions}
+          placeholder={milestones.length === 0 ? 'No milestones yet' : 'No target'}
+          width={230}
+          onChange={(id) =>
+            onUpdateItem(item.id, { targetMilestoneId: id === NONE ? undefined : id })
+          }
+        />
+      </div>
     </div>
   );
 }

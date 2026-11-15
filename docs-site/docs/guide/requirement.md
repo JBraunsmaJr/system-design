@@ -91,17 +91,28 @@ Choose how items are grouped with **Group by** in the toolbar:
 The **Table / Cards / Split** buttons in the toolbar choose how the items are laid out:
 
 - **Table** (the default): one line per item with its type, priority, status, the components linked to it and how
-  it is verified. Each group's heading shows how much of it is verified. Click a line to open the item beneath it, laid out
-  for reading: its statement, its acceptance criteria (click one to tick it), its relationships, its components and
-  its verification. **Edit** swaps in the full card, where every field can be changed; **Done** goes back. When
-  grouping by epic, children are indented under their epic and the count beside an epic's title folds them away.
+  it is verified. Each group's heading shows how much of it is verified. Click a line to open the item beneath it;
+  click the line again to close it. When grouping by epic, children are indented under their epic and the count beside
+  an epic's title folds them away.
 - **Cards**: every item as a full card in one scrolling column.
-- **Split**: an outline on the left and the open item as a page on the right, with its children below. The page has a
-  panel each for acceptance criteria (tick them, or type a new one and press Enter), verification, the components the
-  item is on and its relationships; **Edit** opens the full card. Outline rows show whether a descriptive item is on
-  the diagram, and the status of work items, decisions and verification.
+- **Split**: an outline on the left and the open item as a page on the right, with its children listed below; click
+  a child to open it. Outline rows show whether a descriptive item is on the diagram, and the status of work items,
+  decisions and verification.
 
 Your layout is remembered for each document in this browser.
+
+### Editing an Open Item
+
+In the table and the split view an open item is edited where it stands; there is no edit mode to enter or leave.
+
+- **Title**: type in it.
+- **Type, category, tags**: the pickers at the top. The bin beside them deletes the item.
+- **Description**: click the pencil beside **Statement**, or double-click the text. Click away when you are done.
+- **Acceptance criteria**: click one to tick it, hover it and click the cross to remove it, or type a new one in the
+  box beneath and press Enter.
+- **Relationships**: **Add relationship** adds one; the cross on a relationship removes it.
+- **On the diagram**: click a component to go to it. **New component** adds one to the diagram, linked to the item.
+- **Verification**, and a requirement's **status, priority, owner and target**: their menus.
 
 ### Coverage
 
@@ -120,7 +131,7 @@ show everything. In the table, a descriptive item with no component reads **Not 
 ### Status, Priority, Owner and Target
 
 Requirements and constraints, and items of any descriptive type you add yourself, carry four values. Set them from
-the menus at the top of an open table row or of the split view's page:
+the menus under an open item's title:
 
 - **Status**: _Draft_, _In review_, _Approved_ or _Implemented_. This is the requirement's own status. A ticket's
   _To Do / In Progress / Done_ is separate.
@@ -136,12 +147,12 @@ Requirements and constraints, and items of any descriptive type you add yourself
 assumptions, decisions, epics and work items are not.
 
 - **Acceptance criteria** are task-list lines in the description. Write `- [ ] Checkout completes without an account`
-  for each thing that must hold. Tick one by clicking it in the table's open row, or by changing `[ ]` to `[x]` in the
-  description. The item's header shows how many are ticked, or **No criteria** when there are none.
+  for each thing that must hold, or add them from the open item's **Acceptance criteria** list. Tick one by clicking
+  it there, or by changing `[ ]` to `[x]` in the description. The item's header shows how many are ticked, or **No criteria** when there are none.
 - **Verification** is the control beside the type in the item's header. Choose where it stands (**Not verified**,
   **Verified** or **Failing**) and how it is checked (**Test**, **Demonstration**, **Inspection** or **Analysis**).
 
-- A **note** under the verification control, in the split view, holds one line on what verifies it: a suite's name, a
+- A **note** under the verification control holds one line on what verifies it: a suite's name, a
   link, or the last result.
 
 The table's **Verification** column shows the method and status for every item, and the Markdown export includes each

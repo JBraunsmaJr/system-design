@@ -182,10 +182,10 @@ console.log('=== Split view ===');
   );
   assert(
     html.includes('Children <span class="requirements-split__children-count">2</span>') &&
-      html.includes('class="requirements-split__children-toggle"') &&
-      html.includes('aria-label="Open EPIC-2"') &&
-      html.includes('aria-label="Open TICKET-1"'),
-    "the open item's children are listed beneath it, each with an Open button",
+      html.includes('title="Open EPIC-2"') &&
+      html.includes('title="Open TICKET-1"') &&
+      !html.includes('class="requirement-card'),
+    "the open item's children are listed beneath it as rows that open, not as cards",
   );
   assert(
     html.includes('class="child-quick-add"'),

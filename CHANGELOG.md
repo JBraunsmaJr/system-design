@@ -29,6 +29,18 @@ markers are removed when the section becomes a release. See
 - `ADMIN_GROUPS` makes the members of an identity-provider group store administrators in that API.
   `WORKSPACE_CREATION` sets who may create workspaces there.
 
+### [MINOR] Requirements: an open item is edited in place
+
+- In the table and the split view an open item no longer switches between a reading layout and the old card with
+  **Edit** and **Done**. There is one layout, and every part of it is changed where it stands: the title is a text
+  box; type, category and tags use their pickers; the description opens in the editor from its pencil or a
+  double-click; criteria are ticked, added and removed in their list; relationships are added and removed in theirs;
+  a linked component can be created from **On the diagram**.
+- Status, priority, owner and target use the same menu as the other pickers instead of the browser's own.
+- In the split view an item's children are a list of rows that open, not cards, and a decision's sections are edited
+  on its page.
+- The card remains only in the **Cards** layout.
+
 ### [MINOR] Requirements: priority, status, owner and target
 
 - Requirements and constraints (and items of your own descriptive types) have four values set from menus in the

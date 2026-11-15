@@ -10,6 +10,7 @@ import {
   isVerifiable,
   isVerified,
   parseAcceptanceCriteria,
+  removeAcceptanceCriterion,
   splitAcceptanceCriteria,
   summarizeVerification,
   toggleAcceptanceCriterion,
@@ -123,6 +124,20 @@ console.log('\n=== Adding a criterion ===');
   assert(
     splitAcceptanceCriteria(addAcceptanceCriterion('- [ ] a', 'b')).criteria.length === 2,
     'and reads back as a criterion',
+  );
+}
+
+console.log('\n=== Removing a criterion ===');
+{
+  const body = 'Prose.\n\n- [x] One\n- [ ] Two\n- [ ] Three\n\nMore.';
+  assert(
+    removeAcceptanceCriterion(body, 1) === 'Prose.\n\n- [x] One\n- [ ] Three\n\nMore.',
+    'takes out that line and nothing else',
+  );
+  assert(removeAcceptanceCriterion(body, 9) === body, 'an index past the end changes nothing');
+  assert(
+    removeAcceptanceCriterion('```\n- [ ] code\n```\n- [ ] real', 0) === '```\n- [ ] code\n```',
+    'a line in a code block is not counted',
   );
 }
 

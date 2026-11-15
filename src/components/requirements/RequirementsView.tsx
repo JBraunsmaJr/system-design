@@ -60,14 +60,14 @@ import {
 import { RequirementsOutline } from './RequirementsOutline';
 import { NO_EPIC_KEY, useRequirementGroups } from './useRequirementGroups';
 import { RequirementsCoverageBar } from './RequirementsCoverageBar';
-import { RequirementRowDetail } from './RequirementRowDetail';
-import { RequirementSplitDetail } from './RequirementSplitDetail';
-import { isDecisionItem } from '../../domain/requirements/decisionRecords';
+import { type ItemViewContext, RequirementItemView } from './RequirementItemView';
+import { ChildQuickAdd } from './ChildQuickAdd';
 import {
   RequirementsTable,
   type RequirementsTableRow,
   type RequirementsTableSection,
 } from './RequirementsTable';
+import { getStatusMeta, isItemWorkable } from '../../domain/requirements/requirementsRegistry';
 import {
   computeCoverage,
   type RequirementsCoverage,
@@ -168,7 +168,6 @@ const GAP_CHIPS: {
   },
 ];
 const DETAIL_KEY = '__detail__';
-const DETAIL_CHILDREN_KEY = '__detail-children__';
 const MAX_NAV_HISTORY = 20;
 /** The verb an epic's Add relationship picker opens on when nothing has
  * been used from an epic yet - decomposing an epic is the common case. */
@@ -902,15 +901,6 @@ export function RequirementsView({
   /** The split view's right-hand side: the open item in full, the path of
    * parents above it, and its children beneath - so an epic and its
    * tickets are on screen together. */
-  const sprintNameById = useMemo(
-    () =>
-      new Map(
-        programIncrements.flatMap((pi) =>
-          pi.sprints.map((sp) => [sp.id, sp.name || 'Unnamed sprint'] as const),
-        ),
-      ),
-    [programIncrements],
-  );
   const memberOptions = useMemo(
     () => (team?.members ?? []).map((m) => ({ id: m.id, name: m.name || 'Unnamed' })),
     [team],
@@ -919,17 +909,29 @@ export function RequirementsView({
     () => (milestones ?? []).map((m) => ({ id: m.id, name: m.name || 'Unnamed milestone' })),
     [milestones],
   );
-  const memberNameById = useMemo(
-    () => new Map((team?.members ?? []).map((m) => [m.id, m.name || 'Unnamed'] as const)),
-    [team],
-  );
 
-  const detailCard = (item: RequirementItem) =>
-    renderCard(item, {
-      sectionKey: DETAIL_KEY,
-      cardKey: `detail:${item.id}`,
-      collapsible: false,
-    });
+  /** What every opened item needs - see ItemViewContext. */
+  const itemViewContext: ItemViewContext = {
+    doc,
+    programIncrements,
+    team,
+    members: memberOptions,
+    milestones: milestoneOptions,
+    tagSuggestions: allTags,
+    searchQuery: trimmedSearch,
+    onUpdateItem,
+    onConvertItemType,
+    onDeleteItem,
+    onCreateAndAssignCategory,
+    onDeleteCategory,
+    onAddRelationship,
+    onDeleteRelationship,
+    onNavigateToNode,
+    onCreateLinkedNode,
+    preferredVerbKeyFor: (item) =>
+      lastVerbByTypeId[item.typeId] ?? (isEpicItem(doc, item) ? EPIC_DEFAULT_VERB_KEY : undefined),
+    onVerbUsed,
+  };
 
   const renderDetail = () => {
     const item = selectedItemId ? doc.items.find((i) => i.id === selectedItemId) : undefined;
@@ -956,7 +958,7 @@ export function RequirementsView({
     const children = (hierarchyIndex.childrenByParentId.get(item.id) ?? [])
       .map((id) => itemById.get(id))
       .filter((c): c is RequirementItem => Boolean(c));
-    const anyChildExpanded = children.some((c) => !collapsedIds.has(c.id));
+    const canHaveChildren = isEpicItem(doc, item);
     const crumb = (p: RequirementItem) => (
       <button
         key={p.id}
@@ -985,58 +987,65 @@ export function RequirementsView({
             )}
           </nav>
         )}
-        {isDecisionItem(item) ? (
-          // A decision's sections are its content; it has no reading layout
-          // of its own yet, so it is shown as the card it is edited in.
-          detailCard(item)
-        ) : (
-          <RequirementSplitDetail
-            // Remounts for a different item, so "editing" never carries over.
-            key={item.id}
-            doc={doc}
-            item={item}
-            linkedNodes={linkedNodesByItemId.get(item.id) ?? EMPTY_LINKED_NODES}
-            sprintName={item.sprintId ? sprintNameById.get(item.sprintId) : undefined}
-            assigneeName={item.assigneeId ? memberNameById.get(item.assigneeId) : undefined}
-            members={memberOptions}
-            milestones={milestoneOptions}
-            onUpdateItem={onUpdateItem}
-            onNavigateToItem={(itemId) => onNavigateToItem(itemId, undefined, item.id)}
-            onNavigateToNode={onNavigateToNode}
-            startEditing={!item.title && !item.body}
-            searchQuery={trimmedSearch}
-            sectionKey={DETAIL_KEY}
-            renderEditor={() => detailCard(item)}
-          />
-        )}
-        {children.length > 0 && (
+        <RequirementItemView
+          key={item.id}
+          variant="page"
+          item={item}
+          linkedNodes={linkedNodesByItemId.get(item.id) ?? EMPTY_LINKED_NODES}
+          context={itemViewContext}
+          onNavigateToItem={(itemId) => onNavigateToItem(itemId, undefined, item.id)}
+          sectionKey={DETAIL_KEY}
+        />
+        {(children.length > 0 || canHaveChildren) && (
           <section className="requirements-split__children">
             <h3 className="requirements-view__group-title requirements-split__children-title">
               Children <span className="requirements-split__children-count">{children.length}</span>
-              <button
-                type="button"
-                className="requirements-split__children-toggle"
-                onClick={() =>
-                  setCollapsedIds((prev) => {
-                    const next = new Set(prev);
-                    for (const child of children) {
-                      if (anyChildExpanded) next.add(child.id);
-                      else next.delete(child.id);
-                    }
-                    return next;
-                  })
-                }
-              >
-                {anyChildExpanded ? <ChevronsDownUp size={12} /> : <ChevronsUpDown size={12} />}
-                {anyChildExpanded ? 'Collapse all' : 'Expand all'}
-              </button>
             </h3>
-            {children.map((child) =>
-              renderCard(child, {
-                sectionKey: DETAIL_CHILDREN_KEY,
-                cardKey: `child:${child.id}`,
-                openable: true,
-              }),
+            {children.length > 0 && (
+              <ul className="requirement-children">
+                {children.map((child) => {
+                  const childType = doc.itemTypes.find((t) => t.id === child.typeId);
+                  const childStatus = isItemWorkable(doc, child)
+                    ? getStatusMeta(child.status)
+                    : undefined;
+                  return (
+                    <li key={child.id}>
+                      <button
+                        type="button"
+                        className="requirement-children__row"
+                        onClick={() => onOpenFromDetail(child.id)}
+                        title={`Open ${child.id}`}
+                      >
+                        <span
+                          className="requirement-children__id"
+                          style={{ color: childType?.color }}
+                        >
+                          {child.id}
+                        </span>
+                        <span className="requirement-children__title">
+                          {child.title || 'Untitled'}
+                        </span>
+                        {childStatus && (
+                          <span
+                            className="requirement-children__status"
+                            style={{ color: childStatus.color }}
+                          >
+                            {childStatus.label}
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            {canHaveChildren && defaultChildTypeId && (
+              <ChildQuickAdd
+                doc={doc}
+                parentId={item.id}
+                defaultTypeId={defaultChildTypeId}
+                onAdd={onAddChildItem}
+              />
             )}
           </section>
         )}
@@ -1108,33 +1117,13 @@ export function RequirementsView({
   ]);
 
   const renderTableDetail = (row: RequirementsTableRow) => (
-    <RequirementRowDetail
-      // Remounts for a different item, so one row's "editing" never
-      // carries over to another.
+    <RequirementItemView
       key={row.item.id}
-      doc={doc}
+      variant="row"
       item={row.item}
       linkedNodes={linkedNodesByItemId.get(row.item.id) ?? EMPTY_LINKED_NODES}
-      sprintName={row.item.sprintId ? sprintNameById.get(row.item.sprintId) : undefined}
-      assigneeName={row.item.assigneeId ? memberNameById.get(row.item.assigneeId) : undefined}
-      members={memberOptions}
-      milestones={milestoneOptions}
-      onUpdateItem={onUpdateItem}
-      onNavigateToItem={(itemId) => onNavigateToItem(itemId, row.item.id)}
-      onNavigateToNode={onNavigateToNode}
-      // A new item has nothing to read yet: it opens ready to be written.
-      // So does a decision, whose sections only the card shows.
-      startEditing={(!row.item.title && !row.item.body) || isDecisionItem(row.item)}
-      searchQuery={trimmedSearch}
-      renderEditor={() =>
-        renderCard(row.item, {
-          sectionKey: row.sectionKey,
-          cardKey: `table:${row.key}`,
-          domId: row.domId,
-          isContext: row.isContext,
-          collapsible: false,
-        })
-      }
+      context={itemViewContext}
+      onNavigateToItem={(itemId) => onNavigateToItem(itemId, undefined, row.item.id)}
     />
   );
 
