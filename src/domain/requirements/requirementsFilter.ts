@@ -1,6 +1,7 @@
 import type { RequirementItem, RequirementsDocument, RequirementStatus } from './requirementsTypes';
 import { isItemWorkable } from './requirementsRegistry';
 import { hasTag } from './requirementTags';
+import { isEpicItem } from './requirementsHierarchy';
 
 /**
  * Narrowing the Requirements view by status, assignee, sprint and tag.
@@ -20,6 +21,19 @@ export const UNASSIGNED_FILTER_VALUE = '__unassigned__';
 export const BACKLOG_FILTER_VALUE = '__backlog__';
 export const UNTAGGED_FILTER_VALUE = '__untagged__';
 
+/**
+ * Something an item is missing. Unlike the other dimensions these aren't
+ * values an item has, so they get their own list.
+ *
+ * - `not-on-diagram`: a descriptive item (a requirement, a goal, a
+ *   constraint) that no component on the diagram is linked to. Work items
+ *   and epics are left out - see isExpectedOnDiagram.
+ * - `no-description`: an item of any kind whose body is empty.
+ */
+export type RequirementGap = 'not-on-diagram' | 'no-description';
+
+export const GAP_VALUES: readonly RequirementGap[] = ['not-on-diagram', 'no-description'];
+
 export interface RequirementsFilter {
   statuses?: RequirementStatus[];
   /** TeamMember ids, or UNASSIGNED_FILTER_VALUE. */
@@ -28,6 +42,8 @@ export interface RequirementsFilter {
   sprintIds?: string[];
   /** Tags (matched ignoring case), or UNTAGGED_FILTER_VALUE. */
   tags?: string[];
+  /** Show only items with one of these gaps. */
+  gaps?: RequirementGap[];
 }
 
 export const EMPTY_REQUIREMENTS_FILTER: RequirementsFilter = {};
@@ -41,7 +57,8 @@ export function isFilterActive(filter: RequirementsFilter): boolean {
     (filter.statuses?.length ?? 0) > 0 ||
     (filter.assigneeIds?.length ?? 0) > 0 ||
     (filter.sprintIds?.length ?? 0) > 0 ||
-    (filter.tags?.length ?? 0) > 0
+    (filter.tags?.length ?? 0) > 0 ||
+    (filter.gaps?.length ?? 0) > 0
   );
 }
 
@@ -50,7 +67,8 @@ export function activeFilterCount(filter: RequirementsFilter): number {
     (filter.statuses?.length ?? 0) +
     (filter.assigneeIds?.length ?? 0) +
     (filter.sprintIds?.length ?? 0) +
-    (filter.tags?.length ?? 0)
+    (filter.tags?.length ?? 0) +
+    (filter.gaps?.length ?? 0)
   );
 }
 
@@ -63,6 +81,29 @@ export interface FilterContext {
   existingSprintIds: ReadonlySet<string>;
   /** Every team member id that currently exists - same reasoning. */
   existingMemberIds?: ReadonlySet<string>;
+  /** Every item id some component on the diagram is linked to. Left out,
+   * nothing counts as linked. */
+  linkedItemIds?: ReadonlySet<string>;
+}
+
+/**
+ * Whether `item` is something a component should be linked to. A ticket is
+ * work and an epic is a container for work; neither describes the system,
+ * so counting them as missing from the diagram would bury the real gaps.
+ */
+export function isExpectedOnDiagram(doc: RequirementsDocument, item: RequirementItem): boolean {
+  return !isItemWorkable(doc, item) && !isEpicItem(doc, item);
+}
+
+/** Whether `item` has `gap` - see RequirementGap. */
+export function itemHasGap(
+  item: RequirementItem,
+  gap: RequirementGap,
+  context: Pick<FilterContext, 'doc' | 'linkedItemIds'>,
+): boolean {
+  if (gap === 'no-description') return item.body.trim().length === 0;
+  if (!isExpectedOnDiagram(context.doc, item)) return false;
+  return !context.linkedItemIds?.has(item.id);
 }
 
 export function itemMatchesFilter(
@@ -109,6 +150,9 @@ export function itemMatchesFilter(
     const ok = tags.some((t) => (t === UNTAGGED_FILTER_VALUE ? untagged : hasTag(item, t)));
     if (!ok) return false;
   }
+
+  const gaps = filter.gaps ?? [];
+  if (gaps.length > 0 && !gaps.some((gap) => itemHasGap(item, gap, context))) return false;
 
   return true;
 }
@@ -158,5 +202,9 @@ export function normalizeFilter(value: unknown): RequirementsFilter {
   if (sprintIds) filter.sprintIds = sprintIds;
   const tags = stringArray(raw.tags);
   if (tags) filter.tags = tags;
+  const gaps = stringArray(raw.gaps)?.filter((g): g is RequirementGap =>
+    GAP_VALUES.includes(g as RequirementGap),
+  );
+  if (gaps && gaps.length > 0) filter.gaps = gaps;
   return filter;
 }

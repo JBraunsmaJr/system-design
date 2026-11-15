@@ -7,7 +7,9 @@
 import { normalizeFilter, type RequirementsFilter } from './requirementsFilter';
 
 export type RequirementsGroupBy = 'type' | 'category' | 'epic';
-export type RequirementsLayout = 'list' | 'split';
+/** `table` is one line per item with the rest a click away, `list` is every
+ * item as a full card, `split` is an outline beside one open item. */
+export type RequirementsLayout = 'table' | 'list' | 'split';
 
 export interface RequirementsViewPrefs {
   groupBy?: RequirementsGroupBy;
@@ -33,7 +35,7 @@ export interface RequirementsViewPrefs {
 
 const KEY_PREFIX = 'system-design-editor:requirements-view:';
 const GROUP_BY_VALUES: readonly RequirementsGroupBy[] = ['type', 'category', 'epic'];
-const LAYOUT_VALUES: readonly RequirementsLayout[] = ['list', 'split'];
+const LAYOUT_VALUES: readonly RequirementsLayout[] = ['table', 'list', 'split'];
 
 function keyFor(documentId: string | undefined): string {
   return `${KEY_PREFIX}${documentId ?? 'default'}`;

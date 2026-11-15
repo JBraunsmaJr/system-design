@@ -21,6 +21,7 @@ import {
   ListTree,
   Rows3,
   Search,
+  Table2,
   Settings2,
   Tags,
   Waypoints,
@@ -36,7 +37,9 @@ import type { BulkItemUpdate } from '../../domain/requirements/requirementsBulkE
 import { collectTags } from '../../domain/requirements/requirementTags';
 import {
   activeFilterCount,
+  type RequirementGap,
   type RequirementsFilter,
+  toggleFilterValue,
 } from '../../domain/requirements/requirementsFilter';
 import type { RequirementItem } from '../../domain/requirements/requirementsTypes';
 import type { ProgramIncrement } from '../../domain/timeline/programIncrements';
@@ -58,6 +61,14 @@ import {
 } from '../../domain/requirements/requirementsViewPrefs';
 import { RequirementsOutline } from './RequirementsOutline';
 import { NO_EPIC_KEY, useRequirementGroups } from './useRequirementGroups';
+import { RequirementsCoverageBar } from './RequirementsCoverageBar';
+import {
+  RequirementsTable,
+  type RequirementsTableRow,
+  type RequirementsTableSection,
+} from './RequirementsTable';
+import { computeCoverage } from '../../domain/requirements/requirementsCoverage';
+import { getRelationshipsForItem } from '../../domain/requirements/requirementsRegistry';
 import { useRequirementStoreActions } from './useRequirementStoreActions';
 
 interface RequirementsViewProps {
@@ -114,6 +125,8 @@ const EMPTY_LINKED_NODES: LinkedNodeRef[] = [];
  * RequirementCard's own React.memo comparison just as surely.
  */
 const EMPTY_PEERS: PresenceInfo[] = [];
+const NO_GAPS: readonly RequirementGap[] = [];
+const EPIC_SECTION_KEY = '__epics__';
 const DETAIL_KEY = '__detail__';
 const DETAIL_CHILDREN_KEY = '__detail-children__';
 const MAX_NAV_HISTORY = 20;
@@ -191,7 +204,7 @@ export function RequirementsView({
     () => initialGroupBy ?? initialPrefs.groupBy ?? 'type',
   );
   const [layout, setLayoutState] = useState<RequirementsLayout>(
-    () => initialLayout ?? initialPrefs.layout ?? 'list',
+    () => initialLayout ?? initialPrefs.layout ?? 'table',
   );
   const [collapsedIds, setCollapsedIds] = useState<ReadonlySet<string>>(
     () => new Set(initialPrefs.collapsedIds),
@@ -228,6 +241,13 @@ export function RequirementsView({
     setLayoutState(next);
     setNavHistory([]);
   };
+  /** Rows open in the table, by item id. Not kept between visits: the
+   * table is for scanning, and reopening it with a dozen cards unfolded
+   * would defeat that. */
+  const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(() => new Set<string>());
+  const onToggleExpanded = useCallback((itemId: string) => {
+    setExpandedIds((prev) => toggled(prev, itemId));
+  }, []);
   /** The item open in the split view's detail pane. */
   const [splitSelectedId, setSplitSelectedId] = useState<string | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -323,6 +343,7 @@ export function RequirementsView({
 
   const {
     linkedNodesByItemId,
+    linkedItemIds,
     hierarchyIndex,
     epicTree,
     domIdByNodeKey,
@@ -406,6 +427,12 @@ export function RequirementsView({
 
   const isNarrowed = Boolean(search.trim()) || filterActive;
 
+  const coverage = useMemo(() => computeCoverage(doc, linkedItemIds), [doc, linkedItemIds]);
+  const onToggleGap = useCallback(
+    (gap: RequirementGap) => setFilter((prev) => toggleFilterValue(prev, 'gaps', gap)),
+    [],
+  );
+
   const onAddItem = (typeId: string) => {
     const id = requirementsStoreRef.current.addItem(typeId);
     /*
@@ -419,6 +446,8 @@ export function RequirementsView({
       setSplitSelectedId(id);
       return;
     }
+    // In the table a new item opens straight away, ready to be written.
+    if (layout === 'table') setExpandedIds((prev) => new Set(prev).add(id));
     requestAnimationFrame(() => {
       findCardElement(id)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
@@ -432,6 +461,7 @@ export function RequirementsView({
     selectedId: null as string | null,
     hierarchyIndex,
     outlineSectionOf: new Map<string, string>(),
+    collapsedSectionKeys,
   });
 
   const flash = useCallback((itemId: string) => {
@@ -509,6 +539,25 @@ export function RequirementsView({
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         flash(itemId);
       };
+      if (nav.layout === 'table') {
+        // Following a link opens the row; stepping through search matches
+        // only moves to it, or every match would end up open.
+        if (fromItemId)
+          setExpandedIds((prev) => (prev.has(itemId) ? prev : new Set(prev).add(itemId)));
+        const section = nav.outlineSectionOf.get(itemId);
+        if (section && nav.collapsedSectionKeys.has(section)) {
+          setCollapsedSectionKeys((prev) => {
+            const next = new Set(prev);
+            next.delete(section);
+            return next;
+          });
+          requestAnimationFrame(() => {
+            const revealed = findCardElement(itemId, fromSectionKey);
+            if (revealed) scrollTo(revealed);
+          });
+          return;
+        }
+      }
       const el = findCardElement(itemId, fromSectionKey);
       if (el) {
         scrollTo(el);
@@ -560,8 +609,9 @@ export function RequirementsView({
       selectedId: selectedItemId,
       hierarchyIndex,
       outlineSectionOf,
+      collapsedSectionKeys,
     };
-  }, [layout, groupBy, selectedItemId, hierarchyIndex, outlineSectionOf]);
+  }, [layout, groupBy, selectedItemId, hierarchyIndex, outlineSectionOf, collapsedSectionKeys]);
 
   const activeIndex = useMemo(() => {
     if (!search.trim() || visibleItems.length === 0) return 0;
@@ -659,6 +709,7 @@ export function RequirementsView({
   useEffect(() => {
     if (!focusItemId) return;
     const frame = requestAnimationFrame(() => {
+      setExpandedIds((prev) => (prev.has(focusItemId) ? prev : new Set(prev).add(focusItemId)));
       onNavigateToItem(focusItemId);
       onFocusHandledRef.current?.();
     });
@@ -904,6 +955,97 @@ export function RequirementsView({
     );
   };
 
+  const sprintNameById = useMemo(
+    () =>
+      new Map(
+        programIncrements.flatMap((pi) =>
+          pi.sprints.map((sp) => [sp.id, sp.name || 'Unnamed sprint'] as const),
+        ),
+      ),
+    [programIncrements],
+  );
+  const memberNameById = useMemo(
+    () => new Map((team?.members ?? []).map((m) => [m.id, m.name || 'Unnamed'] as const)),
+    [team],
+  );
+  const relationshipCountByItemId = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const item of doc.items) counts.set(item.id, getRelationshipsForItem(doc, item.id).length);
+    return counts;
+  }, [doc]);
+
+  /** The table's lines: the same groups and epic tree the cards use,
+   * flattened, with folded epics and collapsed sections left out. */
+  const tableSections = useMemo<RequirementsTableSection[]>(() => {
+    if (layout !== 'table') return [];
+    // A search or filter shows every match, folded or not.
+    const collapsed = (key: string) => !isNarrowed && collapsedSectionKeys.has(key);
+    const plain = (item: RequirementItem, sectionKey: string): RequirementsTableRow => ({
+      key: `${sectionKey}/${item.id}`,
+      item,
+      sectionKey,
+      depth: 0,
+      descendantCount: 0,
+      isFolded: false,
+      isContext: false,
+    });
+    if (groupBy !== 'epic') {
+      return groups.map((group) => ({
+        key: `${groupBy}:${group.key}`,
+        label: group.label,
+        color: group.color,
+        rows: group.items.map((item) => plain(item, group.key)),
+        isCollapsed: collapsed(`${groupBy}:${group.key}`),
+      }));
+    }
+    const rows: RequirementsTableRow[] = [];
+    const visit = (node: EpicTreeNode) => {
+      const isFolded = node.children.length > 0 && foldedIds.has(node.item.id) && !isNarrowed;
+      rows.push({
+        key: node.key,
+        item: node.item,
+        sectionKey: node.rootId,
+        depth: node.depth,
+        descendantCount: countDescendants(node),
+        isFolded,
+        isContext: Boolean(node.isContext),
+        domId: domIdByNodeKey.get(node.key),
+      });
+      if (!isFolded) node.children.forEach(visit);
+    };
+    epicTree.roots.forEach(visit);
+    const sections: RequirementsTableSection[] = [];
+    if (rows.length > 0) sections.push({ key: EPIC_SECTION_KEY, rows, isCollapsed: false });
+    if (epicTree.unparented.length > 0) {
+      sections.push({
+        key: `epic:${NO_EPIC_KEY}`,
+        label: 'No epic',
+        color: 'var(--chrome-text-dim)',
+        rows: epicTree.unparented.map((item) => plain(item, NO_EPIC_KEY)),
+        isCollapsed: collapsed(`epic:${NO_EPIC_KEY}`),
+      });
+    }
+    return sections;
+  }, [
+    layout,
+    groupBy,
+    groups,
+    epicTree,
+    domIdByNodeKey,
+    foldedIds,
+    collapsedSectionKeys,
+    isNarrowed,
+  ]);
+
+  const renderTableDetail = (row: RequirementsTableRow) =>
+    renderCard(row.item, {
+      sectionKey: row.sectionKey,
+      cardKey: `table:${row.key}`,
+      domId: row.domId,
+      isContext: row.isContext,
+      collapsible: false,
+    });
+
   const backEntry = navHistory[navHistory.length - 1];
   const backButton = backEntry ? (
     <button type="button" className="requirements-view__back" onClick={goBack}>
@@ -1070,13 +1212,23 @@ export function RequirementsView({
             <div className="requirements-view__group-toggle">
               <button
                 type="button"
+                className={layout === 'table' ? 'active' : undefined}
+                aria-pressed={layout === 'table'}
+                onClick={() => setLayout('table')}
+                title="One line per item; click a line to open it"
+              >
+                <Table2 size={12} />
+                <span>Table</span>
+              </button>
+              <button
+                type="button"
                 className={layout === 'list' ? 'active' : undefined}
                 aria-pressed={layout === 'list'}
                 onClick={() => setLayout('list')}
-                title="One scrolling list of cards"
+                title="Every item as a full card, in one scrolling list"
               >
                 <Rows3 size={12} />
-                <span>List</span>
+                <span>Cards</span>
               </button>
               <button
                 type="button"
@@ -1092,7 +1244,10 @@ export function RequirementsView({
             <div className="requirements-view__group-toggle">
               <button
                 type="button"
-                onClick={() => setCollapsedIds(new Set(doc.items.map((i) => i.id)))}
+                onClick={() => {
+                  setCollapsedIds(new Set(doc.items.map((i) => i.id)));
+                  setExpandedIds(new Set());
+                }}
                 title="Collapse all cards to their headers"
                 aria-label="Collapse all cards"
               >
@@ -1137,6 +1292,11 @@ export function RequirementsView({
         </div>
       </div>
 
+      <RequirementsCoverageBar
+        coverage={coverage}
+        activeGaps={filter.gaps ?? NO_GAPS}
+        onToggleGap={onToggleGap}
+      />
       {(isFilterBarOpen || filterActive) && (
         <RequirementsFilterBar
           filter={filter}
@@ -1199,6 +1359,45 @@ export function RequirementsView({
               </p>
             ) : (
               renderDetail()
+            )}
+          </div>
+          {backButton}
+        </div>
+      ) : layout === 'table' ? (
+        <div className="requirements-view__list-wrap">
+          <div
+            ref={contentRef}
+            className="requirements-view__content requirements-view__content--table"
+          >
+            {doc.items.length === 0 ? (
+              <p className="requirements-view__empty">
+                No requirements yet - add one above to get started.
+              </p>
+            ) : visibleItems.length === 0 ? (
+              <p className="requirements-view__empty">
+                {filterActive
+                  ? 'No requirements match your search and filters.'
+                  : 'No requirements match your search.'}
+              </p>
+            ) : (
+              <RequirementsTable
+                doc={doc}
+                sections={tableSections}
+                linkedNodesByItemId={linkedNodesByItemId}
+                sprintNameById={sprintNameById}
+                memberNameById={memberNameById}
+                relationshipCountByItemId={relationshipCountByItemId}
+                expandedIds={expandedIds}
+                onToggleExpanded={onToggleExpanded}
+                renderExpanded={renderTableDetail}
+                onToggleSection={onToggleSection}
+                onToggleFolded={onToggleFolded}
+                onNavigateToNode={onNavigateToNode}
+                highlightedId={highlightedId ?? (trimmedSearch ? (activeItem?.id ?? null) : null)}
+                searchQuery={trimmedSearch}
+                bulkSelectedIds={bulkSelectedIds}
+                onToggleBulkSelected={isSelectMode ? onToggleBulkSelected : undefined}
+              />
             )}
           </div>
           {backButton}

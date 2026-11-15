@@ -29,6 +29,14 @@ markers are removed when the section becomes a release. See
 - `ADMIN_GROUPS` makes the members of an identity-provider group store administrators in that API.
   `WORKSPACE_CREATION` sets who may create workspaces there.
 
+### [MINOR] Requirements: table and coverage
+
+- The Requirements view opens as a table: one line per item with its type, status, sprint, assignee, linked components
+  and relationship count. Click a line to open the item beneath it. The card list is still there as **Cards**, and
+  **Split** is unchanged. A layout you already chose for a document is kept.
+- A coverage line above the items counts how many descriptive items are linked to a component, how many items have a
+  description, and how much of the work is done. The first two filter to the items that are missing.
+
 ### Store: API description
 
 - `store/openapi.json` describes every route the store serves, with the role each needs, its request and its

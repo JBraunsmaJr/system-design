@@ -5,7 +5,7 @@ import type {
   RequirementsDocument,
 } from '../../domain/requirements/requirementsTypes';
 import type { SubDiagram } from '../../domain/canvas/types';
-import { findAllLinkedNodes } from '../../domain/canvas/subDiagramTree';
+import { findAllLinkedNodes, type LinkedNodeRef } from '../../domain/canvas/subDiagramTree';
 import plur from 'plur';
 import { itemTextMatches } from '../../domain/requirements/decisionRecords';
 import {
@@ -95,9 +95,15 @@ export function useRequirementGroups({
    * approach doesn't scale with the number of items in this list.
    */
   const linkedNodesByItemId = useMemo(
-    () => (diagramRoot ? findAllLinkedNodes(diagramRoot) : new Map()),
+    () => (diagramRoot ? findAllLinkedNodes(diagramRoot) : new Map<string, LinkedNodeRef[]>()),
     [diagramRoot],
   );
+
+  const linkedItemIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const [itemId, nodes] of linkedNodesByItemId) if (nodes.length > 0) ids.add(itemId);
+    return ids;
+  }, [linkedNodesByItemId]);
 
   const { items: docItems, itemTypes: docItemTypes, relationships: docRelationships } = doc;
   const hierarchyIndex = useMemo(
@@ -108,7 +114,7 @@ export function useRequirementGroups({
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q && !filterActive) return doc.items;
-    const context = { doc, existingSprintIds, existingMemberIds };
+    const context = { doc, existingSprintIds, existingMemberIds, linkedItemIds };
     const textMatches = (item: RequirementItem) => {
       if (item.id.toLowerCase().includes(q)) return true;
       if (item.title.toLowerCase().includes(q)) return true;
@@ -122,7 +128,7 @@ export function useRequirementGroups({
       (item) =>
         (!filterActive || itemMatchesFilter(item, filter, context)) && (!q || textMatches(item)),
     );
-  }, [doc, search, filter, filterActive, existingSprintIds, existingMemberIds]);
+  }, [doc, search, filter, filterActive, existingSprintIds, existingMemberIds, linkedItemIds]);
 
   /**
    * Grouping is computed generically for both modes into the same shape,
@@ -251,6 +257,7 @@ export function useRequirementGroups({
 
   return {
     linkedNodesByItemId,
+    linkedItemIds,
     hierarchyIndex,
     epicTree,
     domIdByNodeKey,

@@ -192,8 +192,10 @@ console.log('=== Split view ===');
     'the open epic has its quick-add row, so tickets can be added right under it',
   );
   assert(
-    html.includes('>List</span>') && html.includes('>Split</span>'),
-    'the toolbar offers List and Split',
+    html.includes('>Table</span>') &&
+      html.includes('>Cards</span>') &&
+      html.includes('>Split</span>'),
+    'the toolbar offers Table, Cards and Split',
   );
   assert(
     html.includes('aria-label="Collapse all cards"') &&

@@ -1,0 +1,195 @@
+/**
+ * Checks for the Requirements view's table layout and the coverage line
+ * above it.
+ *
+ * Run with:
+ *   npx tsx --tsconfig tsconfig.app.json src/components/requirements/RequirementsViewTable.verify.tsx
+ */
+import { renderToStaticMarkup } from 'react-dom/server';
+import React from 'react';
+import { RequirementsView } from './RequirementsView';
+import { RequirementsCoverageBar } from './RequirementsCoverageBar';
+import {
+  BUILT_IN_ITEM_TYPES,
+  BUILT_IN_RELATIONSHIP_TYPES,
+} from '../../domain/requirements/requirementsRegistry';
+import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
+import { createLocalRequirementsStore } from '../../collab/stores/requirementsStore';
+import type { SubDiagram } from '../../domain/canvas/types';
+
+let failures = 0;
+function assert(condition: boolean, message: string) {
+  if (condition) {
+    console.log(`ok: ${message}`);
+  } else {
+    failures++;
+    (globalThis as unknown as { process: { exitCode: number } }).process.exitCode = 1;
+    console.error(`FAIL: ${message}`);
+  }
+}
+
+function count(haystack: string, needle: string): number {
+  return haystack.split(needle).length - 1;
+}
+
+/** The markup of the table row for `itemId`, up to the next row. */
+function rowOf(html: string, itemId: string): string {
+  const start = html.indexOf(`data-requirement-id="${itemId}"`);
+  if (start === -1) return '';
+  const next = html.indexOf('data-requirement-id="', start + 1);
+  return html.slice(start, next === -1 ? undefined : next);
+}
+
+const doc: RequirementsDocument = {
+  itemTypes: BUILT_IN_ITEM_TYPES,
+  categories: [{ id: 'cat-1', label: 'Checkout', color: '#3b82f6' }],
+  relationshipTypes: BUILT_IN_RELATIONSHIP_TYPES,
+  items: [
+    { id: 'EPIC-1', typeId: 'epic', title: 'Checkout', body: 'The epic.' },
+    { id: 'REQ-1', typeId: 'requirement', title: 'Guest checkout', body: 'Described.' },
+    { id: 'REQ-2', typeId: 'requirement', title: 'Saved carts', body: '' },
+    {
+      id: 'TICKET-1',
+      typeId: 'ticket',
+      title: 'Build the form',
+      body: 'Do it.',
+      status: 'in-progress',
+      sprintId: 'sp-1',
+      assigneeId: 'm-1',
+    },
+  ],
+  relationships: [
+    { id: 'r1', typeId: 'parent-of', fromItemId: 'EPIC-1', toItemId: 'REQ-1' },
+    { id: 'r2', typeId: 'parent-of', fromItemId: 'EPIC-1', toItemId: 'TICKET-1' },
+  ],
+  nextSequence: {},
+};
+
+const diagramRoot = {
+  nodes: [
+    {
+      id: 'n1',
+      type: 'service',
+      position: { x: 0, y: 0 },
+      data: { label: 'Order Service', linkedRequirementIds: ['REQ-1'] },
+    },
+  ],
+  edges: [],
+} as unknown as SubDiagram;
+
+const programIncrements = [
+  {
+    id: 'pi-1',
+    name: 'PI 1',
+    startDate: '2026-01-05',
+    sprints: [{ id: 'sp-1', name: 'Sprint 1', durationDays: 14 }],
+  },
+];
+
+const team = {
+  members: [{ id: 'm-1', name: 'Ana Ruiz', role: 'Engineer', avatarColor: '#fff' }],
+} as unknown as React.ComponentProps<typeof RequirementsView>['team'];
+
+function render(props: Partial<React.ComponentProps<typeof RequirementsView>> = {}): string {
+  return renderToStaticMarkup(
+    <RequirementsView
+      requirementsStore={createLocalRequirementsStore(doc)}
+      programIncrements={programIncrements}
+      team={team}
+      diagramRoot={diagramRoot}
+      {...props}
+    />,
+  );
+}
+
+console.log('=== The table is where the view opens ===');
+{
+  const html = render({ initialGroupBy: 'type' });
+  assert(html.includes('role="table"'), 'with no stored preference the table is shown');
+  assert(count(html, 'class="requirements-table__row') === 4, 'one line per item');
+  assert(!html.includes('class="requirement-card'), 'and no card until a line is opened');
+  assert(count(html, 'class="requirements-table__section"') === 3, 'a heading per type in use');
+
+  const req1 = rowOf(html, 'REQ-1');
+  assert(req1.includes('Guest checkout'), 'a line has the title');
+  assert(req1.includes('Order Service'), 'and the component linked to it');
+  assert(!req1.includes('Not linked'), 'which is not flagged');
+  assert(rowOf(html, 'REQ-2').includes('Not linked'), 'an unlinked requirement is flagged');
+
+  const ticket = rowOf(html, 'TICKET-1');
+  assert(ticket.includes('In Progress'), 'a ticket shows its status');
+  assert(ticket.includes('Sprint 1') && ticket.includes('Ana Ruiz'), 'its sprint and assignee');
+  assert(!ticket.includes('Not linked'), 'and is not expected on the diagram');
+  assert(!rowOf(html, 'EPIC-1').includes('Not linked'), 'neither is an epic');
+  assert(rowOf(html, 'EPIC-1').includes('title="2 relationships"'), 'relationships are counted');
+}
+
+console.log('\n=== Grouped by epic ===');
+{
+  const html = render({ initialGroupBy: 'epic' });
+  assert(count(html, 'class="requirements-table__row') === 4, 'every item has a line');
+  assert(
+    html.indexOf('data-requirement-id="EPIC-1"') < html.indexOf('data-requirement-id="REQ-1"'),
+    'children follow their epic',
+  );
+  assert(rowOf(html, 'REQ-1').includes('padding-left:18px'), 'indented one step');
+  assert(
+    rowOf(html, 'EPIC-1').includes('aria-label="Hide the items under EPIC-1"'),
+    'the epic can fold them away',
+  );
+  assert(html.includes('No epic'), 'items under no epic get a heading');
+}
+
+console.log('\n=== The other layouts are still there ===');
+{
+  const cards = render({ initialLayout: 'list', initialGroupBy: 'type' });
+  assert(!cards.includes('role="table"'), 'cards: no table');
+  assert(
+    (cards.match(/class="requirement-card[ "]/g) ?? []).length === 4,
+    'cards: a card per item',
+  );
+  const split = render({ initialLayout: 'split', initialGroupBy: 'type' });
+  assert(split.includes('requirements-split'), 'split: the outline and detail');
+}
+
+console.log('\n=== Coverage ===');
+{
+  const html = render({ initialGroupBy: 'type' });
+  assert(html.includes('requirements-coverage'), 'the coverage line is shown');
+  assert(/On the diagram.*?>1<.*?\/2</s.test(html), 'one of two requirements is on the diagram');
+  assert(/Described.*?>3<.*?\/4</s.test(html), 'three of four items are described');
+  assert(/Work done.*?>0<.*?\/1</s.test(html), 'none of the one ticket is done');
+  assert(count(html, 'requirements-coverage__measure--button') === 2, 'two gaps can be opened');
+
+  const empty = renderToStaticMarkup(
+    <RequirementsView
+      requirementsStore={createLocalRequirementsStore({ ...doc, items: [], relationships: [] })}
+      programIncrements={[]}
+    />,
+  );
+  assert(!empty.includes('requirements-coverage'), 'an empty document shows no coverage line');
+
+  const complete = renderToStaticMarkup(
+    <RequirementsCoverageBar
+      coverage={{ total: 2, described: 2, descriptive: 2, onDiagram: 2, workable: 0, done: 0 }}
+      activeGaps={[]}
+      onToggleGap={() => undefined}
+    />,
+  );
+  assert(!complete.includes('<button'), 'a measure with nothing missing is not a button');
+  assert(!complete.includes('Work done'), 'and with no work items there is no work measure');
+
+  const active = renderToStaticMarkup(
+    <RequirementsCoverageBar
+      coverage={{ total: 2, described: 1, descriptive: 2, onDiagram: 1, workable: 0, done: 0 }}
+      activeGaps={['not-on-diagram']}
+      onToggleGap={() => undefined}
+    />,
+  );
+  assert(count(active, 'aria-pressed="true"') === 1, 'the gap being shown is marked pressed');
+}
+
+console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);
+if (failures > 0) {
+  (globalThis as unknown as { process: { exitCode: number } }).process.exitCode = 1;
+}

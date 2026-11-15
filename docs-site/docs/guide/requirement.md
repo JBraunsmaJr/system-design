@@ -85,6 +85,30 @@ Toggle between two organization modes using the toolbar controls:
 - **Group by Type**: Groups items by their artifact type (_Requirements_, _Goals_, _Tickets_, etc.).
 - **Group by Category**: Groups items by assigned functional category, with an _Uncategorized_ section for unsorted items.
 
+### Layouts
+
+**View** in the toolbar chooses how the items are laid out:
+
+- **Table** (the default): one line per item with its type, status, sprint, assignee, the components linked to it and
+  how many relationships it has. Click a line to open the full item beneath it; click again to close it. When grouping
+  by epic, children are indented under their epic and the count beside an epic's title folds them away.
+- **Cards**: every item as a full card in one scrolling column.
+- **Split**: an outline on the left and the open item, with its children, on the right.
+
+Your layout is remembered for each document in this browser.
+
+### Coverage
+
+The line above the items shows how complete the document is:
+
+- **On the diagram**: how many requirements, goals and other descriptive items have a component linked to them. Work
+  items and epics are not counted, since they aren't expected on the diagram.
+- **Described**: how many items have a description.
+- **Work done**: how many work items are done.
+
+When something is missing, **On the diagram** and **Described** are buttons: click one to show only the items with
+that gap, and again to show everything. In the table, a descriptive item with no component reads **Not linked**.
+
 ### Tags
 
 Tags are free-form labels (_security_, _tech-debt_, _q3_) for anything a category or type doesn't capture - an item
