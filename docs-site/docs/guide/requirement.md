@@ -93,7 +93,8 @@ Toggle between two organization modes using the toolbar controls:
   how many relationships it has. Click a line to open the full item beneath it; click again to close it. When grouping
   by epic, children are indented under their epic and the count beside an epic's title folds them away.
 - **Cards**: every item as a full card in one scrolling column.
-- **Split**: an outline on the left and the open item, with its children, on the right.
+- **Split**: an outline on the left and the open item, with its children, on the right. Outline rows show whether a
+  descriptive item is on the diagram, and the status of work items and decisions.
 
 Your layout is remembered for each document in this browser.
 

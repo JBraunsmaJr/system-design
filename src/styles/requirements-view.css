@@ -752,6 +752,39 @@
   border-radius: var(--radius-round);
 }
 
+/* Whether a descriptive item is linked to a component. */
+.requirements-outline__diagram {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: color-mix(in srgb, var(--accent) 70%, var(--chrome-text-dim));
+}
+
+.requirements-outline__diagram.is-missing {
+  color: var(--warning);
+}
+
+.requirements-outline__status--legend {
+  display: inline-block;
+  background: var(--chrome-text-dim);
+}
+
+.requirements-outline__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 16px;
+  padding: 10px 12px 0;
+  border-top: 1px solid var(--chrome-border);
+  font-size: var(--text-2xs);
+  color: var(--chrome-text-dim);
+}
+
+.requirements-outline__legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
 .requirements-view__empty {
   color: var(--chrome-text-dim);
   font-size: var(--text-base);

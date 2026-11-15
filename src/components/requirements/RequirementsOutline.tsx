@@ -1,12 +1,21 @@
 import type { CSSProperties, KeyboardEvent } from 'react';
 import { useEffect, useRef } from 'react';
-import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
+  Link2,
+  TriangleAlert,
+} from 'lucide-react';
 import {
   getItemType,
   getStatusMeta,
   isItemWorkable,
 } from '../../domain/requirements/requirementsRegistry';
 import type { EpicTree, EpicTreeNode } from '../../domain/requirements/requirementsHierarchy';
+import { isExpectedOnDiagram } from '../../domain/requirements/requirementsFilter';
+import { getDecisionStatusMeta, isDecisionItem } from '../../domain/requirements/decisionRecords';
 import type {
   RequirementItem,
   RequirementsDocument,
@@ -51,6 +60,9 @@ interface RequirementsOutlineProps {
    * row (other than search-context rows) gets a checkbox. */
   bulkSelectedIds?: ReadonlySet<string>;
   onToggleBulkSelected?: (itemId: string, extendRange: boolean) => void;
+  /** Items some component on the diagram is linked to. When given, each
+   * row for an item expected on the diagram says whether it is there. */
+  linkedItemIds?: ReadonlySet<string>;
 }
 
 /** Height of one row, and of a section header - sticky offsets stack
@@ -132,6 +144,7 @@ export function RequirementsOutline({
   isFiltered = false,
   bulkSelectedIds,
   onToggleBulkSelected,
+  linkedItemIds,
 }: RequirementsOutlineProps) {
   const listRef = useRef<HTMLDivElement>(null);
   // A filter narrows the outline the same way a search does, so it
@@ -256,7 +269,17 @@ export function RequirementsOutline({
 
   const renderNode = (node: OutlineNode, stickyTop: number): React.ReactNode => {
     const type = getItemType(doc, node.item.typeId);
-    const status = isItemWorkable(doc, node.item) ? getStatusMeta(node.item.status) : null;
+    const status = isItemWorkable(doc, node.item)
+      ? getStatusMeta(node.item.status)
+      : isDecisionItem(node.item)
+        ? getDecisionStatusMeta(node.item.decisionStatus)
+        : null;
+    // Undefined where the question doesn't apply: work and epics aren't
+    // expected on the diagram, and without the links there's nothing to say.
+    const onDiagram =
+      linkedItemIds && isExpectedOnDiagram(doc, node.item)
+        ? linkedItemIds.has(node.item.id)
+        : undefined;
     const isSelected = node.item.id === selectedId;
     const hasChildren = node.children.length > 0;
     const isFolded = isNodeFolded(node);
@@ -328,6 +351,24 @@ export function RequirementsOutline({
             />
             {hasChildren && (
               <span className="requirements-outline__count">{countRows(node.children)}</span>
+            )}
+            {onDiagram === true && (
+              <span
+                className="requirements-outline__diagram"
+                title="On the diagram: a component is linked to this"
+                aria-label="On the diagram"
+              >
+                <Link2 size={11} />
+              </span>
+            )}
+            {onDiagram === false && (
+              <span
+                className="requirements-outline__diagram is-missing"
+                title="Not on the diagram: no component is linked to this"
+                aria-label="Not on the diagram"
+              >
+                <TriangleAlert size={11} />
+              </span>
             )}
             {status && (
               <span
@@ -406,6 +447,21 @@ export function RequirementsOutline({
           );
         })}
       </div>
+      {linkedItemIds && (
+        <div className="requirements-outline__legend" aria-hidden>
+          <span>
+            <Link2 size={11} className="requirements-outline__diagram" /> on the diagram
+          </span>
+          <span>
+            <TriangleAlert size={11} className="requirements-outline__diagram is-missing" /> not
+            linked
+          </span>
+          <span>
+            <span className="requirements-outline__status requirements-outline__status--legend" />{' '}
+            status
+          </span>
+        </div>
+      )}
     </div>
   );
 }

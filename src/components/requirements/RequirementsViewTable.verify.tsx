@@ -150,6 +150,29 @@ console.log('\n=== The other layouts are still there ===');
   );
   const split = render({ initialLayout: 'split', initialGroupBy: 'type' });
   assert(split.includes('requirements-split'), 'split: the outline and detail');
+
+  /** The outline row for `itemId`, up to the next row. */
+  const outlineRow = (itemId: string) => {
+    const start = split.indexOf(`data-outline-id="${itemId}"`);
+    const next = split.indexOf('data-outline-id="', start + 1);
+    // The last row ends where the legend starts, before the detail pane.
+    const end = next === -1 ? split.indexOf('requirements-outline__legend') : next;
+    return start === -1 ? '' : split.slice(start, end);
+  };
+  assert(
+    outlineRow('REQ-1').includes('aria-label="On the diagram"'),
+    'split: a linked requirement is marked as on the diagram',
+  );
+  assert(
+    outlineRow('REQ-2').includes('aria-label="Not on the diagram"'),
+    'split: an unlinked one is flagged',
+  );
+  assert(
+    !outlineRow('TICKET-1').includes('the diagram"') &&
+      !outlineRow('EPIC-1').includes('the diagram"'),
+    'split: work and epics carry neither mark',
+  );
+  assert(split.includes('requirements-outline__legend'), 'split: the marks are explained');
 }
 
 console.log('\n=== Coverage ===');

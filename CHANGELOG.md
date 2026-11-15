@@ -29,6 +29,12 @@ markers are removed when the section becomes a release. See
 - `ADMIN_GROUPS` makes the members of an identity-provider group store administrators in that API.
   `WORKSPACE_CREATION` sets who may create workspaces there.
 
+### Requirements: the split view's outline shows what is on the diagram
+
+- Each requirement, goal or other descriptive item in the split view's outline is marked as linked to a component or
+  flagged as not linked, matching the table and the coverage line. Decisions show their status dot as work items do.
+  A legend at the foot of the outline explains the marks.
+
 ### [MINOR] Diagram: names stay readable when zoomed out
 
 - Below 60% zoom the canvas switches to an overview: each component shows only its name, drawn larger the further out

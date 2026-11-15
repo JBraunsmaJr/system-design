@@ -1349,6 +1349,7 @@ export function RequirementsView({
                 isFiltered={filterActive}
                 bulkSelectedIds={bulkSelectedIds}
                 onToggleBulkSelected={isSelectMode ? onToggleBulkSelected : undefined}
+                linkedItemIds={linkedItemIds}
               />
             )}
           </aside>
