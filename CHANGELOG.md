@@ -29,6 +29,19 @@ markers are removed when the section becomes a release. See
 - `ADMIN_GROUPS` makes the members of an identity-provider group store administrators in that API.
   `WORKSPACE_CREATION` sets who may create workspaces there.
 
+### [MINOR] Requirements: priority, status, owner and target
+
+- Requirements and constraints (and items of your own descriptive types) have four values set from menus in the
+  table's open row and the split view's page: **Status** (Draft, In review, Approved, Implemented), **Priority** (Must,
+  Should, Could), **Owner** and **Target**.
+- Status is the requirement's own and is separate from a work item's To Do / In Progress / Done.
+- Owner is the stakeholder accountable for the requirement, not who works on it: a team member, or a typed name for
+  someone outside the team.
+- Target is one of the document's milestones.
+- Verification has a one-line note for what verifies it or where that stands.
+- The table has Priority and Status columns, and the Markdown export writes all of these beneath each item.
+- Existing documents need no change: an item with nothing set reads as a Draft with no priority, owner or target.
+
 ### Requirements: a simpler toolbar
 
 - The toolbar reads left to right as find, then arrange, then add: search, Filter and Select on the left; **Group by**

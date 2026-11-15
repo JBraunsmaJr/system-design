@@ -33,7 +33,8 @@ function collisionResistantId(prefix: string): string {
 }
 
 /** The item fields only some items carry: an architecture decision's
- * sections and a requirement's verification (see RequirementItem). */
+ * sections, and a requirement's verification and attributes (see
+ * RequirementItem). */
 const OPTIONAL_ITEM_FIELDS = [
   'decisionStatus',
   'decisionOptions',
@@ -41,6 +42,12 @@ const OPTIONAL_ITEM_FIELDS = [
   'decisionConsequences',
   'verificationMethod',
   'verificationStatus',
+  'verificationNote',
+  'priority',
+  'lifecycle',
+  'ownerId',
+  'ownerName',
+  'targetMilestoneId',
 ] as const satisfies readonly (keyof RequirementItem)[];
 
 /**
@@ -329,6 +336,12 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
       decisionConsequences: m.get('decisionConsequences') as string | undefined,
       verificationMethod: m.get('verificationMethod') as RequirementItem['verificationMethod'],
       verificationStatus: m.get('verificationStatus') as RequirementItem['verificationStatus'],
+      verificationNote: m.get('verificationNote') as string | undefined,
+      priority: m.get('priority') as RequirementItem['priority'],
+      lifecycle: m.get('lifecycle') as RequirementItem['lifecycle'],
+      ownerId: m.get('ownerId') as string | undefined,
+      ownerName: m.get('ownerName') as string | undefined,
+      targetMilestoneId: m.get('targetMilestoneId') as string | undefined,
     };
     // Only present when the item has tags, so an untagged item's snapshot
     // has exactly the keys it always had. Normalized on the way out: tags

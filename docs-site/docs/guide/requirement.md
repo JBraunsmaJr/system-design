@@ -90,8 +90,8 @@ Choose how items are grouped with **Group by** in the toolbar:
 
 The **Table / Cards / Split** buttons in the toolbar choose how the items are laid out:
 
-- **Table** (the default): one line per item with its type, status, the components linked to it and how it is
-  verified. Each group's heading shows how much of it is verified. Click a line to open the item beneath it, laid out
+- **Table** (the default): one line per item with its type, priority, status, the components linked to it and how
+  it is verified. Each group's heading shows how much of it is verified. Click a line to open the item beneath it, laid out
   for reading: its statement, its acceptance criteria (click one to tick it), its relationships, its components and
   its verification. **Edit** swaps in the full card, where every field can be changed; **Done** goes back. When
   grouping by epic, children are indented under their epic and the count beside an epic's title folds them away.
@@ -117,6 +117,19 @@ At the right of that line is a button for each gap that exists, with how many it
 **Not verified**, **No acceptance criteria** and **No description**. Click one to show only those items, and again to
 show everything. In the table, a descriptive item with no component reads **Not linked**.
 
+### Status, Priority, Owner and Target
+
+Requirements and constraints, and items of any descriptive type you add yourself, carry four values. Set them from
+the menus at the top of an open table row or of the split view's page:
+
+- **Status**: _Draft_, _In review_, _Approved_ or _Implemented_. This is the requirement's own status. A ticket's
+  _To Do / In Progress / Done_ is separate.
+- **Priority**: _Must_, _Should_ or _Could_.
+- **Owner**: the stakeholder accountable for the requirement, who says whether it is right and whether it has been
+  met. Choose a team member, or **Someone else...** to type the name of a person or team outside it. Who does the work
+  is the assignee on a ticket.
+- **Target**: the milestone the requirement is due for. Milestones are created on the Plan tab.
+
 ### Verification and Acceptance Criteria
 
 Requirements and constraints, and items of any descriptive type you add yourself, can be verified. Goals, risks,
@@ -128,8 +141,11 @@ assumptions, decisions, epics and work items are not.
 - **Verification** is the control beside the type in the item's header. Choose where it stands (**Not verified**,
   **Verified** or **Failing**) and how it is checked (**Test**, **Demonstration**, **Inspection** or **Analysis**).
 
-The table's **Verification** column shows both for every item, and the Markdown export includes each item's
-verification.
+- A **note** under the verification control, in the split view, holds one line on what verifies it: a suite's name, a
+  link, or the last result.
+
+The table's **Verification** column shows the method and status for every item, and the Markdown export includes each
+item's verification and its note.
 
 ### Tags
 

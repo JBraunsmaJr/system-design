@@ -57,6 +57,11 @@ const doc: RequirementsDocument = {
       id: 'REQ-1',
       typeId: 'requirement',
       title: 'Guest checkout',
+      priority: 'must',
+      lifecycle: 'approved',
+      ownerId: 'm-1',
+      targetMilestoneId: 'ms-1',
+      verificationNote: 'checkout-e2e',
       body: 'Described.\n\n- [x] No account needed\n- [ ] Works on mobile',
       verificationMethod: 'test',
       verificationStatus: 'passing',
@@ -220,6 +225,10 @@ console.log('\n=== Coverage ===');
     req1.includes('is-ok') && req1.includes('Test passing') && req1.includes('>1/2<'),
     'a verified requirement shows how it is verified and its criteria',
   );
+  assert(
+    req1.includes('Must') && req1.includes('Approved'),
+    'a requirement shows its priority and its own status',
+  );
   const req2 = rowOf(html, 'REQ-2');
   assert(
     req2.includes('is-warning') && req2.includes('No method'),
@@ -267,6 +276,8 @@ console.log('\n=== An open row ===');
     onUpdateItem: () => undefined,
     onNavigateToItem: () => undefined,
     onNavigateToNode: () => undefined,
+    members: [{ id: 'm-1', name: 'Ana Ruiz' }],
+    milestones: [{ id: 'ms-1', name: 'Release 2.4' }],
     renderEditor: () => <div className="the-editor" />,
   };
   const req1 = doc.items.find((i) => i.id === 'REQ-1')!;
@@ -294,7 +305,11 @@ console.log('\n=== An open row ===');
     'lists its relationships as seen from this item',
   );
   assert(html.includes('Order Service') && html.includes('Show on diagram'), 'and its components');
-  assert(html.includes('>Test<') || html.includes('Test'), 'and how it is verified');
+  assert(
+    html.includes('Test') && html.includes('checkout-e2e'),
+    'how it is verified, with the note',
+  );
+  assert(html.includes('requirement-attributes'), 'and its status, priority, owner and target');
   assert(!html.includes('the-editor'), 'the editor is not shown until asked for');
 
   const ticket = renderPlain(
@@ -339,6 +354,8 @@ console.log("\n=== The split view's detail pane ===");
     onUpdateItem: () => undefined,
     onNavigateToItem: () => undefined,
     onNavigateToNode: () => undefined,
+    members: [{ id: 'm-1', name: 'Ana Ruiz' }],
+    milestones: [{ id: 'ms-1', name: 'Release 2.4' }],
     renderEditor: () => <div className="the-editor" />,
   };
   const html = renderPlain(
@@ -354,6 +371,15 @@ console.log("\n=== The split view's detail pane ===");
     assert(html.includes(`requirement-panel__title">${panel}<`), `has a ${panel} panel`);
   }
   assert(html.includes('>1 of 2 met<'), 'criteria are counted');
+  const chosen = (label: string) =>
+    new RegExp(`<span>${label}</span>.*?<option value="[^"]*" selected="">([^<]*)<`, 's').exec(
+      html,
+    )?.[1];
+  assert(chosen('Status') === 'Approved', 'its status is set from the page');
+  assert(chosen('Priority') === 'Must', 'its priority');
+  assert(chosen('Owner') === 'Ana Ruiz', 'its owner, a team member');
+  assert(chosen('Target') === 'Release 2.4', 'and its target milestone');
+  assert(html.includes('value="checkout-e2e"'), 'the verification note is editable in its panel');
   assert(
     html.includes('aria-label="Add an acceptance criterion to REQ-1"'),
     'and one can be added',
@@ -369,6 +395,12 @@ console.log("\n=== The split view's detail pane ===");
     />,
   );
   assert(!req2.includes('Show on diagram'), 'an unlinked item has no way to the diagram');
+  assert(
+    /<span>Status<\/span>.*?selected="">Draft</s.test(req2) &&
+      /<span>Priority<\/span>.*?selected="">Not set</s.test(req2) &&
+      /<span>Owner<\/span>.*?selected="">No owner</s.test(req2),
+    'with nothing set it reads as a draft with no priority or owner',
+  );
   assert(req2.includes('No component is linked to this'), 'and says what is missing');
 
   const ticket = renderPlain(
@@ -385,7 +417,8 @@ console.log("\n=== The split view's detail pane ===");
     'a ticket shows its status, sprint and assignee',
   );
   assert(
-    !ticket.includes('requirement-panel__title">Verification<') &&
+    !ticket.includes('requirement-attributes') &&
+      !ticket.includes('requirement-panel__title">Verification<') &&
       !ticket.includes('requirement-panel__title">On the diagram<'),
     'and has no verification or diagram panel',
   );

@@ -41,6 +41,7 @@ import {
 import type { RequirementItem } from '../../domain/requirements/requirementsTypes';
 import type { ProgramIncrement } from '../../domain/timeline/programIncrements';
 import type { TeamDocument } from '../../domain/timeline/teamTypes';
+import type { Milestone } from '../../domain/timeline/milestones';
 import type { SubDiagram } from '../../domain/canvas/types';
 import type { DiagramPath, LinkedNodeRef } from '../../domain/canvas/subDiagramTree';
 import type { RequirementsStore } from '../../collab/stores/requirementsStore';
@@ -77,6 +78,8 @@ interface RequirementsViewProps {
   requirementsStore: RequirementsStore;
   programIncrements: ProgramIncrement[];
   team?: TeamDocument;
+  /** Offered as a requirement's target. Left out, no targets are offered. */
+  milestones?: readonly Milestone[];
   /** The full diagram tree, for finding which nodes (anywhere, at any
    * nesting depth) link back to a given requirement item - see
    * findLinkedNodes. Optional purely for prop-drilling convenience at
@@ -215,6 +218,7 @@ export function RequirementsView({
   requirementsStore,
   programIncrements,
   team,
+  milestones,
   diagramRoot,
   onNavigateToNode,
   onCreateLinkedNode,
@@ -907,6 +911,14 @@ export function RequirementsView({
       ),
     [programIncrements],
   );
+  const memberOptions = useMemo(
+    () => (team?.members ?? []).map((m) => ({ id: m.id, name: m.name || 'Unnamed' })),
+    [team],
+  );
+  const milestoneOptions = useMemo(
+    () => (milestones ?? []).map((m) => ({ id: m.id, name: m.name || 'Unnamed milestone' })),
+    [milestones],
+  );
   const memberNameById = useMemo(
     () => new Map((team?.members ?? []).map((m) => [m.id, m.name || 'Unnamed'] as const)),
     [team],
@@ -986,6 +998,8 @@ export function RequirementsView({
             linkedNodes={linkedNodesByItemId.get(item.id) ?? EMPTY_LINKED_NODES}
             sprintName={item.sprintId ? sprintNameById.get(item.sprintId) : undefined}
             assigneeName={item.assigneeId ? memberNameById.get(item.assigneeId) : undefined}
+            members={memberOptions}
+            milestones={milestoneOptions}
             onUpdateItem={onUpdateItem}
             onNavigateToItem={(itemId) => onNavigateToItem(itemId, undefined, item.id)}
             onNavigateToNode={onNavigateToNode}
@@ -1103,6 +1117,8 @@ export function RequirementsView({
       linkedNodes={linkedNodesByItemId.get(row.item.id) ?? EMPTY_LINKED_NODES}
       sprintName={row.item.sprintId ? sprintNameById.get(row.item.sprintId) : undefined}
       assigneeName={row.item.assigneeId ? memberNameById.get(row.item.assigneeId) : undefined}
+      members={memberOptions}
+      milestones={milestoneOptions}
       onUpdateItem={onUpdateItem}
       onNavigateToItem={(itemId) => onNavigateToItem(itemId, row.item.id)}
       onNavigateToNode={onNavigateToNode}

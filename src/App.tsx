@@ -869,6 +869,7 @@ function App() {
             requirementsStore={requirementsStore}
             programIncrements={programIncrementsSnapshot}
             team={teamSnapshot}
+            milestones={milestonesSnapshot}
             diagramRoot={diagramTree}
             onNavigateToNode={onNavigateToNode}
             onCreateLinkedNode={onCreateLinkedNode}

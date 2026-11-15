@@ -19,6 +19,7 @@ import {
 } from '../../domain/requirements/verification';
 import { isExpectedOnDiagram } from '../../domain/requirements/requirementsFilter';
 import { RequirementBody } from './RequirementBody';
+import { type AttributeOption, RequirementAttributeFields } from './RequirementAttributeFields';
 
 interface RequirementRowDetailProps {
   doc: RequirementsDocument;
@@ -26,6 +27,8 @@ interface RequirementRowDetailProps {
   linkedNodes: readonly LinkedNodeRef[];
   sprintName?: string;
   assigneeName?: string;
+  members: readonly AttributeOption[];
+  milestones: readonly AttributeOption[];
   onUpdateItem: (id: string, patch: Partial<RequirementItem>) => void;
   onNavigateToItem: (itemId: string) => void;
   onNavigateToNode?: (path: DiagramPath, nodeId: string) => void;
@@ -50,6 +53,8 @@ export function RequirementRowDetail({
   linkedNodes,
   sprintName,
   assigneeName,
+  members,
+  milestones,
   onUpdateItem,
   onNavigateToItem,
   onNavigateToNode,
@@ -87,6 +92,16 @@ export function RequirementRowDetail({
 
   return (
     <div className="requirement-detail">
+      {verifiable && (
+        <div className="requirement-detail__wide">
+          <RequirementAttributeFields
+            item={item}
+            members={members}
+            milestones={milestones}
+            onUpdateItem={onUpdateItem}
+          />
+        </div>
+      )}
       <div className="requirement-detail__column">
         <section className="requirement-detail__section">
           <h4 className="requirement-detail__label">Statement</h4>
@@ -175,6 +190,12 @@ export function RequirementRowDetail({
               {method ? method.label : 'No method chosen'}
               <span aria-hidden>·</span>
               <span style={{ color: status.color }}>{status.label.toLowerCase()}</span>
+              {item.verificationNote && (
+                <>
+                  <span aria-hidden>·</span>
+                  <span className="requirement-detail__note-text">{item.verificationNote}</span>
+                </>
+              )}
             </p>
           </section>
         )}

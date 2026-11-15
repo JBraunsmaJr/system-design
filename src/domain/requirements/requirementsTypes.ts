@@ -86,6 +86,13 @@ export type RequirementStatus = 'todo' | 'in-progress' | 'done';
  * defines (Nygard's original set, plus "rejected" for an option that was
  * written up and turned down), not a workflow anyone needs to customize.
  * Only meaningful on a Decision item - see RequirementItem.decisionStatus. */
+/** How much a requirement matters - see requirementAttributes.ts. */
+export type RequirementPriority = 'must' | 'should' | 'could';
+
+/** Where a requirement stands, from written to built. Separate from a work
+ * item's RequirementStatus. */
+export type RequirementLifecycle = 'draft' | 'in-review' | 'approved' | 'implemented';
+
 /** How a requirement is checked - see verification.ts. */
 export type VerificationMethod = 'test' | 'demonstration' | 'inspection' | 'analysis';
 
@@ -166,6 +173,23 @@ export interface RequirementItem {
   verificationMethod?: VerificationMethod;
   /** Undefined reads as "not verified". */
   verificationStatus?: VerificationStatus;
+  /** One line on what verifies it or where that stands: a suite's name, a
+   * link, "failed at 640 orders per second". */
+  verificationNote?: string;
+
+  /*
+   * What is set on a requirement - see requirementAttributes.ts. Only
+   * meaningful on the items verification applies to.
+   */
+  priority?: RequirementPriority;
+  /** Undefined reads as "draft". */
+  lifecycle?: RequirementLifecycle;
+  /** The accountable stakeholder, as a team member... */
+  ownerId?: string;
+  /** ...or, for someone outside the team, by name. Only one is set. */
+  ownerName?: string;
+  /** The milestone this is due for. */
+  targetMilestoneId?: string;
 }
 
 export interface RequirementsDocument {

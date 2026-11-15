@@ -219,8 +219,11 @@ export function useFileActions({
   }, [nodes, title]);
 
   const onExportRequirementsMarkdown = useCallback(() => {
-    downloadRequirementsMarkdown(title, requirementsSnapshot);
-  }, [title, requirementsSnapshot]);
+    downloadRequirementsMarkdown(title, requirementsSnapshot, {
+      memberNameById: new Map(teamSnapshot.members.map((m) => [m.id, m.name])),
+      milestoneNameById: new Map(milestonesSnapshot.map((m) => [m.id, m.name])),
+    });
+  }, [title, requirementsSnapshot, teamSnapshot, milestonesSnapshot]);
 
   const onLoadClick = useCallback(() => fileInputRef.current?.click(), []);
 

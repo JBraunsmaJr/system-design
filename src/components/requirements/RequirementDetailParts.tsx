@@ -131,3 +131,35 @@ export function RelationshipChips({
     </div>
   );
 }
+
+/** The one line that says what verifies an item or where that stands. It
+ * is written when you leave the box or press Enter, not on every key. */
+export function VerificationNote({
+  item,
+  onUpdateItem,
+}: {
+  item: RequirementItem;
+  onUpdateItem: UpdateItem;
+}) {
+  const [draft, setDraft] = useState(item.verificationNote ?? '');
+  const commit = () => {
+    const note = draft.trim();
+    if (note !== (item.verificationNote ?? '')) {
+      onUpdateItem(item.id, { verificationNote: note || undefined });
+    }
+  };
+  return (
+    <input
+      type="text"
+      className="requirement-detail__note"
+      value={draft}
+      placeholder="What verifies it: a suite, a link, the last result"
+      aria-label={`Verification note for ${item.id}`}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur();
+      }}
+    />
+  );
+}

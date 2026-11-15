@@ -17,6 +17,7 @@ import {
   type VerificationSummary,
 } from '../../domain/requirements/verification';
 import { percentOf } from '../../domain/requirements/requirementsCoverage';
+import { getLifecycleMeta, getPriorityMeta } from '../../domain/requirements/requirementAttributes';
 import { isExpectedOnDiagram } from '../../domain/requirements/requirementsFilter';
 import { getDecisionStatusMeta, isDecisionItem } from '../../domain/requirements/decisionRecords';
 
@@ -76,6 +77,7 @@ interface RowProps {
   typeLabel: string;
   typeColor: string;
   status?: { label: string; color: string };
+  priority?: { label: string; color: string };
   /** Undefined for work and epics, which aren't expected on the diagram. */
   linkedNodes?: LinkedNodeRef[];
   /** Undefined for an item that isn't verified - see isVerifiable. */
@@ -95,6 +97,7 @@ const Row = memo(function Row({
   typeLabel,
   typeColor,
   status,
+  priority,
   linkedNodes,
   verification,
   isExpanded,
@@ -175,6 +178,20 @@ const Row = memo(function Row({
       </span>
       <span role="cell" className="requirements-table__type">
         {typeLabel}
+      </span>
+      <span role="cell" className="requirements-table__status">
+        {priority ? (
+          <>
+            <span
+              className="requirements-table__priority-dot"
+              style={{ background: priority.color }}
+              aria-hidden
+            />
+            {priority.label}
+          </>
+        ) : (
+          dash
+        )}
       </span>
       <span role="cell" className="requirements-table__status">
         {status ? (
@@ -279,6 +296,7 @@ export function RequirementsTable({
         <span role="columnheader">ID</span>
         <span role="columnheader">Title</span>
         <span role="columnheader">Type</span>
+        <span role="columnheader">Priority</span>
         <span role="columnheader">Status</span>
         <span role="columnheader">On the diagram</span>
         <span
@@ -317,7 +335,9 @@ export function RequirementsTable({
                 ? getStatusMeta(item.status)
                 : isDecisionItem(item)
                   ? getDecisionStatusMeta(item.decisionStatus)
-                  : undefined;
+                  : isVerifiable(doc, item)
+                    ? getLifecycleMeta(item.lifecycle)
+                    : undefined;
               const isExpanded = expandedIds.has(item.id);
               const verification = isVerifiable(doc, item) ? verificationCell(item) : undefined;
               return (
@@ -327,6 +347,7 @@ export function RequirementsTable({
                     typeLabel={type?.label ?? 'Unknown'}
                     typeColor={type?.color ?? 'var(--chrome-text-dim)'}
                     status={status}
+                    priority={isVerifiable(doc, item) ? getPriorityMeta(item.priority) : undefined}
                     linkedNodes={
                       isExpectedOnDiagram(doc, item)
                         ? (linkedNodesByItemId.get(item.id) ?? NONE)

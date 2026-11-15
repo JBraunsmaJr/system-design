@@ -19,6 +19,8 @@ import { isExpectedOnDiagram } from '../../domain/requirements/requirementsFilte
 import { RequirementBody } from './RequirementBody';
 import { StatusPicker } from './StatusPicker';
 import { VerificationPicker } from './VerificationPicker';
+import { type AttributeOption, RequirementAttributeFields } from './RequirementAttributeFields';
+import { VerificationNote } from './RequirementDetailParts';
 import { AddCriterion, CriteriaList, RelationshipChips } from './RequirementDetailParts';
 
 interface RequirementSplitDetailProps {
@@ -27,6 +29,8 @@ interface RequirementSplitDetailProps {
   linkedNodes: readonly LinkedNodeRef[];
   sprintName?: string;
   assigneeName?: string;
+  members: readonly AttributeOption[];
+  milestones: readonly AttributeOption[];
   onUpdateItem: (id: string, patch: Partial<RequirementItem>) => void;
   onNavigateToItem: (itemId: string) => void;
   onNavigateToNode?: (path: DiagramPath, nodeId: string) => void;
@@ -75,6 +79,8 @@ export function RequirementSplitDetail({
   linkedNodes,
   sprintName,
   assigneeName,
+  members,
+  milestones,
   onUpdateItem,
   onNavigateToItem,
   onNavigateToNode,
@@ -174,6 +180,15 @@ export function RequirementSplitDetail({
         </dl>
       )}
 
+      {verifiable && (
+        <RequirementAttributeFields
+          item={item}
+          members={members}
+          milestones={milestones}
+          onUpdateItem={onUpdateItem}
+        />
+      )}
+
       <section className="requirement-page__statement">
         <h3 className="requirement-detail__label">Statement</h3>
         {statement ? (
@@ -215,6 +230,7 @@ export function RequirementSplitDetail({
               onChange={(patch) => onUpdateItem(item.id, patch)}
             />
             <p className="requirement-detail__empty">{verification.description}</p>
+            <VerificationNote item={item} onUpdateItem={onUpdateItem} />
           </Panel>
         )}
 
