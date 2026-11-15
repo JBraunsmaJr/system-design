@@ -235,6 +235,15 @@
      time - which is exactly why the previous version of this fix visibly
      changed nothing). */
   pointer-events: none !important;
+  /* React Flow's stylesheet gives its built-in `group` node type a light
+     grey fill, a grey border and 10px of padding. This node type shares the
+     name but draws its own boundary (.group-node), so all three have to go:
+     the fill turned every boundary into a pale slab on the dark canvas,
+     twice as pale where boundaries nest, and the padding drew the boundary
+     10px inside the area that actually adopts nodes. */
+  background-color: transparent;
+  border: 0;
+  padding: 0;
 }
 
 /* NodeResizer's own handles/lines don't set pointer-events themselves, so

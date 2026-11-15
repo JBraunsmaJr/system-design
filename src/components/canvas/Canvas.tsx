@@ -26,7 +26,8 @@ import {
   useUpdateNodeInternals,
   ViewportPortal,
 } from '@xyflow/react';
-import { MousePointer2 } from 'lucide-react';
+import { Map as MapIcon, MousePointer2 } from 'lucide-react';
+import { loadShowMinimap, saveShowMinimap } from '../../domain/canvas/canvasPrefs';
 import {
   CANVAS_EDGE_TYPES,
   CANVAS_NODE_TYPES,
@@ -259,6 +260,13 @@ export function Canvas({
    * Which node (text annotation or shape) is being label-edited inline right now.
    */
   const [editingLabelNodeId, setEditingLabelNodeId] = useState<string | null>(null);
+  const [showMinimap, setShowMinimap] = useState(loadShowMinimap);
+  const toggleMinimap = useCallback(() => {
+    setShowMinimap((shown) => {
+      saveShowMinimap(!shown);
+      return !shown;
+    });
+  }, []);
 
   const onChangeTextNode = useCallback(
     (nodeId: string, text: string) => onUpdateNode(nodeId, { label: text }),
@@ -608,7 +616,7 @@ export function Canvas({
               ))}
             </ViewportPortal>
           )}
-          {!isPresenting && (
+          {!isPresenting && showMinimap && (
             <MiniMap
               pannable
               zoomable
@@ -629,6 +637,15 @@ export function Canvas({
                 }
               >
                 <MousePointer2 size={13} />
+              </ControlButton>
+              <ControlButton
+                onClick={toggleMinimap}
+                className={showMinimap ? 'is-active' : undefined}
+                aria-pressed={showMinimap}
+                title={showMinimap ? 'Hide the minimap' : 'Show the minimap'}
+                aria-label={showMinimap ? 'Hide the minimap' : 'Show the minimap'}
+              >
+                <MapIcon size={13} />
               </ControlButton>
             </Controls>
           )}

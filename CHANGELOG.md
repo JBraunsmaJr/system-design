@@ -29,6 +29,16 @@ markers are removed when the section becomes a release. See
 - `ADMIN_GROUPS` makes the members of an identity-provider group store administrators in that API.
   `WORKSPACE_CREATION` sets who may create workspaces there.
 
+### [MINOR] Diagram: quieter boundaries, minimap toggle, no popup on click
+
+- Boundaries (regions, VPCs, trust boundaries) no longer have a pale grey fill, which came from the canvas library's
+  defaults and grew paler where boundaries nest. A boundary's outline now sits on its real edge instead of 10px inside
+  it, so it is drawn where it adopts nodes.
+- The minimap is off until you turn it on with the new button in the canvas controls. The choice is remembered in this
+  browser.
+- Clicking a node or edge with a mouse no longer opens the description popup over the diagram: the click selects it and
+  the Inspector shows the same details. Hovering still opens the popup, and so does a tap on a touch screen.
+
 ### [MINOR] Requirements: table and coverage
 
 - The Requirements view opens as a table: one line per item with its type, status, sprint, assignee, linked components
