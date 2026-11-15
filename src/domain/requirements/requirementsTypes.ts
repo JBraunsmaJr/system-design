@@ -86,6 +86,12 @@ export type RequirementStatus = 'todo' | 'in-progress' | 'done';
  * defines (Nygard's original set, plus "rejected" for an option that was
  * written up and turned down), not a workflow anyone needs to customize.
  * Only meaningful on a Decision item - see RequirementItem.decisionStatus. */
+/** How a requirement is checked - see verification.ts. */
+export type VerificationMethod = 'test' | 'demonstration' | 'inspection' | 'analysis';
+
+/** Where that check stands. */
+export type VerificationStatus = 'not-verified' | 'passing' | 'failing';
+
 export type DecisionStatus = 'proposed' | 'accepted' | 'rejected' | 'deprecated' | 'superseded';
 
 export interface RequirementItem {
@@ -149,6 +155,17 @@ export interface RequirementItem {
   decisionOutcome?: string;
   /** Markdown: what follows from the decision - good, bad and neutral. */
   decisionConsequences?: string;
+
+  /*
+   * Verification - see verification.ts. Only meaningful on a verifiable
+   * item (a requirement, a constraint). Flat and optional for the same
+   * reasons as the decision fields above. Acceptance criteria are not here:
+   * they are the task-list lines of `body`.
+   */
+  /** How this is checked. Undefined until someone chooses. */
+  verificationMethod?: VerificationMethod;
+  /** Undefined reads as "not verified". */
+  verificationStatus?: VerificationStatus;
 }
 
 export interface RequirementsDocument {

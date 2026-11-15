@@ -29,6 +29,17 @@ markers are removed when the section becomes a release. See
 - `ADMIN_GROUPS` makes the members of an identity-provider group store administrators in that API.
   `WORKSPACE_CREATION` sets who may create workspaces there.
 
+### [MINOR] Requirements: verification and acceptance criteria
+
+- Requirements and constraints (and items of your own descriptive types) have a verification control in their header:
+  a status (Not verified, Verified, Failing) and how it is checked (Test, Demonstration, Inspection, Analysis).
+- Acceptance criteria are the task-list lines in an item's description (`- [ ] ...`, `- [x] ...`). The header shows
+  how many are ticked, or flags that there are none.
+- The table has a **Verification** column, the split view's outline shows the verification status as its dot, and the
+  coverage line gains **Acceptance criteria** and **Verified**, each of which filters to the items still to go.
+- The Markdown export writes each requirement's verification beneath its title.
+- Existing documents need no change: an item with no verification reads as Not verified.
+
 ### Requirements: the split view's outline shows what is on the diagram
 
 - Each requirement, goal or other descriptive item in the split view's outline is marked as linked to a component or

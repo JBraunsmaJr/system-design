@@ -1,9 +1,10 @@
 import type { RequirementsDocument } from './requirementsTypes';
 import { isItemWorkable } from './requirementsRegistry';
 import { isExpectedOnDiagram, itemHasGap } from './requirementsFilter';
+import { isVerifiable } from './verification';
 
 /**
- * How complete the requirements document is, as three fractions the
+ * How complete the requirements document is, as a few fractions the
  * Requirements view shows above the list. Counted over every item, not the
  * filtered ones: narrowing the view shouldn't make the document look more
  * finished than it is.
@@ -19,6 +20,11 @@ export interface RequirementsCoverage {
   /** Work items, and how many of them are done. */
   workable: number;
   done: number;
+  /** Items that get verified (see verification.ts), how many of them have
+   * acceptance criteria, and how many are marked verified. */
+  verifiable: number;
+  withCriteria: number;
+  verified: number;
 }
 
 export function computeCoverage(
@@ -32,6 +38,9 @@ export function computeCoverage(
     onDiagram: 0,
     workable: 0,
     done: 0,
+    verifiable: 0,
+    withCriteria: 0,
+    verified: 0,
   };
   const context = { doc, linkedItemIds };
   for (const item of doc.items) {
@@ -39,6 +48,11 @@ export function computeCoverage(
     if (isItemWorkable(doc, item)) {
       coverage.workable += 1;
       if (item.status === 'done') coverage.done += 1;
+    }
+    if (isVerifiable(doc, item)) {
+      coverage.verifiable += 1;
+      if (!itemHasGap(item, 'no-acceptance-criteria', context)) coverage.withCriteria += 1;
+      if (!itemHasGap(item, 'not-verified', context)) coverage.verified += 1;
     }
     if (isExpectedOnDiagram(doc, item)) {
       coverage.descriptive += 1;

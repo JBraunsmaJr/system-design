@@ -26,8 +26,9 @@ interface Measure {
 
 /**
  * How complete the document is, above the list: how many descriptive items
- * are on the diagram, how many items have a description, how much of the
- * work is done. The first two are buttons that narrow the view to the
+ * are on the diagram, how many items have a description, how many
+ * requirements have acceptance criteria and are verified, how much of the
+ * work is done. All but the last are buttons that narrow the view to the
  * items still missing - the number is only useful if the gap is one click
  * away.
  */
@@ -61,6 +62,29 @@ export function RequirementsCoverageBar({
     gapLabel: 'with no description',
     title: 'Items that have a description.',
   });
+  if (coverage.verifiable > 0) {
+    measures.push({
+      key: 'criteria',
+      label: 'Acceptance criteria',
+      part: coverage.withCriteria,
+      whole: coverage.verifiable,
+      tone: 'violet',
+      gap: 'no-acceptance-criteria',
+      gapLabel: 'with no acceptance criteria',
+      title:
+        'Requirements and constraints whose description has at least one task-list line ("- [ ] ...") saying what done means.',
+    });
+    measures.push({
+      key: 'verified',
+      label: 'Verified',
+      part: coverage.verified,
+      whole: coverage.verifiable,
+      tone: 'success',
+      gap: 'not-verified',
+      gapLabel: 'not verified',
+      title: 'Requirements and constraints marked verified.',
+    });
+  }
   if (coverage.workable > 0) {
     measures.push({
       key: 'done',
@@ -93,7 +117,7 @@ export function RequirementsCoverageBar({
               <span style={{ width: `${percentOf(m.part, m.whole)}%` }} />
             </span>
             {m.gap && missing > 0 && (
-              <span className="requirements-coverage__missing">{missing} missing</span>
+              <span className="requirements-coverage__missing">{missing} to go</span>
             )}
           </>
         );

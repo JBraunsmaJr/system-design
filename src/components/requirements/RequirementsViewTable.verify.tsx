@@ -46,7 +46,14 @@ const doc: RequirementsDocument = {
   relationshipTypes: BUILT_IN_RELATIONSHIP_TYPES,
   items: [
     { id: 'EPIC-1', typeId: 'epic', title: 'Checkout', body: 'The epic.' },
-    { id: 'REQ-1', typeId: 'requirement', title: 'Guest checkout', body: 'Described.' },
+    {
+      id: 'REQ-1',
+      typeId: 'requirement',
+      title: 'Guest checkout',
+      body: 'Described.\n\n- [x] No account needed\n- [ ] Works on mobile',
+      verificationMethod: 'test',
+      verificationStatus: 'passing',
+    },
     { id: 'REQ-2', typeId: 'requirement', title: 'Saved carts', body: '' },
     {
       id: 'TICKET-1',
@@ -143,6 +150,16 @@ console.log('\n=== Grouped by epic ===');
 console.log('\n=== The other layouts are still there ===');
 {
   const cards = render({ initialLayout: 'list', initialGroupBy: 'type' });
+  assert(
+    cards.includes('title="Verification: Test - Verified') &&
+      cards.includes('title="Verification: Not verified'),
+    'cards: a requirement has a verification control',
+  );
+  assert(
+    (cards.match(/title="Verification:/g) ?? []).length === 2,
+    'cards: and only requirements do',
+  );
+  assert(cards.includes('No criteria'), 'cards: a requirement with no criteria is flagged');
   assert(!cards.includes('role="table"'), 'cards: no table');
   assert(
     (cards.match(/class="requirement-card[ "]/g) ?? []).length === 4,
@@ -182,7 +199,21 @@ console.log('\n=== Coverage ===');
   assert(/On the diagram.*?>1<.*?\/2</s.test(html), 'one of two requirements is on the diagram');
   assert(/Described.*?>3<.*?\/4</s.test(html), 'three of four items are described');
   assert(/Work done.*?>0<.*?\/1</s.test(html), 'none of the one ticket is done');
-  assert(count(html, 'requirements-coverage__measure--button') === 2, 'two gaps can be opened');
+  assert(/Acceptance criteria.*?>1<.*?\/2</s.test(html), 'one of two requirements has criteria');
+  assert(/Verified.*?>1<.*?\/2</s.test(html), 'and one of two is verified');
+  assert(count(html, 'requirements-coverage__measure--button') === 4, 'four gaps can be opened');
+
+  const req1 = rowOf(html, 'REQ-1');
+  assert(
+    req1.includes('Verified') && req1.includes('>1/2<'),
+    'a verified requirement shows its status and its criteria',
+  );
+  const req2 = rowOf(html, 'REQ-2');
+  assert(
+    req2.includes('Not verified') && req2.includes('no criteria'),
+    'an unverified one with no criteria says so',
+  );
+  assert(!rowOf(html, 'TICKET-1').includes('erified'), 'a ticket has no verification');
 
   const empty = renderToStaticMarkup(
     <RequirementsView
@@ -194,7 +225,17 @@ console.log('\n=== Coverage ===');
 
   const complete = renderToStaticMarkup(
     <RequirementsCoverageBar
-      coverage={{ total: 2, described: 2, descriptive: 2, onDiagram: 2, workable: 0, done: 0 }}
+      coverage={{
+        total: 2,
+        described: 2,
+        descriptive: 2,
+        onDiagram: 2,
+        workable: 0,
+        done: 0,
+        verifiable: 0,
+        withCriteria: 0,
+        verified: 0,
+      }}
       activeGaps={[]}
       onToggleGap={() => undefined}
     />,
@@ -204,7 +245,17 @@ console.log('\n=== Coverage ===');
 
   const active = renderToStaticMarkup(
     <RequirementsCoverageBar
-      coverage={{ total: 2, described: 1, descriptive: 2, onDiagram: 1, workable: 0, done: 0 }}
+      coverage={{
+        total: 2,
+        described: 1,
+        descriptive: 2,
+        onDiagram: 1,
+        workable: 0,
+        done: 0,
+        verifiable: 0,
+        withCriteria: 0,
+        verified: 0,
+      }}
       activeGaps={['not-on-diagram']}
       onToggleGap={() => undefined}
     />,

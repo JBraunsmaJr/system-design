@@ -1,5 +1,6 @@
 import type { RequirementsDocument } from './requirementsTypes';
 import { composeItemMarkdown } from './decisionRecords';
+import { describeVerification, isVerifiable } from './verification';
 import { sanitizeFileName } from '../../common/utils/string';
 import { downloadFile } from '../../common/utils/download';
 
@@ -29,6 +30,9 @@ export function toMarkdownDocument(title: string, doc: RequirementsDocument): st
       }
       if (item.tags && item.tags.length > 0) {
         lines.push(`*Tags: ${item.tags.join(', ')}*`, '');
+      }
+      if (isVerifiable(doc, item)) {
+        lines.push(`*Verification: ${describeVerification(item)}*`, '');
       }
       // A decision's sections as well as its context (composeItemMarkdown).
       const content = composeItemMarkdown(item).trim();

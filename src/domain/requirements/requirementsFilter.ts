@@ -2,6 +2,7 @@ import type { RequirementItem, RequirementsDocument, RequirementStatus } from '.
 import { isItemWorkable } from './requirementsRegistry';
 import { hasTag } from './requirementTags';
 import { isEpicItem } from './requirementsHierarchy';
+import { isVerifiable, isVerified, parseAcceptanceCriteria } from './verification';
 
 /**
  * Narrowing the Requirements view by status, assignee, sprint and tag.
@@ -29,10 +30,21 @@ export const UNTAGGED_FILTER_VALUE = '__untagged__';
  *   constraint) that no component on the diagram is linked to. Work items
  *   and epics are left out - see isExpectedOnDiagram.
  * - `no-description`: an item of any kind whose body is empty.
+ * - `no-acceptance-criteria`: a verifiable item (a requirement, a
+ *   constraint - see verification.ts) whose description has no task-list
+ *   lines, so nothing says what "done" means for it.
+ * - `not-verified`: a verifiable item that isn't marked verified, whether
+ *   it was never checked or is failing.
  */
-export type RequirementGap = 'not-on-diagram' | 'no-description';
+export type RequirementGap =
+  'not-on-diagram' | 'no-description' | 'no-acceptance-criteria' | 'not-verified';
 
-export const GAP_VALUES: readonly RequirementGap[] = ['not-on-diagram', 'no-description'];
+export const GAP_VALUES: readonly RequirementGap[] = [
+  'not-on-diagram',
+  'no-description',
+  'no-acceptance-criteria',
+  'not-verified',
+];
 
 export interface RequirementsFilter {
   statuses?: RequirementStatus[];
@@ -102,6 +114,10 @@ export function itemHasGap(
   context: Pick<FilterContext, 'doc' | 'linkedItemIds'>,
 ): boolean {
   if (gap === 'no-description') return item.body.trim().length === 0;
+  if (gap === 'no-acceptance-criteria') {
+    return isVerifiable(context.doc, item) && parseAcceptanceCriteria(item.body).total === 0;
+  }
+  if (gap === 'not-verified') return isVerifiable(context.doc, item) && !isVerified(item);
   if (!isExpectedOnDiagram(context.doc, item)) return false;
   return !context.linkedItemIds?.has(item.id);
 }

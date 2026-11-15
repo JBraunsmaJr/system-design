@@ -7,6 +7,13 @@ import type {
 import type { DiagramPath, LinkedNodeRef } from '../../domain/canvas/subDiagramTree';
 import { getStatusMeta, isItemWorkable } from '../../domain/requirements/requirementsRegistry';
 import { HighlightedText } from '../../common/components/highlight/HighlightText';
+import {
+  type AcceptanceCriteria,
+  describeVerification,
+  getVerificationStatusMeta,
+  isVerifiable,
+  parseAcceptanceCriteria,
+} from '../../domain/requirements/verification';
 import { isExpectedOnDiagram } from '../../domain/requirements/requirementsFilter';
 import { getDecisionStatusMeta, isDecisionItem } from '../../domain/requirements/decisionRecords';
 
@@ -73,6 +80,8 @@ interface RowProps {
   assigneeName?: string;
   /** Undefined for work and epics, which aren't expected on the diagram. */
   linkedNodes?: LinkedNodeRef[];
+  /** Undefined for an item that isn't verified - see isVerifiable. */
+  verification?: { label: string; color: string; title: string; criteria: AcceptanceCriteria };
   relationshipCount: number;
   isExpanded: boolean;
   isHighlighted: boolean;
@@ -92,6 +101,7 @@ const Row = memo(function Row({
   sprintName,
   assigneeName,
   linkedNodes,
+  verification,
   relationshipCount,
   isExpanded,
   isHighlighted,
@@ -226,6 +236,29 @@ const Row = memo(function Row({
           </>
         )}
       </span>
+      <span role="cell" className="requirements-table__verification" title={verification?.title}>
+        {verification ? (
+          <>
+            <span
+              className="requirements-table__status-dot"
+              style={{ borderColor: verification.color }}
+              aria-hidden
+            />
+            {verification.label}
+            <span
+              className={`requirements-table__criteria${
+                verification.criteria.total === 0 ? ' is-missing' : ''
+              }`}
+            >
+              {verification.criteria.total === 0
+                ? 'no criteria'
+                : `${verification.criteria.met}/${verification.criteria.total}`}
+            </span>
+          </>
+        ) : (
+          dash
+        )}
+      </span>
       <span
         role="cell"
         className="requirements-table__count"
@@ -276,6 +309,12 @@ export function RequirementsTable({
         <span role="columnheader">On the diagram</span>
         <span
           role="columnheader"
+          title="Whether a requirement is verified, and how many of its acceptance criteria are ticked"
+        >
+          Verification
+        </span>
+        <span
+          role="columnheader"
           className="requirements-table__count"
           title="Relationships to other items"
         >
@@ -312,6 +351,7 @@ export function RequirementsTable({
                   ? getDecisionStatusMeta(item.decisionStatus)
                   : undefined;
               const isExpanded = expandedIds.has(item.id);
+              const verification = isVerifiable(doc, item) ? verificationCell(item) : undefined;
               return (
                 <Fragment key={row.key}>
                   <Row
@@ -326,6 +366,7 @@ export function RequirementsTable({
                         ? (linkedNodesByItemId.get(item.id) ?? NONE)
                         : undefined
                     }
+                    verification={verification}
                     relationshipCount={relationshipCountByItemId.get(item.id) ?? 0}
                     isExpanded={isExpanded}
                     isHighlighted={highlightedId === item.id}
@@ -349,3 +390,18 @@ export function RequirementsTable({
 }
 
 const NONE: LinkedNodeRef[] = [];
+
+function verificationCell(item: RequirementItem): NonNullable<RowProps['verification']> {
+  const status = getVerificationStatusMeta(item.verificationStatus);
+  const criteria = parseAcceptanceCriteria(item.body);
+  return {
+    label: status.label,
+    color: status.color,
+    criteria,
+    title: `${describeVerification(item)}. ${
+      criteria.total === 0
+        ? 'No acceptance criteria.'
+        : `${criteria.met} of ${criteria.total} acceptance criteria ticked.`
+    }`,
+  };
+}

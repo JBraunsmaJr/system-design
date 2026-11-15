@@ -15,6 +15,7 @@ import {
 } from '../../domain/requirements/requirementsRegistry';
 import type { EpicTree, EpicTreeNode } from '../../domain/requirements/requirementsHierarchy';
 import { isExpectedOnDiagram } from '../../domain/requirements/requirementsFilter';
+import { getVerificationStatusMeta, isVerifiable } from '../../domain/requirements/verification';
 import { getDecisionStatusMeta, isDecisionItem } from '../../domain/requirements/decisionRecords';
 import type {
   RequirementItem,
@@ -273,7 +274,9 @@ export function RequirementsOutline({
       ? getStatusMeta(node.item.status)
       : isDecisionItem(node.item)
         ? getDecisionStatusMeta(node.item.decisionStatus)
-        : null;
+        : isVerifiable(doc, node.item)
+          ? getVerificationStatusMeta(node.item.verificationStatus)
+          : null;
     // Undefined where the question doesn't apply: work and epics aren't
     // expected on the diagram, and without the links there's nothing to say.
     const onDiagram =

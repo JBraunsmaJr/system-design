@@ -32,12 +32,15 @@ function collisionResistantId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
-/** The item fields an architecture decision adds (see RequirementItem). */
-const DECISION_ITEM_FIELDS = [
+/** The item fields only some items carry: an architecture decision's
+ * sections and a requirement's verification (see RequirementItem). */
+const OPTIONAL_ITEM_FIELDS = [
   'decisionStatus',
   'decisionOptions',
   'decisionOutcome',
   'decisionConsequences',
+  'verificationMethod',
+  'verificationStatus',
 ] as const satisfies readonly (keyof RequirementItem)[];
 
 /**
@@ -118,9 +121,9 @@ export function seedYjsRequirementsDoc(doc: Y.Doc, initial: RequirementsDocument
       m.set('assigneeId', item.assigneeId);
       m.set('points', item.points);
       m.set('status', item.status);
-      // Decision fields only when present, so seeding an ordinary item
-      // writes exactly the keys it always has.
-      for (const field of DECISION_ITEM_FIELDS) {
+      // Only when present, so seeding an ordinary item writes exactly the
+      // keys it always has.
+      for (const field of OPTIONAL_ITEM_FIELDS) {
         if (item[field] !== undefined) m.set(field, item[field]);
       }
       // Same: only when the item has tags.
@@ -324,6 +327,8 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
       decisionOptions: m.get('decisionOptions') as string | undefined,
       decisionOutcome: m.get('decisionOutcome') as string | undefined,
       decisionConsequences: m.get('decisionConsequences') as string | undefined,
+      verificationMethod: m.get('verificationMethod') as RequirementItem['verificationMethod'],
+      verificationStatus: m.get('verificationStatus') as RequirementItem['verificationStatus'],
     };
     // Only present when the item has tags, so an untagged item's snapshot
     // has exactly the keys it always had. Normalized on the way out: tags

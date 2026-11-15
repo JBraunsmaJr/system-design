@@ -2502,8 +2502,9 @@ mark.search-highlight--ellipsis {
 }
 
 .requirements-table {
-  --requirements-table-columns: 28px 84px minmax(220px, 1fr) 104px 116px 128px 128px 224px 48px;
-  min-width: 1080px;
+  --requirements-table-columns: 28px 84px minmax(220px, 1fr) 100px 112px 112px 112px 200px 170px
+    48px;
+  min-width: 1240px;
   font-size: var(--text-sm);
 }
 
@@ -2740,4 +2741,44 @@ mark.search-highlight--ellipsis {
 .requirements-table__detail > .requirement-card {
   max-width: 880px;
   margin-bottom: 0;
+}
+
+/* How many of an item's acceptance criteria are ticked - card header. */
+.requirement-card__criteria {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-pill);
+  font-family: var(--mono);
+  font-size: var(--text-2xs);
+  color: var(--chrome-text-dim);
+  white-space: nowrap;
+}
+
+.requirement-card__criteria.is-missing {
+  font-family: var(--sans);
+  color: var(--warning);
+  border-color: color-mix(in srgb, var(--warning) 45%, transparent);
+}
+
+.requirements-table__verification {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.requirements-table__criteria {
+  font-family: var(--mono);
+  font-size: var(--text-2xs);
+  color: var(--chrome-text-dim);
+}
+
+.requirements-table__criteria.is-missing {
+  color: var(--warning);
 }

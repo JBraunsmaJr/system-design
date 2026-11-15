@@ -105,10 +105,26 @@ The line above the items shows how complete the document is:
 - **On the diagram**: how many requirements, goals and other descriptive items have a component linked to them. Work
   items and epics are not counted, since they aren't expected on the diagram.
 - **Described**: how many items have a description.
+- **Acceptance criteria**: how many requirements and constraints have at least one acceptance criterion.
+- **Verified**: how many requirements and constraints are marked verified.
 - **Work done**: how many work items are done.
 
-When something is missing, **On the diagram** and **Described** are buttons: click one to show only the items with
-that gap, and again to show everything. In the table, a descriptive item with no component reads **Not linked**.
+When something is missing, every measure except **Work done** is a button: click one to show only the items with that
+gap, and again to show everything. In the table, a descriptive item with no component reads **Not linked**.
+
+### Verification and Acceptance Criteria
+
+Requirements and constraints, and items of any descriptive type you add yourself, can be verified. Goals, risks,
+assumptions, decisions, epics and work items are not.
+
+- **Acceptance criteria** are task-list lines in the description. Write `- [ ] Checkout completes without an account`
+  for each thing that must hold, and change `[ ]` to `[x]` when it does. The item's header shows how many are ticked,
+  or **No criteria** when there are none.
+- **Verification** is the control beside the type in the item's header. Choose where it stands (**Not verified**,
+  **Verified** or **Failing**) and how it is checked (**Test**, **Demonstration**, **Inspection** or **Analysis**).
+
+The table's **Verification** column shows both for every item, and the Markdown export includes each item's
+verification.
 
 ### Tags
 

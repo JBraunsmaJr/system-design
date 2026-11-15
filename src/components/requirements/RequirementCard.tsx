@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, ListPlus, Maximize2, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, ListChecks, ListPlus, Maximize2, Trash2 } from 'lucide-react';
 import type { ItemMarkdownField } from '../../domain/requirements/requirementsRegistry';
 import { getItemType, isItemWorkable } from '../../domain/requirements/requirementsRegistry';
 import type { DiagramPath, LinkedNodeRef } from '../../domain/canvas/subDiagramTree';
@@ -10,6 +10,8 @@ import { RequirementEditor } from './RequirementEditor';
 import { CategoryPicker } from './CategoryPicker';
 import { StatusPicker } from './StatusPicker';
 import { DecisionStatusPicker } from './DecisionStatusPicker';
+import { VerificationPicker } from './VerificationPicker';
+import { isVerifiable, parseAcceptanceCriteria } from '../../domain/requirements/verification';
 import { DecisionSections } from './DecisionSections';
 import { isDecisionItem } from '../../domain/requirements/decisionRecords';
 import { TypePicker } from './TypePicker';
@@ -193,6 +195,8 @@ function RequirementCardImpl({
     Boolean(onAddChildItem) && Boolean(defaultChildTypeId) && isEpicItem(doc, item);
   const collapsed = isCollapsed && Boolean(onToggleCollapsed);
   const isDecision = isDecisionItem(item);
+  const verifiable = isVerifiable(doc, item);
+  const criteria = parseAcceptanceCriteria(item.body);
 
   // A collapsed card has no body editor, whoever collapsed it
   const editingBody = isEditingBody && !collapsed;
@@ -324,6 +328,26 @@ function RequirementCardImpl({
               status={item.decisionStatus}
               onChange={(decisionStatus) => onUpdateItem(item.id, { decisionStatus })}
             />
+          )}
+          {verifiable && (
+            <VerificationPicker
+              method={item.verificationMethod}
+              status={item.verificationStatus}
+              onChange={(patch) => onUpdateItem(item.id, patch)}
+            />
+          )}
+          {verifiable && (
+            <span
+              className={`requirement-card__criteria${criteria.total === 0 ? ' is-missing' : ''}`}
+              title={
+                criteria.total === 0
+                  ? 'No acceptance criteria. Add task-list lines to the description: "- [ ] what must hold".'
+                  : `${criteria.met} of ${criteria.total} acceptance criteria ticked in the description`
+              }
+            >
+              <ListChecks size={11} aria-hidden />
+              {criteria.total === 0 ? 'No criteria' : `${criteria.met}/${criteria.total}`}
+            </span>
           )}
           <CategoryPicker
             doc={doc}
