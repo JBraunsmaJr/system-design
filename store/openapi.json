@@ -1,0 +1,2111 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Engineers Notebook store",
+    "version": "2",
+    "description": "The store keeps teams' documents in workspaces and decides who may open and change each one.\n\n**Access.** Every `/v2` route resolves the caller from their session, then checks their role in the workspace concerned: `viewer`, `editor` or `owner`, the highest of their individual role, the role of any identity-provider group of theirs the workspace maps, and `owner` for a store administrator. Each operation names the least role it needs in `x-required-role`. Someone with no role in a workspace gets 404 for it and everything in it, the same as for one that does not exist; someone whose role is too low gets 403.\n\n**Sessions.** Sign in by sending the browser to `/v1/auth/{provider}/start`. The store sets an HttpOnly cookie, `sd_session`, which every other call carries. Sessions last eight hours.\n\n**Writes.** A request that changes something must have no `Origin` header, or one that is the store's own origin or in `ALLOWED_ORIGINS` (else 403 `forbidden-origin`), and a body, if any, of `application/json` (else 415).\n\n**Replies.** Errors are `{ error: { reason, message } }`. A reply about a document carries `X-Document-Version`. Nothing is cacheable: every reply carries `Cache-Control: no-store`.\n\n**Documents** are stored as the editor sends them. The server and its administrators can read them."
+  },
+  "servers": [
+    {
+      "url": "https://store.example.gov",
+      "description": "Your store's PUBLIC_URL"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Service"
+    },
+    {
+      "name": "Sign-in"
+    },
+    {
+      "name": "Workspaces"
+    },
+    {
+      "name": "Members"
+    },
+    {
+      "name": "Documents"
+    },
+    {
+      "name": "Sessions"
+    },
+    {
+      "name": "Retention"
+    }
+  ],
+  "security": [
+    {
+      "session": []
+    }
+  ],
+  "paths": {
+    "/v1/health": {
+      "get": {
+        "summary": "Whether the store is up",
+        "operationId": "health",
+        "tags": ["Service"],
+        "x-required-role": "none",
+        "responses": {
+          "200": {
+            "description": "Up.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "const": "ok"
+                    },
+                    "authentication": {
+                      "enum": ["none", "required"]
+                    },
+                    "relayAuthentication": {
+                      "enum": ["none", "required"],
+                      "description": "`required` when the relay only admits people carrying a token from this store (`RELAY_TOKEN_SECRET`)."
+                    }
+                  },
+                  "required": ["status", "authentication", "relayAuthentication"]
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/v1/auth/providers": {
+      "get": {
+        "summary": "The ways to sign in",
+        "operationId": "listProviders",
+        "tags": ["Sign-in"],
+        "x-required-role": "none",
+        "responses": {
+          "200": {
+            "description": "Provider ids, each usable in `/v1/auth/{provider}/start`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "providers": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": ["providers"]
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/v1/auth/{provider}/start": {
+      "get": {
+        "summary": "Begin a sign-in",
+        "operationId": "startSignIn",
+        "tags": ["Sign-in"],
+        "x-required-role": "none",
+        "responses": {
+          "302": {
+            "description": "Sends the browser to the identity provider."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "description": "A browser navigation, not an API call. After the provider returns the browser to `/v1/auth/callback`, the store sets the session cookie and redirects to `returnTo`, or to `AFTER_LOGIN_URL` when none was given.",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "returnTo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "The page to come back to. Its origin must be the store's own or one in `ALLOWED_ORIGINS`; any other is refused with 400 before the sign-in starts."
+          }
+        ],
+        "security": []
+      }
+    },
+    "/v1/auth/callback": {
+      "get": {
+        "summary": "Where the identity provider returns the browser",
+        "operationId": "signInCallback",
+        "tags": ["Sign-in"],
+        "x-required-role": "none",
+        "responses": {
+          "302": {
+            "description": "Signed in. Sets the session cookie and redirects to the editor."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          }
+        },
+        "description": "Not called directly. `state` is single use and expires after ten minutes.",
+        "parameters": [
+          {
+            "name": "state",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "code",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": []
+      }
+    },
+    "/v1/auth/session": {
+      "get": {
+        "summary": "Who is signed in",
+        "operationId": "getSession",
+        "tags": ["Sign-in"],
+        "x-required-role": "signed in",
+        "responses": {
+          "200": {
+            "description": "The session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "session": {
+                      "type": "object",
+                      "properties": {
+                        "issuer": {
+                          "type": "string"
+                        },
+                        "subject": {
+                          "type": "string"
+                        },
+                        "displayName": {
+                          "type": "string"
+                        },
+                        "expiresAt": {
+                          "type": "integer",
+                          "description": "Milliseconds since the epoch."
+                        },
+                        "groupsOverage": {
+                          "type": "boolean",
+                          "description": "The provider had more groups for this person than it would send, so roles from groups may be missing."
+                        }
+                      },
+                      "required": ["issuer", "subject", "expiresAt", "groupsOverage"]
+                    }
+                  },
+                  "required": ["session"]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          }
+        }
+      }
+    },
+    "/v1/auth/logout": {
+      "post": {
+        "summary": "Sign out",
+        "operationId": "signOut",
+        "tags": ["Sign-in"],
+        "x-required-role": "none",
+        "responses": {
+          "204": {
+            "description": "The session is ended and the cookie cleared. Succeeds whether or not anyone was signed in."
+          }
+        },
+        "security": []
+      }
+    },
+    "/v1/rooms/{room}/token": {
+      "post": {
+        "summary": "A relay token for a session started by link",
+        "operationId": "roomToken",
+        "tags": ["Sessions"],
+        "x-required-role": "signed in",
+        "responses": {
+          "200": {
+            "description": "A token admitting the caller to that room on the relay for ten minutes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": {
+                      "type": "string"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": ["token", "expiresAt"]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "description": "For sessions people start themselves and share by link. Refused with 403 for a workspace document's room (`wsdoc-\u2026`), whose token comes from `/v2/documents/{docId}/session`. Answers 404 where the relay does not require tokens.",
+        "parameters": [
+          {
+            "name": "room",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v2/health": {
+      "get": {
+        "summary": "What kind of store this is",
+        "operationId": "workspaceHealth",
+        "tags": ["Service"],
+        "x-required-role": "none",
+        "responses": {
+          "200": {
+            "description": "A store that serves workspaces. An older store answers 404 here.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "const": "ok"
+                    },
+                    "mode": {
+                      "const": "trusted",
+                      "description": "The server keeps documents as sent and can read them."
+                    },
+                    "authentication": {
+                      "enum": ["none", "required"]
+                    },
+                    "workspaceCreation": {
+                      "enum": ["admins", "anyone"]
+                    }
+                  },
+                  "required": ["status", "mode", "authentication", "workspaceCreation"]
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/v2/me": {
+      "get": {
+        "summary": "The caller, and what they may do store-wide",
+        "operationId": "me",
+        "tags": ["Service"],
+        "x-required-role": "signed in",
+        "responses": {
+          "200": {
+            "description": "The caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          }
+        }
+      }
+    },
+    "/v2/workspaces": {
+      "get": {
+        "summary": "The caller's workspaces",
+        "operationId": "listWorkspaces",
+        "tags": ["Workspaces"],
+        "x-required-role": "signed in",
+        "responses": {
+          "200": {
+            "description": "Workspaces the caller has a role in, by name.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "workspaces": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Workspace"
+                      }
+                    }
+                  },
+                  "required": ["workspaces"]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          }
+        },
+        "parameters": [
+          {
+            "name": "archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": ["true"]
+            },
+            "description": "Include archived workspaces. Only takes effect for a store administrator."
+          }
+        ]
+      },
+      "post": {
+        "summary": "Create a workspace",
+        "operationId": "createWorkspace",
+        "tags": ["Workspaces"],
+        "x-required-role": "administrator, or anyone signed in where WORKSPACE_CREATION=anyone",
+        "responses": {
+          "201": {
+            "description": "The workspace, with the caller's role in it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "workspace": {
+                      "$ref": "#/components/schemas/Workspace"
+                    }
+                  },
+                  "required": ["workspace"]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        },
+        "description": "The caller becomes its first owner. Names are unique, ignoring case.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "maxLength": 120
+                  }
+                },
+                "required": ["name"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/workspaces/{workspaceId}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        }
+      ],
+      "get": {
+        "summary": "One workspace",
+        "operationId": "getWorkspace",
+        "tags": ["Workspaces"],
+        "x-required-role": "viewer",
+        "responses": {
+          "200": {
+            "description": "The workspace, with the caller's role in it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "workspace": {
+                      "$ref": "#/components/schemas/Workspace"
+                    }
+                  },
+                  "required": ["workspace"]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "patch": {
+        "summary": "Rename a workspace",
+        "operationId": "renameWorkspace",
+        "tags": ["Workspaces"],
+        "x-required-role": "owner",
+        "responses": {
+          "200": {
+            "description": "The workspace, with the caller's role in it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "workspace": {
+                      "$ref": "#/components/schemas/Workspace"
+                    }
+                  },
+                  "required": ["workspace"]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "maxLength": 120
+                  }
+                },
+                "required": ["name"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/workspaces/{workspaceId}/archive": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        }
+      ],
+      "post": {
+        "summary": "Archive a workspace",
+        "operationId": "archiveWorkspace",
+        "tags": ["Workspaces"],
+        "x-required-role": "administrator",
+        "responses": {
+          "200": {
+            "description": "The workspace, with the caller's role in it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "workspace": {
+                      "$ref": "#/components/schemas/Workspace"
+                    }
+                  },
+                  "required": ["workspace"]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "description": "Its members no longer see it or its documents. Nothing is deleted, and nothing in it can be changed until it is restored."
+      }
+    },
+    "/v2/workspaces/{workspaceId}/restore": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        }
+      ],
+      "post": {
+        "summary": "Bring an archived workspace back",
+        "operationId": "restoreWorkspace",
+        "tags": ["Workspaces"],
+        "x-required-role": "administrator",
+        "responses": {
+          "200": {
+            "description": "The workspace, with the caller's role in it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "workspace": {
+                      "$ref": "#/components/schemas/Workspace"
+                    }
+                  },
+                  "required": ["workspace"]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v2/workspaces/{workspaceId}/members": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        }
+      ],
+      "get": {
+        "summary": "Members and mapped groups",
+        "operationId": "listMembers",
+        "tags": ["Members"],
+        "x-required-role": "viewer",
+        "responses": {
+          "200": {
+            "description": "People added by name, and identity-provider groups given a role.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "members": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Member"
+                      }
+                    },
+                    "groups": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/GroupMapping"
+                      }
+                    }
+                  },
+                  "required": ["members", "groups"]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v2/workspaces/{workspaceId}/members/{userId}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        },
+        {
+          "name": "userId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "put": {
+        "summary": "Add someone, or change their role",
+        "operationId": "putMember",
+        "tags": ["Members"],
+        "x-required-role": "owner",
+        "responses": {
+          "200": {
+            "description": "The member.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "member": {
+                      "$ref": "#/components/schemas/Member"
+                    }
+                  },
+                  "required": ["member"]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "description": "The person must have signed in to the store at least once.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "$ref": "#/components/schemas/Role"
+                  }
+                },
+                "required": ["role"]
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Remove someone added by name",
+        "operationId": "removeMember",
+        "tags": ["Members"],
+        "x-required-role": "owner",
+        "responses": {
+          "200": {
+            "description": "Removed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "removed": {
+                      "const": true
+                    }
+                  },
+                  "required": ["removed"]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "description": "A role they have through a group is unaffected."
+      }
+    },
+    "/v2/workspaces/{workspaceId}/groups": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        }
+      ],
+      "put": {
+        "summary": "Give a group a role, or change it",
+        "operationId": "putGroup",
+        "tags": ["Members"],
+        "x-required-role": "owner",
+        "responses": {
+          "200": {
+            "description": "The mapping.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "group": {
+                      "$ref": "#/components/schemas/GroupMapping"
+                    }
+                  },
+                  "required": ["group"]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "description": "Everyone in the group has the role from their next sign-in. The group is named in the body, never the path: a name may contain a slash (Keycloak's full paths start with one), which a proxy serving the store under a prefix would rewrite.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "group": {
+                    "type": "string",
+                    "maxLength": 256,
+                    "description": "Exactly as it appears in the groups claim."
+                  },
+                  "role": {
+                    "$ref": "#/components/schemas/Role"
+                  }
+                },
+                "required": ["group", "role"]
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Remove a group's role",
+        "operationId": "removeGroup",
+        "tags": ["Members"],
+        "x-required-role": "owner",
+        "responses": {
+          "200": {
+            "description": "Removed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "removed": {
+                      "const": true
+                    }
+                  },
+                  "required": ["removed"]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "parameters": [
+          {
+            "name": "group",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v2/workspaces/{workspaceId}/people": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        }
+      ],
+      "get": {
+        "summary": "Find people to add, by name",
+        "operationId": "findPeople",
+        "tags": ["Members"],
+        "x-required-role": "owner",
+        "responses": {
+          "200": {
+            "description": "Up to twenty people who have signed in to the store and whose name contains the query.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "people": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "userId": {
+                            "type": "string"
+                          },
+                          "displayName": {
+                            "type": ["string", "null"]
+                          }
+                        },
+                        "required": ["userId", "displayName"]
+                      }
+                    }
+                  },
+                  "required": ["people"]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 2
+            }
+          }
+        ]
+      }
+    },
+    "/v2/workspaces/{workspaceId}/documents": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        }
+      ],
+      "get": {
+        "summary": "A workspace's documents",
+        "operationId": "listDocuments",
+        "tags": ["Documents"],
+        "x-required-role": "viewer; editor with deleted=true",
+        "responses": {
+          "200": {
+            "description": "In the order they were added.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "documents": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Document"
+                      }
+                    }
+                  },
+                  "required": ["documents"]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "parameters": [
+          {
+            "name": "deleted",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": ["true"]
+            },
+            "description": "Include deleted documents still being kept."
+          }
+        ]
+      },
+      "post": {
+        "summary": "Create an empty document",
+        "operationId": "createDocument",
+        "tags": ["Documents"],
+        "x-required-role": "editor",
+        "responses": {
+          "201": {
+            "description": "The new document, at version 1.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "document": {
+                      "$ref": "#/components/schemas/Document"
+                    }
+                  },
+                  "required": ["document"]
+                }
+              }
+            },
+            "headers": {
+              "X-Document-Version": {
+                "$ref": "#/components/headers/DocumentVersion"
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        },
+        "description": "Its content follows as updates. The id is chosen by the caller and must be unique in the store; `local` is refused, because it is the id every browser gives its own first document.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "docId": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                  },
+                  "title": {
+                    "type": "string",
+                    "maxLength": 200
+                  }
+                },
+                "required": ["docId", "title"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/documents/{docId}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/DocId"
+        }
+      ],
+      "get": {
+        "summary": "A document and every update",
+        "operationId": "readDocument",
+        "tags": ["Documents"],
+        "x-required-role": "viewer",
+        "responses": {
+          "200": {
+            "description": "The document and its whole update log.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "document": {
+                      "$ref": "#/components/schemas/Document"
+                    },
+                    "blobs": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Blob"
+                      }
+                    }
+                  },
+                  "required": ["document", "blobs"]
+                }
+              }
+            },
+            "headers": {
+              "X-Document-Version": {
+                "$ref": "#/components/headers/DocumentVersion"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "410": {
+            "$ref": "#/components/responses/Deleted"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfDocumentVersion"
+          }
+        ]
+      },
+      "patch": {
+        "summary": "Retitle a document, or move it to another workspace",
+        "operationId": "updateDocument",
+        "tags": ["Documents"],
+        "x-required-role": "editor; to move, editor in both workspaces",
+        "responses": {
+          "200": {
+            "description": "The document.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "document": {
+                      "$ref": "#/components/schemas/Document"
+                    }
+                  },
+                  "required": ["document"]
+                }
+              }
+            },
+            "headers": {
+              "X-Document-Version": {
+                "$ref": "#/components/headers/DocumentVersion"
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "description": "Send `title` or `workspaceId`, not both.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string",
+                        "maxLength": 200
+                      }
+                    },
+                    "required": ["title"]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "workspaceId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["workspaceId"]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a document",
+        "operationId": "deleteDocument",
+        "tags": ["Documents"],
+        "x-required-role": "editor",
+        "responses": {
+          "200": {
+            "description": "The document, now deleted. It is kept for the store's retention period and can be restored.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "document": {
+                      "$ref": "#/components/schemas/Document"
+                    }
+                  },
+                  "required": ["document"]
+                }
+              }
+            },
+            "headers": {
+              "X-Document-Version": {
+                "$ref": "#/components/headers/DocumentVersion"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "410": {
+            "$ref": "#/components/responses/Deleted"
+          }
+        }
+      }
+    },
+    "/v2/documents/{docId}/restore": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/DocId"
+        }
+      ],
+      "post": {
+        "summary": "Restore a deleted document",
+        "operationId": "restoreDocument",
+        "tags": ["Documents"],
+        "x-required-role": "editor",
+        "responses": {
+          "200": {
+            "description": "The document.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "document": {
+                      "$ref": "#/components/schemas/Document"
+                    }
+                  },
+                  "required": ["document"]
+                }
+              }
+            },
+            "headers": {
+              "X-Document-Version": {
+                "$ref": "#/components/headers/DocumentVersion"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/v2/documents/{docId}/updates": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/DocId"
+        }
+      ],
+      "get": {
+        "summary": "Updates after a version",
+        "operationId": "readUpdates",
+        "tags": ["Documents"],
+        "x-required-role": "viewer",
+        "responses": {
+          "200": {
+            "description": "Updates with a version greater than `since`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "document": {
+                      "$ref": "#/components/schemas/Document"
+                    },
+                    "blobs": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Blob"
+                      }
+                    }
+                  },
+                  "required": ["document", "blobs"]
+                }
+              }
+            },
+            "headers": {
+              "X-Document-Version": {
+                "$ref": "#/components/headers/DocumentVersion"
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "410": {
+            "$ref": "#/components/responses/Deleted"
+          }
+        },
+        "parameters": [
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IfDocumentVersion"
+          }
+        ]
+      },
+      "post": {
+        "summary": "Append an update",
+        "operationId": "appendUpdate",
+        "tags": ["Documents"],
+        "x-required-role": "editor",
+        "responses": {
+          "201": {
+            "description": "Appended.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "document": {
+                      "$ref": "#/components/schemas/DocumentWrite"
+                    }
+                  },
+                  "required": ["document"]
+                }
+              }
+            },
+            "headers": {
+              "X-Document-Version": {
+                "$ref": "#/components/headers/DocumentVersion"
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "410": {
+            "$ref": "#/components/responses/Deleted"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          }
+        },
+        "description": "An update is a Yjs update, base64-encoded. The store keeps it as sent and does not parse it.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "bytes": {
+                    "type": "string",
+                    "contentEncoding": "base64"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "default": "update"
+                  },
+                  "expectedVersion": {
+                    "type": "integer",
+                    "description": "Refused with 409 if the document is no longer at this version."
+                  }
+                },
+                "required": ["bytes"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/documents/{docId}/compact": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/DocId"
+        }
+      ],
+      "post": {
+        "summary": "Replace the update log with one snapshot",
+        "operationId": "compactDocument",
+        "tags": ["Documents"],
+        "x-required-role": "editor",
+        "responses": {
+          "200": {
+            "description": "Compacted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "document": {
+                      "$ref": "#/components/schemas/DocumentWrite"
+                    }
+                  },
+                  "required": ["document"]
+                }
+              }
+            },
+            "headers": {
+              "X-Document-Version": {
+                "$ref": "#/components/headers/DocumentVersion"
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "410": {
+            "$ref": "#/components/responses/Deleted"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          }
+        },
+        "description": "Send `expectedVersion`: without it, a snapshot made a moment ago would erase an update someone else appended since.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "bytes": {
+                    "type": "string",
+                    "contentEncoding": "base64"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "default": "snapshot"
+                  },
+                  "expectedVersion": {
+                    "type": "integer"
+                  }
+                },
+                "required": ["bytes"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/documents/{docId}/session": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/DocId"
+        }
+      ],
+      "get": {
+        "summary": "The document's live session",
+        "operationId": "documentSession",
+        "tags": ["Sessions"],
+        "x-required-role": "editor",
+        "responses": {
+          "200": {
+            "description": "The same room and key for everyone who may edit the document.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "session": {
+                      "type": "object",
+                      "properties": {
+                        "room": {
+                          "type": "string",
+                          "pattern": "^wsdoc-[0-9a-f]{32}$"
+                        },
+                        "key": {
+                          "type": "string",
+                          "description": "Encrypts what passes through the relay between browsers."
+                        },
+                        "relayToken": {
+                          "type": ["string", "null"],
+                          "description": "For that room and this caller, valid ten minutes. Null where the relay does not require tokens."
+                        },
+                        "relayTokenExpiresAt": {
+                          "type": ["string", "null"],
+                          "format": "date-time"
+                        }
+                      },
+                      "required": ["room", "key", "relayToken", "relayTokenExpiresAt"]
+                    }
+                  },
+                  "required": ["session"]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "description": "A peer in a session can send changes to the others directly, so being able to read the document is not enough: viewers are refused, and follow through `/updates` instead."
+      }
+    },
+    "/v2/documents/{docId}/hold": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/DocId"
+        }
+      ],
+      "put": {
+        "summary": "Place a legal hold",
+        "operationId": "placeHold",
+        "tags": ["Retention"],
+        "x-required-role": "administrator",
+        "responses": {
+          "200": {
+            "description": "The document.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "document": {
+                      "$ref": "#/components/schemas/Document"
+                    }
+                  },
+                  "required": ["document"]
+                }
+              }
+            },
+            "headers": {
+              "X-Document-Version": {
+                "$ref": "#/components/headers/DocumentVersion"
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "description": "Keeps the document from being removed, by retention or by an administrator, until released.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": ["reason"]
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Release a legal hold",
+        "operationId": "releaseHold",
+        "tags": ["Retention"],
+        "x-required-role": "administrator",
+        "responses": {
+          "200": {
+            "description": "The document.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "document": {
+                      "$ref": "#/components/schemas/Document"
+                    }
+                  },
+                  "required": ["document"]
+                }
+              }
+            },
+            "headers": {
+              "X-Document-Version": {
+                "$ref": "#/components/headers/DocumentVersion"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v2/documents/{docId}/purge": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/DocId"
+        }
+      ],
+      "post": {
+        "summary": "Remove a deleted document for good",
+        "operationId": "purgeDocument",
+        "tags": ["Retention"],
+        "x-required-role": "administrator",
+        "responses": {
+          "200": {
+            "description": "Gone. This cannot be undone.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "purged": {
+                      "const": true
+                    }
+                  },
+                  "required": ["purged"]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        },
+        "description": "Refused with 409 while the document is under hold, or not deleted."
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "session": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "sd_session"
+      }
+    },
+    "parameters": {
+      "WorkspaceId": {
+        "name": "workspaceId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "DocId": {
+        "name": "docId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "IfDocumentVersion": {
+        "name": "If-Document-Version",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "description": "The highest version of this document the caller has seen. A store that would answer with an older one refuses with 409 `stale-version` instead, which is how a rolled-back store is noticed."
+      }
+    },
+    "headers": {
+      "DocumentVersion": {
+        "schema": {
+          "type": "integer"
+        },
+        "description": "The document's version after this request."
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "The request is malformed; the message says how.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Unauthenticated": {
+        "description": "Not signed in, or the session has expired.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Signed in, but the caller's role does not allow this, the action is for administrators, or the request did not come from the editor.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "No such thing, or one the caller has no role in. The two are not told apart.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Refused because of the current state: a name or id already taken, a version that has moved on, a document under hold.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Deleted": {
+        "description": "The document is deleted. Restore it first.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "TooLarge": {
+        "description": "The body or the update exceeds the store's limits.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "reason": {
+                "type": "string",
+                "description": "Stable, for a client to branch on: `unauthenticated`, `forbidden`, `forbidden-origin`, `not-found`, `conflict`, `stale-version`, `deleted`, `bad-request`, `too-large`, `quota`, `unsupported`, `internal`."
+              },
+              "message": {
+                "type": "string",
+                "description": "For a person to read."
+              }
+            },
+            "required": ["reason", "message"]
+          }
+        },
+        "required": ["error"]
+      },
+      "Role": {
+        "enum": ["viewer", "editor", "owner"],
+        "description": "`viewer` opens documents. `editor` also creates, changes, deletes and restores them. `owner` also renames the workspace and manages its members and groups."
+      },
+      "Workspace": {
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "archivedAt": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "via": {
+            "description": "How the caller came by that role.",
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "member"
+                  }
+                },
+                "required": ["kind"]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "group"
+                  },
+                  "group": {
+                    "type": "string"
+                  }
+                },
+                "required": ["kind", "group"]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "admin"
+                  }
+                },
+                "required": ["kind"]
+              }
+            ]
+          }
+        },
+        "required": ["workspaceId", "name", "createdAt", "archivedAt", "role", "via"]
+      },
+      "Member": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": ["string", "null"]
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "addedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["userId", "displayName", "role", "addedAt"]
+      },
+      "GroupMapping": {
+        "type": "object",
+        "properties": {
+          "group": {
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "addedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["group", "role", "addedAt"]
+      },
+      "Me": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "userId": {
+                "type": "string"
+              },
+              "displayName": {
+                "type": ["string", "null"]
+              }
+            },
+            "required": ["userId", "displayName"]
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "As the identity provider reported them at sign-in."
+          },
+          "isAdmin": {
+            "type": "boolean"
+          },
+          "canCreateWorkspaces": {
+            "type": "boolean"
+          }
+        },
+        "required": ["user", "groups", "isAdmin", "canCreateWorkspaces"]
+      },
+      "Document": {
+        "type": "object",
+        "properties": {
+          "docId": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "description": "Increases on every accepted write, and on delete and restore."
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deletedAt": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
+          "purgeAfter": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "description": "When a deleted document will be removed. Null while it is not deleted, under indefinite retention, or under hold."
+          },
+          "legalHold": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string"
+                  },
+                  "placedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": ["reason", "placedAt"]
+              }
+            ]
+          }
+        },
+        "required": [
+          "docId",
+          "workspaceId",
+          "title",
+          "createdAt",
+          "version",
+          "updatedAt",
+          "deletedAt",
+          "purgeAfter",
+          "legalHold"
+        ]
+      },
+      "Blob": {
+        "type": "object",
+        "properties": {
+          "blobId": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "description": "`update`, or `snapshot` for a compacted log."
+          },
+          "version": {
+            "type": "integer"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "bytes": {
+            "type": "string",
+            "contentEncoding": "base64"
+          }
+        },
+        "required": ["blobId", "kind", "version", "createdAt", "bytes"]
+      },
+      "DocumentWrite": {
+        "type": "object",
+        "properties": {
+          "docId": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["docId", "version", "updatedAt"],
+        "description": "Where the document stands after a write to its log."
+      }
+    }
+  }
+}

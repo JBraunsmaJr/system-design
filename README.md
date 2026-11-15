@@ -129,15 +129,15 @@ Pushing to `main` builds and deploys to GitHub Pages. For a first-time setup on 
 
 ### Repository layout
 
-| Path                      | Contents                                                 |
-| ------------------------- | -------------------------------------------------------- |
-| `src/`                    | The editor                                               |
-| `store/`                  | The optional store: service and schema (`schema.sql`)    |
-| `docker/`                 | Images, nginx config, and the full-stack Compose example |
-| `docs/`                   | Operator docs kept in the repo                           |
-| `docs-site/`              | The published documentation site                         |
-| `scripts/`                | Test runner, verification suites, and operational tools  |
-| `fixtures/`, `baselines/` | Performance test workloads and their baselines           |
+| Path                      | Contents                                                  |
+| ------------------------- | --------------------------------------------------------- |
+| `src/`                    | The editor                                                |
+| `store/`                  | The optional store: service, `schema.sql`, `openapi.json` |
+| `docker/`                 | Images, nginx config, and the full-stack Compose example  |
+| `docs/`                   | Operator docs kept in the repo                            |
+| `docs-site/`              | The published documentation site                          |
+| `scripts/`                | Test runner, verification suites, and operational tools   |
+| `fixtures/`, `baselines/` | Performance test workloads and their baselines            |
 
 ## Testing
 

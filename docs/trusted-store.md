@@ -105,6 +105,8 @@ A document's workspace comes from the store's catalog (`store/src/documentCatalo
 | `store/src/documentCatalog.ts`    | Which workspace a document is in, and its title                     |
 | `scripts/verify-store-v2.ts`      | Every route refused to everyone below its minimum, then exercised   |
 
+`store/openapi.json` describes every route, with its request and reply. `scripts/verify-openapi.ts` holds it to the store: it must list exactly the routes the source files list in their headers, and every operation is called against a running store and its reply compared with the description.
+
 ## Progress
 
 1. **Done: rules and storage.** Permissions, workspaces, members, group mappings, with both storage implementations.
@@ -115,7 +117,7 @@ A document's workspace comes from the store's catalog (`store/src/documentCatalo
    - **Done: choosing a store.** File > Documents shows which store the browser uses and lets someone point the editor at one. The address is checked before it is remembered, and the choice made in a browser wins over the one a deployment built in. Signing in returns to the page it started from.
    - **Done: deleted documents.** Editors and owners see what a workspace has deleted and how long it is kept, and can restore it. Administrators can place and release a hold, and remove a document for good.
    - **Done: live sessions.** Opening a workspace document puts everyone who may edit it in one session through the relay, so they see each other's cursors and changes as they happen. Viewers are not in it and follow through the store.
-   - **Next:** nothing the encrypted mode did is now missing. What remains is the editor shell (one save status, Share in place of Collaborate, a canvas that is locked for viewers) and an OpenAPI description of `/v2`.
+   - **Done: the rest of the editor.** A viewer cannot change a workspace document; the toolbar has one save status and **Share** in place of Collaborate, which for a workspace document says who it is shared with instead of offering a session link.
 4. **In progress: removal.**
    - **Done: the editor.** The encrypted mode is gone from the editor: `src/crypto` (except what the store still imports until the next step), device enrolment, the comparison code, recovery, key rotation, automatic access, the key-based store client, and their panels and tests. An editor pointed at a store without `/v2` works on its own and says the store needs upgrading.
    - **Done: the store's API.** The `/v1` document, index, key, device, recovery, join-request, access-rule and administration routes are gone, with the modules behind them. What `/v1` still serves is about the person, not their documents: health, sign-in, and relay tokens for sessions started by link. `CRYPTO_MODE`, `RECOVERY_PUBLIC_KEY`, `RECOVERY_PUBLIC_KEY_FILE`, `AUTO_ACCESS` and `JOIN_EVIDENCE_RETENTION` are no longer read; a store that still sets them starts, and names them at startup.

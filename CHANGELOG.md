@@ -29,6 +29,14 @@ markers are removed when the section becomes a release. See
 - `ADMIN_GROUPS` makes the members of an identity-provider group store administrators in that API.
   `WORKSPACE_CREATION` sets who may create workspaces there.
 
+### Store: API description
+
+- `store/openapi.json` describes every route the store serves, with the role each needs, its request and its
+  reply. A new test checks it against the store: it must list exactly the routes the store has, and every operation
+  is called and its reply compared with the description.
+- [PATCH] Appending an update and compacting a document now both reply with `{ document: { docId, version,
+updatedAt } }`. Compacting used to return the storage layer's whole record, including who placed a legal hold.
+
 ### [MINOR] Toolbar: Share, one save status, readable buttons
 
 - **Collaborate** is now **Share**. For a document in a workspace, the panel says which workspace it is in and that

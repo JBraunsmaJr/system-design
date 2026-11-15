@@ -57,6 +57,15 @@ function documentJson(entry: CatalogEntry, record: DocumentRecord) {
   };
 }
 
+/** What a write to a document's log replies with: where the document now
+ * stands. Not the storage layer's own record, which says more than a
+ * caller needs and would make its shape part of the API. */
+const writeJson = (written: { docId: string; version: number; updatedAt: string }) => ({
+  docId: written.docId,
+  version: written.version,
+  updatedAt: written.updatedAt,
+});
+
 const blobsJson = (blobs: { meta: unknown; bytes: Uint8Array }[]) =>
   blobs.map((blob) => ({ ...(blob.meta as object), bytes: toBase64(blob.bytes) }));
 
@@ -245,7 +254,7 @@ export async function documentRoutes(context: V2Context): Promise<void> {
           typeof body.expectedVersion === 'number' ? body.expectedVersion : undefined,
       });
       await audit('document.append');
-      return context.send(201, { document: appended }, appended.version);
+      return context.send(201, { document: writeJson(appended) }, appended.version);
     }
     methodNotAllowed(context);
   }
@@ -263,7 +272,7 @@ export async function documentRoutes(context: V2Context): Promise<void> {
       expectedVersion: typeof body.expectedVersion === 'number' ? body.expectedVersion : undefined,
     });
     await audit('document.compact');
-    return context.send(200, { document: compacted }, compacted.version);
+    return context.send(200, { document: writeJson(compacted) }, compacted.version);
   }
 
   if (tail === 'session') {

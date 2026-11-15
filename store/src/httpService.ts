@@ -78,9 +78,7 @@ export interface StoreBackend {
     kind: string;
     bytes: Uint8Array;
     expectedVersion?: number;
-  }): Promise<{
-    version: number;
-  }>;
+  }): Promise<{ docId: string; version: number; updatedAt: string }>;
 
   read(
     docId: string,
@@ -107,7 +105,7 @@ export interface StoreBackend {
   compact(
     docId: string,
     snapshot: { kind: string; bytes: Uint8Array; expectedVersion?: number },
-  ): Promise<{ version: number }>;
+  ): Promise<{ docId: string; version: number; updatedAt: string }>;
 
   softDelete(docId: string): Promise<{ version: number }>;
 

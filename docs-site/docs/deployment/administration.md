@@ -210,6 +210,10 @@ curl -s -H "Cookie: $SESSION" "$STORE/v2/me"
 
 Sessions last eight hours. A `401` means sign in again.
 
+The calls an administrator is most likely to script are below. Every route,
+with its request and reply, is described in `store/openapi.json` in the
+repository, which is checked against the store on every change.
+
 | Call                                                         | Does                                     |
 | :----------------------------------------------------------- | :--------------------------------------- |
 | `GET /workspaces?archived=true`                              | Every workspace, archived ones included. |
