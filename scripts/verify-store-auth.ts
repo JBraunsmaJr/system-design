@@ -102,8 +102,11 @@ await new Promise<void>((resolve) =>
  * returns the session cookie the store sets. */
 async function signIn(
   provider: string,
+  query = '',
 ): Promise<{ cookie: string | null; setCookie: string | null; finalLocation: string | null }> {
-  const start = await fetch(`${origin}/v1/auth/${provider}/start`, { redirect: 'manual' });
+  const start = await fetch(`${origin}/v1/auth/${provider}/start${query}`, {
+    redirect: 'manual',
+  });
   const authorizeUrl = start.headers.get('location');
   if (!authorizeUrl) return { cookie: null, setCookie: null, finalLocation: null };
   const atProvider = await fetch(authorizeUrl, { redirect: 'manual' });
@@ -211,6 +214,25 @@ try {
       (await call('/v1/docs', cookie)).status === 401,
       'and the cookie stops working immediately',
     );
+  }
+
+  console.log('\n=== Coming back to where the sign-in started ===');
+  {
+    const page = `${origin}/editor/?doc=abc#section`;
+    const returned = await signIn('oidc', `?returnTo=${encodeURIComponent(page)}`);
+    check(
+      returned.finalLocation === page && !!returned.cookie,
+      'an editor on a trusted origin is sent back to the page it named, document and all',
+    );
+    for (const [bad, why] of [
+      ['https://elsewhere.example/', 'an origin this store does not trust'],
+      ['/editor/', 'a relative address'],
+      ['javascript:alert(1)', 'something that is not a web address'],
+      [`${origin}.elsewhere.example/`, 'an origin that only starts like a trusted one'],
+    ]) {
+      const refused = await call(`/v1/auth/oidc/start?returnTo=${encodeURIComponent(bad)}`);
+      check(refused.status === 400, `${why} is refused before the sign-in starts`);
+    }
   }
 
   console.log('\n=== Sign-ins that should fail ===');

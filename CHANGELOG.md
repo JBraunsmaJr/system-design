@@ -46,6 +46,12 @@ markers are removed when the section becomes a release. See
   that would leave it with no owner.
 - Store administrators can archive a workspace, which hides it from its members without deleting anything, and
   restore it. Archived workspaces stay in an administrator's list, marked.
+- **Store** in File > Documents shows which store this browser uses and lets you point the editor at one by its
+  address. The address is checked before it is saved, and the page reloads once the store answers. A store chosen in
+  the browser is used in place of the one the site was set up with, and can be removed to go back. The store must list
+  the editor's origin in `ALLOWED_ORIGINS`.
+- After signing in you return to the page and document you were on, instead of the store's configured address. The
+  store accepts a `returnTo` address on its own origin or an allowed one and refuses any other.
 - Against a store without the workspace API, nothing changes.
 - Store: compacting a document through `/v2` must name the version it read, and is refused if the document has moved
   on, so a concurrent edit can no longer be erased by a compaction. The id `local` is refused for workspace documents.

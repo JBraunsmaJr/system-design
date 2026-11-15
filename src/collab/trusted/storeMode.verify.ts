@@ -2,6 +2,7 @@
  * Run with: npx tsx --tsconfig tsconfig.app.json src/collab/trusted/storeMode.verify.ts
  */
 import {
+  checkStore,
   getStoreMode,
   probeStoreMode,
   resetStoreModeForTests,
@@ -139,6 +140,40 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
     (await resolveStoreMode('https://other.example', { fetch: answering(404).fetcher })) ===
       'legacy',
     "another store's answer is its own",
+  );
+}
+
+// === Checking an address someone typed ===
+{
+  const byPath = (answers: Record<string, [number, unknown]>) =>
+    (async (input: RequestInfo | URL) => {
+      const path = new URL(String(input)).pathname;
+      const [status, body] = answers[path] ?? [404, {}];
+      return new Response(JSON.stringify(body), { status });
+    }) as typeof fetch;
+
+  assert(
+    (await checkStore(STORE, {
+      fetch: byPath({ '/v2/health': [200, { status: 'ok', mode: 'trusted' }] }),
+    })) === 'trusted',
+    'a typed address with a trusted store behind it is trusted',
+  );
+  assert(
+    (await checkStore(STORE, { fetch: byPath({ '/v1/health': [200, { status: 'ok' }] }) })) ===
+      'legacy',
+    'one with an older store behind it is legacy',
+  );
+  assert(
+    (await checkStore(STORE, { fetch: byPath({}) })) === null,
+    'a web server that answers 404 to everything is not a store',
+  );
+  assert(
+    (await checkStore(STORE, { fetch: failing })) === null,
+    'an address that cannot be reached is not a store',
+  );
+  assert(
+    (await checkStore(STORE, { fetch: hanging, timeoutMs: 20 })) === null,
+    'nor is one that never answers',
   );
 }
 

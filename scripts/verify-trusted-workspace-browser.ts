@@ -543,6 +543,90 @@ async function run() {
       }),
       'restoring brings it back for them',
     );
+
+    // --- Pointing an editor at a store ---------------------------------------
+    console.log('\n=== Choosing a store in the browser ===');
+    {
+      // An editor served with no store configured, as the public build is.
+      const context = await browser!.newContext();
+      contexts.push(context);
+      const page = await context.newPage();
+      page.on('pageerror', (error) => check(false, `page threw: ${error.message}`));
+      await page.goto(`${appOrigin}/system-design/`);
+      await ready(page);
+      const openDocuments = async () => {
+        await page.click('button[title="File"]');
+        await page.click('.export-menu__dropdown button:has-text("Documents")');
+        await page.waitForSelector('.store-connection');
+      };
+      await openDocuments();
+      check(
+        /No store\. Documents are kept in this browser only/.test(
+          (await page.textContent('.store-connection')) ?? '',
+        ) && (await page.locator('.trusted-workspace').count()) === 0,
+        'with no store, the editor says so and shows no workspaces',
+      );
+
+      await page.click('.store-connection__change');
+      await page.fill('#store-connection-address', 'ftp://store.example.com');
+      await page.click('.store-connection__connect');
+      check(
+        /starts with https/.test(
+          (await page.textContent('.store-connection [role="alert"]')) ?? '',
+        ),
+        'an address that cannot be a store is refused with the reason',
+      );
+
+      // Somewhere that answers, but is not a store: the editor's own server.
+      await page.fill('#store-connection-address', appOrigin);
+      await page.click('.store-connection__connect');
+      await page.waitForFunction(() =>
+        /No store answered/.test(document.querySelector('.store-connection')?.textContent ?? ''),
+      );
+      const refusal = (await page.textContent('.store-connection [role="alert"]')) ?? '';
+      check(
+        refusal.includes('ALLOWED_ORIGINS') && refusal.includes(appOrigin),
+        'an address with no store behind it is not saved, and the message names the origin to allow',
+      );
+      check(
+        (await page.evaluate(() => localStorage.getItem('system-design-editor:store-url'))) ===
+          null,
+        'nothing is remembered until a store answers',
+      );
+
+      await page.fill('#store-connection-address', `${theStore.origin}/`);
+      await Promise.all([page.waitForNavigation(), page.click('.store-connection__connect')]);
+      await ready(page);
+      await openManager(page);
+      check(
+        (await page.getAttribute('.trusted-workspace', 'data-phase')) === 'signed-out' &&
+          ((await page.textContent('.store-connection')) ?? '').includes(theStore.origin) &&
+          /Chosen in this browser/.test((await page.textContent('.store-connection')) ?? ''),
+        'a real store is remembered: after the reload the editor is connected to it',
+      );
+
+      const before = page.url();
+      theStore.idp.setSubject('ben', 'Ben');
+      theStore.idp.setClaims({ groups: ['platform-eng'] });
+      await Promise.all([page.waitForNavigation(), page.click('.trusted-workspace__sign-in')]);
+      await ready(page);
+      check(
+        page.url() === before && /[?&]doc=/.test(before),
+        'signing in returns to the same page and document',
+      );
+      await openManager(page);
+      check(/You are an editor here/.test(await roleText(page)), 'and the workspaces are there');
+
+      await page.click('.store-connection__change');
+      await Promise.all([page.waitForNavigation(), page.click('.store-connection__forget')]);
+      await ready(page);
+      await openDocuments();
+      check(
+        (await page.locator('.trusted-workspace').count()) === 0 &&
+          /No store\./.test((await page.textContent('.store-connection')) ?? ''),
+        'forgetting the store returns the editor to working on its own',
+      );
+    }
   } finally {
     for (const context of contexts) await context.close().catch(() => {});
     await browser?.close().catch(() => {});

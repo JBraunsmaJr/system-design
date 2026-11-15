@@ -70,6 +70,39 @@ export async function probeStoreMode(
   }
 }
 
+/**
+ * Whether there is a store at an address someone typed, and which kind.
+ * Null when there is not, or it cannot be reached from this page.
+ *
+ * Stricter than `probeStoreMode`, which takes a 404 from /v2/health to mean
+ * an older store: true of a store the deployment configured, but any web
+ * server answers 404 to a path it does not have. So an apparent older store
+ * must also answer its own health check.
+ */
+export async function checkStore(
+  storeUrl: string,
+  options: { fetch?: typeof fetch; timeoutMs?: number } = {},
+): Promise<'legacy' | 'trusted' | null> {
+  const timeoutMs = options.timeoutMs ?? 4000;
+  const mode = await probeStoreMode(storeUrl, { ...options, timeoutMs });
+  if (mode !== 'legacy') return mode;
+  const call = options.fetch ?? fetch;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await call(`${storeUrl.replace(/\/+$/, '')}/v1/health`, {
+      signal: controller.signal,
+    });
+    if (!response.ok) return null;
+    const body = (await response.json()) as { status?: unknown };
+    return typeof body === 'object' && body !== null && 'status' in body ? 'legacy' : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** Resolves the mode for this visit. Call once, before the first render. */
 export async function resolveStoreMode(
   storeUrl: string | null,

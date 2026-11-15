@@ -125,8 +125,8 @@ export function createPostgresSessionStore(
     async remember(login: PendingLogin) {
       await sweep();
       await pool.query(
-        `INSERT INTO pending_logins (state, provider, nonce, code_verifier, redirect_uri, created_at, has_commitment)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        `INSERT INTO pending_logins (state, provider, nonce, code_verifier, redirect_uri, created_at, has_commitment, return_to)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [
           login.state,
           login.provider,
@@ -135,6 +135,7 @@ export function createPostgresSessionStore(
           login.redirectUri,
           new Date(login.createdAt),
           login.hasCommitment ?? false,
+          login.returnTo ?? null,
         ],
       );
     },
@@ -150,10 +151,11 @@ export function createPostgresSessionStore(
         redirect_uri: string;
         created_at: Date;
         has_commitment: boolean;
+        return_to: string | null;
       }>(
         `DELETE FROM pending_logins WHERE state = $1
            AND created_at > now() - ($2::int * interval '1 millisecond')
-         RETURNING provider, nonce, code_verifier, redirect_uri, created_at, has_commitment`,
+         RETURNING provider, nonce, code_verifier, redirect_uri, created_at, has_commitment, return_to`,
         [state, pendingTtl],
       );
       const row = result.rows[0];
@@ -166,6 +168,7 @@ export function createPostgresSessionStore(
             redirectUri: row.redirect_uri,
             createdAt: row.created_at.getTime(),
             hasCommitment: row.has_commitment,
+            ...(row.return_to !== null ? { returnTo: row.return_to } : {}),
           }
         : null;
     },

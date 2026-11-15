@@ -32,6 +32,7 @@ import { WorkspacePanel } from './components/workspace/WorkspacePanel';
 import { TrustedWorkspacePanel } from './components/workspace/TrustedWorkspacePanel';
 import { useTrustedWorkspaceSync } from './collab/trusted/useTrustedWorkspaceSync';
 import { getStoreMode } from './collab/trusted/storeMode';
+import { StoreConnection } from './components/workspace/StoreConnection';
 import { AccessRequestNotice } from './components/workspace/AccessRequestNotice';
 import { Toast, type ToastType } from './common/components/toast/Toast';
 import { useFileSaving } from './hooks/useFileSaving';
@@ -975,27 +976,30 @@ function App() {
         timedCopies={timedCopies}
         onTimedCopiesChange={setTimedCopies}
         workspace={
-          trustedStoreUrl ? (
-            <TrustedWorkspacePanel
-              storeUrl={trustedStoreUrl}
-              currentDocId={openDocId}
-              currentTitle={title}
-              onOpenDocument={handleOpenWorkspaceDocument}
-              getDocumentState={getDocumentState}
-              onSignIn={isOidcAvailable ? handleLoginOidc : undefined}
-            />
-          ) : legacyStoreUrl ? (
-            <WorkspacePanel
-              storeUrl={legacyStoreUrl}
-              currentDocId={openDocId}
-              currentTitle={title}
-              // What a workspace document holds: this document's CRDT
-              // state, so the workspace copy merges with everyone else's
-              // rather than replacing it (WS8-R2).
-              getDocumentState={getDocumentState}
-              onOpenDocument={handleOpenWorkspaceDocument}
-            />
-          ) : undefined
+          <>
+            <StoreConnection storeUrl={storeUrl} />
+            {trustedStoreUrl ? (
+              <TrustedWorkspacePanel
+                storeUrl={trustedStoreUrl}
+                currentDocId={openDocId}
+                currentTitle={title}
+                onOpenDocument={handleOpenWorkspaceDocument}
+                getDocumentState={getDocumentState}
+                onSignIn={isOidcAvailable ? handleLoginOidc : undefined}
+              />
+            ) : legacyStoreUrl ? (
+              <WorkspacePanel
+                storeUrl={legacyStoreUrl}
+                currentDocId={openDocId}
+                currentTitle={title}
+                // What a workspace document holds: this document's CRDT
+                // state, so the workspace copy merges with everyone else's
+                // rather than replacing it (WS8-R2).
+                getDocumentState={getDocumentState}
+                onOpenDocument={handleOpenWorkspaceDocument}
+              />
+            ) : null}
+          </>
         }
         onOpenDocument={openDocumentInTab}
         onNewDocument={onNew}

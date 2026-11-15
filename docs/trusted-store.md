@@ -112,8 +112,19 @@ A document's workspace comes from the store's catalog (`store/src/documentCatalo
 3. **In progress: the editor.**
    - **Done: opening and saving.** The editor asks the store which API it serves (`/v2/health`) before it first renders, and remembers the answer. Against a trusted store it shows a workspace panel in the document manager: sign in, choose a workspace, create one, add a copy of the open document, open and delete documents. A workspace document saves to the store as it is edited and picks up other people's changes; a viewer's copy follows along and sends nothing. Against a store without `/v2` the editor behaves as before.
    - **Done: managing a workspace.** In the same panel, everyone in a workspace can see its members and mapped groups. Owners add people by name, map groups, change roles, remove either, and rename the workspace. Administrators archive and restore, and see archived workspaces in the list. A change that would cost the person making it their own access, or leave the workspace with no owner, is confirmed first (`src/collab/trusted/accessChanges.ts`).
-   - **Next:** the store address in settings, deleted documents (restore, and purge and holds for administrators), and live sessions.
+   - **Done: choosing a store.** File > Documents shows which store the browser uses and lets someone point the editor at one. The address is checked before it is remembered, and the choice made in a browser wins over the one a deployment built in. Signing in returns to the page it started from.
+   - **Next:** deleted documents (restore, and purge and holds for administrators), and live sessions.
 4. **Last: removal.** The encrypted API, its tables, `src/crypto`, device enrolment, recovery, rotation, and their tests and documentation. The last release with encryption is tagged first.
+
+## An editor hosted somewhere else
+
+An editor does not have to be served by the organization that runs the store: the public build can be pointed at a store from File > Documents. Three things must be true, and the store's startup checks already enforce the last two:
+
+- The editor's origin is in the store's `ALLOWED_ORIGINS`. Without it the browser blocks every request, and the editor can only report that no store answered, naming the origin to add.
+- The store is served over HTTPS, because a session cookie sent from another site must be `SameSite=None; Secure`.
+- The browser allows that cookie. Browsers that block third-party cookies will sign in and then appear signed out. Serving the editor and the store under one site avoids this, and is the arrangement to prefer.
+
+After signing in, the store sends the browser back to the page that started the sign-in (`returnTo`), if that page is on the store's own origin or an allowed one. Anything else is refused before the sign-in begins.
 
 ## Things the editor relies on
 

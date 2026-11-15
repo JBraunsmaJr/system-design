@@ -492,6 +492,29 @@ export function createHttpService(options: HttpServiceOptions): Server {
     void handle(request, response);
   });
 
+  /**
+   * An address to send the browser to after sign-in, if it is on this store
+   * or an editor origin this store allows. http(s) only, so nothing like a
+   * javascript: address can be smuggled through.
+   */
+  function trustedReturnTo(value: string): string {
+    let target: URL;
+    try {
+      target = new URL(value);
+    } catch {
+      throw new HttpError(400, 'bad-request', 'returnTo must be a full address.');
+    }
+    const trusted = [new URL(publicUrl()).origin, ...(options.allowedOrigins ?? [])];
+    if (!['http:', 'https:'].includes(target.protocol) || !trusted.includes(target.origin)) {
+      throw new HttpError(
+        400,
+        'bad-request',
+        `This store does not send people to ${target.origin} after they sign in. Add it to ALLOWED_ORIGINS if it is an editor for this store.`,
+      );
+    }
+    return target.toString();
+  }
+
   /** Set once per request, so every reply carries it - errors and
    * redirects included, or a cross-origin editor sees an opaque failure. */
   function applyCors(request: IncomingMessage, response: ServerResponse): boolean {
@@ -1242,11 +1265,18 @@ export function createHttpService(options: HttpServiceOptions): Server {
         // GitHub has no ID token, so nothing a member could check.
         throw new HttpError(400, 'unsupported', new CommitmentUnsupported(provider.id).message);
       }
+      // Where to come back to. An editor on any trusted origin may name its
+      // own page, so that someone who signs in from one editor is not
+      // dropped in another, and returns to the document they had open.
+      // Anywhere else is refused outright: quietly falling back would hide
+      // a misconfiguration, and following it would be an open redirect.
+      const rawReturnTo = url.searchParams.get('returnTo');
+      const returnTo = rawReturnTo !== null ? trustedReturnTo(rawReturnTo) : undefined;
       const { url: authorizeUrl, pending } = await provider.begin(
         `${publicUrl()}/v1/auth/callback`,
         commitment !== undefined ? { commitment } : {},
       );
-      await sessions.remember(pending);
+      await sessions.remember(returnTo !== undefined ? { ...pending, returnTo } : pending);
       await record({
         operation: 'login-start',
         outcome: 'ok',
@@ -1334,7 +1364,7 @@ export function createHttpService(options: HttpServiceOptions): Server {
         },
       });
       response.writeHead(302, {
-        location: options.afterLoginUrl ?? '/',
+        location: pending.returnTo ?? options.afterLoginUrl ?? '/',
         'set-cookie': serializeSessionCookie(created.id, {
           secure: secureCookies(),
           crossSite: crossSiteCookies(),

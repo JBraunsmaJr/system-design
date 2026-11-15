@@ -62,6 +62,15 @@ async function contract(
   await sessions.remember(pending('state-1'));
   const taken = await sessions.take('state-1');
   check(taken?.codeVerifier === 'v', 'a pending sign-in comes back with what it needs');
+  check(taken?.returnTo === undefined, 'with no return address unless one was given');
+  await sessions.remember({
+    ...pending('state-return'),
+    returnTo: 'https://editor.example/?doc=a',
+  });
+  check(
+    (await sessions.take('state-return'))?.returnTo === 'https://editor.example/?doc=a',
+    'and with the return address when one was',
+  );
   check(
     (await sessions.take('state-1')) === null,
     'and only once: a state that returns twice is a replay',

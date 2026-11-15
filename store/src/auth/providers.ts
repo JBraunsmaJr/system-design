@@ -83,6 +83,9 @@ export interface PendingLogin {
   /** WS14-R3: the nonce is a key commitment the browser supplied, so the
    * token is kept as evidence when the sign-in completes. */
   hasCommitment?: boolean;
+  /** Where the editor asked to be sent back to, already checked against the
+   * origins this store trusts. Absent: the configured address. */
+  returnTo?: string;
 }
 
 export interface Provider {

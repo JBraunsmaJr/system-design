@@ -243,6 +243,9 @@ ALTER TABLE sessions       ADD COLUMN IF NOT EXISTS evidence_iat   BIGINT;
 ALTER TABLE sessions       ADD COLUMN IF NOT EXISTS groups         TEXT[];
 ALTER TABLE sessions       ADD COLUMN IF NOT EXISTS groups_overage BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE pending_logins ADD COLUMN IF NOT EXISTS has_commitment BOOLEAN NOT NULL DEFAULT FALSE;
+-- Where the editor asked to be sent after signing in, when it is not the
+-- configured address. Checked against the trusted origins before it is kept.
+ALTER TABLE pending_logins ADD COLUMN IF NOT EXISTS return_to TEXT;
 ALTER TABLE users          ADD COLUMN IF NOT EXISTS last_groups    TEXT[];
 ALTER TABLE users          ADD COLUMN IF NOT EXISTS last_groups_at TIMESTAMPTZ;
 

@@ -31,7 +31,12 @@ export function useStoreSignIn(
     if (!storeUrl) return;
     const provider = storeProviders.includes('oidc') ? 'oidc' : (storeProviders[0] ?? 'oidc');
     if (plain) {
-      globalThis.location.assign(createStoreClient({ baseUrl: storeUrl }).signInUrl(provider));
+      // Back to this page, document and all: a store can serve more than
+      // one editor, and only this one knows where it was.
+      const start = createStoreClient({ baseUrl: storeUrl }).signInUrl(provider);
+      globalThis.location.assign(
+        `${start}?returnTo=${encodeURIComponent(globalThis.location.href)}`,
+      );
       return;
     }
     // WS14-R2: commits to a key first where automatic access can use it.
