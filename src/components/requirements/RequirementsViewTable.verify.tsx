@@ -429,6 +429,20 @@ console.log('\n=== Who else is editing ===');
     !open('REQ-1', 'row').includes('requirement-card__peers'),
     'outside a session there is nothing',
   );
+
+  const table = render({
+    initialGroupBy: 'type',
+    peers: [peer(1, 'Ben', 'REQ-1'), peer(2, 'Cara', 'REQ-1'), peer(3, 'Dev', null)],
+  });
+  assert(
+    rowOf(table, 'REQ-1').includes('aria-label="Ben, Cara are editing this"'),
+    'a table line shows a dot for the people editing its item',
+  );
+  assert(count(table, 'requirements-table__editing') === 1, 'and only that line does');
+  assert(
+    !render({ initialGroupBy: 'type' }).includes('requirements-table__editing'),
+    'outside a session no line has one',
+  );
 }
 
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);

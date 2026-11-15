@@ -202,8 +202,8 @@ console.log('=== Split view ===');
     'folding every card is not offered where there are no cards',
   );
   assert(
-    /<select[^>]*>.*?<option value="type"[^>]*>Type<.*?<option value="epic"[^>]*>Epic</s.test(html),
-    'grouping is one "Group by" select',
+    /aria-label="Group by: (Type|Category|Epic)"/.test(html) && !html.includes('<select'),
+    'grouping is one "Group by" menu, in the app\'s own style',
   );
   assert(
     html.includes('aria-label="Manage requirement types"') &&

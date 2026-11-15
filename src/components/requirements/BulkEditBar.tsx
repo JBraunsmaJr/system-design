@@ -9,6 +9,7 @@ import {
   REQUIREMENT_STATUSES,
 } from '../../domain/requirements/requirementsRegistry';
 import { collectTags, normalizeTag } from '../../domain/requirements/requirementTags';
+import { MenuPicker } from './MenuPicker';
 import { type BulkItemUpdate, bulkPatches } from '../../domain/requirements/requirementsBulkEdit';
 import type { ProgramIncrement } from '../../domain/timeline/programIncrements';
 import type { TeamDocument } from '../../domain/timeline/teamTypes';
@@ -95,96 +96,71 @@ export function BulkEditBar({
       </div>
 
       <div className="bulk-edit-bar__actions">
-        <select
-          className="bulk-edit-bar__select"
-          aria-label="Set status of selected items"
+        <MenuPicker
+          label="Set status of selected items"
           value=""
+          placeholder="Status"
+          options={REQUIREMENT_STATUSES}
           disabled={nothing || noWork}
           title={workTitle}
-          onChange={(e) => {
-            const status = e.target.value as RequirementItem['status'];
-            onApply(bulkPatches.status(doc, selectedItems, status));
-          }}
-        >
-          <option value="" disabled>
-            Status…
-          </option>
-          {REQUIREMENT_STATUSES.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.label}
-            </option>
-          ))}
-        </select>
+          onChange={(id) =>
+            onApply(bulkPatches.status(doc, selectedItems, id as RequirementItem['status']))
+          }
+        />
 
-        <select
-          className="bulk-edit-bar__select"
-          aria-label="Move selected items to a sprint"
+        <MenuPicker
+          label="Move selected items to a sprint"
           value=""
+          placeholder="Sprint"
+          width={220}
+          options={[
+            { id: NONE, label: 'Backlog (no sprint)' },
+            ...programIncrements.flatMap((pi) =>
+              pi.sprints.map((sp) => ({
+                id: sp.id,
+                label: sp.name || 'Unnamed sprint',
+                group: pi.name || 'Unnamed PI',
+              })),
+            ),
+          ]}
           disabled={nothing || noWork}
           title={workTitle}
-          onChange={(e) => {
-            const value = e.target.value;
-            onApply(bulkPatches.sprint(doc, selectedItems, value === NONE ? undefined : value));
-          }}
-        >
-          <option value="" disabled>
-            Sprint…
-          </option>
-          <option value={NONE}>Backlog (no sprint)</option>
-          {programIncrements.map((pi) => (
-            <optgroup key={pi.id} label={pi.name || 'Unnamed PI'}>
-              {pi.sprints.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name || 'Unnamed sprint'}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
+          onChange={(id) =>
+            onApply(bulkPatches.sprint(doc, selectedItems, id === NONE ? undefined : id))
+          }
+        />
 
-        <select
-          className="bulk-edit-bar__select"
-          aria-label="Set category of selected items"
+        <MenuPicker
+          label="Set category of selected items"
           value=""
+          placeholder="Category"
+          width={200}
+          options={[
+            { id: NONE, label: 'No category' },
+            ...doc.categories.map((c) => ({ id: c.id, label: c.label, color: c.color })),
+          ]}
           disabled={nothing}
-          onChange={(e) => {
-            const value = e.target.value;
-            onApply(bulkPatches.category(selectedItems, value === NONE ? undefined : value));
-          }}
-        >
-          <option value="" disabled>
-            Category…
-          </option>
-          <option value={NONE}>No category</option>
-          {doc.categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.label}
-            </option>
-          ))}
-        </select>
+          onChange={(id) =>
+            onApply(bulkPatches.category(selectedItems, id === NONE ? undefined : id))
+          }
+        />
 
         {team && (
-          <select
-            className="bulk-edit-bar__select"
-            aria-label="Assign selected items"
+          <MenuPicker
+            label="Assign selected items"
             value=""
+            placeholder="Assignee"
+            width={210}
+            options={[
+              { id: NONE, label: 'Unassigned' },
+              ...team.members.map((m) => ({ id: m.id, label: m.name || 'Unnamed' })),
+            ]}
             disabled={nothing || noWork}
             title={workTitle}
-            onChange={(e) => {
-              const value = e.target.value;
-              onApply(bulkPatches.assignee(doc, selectedItems, value === NONE ? undefined : value));
-            }}
-          >
-            <option value="" disabled>
-              Assignee…
-            </option>
-            <option value={NONE}>Unassigned</option>
-            {team.members.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name || 'Unnamed'}
-              </option>
-            ))}
-          </select>
+            onChange={(id) =>
+              onApply(bulkPatches.assignee(doc, selectedItems, id === NONE ? undefined : id))
+            }
+          />
         )}
 
         <div className="bulk-edit-bar__tag">
@@ -220,21 +196,13 @@ export function BulkEditBar({
         </div>
 
         {selectedTags.length > 0 && (
-          <select
-            className="bulk-edit-bar__select"
-            aria-label="Remove a tag from selected items"
+          <MenuPicker
+            label="Remove a tag from selected items"
             value=""
-            onChange={(e) => onApply(bulkPatches.removeTag(selectedItems, e.target.value))}
-          >
-            <option value="" disabled>
-              Remove tag…
-            </option>
-            {selectedTags.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
+            placeholder="Remove tag"
+            options={selectedTags.map((t) => ({ id: t, label: t }))}
+            onChange={(tag) => onApply(bulkPatches.removeTag(selectedItems, tag))}
+          />
         )}
       </div>
 

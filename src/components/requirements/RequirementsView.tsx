@@ -62,6 +62,7 @@ import { NO_EPIC_KEY, useRequirementGroups } from './useRequirementGroups';
 import { RequirementsCoverageBar } from './RequirementsCoverageBar';
 import { type ItemViewContext, RequirementItemView } from './RequirementItemView';
 import { ChildQuickAdd } from './ChildQuickAdd';
+import { MenuPicker, type MenuOption } from './MenuPicker';
 import {
   RequirementsTable,
   type RequirementsTableRow,
@@ -133,6 +134,12 @@ const EMPTY_PEERS: PresenceInfo[] = [];
 const NO_GAPS: readonly RequirementGap[] = [];
 
 const EPIC_SECTION_KEY = '__epics__';
+
+const GROUP_BY_OPTIONS: MenuOption[] = [
+  { id: 'type', label: 'Type', description: 'Requirements, goals, tickets and so on' },
+  { id: 'category', label: 'Category', description: 'By assigned category' },
+  { id: 'epic', label: 'Epic', description: 'Each epic with its children beneath it' },
+];
 
 /** The gaps offered as one-click filters beside the coverage line, each
  * with how many items have it. */
@@ -910,6 +917,26 @@ export function RequirementsView({
     [milestones],
   );
 
+  /** For each item someone else has their cursor in: their names, and the
+   * first one's colour for the dot on its table line. Rebuilt only when
+   * the people or what they are in changes, so table lines stay memoized. */
+  const editorsKey = peers
+    .filter((p) => p.focusedItemId)
+    .map((p) => `${p.focusedItemId}\u0000${p.name}\u0000${p.color}`)
+    .join('\u0001');
+  const editorsByItemId = useMemo(() => {
+    const byItem = new Map<string, { names: string; color: string }>();
+    for (const entry of editorsKey ? editorsKey.split('\u0001') : []) {
+      const [itemId, name, color] = entry.split('\u0000');
+      const existing = byItem.get(itemId);
+      byItem.set(itemId, {
+        names: existing ? `${existing.names}, ${name}` : name,
+        color: existing?.color ?? color,
+      });
+    }
+    return byItem;
+  }, [editorsKey]);
+
   /** What every opened item needs - see ItemViewContext. */
   const itemViewContext: ItemViewContext = {
     doc,
@@ -1243,18 +1270,17 @@ export function RequirementsView({
         </div>
 
         <div className="requirements-view__toolbar-right">
-          <label className="requirements-view__group-by">
+          <div className="requirements-view__group-by">
             <span className="requirements-view__toolbar-label">Group by</span>
-            <select
+            <MenuPicker
+              label="Group by"
               value={groupBy}
-              onChange={(e) => setGroupBy(e.target.value as RequirementsGroupBy)}
-              title="How the items are grouped"
-            >
-              <option value="type">Type</option>
-              <option value="category">Category</option>
-              <option value="epic">Epic</option>
-            </select>
-          </label>
+              placeholder="Type"
+              width={150}
+              options={GROUP_BY_OPTIONS}
+              onChange={(id) => setGroupBy(id as RequirementsGroupBy)}
+            />
+          </div>
           <div className="requirements-view__group-control">
             <div className="requirements-view__group-toggle">
               <button
@@ -1462,6 +1488,7 @@ export function RequirementsView({
                 onNavigateToNode={onNavigateToNode}
                 highlightedId={highlightedId ?? (trimmedSearch ? (activeItem?.id ?? null) : null)}
                 searchQuery={trimmedSearch}
+                editorsByItemId={editorsByItemId}
                 bulkSelectedIds={bulkSelectedIds}
                 onToggleBulkSelected={isSelectMode ? onToggleBulkSelected : undefined}
               />

@@ -543,6 +543,10 @@ async function run() {
       // B opens the same line and sees that A is in it.
       const line = b.locator('.requirements-table__title', { hasText: 'Seen by both' });
       await line.waitFor({ timeout: 10_000 });
+      await b.waitForSelector('.requirements-table__row .requirements-table__editing', {
+        timeout: 10_000,
+      });
+      check(true, "B's table shows a dot on the line A is editing, before opening it");
       await line.click();
       await b.waitForSelector('.requirements-table__detail .requirement-card__peers', {
         timeout: 10_000,

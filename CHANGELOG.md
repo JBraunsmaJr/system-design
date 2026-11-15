@@ -29,6 +29,14 @@ markers are removed when the section becomes a release. See
 - `ADMIN_GROUPS` makes the members of an identity-provider group store administrators in that API.
   `WORKSPACE_CREATION` sets who may create workspaces there.
 
+### Requirements: one menu style, and a dot on lines being edited
+
+- The bulk edit bar's Status, Sprint, Category, Assignee and Remove tag menus, and the toolbar's **Group by**, use the
+  same menu as the item pickers instead of the browser's own. The sprint menu groups sprints under their program
+  increment.
+- In a live session a table line shows a dot, in that person's colour, when someone else's cursor is in its item, so
+  you can tell before opening it. The tooltip names them.
+
 ### Requirements: who else is editing an open item
 
 - In a live session, an item open in the table or the split view shows a badge for each other person whose cursor is

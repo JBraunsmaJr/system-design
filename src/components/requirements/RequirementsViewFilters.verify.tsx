@@ -512,11 +512,12 @@ console.log('=== Bars ===');
     'the bulk bar counts the selection',
   );
   const statusSelect =
-    bulk.match(/<select[^>]*aria-label="Set status of selected items"[^>]*>/)?.[0] ?? '';
+    bulk.match(/<button[^>]*aria-label="Set status of selected items[^"]*"[^>]*>/)?.[0] ?? '';
   assert(
     / disabled=""/.test(statusSelect) && /only work items/i.test(statusSelect),
     'with only non-work items selected, status is disabled and says why',
   );
+  assert(!bulk.includes('<select'), "the bulk bar's menus are the app's own, not the browser's");
   const categorySelect =
     bulk.match(/<select[^>]*aria-label="Set category of selected items"[^>]*>/)?.[0] ?? '';
   assert(!/ disabled=""/.test(categorySelect), 'category still applies to them');

@@ -65,6 +65,8 @@ interface RequirementsTableProps {
   highlightedId: string | null;
   /** Marked in ids and titles. */
   searchQuery?: string;
+  /** Items someone else in the session has their cursor in. */
+  editorsByItemId?: ReadonlyMap<string, { names: string; color: string }>;
   bulkSelectedIds: ReadonlySet<string>;
   /** Set while selecting: rows get a checkbox. */
   onToggleBulkSelected?: (itemId: string, extendRange: boolean) => void;
@@ -86,6 +88,10 @@ interface RowProps {
   isHighlighted: boolean;
   isBulkSelected: boolean;
   searchQuery?: string;
+  /** Who else is editing this item, as text, and the colour of their dot.
+   * Two plain strings rather than one object so the row stays memoized. */
+  editorNames?: string;
+  editorColor?: string;
   onToggleExpanded: (itemId: string) => void;
   onToggleFolded: (itemId: string) => void;
   onNavigateToNode?: (path: DiagramPath, nodeId: string) => void;
@@ -104,6 +110,8 @@ const Row = memo(function Row({
   isHighlighted,
   isBulkSelected,
   searchQuery,
+  editorNames,
+  editorColor,
   onToggleExpanded,
   onToggleFolded,
   onNavigateToNode,
@@ -162,6 +170,15 @@ const Row = memo(function Row({
             <span className="requirements-table__none">Untitled</span>
           )}
         </button>
+        {editorNames && (
+          <span
+            className="requirements-table__editing"
+            style={{ background: editorColor }}
+            role="img"
+            aria-label={`${editorNames} ${editorNames.includes(', ') ? 'are' : 'is'} editing this`}
+            title={`${editorNames} ${editorNames.includes(', ') ? 'are' : 'is'} editing this`}
+          />
+        )}
         {row.descendantCount > 0 && (
           <button
             type="button"
@@ -285,6 +302,7 @@ export function RequirementsTable({
   onNavigateToNode,
   highlightedId,
   searchQuery,
+  editorsByItemId,
   bulkSelectedIds,
   onToggleBulkSelected,
 }: RequirementsTableProps) {
@@ -358,6 +376,8 @@ export function RequirementsTable({
                     isHighlighted={highlightedId === item.id}
                     isBulkSelected={bulkSelectedIds.has(item.id)}
                     searchQuery={searchQuery}
+                    editorNames={editorsByItemId?.get(item.id)?.names}
+                    editorColor={editorsByItemId?.get(item.id)?.color}
                     onToggleExpanded={onToggleExpanded}
                     onToggleFolded={onToggleFolded}
                     onNavigateToNode={onNavigateToNode}

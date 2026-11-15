@@ -2299,7 +2299,6 @@ mark.search-highlight--ellipsis {
   flex: 1;
 }
 
-.bulk-edit-bar__select,
 .bulk-edit-bar__tag {
   height: 26px;
   font: inherit;
@@ -2310,12 +2309,6 @@ mark.search-highlight--ellipsis {
   border-radius: var(--radius-sm);
 }
 
-.bulk-edit-bar__select {
-  padding: 0 6px;
-  cursor: pointer;
-}
-
-.bulk-edit-bar__select:disabled,
 .bulk-edit-bar__tag-input:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -3171,23 +3164,6 @@ mark.search-highlight--ellipsis {
   white-space: nowrap;
 }
 
-.requirements-view__group-by > select {
-  height: 30px;
-  padding: 0 8px;
-  border: 1px solid var(--chrome-border);
-  border-radius: var(--radius-sm);
-  background: var(--chrome-bg);
-  color: var(--chrome-text);
-  font-size: var(--text-xs-plus);
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.requirements-view__group-by > select:focus-visible {
-  outline: 1px solid var(--accent);
-  border-color: var(--accent);
-}
-
 /* Search takes the room the left side has, up to a comfortable width. */
 .requirements-view__toolbar-left > .requirements-view__search-wrap {
   flex: 1 1 220px;
@@ -3473,4 +3449,19 @@ mark.search-highlight--ellipsis {
 
 .requirement-page.has-peers {
   padding-left: 14px;
+}
+
+/* Someone else in the session has their cursor in this line's item. */
+.requirements-table__editing {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-round);
+  box-shadow: 0 0 0 2px var(--chrome-bg-raised);
+}
+
+/* A menu that can't be used right now (nothing it applies to is selected). */
+.status-picker__trigger:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }

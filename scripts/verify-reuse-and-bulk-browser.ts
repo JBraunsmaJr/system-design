@@ -443,7 +443,10 @@ async function run() {
       ((await p.textContent('.bulk-edit-bar__selection strong')) ?? '') === '3 selected',
       'shift-click selects the range',
     );
-    await p.selectOption('select[aria-label="Set status of selected items"]', 'in-progress');
+    await p.click(
+      '.bulk-edit-bar .status-picker__trigger[aria-label^="Set status of selected items"]',
+    );
+    await p.click('.status-picker__dropdown .status-picker__option:has-text("In Progress")');
     await p.waitForTimeout(150);
     for (const id of ['TICKET-2', 'TICKET-3', 'TICKET-4']) {
       check(
@@ -459,7 +462,14 @@ async function run() {
       )) === 'Status: Done',
       'TICKET-1 kept its own status',
     );
-    await p.selectOption('select[aria-label="Move selected items to a sprint"]', 'sp-2');
+    await p.click(
+      '.bulk-edit-bar .status-picker__trigger[aria-label^="Move selected items to a sprint"]',
+    );
+    check(
+      (await p.locator('.status-picker__dropdown .status-picker__heading').count()) > 0,
+      'the sprint menu groups sprints under their program increment',
+    );
+    await p.click(`.status-picker__dropdown .status-picker__option:has-text("Sprint 2")`);
     await p.waitForTimeout(150);
     check(
       (
