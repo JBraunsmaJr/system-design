@@ -3312,3 +3312,40 @@ mark.search-highlight--ellipsis {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ---------- Toolbar: group-by select ---------- */
+
+.requirements-view__group-by {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.requirements-view__group-by > .requirements-view__toolbar-label {
+  text-transform: none;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.requirements-view__group-by > select {
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  background: var(--chrome-bg);
+  color: var(--chrome-text);
+  font-size: var(--text-xs-plus);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.requirements-view__group-by > select:focus-visible {
+  outline: 1px solid var(--accent);
+  border-color: var(--accent);
+}
+
+/* Search takes the room the left side has, up to a comfortable width. */
+.requirements-view__toolbar-left > .requirements-view__search-wrap {
+  flex: 1 1 220px;
+  max-width: 340px;
+}

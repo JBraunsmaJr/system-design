@@ -80,14 +80,15 @@ Organize large requirement catalogs into functional domains and toggle view layo
 
 ### Grouping Views
 
-Toggle between two organization modes using the toolbar controls:
+Choose how items are grouped with **Group by** in the toolbar:
 
-- **Group by Type**: Groups items by their artifact type (_Requirements_, _Goals_, _Tickets_, etc.).
-- **Group by Category**: Groups items by assigned functional category, with an _Uncategorized_ section for unsorted items.
+- **Type**: by artifact type (_Requirements_, _Goals_, _Tickets_, etc.).
+- **Category**: by assigned functional category, with an _Uncategorized_ section for unsorted items.
+- **Epic**: each epic with its children nested beneath it, and a _No epic_ section for the rest.
 
 ### Layouts
 
-**View** in the toolbar chooses how the items are laid out:
+The **Table / Cards / Split** buttons in the toolbar choose how the items are laid out:
 
 - **Table** (the default): one line per item with its type, status, the components linked to it and how it is
   verified. Each group's heading shows how much of it is verified. Click a line to open the item beneath it, laid out

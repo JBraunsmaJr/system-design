@@ -16,14 +16,11 @@ import {
   ChevronUp,
   Columns2,
   Filter,
-  LayoutList,
   ListChecks,
-  ListTree,
   Rows3,
   Search,
   Table2,
   Settings2,
-  Tags,
   Waypoints,
   X,
 } from 'lucide-react';
@@ -1137,12 +1134,6 @@ export function RequirementsView({
     <div className="requirements-view">
       <div className="requirements-view__toolbar">
         <div className="requirements-view__toolbar-left">
-          <AddItemDropdown
-            itemTypes={doc.itemTypes}
-            onAddItem={onAddItem}
-            onOpenManageTypes={() => setIsManagingTypes(true)}
-            itemCountsByType={itemCountsByType}
-          />
           <div className={`requirements-view__search-wrap${search.trim() ? ' has-query' : ''}`}>
             <Search size={13} className="requirements-view__search-icon" />
             <input
@@ -1245,44 +1236,19 @@ export function RequirementsView({
         </div>
 
         <div className="requirements-view__toolbar-right">
+          <label className="requirements-view__group-by">
+            <span className="requirements-view__toolbar-label">Group by</span>
+            <select
+              value={groupBy}
+              onChange={(e) => setGroupBy(e.target.value as RequirementsGroupBy)}
+              title="How the items are grouped"
+            >
+              <option value="type">Type</option>
+              <option value="category">Category</option>
+              <option value="epic">Epic</option>
+            </select>
+          </label>
           <div className="requirements-view__group-control">
-            <span className="requirements-view__toolbar-label">Group:</span>
-            <div className="requirements-view__group-toggle">
-              <button
-                type="button"
-                className={groupBy === 'type' ? 'active' : undefined}
-                aria-pressed={groupBy === 'type'}
-                onClick={() => setGroupBy('type')}
-                title="Group by item type"
-              >
-                <LayoutList size={12} />
-                <span>Type</span>
-              </button>
-              <button
-                type="button"
-                className={groupBy === 'category' ? 'active' : undefined}
-                aria-pressed={groupBy === 'category'}
-                onClick={() => setGroupBy('category')}
-                title="Group by category"
-              >
-                <Tags size={12} />
-                <span>Category</span>
-              </button>
-              <button
-                type="button"
-                className={groupBy === 'epic' ? 'active' : undefined}
-                aria-pressed={groupBy === 'epic'}
-                onClick={() => setGroupBy('epic')}
-                title="Group by epic, with each epic's children nested beneath it"
-              >
-                <ListTree size={12} />
-                <span>Epic</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="requirements-view__group-control">
-            <span className="requirements-view__toolbar-label">View:</span>
             <div className="requirements-view__group-toggle">
               <button
                 type="button"
@@ -1315,54 +1281,59 @@ export function RequirementsView({
                 <span>Split</span>
               </button>
             </div>
-            <div className="requirements-view__group-toggle">
-              <button
-                type="button"
-                onClick={() => {
-                  setCollapsedIds(new Set(doc.items.map((i) => i.id)));
-                  setExpandedIds(new Set());
-                }}
-                title="Collapse all cards to their headers"
-                aria-label="Collapse all cards"
-              >
-                <ChevronsDownUp size={12} />
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setCollapsedIds(new Set());
-                  setFoldedIds(new Set());
-                }}
-                title="Expand all cards and show every epic's children"
-                aria-label="Expand all cards"
-              >
-                <ChevronsUpDown size={12} />
-              </button>
-            </div>
+            {/* Folding every card only means something where there are cards. */}
+            {layout === 'list' && (
+              <div className="requirements-view__group-toggle">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCollapsedIds(new Set(doc.items.map((i) => i.id)));
+                    setExpandedIds(new Set());
+                  }}
+                  title="Collapse all cards to their headers"
+                  aria-label="Collapse all cards"
+                >
+                  <ChevronsDownUp size={12} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCollapsedIds(new Set());
+                    setFoldedIds(new Set());
+                  }}
+                  title="Expand all cards and show every epic's children"
+                  aria-label="Expand all cards"
+                >
+                  <ChevronsUpDown size={12} />
+                </button>
+              </div>
+            )}
           </div>
 
-          <div className="requirements-view__toolbar-divider" />
-
-          <div className="requirements-view__manage-group">
+          <div className="requirements-view__group-toggle">
             <button
               type="button"
-              className="requirements-view__manage-btn"
               onClick={() => setIsManagingTypes(true)}
               title="Manage requirement types"
+              aria-label="Manage requirement types"
             >
               <Settings2 size={13} />
-              <span>Types</span>
             </button>
             <button
               type="button"
-              className="requirements-view__manage-btn"
               onClick={() => setIsManagingRelationshipTypes(true)}
               title="Manage relationship types"
+              aria-label="Manage relationship types"
             >
               <Waypoints size={13} />
-              <span>Relationships</span>
             </button>
           </div>
+          <AddItemDropdown
+            itemTypes={doc.itemTypes}
+            onAddItem={onAddItem}
+            onOpenManageTypes={() => setIsManagingTypes(true)}
+            itemCountsByType={itemCountsByType}
+          />
         </div>
       </div>
 

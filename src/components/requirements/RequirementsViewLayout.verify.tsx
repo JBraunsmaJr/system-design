@@ -198,9 +198,21 @@ console.log('=== Split view ===');
     'the toolbar offers Table, Cards and Split',
   );
   assert(
-    html.includes('aria-label="Collapse all cards"') &&
-      html.includes('aria-label="Expand all cards"'),
-    'the toolbar offers Collapse all and Expand all',
+    !html.includes('aria-label="Collapse all cards"'),
+    'folding every card is not offered where there are no cards',
+  );
+  assert(
+    /<select[^>]*>.*?<option value="type"[^>]*>Type<.*?<option value="epic"[^>]*>Epic</s.test(html),
+    'grouping is one "Group by" select',
+  );
+  assert(
+    html.includes('aria-label="Manage requirement types"') &&
+      html.includes('aria-label="Manage relationship types"'),
+    'types and relationship types are managed from the toolbar',
+  );
+  assert(
+    html.indexOf('New Requirement') > html.indexOf('>Split</span>'),
+    'the button for a new item comes last',
   );
 }
 

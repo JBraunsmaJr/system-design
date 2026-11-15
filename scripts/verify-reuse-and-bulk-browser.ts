@@ -54,6 +54,16 @@ async function diagram(p: Page): Promise<{ nodes: StoredNode[]; edges: { id: str
 const rootNodes = async (p: Page) =>
   (await diagram(p)).nodes.filter((n) => (n.data.parentPath ?? []).length === 0);
 
+/** Waits for the root diagram to hold `count` nodes rather than sleeping a
+ * fixed time, which is too short on a loaded machine. */
+async function rootNodeCountReaches(p: Page, count: number): Promise<boolean> {
+  for (let i = 0; i < 40; i++) {
+    if ((await rootNodes(p)).length === count) return true;
+    await p.waitForTimeout(100);
+  }
+  return false;
+}
+
 async function select(p: Page, nodeIds: string[]) {
   await p.evaluate((ids) => {
     const perf = (
@@ -302,16 +312,14 @@ async function run() {
       );
       const countBefore = (await rootNodes(p)).length;
       await hit.dragTo(p.locator('.react-flow__pane'), { targetPosition: { x: 700, y: 300 } });
-      await p.waitForTimeout(400);
-      check((await rootNodes(p)).length === countBefore + 1, 'a result drags onto the canvas');
+      check(await rootNodeCountReaches(p, countBefore + 1), 'a result drags onto the canvas');
       // Enter adds the first match without a drag.
       await p.keyboard.press('/');
       await p.keyboard.type('cache');
       await p.locator('.palette__item.is-top-result').waitFor();
       await p.keyboard.press('Enter');
-      await p.waitForTimeout(400);
       check(
-        (await rootNodes(p)).length === countBefore + 2,
+        await rootNodeCountReaches(p, countBefore + 2),
         'Enter adds the first match to the canvas',
       );
       await p.keyboard.press('Escape');

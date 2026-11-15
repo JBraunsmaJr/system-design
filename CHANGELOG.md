@@ -29,6 +29,12 @@ markers are removed when the section becomes a release. See
 - `ADMIN_GROUPS` makes the members of an identity-provider group store administrators in that API.
   `WORKSPACE_CREATION` sets who may create workspaces there.
 
+### Requirements: a simpler toolbar
+
+- The toolbar reads left to right as find, then arrange, then add: search, Filter and Select on the left; **Group by**
+  (now one menu), the Table / Cards / Split buttons, the two manage buttons and **New Requirement** on the right.
+- Collapse all and Expand all appear only in the Cards layout, where there are cards to fold.
+
 ### [MINOR] Requirements: the split view opens an item as a page
 
 - The split view's right-hand pane shows the selected item as a page: its id, kind and title with **Show on diagram**,
