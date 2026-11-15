@@ -1,11 +1,12 @@
 # Workspaces
 
-A **workspace** is shared storage for documents. Everyone in it can open the
-same documents from any browser they have signed in on, and changes are kept
-without anyone remembering to save or send a file.
+A **workspace** is shared storage for a team's documents, kept on your
+organization's server. Everyone in it can open the same documents from any
+browser they have signed in on, and changes are kept without anyone
+remembering to save or send a file.
 
-Workspaces are optional. With no workspace configured, the editor behaves as
-it always has: documents live in your browser, sessions are started from a
+Workspaces are optional. With no store set up, the editor behaves as it
+always has: documents live in your browser, sessions are started from a
 link, and nothing leaves the machine.
 
 ::: tip The short version
@@ -13,116 +14,137 @@ A **workspace** is where documents live. A **session** is who is in one right
 now. Opening a workspace document puts you in its session automatically.
 :::
 
+::: warning Who can read a workspace document
+Documents in a workspace are stored on your organization's server as they
+are. Its administrators can read them. The editor says so wherever it shows
+workspaces. [How your work is protected](/guide/security) has the detail.
+:::
+
 ## Signing in
 
-Open **File → Documents**. If your deployment has a workspace, a Workspace
-section appears at the top with the sign-in providers it accepts - usually
-your organization's single sign-on.
+Open **File → Documents** and choose **Sign in**. You are sent to your
+organization's sign-in page and brought back to the document you had open.
 
-Signing in identifies you. It does not, on its own, let you read anything:
-documents are encrypted with keys the server never holds, so access is
-something a person gives you, not something the server can grant.
+That is all there is to it. There is nothing to set up on each browser, no
+code to compare, and nobody has to approve you: the workspaces you can use
+are there as soon as you are signed in.
 
-## The first browser
+### If your editor has no store
 
-The first person to use a workspace sets it up: their browser generates the
-keys and is ready immediately. Any document they save becomes readable by
-anyone they let in afterwards.
+Some copies of the editor are not set up with a store - the public one, for
+example. **File → Documents** then shows **No store**. Choose **Connect to a
+store** and type the address your administrator gave you. The editor checks
+that a store answers there before remembering it, and reloads.
 
-## Every browser after that
+The address is remembered in this browser only. **Change** lets you point at
+a different store or stop using one. Documents already in your browser stay
+where they are whichever you choose.
 
-A **second browser of your own** - a laptop as well as a desktop - shows a
-short verification code and waits. On a browser you already use, open
-**File → Documents** and approve it, checking the code matches on both
-screens. Comparing the code is what stops someone substituting their own
-browser for yours; if the codes differ, refuse.
+## Which workspaces you have
 
-A **different person** signing in is told they are waiting for access.
-Anyone already in the workspace sees them listed under _People in this
-workspace_ with a **Give access** button. Pressing it hands them the
-workspace key, wrapped so that only they can open it. Their browser picks it
-up within a few seconds.
+A workspace is yours in one of two ways, and the panel tells you which:
 
-Nothing you do while waiting can read the workspace - and neither can the
-server.
+> You are an editor here, through the group /platform-eng.
 
-### Joining automatically
+- **Through a group.** Your organization's sign-in tells the store which
+  groups you are in, and a workspace can give a whole group a role. Join the
+  group and you have the workspace the next time you sign in.
+- **By name.** An owner of the workspace added you.
 
-Your workspace may be set up to let in everyone in a particular group at your
-organization. If you are in it, you do not wait for anyone to press a button:
-a teammate's open editor checks your sign-in and lets you in, usually within
-a few seconds.
+If you expected a workspace and it is not there, sign out and in again:
+groups are read when you sign in. If it still is not there, ask one of its
+owners, or your administrator.
 
-If nobody in the workspace has the editor open, you wait until someone does -
-the screen says so. Leave it open, or come back later; if a day passes, you
-will be asked to sign in again so your sign-in can be checked.
+| Role       | You can                                                         |
+| :--------- | :-------------------------------------------------------------- |
+| **Viewer** | Open the workspace's documents and follow changes to them.      |
+| **Editor** | Also create, change, delete and restore documents.              |
+| **Owner**  | Also rename the workspace and decide who is in it, and as what. |
 
-Your teammate's browser checks your organization's signed record of your
-groups itself, rather than trusting the workspace server, so the server
-cannot use this to let anyone else in. Administrators set it up as described
-in [Automatic Access from Groups](/deployment/group-access).
+## Putting a document in a workspace
+
+Open the document, then **File → Documents**, pick the workspace, and choose
+**Add a copy to …**.
+
+The workspace gets a copy, and the editor switches you to it. The original
+stays in your browser, untouched; delete it from your documents list if you
+no longer want it. From then on the copy saves to the workspace as you work.
+
+## Opening one
+
+**File → Documents**, pick the workspace, and choose **Open** beside the
+document. It arrives from the store with everyone's changes.
+
+The "Linked document" field on a diagram node offers workspace documents
+too, including ones you have never opened.
 
 ## Saving
 
-Save the open document with **Save this document to the workspace**. From
-then on it keeps itself up to date: every autosave goes to the workspace as
-well as to your browser, and the save indicator reads **In workspace**.
+A workspace document keeps itself up to date. Every change goes to the
+workspace within a second or so, and the save indicator says where your work
+is.
 
-If the workspace is unreachable, the editor says so and keeps working. Your
+If the store is unreachable, the editor says so and keeps working. Your
 changes stay in your browser and go up when it returns.
 
 ## Working together
 
 Opening a workspace document puts you in a live session with everyone else
-who has it open. You see their cursors, their selections and their names, and
-their edits arrive as they type. Nobody shares a link - everyone holding the
-document's key arrives in the same place.
+who can edit it and has it open. You see their cursors, their selections and
+their names, and their edits arrive as they type. Nobody shares a link.
 
 Concurrent edits **merge**. Two people editing the same diagram both keep
 their work; there is no last-writer-wins and no overwrite. Someone who edits
 while disconnected keeps those changes too, and they are merged when they
 come back.
 
+**Viewers** are not in the live session. They see changes a few seconds
+after they are made, and anything they change on their own screen stays
+there: it is not sent to the workspace.
+
+## Deleting, and getting a document back
+
+An editor can delete a document from a workspace with the bin beside it. It
+is gone for everyone in the workspace, but not at once from the store: your
+organization keeps deleted documents for a period, so a mistake can be
+undone.
+
+Choose **Deleted** in the workspace panel to see what is being kept and for
+how long, and **Restore** to bring one back. If you had it open, saving
+resumes when you return to the tab.
+
+## Managing a workspace
+
+Owners see more in the panel.
+
+**Members** lists the people added by name and the groups that have a role.
+
+- **Add someone** by typing their name. They can be found once they have
+  signed in at least once.
+- **Add a group** by typing its name as your sign-in provider reports it,
+  and picking a role. Everyone in it has that role the next time they sign
+  in. Your own groups are suggested; any other is typed.
+- Change a role with the menu beside a person or group, or remove them with
+  the bin.
+
+Someone with more than one role - their own, and one from a group - has the
+highest of them. To give someone less than their group has, they have to
+come out of the group.
+
+The editor asks before a change that would take away your own access or
+leave the workspace with no owner.
+
+**Rename** changes the workspace's name for everyone.
+
 ## Losing a laptop
 
-Two steps, and both matter:
+Sign-in is your organization's, so that is where a lost machine is dealt
+with: change your password there, and ask your administrator to end your
+sessions. Nothing about the workspace needs replacing.
 
-1. **Revoke the browser.** Under _Browsers with access_, press **Revoke**.
-   The workspace stops serving it immediately.
-2. **Rotate the key.** A revoked browser still holds the workspace key it
-   already had. **Rotate key** replaces it so that key opens nothing saved
-   afterwards. Every document is re-wrapped; no content is re-encrypted and
-   nothing is lost - a workspace of 500 documents rotates in under a second.
-
-Revoking alone is not enough, and the editor says so at the point you do it.
-
-## Getting back in
-
-| Situation                                       | What to use                             |
-| ----------------------------------------------- | --------------------------------------- |
-| New browser, one you already use still works    | Approve it from the working browser     |
-| Every browser gone, you have your recovery code | The recovery code unseals your keys     |
-| Every browser gone and no recovery code         | An administrator re-grants access       |
-| The workspace itself has lost its keys          | The organization's offline recovery key |
-
-### Your recovery code
-
-Once you have access, File → Documents offers to **create a recovery code**.
-It is shown once - 28 characters in groups of five - and you are asked to
-confirm you have kept it. Keep it somewhere other than the machines it
-recovers: written down, or in a password manager.
-
-The workspace never stores the code in any form, which is also why nobody -
-including an administrator - can look it up for you. You can make a new one
-at any time; the old one stops working.
-
-To use it, open File → Documents on the new browser. It will be waiting for
-approval; choose **No other browser? Use your recovery code** and type it.
-Case, spaces and dashes do not matter, and a mistyped character is caught
-before anything is sent, because the code checks itself.
+Documents you had open are still in that browser's storage. If that matters,
+treat the laptop as you would one holding the files themselves.
 
 ## What the server can see
 
-See [How your work is protected](/guide/security) for the detail. In short:
-in its default mode the workspace stores documents it cannot read, and the
-interface tells you plainly on the rare deployment configured otherwise.
+Everything in a workspace. See [How your work is protected](/guide/security).

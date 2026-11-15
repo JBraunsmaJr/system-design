@@ -3,22 +3,22 @@
 The editor runs entirely in the browser, so you can host it for your team
 with no database at all. Choose the path that fits.
 
-|                                                | [Core](/deployment/core) | [With workspaces](/deployment/with-workspaces)         |
-| :--------------------------------------------- | :----------------------- | :----------------------------------------------------- |
-| Draw, save to the browser and to files         | ✓                        | ✓                                                      |
-| Live sessions, by sharing a link               | ✓                        | ✓                                                      |
-| Shared team storage                            |                          | ✓                                                      |
-| Sign in with your identity provider            |                          | ✓                                                      |
-| Live sessions only for people who signed in    |                          | ✓                                                      |
-| Documents open from any browser you sign in on |                          | ✓                                                      |
-| Services                                       | editor, relay, coturn    | editor, relay, coturn, store, PostgreSQL               |
-| Stores documents on your server                | No                       | Yes, encrypted - the server cannot read them           |
-| You look after                                 | a TLS certificate        | a certificate, a database, backups, and a recovery key |
-| Setup time                                     | ~10 minutes              | ~30 minutes                                            |
+|                                                | [Core](/deployment/core) | [With workspaces](/deployment/with-workspaces)     |
+| :--------------------------------------------- | :----------------------- | :------------------------------------------------- |
+| Draw, save to the browser and to files         | ✓                        | ✓                                                  |
+| Live sessions, by sharing a link               | ✓                        | ✓                                                  |
+| Shared team storage                            |                          | ✓                                                  |
+| Sign in with your identity provider            |                          | ✓                                                  |
+| Live sessions only for people who signed in    |                          | ✓                                                  |
+| Documents open from any browser you sign in on |                          | ✓                                                  |
+| Services                                       | editor, relay, coturn    | editor, relay, coturn, store, PostgreSQL           |
+| Stores documents on your server                | No                       | Yes, readable by the server and its administrators |
+| You look after                                 | a TLS certificate        | a certificate, a database and its backups          |
+| Setup time                                     | ~10 minutes              | ~20 minutes                                        |
 
 **Not sure?** Start with [Core](/deployment/core). Moving to workspaces later
 means adding services, not replacing anything, and documents people already
-have stay in their browsers until they choose to save them to the workspace.
+have stay in their browsers until they choose to add them to a workspace.
 
 Both paths use one domain and one TLS proxy with every service behind it by
 path. That keeps browsers' cookie and cross-origin rules out of the way, so

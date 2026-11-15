@@ -29,9 +29,8 @@ in the path.
   than assumed.
 - Stateless. It stores nothing on disk, keeps no database, and forgets
   everything when it restarts.
-- Unaware of your content. Session traffic is encrypted with the key in the
-  session's link before it reaches the relay, and the relay never has that
-  key.
+- Unaware of your content. Session traffic is encrypted with the session's
+  key before it reaches the relay, and the relay never has that key.
 - Optionally restricted to people who have signed in, where you also run a
   workspace. See [Who can use it](#who-can-use-it).
 
@@ -185,12 +184,17 @@ or you tell them the new URL.
 
 Two separate questions, with separate answers.
 
-**Who can read a session?** Only people with its link. A session's link
-carries a key; everything the session sends - through the relay and
-directly between browsers - is encrypted with it, and neither the relay nor
-the workspace store ever has it. This is always on. Someone who learns only a
+**Who can read a session?** Only people with its key. Everything a session
+sends - through the relay and directly between browsers - is encrypted with
+it, and the relay never has it. This is always on. Someone who learns only a
 session's room name can connect to the relay and see that the room exists,
 and nothing more.
+
+- A session someone **starts and shares** carries its key in the link, so
+  only people with the link can read it. The workspace store never has that
+  key either.
+- A **workspace document's** session gets its key from the store, which
+  gives it to people who may edit that document.
 
 **Who can connect to the relay at all?** By default, anyone who can reach it.
 That's fine where the relay is only reachable inside your network, and worth
@@ -201,12 +205,15 @@ restricting where it isn't. Three ways, roughly in order of strength:
    strangers at all.
 2. **Membership, with a workspace.** Set the same `RELAY_TOKEN_SECRET` on the
    relay and the [workspace store](/deployment/workspace-store). The store
-   then issues a short-lived token for one room to someone it has signed in,
-   and the relay refuses anyone without a valid one - including someone
-   holding a token for a different room, or one that has expired.
+   then issues a short-lived token for one room - to anyone it has signed
+   in, for a session shared by link; to people who may edit the document,
+   for a workspace document's session - and the relay refuses anyone
+   without a valid one, including someone holding a token for a different
+   room, or one that has expired. With workspaces this is what keeps
+   someone who has been removed out of a document's live session.
    [Deployment with Workspaces](/deployment/with-workspaces) sets this up.
 3. **Treat links as secrets.** Share them over a channel you trust. Anyone
-   with a link can read the session, whatever the relay allows.
+   with a link can read that session, whatever the relay allows.
 
 **Check membership took effect** rather than assuming so. Both must say
 `required`:

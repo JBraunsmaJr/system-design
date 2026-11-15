@@ -287,12 +287,12 @@ async function run() {
       await ada.waitForSelector(`.workspace-access__entry[data-kind="group"]:has-text("${group}")`);
     };
     await mapGroup('platform-eng', 'editor');
-    await mapGroup('auditors', 'viewer');
+    await mapGroup('/auditors', 'viewer');
     const mappings = await theStore.workspaces.listGroupMappings(workspace.workspaceId);
     check(
       mappings.length === 2 &&
         mappings.find((m) => m.group === 'platform-eng')?.role === 'editor' &&
-        mappings.find((m) => m.group === 'auditors')?.role === 'viewer',
+        mappings.find((m) => m.group === '/auditors')?.role === 'viewer',
       'an owner maps groups to roles from the panel',
     );
 
@@ -355,7 +355,7 @@ async function run() {
     // --- A viewer -------------------------------------------------------------
     console.log('\n=== A viewer ===');
     const vic = await openBrowser();
-    await signInAs(vic, 'vic', ['auditors']);
+    await signInAs(vic, 'vic', ['/auditors']);
     await openManager(vic);
     check(
       /You are a viewer here/.test((await vic.textContent('.trusted-workspace__role')) ?? ''),
@@ -658,7 +658,7 @@ async function run() {
     );
 
     // Removing a group.
-    await ada.click('button[aria-label="Remove the group auditors"]');
+    await ada.click('button[aria-label="Remove the group /auditors"]');
     check(
       await eventually(async () => {
         await reopen(vic);

@@ -61,28 +61,28 @@ Route handlers must not decide access themselves. They load the grants with `gra
 
 Served under `/v2`, beside the existing API, which is unchanged. Sign-in still goes through `/v1/auth/...`; both APIs share one session.
 
-| Route                                            | Needs         | What it does                                              |
-| ------------------------------------------------ | ------------- | --------------------------------------------------------- |
-| `GET /v2/health`                                 | nothing       | Says the store is in trusted mode. No sign-in needed.     |
-| `GET /v2/me`                                     | signed in     | The caller, their groups, and what they may do store-wide |
-| `GET /v2/workspaces`                             | signed in     | The caller's workspaces, each with their role             |
-| `POST /v2/workspaces`                            | administrator | Create one. The creator becomes its first owner.          |
-| `GET /v2/workspaces/:id`                         | viewer        | One workspace                                             |
-| `PATCH /v2/workspaces/:id`                       | owner         | Rename it                                                 |
-| `POST /v2/workspaces/:id/archive`, `/restore`    | administrator | Hide it from its members, or bring it back                |
-| `GET /v2/workspaces/:id/members`                 | viewer        | Members and group mappings                                |
-| `PUT`, `DELETE /v2/workspaces/:id/members/:user` | owner         | Add someone, change their role, remove them               |
-| `PUT`, `DELETE /v2/workspaces/:id/groups/:group` | owner         | Map a group to a role, change it, remove it               |
-| `GET /v2/workspaces/:id/people?query=`           | owner         | Find people to add, by name                               |
-| `GET /v2/workspaces/:id/documents`               | viewer        | List documents (`?deleted=true` needs editor)             |
-| `POST /v2/workspaces/:id/documents`              | editor        | Create a document                                         |
-| `GET /v2/documents/:doc`                         | viewer        | The document and every update                             |
-| `PATCH /v2/documents/:doc`                       | editor        | Retitle it, or move it to another workspace               |
-| `DELETE /v2/documents/:doc`, `POST .../restore`  | editor        | Soft-delete it; restore it while it is retained           |
-| `GET /v2/documents/:doc/updates?since=`          | viewer        | Updates after a version                                   |
-| `POST /v2/documents/:doc/updates`, `.../compact` | editor        | Append an update; replace the log with a snapshot         |
-| `PUT`, `DELETE /v2/documents/:doc/hold`          | administrator | Place or release a legal hold                             |
-| `POST /v2/documents/:doc/purge`                  | administrator | Remove a document for good                                |
+| Route                                              | Needs         | What it does                                                                                                                                                                                  |
+| -------------------------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /v2/health`                                   | nothing       | Says the store is in trusted mode. No sign-in needed.                                                                                                                                         |
+| `GET /v2/me`                                       | signed in     | The caller, their groups, and what they may do store-wide                                                                                                                                     |
+| `GET /v2/workspaces`                               | signed in     | The caller's workspaces, each with their role                                                                                                                                                 |
+| `POST /v2/workspaces`                              | administrator | Create one. The creator becomes its first owner.                                                                                                                                              |
+| `GET /v2/workspaces/:id`                           | viewer        | One workspace                                                                                                                                                                                 |
+| `PATCH /v2/workspaces/:id`                         | owner         | Rename it                                                                                                                                                                                     |
+| `POST /v2/workspaces/:id/archive`, `/restore`      | administrator | Hide it from its members, or bring it back                                                                                                                                                    |
+| `GET /v2/workspaces/:id/members`                   | viewer        | Members and group mappings                                                                                                                                                                    |
+| `PUT`, `DELETE /v2/workspaces/:id/members/:user`   | owner         | Add someone, change their role, remove them                                                                                                                                                   |
+| `PUT /v2/workspaces/:id/groups`, `DELETE …?group=` | owner         | Map a group to a role, change it, remove it. The group is named in the body or the query, never the path: a proxy serving the store under a prefix would rewrite a name that contains a slash |
+| `GET /v2/workspaces/:id/people?query=`             | owner         | Find people to add, by name                                                                                                                                                                   |
+| `GET /v2/workspaces/:id/documents`                 | viewer        | List documents (`?deleted=true` needs editor)                                                                                                                                                 |
+| `POST /v2/workspaces/:id/documents`                | editor        | Create a document                                                                                                                                                                             |
+| `GET /v2/documents/:doc`                           | viewer        | The document and every update                                                                                                                                                                 |
+| `PATCH /v2/documents/:doc`                         | editor        | Retitle it, or move it to another workspace                                                                                                                                                   |
+| `DELETE /v2/documents/:doc`, `POST .../restore`    | editor        | Soft-delete it; restore it while it is retained                                                                                                                                               |
+| `GET /v2/documents/:doc/updates?since=`            | viewer        | Updates after a version                                                                                                                                                                       |
+| `POST /v2/documents/:doc/updates`, `.../compact`   | editor        | Append an update; replace the log with a snapshot                                                                                                                                             |
+| `PUT`, `DELETE /v2/documents/:doc/hold`            | administrator | Place or release a legal hold                                                                                                                                                                 |
+| `POST /v2/documents/:doc/purge`                    | administrator | Remove a document for good                                                                                                                                                                    |
 
 With `WORKSPACE_CREATION=anyone`, any signed-in person may create a workspace.
 
@@ -120,7 +120,7 @@ A document's workspace comes from the store's catalog (`store/src/documentCatalo
    - **Done: the editor.** The encrypted mode is gone from the editor: `src/crypto` (except what the store still imports until the next step), device enrolment, the comparison code, recovery, key rotation, automatic access, the key-based store client, and their panels and tests. An editor pointed at a store without `/v2` works on its own and says the store needs upgrading.
    - **Done: the store's API.** The `/v1` document, index, key, device, recovery, join-request, access-rule and administration routes are gone, with the modules behind them. What `/v1` still serves is about the person, not their documents: health, sign-in, and relay tokens for sessions started by link. `CRYPTO_MODE`, `RECOVERY_PUBLIC_KEY`, `RECOVERY_PUBLIC_KEY_FILE`, `AUTO_ACCESS` and `JOIN_EVIDENCE_RETENTION` are no longer read; a store that still sets them starts, and names them at startup.
    - **Next: the store's storage.** The document service still accepts wrapped keys and sealed metadata, and sessions still have columns for sign-in evidence. Nothing writes them any more.
-   - **Then: the documentation.** The deployment and security guides still describe the encrypted mode.
+   - **Done: the documentation and the example deployments.** The guides under `docs-site/` describe workspaces as they are now; the example deployments no longer create a recovery key and name administrators by group, so the first person in can create a workspace. `scripts/verify-deployment-example.ts` checks both examples.
 
 ## An editor hosted somewhere else
 

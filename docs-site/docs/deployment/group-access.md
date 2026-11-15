@@ -1,64 +1,66 @@
-# Automatic Access from Groups
+# Groups and Roles
 
-Without this, every new person waits for someone to press **Give access**.
-With it, a workspace can say "anyone in this group may join", and members'
-browsers let those people in on their own - usually within seconds of them
-signing in.
+A workspace decides who can open and change its documents. It can name people
+one by one, but the usual way is to give a role to a **group from your
+identity provider**: everyone in the group has the workspace the next time
+they sign in, and loses it when they leave the group. Nobody approves anyone.
 
-::: tip The short version
-Your identity provider puts the person's groups in their sign-in token. The
-workspace keeps a rule naming which groups may join. A member's browser -
-never the server - checks the token against the rule and hands over the
-workspace key.
-:::
+This page covers how roles work, how to get groups from your provider to the
+store, and what to check when someone does not have the access you expect.
 
-## Why a browser grants, not the server
+## Roles
 
-The store holds only wrapped keys: it cannot give anyone the workspace key,
-because it never has it. Access is always handed from a browser that holds
-the key to the newcomer. Automatic access keeps that; it only removes the
-button press.
+| Role       | Can                                                                 |
+| :--------- | :------------------------------------------------------------------ |
+| **Viewer** | Open the workspace's documents.                                     |
+| **Editor** | Also create, change, delete and restore documents.                  |
+| **Owner**  | Also rename the workspace and manage its members and mapped groups. |
 
-What changes is what the granting browser trusts. It does **not** take the
-store's word that someone is in a group. It checks the identity provider's
-signed token itself, and it checks that the token vouches for the exact key
-it is about to hand the workspace key to. A store that has been tampered with
-can delay a join or hide one, but it cannot get anyone in.
+A person's role in a workspace is the **highest** of:
 
-See [How a grant is checked](#how-a-grant-is-checked) for the detail.
+- the role they were given individually,
+- the role of any group of theirs that the workspace maps to a role, and
+- owner, if they are a store administrator.
+
+A role is a grant, never a restriction. Adding someone as a viewer does not
+take away the editor role their group gives them. To give someone less, take
+them out of the group.
+
+**Store administrators** are owners of every workspace. They are also the
+only people who can archive a workspace, place a legal hold, or remove a
+deleted document before its retention ends. They are named in the store's
+settings with `ADMIN_GROUPS` and `ADMIN_SUBJECTS`; see
+[Administering Workspaces](/deployment/administration).
+
+Someone with no role in a workspace cannot tell that it exists.
 
 ## What you need
 
-- The workspace store, set up as in [Deployment with Workspaces](/deployment/with-workspaces).
-- Sign-in through **OIDC**. GitHub sign-in has no signed token to check, so
-  people signing in with GitHub always wait for a manual grant.
-- An identity provider that puts group membership in the **ID token**. The
-  steps below are for Keycloak.
-- The provider's discovery document and signing keys readable **from the
-  editor's origin** (CORS). The granting browser fetches them directly -
-  deliberately not through the store. See [Step 4](#_4-check-the-browser-can-reach-the-signing-keys).
-- At least one member with the editor open. A grant happens in a member's
-  browser, so if nobody is online the newcomer waits until someone is. See
-  [When nobody is online](#when-nobody-is-online).
+- **OIDC sign-in.** Groups come from the ID token. GitHub sign-in has no
+  groups, so people who sign in with GitHub are added individually.
+- **Groups in the ID token.** The store reads one claim, named by
+  `OIDC_GROUPS_CLAIM` (default `groups`), holding a list of group names.
+- **The names, exactly.** A workspace matches a group by its name as it
+  appears in the token, character for character.
 
 ## Keycloak
 
 These steps use Keycloak 26 and the realm from the example deployment
 (`system-design`, client `system-design-store`). Substitute your own realm
-and client names.
+and client names. The example realm already has the mapper from step 3.
 
 ### 1. Create the groups
 
 In the admin console, open your realm, then **Groups → Create group**.
 
-| Group                                | Path in the token            |
-| :----------------------------------- | :--------------------------- |
-| `design-team-a` at the top level     | `/design-team-a`             |
-| `design-team-a` inside `engineering` | `/engineering/design-team-a` |
+| Group                               | Name in the token           |
+| :---------------------------------- | :-------------------------- |
+| `platform-eng` at the top level     | `/platform-eng`             |
+| `platform-eng` inside `engineering` | `/engineering/platform-eng` |
 
-The workspace rule matches the **full path**, so a subgroup's name alone is
-not enough. Full paths are what you want: two teams can each have a subgroup
-called `design`, and only the path tells them apart.
+With **Full group path** on, which is what the example uses, a group is known
+by its full path, starting with a slash. That is what you want: two teams can
+each have a subgroup called `design`, and only the path tells them apart.
 
 ### 2. Put people in them
 
@@ -80,273 +82,138 @@ system-design-store-dedicated → Configure a new mapper → Group Membership**.
 | Add to userinfo            | On       |
 | Add to token introspection | On       |
 
-**Add to ID token** is the one that matters. The store never reads the access
-token, and the granting browser checks only the ID token. Groups in any other
-token are ignored.
+**Add to ID token** is the one that matters. The store reads only the ID
+token. Groups in any other token are ignored.
 
 Putting the mapper on the dedicated scope means it applies to every sign-in
 with no change to the store's `OIDC_SCOPES`. If you would rather share one
 `groups` client scope across several clients, create it under **Client
 scopes**, add the same mapper there, and assign it to the client as
-**Default** - an **Optional** scope needs `OIDC_SCOPES=openid profile groups`
+**Default** - an **Optional** scope needs `OIDC_SCOPES=openid,profile,groups`
 on the store, and is easy to forget.
 
 **Check it:** **Clients → system-design-store → Client scopes → Evaluate**.
 Pick a user who is in the group, then **Generated ID token**. You should see:
 
 ```json
-"groups": ["/design-team-a"]
+"groups": ["/platform-eng"]
 ```
 
 If `groups` is missing, the mapper is not adding to the ID token. If it holds
-names without a leading `/`, **Full group path** is off.
+names without a leading `/`, **Full group path** is off: that works too, but
+then type the names without the slash everywhere.
 
-### 4. Check the browser can reach the signing keys
+### 4. Tell the store which claim holds groups
 
-:::warning
-This is assuming that Keycloak is hosted elsewhere.
-:::
-
-The granting browser fetches the provider's discovery document and signing
-keys from the editor's page. Check both answer with a CORS header for the
-editor's origin:
-
-```bash
-EDITOR=https://design.example.gov
-ISSUER=https://keycloak.example.gov/realms/system-design
-
-curl -s -D - -o /dev/null -H "Origin: $EDITOR" \
-  "$ISSUER/.well-known/openid-configuration" | grep -i access-control-allow-origin
-
-curl -s -D - -o /dev/null -H "Origin: $EDITOR" \
-  "$ISSUER/protocol/openid-connect/certs" | grep -i access-control-allow-origin
-```
-
-Each should print an `access-control-allow-origin` line naming the editor or
-`*`. Keycloak 26 sends it on both as soon as the editor's origin is in the
-client's **Web origins** - the example realm already has it. If either prints
-nothing:
-
-1. Add the editor's origin under **Clients → system-design-store → Settings
-   → Web origins**, and run the check again.
-2. If it still prints nothing, add the header at the reverse proxy in front
-   of Keycloak, for those two paths only. For Caddy:
-
-   ```
-   keycloak.example.gov {
-       @keys path /realms/*/.well-known/openid-configuration /realms/*/protocol/openid-connect/certs
-       header @keys Access-Control-Allow-Origin "https://design.example.gov"
-       reverse_proxy keycloak:8080
-   }
-   ```
-
-Do not work around this by serving the keys through the store. The point of
-the check is that it does not depend on the store.
-
-### 5. Tell the store which claim holds groups
-
-The store reads the same claim to know whom to show as waiting for which
-workspace. It defaults to `groups`, which matches step 3:
+Only if you named the claim something other than `groups`:
 
 ```yaml
-OIDC_GROUPS_CLAIM: groups
+OIDC_GROUPS_CLAIM: roles
 ```
 
-Keycloak leaves the claim out entirely for someone in no groups, rather than
-sending an empty list. So by default a sign-in without it means **no
-groups**: someone who leaves their only group is removed like anyone else
-who leaves. If your provider can leave groups out for other reasons, set
-`OIDC_GROUPS_CLAIM_ABSENT: unknown`, and a missing claim removes nobody - at
-the cost that someone who leaves every group is then removed only by
-**Remove** or a rule change. A claim that is present but is not a list is
-never taken as leaving.
-
-#### Additional store settings for automatic access
-
-- **`AUTO_ACCESS`**: `on` (default) or `off`. Setting `AUTO_ACCESS: off` disables
-  automatic access store-wide immediately. Newcomers will not be granted entry
-  automatically even if a workspace rule matches their groups, and existing members
-  can only admit them via manual **Give access**.
-- **`JOIN_EVIDENCE_RETENTION`**: Controls how long the store keeps raw ID token
-  join evidence before discarding it: a duration (`12h`, `7d`, `2w`), default `7d`,
-  up to a maximum of `30d`.
-
-Restart the store if you change any of these settings.
-
-### 6. Turn it on for the workspace
-
-A member of the workspace opens **File → Documents → Workspace settings →
-Automatic access** and adds the group paths:
-
-| Setting            | Example          | Meaning                                         |
-| :----------------- | :--------------- | :---------------------------------------------- |
-| Groups             | `/design-team-a` | Anyone whose token lists one of these may join. |
-| Evidence valid for | `24h` (default)  | How old a sign-in may be when it is checked.    |
-
-The editor fills in the issuer and client from the running deployment and
-shows them for confirmation. They are saved inside the workspace's sealed
-document list, next to the titles, so the store cannot read or change them.
-
-### 7. Try it
-
-The example realm (`docker/store/keycloak/system-design-realm.json`) already
-has `design-team-a` and `design-team-b`, and three accounts:
-
-| User     | Password | Groups           |
-| :------- | :------- | :--------------- |
-| `demo`   | `demo`   | `/design-team-a` |
-| `otter`  | `otter`  | `/design-team-a` |
-| `Badger` | `badger` | `/design-team-b` |
-
-1. Sign in as `demo` and set up the workspace. Add `/design-team-a` under
-   Automatic access.
-2. Leave that window open. In a private window, sign in as `otter`. Within
-   about fifteen seconds the workspace opens, with no button pressed.
-3. In another private window, sign in as `Badger`. They wait, and `demo` sees
-   them under _People in this workspace_ with **Give access**, as before.
-
-The same walk-through runs as a test, in a real browser against a real
-Keycloak - `scripts/verify-auto-grant-keycloak.ts`. With Keycloak running
-from `docker/store/compose.yaml` (or any Keycloak 26 with the example realm
-imported on port 8081), and ports 8080 and 8088 free:
-
-```bash
-npx tsx scripts/verify-auto-grant-keycloak.ts
-```
-
-It also takes otter out of the group through Keycloak's admin API, checks
-the store removes them and the key is replaced, then puts them back and
-checks they rejoin from the interface. Without Keycloak it says so and does
-nothing.
-
-## How a grant is checked
-
-For the reviewer. Nothing in this section needs configuring.
-
-**At sign-in.** Before sending a newcomer to the provider, their browser
-creates its key pair and commits to the public key in the sign-in's `nonce`:
+Restart the store. At startup it prints the claim it reads:
 
 ```
-nonce = base64url( SHA-256( "system-design/join/v1" ‖ 0x00 ‖ SPKI(public key) ‖ salt ) )
+Groups: read from the "groups" claim at sign-in, for workspace roles and ADMIN_GROUPS (a token without it means no groups)
 ```
 
-`salt` is 32 random bytes the browser keeps. The provider copies the nonce
-into the ID token it signs, so the token now says: _this person, in these
-groups, holds this key_. The store checks the nonce as it always has, and
-keeps the raw ID token alongside the person's request to join.
+### 5. Give a group a role
 
-**At grant.** A member's browser that holds the workspace key sees the
-request - the ID token, the public key, and the salt - and accepts it only if
-all of these hold:
+Sign in to the editor as an owner of the workspace, or as an administrator.
 
-1. The workspace's rule, read from the sealed document list, has automatic
-   access on.
-2. The token's signature verifies against keys fetched **from the issuer
-   named in the rule**, not from the store.
-3. `iss` is that issuer and `aud` includes the client named in the rule.
-4. `iat` is within _Evidence valid for_, and not in the future. Expiry
-   (`exp`) is not used: ID tokens live for minutes, and a join may be checked
-   hours later.
-5. `sub` is the person the store says is asking.
-6. The nonce recomputed from the public key and salt matches the token's.
-7. The groups claim lists at least one group the rule names.
+1. **File → Documents**, and pick the workspace.
+2. Choose **Members**.
+3. Under **Groups**, type the group as it appears in the token
+   (`/platform-eng`), pick a role, and choose **Add group**.
 
-Only then is the workspace key wrapped to that public key. The grant is
-recorded in the store's audit log as `join.auto_grant`, with the group that
-matched in `detail.matchedGroup` and a hash of the token that was checked in
-`detail.evidenceHash`.
+The editor suggests the groups you are in yourself. For any other group, type
+the name: the store only learns a group's name when a member of it signs in,
+so it cannot list them for you.
 
-**What each check stops.** Check 2 stops the store inventing a token. Check 6
-stops it pairing a real person's token with a key of its own - the attack
-that would otherwise make this unsafe. Checks 1 and 3 stop it swapping in a
-rule or an issuer of its choosing. Check 4 limits how long a leaked token is
-useful.
+### 6. Try it
 
-**What it trusts.** Your identity provider: whoever can put someone in the
-group, or sign tokens as the provider, can let them in. That is usually the
-right boundary for a team that already signs in with single sign-on - but it
-means Keycloak group administration is now also workspace access.
+Sign in as someone in the group, in another browser or a private window.
+**File → Documents** shows the workspace, and under its name:
 
-**What it does not change.** Any member can already let anyone in by hand,
-and any member can edit the rule. The rule is protected from the store, not
-from members.
+> You are an editor here, through the group /platform-eng.
 
-## Leaving a group
+## Other providers
 
-The store re-reads groups at every sign-in. Sessions last eight hours, so
-someone taken out of the group loses access **within eight hours**, when
-they next have to sign in and no longer match. From that moment the store
-refuses them everything that serves the workspace - documents, the index,
-keys, their devices and the relay - even on a session they already had.
-They can still sign in, so putting them back in the group lets them join
-again.
+Anything that puts a list of group names in the ID token works.
 
-They still hold the workspace key they were given. So when the store removes
-someone, it marks the workspace as needing a new key, and the next member
-browser to have the editor open
-[replaces it](/guide/workspaces#losing-a-laptop) without anyone asking.
-Only one browser does this, even if several are open. Saved work is not
-re-encrypted and nothing is lost; people still in the workspace pick up the
-new key on their own.
+- **Entra ID** - add a **groups claim** to the app registration's token
+  configuration, for the ID token. Entra sends group **object ids** unless
+  you choose otherwise, so those ids are what you type into the workspace.
+  When someone is in more groups than Entra will put in a token (about 200),
+  it leaves the claim out and points elsewhere; the store then has no groups
+  for that sign-in and gives no role from a group. Limit the claim to groups
+  assigned to the application to stay under it.
+- **Okta** - add a **groups claim** to the ID token of the authorization
+  server, with a filter that matches the groups you want sent.
+- **Anything else** - find the setting that adds group membership to the ID
+  token, and set `OIDC_GROUPS_CLAIM` to the claim's name.
 
-Removal only happens while the rule is on. Turning automatic access off
-removes nobody unless you ask it to.
+## When access changes
 
-### Narrowing the rule
+**Groups are read when someone signs in**, and kept for that session.
 
-When you save a rule that admits fewer people - a group taken out of it, or
-automatic access turned off - the settings ask whether to remove the people
-it no longer admits **now**. Without that, they are removed at their next
-sign-in (or, if the rule is off, not at all). "Now" is judged on the groups
-each person had when they last signed in.
+| Change                                 | Takes effect                                                                   |
+| :------------------------------------- | :----------------------------------------------------------------------------- |
+| A group is given a role in a workspace | For each member of the group, the next time they sign in.                      |
+| A group's role is changed or removed   | At once, for everyone who has it through that group.                           |
+| Someone is added to a group            | The next time they sign in.                                                    |
+| Someone is removed from a group        | When their session ends: at sign-out, or after eight hours, whichever is first |
+| A person is added or removed by name   | At once.                                                                       |
 
 ### Someone who must lose access immediately
 
-For someone leaving on bad terms, do both straight away:
+Removing them from the group is not enough on its own: their session still
+carries the group until it ends. To cut someone off at once:
 
-1. In the editor, open _People in this workspace_ and press **Remove** next
-   to them. They are refused on their very next request, and the key is
-   replaced.
-2. In Keycloak, **disable the user**, or take them out of the group, so the
-   group no longer vouches for them anywhere else it is used.
+1. Remove them from the group at the provider, so they do not come back.
+2. Remove or lower the group's role in the workspace, **or** disable their
+   account at the provider and end their session there.
 
-**Remove** works on anyone, however they were let in. Someone removed this
-way is let back in only by a person pressing **Give access**: being in a
-group the workspace admits is not enough, and no browser will let them in
-automatically. People removed because their groups changed are different -
-put them back in the group and they rejoin on their own. Group changes never
-remove people who were given access by hand, and only someone who holds the
-workspace key can give a removed person access again.
+If the group has many members and only one must go, the quick route is the
+provider: disabling the account stops new sign-ins, and the session they have
+ends within eight hours. If that is too long, lower the group's role for the
+moment and give the others their role by name.
 
-## When nobody is online
-
-A grant needs a browser that holds the key, so a newcomer who signs in at
-3 a.m. waits until a member opens the editor. The waiting screen says so:
-_Access will be given automatically when a teammate next opens the editor._
-
-If they wait longer than _Evidence valid for_, their sign-in is too old to
-check. The waiting screen asks them to sign in again; nothing else is needed.
+Set `RELAY_TOKEN_SECRET` on the store and the relay as well. Without it,
+someone removed from a workspace who had kept a live session's details could
+rejoin that session and watch edits; see
+[Workspace Store](/deployment/workspace-store#sessions-and-the-relay).
 
 ## Troubleshooting
 
-| What you see                                          | Likely cause                                                                                                                                                   |
-| :---------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Newcomer waits, members see them with **Give access** | Their token does not match the rule. Compare the rule with **Evaluate → Generated ID token** for that user - usually a path versus a bare name, or a subgroup. |
-| Newcomer waits, members see nothing                   | The store's `OIDC_GROUPS_CLAIM` does not match the mapper's claim name, so the store does not know which workspace they are for.                               |
-| Members see _Could not check this sign-in_            | The browser could not fetch the signing keys. Run the CORS check in [step 4](#_4-check-the-browser-can-reach-the-signing-keys) from a member's network.        |
-| _Sign-in too old to check_                            | Longer than _Evidence valid for_ has passed. The newcomer signs in again.                                                                                      |
-| Worked in the example, not in production              | The rule's issuer is the one the **browser** sees (`OIDC_ISSUER`), not `OIDC_INTERNAL_URL`. A token's `iss` never contains the internal name.                  |
-| Nobody in the group is ever let in                    | Groups are only in the access token. Turn on **Add to ID token**.                                                                                              |
+Open `https://<your store>/v2/me` while signed in. It shows what the store
+knows about you:
 
-## Things to decide before turning it on
+```json
+{
+  "user": { "userId": "…", "displayName": "Dee Okafor" },
+  "groups": ["/platform-eng"],
+  "isAdmin": false,
+  "canCreateWorkspaces": false
+}
+```
 
-- **Rename with care.** A rule names group paths. Renaming or moving a group
-  in Keycloak changes its path, and its members stop matching until the rule
-  is updated. Deleting a group and creating another with the same name gives
-  the new one the old one's access.
-- **Who administers the group.** Anyone who can add members to the group in
-  Keycloak can now add people to the workspace. If that is a wider set of
-  people than your workspace members, use a group only they manage.
-- **Evidence valid for.** Shorter is stricter and makes people sign in again
-  more often while they wait. The default of a day suits a team whose members
-  open the editor at least daily.
+| What you see                                    | What it means                                                                                                                            |
+| :---------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------- |
+| `groups` is empty                               | The token carried no groups. Check the mapper adds to the **ID token**, and that `OIDC_GROUPS_CLAIM` names the claim.                    |
+| The group is listed, but the workspace is not   | The workspace maps a different spelling. Compare with the name under **Members → Groups**: a missing `/` or different case is a mismatch |
+| The group is missing, though you were added     | You signed in before being added. Sign out and in again.                                                                                 |
+| `isAdmin` is false, though you are in the group | `ADMIN_GROUPS` is spelled differently from the name in `groups`. Copy it from here, then restart the store.                              |
+| The workspace is there, but as a viewer         | You have the highest role any of your groups gives you. An owner can raise the group's role, or add you by name.                         |
+
+## Things to decide first
+
+- **Which groups, and whose.** A workspace per team, with that team's group
+  as editors, is the usual shape. Avoid mapping a group so broad that nobody
+  would notice a new member.
+- **Who owns each workspace.** Owners manage members. Giving a small group
+  the owner role keeps that from resting on one person. The editor warns
+  before a change that would leave a workspace with no owner; administrators
+  can always manage it regardless.
+- **Who administers the store.** Administrators can open every workspace and
+  every document. Keep `ADMIN_GROUPS` to the people who run the service.

@@ -1,6 +1,6 @@
 /**
- * The deployment example, checked for the mistakes that only appear when
- * someone runs it (WS8-R9, WS10-R1).
+ * The deployment examples, checked for the mistakes that only appear when
+ * someone runs them.
  *
  * The compose file, the Keycloak realm it imports, and the store's own
  * configuration rules have to agree. They are three files that drift
@@ -105,13 +105,13 @@ console.log("=== The store's own settings are valid ===");
   // The same validation the store applies at startup, so the example
   // cannot ship a configuration the store would refuse.
   try {
-    const config = loadStoreConfig({
-      ...store,
-      RECOVERY_PUBLIC_KEY_FILE: undefined,
-      RECOVERY_PUBLIC_KEY: '-----BEGIN PUBLIC KEY-----\nx\n-----END PUBLIC KEY-----',
-    });
+    const config = loadStoreConfig(store);
     check(config.providers[0]?.id === 'oidc', 'the example configures sign-in');
     check(config.allowedOrigins.length > 0, "and names the editor's origin");
+    check(
+      config.retiredSettings.length === 0,
+      `and sets nothing the store no longer reads (${config.retiredSettings.join(', ') || 'none'})`,
+    );
   } catch (error) {
     check(
       false,
@@ -172,12 +172,8 @@ check(
   `the store waits for its dependencies (${compose.services.store.dependsOn.join(', ')})`,
 );
 check(
-  compose.services.store.volumes.some((volume) => volume.includes('recovery-public.pem')),
-  'the recovery public key is mounted, or the store would refuse every document (WS7-R4)',
-);
-check(
-  compose.services.store.volumes.every((volume) => !volume.includes('private')),
-  'and the private half is nowhere near the store',
+  compose.services.store.volumes.every((volume) => !/recovery|\.pem/.test(volume)),
+  'the store mounts no key files: it has none to read',
 );
 for (const user of realm.users ?? []) {
   check(
@@ -189,8 +185,141 @@ for (const user of realm.users ?? []) {
     `and nothing it must do first (${user.username})`,
   );
 }
-const ignored = readFileSync('.gitignore', 'utf8');
-check(/-private\.pem/.test(ignored), 'a private recovery key cannot be committed by accident');
+
+console.log('\n=== Someone can use it once it is up ===');
+{
+  // With nobody able to create a workspace the example starts, signs
+  // people in, and then offers them nothing to do.
+  const groupsMapper = (
+    realm.clients[0] as unknown as {
+      protocolMappers?: { protocolMapper: string; config: Record<string, string> }[];
+    }
+  ).protocolMappers?.find((mapper) => mapper.protocolMapper === 'oidc-group-membership-mapper');
+  check(
+    groupsMapper?.config['claim.name'] === (store.OIDC_GROUPS_CLAIM ?? 'groups') &&
+      groupsMapper?.config['id.token.claim'] === 'true',
+    'the realm puts groups in the ID token, under the claim the store reads',
+  );
+  const fullPath = groupsMapper?.config['full.path'] === 'true';
+  const asInToken = (path: string) => (fullPath ? path : path.replace(/^.*\//, ''));
+  const adminGroups = (store.ADMIN_GROUPS ?? '')
+    .split(',')
+    .map((group) => group.trim())
+    .filter(Boolean);
+  const realmGroups = ((realm as unknown as { groups?: { name: string }[] }).groups ?? []).map(
+    (group) => asInToken(`/${group.name}`),
+  );
+  check(
+    adminGroups.length > 0 && adminGroups.every((group) => realmGroups.includes(group)),
+    `the administrators' group exists in the realm, spelled as the token will carry it (${adminGroups.join(', ') || 'none set'})`,
+  );
+  const admins = (realm.users ?? []).filter((user) =>
+    ((user as unknown as { groups?: string[] }).groups ?? []).some((group) =>
+      adminGroups.includes(asInToken(group)),
+    ),
+  );
+  check(
+    admins.length > 0,
+    `and at least one account is in it, so a workspace can be created (${admins.map((user) => user.username).join(', ') || 'nobody'})`,
+  );
+}
+
+console.log('\n=== The published example (docs-site/docs/files/workspace) ===');
+{
+  const published = readComposeExample(
+    readFileSync('docs-site/docs/files/workspace/compose.yml', 'utf8'),
+  );
+  const env = readFileSync('docs-site/docs/files/workspace/workspace.env', 'utf8');
+  const defaults: Record<string, string> = {
+    DOMAIN: 'design.example.gov',
+    POSTGRES_PASSWORD: 'p'.repeat(64),
+    RELAY_TOKEN_SECRET: 'r'.repeat(64),
+    OIDC_CLIENT_SECRET: 's'.repeat(64),
+  };
+  for (const line of env.split('\n')) {
+    const match = /^([A-Z_]+)=(.*)$/.exec(line.trim());
+    if (match && match[2] !== '') defaults[match[1]] = match[2];
+  }
+  // ${NAME}, ${NAME:-fallback} and ${NAME:?message}, as Compose reads them.
+  const resolve = (value: string) =>
+    value.replace(/\$\{([A-Z_]+)(?::[-?]([^}]*))?\}/g, (_all, name: string, rest?: string) =>
+      defaults[name] !== undefined ? defaults[name] : (rest ?? ''),
+    );
+  const resolved = (service: string) =>
+    Object.fromEntries(
+      Object.entries(published.services[service].environment).map(([key, value]) => [
+        key,
+        resolve(value),
+      ]),
+    );
+  const publishedStore = resolved('store');
+  try {
+    const config = loadStoreConfig(publishedStore);
+    check(
+      config.providers[0]?.id === 'oidc' && config.retiredSettings.length === 0,
+      'the store would start with it, and it sets nothing the store no longer reads',
+    );
+    check(
+      config.adminGroups.length > 0 || config.admins.length > 0,
+      'as shipped it names administrators, so someone can create the first workspace',
+    );
+  } catch (error) {
+    check(
+      false,
+      `the store would start with these settings (${error instanceof ConfigError ? error.message : String(error)})`,
+    );
+  }
+  check(
+    resolved('relay').RELAY_TOKEN_SECRET === publishedStore.RELAY_TOKEN_SECRET &&
+      !!publishedStore.RELAY_TOKEN_SECRET,
+    'the relay and the store are given the same token secret',
+  );
+  check(
+    resolved('editor').STORE_URL === publishedStore.PUBLIC_URL,
+    "the editor points at the store's public address",
+  );
+  check(
+    published.services.store.volumes.every((volume) => !/recovery|keys/.test(volume)),
+    'and no key files are mounted',
+  );
+  const publishedRealm = JSON.parse(
+    readFileSync('docs-site/docs/files/workspace/keycloak-realm.json', 'utf8'),
+  ) as {
+    groups?: { name: string }[];
+    clients: {
+      redirectUris: string[];
+      protocolMappers?: { protocolMapper: string; config: Record<string, string> }[];
+    }[];
+  };
+  check(
+    publishedRealm.clients[0].redirectUris.includes('https://${DOMAIN}/store/v1/auth/callback'),
+    "its Keycloak realm's redirect URI is the store's callback",
+  );
+  const mapper = publishedRealm.clients[0].protocolMappers?.find(
+    (candidate) => candidate.protocolMapper === 'oidc-group-membership-mapper',
+  );
+  check(
+    (publishedRealm.groups ?? []).some(
+      (group) =>
+        (mapper?.config['full.path'] === 'true' ? `/${group.name}` : group.name) ===
+        defaults.ADMIN_GROUPS,
+    ),
+    `and that realm creates the administrators' group the settings name (${defaults.ADMIN_GROUPS})`,
+  );
+  const documented = [
+    'docs-site/docs/deployment/with-workspaces.md',
+    'docs-site/docs/deployment/workspace-store.md',
+    'README.md',
+  ].filter((path) =>
+    /generate-recovery-key|recover-document|recovery-public\.pem|recovery-private/.test(
+      readFileSync(path, 'utf8'),
+    ),
+  );
+  check(
+    documented.length === 0,
+    `the guides that go with it no longer tell anyone to create a recovery key${documented.length ? `: ${documented.join(', ')}` : ''}`,
+  );
+}
 
 if (failures > 0) {
   console.error(`\n${failures} check(s) failed`);

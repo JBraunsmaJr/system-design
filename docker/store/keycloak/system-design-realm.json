@@ -53,7 +53,7 @@
           "temporary": false
         }
       ],
-      "groups": ["/design-team-a"]
+      "groups": ["/notebook-admins", "/design-team-a"]
     },
     {
       "username": "otter",
@@ -91,6 +91,9 @@
     }
   ],
   "groups": [
+    {
+      "name": "notebook-admins"
+    },
     {
       "name": "design-team-a"
     },

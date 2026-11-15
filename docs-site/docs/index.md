@@ -23,8 +23,8 @@ features:
     details: Link diagram components directly to requirements with bi-directional navigation and drill-in support.
   - title: Capacity & Sprint Planning
     details: Program Increment (PI) planning with capacity reservations, team allocation, and interactive timelines.
-  - title: Shared Workspaces, Encrypted
-    details: Optional team storage the server cannot read. Documents are sealed in the browser; the store holds ciphertext and wrapped keys.
+  - title: Shared Workspaces
+    details: Optional team storage on your own server, with sign-in through your identity provider. Groups from the provider give whole teams their workspaces, with no approvals.
   - title: 100% Static & Air-Gap Friendly
     details: The editor deploys as a pure static bundle with no runtime database. Fully operable in restricted or isolated networks.
 ---

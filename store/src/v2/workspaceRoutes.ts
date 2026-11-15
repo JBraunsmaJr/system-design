@@ -10,8 +10,8 @@
  *   GET    /v2/workspaces/:id/members              members and group mappings
  *   PUT    /v2/workspaces/:id/members/:userId      add someone or change their role
  *   DELETE /v2/workspaces/:id/members/:userId
- *   PUT    /v2/workspaces/:id/groups/:group        map a group or change its role
- *   DELETE /v2/workspaces/:id/groups/:group
+ *   PUT    /v2/workspaces/:id/groups               map a group or change its role
+ *   DELETE /v2/workspaces/:id/groups?group=        remove a group's role
  *   GET    /v2/workspaces/:id/people?query=        find people to add
  *
  * Documents inside a workspace are in documentRoutes.ts.
@@ -167,13 +167,19 @@ export async function workspaceRoutes(context: V2Context): Promise<void> {
     }
   }
 
-  // /v2/workspaces/:id/groups/:group
-  if (section === 'groups' && context.parts.length === 4) {
-    const group = segment(context, 3);
+  // /v2/workspaces/:id/groups
+  //
+  // The group is named in the body or the query, never in the path. A
+  // group's name is whatever the identity provider calls it, and Keycloak's
+  // start with a slash: "/platform-eng". A reverse proxy that serves the
+  // store under a prefix rewrites the path, turning an encoded slash back
+  // into a real one, and the name would arrive as something else.
+  if (section === 'groups' && context.parts.length === 3) {
     if (method === 'PUT') {
       context.describeForAudit('workspace.group.put');
       await workspaceFor(context, workspaceId, 'workspace.manage');
       const body = await context.readJson();
+      const group = body.group as string;
       const mapping = await translating(async () =>
         deps.workspaces.putGroupMapping({
           workspaceId,
@@ -190,6 +196,8 @@ export async function workspaceRoutes(context: V2Context): Promise<void> {
     if (method === 'DELETE') {
       context.describeForAudit('workspace.group.remove');
       await workspaceFor(context, workspaceId, 'workspace.manage');
+      const group = context.url.searchParams.get('group') ?? '';
+      if (group === '') fail(400, 'bad-request', 'Name the group to remove: ?group=...');
       const removed = await translating(() =>
         deps.workspaces.removeGroupMapping(workspaceId, group),
       );

@@ -1,185 +1,131 @@
-# Administering a Workspace
+# Administering Workspaces
 
-Most of what happens in a workspace needs no administrator: people sign in,
-approve their own browsers, let each other in, and rotate keys themselves. A
-few actions are deliberately reserved - legal holds, purging, and restoring
-access for someone who has lost everything - because they override retention
-or someone's keys.
+Most of what happens in a workspace needs no administrator. Owners add and
+remove people, map groups, and rename their workspace; editors create,
+delete and restore documents. A few things are reserved for **store
+administrators**, because they reach across workspaces or override
+retention:
 
-These are **API actions** in this release. There is no administration screen
-yet; this page shows how to perform each one.
+- creating workspaces (unless the store lets anyone);
+- seeing and managing every workspace, as an owner of each;
+- archiving a workspace and bringing it back;
+- placing and releasing legal holds;
+- removing a deleted document before its retention ends.
 
-::: info What an administrator cannot do
-An administrator cannot read documents, see their titles, or recover anyone's
-keys. The workspace store holds only ciphertext and wrapped keys, and being an
-administrator does not change that. What they can do is decide what is kept,
-and let someone back in so that a member can give them access again.
+All of it is done in the editor, from **File → Documents**. The same actions
+are available over the store's API for scripts; see [The API](#the-api).
+
+::: warning What an administrator can see
+An administrator can open every workspace and read every document. So can
+anyone with access to the store's database or its backups. Keep the list of
+administrators short, and treat the database as you would the documents in
+it. [How your work is protected](/guide/security) says this to your users.
 :::
 
-## Becoming an administrator
+## Who is an administrator
 
-Administrators are listed in the store's `ADMIN_SUBJECTS`, as
-`issuer#subject`, comma separated:
+Two settings on the store name them. Either is enough; both can be used.
+
+**By group**, which is the one to prefer. Members of these groups are
+administrators, decided each time they sign in, so you add and remove
+administrators at your identity provider:
+
+```yaml
+ADMIN_GROUPS: /notebook-admins
+```
+
+Spell each group exactly as it appears in the groups claim. With Keycloak's
+full group paths that includes the leading slash.
+[Groups and Roles](/deployment/group-access) covers getting groups into the
+token.
+
+**By person**, as `issuer#subject`, comma separated. Useful where sign-in
+has no groups (GitHub), or to name one person regardless of their groups:
 
 ```yaml
 ADMIN_SUBJECTS: https://keycloak.example.gov/realms/design#9b1f3c52-6a1e-4c3a-9d2e-1f0a7b5c4e21
 ```
 
-The subject is your identity provider's identifier for you - for Keycloak, a
-UUID - not your username. To find yours, sign in to the editor, then open:
+The subject is your provider's identifier for the person - for Keycloak, a
+UUID - not their username. To find yours, sign in to the editor and open
+`https://store.example.gov/v1/auth/session`.
 
-```
-https://store.example.gov/v1/auth/session
-```
+Restart the store after changing either setting. To check, open
+`https://store.example.gov/v2/me` while signed in: `isAdmin` should be
+`true`. With neither setting, there are no administrators, and with the
+default `WORKSPACE_CREATION=admins` nobody can create a workspace.
 
-and copy `issuer` and `subject` from the response, joined with `#`. Restart
-the store after changing the setting. With no administrators configured,
-every action on this page is refused to everyone, rather than allowed to
-anyone.
+## Workspaces
 
-## Calling the API
+**Create one** with **New workspace** in the Workspaces panel. Name it for
+the team that will use it; names must be unique. Then open **Members** and
+give the team's group a role, or add people by name.
 
-Every call needs the session your browser holds after signing in. Two ways to
-use it:
+**Who creates workspaces** is the store's `WORKSPACE_CREATION` setting:
+`admins` (the default) or `anyone`, meaning anyone signed in. Whoever creates
+a workspace is its first owner.
 
-::: code-group
+**Rename** a workspace from the panel. Its documents and members are
+unaffected.
 
-```js [From the editor's console]
-// Sign in to the editor, open the browser's developer tools on the
-// editor's page, and paste this. It sends your session with each call.
-const store = 'https://store.example.gov';
-const api = (method, path, body) =>
-  fetch(store + path, {
-    method,
-    credentials: 'include',
-    headers: body ? { 'content-type': 'application/json' } : {},
-    body: body ? JSON.stringify(body) : undefined,
-  }).then(async (r) => ({
-    status: r.status,
-    body: await r.text().then((t) => (t ? JSON.parse(t) : null)),
-  }));
+**Archive** a workspace when a team is finished with it. Its members no
+longer see it or its documents; nothing is deleted. It stays in your list,
+marked _(archived)_, where **Restore** brings it back exactly as it was.
+Nothing in an archived workspace can be changed until then.
 
-await api('GET', '/v1/auth/session');
-```
+There is no way to delete a workspace. Archive it, and let retention deal
+with any documents deleted from it beforehand.
 
-```bash [With curl]
-# In the browser's developer tools, under Application → Cookies for the
-# store's address, copy the value of sd_session.
-export STORE=https://store.example.gov
-export SESSION='sd_session=<value>'
+## Members
 
-curl -s -H "Cookie: $SESSION" "$STORE/v1/auth/session"
-```
+Open a workspace and choose **Members**. As an administrator you are an
+owner of every workspace, so you can do everything an owner can:
 
-:::
+- add someone by name, once they have signed in to the store at least once;
+- give a group a role;
+- change or remove either.
 
-The examples below use the console form. Each has an exact curl equivalent:
-the same method and path, with `-H "Cookie: $SESSION"` and, where there is a
-body, `-H 'content-type: application/json' -d '…'`.
-
-Sessions last eight hours. A `401` means sign in again.
-
-## Finding a document
-
-The store identifies documents by id and never knows their titles - that is
-the point of encrypting them. To act on a particular document you need its
-id, which is in the editor's address bar while it is open:
-
-```
-https://design.example.gov/?doc=3f6e2b1c-…
-                              ^ this
-```
-
-Ask someone who can open it, or find it in the audit trail by who touched it
-and when (see _Reading the audit trail_).
+The editor asks before a change that would leave a workspace with no owner.
+The store allows it, because an administrator can always put it right.
 
 ## Deleted documents
 
-Deleting a document hides it and, depending on `RETENTION_PERIOD`, keeps it
-restorable for a time. Any signed-in member can see and restore deleted
-documents; this is not an administrator action.
+Deleting a document from a workspace keeps it for the store's
+`RETENTION_PERIOD`, so it can be brought back. Open a workspace and choose
+**Deleted** to see what is being kept and for how long.
 
-```js
-// Everything, including documents that are deleted but still retained.
-await api('GET', '/v1/docs?includeDeleted=true');
+| `RETENTION_PERIOD`       | A deleted document is                                    |
+| :----------------------- | :------------------------------------------------------- |
+| `immediate`              | Removed at once. Nothing is kept.                        |
+| a duration, such as `7y` | Restorable for that long, then removed. Default `30d`.   |
+| `indefinite`             | Kept until an administrator removes it, however long ago |
 
-// Bring one back.
-await api('POST', '/v1/docs/3f6e2b1c-…/restore');
-```
+Editors and owners can **Restore** a document. Two more actions are yours
+alone.
 
-A deleted document shows a `deletedAt` time, and `purgeAfter` when retention
-will remove it.
+### Legal hold
 
-## Legal hold
+**Hold** keeps a deleted document past its retention until you **Release**
+it. You give a reason, which is recorded with the hold and in the audit
+trail. A held document cannot be removed, by retention or by you, until the
+hold is released.
 
-A hold stops a document being purged - by retention, by the sweep, or by an
-explicit purge - until it is released. It applies whether or not the
-document is deleted, and in every retention mode, including `immediate`.
+Holds are placed on deleted documents, from the **Deleted** list. A document
+that is still live is not at risk of being removed; if it must not be
+deleted either, that is a matter for the workspace's roles.
 
-```js
-// Place a hold. The reason is recorded with it and in the audit trail.
-await api('PUT', '/v1/docs/3f6e2b1c-…/hold', { reason: 'FOIA request 2026-114' });
+### Removing a document for good
 
-// Release it. If the document is deleted, its purge date is restored.
-await api('DELETE', '/v1/docs/3f6e2b1c-…/hold');
-```
-
-Place holds before anything else when a records request arrives. A hold is
-cheap and reversible; a purge is neither.
-
-## Purging
-
-Purging removes a document and its history permanently. It cannot be undone,
-and nobody - including the organization's offline recovery key - can bring a
-purged document back.
-
-```js
-// One document, now. Refused while it is under a hold.
-await api('POST', '/v1/docs/3f6e2b1c-…/purge');
-
-// Everything whose retention has ended. The store runs this on its own every
-// PURGE_INTERVAL_MINUTES; this is for running it now.
-await api('POST', '/v1/admin/purge-due');
-// → { purged: ['…', '…'] }
-```
-
-## Restoring someone's access
-
-For someone who has lost every browser **and** their recovery code. If they
-still have either, they do not need an administrator: another browser can
-approve a new one, or the recovery code can.
-
-It takes two people, and that is deliberate - no single step lets anyone read
-the workspace.
-
-**1. The administrator resets their keys.**
-
-```js
-// Find them.
-await api('GET', '/v1/admin/users');
-// → { users: [ { userId, displayName, publicKey, workspaceKeyGenerations }, … ] }
-
-// Reset.
-await api('POST', '/v1/admin/users/<userId>/regrant');
-```
-
-This revokes every browser they had, discards their recovery code and their
-copy of the workspace key, and forgets their old public key. Anything wrapped
-to their lost keys goes with them.
-
-**2. A member lets them back in.** They sign in on a new browser, which
-publishes a fresh key and tells them they are waiting for access. Anyone
-already in the workspace sees a notice over their document and presses
-**Give access** - exactly as for a new colleague.
-
-Consider [rotating the workspace key](/guide/workspaces#losing-a-laptop)
-afterwards if the lost browsers might be in someone else's hands.
+The bin icon beside a deleted document removes it now, without waiting for
+its retention. The editor asks first. **This cannot be undone**, by anyone:
+the document and its history are gone from the store. Copies in people's
+browsers and in your backups are unaffected.
 
 ## Reading the audit trail
 
 The store records every request - who, what, which document, and whether it
-was allowed - in PostgreSQL's `audit_log` table. There is no API for it in
-this release; read it with SQL:
+was allowed - in PostgreSQL's `audit_log` table. There is no screen for it;
+read it with SQL:
 
 ```sql
 -- Everything that happened to one document, newest first.
@@ -189,10 +135,23 @@ WHERE doc_id = '3f6e2b1c-…'
 ORDER BY at DESC;
 
 -- Everything one person did in the last week.
-SELECT at, operation, doc_id, outcome
+SELECT at, operation, doc_id, outcome, detail
 FROM audit_log
 WHERE subject = 'https://keycloak.example.gov/realms/design#9b1f3c52-…'
   AND at > now() - interval '7 days'
+ORDER BY at DESC;
+
+-- Changes to who is in which workspace.
+SELECT at, subject, operation, detail
+FROM audit_log
+WHERE operation LIKE 'workspace.%' AND outcome = 'ok'
+  AND operation NOT IN ('workspace.list', 'workspace.read', 'workspace.members')
+ORDER BY at DESC;
+
+-- Holds placed and released, and documents removed for good.
+SELECT at, subject, operation, doc_id, detail
+FROM audit_log
+WHERE operation IN ('document.hold', 'document.release', 'document.purge')
 ORDER BY at DESC;
 
 -- Refusals, which are where problems and probing both show up.
@@ -203,50 +162,93 @@ ORDER BY at DESC
 LIMIT 100;
 ```
 
-Worth knowing: the log is append-only **by convention** in this release - the
-store never updates or deletes a row - not by database permissions. If your
-assessment requires tamper resistance, grant the store's database role
-`INSERT` and `SELECT` on `audit_log` only, and ship the table to your log
-platform.
+`subject` is `issuer#subject`, as in `ADMIN_SUBJECTS`. Operations are named
+for what was done: `workspace.create`, `workspace.member.put`,
+`workspace.group.put`, `document.append`, `document.delete`,
+`document.restore` and so on.
 
-## Offline document recovery
+Worth knowing: the log is append-only **by convention** - the store never
+updates or deletes a row - not by database permissions. If your assessment
+requires tamper resistance, grant the store's database role `INSERT` and
+`SELECT` on `audit_log` only, and ship the table to your log platform.
 
-When all workspace member devices and recovery codes are lost, or in an
-emergency disaster recovery scenario, administrators can decrypt an escrowed
-document package directly using the organization's offline recovery private key.
+## The API
 
-Using the container image:
+Everything above is a call to the store, under `/v2`. Scripts can make the
+same calls with the session a browser holds after signing in.
 
-```bash
-docker run --rm \
-  -u $(id -u):$(id -g) \
-  -v ./keys:/keys \
-  -v ./backups:/backups \
-  ghcr.io/jbraunsmajr/system-design-store:latest \
-  recover-document \
-    --key /keys/recovery-private.pem \
-    --package /backups/doc-123.json \
-    --out /backups/recovered-123.json
+::: code-group
+
+```js [From the editor's console]
+// Sign in to the editor, open the browser's developer tools on the
+// editor's page, and paste this. It sends your session with each call.
+const store = 'https://store.example.gov';
+const api = (method, path, body) =>
+  fetch(store + '/v2' + path, {
+    method,
+    credentials: 'include',
+    headers: body ? { 'content-type': 'application/json' } : {},
+    body: body ? JSON.stringify(body) : undefined,
+  }).then(async (r) => ({
+    status: r.status,
+    body: await r.text().then((t) => (t ? JSON.parse(t) : null)),
+  }));
+
+await api('GET', '/me');
 ```
 
-Or from source:
+```bash [With curl]
+# In the browser's developer tools, under Application → Cookies for the
+# store's address, copy the value of sd_session.
+export STORE=https://store.example.gov
+export SESSION='sd_session=<value>'
 
-```bash
-npx tsx scripts/recover-document.ts \
-  --key recovery-private.pem \
-  --package doc-123.json \
-  --out doc-123-recovered.json
+curl -s -H "Cookie: $SESSION" "$STORE/v2/me"
 ```
 
-The output JSON file can be opened directly in the editor via **File > Open**.
+:::
 
-## Responses
+Sessions last eight hours. A `401` means sign in again.
 
-| Status                | Meaning                                                                                 |
-| :-------------------- | :-------------------------------------------------------------------------------------- |
-| `200`, `204`          | Done.                                                                                   |
-| `401 unauthenticated` | Your session has expired. Sign in again.                                                |
-| `403 forbidden`       | You are not in `ADMIN_SUBJECTS`, or none are configured.                                |
-| `404 not-found`       | No such document or person. Check the id.                                               |
-| `409 conflict`        | Refused for a reason in the message - most often, a purge of a document under hold.     |
-| `410 deleted`         | The document is deleted. Restore it first, or include deleted documents in the request. |
+| Call                                                         | Does                                     |
+| :----------------------------------------------------------- | :--------------------------------------- |
+| `GET /workspaces?archived=true`                              | Every workspace, archived ones included. |
+| `POST /workspaces` `{ "name": "…" }`                         | Creates one.                             |
+| `PATCH /workspaces/:id` `{ "name": "…" }`                    | Renames it.                              |
+| `POST /workspaces/:id/archive`, `…/restore`                  | Archives it, or brings it back.          |
+| `GET /workspaces/:id/members`                                | Its members and mapped groups.           |
+| `PUT /workspaces/:id/members/:userId` `{ "role": "…" }`      | Adds someone, or changes their role.     |
+| `DELETE /workspaces/:id/members/:userId`                     | Removes them.                            |
+| `PUT /workspaces/:id/groups` `{ "group": "…", "role": "…" }` | Gives a group a role, or changes it.     |
+| `DELETE /workspaces/:id/groups?group=…`                      | Removes the group's role.                |
+| `GET /workspaces/:id/documents?deleted=true`                 | Its documents, deleted ones included.    |
+| `POST /documents/:docId/restore`                             | Restores a deleted document.             |
+| `PUT /documents/:docId/hold` `{ "reason": "…" }`             | Places a legal hold.                     |
+| `DELETE /documents/:docId/hold`                              | Releases it.                             |
+| `POST /documents/:docId/purge`                               | Removes a deleted document for good.     |
+| `PATCH /documents/:docId` `{ "workspaceId": "…" }`           | Moves a document to another workspace.   |
+
+Roles are `viewer`, `editor` and `owner`. A group is named in the body, or
+in the query when removing it, where `/platform-eng` is written
+`?group=%2Fplatform-eng`.
+
+```js
+// Give a group the editor role in a workspace.
+const { body } = await api('GET', '/workspaces');
+const workspace = body.workspaces.find((w) => w.name === 'Platform Team');
+await api('PUT', `/workspaces/${workspace.workspaceId}/groups`, {
+  group: '/platform-eng',
+  role: 'editor',
+});
+```
+
+### Responses
+
+| Status                | Meaning                                                                                        |
+| :-------------------- | :--------------------------------------------------------------------------------------------- |
+| `200`, `201`          | Done.                                                                                          |
+| `401 unauthenticated` | Your session has expired. Sign in again.                                                       |
+| `403 forbidden`       | You are signed in, but your role does not allow it - or the action is for administrators only. |
+| `404 not-found`       | No such workspace, document or person - or one you have no role in. The two look the same.     |
+| `409 conflict`        | Refused for a reason in the message - most often, removing a document that is under hold.      |
+| `410 deleted`         | The document is deleted. Restore it first.                                                     |

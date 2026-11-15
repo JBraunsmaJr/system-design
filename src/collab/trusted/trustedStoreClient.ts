@@ -217,15 +217,19 @@ export function createTrustedStoreClient(options: TrustedStoreClientOptions) {
       group: string,
       role: WorkspaceRole,
     ): Promise<TrustedGroupMapping> {
-      const { body } = await request(`/workspaces/${id(workspaceId)}/groups/${id(group)}`, {
+      // The group goes in the body, not the address: its name may contain
+      // a slash, which a proxy in front of the store would rewrite.
+      const { body } = await request(`/workspaces/${id(workspaceId)}/groups`, {
         method: 'PUT',
-        body: { role },
+        body: { group, role },
       });
       return body.group as TrustedGroupMapping;
     },
 
     async removeGroupMapping(workspaceId: string, group: string): Promise<void> {
-      await request(`/workspaces/${id(workspaceId)}/groups/${id(group)}`, { method: 'DELETE' });
+      await request(`/workspaces/${id(workspaceId)}/groups?group=${encodeURIComponent(group)}`, {
+        method: 'DELETE',
+      });
     },
 
     /** People to add, by name. At least two characters. */

@@ -244,8 +244,12 @@ async function run(label: string, backend: Backend) {
     await member(B, mo, 'editor');
     await member(B, out, 'editor');
     check(
-      (await call(olive, 'PUT', `/workspaces/${A}/groups/platform-eng`, { role: 'editor' }))
-        .status === 200,
+      (
+        await call(olive, 'PUT', `/workspaces/${A}/groups`, {
+          group: 'platform-eng',
+          role: 'editor',
+        })
+      ).status === 200,
       'an owner maps a group to a role',
     );
 
@@ -290,11 +294,11 @@ async function run(label: string, backend: Backend) {
       { method: 'DELETE', path: `/workspaces/${A}/members/${ed.userId}`, needs: 'owner' },
       {
         method: 'PUT',
-        path: `/workspaces/${A}/groups/everyone`,
-        body: { role: 'owner' },
+        path: `/workspaces/${A}/groups`,
+        body: { group: 'everyone', role: 'owner' },
         needs: 'owner',
       },
-      { method: 'DELETE', path: `/workspaces/${A}/groups/platform-eng`, needs: 'owner' },
+      { method: 'DELETE', path: `/workspaces/${A}/groups?group=platform-eng`, needs: 'owner' },
       { method: 'GET', path: `/workspaces/${A}/people?query=ol`, needs: 'owner' },
       { method: 'GET', path: `/workspaces/${A}/documents`, needs: 'viewer' },
       { method: 'GET', path: `/workspaces/${A}/documents?deleted=true`, needs: 'editor' },
@@ -529,13 +533,51 @@ async function run(label: string, backend: Backend) {
       'signing in without the group means no access: membership is read from the sign-in, not stored',
     );
     check(
-      (await call(olive, 'DELETE', `/workspaces/${A}/groups/platform-eng`)).status === 200 &&
+      (await call(olive, 'DELETE', `/workspaces/${A}/groups?group=platform-eng`)).status === 200 &&
         (await call(gil, 'GET', `/documents/${D1}`)).status === 404,
       'removing a group mapping removes access for people who came in through it, at once',
     );
     check(
-      (await call(olive, 'DELETE', `/workspaces/${A}/groups/platform-eng`)).status === 404,
+      (await call(olive, 'DELETE', `/workspaces/${A}/groups?group=platform-eng`)).status === 404,
       'removing a mapping that is not there is 404',
+    );
+    check(
+      (await call(olive, 'DELETE', `/workspaces/${A}/groups`)).status === 400,
+      'and removing without naming a group is refused',
+    );
+
+    // A group is called whatever the identity provider calls it. Keycloak's
+    // full paths start with a slash and may contain more, so the name is
+    // never part of the address, where a proxy could rewrite it.
+    const PATHED = '/engineering/platform eng';
+    const mapped = await call(olive, 'PUT', `/workspaces/${A}/groups`, {
+      group: PATHED,
+      role: 'viewer',
+    });
+    const pat = await signIn('pat', [PATHED]);
+    const lookalike = await signIn('lou', ['engineering/platform eng']);
+    check(
+      mapped.status === 200 &&
+        (mapped.body.group as { group: string }).group === PATHED &&
+        (await call(pat, 'GET', `/workspaces/${A}`)).status === 200,
+      'a group whose name is a path with slashes and a space is mapped as it is, and gives its members the role',
+    );
+    check(
+      (await call(lookalike, 'GET', `/workspaces/${A}`)).status === 404,
+      'a group that differs only by its leading slash is another group',
+    );
+    check(
+      (
+        await call(olive, 'PUT', `/workspaces/${A}/groups/${encodeURIComponent(PATHED)}`, {
+          role: 'owner',
+        })
+      ).status === 404,
+      'the name is not accepted in the address',
+    );
+    check(
+      (await call(olive, 'DELETE', `/workspaces/${A}/groups?group=${encodeURIComponent(PATHED)}`))
+        .status === 200 && (await call(pat, 'GET', `/workspaces/${A}`)).status === 404,
+      'and it is removed by the same name',
     );
     const removedEd = await call(olive, 'DELETE', `/workspaces/${A}/members/${ed.userId}`);
     check(

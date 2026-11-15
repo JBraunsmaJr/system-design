@@ -1,13 +1,14 @@
-# Engineers Notebook - with workspaces: shared, encrypted team storage.
+# Engineers Notebook - with workspaces: shared team storage on your server.
 #
 # One domain, one TLS proxy:
 #   https://<DOMAIN>/         the editor (and its documentation at /docs/)
 #   wss://<DOMAIN>/relay/     the relay, for live sessions
 #   https://<DOMAIN>/store/   the workspace store
 #
-# The store holds documents it cannot read: they are encrypted in the
-# browser. Sign-in uses your identity provider; to run one here instead,
-# add compose.keycloak.yml (see the setup guide).
+# The store keeps documents as the editor sends them, so this server and
+# whoever administers it can read them. Protect it, its database and its
+# backups as you would the documents. Sign-in uses your identity provider;
+# to run one here instead, add compose.keycloak.yml (see the setup guide).
 
 name: system-design
 
@@ -33,7 +34,8 @@ services:
     #volumes:
     #  - ./certs:/certs:ro
     environment:
-      # The same value as the store's: sessions then require signing in.
+      # The same value as the store's: the relay then admits only people the
+      # store has let into a session.
       RELAY_TOKEN_SECRET: ${RELAY_TOKEN_SECRET:?Set RELAY_TOKEN_SECRET in .env}
       # If you are using self-signed certs
       # NODE_EXTRA_CA_CERTS: /certs/your-ca.crt
@@ -53,17 +55,23 @@ services:
       OIDC_INTERNAL_URL: ${OIDC_INTERNAL_URL:-}
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:?Set OIDC_CLIENT_ID in .env}
       OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:?Set OIDC_CLIENT_SECRET in .env}
-      RECOVERY_PUBLIC_KEY_FILE: /run/keys/recovery-public.pem
+      # The ID-token claim that lists a person's groups. Workspace roles
+      # and ADMIN_GROUPS are matched against it.
+      OIDC_GROUPS_CLAIM: ${OIDC_GROUPS_CLAIM:-groups}
       RELAY_TOKEN_SECRET: ${RELAY_TOKEN_SECRET}
+      # Who administers the store: members of these groups, and anyone
+      # listed by issuer#subject. Without either, nobody can create a
+      # workspace.
+      ADMIN_GROUPS: ${ADMIN_GROUPS:-}
       ADMIN_SUBJECTS: ${ADMIN_SUBJECTS:-}
+      # admins: only administrators create workspaces. anyone: anyone signed in.
+      WORKSPACE_CREATION: ${WORKSPACE_CREATION:-admins}
       RETENTION_PERIOD: ${RETENTION_PERIOD:-30d}
       # If you are using self-signed certs, mount your certificates and specify the CA here
       # NODE_EXTRA_CA_CERTS: /certs/your-ca.crt
-    volumes:
-      # The PUBLIC half only. The private half never belongs on this host.
-      - ./keys/recovery-public.pem:/run/keys/recovery-public.pem:ro
-      # If you are using self-signed certs, mount the certs
-      # - ./certs:/certs:ro
+    # If you are using self-signed certs, mount the certs
+    #volumes:
+    #  - ./certs:/certs:ro
 
   postgres:
     image: postgres:16-alpine

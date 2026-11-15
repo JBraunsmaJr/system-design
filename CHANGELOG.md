@@ -29,6 +29,20 @@ markers are removed when the section becomes a release. See
 - `ADMIN_GROUPS` makes the members of an identity-provider group store administrators in that API.
   `WORKSPACE_CREATION` sets who may create workspaces there.
 
+### Documentation and example deployments
+
+- The guides describe workspaces as they now work. **Deployment with Workspaces** no longer has a recovery-key step
+  and ends with creating a workspace and giving a group a role. **Automatic Access from Groups** is replaced by
+  **Groups and Roles**. **Administering a Workspace** is now **Administering Workspaces** and is done from the editor,
+  with the API as an alternative. **Workspaces** and **How your work is protected** are rewritten for people using
+  the editor, and say plainly that the server and its administrators can read workspace documents.
+- The example deployments are updated to match: no recovery key or `keys` folder, `ADMIN_GROUPS` set so the first
+  person in can create a workspace, and `WORKSPACE_CREATION` and `OIDC_GROUPS_CLAIM` shown. The Keycloak realms
+  create a `notebook-admins` group, and in `docker/store` the `demo` account is in it.
+- [PATCH] Store: a group is now named in the request body (`PUT /v2/workspaces/:id/groups`) or the query (`DELETE
+…/groups?group=`) instead of the address. A name with a slash in it, which is every group Keycloak reports by full
+  path, was rewritten by a reverse proxy serving the store under a prefix and stored under the wrong name.
+
 ### [MAJOR] The encrypted workspace is removed from the store
 
 - The store no longer serves the encrypted workspace: the `/v1` routes for documents, the workspace index, keys,

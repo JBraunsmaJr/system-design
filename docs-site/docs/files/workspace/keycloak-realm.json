@@ -17,7 +17,9 @@
       "serviceAccountsEnabled": false,
       "redirectUris": ["https://${DOMAIN}/store/v1/auth/callback"],
       "webOrigins": ["https://${DOMAIN}"],
-      "attributes": { "pkce.code.challenge.method": "S256" },
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
       "protocolMappers": [
         {
           "name": "groups",
@@ -34,6 +36,11 @@
           }
         }
       ]
+    }
+  ],
+  "groups": [
+    {
+      "name": "notebook-admins"
     }
   ]
 }
