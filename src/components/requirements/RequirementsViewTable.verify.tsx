@@ -283,6 +283,7 @@ const context: ItemViewContext = {
   onNavigateToNode: () => undefined,
   onCreateLinkedNode: () => undefined,
   preferredVerbKeyFor: () => undefined,
+  peers: [],
 };
 const open = (id: string, variant: 'row' | 'page', linked = false) =>
   renderPlain(
@@ -386,6 +387,48 @@ for (const variant of ['row', 'page'] as const) {
     "an epic's children are listed as rows that open",
   );
   assert(epic.includes('class="child-quick-add"'), 'and a child can be added under it');
+}
+
+console.log('\n=== Who else is editing ===');
+{
+  const peer = (clientId: number, name: string, focusedItemId: string | null) =>
+    ({
+      clientId,
+      name,
+      color: '#f00',
+      focusedItemId,
+    }) as unknown as ItemViewContext['peers'][number];
+  const withPeers = (id: string, variant: 'row' | 'page') =>
+    renderPlain(
+      <RequirementItemView
+        variant={variant}
+        item={doc.items.find((i) => i.id === id)!}
+        linkedNodes={[]}
+        context={{
+          ...context,
+          peers: [peer(1, 'Ben', 'REQ-1'), peer(2, 'Cara', 'REQ-1'), peer(3, 'Dev', 'REQ-2')],
+        }}
+        onNavigateToItem={() => undefined}
+      />,
+    );
+  for (const variant of ['row', 'page'] as const) {
+    const html = withPeers('REQ-1', variant);
+    assert(
+      html.includes('title="Ben, Cara are editing this"'),
+      `${variant}: names the people editing this item`,
+    );
+    assert(count(html, 'requirement-card__peer-dot') === 2, `${variant}: one badge each`);
+    assert(!html.includes('Dev'), `${variant}: and not someone on another item`);
+    assert(html.includes('has-peers'), `${variant}: the item is marked as being edited`);
+  }
+  assert(
+    withPeers('REQ-2', 'row').includes('title="Dev is editing this"'),
+    'one person reads in the singular',
+  );
+  assert(
+    !open('REQ-1', 'row').includes('requirement-card__peers'),
+    'outside a session there is nothing',
+  );
 }
 
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);

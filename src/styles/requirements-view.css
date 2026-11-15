@@ -3464,3 +3464,13 @@ mark.search-highlight--ellipsis {
   flex-shrink: 0;
   font-size: var(--text-xs);
 }
+
+/* Someone else in the session has their cursor in this open item. */
+.requirement-detail.has-peers,
+.requirement-page.has-peers {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.requirement-page.has-peers {
+  padding-left: 14px;
+}

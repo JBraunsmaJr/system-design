@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from 'react';
+import { type FocusEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 import { Pencil, Plus, Trash2, Workflow } from 'lucide-react';
 import type {
   RequirementItem,
@@ -27,6 +27,8 @@ import { MemberPicker } from '../team/MemberPicker';
 import { PointsPicker } from '../team/PointsPicker';
 import { type AttributeOption, RequirementAttributeFields } from './RequirementAttributeFields';
 import { AddCriterion, CriteriaList, VerificationNote } from './RequirementDetailParts';
+import { PeerBadges } from './PeerBadges';
+import type { PresenceInfo } from '../../collab/sync/session';
 
 /** Everything an item view needs that is the same for every item: the
  * document, the lists its menus offer, and the ways to change things.
@@ -52,6 +54,11 @@ export interface ItemViewContext {
    * RelationshipManager. */
   preferredVerbKeyFor: (item: RequirementItem) => string | undefined;
   onVerbUsed?: (itemTypeId: string, verbKey: string) => void;
+  /** Everyone else in the collaborative session; empty outside one. */
+  peers: readonly PresenceInfo[];
+  /** Tells the session this person started or stopped editing an item, so
+   * the others see it. */
+  onEditingChange?: (itemId: string, isEditing: boolean) => void;
 }
 
 interface RequirementItemViewProps {
@@ -87,6 +94,46 @@ export function RequirementItemView({
   // A new item has nothing to read, so its statement starts as the editor.
   const [isEditingBody, setIsEditingBody] = useState(false);
   const [editingField, setEditingField] = useState<ItemMarkdownField | null>(null);
+
+  /*
+   * "Editing" for the people watching: the cursor is somewhere in this
+   * item - its title, its description, a criterion being typed, a note. The
+   * card only counted its description editor, but here every part is
+   * edited in place, so focus is the honest signal. Reported on change
+   * only, and withdrawn if the item closes while still focused.
+   */
+  const { onEditingChange } = context;
+  const isFocusedRef = useRef(false);
+  const reportFocus = (focused: boolean) => {
+    if (isFocusedRef.current === focused) return;
+    isFocusedRef.current = focused;
+    onEditingChange?.(item.id, focused);
+  };
+  const onFocus = () => reportFocus(true);
+  const onBlur = (event: FocusEvent<HTMLElement>) => {
+    // Moving between two fields of the same item isn't leaving it.
+    if (event.currentTarget.contains(event.relatedTarget)) return;
+    reportFocus(false);
+  };
+  const rootRef = useRef<HTMLElement | null>(null);
+  useEffect(
+    () => {
+      // A new item is focused as it mounts (its title has autoFocus), and
+      // that focus happens before these handlers can hear it - so ask.
+      if (rootRef.current?.contains(document.activeElement)) reportFocus(true);
+      return () => {
+        // Through reportFocus so the flag is cleared too: React runs this
+        // pair twice in development, and a stale "already reported" flag
+        // would swallow the second mount's report.
+        reportFocus(false);
+      };
+    },
+    // Only on mount and unmount: item.id is fixed for a mounted view (it
+    // is keyed by it), and the callback is read at that moment.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+  const peersHere = context.peers.filter((p) => p.focusedItemId === item.id);
 
   const type = getItemType(doc, item.typeId);
   const isDecision = isDecisionItem(item);
@@ -134,6 +181,7 @@ export function RequirementItemView({
           else onUpdateItem(item.id, { typeId: newTypeId });
         }}
       />
+      <PeerBadges peers={peersHere} />
       <CategoryPicker
         doc={doc}
         categoryId={item.categoryId}
@@ -387,9 +435,12 @@ export function RequirementItemView({
   if (isPage) {
     return (
       <article
-        className="requirement-page"
+        className={`requirement-page${peersHere.length > 0 ? ' has-peers' : ''}`}
         data-requirement-id={item.id}
         data-section-key={sectionKey}
+        ref={rootRef}
+        onFocus={onFocus}
+        onBlur={onBlur}
       >
         <header className="requirement-page__header">
           {identity}
@@ -408,7 +459,14 @@ export function RequirementItemView({
   }
 
   return (
-    <div className="requirement-detail">
+    <div
+      className={`requirement-detail${peersHere.length > 0 ? ' has-peers' : ''}`}
+      ref={(element) => {
+        rootRef.current = element;
+      }}
+      onFocus={onFocus}
+      onBlur={onBlur}
+    >
       <div className="requirement-detail__wide">
         {identity}
         {title}

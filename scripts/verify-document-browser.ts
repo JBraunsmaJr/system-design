@@ -532,6 +532,42 @@ async function run() {
       "B's rename survives A's undo",
     );
 
+    console.log('\n=== Who is editing a requirement ===');
+    {
+      await a.click('button[title="Requirements"]');
+      await b.click('button[title="Requirements"]');
+      // A adds a requirement; it opens with the cursor in its title.
+      await a.click('.add-item-dropdown__primary-btn');
+      await a.waitForSelector('.requirements-table__detail .requirement-item__title:focus');
+      await a.keyboard.type('Seen by both');
+      // B opens the same line and sees that A is in it.
+      const line = b.locator('.requirements-table__title', { hasText: 'Seen by both' });
+      await line.waitFor({ timeout: 10_000 });
+      await line.click();
+      await b.waitForSelector('.requirements-table__detail .requirement-card__peers', {
+        timeout: 10_000,
+      });
+      check(
+        (await b.locator('.requirements-table__detail .requirement-card__peer-dot').count()) === 1,
+        "B's open row shows a badge for A while A's cursor is in the item",
+      );
+      // A clicks away from the item; the badge goes.
+      await a.click('.requirements-coverage__total');
+      await b.waitForSelector('.requirements-table__detail .requirement-card__peers', {
+        state: 'detached',
+        timeout: 10_000,
+      });
+      check(true, 'and it goes when A leaves the item');
+      // A comes back to it by clicking into a field.
+      await a.click('.requirements-table__detail .requirement-item__title');
+      await b.waitForSelector('.requirements-table__detail .requirement-card__peers', {
+        timeout: 10_000,
+      });
+      check(true, 'and returns when A clicks back into it');
+      await a.click('button[title="Diagram"]');
+      await b.click('button[title="Diagram"]');
+    }
+
     console.log('\n=== Leaving and New ===');
     await b.click('.collab-panel__trigger');
     await b.click('.collab-panel__leave-button');

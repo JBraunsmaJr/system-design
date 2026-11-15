@@ -11,6 +11,7 @@ import { CategoryPicker } from './CategoryPicker';
 import { StatusPicker } from './StatusPicker';
 import { DecisionStatusPicker } from './DecisionStatusPicker';
 import { VerificationPicker } from './VerificationPicker';
+import { PeerBadges } from './PeerBadges';
 import { isVerifiable, parseAcceptanceCriteria } from '../../domain/requirements/verification';
 import { DecisionSections } from './DecisionSections';
 import { isDecisionItem } from '../../domain/requirements/decisionRecords';
@@ -301,22 +302,7 @@ function RequirementCardImpl({
               }
             }}
           />
-          {peersHere.length > 0 && (
-            <span
-              className="requirement-card__peers"
-              title={`${peersHere.map((p) => p.name).join(', ')} ${peersHere.length === 1 ? 'is' : 'are'} editing this`}
-            >
-              {peersHere.map((p) => (
-                <span
-                  key={p.clientId}
-                  className="requirement-card__peer-dot"
-                  style={{ backgroundColor: p.color }}
-                >
-                  {p.name.charAt(0).toUpperCase()}
-                </span>
-              ))}
-            </span>
-          )}
+          <PeerBadges peers={peersHere} />
           {isItemWorkable(doc, item) && (
             <StatusPicker
               status={item.status}

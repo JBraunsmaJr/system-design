@@ -29,6 +29,13 @@ markers are removed when the section becomes a release. See
 - `ADMIN_GROUPS` makes the members of an identity-provider group store administrators in that API.
   `WORKSPACE_CREATION` sets who may create workspaces there.
 
+### Requirements: who else is editing an open item
+
+- In a live session, an item open in the table or the split view shows a badge for each other person whose cursor is
+  in it, with their names in the tooltip, and a bar down its left edge.
+- You count as editing an item while your cursor is anywhere in it (its title, its description, a criterion, a note),
+  not only while its description editor is open.
+
 ### [MINOR] Requirements: an open item is edited in place
 
 - In the table and the split view an open item no longer switches between a reading layout and the old card with

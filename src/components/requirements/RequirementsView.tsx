@@ -931,6 +931,8 @@ export function RequirementsView({
     preferredVerbKeyFor: (item) =>
       lastVerbByTypeId[item.typeId] ?? (isEpicItem(doc, item) ? EPIC_DEFAULT_VERB_KEY : undefined),
     onVerbUsed,
+    peers,
+    onEditingChange,
   };
 
   const renderDetail = () => {
