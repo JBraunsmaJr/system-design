@@ -1,17 +1,13 @@
 /**
  * What the "Linked document" picker offers: this browser's documents and the
- * workspace's, merged, with either source allowed to fail - and reading the
- * workspace never enrolling, publishing, or forgetting anything.
+ * workspaces', merged, with either source allowed to fail.
  */
 import {
   listLinkableDocuments,
   listWorkspaceDocuments,
   mergeLinkableDocuments,
-  readOnlyEnrollmentApi,
 } from './linkableDocuments.ts';
-import type { StoreClient } from '../access/storeClient.ts';
-import type { DeviceKeyStorage } from '../access/deviceIdentity.ts';
-import { generateWrappingKeyPair } from '../../crypto/keys.ts';
+import { StoreClientError } from '../access/storeErrors.ts';
 
 let failures = 0;
 
@@ -91,100 +87,70 @@ async function run() {
     });
     assert(
       !notEnrolled.workspaceUnavailable && notEnrolled.documents.length === 0,
-      'nor is a browser with no workspace access',
+      'nor is someone who is not signed in',
     );
   }
 
-  console.log('Reading the workspace is read-only');
+  console.log('Reading the workspaces');
   {
-    const writes: string[] = [];
-    const client = new Proxy(
-      {},
-      {
-        get: (_target, name) => () => {
-          writes.push(String(name));
-          if (name === 'keysForDevice')
-            return Promise.resolve({ status: 'awaiting-approval', verificationCode: 'X' });
-          return Promise.resolve(undefined);
-        },
+    const calls: string[] = [];
+    const client = {
+      listWorkspaces: async () => {
+        calls.push('workspaces');
+        return [{ workspaceId: 'ws_a' }, { workspaceId: 'ws_b' }] as never;
       },
-    ) as unknown as StoreClient;
-    const api = readOnlyEnrollmentApi(client);
-    for (const write of [
-      () => api.registerDevice('pk'),
-      () => api.publishUserPublicKey('pk'),
-      () => api.putWorkspaceKey(1, 'k'),
-      () => api.approveDevice('d', 'c', { keyWrap: '', body: '' }, 'u'),
-      () => api.setOwnUserKey('d', { keyWrap: '', body: '' }),
-      () => api.listDevices(),
-    ]) {
-      await write().then(
-        () => assert(false, 'a write went through'),
-        () => {},
-      );
-    }
-    assert(writes.length === 0, 'every write is refused before it reaches the store');
-
-    let cleared = false;
-    let saved = false;
-    const held: DeviceKeyStorage = {
-      load: async () => ({ deviceId: 'device-1', keyPair: {} as CryptoKeyPair }),
-      save: async () => {
-        saved = true;
-      },
-      clear: async () => {
-        cleared = true;
+      listDocuments: async (workspaceId: string) => {
+        calls.push(workspaceId);
+        return (
+          workspaceId === 'ws_a'
+            ? [
+                { docId: 'auth', title: 'Auth platform' },
+                { docId: 'not a valid id', title: 'Bad' },
+              ]
+            : [{ docId: 'billing', title: 'Billing' }]
+        ) as never;
       },
     };
-    const waiting = await listWorkspaceDocuments({ client, storage: held });
-    assert(waiting === null, 'a browser still waiting for approval sees no workspace documents');
+    const listed = await listWorkspaceDocuments(client);
     assert(
-      !cleared && !saved,
-      "and its stored device key is left alone - the picker can't make it forget or replace it",
+      listed?.map((d) => d.docId).join(',') === 'auth,billing',
+      'the documents of every workspace this person can see, in one list',
     );
     assert(
-      !writes.includes('registerDevice') && !writes.includes('listDevices'),
-      'no device was registered, and the device list was never consulted',
+      !listed?.some((d) => d.docId === 'not a valid id'),
+      'an id that could not be a document address is left out',
+    );
+    assert(
+      calls.join(',') === 'workspaces,ws_a,ws_b',
+      'and only reads were made: workspaces, then the documents of each',
     );
 
-    // Waiting to be let in to a workspace someone else made: enrollment
-    // would publish this browser's key here, which the picker refuses.
-    // Real keys this time, so enrollment gets as far as the write.
-    const realKeys = await generateWrappingKeyPair('device');
-    const publishing = new Proxy(
-      {},
-      {
-        get: (_target, name) => () => {
-          if (name === 'keysForDevice')
-            return Promise.resolve({ status: 'needs-setup', verificationCode: 'X' });
-          if (name === 'workspaceExists') return Promise.resolve(true);
-          return Promise.resolve(undefined);
-        },
+    const signedOut = await listWorkspaceDocuments({
+      listWorkspaces: async () => {
+        throw new StoreClientError('Sign in first.', 'unauthenticated');
       },
-    ) as unknown as StoreClient;
-    const needsAccess = await listLinkableDocuments({
+      listDocuments: async () => [],
+    });
+    assert(signedOut === null, 'someone not signed in has no workspaces to read');
+    const viaList = await listLinkableDocuments({
       listLocal: async () => [],
-      listWorkspace: async () =>
+      listWorkspace: async () => signedOut,
+    });
+    assert(!viaList.workspaceUnavailable, 'which is not reported as the store being unreachable');
+
+    const offline = await listLinkableDocuments({
+      listLocal: async () => [{ docId: 'a', title: 'A' }],
+      listWorkspace: () =>
         listWorkspaceDocuments({
-          client: publishing,
-          storage: { ...held, load: async () => ({ deviceId: 'device-1', keyPair: realKeys }) },
+          listWorkspaces: async () => {
+            throw new StoreClientError('down', 'offline');
+          },
+          listDocuments: async () => [],
         }),
     });
     assert(
-      !needsAccess.workspaceUnavailable,
-      'a browser waiting for access is told nothing is unreachable - it simply has no workspace yet',
-    );
-
-    const empty: DeviceKeyStorage = {
-      load: async () => null,
-      save: async () => {
-        saved = true;
-      },
-      clear: async () => {},
-    };
-    assert(
-      (await listWorkspaceDocuments({ client, storage: empty })) === null && !saved,
-      'a browser that was never set up stays that way',
+      offline.workspaceUnavailable && offline.documents.length === 1,
+      'an unreachable store is, and the local documents are still offered',
     );
   }
 }

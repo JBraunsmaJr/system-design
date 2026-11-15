@@ -17,7 +17,7 @@ import {
 import { installUnloadGuard } from '../../domain/storage/unloadGuard';
 import type { DurabilitySignals } from '../../domain/storage/durability';
 import type { FileSaving } from '../../hooks/useFileSaving';
-import type { useWorkspaceSync } from '../../collab/hooks/useWorkspaceSync';
+import type { useTrustedWorkspaceSync } from '../../collab/trusted/useTrustedWorkspaceSync';
 import { isPerfAutosaveSuppressed } from '../../perf/instrumentation';
 import type { ArchEdgeData, ArchNodeData, Scenario } from '../../domain/canvas/types';
 import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
@@ -28,7 +28,7 @@ import type { SrdDocumentState } from '../../domain/srd/srdTypes';
 
 export interface UseDocumentPersistenceOptions {
   fileSaving: FileSaving;
-  workspaceSync: ReturnType<typeof useWorkspaceSync>;
+  workspaceSync: ReturnType<typeof useTrustedWorkspaceSync>;
   documentStore: ReturnType<typeof createDocumentStore>;
   activeSession: {
     session: object;
@@ -147,7 +147,7 @@ export function useDocumentPersistence({
       // WS13-R1: the attached file belongs to the open local document, never
       // to a joined session's content.
       // The workspace receives the document's own CRDT updates as they
-      // happen (useWorkspaceSync), not a snapshot from here. Autosave
+      // happen (useTrustedWorkspaceSync), not a snapshot from here. Autosave
       // only pushes it along, so a pause in typing lands in the workspace
       // at the same moment it lands in the browser.
       if (activeDocId === openDocId) {

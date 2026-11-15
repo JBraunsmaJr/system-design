@@ -10,17 +10,19 @@
  * does not ask for tokens, and the URLs are returned untouched - which is
  * how every deployment has worked until now.
  *
- * A token admits someone to a room. It does not decrypt anything: session
- * content is encrypted with the key from the share link (WS3-R1), which
- * neither the store nor the relay ever sees.
+ * A token admits someone to a room. It does not decrypt anything: what
+ * passes through the relay is encrypted with the session's key, which the
+ * relay never sees. For a session started by link that key is in the link;
+ * for a workspace document it comes from the store, with the document.
  */
-import { createStoreClient, StoreClientError, type StoreClient } from './storeClient.ts';
+import { StoreClientError } from './storeErrors.ts';
+import { createStoreSessionClient, type StoreSessionClient } from './storeSessionClient.ts';
 
 export interface RelayAccessOptions {
   storeUrl: string | null;
   room: string;
   urls: string[];
-  client?: StoreClient;
+  client?: StoreSessionClient;
   /**
    * Asked first. A workspace document's room on a trusted store is not
    * open to everyone signed in: its token comes with the document, for
@@ -62,11 +64,10 @@ export async function authorizeRelayUrls(options: RelayAccessOptions): Promise<R
       };
     }
   }
-  const client = options.client ?? createStoreClient({ baseUrl: storeUrl });
+  const client = options.client ?? createStoreSessionClient({ baseUrl: storeUrl });
 
   try {
-    const health = await client.health();
-    if (health.relayAuthentication !== 'required') return { urls, note: null };
+    if ((await client.relayAuthentication()) !== 'required') return { urls, note: null };
     const token = await client.roomToken(room);
     return { urls: urls.map((url) => withToken(url, token.token)), note: null };
   } catch (error) {

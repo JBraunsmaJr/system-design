@@ -2,8 +2,7 @@
  * Keeping the open document in step with a trusted store (the workspace
  * API, /v2).
  *
- * The same job useWorkspaceSync does for the key-based API, without the
- * keys: if the store has this document and this person may see it, its
+ * If the store has this document and this person may see it, its
  * CRDT updates go up as they happen and other people's come down, so two
  * editors merge rather than overwrite (documentSync.ts). Whether the store
  * has it is the store's answer alone - there is no local list to consult -
@@ -13,15 +12,12 @@
  * Someone with the viewer role follows the document without sending
  * anything: the store would refuse their changes, so they stay in this
  * browser and `readOnly` says so.
- *
- * Returns the same shape as useWorkspaceSync, so the durability indicator
- * and the unload guard work with either.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type * as Y from 'yjs';
 import { StoreClientError } from '../access/storeErrors.ts';
 import { DEFAULT_DOCUMENT_ID } from '../../domain/storage/currentDocument.ts';
-import { WORKSPACE_CHANGED_EVENT, type WorkspaceSyncState } from '../hooks/useWorkspaceSync.ts';
+import { WORKSPACE_CHANGED_EVENT, type WorkspaceSyncState } from './workspaceSyncState.ts';
 import { createDocumentSync, type DocumentSync } from '../sync/documentSync.ts';
 import {
   createTrustedStoreClient,
@@ -154,7 +150,9 @@ export function useTrustedWorkspaceSync(options: TrustedWorkspaceSyncOptions) {
   }, [client, docId, doc, stop]);
 
   // A page going away sends what is outstanding in a request that may
-  // outlive it; see useWorkspaceSync for why both events are listened for.
+  // outlive it. Both events, because neither is reliable alone: pagehide
+  // is missed when a mobile browser is backgrounded and then killed, and
+  // visibilitychange does not fire for every navigation.
   useEffect(() => {
     const leaving = () => sync.current?.flushOnExit();
     const onVisibility = () => {

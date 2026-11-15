@@ -116,7 +116,10 @@ A document's workspace comes from the store's catalog (`store/src/documentCatalo
    - **Done: deleted documents.** Editors and owners see what a workspace has deleted and how long it is kept, and can restore it. Administrators can place and release a hold, and remove a document for good.
    - **Done: live sessions.** Opening a workspace document puts everyone who may edit it in one session through the relay, so they see each other's cursors and changes as they happen. Viewers are not in it and follow through the store.
    - **Next:** nothing the encrypted mode did is now missing. What remains is the editor shell (one save status, Share in place of Collaborate, a canvas that is locked for viewers) and an OpenAPI description of `/v2`.
-4. **Last: removal.** The encrypted API, its tables, `src/crypto`, device enrolment, recovery, rotation, and their tests and documentation. The last release with encryption is tagged first.
+4. **In progress: removal.**
+   - **Done: the editor.** The encrypted mode is gone from the editor: `src/crypto` (except what the store still imports until the next step), device enrolment, the comparison code, recovery, key rotation, automatic access, the key-based store client, and their panels and tests. An editor pointed at a store without `/v2` works on its own and says the store needs upgrading.
+   - **Next: the store.** The `/v1` document, index, key, device, join and access-rule routes, their tables, and `ESCROW`, `CRYPTO_MODE` and the automatic-access settings. Sign-in (`/v1/auth`), health and relay tokens stay where they are.
+   - **Then: the documentation.** The deployment and security guides still describe the encrypted mode.
 
 ## An editor hosted somewhere else
 

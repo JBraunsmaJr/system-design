@@ -1,24 +1,27 @@
 /**
- * Which API the configured store speaks.
+ * Whether the configured store is one this editor can use.
  *
- * A store serving the workspace API (/v2) is "trusted": the server decides
- * access and can read documents. One that does not is "legacy": the
- * key-based API, where documents are encrypted in the browser. The editor
- * supports both while stores are being upgraded, and needs to know which
- * before it mounts, because the two are wired through different hooks.
+ * A store serves workspaces under /v2 and says so at /v2/health: that is
+ * "trusted", the only kind this editor works with. A store from before
+ * workspaces has no /v2: that is "outdated". The editor then runs on its
+ * own and says the store needs upgrading, rather than failing request by
+ * request.
  *
- * So the answer is resolved once, before the first render (main.tsx), and
- * read synchronously afterwards. To keep that from delaying every start:
+ * The answer decides how the editor is wired, so it is resolved once,
+ * before the first render (main.tsx), and read synchronously afterwards.
+ * To keep that from delaying every start:
  *
  *   - no store configured: nothing to ask;
  *   - asked before: the remembered answer is used at once, and re-checked in
  *     the background for next time (a store is upgraded once, and the editor
  *     is reloaded far more often than that);
- *   - never asked: one short request, and if the store does not answer in
- *     time it is treated as legacy for this visit and nothing is remembered.
+ *   - never asked: one short request. A store that does not answer in time
+ *     is taken to be a current one that is unreachable - which the editor
+ *     already handles, by saying so and working locally - and nothing is
+ *     remembered.
  */
 
-export type StoreMode = 'none' | 'legacy' | 'trusted';
+export type StoreMode = 'none' | 'outdated' | 'trusted';
 
 const KEY_PREFIX = 'system-design-editor:store-mode:';
 /** Long enough for a store on the same network, short enough not to hold up
@@ -30,7 +33,10 @@ let resolved: StoreMode | null = null;
 function remembered(storeUrl: string): StoreMode | null {
   try {
     const value = localStorage.getItem(`${KEY_PREFIX}${storeUrl}`);
-    return value === 'legacy' || value === 'trusted' ? value : null;
+    // "legacy" is what earlier versions of this editor wrote for the same
+    // thing.
+    if (value === 'legacy' || value === 'outdated') return 'outdated';
+    return value === 'trusted' ? value : null;
   } catch {
     return null;
   }
@@ -51,7 +57,7 @@ function remember(storeUrl: string, mode: StoreMode) {
 export async function probeStoreMode(
   storeUrl: string,
   options: { fetch?: typeof fetch; timeoutMs?: number } = {},
-): Promise<'legacy' | 'trusted' | null> {
+): Promise<'outdated' | 'trusted' | null> {
   const call = options.fetch ?? fetch;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? PROBE_TIMEOUT_MS);
@@ -59,10 +65,10 @@ export async function probeStoreMode(
     const response = await call(`${storeUrl.replace(/\/+$/, '')}/v2/health`, {
       signal: controller.signal,
     });
-    if (response.status === 404) return 'legacy';
+    if (response.status === 404) return 'outdated';
     if (!response.ok) return null;
     const body = (await response.json()) as { mode?: unknown };
-    return body.mode === 'trusted' ? 'trusted' : 'legacy';
+    return body.mode === 'trusted' ? 'trusted' : 'outdated';
   } catch {
     return null;
   } finally {
@@ -75,17 +81,17 @@ export async function probeStoreMode(
  * Null when there is not, or it cannot be reached from this page.
  *
  * Stricter than `probeStoreMode`, which takes a 404 from /v2/health to mean
- * an older store: true of a store the deployment configured, but any web
- * server answers 404 to a path it does not have. So an apparent older store
- * must also answer its own health check.
+ * an outdated store: true of a store the deployment configured, but any web
+ * server answers 404 to a path it does not have. So an apparent outdated
+ * store must also answer the health check every store has had.
  */
 export async function checkStore(
   storeUrl: string,
   options: { fetch?: typeof fetch; timeoutMs?: number } = {},
-): Promise<'legacy' | 'trusted' | null> {
+): Promise<'outdated' | 'trusted' | null> {
   const timeoutMs = options.timeoutMs ?? 4000;
   const mode = await probeStoreMode(storeUrl, { ...options, timeoutMs });
-  if (mode !== 'legacy') return mode;
+  if (mode !== 'outdated') return mode;
   const call = options.fetch ?? fetch;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -95,7 +101,7 @@ export async function checkStore(
     });
     if (!response.ok) return null;
     const body = (await response.json()) as { status?: unknown };
-    return typeof body === 'object' && body !== null && 'status' in body ? 'legacy' : null;
+    return typeof body === 'object' && body !== null && 'status' in body ? 'outdated' : null;
   } catch {
     return null;
   } finally {
@@ -123,18 +129,18 @@ export async function resolveStoreMode(
   }
   const probed = await probeStoreMode(storeUrl, options);
   if (probed) remember(storeUrl, probed);
-  resolved = probed ?? 'legacy';
+  resolved = probed ?? 'trusted';
   return resolved;
 }
 
 /**
  * The mode resolved for this visit. Before `resolveStoreMode` has run -
  * which only happens in tests that render without main.tsx - a configured
- * store is taken to be legacy, as it always was.
+ * store is taken to be a current one.
  */
 export function getStoreMode(storeUrl: string | null): StoreMode {
   if (!storeUrl) return 'none';
-  return resolved ?? 'legacy';
+  return resolved ?? 'trusted';
 }
 
 /** For tests. */

@@ -5,13 +5,13 @@
  * last writer wins, which is the opposite of what the rest of this
  * application does: two people editing the same document would overwrite
  * each other. So the workspace holds the same thing a session carries -
- * Yjs updates - sealed one by one. Everyone's updates merge, and the order
- * they arrive in does not matter.
+ * Yjs updates, one by one. Everyone's updates merge, and the order they
+ * arrive in does not matter.
  *
  * What this manages:
  *
  *  - applying what the store already holds, into the open document
- *  - appending this browser's changes, sealed, as they happen
+ *  - appending this browser's changes as they happen
  *  - fetching what others have appended since, and applying that
  *  - collapsing a long log into one state when it grows (WS8-R5)
  *
@@ -20,7 +20,6 @@
  * (WS3-R3).
  */
 import * as Y from 'yjs';
-import type { StoreClient } from '../access/storeClient.ts';
 import { StoreClientError } from '../access/storeErrors.ts';
 
 /** Marks updates that came from the store, so they are not echoed back
@@ -29,8 +28,8 @@ export const WORKSPACE_ORIGIN = Symbol('workspace');
 
 /**
  * A document's update log in a store, as the sync needs it. The sync only
- * merges CRDT updates and counts versions; how they are stored - sealed
- * with a document key, or as they are - is the log's business.
+ * merges CRDT updates and counts versions; how they are stored and fetched
+ * is the log's business (trustedStoreClient.ts provides one).
  */
 export interface DocumentLog {
   all(): Promise<{ version: number; blobs: { kind: string; bytes: Uint8Array }[] }>;
@@ -45,29 +44,9 @@ export interface DocumentLog {
   compact(state: Uint8Array, expectedVersion: number): Promise<number>;
 }
 
-/** The key-based API's log: every blob sealed with the document's key. */
-export function sealedDocumentLog(
-  client: StoreClient,
-  docId: string,
-  documentKey: string,
-): DocumentLog {
-  return {
-    all: () => client.allUpdates(docId, documentKey),
-    since: (version) => client.updatesSince(docId, documentKey, version),
-    append: (update, expectedVersion, options) =>
-      client.appendUpdate(docId, documentKey, update, expectedVersion, options),
-    compact: (state, expectedVersion) =>
-      client.compactDocument(docId, documentKey, state, expectedVersion),
-  };
-}
-
-/** Where the document's log is: given directly, or - as callers of the
- * key-based API have always passed it - a client, an id and a key. */
-type DocumentSyncTarget =
-  | { log: DocumentLog; client?: undefined; docId?: undefined; documentKey?: undefined }
-  | { log?: undefined; client: StoreClient; docId: string; documentKey: string };
-
-export type DocumentSyncOptions = DocumentSyncTarget & {
+export interface DocumentSyncOptions {
+  /** The document's update log in the store. */
+  log: DocumentLog;
   doc: Y.Doc;
   /**
    * Follow the store without ever sending to it, for someone who may read a
@@ -81,7 +60,7 @@ export type DocumentSyncOptions = DocumentSyncTarget & {
   /** Collapse the log once it holds more than this many blobs (WS8-R5). */
   compactAfterBlobs?: number;
   onStatus?: (status: DocumentSyncStatus, detail?: string) => void;
-};
+}
 
 export type DocumentSyncStatus = 'starting' | 'saving' | 'saved' | 'offline' | 'error';
 
@@ -106,7 +85,7 @@ export interface DocumentSync {
 
 export function createDocumentSync(options: DocumentSyncOptions): DocumentSync {
   const { doc } = options;
-  const log = options.log ?? sealedDocumentLog(options.client, options.docId, options.documentKey);
+  const { log } = options;
   const readOnly = options.readOnly ?? false;
   const pollMs = options.pollMs ?? 4000;
   const debounceMs = options.debounceMs ?? 800;

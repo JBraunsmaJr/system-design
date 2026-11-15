@@ -797,6 +797,73 @@ async function run() {
         'forgetting the store returns the editor to working on its own',
       );
     }
+
+    // --- A store from before workspaces --------------------------------------
+    console.log('\n=== An outdated store ===');
+    {
+      const blobs = createMemoryBlobStore();
+      const old = createHttpService({
+        store: createDocumentService<MemoryTx>({
+          blobs,
+          begin: () => blobs.begin(),
+          commit: (tx) => blobs.commit(tx),
+          rollback: (tx) => blobs.rollback(tx),
+        }) as unknown as StoreBackend,
+        allowUnauthenticated: true,
+        allowedOrigins: [appOrigin],
+      });
+      await new Promise<void>((resolve) => old.listen(0, '127.0.0.1', resolve));
+      const oldOrigin = `http://127.0.0.1:${(old.address() as AddressInfo).port}`;
+      try {
+        const context = await browser!.newContext();
+        contexts.push(context);
+        await context.addInitScript({
+          content: `window.__APP_CONFIG__ = Object.assign({}, window.__APP_CONFIG__, { STORE_URL: ${JSON.stringify(oldOrigin)} });`,
+        });
+        const page = await context.newPage();
+        page.on('pageerror', (error) => check(false, `page threw: ${error.message}`));
+        await page.goto(`${appOrigin}/system-design/`);
+        await ready(page);
+        await page.click('button[title="File"]');
+        await page.click('.export-menu__dropdown button:has-text("Documents")');
+        await page.waitForSelector('.store-connection');
+        check(
+          /older version/.test(
+            (await page.textContent('.store-connection__unsupported').catch(() => '')) ?? '',
+          ) && (await page.locator('.workspace-panel').count()) === 0,
+          'an editor set up with an outdated store says it needs upgrading, and shows no workspaces',
+        );
+        await page.keyboard.press('Escape');
+        await page.fill('[aria-label="Diagram title"]', 'Still works');
+        check(
+          (await titleOf(page)) === 'Still works',
+          'and goes on working with documents in the browser',
+        );
+
+        // Typed into an editor with no store: refused, and not remembered.
+        const fresh = await browser!.newContext();
+        contexts.push(fresh);
+        const other = await fresh.newPage();
+        await other.goto(`${appOrigin}/system-design/`);
+        await ready(other);
+        await other.click('button[title="File"]');
+        await other.click('.export-menu__dropdown button:has-text("Documents")');
+        await other.click('.store-connection__change');
+        await other.fill('#store-connection-address', oldOrigin);
+        await other.click('.store-connection__connect');
+        await other.waitForSelector('.store-connection [role="alert"]');
+        check(
+          /older version/.test(
+            (await other.textContent('.store-connection [role="alert"]')) ?? '',
+          ) &&
+            (await other.evaluate(() => localStorage.getItem('system-design-editor:store-url'))) ===
+              null,
+          'connecting to one by address is refused with the same explanation',
+        );
+      } finally {
+        await new Promise<void>((resolve) => old.close(() => resolve()));
+      }
+    }
   } finally {
     for (const context of contexts) await context.close().catch(() => {});
     await browser?.close().catch(() => {});

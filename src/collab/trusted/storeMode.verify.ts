@@ -60,12 +60,13 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
     'the store address is used without its trailing slash',
   );
   assert(
-    (await probeStoreMode(STORE, { fetch: answering(404).fetcher })) === 'legacy',
-    'a store with no /v2 is legacy',
+    (await probeStoreMode(STORE, { fetch: answering(404).fetcher })) === 'outdated',
+    'a store with no /v2 is outdated',
   );
   assert(
-    (await probeStoreMode(STORE, { fetch: answering(200, { status: 'ok' }).fetcher })) === 'legacy',
-    'an answer that does not say trusted is legacy',
+    (await probeStoreMode(STORE, { fetch: answering(200, { status: 'ok' }).fetcher })) ===
+      'outdated',
+    'an answer that does not say trusted is outdated',
   );
   assert(
     (await probeStoreMode(STORE, { fetch: answering(503).fetcher })) === null,
@@ -86,8 +87,8 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
   resetStoreModeForTests();
   assert(getStoreMode(null) === 'none', 'no store configured is none');
   assert(
-    getStoreMode(STORE) === 'legacy',
-    'before resolving, a configured store is taken to be legacy',
+    getStoreMode(STORE) === 'trusted',
+    'before resolving, a configured store is taken to be a current one',
   );
   assert((await resolveStoreMode(null)) === 'none', 'resolving with no store asks nothing');
 
@@ -118,18 +119,29 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
   await settle();
   resetStoreModeForTests();
   assert(
-    (await resolveStoreMode(STORE, { fetch: failing })) === 'legacy',
+    (await resolveStoreMode(STORE, { fetch: failing })) === 'outdated',
     'but the next visit starts with what the store said last time',
   );
 
-  // Never reached: legacy for now, and not remembered.
+  // Never reached: taken to be current and unreachable, and not remembered.
+  // Calling it outdated would tell someone to upgrade a store that is
+  // merely down.
   entries.clear();
   resetStoreModeForTests();
   assert(
-    (await resolveStoreMode(STORE, { fetch: failing })) === 'legacy',
-    'a store never reached is treated as legacy for this visit',
+    (await resolveStoreMode(STORE, { fetch: failing })) === 'trusted',
+    'a store never reached is treated as a current one for this visit',
   );
   assert(entries.size === 0, 'and nothing is remembered about it');
+
+  // What an earlier version of the editor remembered still reads correctly.
+  entries.clear();
+  entries.set(`system-design-editor:store-mode:${STORE}`, 'legacy');
+  resetStoreModeForTests();
+  assert(
+    (await resolveStoreMode(STORE, { fetch: failing })) === 'outdated',
+    'an answer remembered under the old name is read as outdated',
+  );
 
   // Each store is remembered on its own.
   entries.clear();
@@ -138,7 +150,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
   resetStoreModeForTests();
   assert(
     (await resolveStoreMode('https://other.example', { fetch: answering(404).fetcher })) ===
-      'legacy',
+      'outdated',
     "another store's answer is its own",
   );
 }
@@ -160,8 +172,8 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
   );
   assert(
     (await checkStore(STORE, { fetch: byPath({ '/v1/health': [200, { status: 'ok' }] }) })) ===
-      'legacy',
-    'one with an older store behind it is legacy',
+      'outdated',
+    'one with an older store behind it is outdated',
   );
   assert(
     (await checkStore(STORE, { fetch: byPath({}) })) === null,

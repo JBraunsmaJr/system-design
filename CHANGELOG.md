@@ -29,6 +29,20 @@ markers are removed when the section becomes a release. See
 - `ADMIN_GROUPS` makes the members of an identity-provider group store administrators in that API.
   `WORKSPACE_CREATION` sets who may create workspaces there.
 
+### [MAJOR] The encrypted workspace is removed from the editor
+
+- The editor no longer works with a store from before workspaces. Documents in such a store were encrypted in the
+  browser with keys held by enrolled devices; none of that remains: no device enrolment, comparison codes, recovery
+  codes, key rotation, access requests or automatic access.
+- **Before upgrading**, open each document you want to keep in the previous release and save it to a file (File >
+  Save), then import it into a workspace on the upgraded store. There is no migration tool, and this release cannot
+  read the old store.
+- An editor pointed at an outdated store says so in File > Documents and keeps working with documents in the browser.
+  A store that is merely unreachable is not reported as outdated.
+- The save indicator's "Save to workspace" is now "Add to a workspace...", which opens the workspace panel.
+- The "Linked document" picker lists the documents of every workspace you can see.
+- `scripts/recover-document.ts` and `scripts/generate-recovery-key.ts` are removed with the recovery feature.
+
 ### [MINOR] Workspaces on a trusted store
 
 - When the store it points at serves the workspace API, the editor shows **Workspaces** in the document manager: sign

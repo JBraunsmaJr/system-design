@@ -34,7 +34,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../../common/components/button/Button';
 import { StoreClientError } from '../../collab/access/storeErrors';
-import { announceWorkspaceChange } from '../../collab/hooks/useWorkspaceSync';
+import { announceWorkspaceChange } from '../../collab/trusted/workspaceSyncState';
 import { describeRole } from '../../collab/trusted/roleWords';
 import { newDocumentId } from '../../domain/storage/documentStore';
 import { DeletedDocuments } from './DeletedDocuments';

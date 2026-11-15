@@ -23,16 +23,27 @@ import {
   saveStoreUrl,
 } from '../../domain/storage/storeConfig';
 
+const OLDER_STORE =
+  'The store at this address runs an older version, from before workspaces, which this editor no longer works with. ' +
+  'Ask its administrator to upgrade it. Until then your documents are kept in this browser only.';
+
 interface StoreConnectionProps {
   /** The store in use on this visit, or null. */
   storeUrl: string | null;
+  /** That store predates workspaces, so this editor cannot use it. */
+  unsupported?: boolean;
   /** Injected for tests; default reloads the page. */
   onChanged?: () => void;
   /** Injected for tests. */
   check?: typeof checkStore;
 }
 
-export function StoreConnection({ storeUrl, onChanged, check = checkStore }: StoreConnectionProps) {
+export function StoreConnection({
+  storeUrl,
+  unsupported = false,
+  onChanged,
+  check = checkStore,
+}: StoreConnectionProps) {
   const [saved] = useState(() => getSavedStoreUrl());
   const [deployment] = useState(() => getDeploymentStoreUrl());
   const [address, setAddress] = useState<string | null>(null);
@@ -50,6 +61,9 @@ export function StoreConnection({ storeUrl, onChanged, check = checkStore }: Sto
     setProblem(null);
     const found = await check(parsed.url);
     setChecking(false);
+    if (found === 'outdated') {
+      return setProblem(OLDER_STORE);
+    }
     if (!found) {
       // The browser does not say which of these it was, so name them all.
       return setProblem(
@@ -156,6 +170,12 @@ export function StoreConnection({ storeUrl, onChanged, check = checkStore }: Sto
             </div>
           )}
         </>
+      )}
+
+      {unsupported && address === null && (
+        <p className="trusted-workspace__error store-connection__unsupported" role="alert">
+          {OLDER_STORE}
+        </p>
       )}
 
       {problem && (

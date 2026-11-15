@@ -9,7 +9,7 @@
  * starts, rather than arriving afterwards and having to be republished.
  */
 import { useEffect, useState } from 'react';
-import { createStoreClient } from '../access/storeClient';
+import { createStoreSessionClient } from '../access/storeSessionClient';
 
 export interface StoreIdentity {
   displayName?: string;
@@ -34,7 +34,7 @@ export function useStoreAuth(storeUrl: string | null): StoreAuthInfo {
     if (!storeUrl) return;
     const setAuth = (auth: StoreAuthInfo) => setAnswer({ storeUrl, auth });
     let cancelled = false;
-    const client = createStoreClient({ baseUrl: storeUrl });
+    const client = createStoreSessionClient({ baseUrl: storeUrl });
     const ask = async () => {
       try {
         const session = await client.session();

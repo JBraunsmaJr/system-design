@@ -5,8 +5,8 @@
  * wrap or enrol: a request carries the session cookie, and the store allows
  * it or not from the signed-in person's role. See docs/trusted-store.md.
  *
- * Errors are the same StoreClientError the key-based client throws, so code
- * that reacts to "offline" or "conflict" works with either.
+ * Errors are StoreClientError, with a reason the editor can act on:
+ * "offline", "conflict", "forbidden" and so on.
  */
 import { StoreClientError, type StoreClientErrorReason } from '../access/storeErrors.ts';
 import type { DocumentLog } from '../sync/documentSync.ts';
