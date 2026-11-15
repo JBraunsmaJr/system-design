@@ -38,7 +38,7 @@ export interface ProviderConfig {
   tokenUrl?: string;
   userUrl?: string;
   scopes?: string[];
-  /** OIDC only: the ID-token claim holding groups (WS14-R6). Default `groups`. */
+  /** OIDC only: the ID-token claim holding groups . Default `groups`. */
   groupsClaim?: string;
   /**
    * OIDC only: what a token without the groups claim means. Keycloak leaves
@@ -53,23 +53,10 @@ export interface Identity {
   issuer: string;
   subject: string;
   displayName?: string;
-  /** WS14-R6: the groups the verified ID token carried. OIDC only. */
+  /** The groups the verified ID token carried. OIDC only. */
   groups?: string[];
-  /** WS14-R6: the provider left groups out of the token (Entra overage). */
+  /** The provider left groups out of the token (Entra overage). */
   groupsOverage?: boolean;
-  /**
-   * WS14-R4: present only when the sign-in carried a key commitment. The
-   * raw token is kept so a member's browser can check the provider's own
-   * signature later, rather than taking the store's word for anything.
-   */
-  evidence?: JoinEvidenceRecord;
-}
-
-export interface JoinEvidenceRecord {
-  idToken: string;
-  commitment: string;
-  /** Seconds since the epoch, from the token. */
-  iat: number;
 }
 
 /** What a sign-in needs to remember between the redirect out and back. */
@@ -80,9 +67,6 @@ export interface PendingLogin {
   codeVerifier: string;
   redirectUri: string;
   createdAt: number;
-  /** WS14-R3: the nonce is a key commitment the browser supplied, so the
-   * token is kept as evidence when the sign-in completes. */
-  hasCommitment?: boolean;
   /** Where the editor asked to be sent back to, already checked against the
    * origins this store trusts. Absent: the configured address. */
   returnTo?: string;
@@ -93,22 +77,11 @@ export interface Provider {
   /** Where to send the browser, plus what to remember. Async because an
    * OIDC provider's authorization endpoint comes from discovery: guessing it
    * from the issuer is wrong for Keycloak, among others. */
-  begin(
-    redirectUri: string,
-    options?: { commitment?: string },
-  ): Promise<{ url: string; pending: PendingLogin }>;
+  begin(redirectUri: string): Promise<{ url: string; pending: PendingLogin }>;
   /** Exchanges the code and returns who signed in. */
   complete(code: string, pending: PendingLogin): Promise<Identity>;
-  /** What the editor needs to pre-fill an access rule (WS14-R12). */
+  /** What kind of provider this is, and how it knows this store. */
   describe(): { kind: 'oidc' | 'github'; issuer?: string; clientId: string };
-}
-
-/** WS14-R7: only OIDC produces a signed token a member can check. */
-export class CommitmentUnsupported extends Error {
-  constructor(provider: string) {
-    super(`Automatic access needs an ID token, which ${provider} sign-in does not provide.`);
-    this.name = 'CommitmentUnsupported';
-  }
 }
 
 const base64url = (bytes: Buffer) => bytes.toString('base64url');
@@ -212,22 +185,15 @@ export function createOidcProvider(config: ProviderConfig, fetcher: Fetcher = fe
       return { kind: 'oidc' as const, issuer, clientId: config.clientId };
     },
 
-    async begin(redirectUri, beginOptions = {}) {
+    async begin(redirectUri) {
       const document = await discover();
-      // WS14-R3: a key commitment from the browser becomes the nonce, so the
-      // provider signs it into the token. Validated by the caller; checked
-      // again here because this is where it turns into a signed claim.
-      const commitment = beginOptions.commitment;
-      if (commitment !== undefined && !/^[A-Za-z0-9_-]{43}$/.test(commitment))
-        throw new Error('A key commitment must be 43 base64url characters.');
       const pending: PendingLogin = {
         provider: config.id,
         state: randomToken(),
-        nonce: commitment ?? randomToken(),
+        nonce: randomToken(),
         codeVerifier: randomToken(),
         redirectUri,
         createdAt: Date.now(),
-        hasCommitment: commitment !== undefined,
       };
       const challenge = base64url(createHash('sha256').update(pending.codeVerifier).digest());
       const query = new URLSearchParams({
@@ -295,8 +261,7 @@ export function createOidcProvider(config: ProviderConfig, fetcher: Fetcher = fe
         issuer,
         subject: claims.sub,
         displayName: claims.name ?? claims.preferred_username ?? undefined,
-        // A malformed claim tells us nothing, and must not remove anyone or
-        // overwrite the groups last seen. A missing one means whatever this
+        // A malformed claim tells us nothing. A missing one means whatever this
         // provider means by it: Keycloak omits the claim for someone in no
         // groups, so by default that is what it is.
         ...(Array.isArray(rawGroups)
@@ -307,10 +272,6 @@ export function createOidcProvider(config: ProviderConfig, fetcher: Fetcher = fe
             ? { groups: [] }
             : {}),
         groupsOverage,
-        // WS14-R4: kept only for a sign-in that committed to a key.
-        ...(pending.hasCommitment && typeof claims.iat === 'number'
-          ? { evidence: { idToken: token.id_token, commitment: pending.nonce, iat: claims.iat } }
-          : {}),
       };
     },
   };
@@ -334,8 +295,7 @@ export function createGitHubProvider(config: ProviderConfig, fetcher: Fetcher = 
       return { kind: 'github' as const, clientId: config.clientId };
     },
 
-    async begin(redirectUri, beginOptions = {}) {
-      if (beginOptions.commitment !== undefined) throw new CommitmentUnsupported('GitHub');
+    async begin(redirectUri) {
       const pending: PendingLogin = {
         provider: config.id,
         state: randomToken(),

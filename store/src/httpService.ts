@@ -71,10 +71,7 @@ export function createMemoryAuditSink() {
 /** The document operations the workspace API needs. Both implementations
  * (documentService.ts in memory, postgresStore.ts) satisfy it. */
 export interface StoreBackend {
-  create(request: {
-    docId: string;
-    keys: { wrappedForWorkspace: string; wrappedForRecovery?: string };
-  }): Promise<unknown>;
+  create(request: { docId: string }): Promise<unknown>;
 
   append(request: {
     docId: string;

@@ -96,10 +96,7 @@ export async function workspaceDocuments(context: V2Context, workspaceId: string
     // Content first: the catalog row points at it. Until that row exists
     // the document is unreachable, so a failure in between leaves nothing
     // anyone can see - and it is cleared away below.
-    const record = (await deps.documents.create({
-      docId,
-      keys: { wrappedForWorkspace: '' },
-    })) as DocumentRecord;
+    const record = (await deps.documents.create({ docId })) as DocumentRecord;
     let entry: CatalogEntry;
     try {
       entry = await translating(() =>

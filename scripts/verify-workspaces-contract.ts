@@ -653,7 +653,7 @@ if (DATABASE_URL) {
       createPostgresDocumentCatalog(pool, { now: clock() }),
       users,
       async (docId) => {
-        await documents.create({ docId, keys: { wrappedForWorkspace: '' } });
+        await documents.create({ docId });
       },
     );
 

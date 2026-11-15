@@ -29,6 +29,14 @@ markers are removed when the section becomes a release. See
 - `ADMIN_GROUPS` makes the members of an identity-provider group store administrators in that API.
   `WORKSPACE_CREATION` sets who may create workspaces there.
 
+### Store: storage no longer carries keys
+
+- Documents are created without wrapped keys, and the store no longer keeps sealed metadata or sign-in evidence. This
+  finishes the removal of the encrypted workspace.
+- A database that held the encrypted workspace upgrades in place: the schema lifts the requirement that every
+  document carry a wrapped key, and leaves the old columns, tables and documents untouched. A new test builds such a
+  database and upgrades it. `docs/trusted-store.md` lists the columns that can be dropped afterwards.
+
 ### Documentation and example deployments
 
 - The guides describe workspaces as they now work. **Deployment with Workspaces** no longer has a recovery-key step

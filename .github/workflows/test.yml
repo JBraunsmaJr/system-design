@@ -135,6 +135,11 @@ jobs:
         env:
           DATABASE_URL: postgresql://store:store@localhost:5432/store
 
+      - name: Upgrade a database from the encrypted workspace
+        run: npx tsx scripts/verify-store-upgrade.ts
+        env:
+          DATABASE_URL: postgresql://store:store@localhost:5432/store
+
       - name: Run the workspace API against PostgreSQL
         run: npx tsx scripts/verify-store-v2.ts
         env:

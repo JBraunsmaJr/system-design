@@ -119,8 +119,11 @@ A document's workspace comes from the store's catalog (`store/src/documentCatalo
 4. **In progress: removal.**
    - **Done: the editor.** The encrypted mode is gone from the editor: `src/crypto` (except what the store still imports until the next step), device enrolment, the comparison code, recovery, key rotation, automatic access, the key-based store client, and their panels and tests. An editor pointed at a store without `/v2` works on its own and says the store needs upgrading.
    - **Done: the store's API.** The `/v1` document, index, key, device, recovery, join-request, access-rule and administration routes are gone, with the modules behind them. What `/v1` still serves is about the person, not their documents: health, sign-in, and relay tokens for sessions started by link. `CRYPTO_MODE`, `RECOVERY_PUBLIC_KEY`, `RECOVERY_PUBLIC_KEY_FILE`, `AUTO_ACCESS` and `JOIN_EVIDENCE_RETENTION` are no longer read; a store that still sets them starts, and names them at startup.
-   - **Next: the store's storage.** The document service still accepts wrapped keys and sealed metadata, and sessions still have columns for sign-in evidence. Nothing writes them any more.
-   - **Done: the documentation and the example deployments.** The guides under `docs-site/` describe workspaces as they are now; the example deployments no longer create a recovery key and name administrators by group, so the first person in can create a workspace. `scripts/verify-deployment-example.ts` checks both examples.
+   - **Done: the store's storage.** Documents carry no keys or sealed metadata, and sign-in keeps no evidence. A database from the encrypted workspace required a wrapped key on every document; the schema lifts that requirement where it finds it, and `scripts/verify-store-upgrade.ts` upgrades such a database and checks the old data is untouched.
+
+The removal is complete. Nothing in the editor, the store or the documentation refers to the encrypted workspace except to say that it existed and how to move on from it.
+
+- **Done: the documentation and the example deployments.** The guides under `docs-site/` describe workspaces as they are now; the example deployments no longer create a recovery key and name administrators by group, so the first person in can create a workspace. `scripts/verify-deployment-example.ts` checks both examples.
 
 ## An editor hosted somewhere else
 
@@ -167,6 +170,13 @@ DROP TABLE IF EXISTS join_requests, workspace_memberships, workspace_access_rule
 ALTER TABLE users DROP COLUMN IF EXISTS user_public_key,
                   DROP COLUMN IF EXISTS last_groups,
                   DROP COLUMN IF EXISTS last_groups_at;
+ALTER TABLE documents DROP COLUMN IF EXISTS wrapped_for_workspace,
+                      DROP COLUMN IF EXISTS wrapped_for_recovery,
+                      DROP COLUMN IF EXISTS sealed_meta;
+ALTER TABLE sessions DROP COLUMN IF EXISTS id_token,
+                     DROP COLUMN IF EXISTS commitment,
+                     DROP COLUMN IF EXISTS evidence_iat;
+ALTER TABLE pending_logins DROP COLUMN IF EXISTS has_commitment;
 COMMIT;
 ```
 

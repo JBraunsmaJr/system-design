@@ -6,9 +6,9 @@
  * is the property an object store cannot give us for free, and the reason the
  * bytes live here until WS8-R17's measurements say otherwise.
  *
- * Every value the store holds for a document is opaque: sealed blobs and
- * wrapped keys. Nothing here interprets them, and a database dump reveals no
- * document content.
+ * A document's updates are stored as the editor sent them. Nothing here
+ * interprets them, but they are not encrypted: a database dump contains
+ * every document.
  */
 import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
@@ -92,8 +92,6 @@ interface DocumentRow {
   purge_after: Date | null;
   legal_hold: boolean;
   legal_hold_reason: string | null;
-  wrapped_for_workspace: Buffer;
-  wrapped_for_recovery: Buffer | null;
 }
 
 interface BlobRow {
@@ -121,12 +119,6 @@ const toRecord = (row: DocumentRow, blobs: StoredBlobMeta[]): DocumentRecord => 
   legalHold: row.legal_hold
     ? { reason: row.legal_hold_reason ?? '', placedBy: '', placedAt: row.updated_at.toISOString() }
     : null,
-  keys: {
-    wrappedForWorkspace: row.wrapped_for_workspace.toString('base64'),
-    ...(row.wrapped_for_recovery
-      ? { wrappedForRecovery: row.wrapped_for_recovery.toString('base64') }
-      : {}),
-  },
   blobs,
 });
 
@@ -223,16 +215,9 @@ export function createPostgresStore(options: PostgresStoreOptions) {
       const at = now();
       try {
         const result = await pool.query<DocumentRow>(
-          `INSERT INTO documents (doc_id, version, created_at, updated_at, wrapped_for_workspace, wrapped_for_recovery)
-           VALUES ($1, 1, $2, $2, $3, $4) RETURNING *`,
-          [
-            request.docId,
-            at,
-            Buffer.from(request.keys.wrappedForWorkspace, 'base64'),
-            request.keys.wrappedForRecovery
-              ? Buffer.from(request.keys.wrappedForRecovery, 'base64')
-              : null,
-          ],
+          `INSERT INTO documents (doc_id, version, created_at, updated_at)
+           VALUES ($1, 1, $2, $2) RETURNING *`,
+          [request.docId, at],
         );
         return toRecord(result.rows[0], []);
       } catch (error) {
@@ -335,42 +320,6 @@ export function createPostgresStore(options: PostgresStoreOptions) {
         record: toRecord(row, await blobsOf(docId)),
         blobs: result.rows.map((r, i) => ({ meta: metas[i], bytes: new Uint8Array(r.bytes) })),
       };
-    },
-
-    async getMeta(docId: string, opts: ReadOptions = {}): Promise<Uint8Array | null> {
-      await requireRow(docId, opts);
-      const result = await pool.query<{ sealed_meta: Buffer | null }>(
-        `SELECT sealed_meta FROM documents WHERE doc_id = $1`,
-        [docId],
-      );
-      const sealed = result.rows[0]?.sealed_meta;
-      return sealed ? new Uint8Array(sealed) : null;
-    },
-
-    /** WS7-R7: the document key re-wrapped under a new workspace key. The
-     * content is untouched; only the wrap changes. */
-    async setWorkspaceWrap(docId: string, wrappedForWorkspace: string): Promise<DocumentRecord> {
-      return inTransaction(async (tx) => {
-        const row = await lockDocument(tx, docId, { includeDeleted: true });
-        const updated = await tx.query<DocumentRow>(
-          `UPDATE documents SET wrapped_for_workspace = $2 WHERE doc_id = $1 RETURNING *`,
-          [row.doc_id, Buffer.from(wrappedForWorkspace, 'base64')],
-        );
-        return toRecord(updated.rows[0], await blobsOf(docId, tx));
-      });
-    },
-
-    async setMeta(docId: string, sealed: Uint8Array): Promise<DocumentRecord> {
-      return inTransaction(async (tx) => {
-        const row = await lockDocument(tx, docId);
-        const at = now();
-        const version = Number(row.version) + 1;
-        const updated = await tx.query<DocumentRow>(
-          `UPDATE documents SET sealed_meta = $2, version = $3, updated_at = $4 WHERE doc_id = $1 RETURNING *`,
-          [docId, Buffer.from(sealed), version, at],
-        );
-        return toRecord(updated.rows[0], await blobsOf(docId, tx));
-      });
     },
 
     async head(docId: string, opts: ReadOptions = {}): Promise<DocumentRecord> {

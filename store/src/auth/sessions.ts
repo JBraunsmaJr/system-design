@@ -1,17 +1,17 @@
 /**
- * Sessions (WS10-R1).
+ * Sessions.
  *
  * The browser holds one opaque cookie and nothing else: no token, no claims,
  * no key material. A scripting bug on the page therefore cannot steal
  * anything reusable, and the store can end a session at any moment by
  * forgetting it.
  *
- * Signing in establishes identity only. It grants no access to document
- * content: that still requires a device to be approved, or the recovery code,
- * or an administrator (WS7-R11 to R13).
+ * Signing in establishes identity, and the groups the identity provider
+ * reported with it. What that person may do is decided per request, from
+ * their role in a workspace (permissions.ts).
  */
 import { randomBytes } from 'crypto';
-import type { Identity, JoinEvidenceRecord, PendingLogin } from './providers.ts';
+import type { Identity, PendingLogin } from './providers.ts';
 
 export const SESSION_COOKIE = 'sd_session';
 
@@ -25,12 +25,12 @@ export interface Session {
   displayName?: string;
   createdAt: number;
   expiresAt: number;
-  /** WS14-R6: the groups the sign-in's ID token carried. */
+  /** The groups the sign-in's ID token carried. Workspace roles and
+   * ADMIN_GROUPS are matched against them for as long as the session lasts. */
   groups?: string[];
+  /** The provider had more groups than it would put in the token, so
+   * `groups` is not known. */
   groupsOverage?: boolean;
-  /** WS14-R4: the raw token and its commitment, for a sign-in that made one.
-   * Never sent back to the browser that owns the session (WS14-R45). */
-  evidence?: JoinEvidenceRecord;
 }
 
 /**
@@ -85,7 +85,6 @@ export function createSessionStore(options: SessionOptions = {}): SessionStore {
         expiresAt: now() + ttl,
         ...(identity.groups ? { groups: [...identity.groups] } : {}),
         ...(identity.groupsOverage ? { groupsOverage: true } : {}),
-        ...(identity.evidence ? { evidence: { ...identity.evidence } } : {}),
       };
       sessions.set(session.id, session);
       return session;

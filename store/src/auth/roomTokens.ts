@@ -12,9 +12,8 @@
  * anywhere rather than another service with state.
  *
  * A token names a room and a subject, and expires in minutes. It is not a
- * capability for the document: everything in the session is still
- * end-to-end encrypted with the key from the link (WS3-R1), which the
- * relay never sees.
+ * capability for the document: everything in the session is encrypted
+ * between browsers with the session's key, which the relay never sees.
  */
 import { createHmac, timingSafeEqual } from 'crypto';
 

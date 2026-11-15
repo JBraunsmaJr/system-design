@@ -29,13 +29,7 @@ CREATE TABLE IF NOT EXISTS documents (
     purge_after             TIMESTAMPTZ,
     -- WS10-R8: a hold prevents purge in every retention mode.
     legal_hold              BOOLEAN     NOT NULL DEFAULT FALSE,
-    legal_hold_reason       TEXT,
-    -- WS7-R3 and R4, opaque to the store.
-    wrapped_for_workspace   BYTEA       NOT NULL,
-    wrapped_for_recovery    BYTEA,
-    -- WS9-R1: sealed per-document metadata (the title among it). The store
-    -- cannot enumerate titles; this is ciphertext to it.
-    sealed_meta             BYTEA
+    legal_hold_reason       TEXT
 );
 
 -- Purge sweeps and the deleted-items view (WS9-R6) both read this.
@@ -128,19 +122,34 @@ CREATE TABLE IF NOT EXISTS audit_log (
 CREATE INDEX IF NOT EXISTS audit_at_idx ON audit_log (at DESC);
 CREATE INDEX IF NOT EXISTS audit_doc_idx ON audit_log (doc_id, at DESC);
 
--- Columns added after a deployment may already have created these tables.
--- Applied every startup, so an existing database catches up without a
--- separate migration step. A real migration tool arrives with WS8-R9.
-ALTER TABLE documents ADD COLUMN IF NOT EXISTS sealed_meta BYTEA;
-ALTER TABLE documents DROP COLUMN IF EXISTS sealed_title;
--- WS14: evidence on a session that signed in with a key commitment
--- (WS14-R4), the groups it carried (R6), and last-seen groups (R32).
-ALTER TABLE sessions       ADD COLUMN IF NOT EXISTS id_token       TEXT;
-ALTER TABLE sessions       ADD COLUMN IF NOT EXISTS commitment     TEXT;
-ALTER TABLE sessions       ADD COLUMN IF NOT EXISTS evidence_iat   BIGINT;
+-- Changes for a database that an earlier version created. Applied at every
+-- startup, so an existing database catches up without a separate migration
+-- step; every statement is safe to repeat and does nothing to a new one.
+
+-- The groups a sign-in carried, for workspace roles.
 ALTER TABLE sessions       ADD COLUMN IF NOT EXISTS groups         TEXT[];
 ALTER TABLE sessions       ADD COLUMN IF NOT EXISTS groups_overage BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE pending_logins ADD COLUMN IF NOT EXISTS has_commitment BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- A database from the encrypted workspace required every document to carry
+-- a wrapped key. Documents no longer have one, so the column - where it
+-- exists - must accept nothing. It is otherwise left alone, with the other
+-- columns of that time (documents.wrapped_for_recovery and sealed_meta,
+-- sessions.id_token, commitment and evidence_iat, and
+-- pending_logins.has_commitment): nothing reads or writes them.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_schema = current_schema()
+       AND table_name = 'documents'
+       AND column_name = 'wrapped_for_workspace'
+       AND is_nullable = 'NO'
+  ) THEN
+    ALTER TABLE documents ALTER COLUMN wrapped_for_workspace DROP NOT NULL;
+  END IF;
+END
+$$;
+
 -- Where the editor asked to be sent after signing in, when it is not the
 -- configured address. Checked against the trusted origins before it is kept.
 ALTER TABLE pending_logins ADD COLUMN IF NOT EXISTS return_to TEXT;

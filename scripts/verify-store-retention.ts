@@ -34,7 +34,6 @@ async function rejects(work: () => Promise<unknown>, reason: string, message: st
 }
 
 const bytes = new TextEncoder().encode('sealed content');
-const KEYS = { wrappedForWorkspace: 'd29ya3NwYWNl' };
 const DATABASE_URL = process.env.DATABASE_URL ?? '';
 const DAY = 86_400_000;
 
@@ -96,7 +95,7 @@ async function run(backend: Backend) {
   let clock = new Date('2026-09-17T12:00:00Z');
   const now = () => clock;
   const seed = async (service: Service, docId: string) => {
-    await service.create({ docId, keys: KEYS });
+    await service.create({ docId });
     await service.append({ docId, kind: 'snapshot', bytes });
   };
 
