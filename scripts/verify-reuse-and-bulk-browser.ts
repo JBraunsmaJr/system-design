@@ -241,6 +241,36 @@ async function run() {
 
     await p.setInputFiles('input[type="file"][accept="application/json"]', FILE);
     await p.waitForSelector('.react-flow__node[data-id="n-gateway"]');
+    console.log('=== Palette search ===');
+    {
+      await p.keyboard.press('Escape');
+      await p.locator('.react-flow__pane').click({ position: { x: 300, y: 300 } });
+      await p.keyboard.press('/');
+      check(
+        await p.evaluate(() => document.activeElement?.classList.contains('palette__search-input')),
+        '"/" puts the cursor in the palette search',
+      );
+      await p.keyboard.type('sqs');
+      const hit = p.locator('.palette__item', { hasText: 'SQS' }).first();
+      await hit.waitFor();
+      check(
+        (await hit.locator('.palette__item-group').textContent()) === 'AWS',
+        'it finds a cloud component from the System palette, and says where it is filed',
+      );
+      const countBefore = (await rootNodes(p)).length;
+      await hit.dragTo(p.locator('.react-flow__pane'), { targetPosition: { x: 700, y: 300 } });
+      await p.waitForTimeout(400);
+      check((await rootNodes(p)).length === countBefore + 1, 'a result drags onto the canvas');
+      await p.keyboard.press('/');
+      await p.keyboard.press('Escape');
+      await p.waitForSelector('.palette__group--recent');
+      check(
+        (await p.locator('.palette__group--recent .palette__item', { hasText: 'SQS' }).count()) ===
+          1,
+        'Escape clears the search, and what was dropped is listed under Recently used',
+      );
+    }
+
     await p.click('button[title="Requirements"]');
     console.log('=== Requirements table ===');
     await p.waitForSelector('.requirements-table__row');

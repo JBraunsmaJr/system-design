@@ -11,8 +11,94 @@
   flex-direction: column;
 }
 
+.palette__search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.palette__search-icon {
+  position: absolute;
+  left: 9px;
+  color: var(--chrome-text-dim);
+  pointer-events: none;
+}
+
+.palette__search-input {
+  width: 100%;
+  height: 32px;
+  padding: 0 30px 0 28px;
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  color: var(--chrome-text);
+  font-size: var(--text-sm);
+}
+
+.palette__search-input:focus {
+  outline: 1px solid var(--accent);
+  border-color: var(--accent);
+}
+
+.palette__search-key,
+.palette__search-clear {
+  position: absolute;
+  right: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-xs);
+  background: none;
+  color: var(--chrome-text-dim);
+  font-family: var(--mono);
+  font-size: var(--text-2xs);
+}
+
+.palette__search-key {
+  pointer-events: none;
+}
+
+.palette__search-clear {
+  padding: 0;
+  cursor: pointer;
+}
+
+.palette__search-clear:hover {
+  color: var(--chrome-text);
+}
+
 .palette__list {
   flex: 1;
+}
+
+.palette__group--recent {
+  padding-bottom: 10px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--chrome-border);
+}
+
+.palette__item-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Where a search result or a recent item is filed. */
+.palette__item-group {
+  margin-left: auto;
+  padding-left: 8px;
+  flex-shrink: 0;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-2xs-plus);
+  color: var(--chrome-text-dim);
 }
 
 .palette__group-label {
@@ -31,9 +117,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 8px;
+  padding: 5px 8px;
   border-radius: var(--radius-sm);
-  font-size: var(--text-sm-plus);
+  font-size: var(--text-sm);
   color: var(--chrome-text);
   cursor: grab;
 }

@@ -29,6 +29,15 @@ markers are removed when the section becomes a release. See
 - `ADMIN_GROUPS` makes the members of an identity-provider group store administrators in that API.
   `WORKSPACE_CREATION` sets who may create workspaces there.
 
+### [MINOR] Palette: search and recently used
+
+- A search box at the top of the palette looks through every palette at once (system, cloud, shapes, code, git,
+  boundaries and saved fragments) and shows where each result is filed. Press `/` to jump to it and `Escape` to clear
+  it. Results drag onto the canvas like any palette item.
+- The last six things you dropped on a canvas are listed under **Recently used** at the top of the palette, remembered
+  in this browser.
+- Palette rows are slightly tighter.
+
 ### [MINOR] Inspector: header and sections
 
 - Selecting a component or boundary shows its icon, name and type at the top of the Inspector, with **Open sub-diagram**

@@ -1,4 +1,12 @@
-import { type DragEvent, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import {
+  type DragEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { createPortal } from 'react-dom';
 import {
   Boxes,
@@ -9,8 +17,10 @@ import {
   GitBranch,
   type LucideIcon,
   Package,
+  Search,
   Shapes,
   Trash2,
+  X,
 } from 'lucide-react';
 import { useOutsideClick } from '../../common/hooks/useOutsideClick';
 import { usePositionedDropdown } from '../../common/hooks/usePositionedDropdown';
@@ -36,6 +46,14 @@ import {
   subscribeToFragments,
 } from '../../domain/canvas/diagramFragments';
 import type { NodeCategory, NodeTypeDefinition } from '../../domain/canvas/types';
+import {
+  loadRecentPaletteKeys,
+  type PaletteEntry,
+  paletteEntryKey,
+  saveRecentPaletteKeys,
+  searchPalette,
+  withRecentPaletteKey,
+} from '../../domain/canvas/paletteSearch';
 
 const SYSTEM_CATEGORIES: NodeCategory[] = [
   'compute',
@@ -78,9 +96,80 @@ const MODE_HINTS: Record<PaletteMode, string | null> = {
 
 const NO_FRAGMENTS: DiagramFragment[] = [];
 
+const CODE_SNIPPET_ITEM = {
+  id: 'code',
+  label: 'Code Snippet',
+  icon: 'FileCode2',
+  color: '#22B8CF',
+};
+const TEXT_ITEM = { id: 'text', label: 'Text', icon: 'Type', color: '#8b90a0' };
+
+/**
+ * Everything the palette can drop, from every mode, in the order the modes
+ * list it - what the search box looks through and what "Recently used" is
+ * resolved against. Built on demand rather than at module load because
+ * shapes (imported libraries) and fragments change while the app runs.
+ */
+function buildPaletteEntries(fragments: DiagramFragment[]): PaletteEntry[] {
+  const entries: PaletteEntry[] = [];
+  const add = (
+    mimeType: string,
+    group: string,
+    item: { id: string; label: string; icon?: string; color: string },
+  ) =>
+    entries.push({
+      key: paletteEntryKey(mimeType, item.id),
+      id: item.id,
+      label: item.label,
+      icon: item.icon,
+      color: item.color,
+      mimeType,
+      group,
+    });
+  for (const node of NODE_TYPES) {
+    add(DRAG_MIME_TYPE, node.subcategory ?? CATEGORY_LABELS[node.category], node);
+  }
+  for (const group of GROUP_TYPES) add(GROUP_DRAG_MIME_TYPE, 'Boundaries', group);
+  for (const category of globalShapeRegistry.getCategories()) {
+    for (const shape of globalShapeRegistry.getShapesByCategory(category)) {
+      add(SHAPE_DRAG_MIME_TYPE, category, {
+        id: shape.id,
+        label: shape.name,
+        icon: getShapePaletteIcon(shape.id, shape.iconId),
+        color: shape.defaults.color || '#5B7CFA',
+      });
+    }
+  }
+  add(CODE_DRAG_MIME_TYPE, 'Code', CODE_SNIPPET_ITEM);
+  add(TEXT_DRAG_MIME_TYPE, 'Annotations', TEXT_ITEM);
+  for (const fragment of fragments) {
+    add(FRAGMENT_DRAG_MIME_TYPE, 'Fragments', {
+      id: fragment.id,
+      label: fragment.name,
+      icon: 'Package',
+      color: '#5B7CFA',
+    });
+  }
+  return entries;
+}
+
+/** Whether a key press belongs to something being typed into. */
+function isTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return (
+    target.isContentEditable ||
+    target.tagName === 'INPUT' ||
+    target.tagName === 'TEXTAREA' ||
+    target.tagName === 'SELECT'
+  );
+}
+
 export function Palette() {
   const [mode, setMode] = useState<PaletteMode>('system');
-  const [, setVersion] = useState(0);
+  const [shapesVersion, setVersion] = useState(0);
+  const [query, setQuery] = useState('');
+  const [recentKeys, setRecentKeys] = useState(loadRecentPaletteKeys);
+  const searchRef = useRef<HTMLInputElement>(null);
   const [isOpen, setIsOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -104,6 +193,42 @@ export function Palette() {
   const close = () => {
     setIsOpen(false);
   };
+
+  // "/" jumps to the search box from anywhere that isn't a text field.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return;
+      if (isTypingTarget(event.target)) return;
+      event.preventDefault();
+      searchRef.current?.focus();
+      searchRef.current?.select();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  const entries = useMemo(
+    () => buildPaletteEntries(fragments),
+    // shapesVersion stands for the shape registry's contents, which the
+    // subscription above bumps it for.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [fragments, shapesVersion],
+  );
+  const trimmedQuery = query.trim();
+  const results = useMemo(() => searchPalette(entries, trimmedQuery), [entries, trimmedQuery]);
+  const recentEntries = useMemo(() => {
+    const byKey = new Map(entries.map((e) => [e.key, e]));
+    return recentKeys.map((k) => byKey.get(k)).filter((e): e is PaletteEntry => Boolean(e));
+  }, [entries, recentKeys]);
+
+  /** Called when a drag from the palette ended in a drop somewhere. */
+  const onUsed = useCallback((key: string) => {
+    setRecentKeys((prev) => {
+      const next = withRecentPaletteKey(prev, key);
+      saveRecentPaletteKeys(next);
+      return next;
+    });
+  }, []);
 
   const { position: dropdownPos } = usePositionedDropdown({
     triggerRef,
@@ -181,133 +306,211 @@ export function Palette() {
           )}
       </div>
 
-      <div className="palette__list">
-        {MODE_HINTS[mode] && <p className="palette__mode-hint">{MODE_HINTS[mode]}</p>}
+      <div className="palette__search">
+        <Search size={13} className="palette__search-icon" aria-hidden />
+        <input
+          ref={searchRef}
+          type="text"
+          className="palette__search-input"
+          placeholder="Find a component"
+          aria-label="Find a component in every palette"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setQuery('');
+              e.currentTarget.blur();
+            }
+          }}
+        />
+        {query ? (
+          <button
+            type="button"
+            className="palette__search-clear"
+            aria-label="Clear the search"
+            onClick={() => {
+              setQuery('');
+              searchRef.current?.focus();
+            }}
+          >
+            <X size={12} />
+          </button>
+        ) : (
+          <kbd className="palette__search-key" aria-hidden>
+            /
+          </kbd>
+        )}
+      </div>
 
-        {mode === 'system' && (
-          <>
-            {SYSTEM_CATEGORIES.map((category) => (
+      {trimmedQuery ? (
+        <div className="palette__list" role="region" aria-label="Search results" aria-live="polite">
+          {results.length === 0 ? (
+            <p className="palette__empty">Nothing in any palette matches "{trimmedQuery}".</p>
+          ) : (
+            <div className="palette__group">
+              <div className="palette__group-label" style={{ color: '#8b90a0' }}>
+                {results.length} {results.length === 1 ? 'match' : 'matches'}
+              </div>
+              {results.map((entry) => (
+                <PaletteRow key={entry.key} entry={entry} showGroup onUsed={onUsed} />
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="palette__list">
+          {recentEntries.length > 0 && (
+            <div className="palette__group palette__group--recent">
+              <div className="palette__group-label" style={{ color: '#8b90a0' }}>
+                Recently used
+              </div>
+              {recentEntries.map((entry) => (
+                <PaletteRow key={entry.key} entry={entry} showGroup onUsed={onUsed} />
+              ))}
+            </div>
+          )}
+
+          {MODE_HINTS[mode] && <p className="palette__mode-hint">{MODE_HINTS[mode]}</p>}
+
+          {mode === 'system' && (
+            <>
+              {SYSTEM_CATEGORIES.map((category) => (
+                <PaletteGroup
+                  onUsed={onUsed}
+                  key={category}
+                  label={CATEGORY_LABELS[category]}
+                  color={CATEGORY_COLORS[category]}
+                  dragMimeType={DRAG_MIME_TYPE}
+                  items={NODE_TYPES.filter((n) => n.category === category)}
+                />
+              ))}
+
               <PaletteGroup
-                key={category}
-                label={CATEGORY_LABELS[category]}
-                color={CATEGORY_COLORS[category]}
+                onUsed={onUsed}
+                label="Custom"
+                color={CATEGORY_COLORS.custom}
                 dragMimeType={DRAG_MIME_TYPE}
-                items={NODE_TYPES.filter((n) => n.category === category)}
+                items={NODE_TYPES.filter((n) => n.category === 'custom')}
+              />
+
+              <PaletteGroup
+                onUsed={onUsed}
+                label="Boundaries"
+                color="#8b90a0"
+                dragMimeType={GROUP_DRAG_MIME_TYPE}
+                items={GROUP_TYPES.map((g) => ({
+                  id: g.id,
+                  label: g.label,
+                  icon: g.icon,
+                  color: g.color,
+                }))}
+              />
+
+              <PaletteGroup
+                onUsed={onUsed}
+                label="General Shapes"
+                color="#8b90a0"
+                dragMimeType={SHAPE_DRAG_MIME_TYPE}
+                items={globalShapeRegistry.getShapesByCategory('General').map((s) => ({
+                  id: s.id,
+                  label: s.name,
+                  icon: getShapePaletteIcon(s.id, s.iconId),
+                  color: s.defaults.color || '#5B7CFA',
+                }))}
+              />
+            </>
+          )}
+
+          {mode === 'cloud' &&
+            CLOUD_SUBCATEGORY_ORDER.map((subcategory) => (
+              <PaletteGroup
+                onUsed={onUsed}
+                key={subcategory}
+                label={subcategory}
+                color={
+                  subcategory === 'AWS'
+                    ? '#FF9900'
+                    : subcategory === 'Azure'
+                      ? '#0089D6'
+                      : '#4285F4'
+                }
+                dragMimeType={DRAG_MIME_TYPE}
+                items={NODE_TYPES.filter(
+                  (n) => n.category === 'cloud' && n.subcategory === subcategory,
+                )}
               />
             ))}
 
-            <PaletteGroup
-              label="Custom"
-              color={CATEGORY_COLORS.custom}
-              dragMimeType={DRAG_MIME_TYPE}
-              items={NODE_TYPES.filter((n) => n.category === 'custom')}
-            />
+          {mode === 'shapes' && (
+            <>
+              {shapeCategories.map((category) => {
+                const shapes = globalShapeRegistry.getShapesByCategory(category);
+                return (
+                  <PaletteGroup
+                    onUsed={onUsed}
+                    key={category}
+                    label={category}
+                    color="#5B7CFA"
+                    dragMimeType={SHAPE_DRAG_MIME_TYPE}
+                    items={shapes.map((s) => ({
+                      id: s.id,
+                      label: s.name,
+                      icon: getShapePaletteIcon(s.id, s.iconId),
+                      color: s.defaults.color || '#5B7CFA',
+                    }))}
+                  />
+                );
+              })}
+            </>
+          )}
 
-            <PaletteGroup
-              label="Boundaries"
-              color="#8b90a0"
-              dragMimeType={GROUP_DRAG_MIME_TYPE}
-              items={GROUP_TYPES.map((g) => ({
-                id: g.id,
-                label: g.label,
-                icon: g.icon,
-                color: g.color,
-              }))}
-            />
+          {mode === 'code' &&
+            LOGIC_SUBCATEGORY_ORDER.map((subcategory) => (
+              <PaletteGroup
+                onUsed={onUsed}
+                key={subcategory}
+                label={subcategory}
+                color="#8b90a0"
+                dragMimeType={DRAG_MIME_TYPE}
+                items={NODE_TYPES.filter(
+                  (n) => n.category === 'logic' && n.subcategory === subcategory,
+                )}
+              />
+            ))}
 
-            <PaletteGroup
-              label="General Shapes"
-              color="#8b90a0"
-              dragMimeType={SHAPE_DRAG_MIME_TYPE}
-              items={globalShapeRegistry.getShapesByCategory('General').map((s) => ({
-                id: s.id,
-                label: s.name,
-                icon: getShapePaletteIcon(s.id, s.iconId),
-                color: s.defaults.color || '#5B7CFA',
-              }))}
-            />
-          </>
-        )}
+          {mode === 'git' &&
+            VCS_SUBCATEGORY_ORDER.map((subcategory) => (
+              <PaletteGroup
+                onUsed={onUsed}
+                key={subcategory}
+                label={subcategory}
+                color="#8b90a0"
+                dragMimeType={DRAG_MIME_TYPE}
+                items={NODE_TYPES.filter(
+                  (n) => n.category === 'vcs' && n.subcategory === subcategory,
+                )}
+              />
+            ))}
 
-        {mode === 'cloud' &&
-          CLOUD_SUBCATEGORY_ORDER.map((subcategory) => (
-            <PaletteGroup
-              key={subcategory}
-              label={subcategory}
-              color={
-                subcategory === 'AWS' ? '#FF9900' : subcategory === 'Azure' ? '#0089D6' : '#4285F4'
-              }
-              dragMimeType={DRAG_MIME_TYPE}
-              items={NODE_TYPES.filter(
-                (n) => n.category === 'cloud' && n.subcategory === subcategory,
-              )}
-            />
-          ))}
+          {mode === 'fragments' && <FragmentList fragments={fragments} />}
 
-        {mode === 'shapes' && (
-          <>
-            {shapeCategories.map((category) => {
-              const shapes = globalShapeRegistry.getShapesByCategory(category);
-              return (
-                <PaletteGroup
-                  key={category}
-                  label={category}
-                  color="#5B7CFA"
-                  dragMimeType={SHAPE_DRAG_MIME_TYPE}
-                  items={shapes.map((s) => ({
-                    id: s.id,
-                    label: s.name,
-                    icon: getShapePaletteIcon(s.id, s.iconId),
-                    color: s.defaults.color || '#5B7CFA',
-                  }))}
-                />
-              );
-            })}
-          </>
-        )}
+          <PaletteGroup
+            onUsed={onUsed}
+            label="Code"
+            color="#22B8CF"
+            dragMimeType={CODE_DRAG_MIME_TYPE}
+            items={[CODE_SNIPPET_ITEM]}
+          />
 
-        {mode === 'code' &&
-          LOGIC_SUBCATEGORY_ORDER.map((subcategory) => (
-            <PaletteGroup
-              key={subcategory}
-              label={subcategory}
-              color="#8b90a0"
-              dragMimeType={DRAG_MIME_TYPE}
-              items={NODE_TYPES.filter(
-                (n) => n.category === 'logic' && n.subcategory === subcategory,
-              )}
-            />
-          ))}
-
-        {mode === 'git' &&
-          VCS_SUBCATEGORY_ORDER.map((subcategory) => (
-            <PaletteGroup
-              key={subcategory}
-              label={subcategory}
-              color="#8b90a0"
-              dragMimeType={DRAG_MIME_TYPE}
-              items={NODE_TYPES.filter(
-                (n) => n.category === 'vcs' && n.subcategory === subcategory,
-              )}
-            />
-          ))}
-
-        {mode === 'fragments' && <FragmentList fragments={fragments} />}
-
-        <PaletteGroup
-          label="Code"
-          color="#22B8CF"
-          dragMimeType={CODE_DRAG_MIME_TYPE}
-          items={[{ id: 'code', label: 'Code Snippet', icon: 'FileCode2', color: '#22B8CF' }]}
-        />
-
-        <PaletteGroup
-          label="Annotations"
-          color="#8b90a0"
-          dragMimeType={TEXT_DRAG_MIME_TYPE}
-          items={[{ id: 'text', label: 'Text', icon: 'Type', color: '#8b90a0' }]}
-        />
-      </div>
+          <PaletteGroup
+            onUsed={onUsed}
+            label="Annotations"
+            color="#8b90a0"
+            dragMimeType={TEXT_DRAG_MIME_TYPE}
+            items={[TEXT_ITEM]}
+          />
+        </div>
+      )}
       <p className="palette__hint">
         Drag a component onto the canvas to place it. Drag a boundary over existing nodes (or nodes
         into a boundary) to group them - drag either back out to release.
@@ -321,34 +524,58 @@ interface PaletteGroupProps {
   color: string;
   items: Pick<NodeTypeDefinition, 'id' | 'label' | 'icon' | 'color'>[];
   dragMimeType: string;
+  onUsed: (key: string) => void;
 }
 
-function PaletteGroup({ label, color, items, dragMimeType }: PaletteGroupProps) {
-  if (!items.length) return null;
-
-  const onDragStart = (event: DragEvent, itemId: string) => {
-    event.dataTransfer.setData(dragMimeType, itemId);
-    event.dataTransfer.effectAllowed = 'move';
+/** One draggable line. `showGroup` adds where the entry is filed, for the
+ * lists that mix modes (search results, recently used). */
+function PaletteRow({
+  entry,
+  showGroup = false,
+  onUsed,
+}: {
+  entry: Pick<PaletteEntry, 'key' | 'id' | 'label' | 'icon' | 'color' | 'mimeType'> & {
+    group?: string;
   };
+  showGroup?: boolean;
+  onUsed: (key: string) => void;
+}) {
+  return (
+    <div
+      className="palette__item"
+      draggable
+      onDragStart={(event: DragEvent) => {
+        event.dataTransfer.setData(entry.mimeType, entry.id);
+        event.dataTransfer.effectAllowed = 'move';
+      }}
+      // dropEffect is "none" when the drag was cancelled or let go
+      // somewhere that doesn't take it.
+      onDragEnd={(event: DragEvent) => {
+        if (event.dataTransfer.dropEffect !== 'none') onUsed(entry.key);
+      }}
+    >
+      <IconRenderer icon={entry.icon} size={15} style={{ color: entry.color }} />
+      <span className="palette__item-label">{entry.label}</span>
+      {showGroup && entry.group && <span className="palette__item-group">{entry.group}</span>}
+    </div>
+  );
+}
+
+function PaletteGroup({ label, color, items, dragMimeType, onUsed }: PaletteGroupProps) {
+  if (!items.length) return null;
 
   return (
     <div className="palette__group">
       <div className="palette__group-label" style={{ color }}>
         {label}
       </div>
-      {items.map((item) => {
-        return (
-          <div
-            key={item.id}
-            className="palette__item"
-            draggable
-            onDragStart={(event) => onDragStart(event, item.id)}
-          >
-            <IconRenderer icon={item.icon} size={15} style={{ color: item.color }} />
-            <span>{item.label}</span>
-          </div>
-        );
-      })}
+      {items.map((item) => (
+        <PaletteRow
+          key={item.id}
+          entry={{ ...item, key: paletteEntryKey(dragMimeType, item.id), mimeType: dragMimeType }}
+          onUsed={onUsed}
+        />
+      ))}
     </div>
   );
 }

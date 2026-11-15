@@ -15,6 +15,9 @@ The editor is designed for rapid, low-friction diagramming with zero configurati
 ### Adding Components & Shapes
 
 - **Palette**: Drag nodes and components directly from the left sidebar onto the canvas.
+- **Search**: Type in the box at the top of the palette (or press `/`) to search every palette at once; each result
+  shows where it is filed and drags onto the canvas. `Escape` clears the search.
+- **Recently used**: The last six things you dropped are listed at the top of the palette.
 - **Architectural Nodes**: Choose from pre-configured system components (Microservices, Databases, Caches, Gateways,
   Message Queues, Clients, and Compute nodes).
 - **Geometric Shapes**: Insert standard geometric shapes (Rectangles, Rounded Rectangles, Cylinders, Diamonds, Hexagons,
