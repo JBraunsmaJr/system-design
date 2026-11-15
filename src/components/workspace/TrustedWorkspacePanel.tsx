@@ -10,26 +10,32 @@
  *   - open a workspace's documents,
  *   - put a copy of the document they have open into a workspace (editors),
  *   - delete a document from a workspace (editors),
- *   - create a workspace (where the store allows them to).
- *
- * Managing members and group mappings is not here yet.
+ *   - create a workspace (where the store allows them to),
+ *   - see who is in a workspace, and as an owner change that
+ *     (WorkspaceAccess) and rename it,
+ *   - as a store administrator, archive a workspace and bring it back.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Archive,
+  ArchiveRestore,
   Cloud,
   CloudOff,
   FolderOpen,
   Loader2,
+  Pencil,
   Plus,
   ShieldAlert,
   Trash2,
   Upload,
+  Users,
 } from 'lucide-react';
 import { Button } from '../../common/components/button/Button';
 import { StoreClientError } from '../../collab/access/storeErrors';
 import { announceWorkspaceChange } from '../../collab/hooks/useWorkspaceSync';
 import { describeRole } from '../../collab/trusted/roleWords';
 import { newDocumentId } from '../../domain/storage/documentStore';
+import { WorkspaceAccess } from './WorkspaceAccess';
 import {
   createTrustedStoreClient,
   type TrustedDocument,
@@ -82,6 +88,11 @@ export function TrustedWorkspacePanel(props: TrustedWorkspacePanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [newName, setNewName] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
+  /** Whether the selected workspace's members and groups are shown. */
+  const [showAccess, setShowAccess] = useState(false);
+  /** The new name being typed for the selected workspace, or null. */
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [confirmingArchive, setConfirmingArchive] = useState(false);
 
   const selected = workspaces.find((w) => w.workspaceId === selectedId) ?? null;
 
@@ -90,7 +101,9 @@ export function TrustedWorkspacePanel(props: TrustedWorkspacePanelProps) {
     try {
       const [who, list, current] = await Promise.all([
         client.me(),
-        client.listWorkspaces(),
+        // Archived ones too: the store only includes them for an
+        // administrator, the one person who can bring them back.
+        client.listWorkspaces({ includeArchived: true }),
         // A document deleted from its workspace is, for this panel, not in one.
         client.findDocument(currentDocId).catch((cause) => {
           if (cause instanceof StoreClientError && cause.reason === 'deleted') return null;
@@ -198,6 +211,30 @@ export function TrustedWorkspacePanel(props: TrustedWorkspacePanelProps) {
       if (selected) await loadDocuments(selected.workspaceId);
     });
 
+  const rename = () =>
+    act(async () => {
+      if (!selected || renaming === null) return;
+      await client.renameWorkspace(selected.workspaceId, renaming);
+      setRenaming(null);
+      await load();
+    });
+
+  const setArchived = (archived: boolean) =>
+    act(async () => {
+      if (!selected) return;
+      await client.setWorkspaceArchived(selected.workspaceId, archived);
+      setConfirmingArchive(false);
+      // The open document may have just become read-only, or stopped being.
+      if (currentIn?.workspaceId === selected.workspaceId) announceWorkspaceChange();
+      await load();
+    });
+
+  /** The signed-in person changed their own role: what they see may differ. */
+  const reloadAfterOwnAccessChange = useCallback(() => {
+    announceWorkspaceChange();
+    void load();
+  }, [load]);
+
   const createWorkspace = () =>
     act(async () => {
       if (newName === null) return;
@@ -275,12 +312,15 @@ export function TrustedWorkspacePanel(props: TrustedWorkspacePanelProps) {
                 onChange={(e) => {
                   setDocuments(null);
                   setConfirmingDelete(null);
+                  setRenaming(null);
+                  setConfirmingArchive(false);
                   setSelectedId(e.target.value);
                 }}
               >
                 {workspaces.map((workspace) => (
                   <option key={workspace.workspaceId} value={workspace.workspaceId}>
                     {workspace.name}
+                    {workspace.archivedAt ? ' (archived)' : ''}
                   </option>
                 ))}
               </select>
@@ -336,6 +376,122 @@ export function TrustedWorkspacePanel(props: TrustedWorkspacePanelProps) {
 
           {selected && (
             <>
+              {selected.archivedAt && (
+                <p className="trusted-workspace__status trusted-workspace__archived">
+                  <strong>{selected.name}</strong> is archived. Its members cannot see it, and
+                  nothing in it can be changed until it is restored.
+                </p>
+              )}
+
+              <div className="trusted-workspace__row trusted-workspace__manage">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={<Users size={12} />}
+                  className="trusted-workspace__access-toggle"
+                  aria-expanded={showAccess}
+                  onClick={() => setShowAccess((shown) => !shown)}
+                >
+                  {showAccess ? 'Hide members' : 'Members'}
+                </Button>
+                {selected.role === 'owner' && !selected.archivedAt && renaming === null && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon={<Pencil size={12} />}
+                    className="trusted-workspace__rename"
+                    onClick={() => setRenaming(selected.name)}
+                  >
+                    Rename
+                  </Button>
+                )}
+                {me.isAdmin &&
+                  (selected.archivedAt ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      icon={<ArchiveRestore size={12} />}
+                      className="trusted-workspace__restore"
+                      disabled={busy}
+                      onClick={() => void setArchived(false)}
+                    >
+                      Restore
+                    </Button>
+                  ) : confirmingArchive ? (
+                    <>
+                      <span className="trusted-workspace__document-meta">
+                        Archive {selected.name}? Its members will no longer see it or its documents.
+                        Nothing is deleted, and you can restore it.
+                      </span>
+                      <Button
+                        variant="danger-outline"
+                        size="sm"
+                        className="trusted-workspace__archive-yes"
+                        disabled={busy}
+                        onClick={() => void setArchived(true)}
+                      >
+                        Archive
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => setConfirmingArchive(false)}>
+                        Cancel
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      icon={<Archive size={12} />}
+                      className="trusted-workspace__archive"
+                      onClick={() => setConfirmingArchive(true)}
+                    >
+                      Archive
+                    </Button>
+                  ))}
+              </div>
+
+              {renaming !== null && (
+                <form
+                  className="trusted-workspace__row"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void rename();
+                  }}
+                >
+                  <label htmlFor="trusted-workspace-rename">New name</label>
+                  <input
+                    id="trusted-workspace-rename"
+                    className="trusted-workspace__input"
+                    value={renaming}
+                    maxLength={120}
+                    autoFocus
+                    onChange={(e) => setRenaming(e.target.value)}
+                  />
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="sm"
+                    disabled={busy || renaming.trim() === '' || renaming.trim() === selected.name}
+                  >
+                    Rename
+                  </Button>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setRenaming(null)}>
+                    Cancel
+                  </Button>
+                </form>
+              )}
+
+              {showAccess && (
+                // Keyed by workspace and role: switching workspace, or
+                // losing the owner role, starts it afresh.
+                <WorkspaceAccess
+                  key={`${selected.workspaceId}:${selected.role}:${selected.archivedAt ?? ''}`}
+                  client={client}
+                  workspace={selected}
+                  me={me}
+                  onOwnAccessChanged={reloadAfterOwnAccessChange}
+                />
+              )}
+
               {currentIn ? (
                 <p className="trusted-workspace__status">
                   The document you have open is in{' '}

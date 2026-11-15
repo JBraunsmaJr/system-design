@@ -38,6 +38,14 @@ markers are removed when the section becomes a release. See
 - Adding a document to a workspace makes a copy under a new id and opens the copy; the original stays in your browser.
 - Viewers receive changes and send none. The canvas is not locked for them yet, so a viewer's own edits stay on their
   screen only.
+- **Members** in the workspace panel shows who is in a workspace and which identity-provider groups are mapped to a
+  role. Owners can add someone by name, map a group, change a role, remove either, and rename the workspace. People
+  can be found once they have signed in to the store for the first time. Everyone in a mapped group gets its role when
+  they sign in; no one approves them.
+- You are asked to confirm a change that would remove your own access or your ability to manage the workspace, or
+  that would leave it with no owner.
+- Store administrators can archive a workspace, which hides it from its members without deleting anything, and
+  restore it. Archived workspaces stay in an administrator's list, marked.
 - Against a store without the workspace API, nothing changes.
 - Store: compacting a document through `/v2` must name the version it read, and is refused if the document has moved
   on, so a concurrent edit can no longer be erased by a compaction. The id `local` is refused for workspace documents.

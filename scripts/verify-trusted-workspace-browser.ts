@@ -256,19 +256,31 @@ async function run() {
       'the panel says the open document is in the workspace',
     );
 
-    // Group mappings have no screen yet: set as an owner would through the API.
-    await theStore.workspaces.putGroupMapping({
-      workspaceId: workspace.workspaceId,
-      group: 'platform-eng',
-      role: 'editor',
-      addedBy: null,
-    });
-    await theStore.workspaces.putGroupMapping({
-      workspaceId: workspace.workspaceId,
-      group: 'auditors',
-      role: 'viewer',
-      addedBy: null,
-    });
+    // Map two identity-provider groups to roles, as an owner does.
+    await ada.click('.trusted-workspace__access-toggle');
+    await ada.waitForSelector('.workspace-access');
+    check(
+      (await ada.locator('.workspace-access__entry[data-kind="member"]').count()) === 1 &&
+        /Ada \(you\)/.test(
+          (await ada.textContent('.workspace-access__entry[data-kind="member"]')) ?? '',
+        ),
+      'the members list shows the person who created the workspace, marked as them',
+    );
+    const mapGroup = async (group: string, role: string) => {
+      await ada.fill('#workspace-access-group', group);
+      await ada.selectOption('select[aria-label="Role for the new group"]', role);
+      await ada.click('.workspace-access__add-group');
+      await ada.waitForSelector(`.workspace-access__entry[data-kind="group"]:has-text("${group}")`);
+    };
+    await mapGroup('platform-eng', 'editor');
+    await mapGroup('auditors', 'viewer');
+    const mappings = await theStore.workspaces.listGroupMappings(workspace.workspaceId);
+    check(
+      mappings.length === 2 &&
+        mappings.find((m) => m.group === 'platform-eng')?.role === 'editor' &&
+        mappings.find((m) => m.group === 'auditors')?.role === 'viewer',
+      'an owner maps groups to roles from the panel',
+    );
 
     // --- Someone in a mapped group ------------------------------------------
     console.log('\n=== An editor, through a group ===');
@@ -390,6 +402,146 @@ async function run() {
         async () => (await ada.locator('.trusted-workspace__document').count()) === 0,
       ),
       'and it leaves the list',
+    );
+
+    // --- Managing who is in a workspace -------------------------------------
+    console.log('\n=== Managing a workspace ===');
+    const reopen = async (page: Page) => {
+      await closeManager(page);
+      await openManager(page);
+    };
+    const roleText = async (page: Page) =>
+      (await page.locator('.trusted-workspace__role').count())
+        ? ((await page.textContent('.trusted-workspace__role')) ?? '')
+        : '';
+
+    // A viewer sees who is here and can change none of it.
+    await reopen(vic);
+    await vic.click('.trusted-workspace__access-toggle');
+    await vic.waitForSelector('.workspace-access');
+    check(
+      (await vic.locator('.workspace-access__entry[data-kind="group"]').count()) === 2 &&
+        (await vic.locator('.workspace-access select').count()) === 0 &&
+        (await vic.locator('.workspace-access input').count()) === 0 &&
+        (await vic.locator('.trusted-workspace__rename').count()) === 0 &&
+        (await vic.locator('.trusted-workspace__archive').count()) === 0,
+      'a viewer sees the members and groups, with nothing to change them',
+    );
+
+    // Adding someone by name. Zed has signed in, so the store knows them.
+    const showMembers = async (page: Page) => {
+      await openManager(page);
+      if (!(await page.locator('.workspace-access').count())) {
+        await page.click('.trusted-workspace__access-toggle');
+      }
+      await page.waitForSelector('.workspace-access__section');
+    };
+    await showMembers(ada);
+    await ada.fill('#workspace-access-person', 'ze');
+    await ada.selectOption('select[aria-label="Role for the new person"]', 'viewer');
+    await ada.click('.workspace-access__add-person');
+    await ada.waitForSelector('.workspace-access__entry[data-kind="member"]:has-text("Zed")');
+    check(
+      await (async () => {
+        const members = await theStore.workspaces.listMembers(workspace.workspaceId);
+        return members.length === 2 && members.filter((m) => m.role === 'viewer').length === 1;
+      })(),
+      'an owner finds someone by name and adds them',
+    );
+    await zed.goto(`${appOrigin}/system-design/`);
+    await ready(zed);
+    await openManager(zed);
+    check(
+      /You are a viewer here\./.test(await roleText(zed)),
+      'who then sees the workspace, with no approval step',
+    );
+
+    // Changing a role.
+    await ada.selectOption('select[aria-label="Role for Zed"]', 'owner');
+    check(
+      await eventually(async () => {
+        await reopen(zed);
+        return /You are an owner here\./.test(await roleText(zed));
+      }),
+      "changing someone's role takes effect for them",
+    );
+
+    // An owner who is not an administrator is warned before giving up the role.
+    await zed.click('.trusted-workspace__access-toggle');
+    await zed.waitForSelector('.workspace-access select[aria-label="Role for Zed"]');
+    await zed.selectOption('select[aria-label="Role for Zed"]', 'viewer');
+    await zed.waitForSelector('.workspace-access__confirm');
+    const zedBefore = (await theStore.workspaces.listMembers(workspace.workspaceId)).filter(
+      (m) => m.role === 'owner',
+    ).length;
+    check(
+      /become a viewer/.test((await zed.textContent('.workspace-access__confirm')) ?? '') &&
+        zedBefore === 2,
+      'demoting yourself asks first, and changes nothing until confirmed',
+    );
+    await zed.click('.workspace-access__confirm-yes');
+    check(
+      (await eventually(async () => /You are a viewer here\./.test(await roleText(zed)))) &&
+        (await eventually(
+          async () => (await zed.locator('.workspace-access select').count()) === 0,
+        )),
+      'confirming it makes them a viewer, and the controls go',
+    );
+
+    // Removing a group.
+    await ada.click('button[aria-label="Remove the group auditors"]');
+    check(
+      await eventually(async () => {
+        await reopen(vic);
+        return /not in any workspace yet/.test((await vic.textContent('.trusted-workspace')) ?? '');
+      }),
+      'removing a group mapping removes the workspace for people who had it only through that group',
+    );
+
+    // Renaming.
+    await ada.click('.trusted-workspace__rename');
+    await ada.fill('#trusted-workspace-rename', 'Platform Group');
+    await ada.click('form:has(#trusted-workspace-rename) button[type="submit"]');
+    check(
+      await eventually(
+        async () =>
+          (await theStore.workspaces.getWorkspace(workspace.workspaceId))?.name ===
+          'Platform Group',
+      ),
+      'an owner renames the workspace',
+    );
+
+    // Archiving, which only an administrator is offered.
+    await reopen(ben);
+    check(
+      (await ben.locator('.trusted-workspace__archive').count()) === 0 &&
+        /Platform Group/.test((await ben.textContent('.trusted-workspace__select')) ?? ''),
+      'an editor sees the new name and is not offered archiving',
+    );
+    await ada.click('.trusted-workspace__archive');
+    check(
+      (await theStore.workspaces.getWorkspace(workspace.workspaceId))?.archivedAt === null,
+      'archiving asks first',
+    );
+    await ada.click('.trusted-workspace__archive-yes');
+    await ada.waitForSelector('.trusted-workspace__restore');
+    check(
+      /\(archived\)/.test((await ada.textContent('.trusted-workspace__select')) ?? '') &&
+        (await ada.locator('.trusted-workspace__rename').count()) === 0,
+      'the administrator still sees it, marked archived and not editable',
+    );
+    await reopen(ben);
+    check(
+      /not in any workspace yet/.test((await ben.textContent('.trusted-workspace')) ?? ''),
+      'its members no longer see it',
+    );
+    await ada.click('.trusted-workspace__restore');
+    check(
+      await eventually(async () => {
+        await reopen(ben);
+        return /You are an editor here/.test(await roleText(ben));
+      }),
+      'restoring brings it back for them',
     );
   } finally {
     for (const context of contexts) await context.close().catch(() => {});

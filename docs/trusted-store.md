@@ -111,7 +111,8 @@ A document's workspace comes from the store's catalog (`store/src/documentCatalo
 2. **Done: the API.** The routes above, with a refusal test for every one, against memory and PostgreSQL. Administrators can come from an identity-provider group. Documents have a workspace and a plain title. Not yet done: tokens for live sessions through the relay, and an OpenAPI description.
 3. **In progress: the editor.**
    - **Done: opening and saving.** The editor asks the store which API it serves (`/v2/health`) before it first renders, and remembers the answer. Against a trusted store it shows a workspace panel in the document manager: sign in, choose a workspace, create one, add a copy of the open document, open and delete documents. A workspace document saves to the store as it is edited and picks up other people's changes; a viewer's copy follows along and sends nothing. Against a store without `/v2` the editor behaves as before.
-   - **Next:** members and group mappings, an administration page, the store address in settings, and live sessions.
+   - **Done: managing a workspace.** In the same panel, everyone in a workspace can see its members and mapped groups. Owners add people by name, map groups, change roles, remove either, and rename the workspace. Administrators archive and restore, and see archived workspaces in the list. A change that would cost the person making it their own access, or leave the workspace with no owner, is confirmed first (`src/collab/trusted/accessChanges.ts`).
+   - **Next:** the store address in settings, deleted documents (restore, and purge and holds for administrators), and live sessions.
 4. **Last: removal.** The encrypted API, its tables, `src/crypto`, device enrolment, recovery, rotation, and their tests and documentation. The last release with encryption is tagged first.
 
 ## Things the editor relies on
@@ -128,4 +129,4 @@ There is no migration tool. Before upgrading, each team opens its documents in t
 
 - **Live sessions.** The relay admits peers with a token the store issues. In this model the store should issue one only to editors of the document, since a peer in a live session can send edits to the others directly. Viewers follow along through the store instead.
 - **Group changes during a session.** Groups are read at sign-in, so a change takes effect at the next sign-in. The session lifetime (eight hours by default) is therefore the longest someone keeps access after being removed from a group.
-- **The last owner.** Nothing stops a workspace's only owner being removed, because an administrator can always manage it. If deployments run without administrators, this needs a guard.
+- **The last owner.** The store does not stop a workspace's only owner being removed, because an administrator can always manage it. The editor warns before it happens. If deployments run without administrators, the store needs a guard too.
