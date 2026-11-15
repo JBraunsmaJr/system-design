@@ -247,7 +247,9 @@ async function run() {
       await p.locator('.react-flow__pane').click({ position: { x: 300, y: 300 } });
       await p.keyboard.press('/');
       check(
-        await p.evaluate(() => document.activeElement?.classList.contains('palette__search-input')),
+        await p.evaluate(
+          () => document.activeElement?.classList.contains('palette__search-input') === true,
+        ),
         '"/" puts the cursor in the palette search',
       );
       await p.keyboard.type('sqs');
