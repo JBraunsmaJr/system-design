@@ -529,6 +529,12 @@ export function createHttpService(options: HttpServiceOptions): Server {
 
   async function handle(request: IncomingMessage, response: ServerResponse) {
     const url = new URL(request.url ?? '/', 'http://store.local');
+    // Nothing this API returns may be reused by a browser or a proxy: every
+    // answer depends on who is asking and on state that changes. Without
+    // this a browser may keep an error - "that document is deleted" - and
+    // go on giving it after the document has been restored. It also keeps
+    // documents out of shared caches.
+    response.setHeader('cache-control', 'no-store');
     applyCors(request, response);
     if (request.method === 'OPTIONS') {
       response.writeHead(204, {

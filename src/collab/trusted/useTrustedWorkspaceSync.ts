@@ -157,9 +157,21 @@ export function useTrustedWorkspaceSync(options: TrustedWorkspaceSyncOptions) {
     });
     const onChanged = () => void check();
     globalThis.addEventListener?.(WORKSPACE_CHANGED_EVENT, onChanged);
+    // Whether this document is in a workspace can change somewhere else:
+    // a colleague restores it after deleting it, or adds this person to its
+    // workspace. Nothing tells this tab, so it looks again when someone
+    // comes back to it - but only while it is not syncing, when there is
+    // something to find out.
+    const onReturn = () => {
+      if (!sync.current && document.visibilityState !== 'hidden') void check();
+    };
+    globalThis.addEventListener?.('focus', onReturn);
+    document.addEventListener?.('visibilitychange', onReturn);
     return () => {
       cancelled = true;
       globalThis.removeEventListener?.(WORKSPACE_CHANGED_EVENT, onChanged);
+      globalThis.removeEventListener?.('focus', onReturn);
+      document.removeEventListener?.('visibilitychange', onReturn);
       stop();
     };
   }, [client, check, stop]);

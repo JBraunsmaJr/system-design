@@ -301,6 +301,28 @@ export function createTrustedStoreClient(options: TrustedStoreClientOptions) {
       return body.document as TrustedDocument;
     },
 
+    // --- Retention (store administrators) -----------------------------------
+
+    /** Keeps a document from being purged, whatever its retention says,
+     * until the hold is released. The reason is recorded with it. */
+    async placeHold(docId: string, reason: string): Promise<TrustedDocument> {
+      const { body } = await request(`/documents/${id(docId)}/hold`, {
+        method: 'PUT',
+        body: { reason },
+      });
+      return body.document as TrustedDocument;
+    },
+
+    async releaseHold(docId: string): Promise<TrustedDocument> {
+      const { body } = await request(`/documents/${id(docId)}/hold`, { method: 'DELETE' });
+      return body.document as TrustedDocument;
+    },
+
+    /** Removes a deleted document for good, before its retention ends. */
+    async purgeDocument(docId: string): Promise<void> {
+      await request(`/documents/${id(docId)}/purge`, { method: 'POST' });
+    },
+
     /**
      * The document's update log, for documentSync. Updates travel as they
      * are: this store is trusted with them.

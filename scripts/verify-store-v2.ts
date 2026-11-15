@@ -799,6 +799,32 @@ async function run(label: string, backend: Backend) {
     // --- The rest of the service is untouched ------------------------------------------------
     const v1 = await fetch(`${origin}/v1/health`);
     check(v1.status === 200, 'the existing /v1 API still answers');
+
+    // --- Nothing is cacheable ----------------------------------------------------------------
+    // A browser that kept "that document is deleted" went on showing it
+    // after the document was restored. Errors are the ones that matter:
+    // a 404 or 410 without this header may be reused.
+    const cacheable: string[] = [];
+    for (const path of [
+      '/v2/health',
+      '/v2/me',
+      '/v2/workspaces',
+      `/v2/documents/${D2}`,
+      `/v2/documents/${D2}/updates?since=0`,
+      '/v2/documents/no-such-document',
+      '/v2/nothing-here',
+      '/v1/health',
+      '/v1/nothing-here',
+    ]) {
+      const response = await fetch(`${origin}${path}`, { headers: { cookie: ed.cookie } });
+      if (response.headers.get('cache-control') !== 'no-store') {
+        cacheable.push(`${path} (${response.status})`);
+      }
+    }
+    check(
+      cacheable.length === 0,
+      `every reply, errors included, says it must not be cached${cacheable.length ? `: ${cacheable.join(', ')}` : ''}`,
+    );
     check(
       (await call(ed, 'GET', '/nothing-here')).status === 404 &&
         (await call(ed, 'PUT', '/me')).status === 405,

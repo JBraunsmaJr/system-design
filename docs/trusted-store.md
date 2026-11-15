@@ -113,7 +113,8 @@ A document's workspace comes from the store's catalog (`store/src/documentCatalo
    - **Done: opening and saving.** The editor asks the store which API it serves (`/v2/health`) before it first renders, and remembers the answer. Against a trusted store it shows a workspace panel in the document manager: sign in, choose a workspace, create one, add a copy of the open document, open and delete documents. A workspace document saves to the store as it is edited and picks up other people's changes; a viewer's copy follows along and sends nothing. Against a store without `/v2` the editor behaves as before.
    - **Done: managing a workspace.** In the same panel, everyone in a workspace can see its members and mapped groups. Owners add people by name, map groups, change roles, remove either, and rename the workspace. Administrators archive and restore, and see archived workspaces in the list. A change that would cost the person making it their own access, or leave the workspace with no owner, is confirmed first (`src/collab/trusted/accessChanges.ts`).
    - **Done: choosing a store.** File > Documents shows which store the browser uses and lets someone point the editor at one. The address is checked before it is remembered, and the choice made in a browser wins over the one a deployment built in. Signing in returns to the page it started from.
-   - **Next:** deleted documents (restore, and purge and holds for administrators), and live sessions.
+   - **Done: deleted documents.** Editors and owners see what a workspace has deleted and how long it is kept, and can restore it. Administrators can place and release a hold, and remove a document for good.
+   - **Next:** live sessions.
 4. **Last: removal.** The encrypted API, its tables, `src/crypto`, device enrolment, recovery, rotation, and their tests and documentation. The last release with encryption is tagged first.
 
 ## An editor hosted somewhere else
@@ -130,6 +131,8 @@ After signing in, the store sends the browser back to the page that started the 
 
 - **A browser's first document is never a workspace document.** Its id is `local` in every browser, so the store refuses that id and the editor never looks it up. Adding the open document to a workspace makes a copy under a new id and opens the copy.
 - **Compaction names the version it read.** Replacing a document's update log with one snapshot is refused with a conflict if anything was appended since, so a concurrent edit is never erased. The encrypted API's compaction does not have this check.
+- **No reply is cacheable.** Every response carries `Cache-Control: no-store`. Browsers may otherwise reuse an error such as "that document is deleted" after it stops being true, which is how this was found.
+- **A tab that is not syncing looks again when someone returns to it.** Whether a document is in a workspace can change elsewhere (restored by a colleague, or access granted), and nothing pushes that to the browser.
 - **Viewers are read-only in the store, not yet in the editor.** A viewer can still change their own copy on screen; nothing they change is sent, and the store would refuse it. Locking the canvas for viewers comes with the editor shell work.
 
 ## Moving from an encrypted store

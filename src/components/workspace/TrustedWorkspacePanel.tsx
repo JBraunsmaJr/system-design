@@ -13,12 +13,14 @@
  *   - create a workspace (where the store allows them to),
  *   - see who is in a workspace, and as an owner change that
  *     (WorkspaceAccess) and rename it,
+ *   - see what has been deleted and restore it (editors; DeletedDocuments),
  *   - as a store administrator, archive a workspace and bring it back.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Archive,
   ArchiveRestore,
+  History,
   Cloud,
   CloudOff,
   FolderOpen,
@@ -35,6 +37,7 @@ import { StoreClientError } from '../../collab/access/storeErrors';
 import { announceWorkspaceChange } from '../../collab/hooks/useWorkspaceSync';
 import { describeRole } from '../../collab/trusted/roleWords';
 import { newDocumentId } from '../../domain/storage/documentStore';
+import { DeletedDocuments } from './DeletedDocuments';
 import { WorkspaceAccess } from './WorkspaceAccess';
 import {
   createTrustedStoreClient,
@@ -93,7 +96,12 @@ export function TrustedWorkspacePanel(props: TrustedWorkspacePanelProps) {
   /** The new name being typed for the selected workspace, or null. */
   const [renaming, setRenaming] = useState<string | null>(null);
   const [confirmingArchive, setConfirmingArchive] = useState(false);
+  const [showDeleted, setShowDeleted] = useState(false);
+  /** Bumped when a document is deleted, so an open deleted list reloads. */
+  const [deletions, setDeletions] = useState(0);
 
+  /** Whether the open document was in a workspace when last looked at. */
+  const wasInWorkspace = useRef<boolean | null>(null);
   const selected = workspaces.find((w) => w.workspaceId === selectedId) ?? null;
 
   /** Who is signed in, their workspaces, and where the open document is. */
@@ -113,6 +121,13 @@ export function TrustedWorkspacePanel(props: TrustedWorkspacePanelProps) {
       setMe(who);
       setWorkspaces(list);
       setCurrentIn(current);
+      // The open document has entered or left a workspace since this panel
+      // last looked - restored by someone else, say. Syncing should
+      // follow; it does nothing if it already agrees.
+      if (wasInWorkspace.current !== (current !== null)) {
+        wasInWorkspace.current = current !== null;
+        announceWorkspaceChange();
+      }
       // Keep the selection if it still exists; otherwise the open
       // document's workspace, or the first.
       setSelectedId((previous) =>
@@ -206,6 +221,7 @@ export function TrustedWorkspacePanel(props: TrustedWorkspacePanelProps) {
     act(async () => {
       await client.deleteDocument(docId);
       setConfirmingDelete(null);
+      setDeletions((count) => count + 1);
       if (docId === currentDocId) announceWorkspaceChange();
       await load();
       if (selected) await loadDocuments(selected.workspaceId);
@@ -394,6 +410,18 @@ export function TrustedWorkspacePanel(props: TrustedWorkspacePanelProps) {
                 >
                   {showAccess ? 'Hide members' : 'Members'}
                 </Button>
+                {selected.role !== 'viewer' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon={<History size={12} />}
+                    className="trusted-workspace__deleted-toggle"
+                    aria-expanded={showDeleted}
+                    onClick={() => setShowDeleted((shown) => !shown)}
+                  >
+                    {showDeleted ? 'Hide deleted' : 'Deleted'}
+                  </Button>
+                )}
                 {selected.role === 'owner' && !selected.archivedAt && renaming === null && (
                   <Button
                     variant="ghost"
@@ -489,6 +517,20 @@ export function TrustedWorkspacePanel(props: TrustedWorkspacePanelProps) {
                   workspace={selected}
                   me={me}
                   onOwnAccessChanged={reloadAfterOwnAccessChange}
+                />
+              )}
+
+              {showDeleted && selected.role !== 'viewer' && (
+                <DeletedDocuments
+                  key={`${selected.workspaceId}:${deletions}:${selected.archivedAt ?? ''}`}
+                  client={client}
+                  workspace={selected}
+                  isAdmin={me.isAdmin}
+                  onRestored={(docId) => {
+                    if (docId === currentDocId) announceWorkspaceChange();
+                    void load();
+                    void loadDocuments(selected.workspaceId);
+                  }}
                 />
               )}
 

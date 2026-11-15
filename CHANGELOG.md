@@ -52,6 +52,13 @@ markers are removed when the section becomes a release. See
   the editor's origin in `ALLOWED_ORIGINS`.
 - After signing in you return to the page and document you were on, instead of the store's configured address. The
   store accepts a `returnTo` address on its own origin or an allowed one and refuses any other.
+- **Deleted** in the workspace panel lists the documents deleted from a workspace and how long each is kept. Editors
+  and owners can restore one. Store administrators can place a hold with a reason, which keeps a document until the
+  hold is released, and remove a deleted document for good.
+- A document that comes back to a workspace while you have it open resumes saving when you return to the tab or open
+  the workspace panel.
+- [PATCH] Store: every reply now carries `Cache-Control: no-store`. A browser could keep an error reply, such as "that
+  document is deleted", and go on showing it after the document was restored.
 - Against a store without the workspace API, nothing changes.
 - Store: compacting a document through `/v2` must name the version it read, and is refused if the document has moved
   on, so a concurrent edit can no longer be erased by a compaction. The id `local` is refused for workspace documents.

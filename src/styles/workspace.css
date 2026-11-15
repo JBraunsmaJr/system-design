@@ -555,3 +555,14 @@
 .store-connection__source {
   color: var(--chrome-text-dim);
 }
+
+/* ---------- Trusted store: a workspace's deleted documents ---------- */
+
+.deleted-documents__entry {
+  display: grid;
+  gap: 6px;
+}
+
+.deleted-documents__kept {
+  white-space: normal;
+}

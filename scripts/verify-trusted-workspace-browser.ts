@@ -122,7 +122,7 @@ async function run() {
   let store: Awaited<ReturnType<typeof startStore>> | undefined;
 
   try {
-    servers = await startDevServers({ vitePort: 5197, signalingPort: 14468, quiet: true });
+    servers = await startDevServers({ vitePort: 5223, signalingPort: 14509, quiet: true });
     browser = await chromium.launch({ headless: true });
     const appOrigin = servers.appUrl;
     store = await startStore(appOrigin);
@@ -403,6 +403,98 @@ async function run() {
       ),
       'and it leaves the list',
     );
+
+    // --- What was deleted is kept --------------------------------------------
+    console.log('\n=== Deleted documents ===');
+    const live = '.trusted-workspace__documents .trusted-workspace__document';
+    const kept = '.deleted-documents .trusted-workspace__document';
+    await ada.click('.trusted-workspace__deleted-toggle');
+    await ada.waitForSelector(kept);
+    check(
+      (await ada.locator(kept).count()) === 1 &&
+        /Shared architecture, revised/.test((await ada.textContent(kept)) ?? ''),
+      'the deleted document is listed as kept',
+    );
+
+    // A hold, which only an administrator can place.
+    await ada.click('.deleted-documents__hold');
+    await ada.fill('.deleted-documents input', 'Contract review');
+    await ada.click('.deleted-documents form button[type="submit"]');
+    await ada.waitForSelector('.deleted-documents__release');
+    check(
+      (await record(docId)).legalHold?.reason === 'Contract review' &&
+        /On hold.*Reason: Contract review/.test(
+          (await ada.textContent('.deleted-documents__kept')) ?? '',
+        ) &&
+        (await ada.locator('.deleted-documents__purge').count()) === 0,
+      'an administrator places a hold with a reason, and a held document is not offered for removal',
+    );
+
+    // An editor sees what is kept, and can restore, but not hold or remove.
+    await closeManager(ben);
+    await openManager(ben);
+    await ben.click('.trusted-workspace__deleted-toggle');
+    await ben.waitForSelector(kept);
+    check(
+      (await ben.locator('.deleted-documents__restore').count()) === 1 &&
+        (await ben.locator('.deleted-documents__release').count()) === 0 &&
+        (await ben.locator('.deleted-documents__hold').count()) === 0 &&
+        (await ben.locator('.deleted-documents__purge').count()) === 0,
+      'an editor can restore it, and is offered neither holds nor removal',
+    );
+    await closeManager(vic);
+    await openManager(vic);
+    check(
+      (await vic.locator('.trusted-workspace__deleted-toggle').count()) === 0,
+      'a viewer is not shown deleted documents',
+    );
+
+    await ada.click('.deleted-documents__release');
+    await ada.waitForSelector('.deleted-documents__hold');
+    check((await record(docId)).legalHold === null, 'the administrator releases the hold');
+
+    // Restoring.
+    await ben.click('.deleted-documents__restore');
+    check(
+      (await eventually(async () => (await record(docId)).deletedAt === null)) &&
+        (await eventually(async () => (await ben.locator(live).count()) === 1)) &&
+        (await eventually(async () => (await ben.locator(kept).count()) === 0)),
+      'restoring brings the document back to the workspace and out of the deleted list',
+    );
+    // Both still have it open: saving picks up where it left off. Ada,
+    // who deleted it, learns it is back when she next looks at the panel.
+    await closeManager(ben);
+    await ben.fill('[aria-label="Diagram title"]', 'Shared architecture, restored');
+    await closeManager(ada);
+    await openManager(ada);
+    check(
+      (await eventually(
+        async () => (await theStore.catalog.get(docId))?.title === 'Shared architecture, restored',
+      )) &&
+        (await eventually(async () => (await titleOf(ada)) === 'Shared architecture, restored')),
+      'and for the people who have it open, saving and syncing resume',
+    );
+
+    // Removing for good.
+    await closeManager(ada);
+    await openManager(ada);
+    await ada.click(`${live} button[aria-label^="Delete"]`);
+    await ada.click(`${live} button:has-text("Delete")`);
+    await ada.click('.trusted-workspace__deleted-toggle');
+    await ada.waitForSelector('.deleted-documents__purge');
+    await ada.click('.deleted-documents__purge');
+    check((await theStore.catalog.get(docId)) !== null, 'removing for good asks first');
+    await ada.click('.deleted-documents__purge-yes');
+    check(
+      (await eventually(async () => (await theStore.catalog.get(docId)) === null)) &&
+        (await eventually(async () => (await ada.locator(kept).count()) === 0)) &&
+        (await theStore.documents.head(docId, { includeDeleted: true }).then(
+          () => false,
+          () => true,
+        )),
+      'and then the document is gone from the store',
+    );
+    await ada.click('.trusted-workspace__deleted-toggle');
 
     // --- Managing who is in a workspace -------------------------------------
     console.log('\n=== Managing a workspace ===');
