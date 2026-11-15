@@ -143,6 +143,23 @@ function assert(condition: boolean, message: string) {
     'Renders "Create sub-diagram" when node has no sub-diagram',
   );
   assert(
+    html.includes('class="inspector__identity-name">Service A<'),
+    'the header names the selected node',
+  );
+  assert(
+    html.indexOf('Create sub-diagram') < html.indexOf('<span>Label</span>'),
+    'the sub-diagram button comes before the fields, not after them',
+  );
+  for (const title of ['Requirements', 'Properties', 'Tags', 'Appearance and order']) {
+    assert(html.includes(`class="inspector-section__title">${title}<`), `has a ${title} section`);
+  }
+  assert(!html.includes('class="inspector-section__count"'), 'an empty section shows no count');
+  assert(
+    !html.includes('color-field') && html.includes('Add property'),
+    'appearance starts folded; the other sections start open',
+  );
+
+  assert(
     !html.includes('Open sub-diagram'),
     'Does not render "Open sub-diagram" when node has no sub-diagram',
   );
@@ -323,6 +340,39 @@ function assert(condition: boolean, message: string) {
     html.includes('Deleting a boundary keeps the nodes inside it'),
     'Group node renders boundary release hint',
   );
+}
+
+// Sections count what they hold.
+{
+  const html = renderToStaticMarkup(
+    <Inspector
+      selectedNode={{
+        id: 'n1',
+        type: 'typed',
+        position: { x: 0, y: 0 },
+        data: {
+          nodeType: 'service',
+          label: 'Service A',
+          properties: { runtime: 'Go', replicas: '3' },
+          tags: ['edge'],
+          linkedRequirementIds: ['REQ-1', 'REQ-2', 'REQ-3'],
+        },
+      }}
+      selectedEdge={null}
+      onUpdateNode={() => {}}
+      onUpdateEdge={() => {}}
+      onClearEdgeWaypoints={() => {}}
+      onRemoveEdgeWaypoint={() => {}}
+      onDeleteNode={() => {}}
+      onDeleteEdge={() => {}}
+      onDrillInto={() => {}}
+      requirements={EMPTY_REQUIREMENTS_DOCUMENT}
+      onNavigateToRequirement={() => {}}
+      onZOrderCommand={() => {}}
+    />,
+  );
+  const counts = [...html.matchAll(/class="inspector-section__count">(\d+)</g)].map((m) => m[1]);
+  assert(counts.join() === '3,2,1', 'requirements, properties and tags show how many they hold');
 }
 
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);

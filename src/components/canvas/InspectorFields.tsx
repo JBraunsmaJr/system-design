@@ -1,5 +1,13 @@
 import type { ReactNode } from 'react';
-import { BringToFront, ChevronDown, ChevronUp, Lock, LockOpen, SendToBack } from 'lucide-react';
+import {
+  BringToFront,
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
+  Lock,
+  LockOpen,
+  SendToBack,
+} from 'lucide-react';
 import {
   DEFAULT_EDGE_STROKE_WIDTH,
   EDGE_ROUTINGS,
@@ -16,6 +24,55 @@ import { MIXED, type Mixed } from './mixedValue';
  * Field building blocks shared by the single-item Inspector and the
  * multi-selection one (MultiSelectionInspector.tsx).
  */
+
+/**
+ * A titled, foldable group of Inspector fields. The Inspector used to be
+ * one flat column in which the things edited most (what the node is linked
+ * to, its properties) sat below the things edited once (icon, colour), so
+ * each group now has a heading that says how much is in it and can be
+ * folded away. Which sections are folded is the person's own preference -
+ * the caller keeps it (see canvasPrefs.ts) and passes it down.
+ *
+ * `singleField` is for a section holding exactly one field whose own label
+ * would repeat the heading: the label stays for screen readers and is
+ * hidden from view.
+ */
+export function InspectorSection({
+  id,
+  title,
+  count,
+  collapsed,
+  onToggle,
+  singleField = false,
+  children,
+}: {
+  id: string;
+  title: string;
+  /** Shown beside the title when there is something to count. */
+  count?: number;
+  collapsed: boolean;
+  onToggle: (id: string) => void;
+  singleField?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <section className={`inspector-section${singleField ? ' inspector-section--single' : ''}`}>
+      <button
+        type="button"
+        className="inspector-section__header"
+        aria-expanded={!collapsed}
+        onClick={() => onToggle(id)}
+      >
+        {collapsed ? <ChevronRight size={13} aria-hidden /> : <ChevronDown size={13} aria-hidden />}
+        <span className="inspector-section__title">{title}</span>
+        {count !== undefined && count > 0 && (
+          <span className="inspector-section__count">{count}</span>
+        )}
+      </button>
+      {!collapsed && <div className="inspector-section__body">{children}</div>}
+    </section>
+  );
+}
 
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (

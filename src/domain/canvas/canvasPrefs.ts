@@ -22,3 +22,32 @@ export function saveShowMinimap(shown: boolean): void {
     // Storage is unavailable or full: the choice lasts until reload.
   }
 }
+
+const INSPECTOR_SECTIONS_KEY = 'system-design-editor:inspector:collapsed-sections';
+
+/** Inspector sections folded when nothing has been stored: appearance is
+ * set once and then left alone, so it starts out of the way. */
+const DEFAULT_COLLAPSED_SECTIONS: readonly string[] = ['appearance'];
+
+/** The ids of the Inspector sections this person has folded. */
+export function loadCollapsedInspectorSections(): ReadonlySet<string> {
+  try {
+    const raw = localStorage.getItem(INSPECTOR_SECTIONS_KEY);
+    if (raw === null) return new Set(DEFAULT_COLLAPSED_SECTIONS);
+    const parsed: unknown = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.every((v) => typeof v === 'string')) {
+      return new Set(parsed as string[]);
+    }
+  } catch {
+    // Unreadable or unavailable: fall through to the defaults.
+  }
+  return new Set(DEFAULT_COLLAPSED_SECTIONS);
+}
+
+export function saveCollapsedInspectorSections(collapsed: ReadonlySet<string>): void {
+  try {
+    localStorage.setItem(INSPECTOR_SECTIONS_KEY, JSON.stringify([...collapsed]));
+  } catch {
+    // Storage is unavailable or full: the choice lasts until reload.
+  }
+}

@@ -220,6 +220,8 @@ async function run() {
 
     console.log('=== Locked nodes stay put ===');
     await select(p, ['n-db']);
+    // A single node's lock is under Appearance and order, which starts folded.
+    await p.click('.inspector-section__header:has-text("Appearance and order")');
     await p.locator('.inspector .inspector__checkbox:has-text("Locked") input').check();
     await p.waitForTimeout(150);
     check(
@@ -285,7 +287,7 @@ async function run() {
       'both nodes now sit inside it',
     );
     check(
-      (await p.textContent('.inspector .panel-header'))?.trim() === 'Group',
+      (await p.textContent('.inspector .inspector__identity-type'))?.trim() === 'Group',
       'the new boundary is selected',
     );
 

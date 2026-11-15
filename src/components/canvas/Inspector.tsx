@@ -1,5 +1,10 @@
 import { type KeyboardEvent, useEffect, useState } from 'react';
-import { ExternalLink, FileText, X } from 'lucide-react';
+import { ArrowRight, ExternalLink, FileText, X } from 'lucide-react';
+import { IconRenderer } from './IconRenderer';
+import {
+  loadCollapsedInspectorSections,
+  saveCollapsedInspectorSections,
+} from '../../domain/canvas/canvasPrefs';
 import type { Edge, Node } from '@xyflow/react';
 import { getNodeType } from '../../domain/canvas/nodeRegistry';
 import { getGroupType } from '../../domain/canvas/groupRegistry';
@@ -17,6 +22,7 @@ import {
   EdgeStrokeWidthField,
   EdgeTypeSelect,
   Field,
+  InspectorSection,
   LockField,
   ZOrderControls,
 } from './InspectorFields';
@@ -86,6 +92,15 @@ export function Inspector({
   selectedEdges,
   multiSelection,
 }: InspectorProps) {
+  const [collapsedSections, setCollapsedSections] = useState(loadCollapsedInspectorSections);
+  const toggleSection = (id: string) =>
+    setCollapsedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      saveCollapsedInspectorSections(next);
+      return next;
+    });
   const selectionCount = (selectedNodes?.length ?? 0) + (selectedEdges?.length ?? 0);
   if (multiSelection && selectionCount > 1) {
     return (
@@ -394,9 +409,58 @@ export function Inspector({
     const subCount = data.subDiagramNodeCount ?? data.subDiagram?.nodes.length ?? 0;
     const hasSubDiagram = data.hasSubDiagram ?? subCount > 0;
 
+    const iconName =
+      data.icon ?? (isGroup ? groupDef?.icon : nodeDef?.icon) ?? (isGroup ? 'SquareDashed' : 'Box');
+    const accent = data.color ?? defaultColor;
+    const section = (id: string) => ({
+      id,
+      collapsed: collapsedSections.has(id),
+      onToggle: toggleSection,
+    });
+
     return (
       <aside className="inspector">
-        <div className="panel-header">{headerLabel}</div>
+        {/* What is selected, and the one thing people come here to do with
+            it besides editing: go inside. The sub-diagram button used to sit
+            two thirds of the way down, between tags and requirements. */}
+        <header className="inspector__identity">
+          <span
+            className="inspector__identity-icon"
+            style={{
+              color: accent,
+              background: `color-mix(in srgb, ${accent} 14%, transparent)`,
+            }}
+          >
+            <IconRenderer icon={iconName} size={17} />
+          </span>
+          <span className="inspector__identity-text">
+            <span className="inspector__identity-name">{data.label || 'Untitled'}</span>
+            <span className="inspector__identity-type">{headerLabel}</span>
+          </span>
+        </header>
+
+        {!isGroup && (
+          <button
+            type="button"
+            className="inspector__drill"
+            onClick={() => onDrillInto(selectedNode.id)}
+          >
+            {subCount > 0
+              ? `Open sub-diagram (${subCount})`
+              : hasSubDiagram
+                ? 'Open sub-diagram'
+                : 'Create sub-diagram'}
+            <ArrowRight size={13} aria-hidden />
+          </button>
+        )}
+
+        {!isGroup && (data.unwiredPortCount ?? 0) > 0 && (
+          <p className="inspector__hint inspector__hint--warning">
+            {data.unwiredPortCount} connection{data.unwiredPortCount === 1 ? '' : 's'} to this node{' '}
+            {data.unwiredPortCount === 1 ? "isn't" : "aren't"} wired to anything inside its
+            sub-diagram. Open it and drag from the port on its edge to the node that handles it.
+          </p>
+        )}
 
         <Field label="Label">
           <input
@@ -413,82 +477,86 @@ export function Inspector({
           />
         </Field>
 
-        {/* Boundaries carry an icon in their label chip just as typed
-            nodes do, so they get the same override. The fallback differs
-            per kind: SquareDashed matches GroupNode's own final fallback,
-            so clearing the override lands back on exactly what the node
-            renders rather than on a different default. */}
-        <IconPicker
-          value={data.icon}
-          defaultValue={
-            (isGroup ? groupDef?.icon : nodeDef?.icon) ?? (isGroup ? 'SquareDashed' : 'Box')
-          }
-          onChange={(icon) => onUpdateNode(selectedNode.id, { icon })}
-        />
+        <InspectorSection
+          {...section('requirements')}
+          title="Requirements"
+          count={data.linkedRequirementIds?.length}
+          singleField
+        >
+          <LinkedRequirementsField
+            nodeId={selectedNode.id}
+            linkedRequirementIds={data.linkedRequirementIds}
+            onUpdateNode={onUpdateNode}
+            requirements={requirements}
+            onNavigateToRequirement={onNavigateToRequirement}
+          />
+        </InspectorSection>
 
-        <ColorField
-          value={data.color}
-          defaultValue={defaultColor}
-          onChange={(color) => onUpdateNode(selectedNode.id, { color })}
-        />
+        <InspectorSection
+          {...section('properties')}
+          title="Properties"
+          count={Object.keys(data.properties ?? {}).length}
+          singleField
+        >
+          <PropertyEditor
+            properties={data.properties}
+            onChange={(properties) => onUpdateNode(selectedNode.id, { properties })}
+          />
+        </InspectorSection>
 
-        <PropertyEditor
-          properties={data.properties}
-          onChange={(properties) => onUpdateNode(selectedNode.id, { properties })}
-        />
-
-        <TagEditor tags={data.tags} onChange={(tags) => onUpdateNode(selectedNode.id, { tags })} />
-
-        {!isGroup && (
-          <button
-            type="button"
-            style={{ marginBottom: '16px' }}
-            className="inspector__drill"
-            onClick={() => onDrillInto(selectedNode.id)}
-          >
-            {subCount > 0
-              ? `Open sub-diagram (${subCount})`
-              : hasSubDiagram
-                ? 'Open sub-diagram'
-                : 'Create sub-diagram'}{' '}
-            →
-          </button>
-        )}
-
-        {!isGroup && (data.unwiredPortCount ?? 0) > 0 && (
-          <p className="inspector__hint inspector__hint--warning">
-            {data.unwiredPortCount} connection{data.unwiredPortCount === 1 ? '' : 's'} to this node{' '}
-            {data.unwiredPortCount === 1 ? "isn't" : "aren't"} wired to anything inside its
-            sub-diagram. Open it and drag from the port on its edge to the node that handles it.
-          </p>
-        )}
-
-        <LinkedRequirementsField
-          nodeId={selectedNode.id}
-          linkedRequirementIds={data.linkedRequirementIds}
-          onUpdateNode={onUpdateNode}
-          requirements={requirements}
-          onNavigateToRequirement={onNavigateToRequirement}
-        />
+        <InspectorSection {...section('tags')} title="Tags" count={data.tags?.length} singleField>
+          <TagEditor
+            tags={data.tags}
+            onChange={(tags) => onUpdateNode(selectedNode.id, { tags })}
+          />
+        </InspectorSection>
 
         {listDocuments && (
-          <LinkedDocumentField
-            nodeId={selectedNode.id}
-            linkedDocument={data.linkedDocument}
-            onUpdateNode={onUpdateNode}
-            currentDocId={currentDocId}
-            listDocuments={listDocuments}
-          />
+          <InspectorSection
+            {...section('document')}
+            title="Linked document"
+            count={data.linkedDocument ? 1 : 0}
+            singleField
+          >
+            <LinkedDocumentField
+              nodeId={selectedNode.id}
+              linkedDocument={data.linkedDocument}
+              onUpdateNode={onUpdateNode}
+              currentDocId={currentDocId}
+              listDocuments={listDocuments}
+            />
+          </InspectorSection>
         )}
 
-        <ZOrderControls onCommand={onZOrderCommand} />
-        <NodeLockField node={selectedNode} onUpdateNode={onUpdateNode} />
+        <InspectorSection {...section('appearance')} title="Appearance and order">
+          {/* Boundaries carry an icon in their label chip just as typed
+              nodes do, so they get the same override. The fallback differs
+              per kind: SquareDashed matches GroupNode's own final fallback,
+              so clearing the override lands back on exactly what the node
+              renders rather than on a different default. */}
+          <IconPicker
+            value={data.icon}
+            defaultValue={
+              (isGroup ? groupDef?.icon : nodeDef?.icon) ?? (isGroup ? 'SquareDashed' : 'Box')
+            }
+            onChange={(icon) => onUpdateNode(selectedNode.id, { icon })}
+          />
+
+          <ColorField
+            value={data.color}
+            defaultValue={defaultColor}
+            onChange={(color) => onUpdateNode(selectedNode.id, { color })}
+          />
+
+          <ZOrderControls onCommand={onZOrderCommand} />
+          <NodeLockField node={selectedNode} onUpdateNode={onUpdateNode} />
+        </InspectorSection>
 
         <button
           type="button"
           className="inspector__delete"
           disabled={data.locked === true}
-          title={data.locked ? 'Unlock to delete' : undefined}
+          title={data.locked ? 'Unlock it under Appearance and order to delete it' : undefined}
           onClick={() => onDeleteNode(selectedNode.id)}
         >
           {isGroup ? 'Delete boundary' : 'Delete node'}

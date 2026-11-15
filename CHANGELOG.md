@@ -29,6 +29,14 @@ markers are removed when the section becomes a release. See
 - `ADMIN_GROUPS` makes the members of an identity-provider group store administrators in that API.
   `WORKSPACE_CREATION` sets who may create workspaces there.
 
+### [MINOR] Inspector: header and sections
+
+- Selecting a component or boundary shows its icon, name and type at the top of the Inspector, with **Open sub-diagram**
+  directly beneath instead of two thirds of the way down.
+- The rest is grouped into sections that fold: Requirements, Properties, Tags, Linked document, and Appearance and
+  order (icon, colour, arrange, lock). Each heading shows how many entries it holds. Appearance and order starts
+  folded; which sections you fold is remembered in this browser.
+
 ### [MINOR] Diagram: quieter boundaries, minimap toggle, no popup on click
 
 - Boundaries (regions, VPCs, trust boundaries) no longer have a pale grey fill, which came from the canvas library's
