@@ -64,6 +64,7 @@ services:
       start_period: 30s
 
   store:
+    image: ghcr.io/jbraunsmajr/system-design-store
     build:
       context: ../..
       dockerfile: docker/store/Dockerfile
@@ -117,6 +118,7 @@ services:
       - '8080:8080'
 
   relay:
+    image: ghcr.io/jbraunsmajr/system-design-relay
     build:
       context: ../..
       dockerfile: docker/signaling/Dockerfile
@@ -126,6 +128,7 @@ services:
       - '4444:4444'
 
   editor:
+    image: ghcr.io/jbraunsmajr/system-design
     build:
       context: ../..
       dockerfile: Dockerfile
