@@ -32,6 +32,9 @@ American English.
   it, with each other's cursors and changes.
 - **Deleted documents.** **Deleted** in the workspace panel lists what was deleted and how long it is kept. Editors
   and owners can restore a document; store administrators can hold one or remove it for good.
+- **Administration.** Store administrators get an **Administration** page: every workspace with its people, groups,
+  documents, last activity and status; a side panel to manage the selected one; who has access to what across the
+  store; and every deleted document still being kept.
 - **Choosing a store.** **Store** in File > Documents shows which store this browser uses and lets you point the
   editor at another by its address.
 - **The encrypted workspace is removed**, along with device enrollment, comparison codes, recovery codes, key rotation

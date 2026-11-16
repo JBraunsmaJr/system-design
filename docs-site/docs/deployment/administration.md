@@ -12,8 +12,29 @@ retention:
 - placing and releasing legal holds;
 - removing a deleted document before its retention ends.
 
-All of it is done in the editor, from **File → Documents**. The same actions
-are available over the store's API for scripts; see [The API](#the-api).
+All of it is done in the editor. The same actions are available over the
+store's API for scripts; see [The API](#the-api).
+
+## The Administration page
+
+Sign in as an administrator and open **File → Documents**. Beside your name
+is a **Store admin** badge and an **Administration** button, which opens a
+page covering the whole store:
+
+- **Workspaces** lists every workspace with how many people and groups are
+  in it, how many documents it holds, when it was last changed, and whether
+  it is active or archived. **New workspace** creates one. Click a line to
+  open the workspace beside the table, where you rename it, give groups and
+  people a role, and archive or restore it.
+- **People and groups** shows each identity-provider group and each person
+  added by name, with every workspace they reach and their role there.
+- **Deleted documents** shows what is being kept in each workspace, to
+  restore, hold or remove for good.
+
+Someone who is not an administrator does not see the button. If they are in
+no workspace, the Workspaces panel tells them so and lists the groups their
+sign-in reported, which is the first thing to check when a group mapping
+does not seem to work.
 
 ::: warning What an administrator can see
 An administrator can open every workspace and read every document. So can

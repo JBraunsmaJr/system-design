@@ -355,7 +355,7 @@
 }
 
 .workspace-access__role {
-  max-width: 110px;
+  flex: none;
 }
 
 .workspace-access__add {

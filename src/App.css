@@ -29,3 +29,4 @@
 @import './styles/documentation.css'; /* Diagram hover documentation */
 @import './styles/toasts.css'; /* Toast notifications */
 @import './styles/durability.css'; /* Durability indicator */
+@import './styles/administration.css'; /* Store administration page */

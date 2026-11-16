@@ -308,7 +308,8 @@ export function DurabilityIndicator({
         className="durability__chip"
         aria-expanded={expanded}
         aria-describedby={expanded ? detailId : undefined}
-        title={state.label}
+        title={state.busy ? `${state.label} - ${state.detail}` : state.label}
+        aria-busy={state.busy || undefined}
         onClick={() => {
           if (open) {
             closeDropdown();
@@ -320,7 +321,13 @@ export function DurabilityIndicator({
         <Icon
           size={14}
           aria-hidden="true"
-          className={state.level === 'loading' ? 'durability__icon--spin' : undefined}
+          className={
+            state.level === 'loading'
+              ? 'durability__icon--spin'
+              : state.busy
+                ? 'durability__icon--busy'
+                : undefined
+          }
         />
         <span className="toolbar__label">{state.label}</span>
       </button>

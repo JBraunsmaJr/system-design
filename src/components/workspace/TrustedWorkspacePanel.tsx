@@ -27,6 +27,7 @@ import {
   Loader2,
   Pencil,
   Plus,
+  Settings2,
   ShieldAlert,
   Trash2,
   Upload,
@@ -38,6 +39,7 @@ import { announceWorkspaceChange } from '../../collab/trusted/workspaceSyncState
 import { describeRole } from '../../collab/trusted/roleWords';
 import { newDocumentId } from '../../domain/storage/documentStore';
 import { DeletedDocuments } from './DeletedDocuments';
+import { StoreAdministration } from './StoreAdministration';
 import { WorkspaceAccess } from './WorkspaceAccess';
 import {
   createTrustedStoreClient,
@@ -99,6 +101,8 @@ export function TrustedWorkspacePanel(props: TrustedWorkspacePanelProps) {
   const [showDeleted, setShowDeleted] = useState(false);
   /** Bumped when a document is deleted, so an open deleted list reloads. */
   const [deletions, setDeletions] = useState(0);
+  /** Whether the store administration page is open. */
+  const [administering, setAdministering] = useState(false);
 
   /** Whether the open document was in a workspace when last looked at. */
   const wasInWorkspace = useRef<boolean | null>(null);
@@ -267,7 +271,30 @@ export function TrustedWorkspacePanel(props: TrustedWorkspacePanelProps) {
         <strong>Workspaces</strong>
         {(phase === 'loading' || busy) && <Loader2 size={12} className="workspace-panel__busy" />}
         {me && <span className="workspace-panel__who">{me.user.displayName ?? 'Signed in'}</span>}
+        {me?.isAdmin && (
+          <span className="workspace-panel__admin">
+            <span className="store-admin__pill store-admin__pill--owner">Store admin</span>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<Settings2 size={12} />}
+              className="trusted-workspace__administration"
+              onClick={() => setAdministering(true)}
+            >
+              Administration
+            </Button>
+          </span>
+        )}
       </div>
+
+      {administering && me && (
+        <StoreAdministration
+          client={client}
+          me={me}
+          onClose={() => setAdministering(false)}
+          onChanged={reloadAfterOwnAccessChange}
+        />
+      )}
 
       {/* Not dismissible, and stated plainly: this is what "trusted" means. */}
       <p className="trusted-workspace__notice" role="note">
@@ -314,9 +341,19 @@ export function TrustedWorkspacePanel(props: TrustedWorkspacePanelProps) {
           {workspaces.length === 0 ? (
             <p className="trusted-workspace__status">
               You are not in any workspace yet.{' '}
-              {me.canCreateWorkspaces
-                ? 'Create one to share documents.'
-                : 'Ask a workspace owner to add you, or your administrator to map one of your groups.'}
+              {me.isAdmin
+                ? 'Open Administration to create one and give a group a role in it.'
+                : me.canCreateWorkspaces
+                  ? 'Create one to share documents.'
+                  : 'A workspace owner can add you by name, or a store administrator can give one of your groups a role in a workspace.'}
+              {!me.isAdmin && (
+                <>
+                  {' '}
+                  {me.groups.length > 0
+                    ? `Your groups: ${me.groups.join(', ')}.`
+                    : 'Your sign-in reported no groups.'}
+                </>
+              )}
             </p>
           ) : (
             <div className="trusted-workspace__row">

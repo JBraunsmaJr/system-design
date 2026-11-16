@@ -280,9 +280,16 @@ async function run() {
         ),
       'the members list shows the person who created the workspace, marked as them',
     );
+    /** Chooses a role from one of the members list's menus. */
+    const pickRole = async (page: Page, label: string, role: string) => {
+      await page.click(`.workspace-access .status-picker__trigger[aria-label^="${label}:"]`);
+      await page.click(
+        `.status-picker__dropdown .status-picker__option:has-text("${role[0].toUpperCase()}${role.slice(1)}")`,
+      );
+    };
     const mapGroup = async (group: string, role: string) => {
       await ada.fill('#workspace-access-group', group);
-      await ada.selectOption('select[aria-label="Role for the new group"]', role);
+      await pickRole(ada, 'Role for the new group', role);
       await ada.click('.workspace-access__add-group');
       await ada.waitForSelector(`.workspace-access__entry[data-kind="group"]:has-text("${group}")`);
     };
@@ -695,7 +702,7 @@ async function run() {
     };
     await showMembers(ada);
     await ada.fill('#workspace-access-person', 'ze');
-    await ada.selectOption('select[aria-label="Role for the new person"]', 'viewer');
+    await pickRole(ada, 'Role for the new person', 'viewer');
     await ada.click('.workspace-access__add-person');
     await ada.waitForSelector('.workspace-access__entry[data-kind="member"]:has-text("Zed")');
     check(
@@ -714,7 +721,7 @@ async function run() {
     );
 
     // Changing a role.
-    await ada.selectOption('select[aria-label="Role for Zed"]', 'owner');
+    await pickRole(ada, 'Role for Zed', 'owner');
     check(
       await eventually(async () => {
         await reopen(zed);
@@ -725,8 +732,10 @@ async function run() {
 
     // An owner who is not an administrator is warned before giving up the role.
     await zed.click('.trusted-workspace__access-toggle');
-    await zed.waitForSelector('.workspace-access select[aria-label="Role for Zed"]');
-    await zed.selectOption('select[aria-label="Role for Zed"]', 'viewer');
+    await zed.waitForSelector(
+      '.workspace-access .status-picker__trigger[aria-label^="Role for Zed:"]',
+    );
+    await pickRole(zed, 'Role for Zed', 'viewer');
     await zed.waitForSelector('.workspace-access__confirm');
     const zedBefore = (await theStore.workspaces.listMembers(workspace.workspaceId)).filter(
       (m) => m.role === 'owner',
@@ -800,6 +809,80 @@ async function run() {
       }),
       'restoring brings it back for them',
     );
+
+    // --- The administration page ---------------------------------------------
+    console.log('\n=== Store administration ===');
+    {
+      await reopen(ben);
+      check(
+        (await ben.locator('.trusted-workspace__administration').count()) === 0,
+        'someone who is not an administrator is not offered the page',
+      );
+      await reopen(ada);
+      check(
+        /Store admin/.test((await ada.textContent('.workspace-panel__admin')) ?? ''),
+        'an administrator is told they are one',
+      );
+      await ada.click('.trusted-workspace__administration');
+      await ada.waitForSelector('.store-admin[data-loaded="true"]');
+      const rowText = async (name: string) =>
+        ((await ada.textContent(`.store-admin__table tr[data-workspace="${name}"]`)) ?? '').replace(
+          /\s+/g,
+          ' ',
+        );
+      const expected = {
+        members: (await theStore.workspaces.listMembers(workspace.workspaceId)).length,
+        groups: (await theStore.workspaces.listGroupMappings(workspace.workspaceId)).length,
+      };
+      const platformRow = await rowText('Platform Group');
+      check(
+        platformRow.includes(
+          `${expected.members} ${expected.members === 1 ? 'person' : 'people'}, ` +
+            `${expected.groups} ${expected.groups === 1 ? 'group' : 'groups'}`,
+        ) && /Active/.test(platformRow),
+        `every workspace is listed with who is in it and its status (${platformRow.trim()})`,
+      );
+
+      await ada.click('.store-admin__new');
+      await ada.fill('[aria-label="Name of the new workspace"]', 'Payments');
+      await ada.keyboard.press('Enter');
+      await ada.waitForSelector('.store-admin__aside:has-text("Payments")');
+      check(
+        /1 person/.test(await rowText('Payments')),
+        'a workspace created here is listed, with its creator in it, and opens beside the table',
+      );
+      await ada.fill('.store-admin__aside #workspace-access-group', '/payments-eng');
+      await ada.click('.store-admin__aside .workspace-access__add-group');
+      check(
+        await eventually(async () => /1 group/.test(await rowText('Payments'))),
+        'giving a group a role there is counted in the table',
+      );
+
+      await ada.click('.store-admin__tab:has-text("People and groups")');
+      check(
+        /Payments/.test(
+          (await ada.textContent('.store-admin__table tr[data-group="/payments-eng"]')) ?? '',
+        ),
+        'People and groups shows each group with the workspaces it reaches',
+      );
+
+      await ada.click('.store-admin__tab:has-text("Workspaces")');
+      // The workspace chosen before is still open beside the table.
+      await ada.click('.store-admin__archive');
+      await ada.click('.store-admin__archive-yes');
+      check(
+        await eventually(async () => /Archived/.test(await rowText('Payments'))),
+        'archiving a workspace marks it in the table',
+      );
+      if (process.env.ADMIN_SHOT) await ada.screenshot({ path: process.env.ADMIN_SHOT });
+
+      await ada.keyboard.press('Escape');
+      await ada.waitForSelector('.store-admin', { state: 'detached' });
+      check(
+        (await ada.locator('.trusted-workspace').count()) === 1,
+        'Escape closes the page and leaves the document manager open beneath it',
+      );
+    }
 
     // --- Pointing an editor at a store ---------------------------------------
     console.log('\n=== Choosing a store in the browser ===');

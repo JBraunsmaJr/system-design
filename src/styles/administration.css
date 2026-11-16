@@ -1,0 +1,351 @@
+/* Store administration (components/workspace/StoreAdministration.tsx): a
+   page over the whole editor, above the document manager it opens from
+   (BaseModal, 1100) and below the menus it uses (1200). */
+
+.store-admin {
+  position: fixed;
+  inset: 0;
+  z-index: 1150;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  background: var(--canvas-bg);
+  color: var(--chrome-text);
+  font-size: var(--text-base);
+}
+
+.store-admin__header,
+.store-admin__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--chrome-bg);
+  border-bottom: 1px solid var(--chrome-border);
+}
+
+.store-admin__tabs {
+  gap: 4px;
+  padding: 8px 16px;
+}
+
+.store-admin__crumb {
+  color: var(--chrome-text-dim);
+}
+
+.store-admin__title {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.store-admin__spacer {
+  flex: 1 1 40px;
+}
+
+.store-admin__who {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px 4px 12px;
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-pill);
+}
+
+.store-admin__tab {
+  height: 32px;
+  padding: 0 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--chrome-text-dim);
+  font: inherit;
+  cursor: pointer;
+}
+
+.store-admin__tab:hover {
+  color: var(--chrome-text);
+  background: var(--chrome-bg-hover);
+}
+
+.store-admin__tab.is-current {
+  background: var(--chrome-bg-raised);
+  border-color: var(--chrome-border);
+  color: var(--chrome-text);
+  font-weight: 600;
+}
+
+.store-admin__error {
+  padding: 12px 32px 0;
+}
+
+.store-admin__body {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 24px;
+  padding: 28px 32px;
+}
+
+.store-admin__main {
+  flex: 999 1 560px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.store-admin__heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  min-height: 38px;
+}
+
+.store-admin__heading h2 {
+  margin: 0;
+  font-size: var(--text-xl-plus);
+  font-weight: 600;
+}
+
+.store-admin__heading:not(:first-child) {
+  margin-top: 16px;
+}
+
+.store-admin__inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.store-admin__empty,
+.store-admin__note {
+  margin: 0;
+  max-width: 70ch;
+  color: var(--chrome-text-dim);
+  line-height: 1.5;
+}
+
+.store-admin__empty {
+  padding: 28px 32px;
+}
+
+.store-admin__main > .store-admin__empty {
+  padding: 20px;
+  border: 1px dashed var(--chrome-border);
+  border-radius: var(--radius-md);
+}
+
+.store-admin__table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-md);
+  background: var(--chrome-bg);
+}
+
+.store-admin__table {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.store-admin__table thead th {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--chrome-border);
+  color: var(--chrome-text-dim);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+.store-admin__table tbody th,
+.store-admin__table tbody td {
+  padding: 14px 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--chrome-border) 70%, transparent);
+  color: color-mix(in srgb, var(--chrome-text) 82%, var(--chrome-text-dim));
+  font-weight: 400;
+  vertical-align: top;
+}
+
+.store-admin__table tbody th {
+  color: var(--chrome-text);
+  font-weight: 500;
+}
+
+.store-admin__table tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+.store-admin__table tbody tr.is-selected {
+  background: var(--chrome-bg-raised);
+}
+
+.store-admin__table tbody tr.is-selected > th {
+  box-shadow: inset 2px 0 0 var(--accent);
+  font-weight: 600;
+}
+
+.store-admin__table tbody tr.is-archived > * {
+  color: var(--chrome-text-dim);
+}
+
+.store-admin__row-button {
+  padding: 0;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.store-admin__row-button:hover {
+  color: var(--accent);
+}
+
+/* The whole line opens the workspace; the name is the button for the
+   keyboard. */
+.store-admin__table tbody tr[data-workspace] {
+  cursor: pointer;
+}
+
+.store-admin__table tbody tr[data-workspace]:hover:not(.is-selected) {
+  background: var(--chrome-bg-hover);
+}
+
+.store-admin__dim {
+  color: var(--chrome-text-dim);
+}
+
+.store-admin__mono {
+  font-family: var(--mono);
+  font-size: var(--text-sm);
+}
+
+.store-admin__pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--chrome-bg-raised);
+  color: color-mix(in srgb, var(--chrome-text) 82%, var(--chrome-text-dim));
+  font-size: var(--text-xs);
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.store-admin__pill--active {
+  background: color-mix(in srgb, var(--success) 18%, var(--chrome-bg));
+  color: color-mix(in srgb, var(--success) 75%, var(--white));
+}
+
+.store-admin__pill--archived {
+  background: color-mix(in srgb, var(--warning) 16%, var(--chrome-bg));
+  color: color-mix(in srgb, var(--warning) 80%, var(--white));
+}
+
+.store-admin__pill--owner {
+  background: color-mix(in srgb, var(--accent) 22%, var(--chrome-bg));
+  color: color-mix(in srgb, var(--accent) 45%, var(--white));
+}
+
+.store-admin__pill--editor {
+  background: color-mix(in srgb, var(--accent) 12%, var(--chrome-bg));
+  color: color-mix(in srgb, var(--accent) 60%, var(--white));
+}
+
+.store-admin__grants {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.store-admin__grants li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.store-admin__aside {
+  flex: 1 1 360px;
+  max-width: 460px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-md);
+}
+
+.store-admin__aside-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.store-admin__aside-head h2 {
+  margin: 0;
+  font-size: var(--text-lg-plus);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.store-admin__aside-close {
+  display: inline-flex;
+  padding: 6px;
+  background: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--chrome-text-dim);
+  cursor: pointer;
+}
+
+.store-admin__aside-close:hover {
+  background: var(--chrome-bg-hover);
+  color: var(--chrome-text);
+}
+
+.store-admin__danger {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--chrome-border);
+}
+
+.store-admin__deleted {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 20px;
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-md);
+}
+
+.store-admin__deleted h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+
+/* The badge and button in the workspace panel that lead here. */
+.workspace-panel__admin {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}

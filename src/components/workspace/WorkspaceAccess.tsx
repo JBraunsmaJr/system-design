@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Trash2, UserPlus, Users } from 'lucide-react';
 import { Button } from '../../common/components/button/Button';
+import { MenuPicker } from '../requirements/MenuPicker';
 import { warningFor, type AccessChange } from '../../collab/trusted/accessChanges';
 import type {
   TrustedGroupMapping,
@@ -32,6 +33,8 @@ interface WorkspaceAccessProps {
   /** Called after a change that may have altered the signed-in person's own
    * role, so the panel can reload what they see. */
   onOwnAccessChanged: () => void;
+  /** Called after any change to who is in the workspace. */
+  onChanged?: () => void;
 }
 
 const ROLES: readonly WorkspaceRole[] = ['viewer', 'editor', 'owner'];
@@ -48,6 +51,13 @@ const ROLE_MEANS: Record<WorkspaceRole, string> = {
 
 const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
+const ROLE_OPTIONS = ROLES.map((role) => ({
+  id: role,
+  label: ROLE_LABEL[role],
+  description: ROLE_MEANS[role],
+}));
+
+/** A role, chosen from the same menu every other picker in the app uses. */
 function RoleSelect(props: {
   value: WorkspaceRole;
   label: string;
@@ -55,19 +65,17 @@ function RoleSelect(props: {
   onChange: (role: WorkspaceRole) => void;
 }) {
   return (
-    <select
-      className="trusted-workspace__select workspace-access__role"
-      aria-label={props.label}
-      value={props.value}
-      disabled={props.disabled}
-      onChange={(e) => props.onChange(e.target.value as WorkspaceRole)}
-    >
-      {ROLES.map((role) => (
-        <option key={role} value={role}>
-          {ROLE_LABEL[role]}
-        </option>
-      ))}
-    </select>
+    <span className="workspace-access__role">
+      <MenuPicker
+        label={props.label}
+        value={props.value}
+        options={ROLE_OPTIONS}
+        placeholder="Role"
+        width={140}
+        disabled={props.disabled}
+        onChange={(role) => props.onChange(role as WorkspaceRole)}
+      />
+    </span>
   );
 }
 
@@ -76,6 +84,7 @@ export function WorkspaceAccess({
   workspace,
   me,
   onOwnAccessChanged,
+  onChanged,
 }: WorkspaceAccessProps) {
   const { workspaceId } = workspace;
   const canManage = workspace.role === 'owner' && workspace.archivedAt === null;
@@ -158,6 +167,7 @@ export function WorkspaceAccess({
       }
       if (affectsMe(change)) onOwnAccessChanged();
       await load();
+      onChanged?.();
     } catch (cause) {
       setError(messageOf(cause));
       // Whatever the store now holds is the truth; show that.
