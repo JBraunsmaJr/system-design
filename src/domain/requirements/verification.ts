@@ -133,7 +133,7 @@ const CRITERIA_HEADING =
 
 /**
  * Counts the acceptance criteria in a description: its task-list lines,
- * and how many are ticked. Lines inside a fenced code block are text, not
+ * and how many are checked. Lines inside a fenced code block are text, not
  * criteria.
  */
 export function parseAcceptanceCriteria(body: string): AcceptanceCriteria {
@@ -162,7 +162,7 @@ export interface AcceptanceCriterion {
  * A description split into what it states and what must hold: the prose
  * with the task-list lines taken out, and those lines as criteria. The
  * Requirements view shows the two apart - the statement as text, the
- * criteria as boxes to tick - while the description stays one piece of
+ * criteria as boxes to check - while the description stays one piece of
  * Markdown underneath.
  */
 export function splitAcceptanceCriteria(body: string): {
@@ -197,7 +197,7 @@ export function splitAcceptanceCriteria(body: string): {
   };
 }
 
-/** `body` with its `index`-th criterion ticked or unticked. Only the box
+/** `body` with its `index`-th criterion checked or unchecked. Only the box
  * changes - the rest of the line and of the description is untouched, so
  * the edit merges cleanly with someone else's change to the prose. */
 export function toggleAcceptanceCriterion(body: string, index: number): string {
@@ -219,7 +219,7 @@ export function toggleAcceptanceCriterion(body: string, index: number): string {
 }
 
 /**
- * `body` with one more unticked criterion: after the last one there is, or
+ * `body` with one more unchecked criterion: after the last one there is, or
  * at the end of the description when there are none yet. A blank `text`
  * adds nothing.
  */

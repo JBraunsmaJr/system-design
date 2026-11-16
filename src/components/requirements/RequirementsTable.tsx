@@ -88,7 +88,7 @@ interface RowProps {
   isHighlighted: boolean;
   isBulkSelected: boolean;
   searchQuery?: string;
-  /** Who else is editing this item, as text, and the colour of their dot.
+  /** Who else is editing this item, as text, and the color of their dot.
    * Two plain strings rather than one object so the row stays memoized. */
   editorNames?: string;
   editorColor?: string;
@@ -319,7 +319,7 @@ export function RequirementsTable({
         <span role="columnheader">On the diagram</span>
         <span
           role="columnheader"
-          title="Whether a requirement is verified, and how many of its acceptance criteria are ticked"
+          title="Whether a requirement is verified, and how many of its acceptance criteria are checked"
         >
           Verification
         </span>
@@ -437,7 +437,7 @@ function verificationCell(item: RequirementItem): NonNullable<RowProps['verifica
     title: `${describeVerification(item)}. ${
       criteria.total === 0
         ? 'No acceptance criteria.'
-        : `${criteria.met} of ${criteria.total} acceptance criteria ticked.`
+        : `${criteria.met} of ${criteria.total} acceptance criteria checked.`
     }`,
   };
 }

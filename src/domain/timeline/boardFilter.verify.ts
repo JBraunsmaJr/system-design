@@ -54,25 +54,25 @@ const ids = (set: Set<string> | null) => (set === null ? 'all' : [...set].join('
 {
   let f: BoardFilter = selectProgramIncrement('pi-a');
   f = toggleSprint(f, A, 'a2');
-  assert(ids(visibleSprintIds(A, f)) === 'a2', 'from all, ticking one sprint focuses on it alone');
+  assert(ids(visibleSprintIds(A, f)) === 'a2', 'from all, checking one sprint focuses on it alone');
   f = toggleSprint(f, A, 'a1');
   assert(
     ids(visibleSprintIds(A, f)) === 'a1,a2',
-    'ticking another adds it, kept in the PI order not click order',
+    'checking another adds it, kept in the PI order not click order',
   );
   f = toggleSprint(f, A, 'a2');
-  assert(ids(visibleSprintIds(A, f)) === 'a1', 'unticking removes it');
+  assert(ids(visibleSprintIds(A, f)) === 'a1', 'unchecking removes it');
   f = toggleSprint(f, A, 'a1');
   assert(
     f.sprintIds.length === 0 && visibleSprintIds(A, f) === null,
-    'unticking the last one returns to all sprints',
+    'unchecking the last one returns to all sprints',
   );
 
   let g: BoardFilter = selectProgramIncrement('pi-a');
   for (const s of ['a1', 'a2', 'a3']) g = toggleSprint(g, A, s);
   assert(
     g.sprintIds.length === 0 && visibleSprintIds(A, g) === null,
-    'ticking every sprint is stored as all sprints',
+    'checking every sprint is stored as all sprints',
   );
   assert(toggleSprint(f, A, 'b1') === f, "a sprint from another PI doesn't change the filter");
 }

@@ -108,7 +108,7 @@ In the table and the split view an open item is edited where it stands; there is
 - **Title**: type in it.
 - **Type, category, tags**: the pickers at the top. The bin beside them deletes the item.
 - **Description**: click the pencil beside **Statement**, or double-click the text. Click away when you are done.
-- **Acceptance criteria**: click one to tick it, hover it and click the cross to remove it, or type a new one in the
+- **Acceptance criteria**: click one to check it, hover it and click the cross to remove it, or type a new one in the
   box beneath and press Enter.
 - **Relationships**: **Add relationship** adds one; the cross on a relationship removes it.
 - **On the diagram**: click a component to go to it. **New component** adds one to the diagram, linked to the item.
@@ -147,8 +147,8 @@ Requirements and constraints, and items of any descriptive type you add yourself
 assumptions, decisions, epics and work items are not.
 
 - **Acceptance criteria** are task-list lines in the description. Write `- [ ] Checkout completes without an account`
-  for each thing that must hold, or add them from the open item's **Acceptance criteria** list. Tick one by clicking
-  it there, or by changing `[ ]` to `[x]` in the description. The item's header shows how many are ticked, or **No criteria** when there are none.
+  for each thing that must hold, or add them from the open item's **Acceptance criteria** list. Check one by clicking
+  it there, or by changing `[ ]` to `[x]` in the description. The item's header shows how many are checked, or **No criteria** when there are none.
 - **Verification** is the control beside the type in the item's header. Choose where it stands (**Not verified**,
   **Verified** or **Failing**) and how it is checked (**Test**, **Demonstration**, **Inspection** or **Analysis**).
 
@@ -190,7 +190,7 @@ a second one to select everything in between, or use **Select all**. Then, in th
 - **Add tag** and **Remove tag…** change tags on every selected item.
 
 Each change applies to all of them at once and is a single undo step. Only selected items that are currently shown are
-changed, so what's ticked on screen is exactly what changes. Click **×** or **Select** again to finish.
+changed, so what's checked on screen is exactly what changes. Click **×** or **Select** again to finish.
 
 ---
 

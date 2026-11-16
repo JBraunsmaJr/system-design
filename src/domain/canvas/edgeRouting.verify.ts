@@ -375,7 +375,7 @@ function passesThrough(points: Point[], p: Point): boolean {
     Position.Left,
   );
   assert(curved.startsWith('M 0,0 C '), 'curved routing is cubic Beziers');
-  assert(curved.includes(' 100,150 C '), 'the curve passes through the bend, not just towards it');
+  assert(curved.includes(' 100,150 C '), 'the curve passes through the bend, not just toward it');
   assert(curved.endsWith(' 300,200'), 'the curve ends on the target');
 
   const segments = buildCurvedSegments(source, Position.Right, bends, target, Position.Left);

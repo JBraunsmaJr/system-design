@@ -204,7 +204,7 @@ const liveHandles = new Map<string, OpenDocument & { ready: Promise<void> }>();
  * kept document's edits on the next load - Yjs resolves such concurrent writes
  * by client id, not by time - so a typed title was lost about half the time.
  *
- * The handle is released by its own close(); opening the same id afterwards
+ * The handle is released by its own close(); opening the same id afterward
  * opens it afresh.
  */
 export function acquireDocument(

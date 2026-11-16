@@ -210,7 +210,7 @@ console.log('\n=== Coverage ===');
   assert(/Acceptance criteria.*?>1<.*?\/2</s.test(html), 'one of two requirements has criteria');
   assert(/Verified.*?>1<.*?\/2</s.test(html), 'and one of two is verified');
 
-  /** The count on the gap chip labelled `label`, or null if it isn't shown. */
+  /** The count on the gap chip labeled `label`, or null if it isn't shown. */
   const chip = (label: string) =>
     new RegExp(`requirements-view__gap"[^>]*>${label}<span[^>]*>(\\d+)<`).exec(html)?.[1] ?? null;
   assert(chip('Not on diagram') === '1', 'a chip offers the one requirement not on the diagram');
@@ -297,7 +297,7 @@ const open = (id: string, variant: 'row' | 'page', linked = false) =>
       onNavigateToItem={() => undefined}
     />,
   );
-/** What the menu labelled `label` shows as chosen. */
+/** What the menu labeled `label` shows as chosen. */
 const chosen = (html: string, label: string) =>
   new RegExp(`aria-label="${label}: ([^"]*)"`).exec(html)?.[1];
 
@@ -323,7 +323,7 @@ for (const variant of ['row', 'page'] as const) {
     `${variant}: which can be edited`,
   );
   assert(html.includes('1 of 2 met'), `${variant}: counts the criteria`);
-  assert(count(html, 'role="checkbox"') === 2, `${variant}: each is a box to tick`);
+  assert(count(html, 'role="checkbox"') === 2, `${variant}: each is a box to check`);
   assert(count(html, 'aria-label="Remove the criterion') === 2, `${variant}: and can be removed`);
   assert(
     html.includes('aria-label="Add an acceptance criterion to REQ-1"'),

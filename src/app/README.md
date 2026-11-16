@@ -6,9 +6,9 @@ constrained by performance first, readability second.
 
 | Module                         | What it owns                                                         |
 | ------------------------------ | -------------------------------------------------------------------- |
-| `documentSnapshot.ts`          | File ⇄ document normalisation (pure)                                 |
+| `documentSnapshot.ts`          | File ⇄ document normalization (pure)                                 |
 | `canvasProjection.ts`          | Nodes/edges the canvas renders, and the caches that keep them stable |
-| `hooks/useOpenDocument`        | Which document is open, the Y.Doc, the document catalogue            |
+| `hooks/useOpenDocument`        | Which document is open, the Y.Doc, the document catalog              |
 | `hooks/useStoreSignIn`         | Workspace store identity and sign-in                                 |
 | `hooks/useCollabSession`       | Sessions, presence, relay and ICE configuration                      |
 | `hooks/useDocumentStores`      | Undoable stores and their snapshots                                  |

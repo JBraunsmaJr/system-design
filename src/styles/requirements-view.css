@@ -2716,7 +2716,7 @@ mark.search-highlight--ellipsis {
   margin-bottom: 0;
 }
 
-/* How many of an item's acceptance criteria are ticked - card header. */
+/* How many of an item's acceptance criteria are checked - card header. */
 .requirement-card__criteria {
   display: inline-flex;
   align-items: center;

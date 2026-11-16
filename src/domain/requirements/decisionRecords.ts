@@ -137,7 +137,7 @@ export function getSupersedingDecisionIds(doc: RequirementsDocument, itemId: str
  *
  * For anything but a decision this is just the body, exactly as stored
  * (callers trim where they always have). A decision's
- * sections become bold-labelled paragraphs rather than headings, because
+ * sections become bold-labeled paragraphs rather than headings, because
  * every export already puts the item under a heading of its own, and
  * headings here would break that outline (and the PDF's table of
  * contents) apart. Empty sections are left out.

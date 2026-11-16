@@ -28,7 +28,7 @@ import { MIXED, type Mixed } from './mixedValue';
 /**
  * A titled, foldable group of Inspector fields. The Inspector used to be
  * one flat column in which the things edited most (what the node is linked
- * to, its properties) sat below the things edited once (icon, colour), so
+ * to, its properties) sat below the things edited once (icon, color), so
  * each group now has a heading that says how much is in it and can be
  * folded away. Which sections are folded is the person's own preference -
  * the caller keeps it (see canvasPrefs.ts) and passes it down.

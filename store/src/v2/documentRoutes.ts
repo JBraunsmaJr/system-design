@@ -86,7 +86,7 @@ export async function workspaceDocuments(context: V2Context, workspaceId: string
           includeDeleted: true,
         })) as DocumentRecord;
       } catch {
-        // Purged by the retention sweep since it was catalogued.
+        // Purged by the retention sweep since it was cataloged.
         await deps.catalog.remove(entry.docId);
         continue;
       }
@@ -333,7 +333,7 @@ export async function documentRoutes(context: V2Context): Promise<void> {
     if (!deps.documents.purge) fail(404, 'unsupported', 'This store does not support purging.');
     await deps.documents.purge(docId);
     // PostgreSQL removes the catalog row with the document; in memory it is
-    // removed here. Either way it is gone afterwards.
+    // removed here. Either way it is gone afterward.
     await deps.catalog.remove(docId);
     await audit('document.purge');
     return context.send(200, { purged: true });

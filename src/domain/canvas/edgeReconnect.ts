@@ -68,7 +68,7 @@ export function isSameEndpoints(a: EdgeEndpoints, b: EdgeEndpoints): boolean {
  * exactly what it already was.
  *
  * Pinning it is the whole trick. Rather than trusting which end of the
- * incoming Connection is labelled "source", this finds whichever end of
+ * incoming Connection is labeled "source", this finds whichever end of
  * it corresponds to the anchored (undragged) end and treats the OTHER
  * one as the new position of the dragged end. An inverted Connection
  * therefore resolves correctly instead of silently reversing the edge's

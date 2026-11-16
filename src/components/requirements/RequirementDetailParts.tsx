@@ -10,13 +10,13 @@ import {
 
 /*
  * The pieces an item is read through, shared by the table's open row and
- * the split view's page: criteria that tick and can be removed, a box to
+ * the split view's page: criteria that can be checked and removed, a box to
  * add one, and the verification note.
  */
 
 type UpdateItem = (id: string, patch: Partial<RequirementItem>) => void;
 
-/** An item's acceptance criteria as boxes. Ticking one rewrites only that
+/** An item's acceptance criteria as boxes. Checking one rewrites only that
  * box in the description. */
 export function CriteriaList({
   item,

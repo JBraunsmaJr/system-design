@@ -48,7 +48,7 @@ const round = (v: number) => Math.round(v);
  * Moves every movable box so the chosen edge or center lines up with the
  * same edge or center of the selection's bounding box - which is where
  * Figma, Keynote and draw.io all align to. `fixed` boxes (locked nodes)
- * still count towards that bounding box, so a locked node works as the
+ * still count toward that bounding box, so a locked node works as the
  * anchor everything else lines up with.
  */
 export function alignBoxes(
@@ -91,7 +91,7 @@ export function alignBoxes(
 }
 
 /**
- * Equal gaps between neighbours along one axis. The two outermost boxes
+ * Equal gaps between neighbors along one axis. The two outermost boxes
  * stay where they are and everything between is spaced evenly between
  * them, in the order the boxes already sit in - the standard "distribute
  * spacing". Needs at least three boxes to do anything.

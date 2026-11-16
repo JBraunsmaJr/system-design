@@ -111,7 +111,7 @@ export function distanceToSide(rect: Rect, side: Side, p: Point): number {
 }
 
 /** The side of `rect` nearest to `p`, from inside or outside the box.
- * Ties (exact corners, the exact centre of a square) resolve in SIDES
+ * Ties (exact corners, the exact center of a square) resolve in SIDES
  * order so the result is deterministic. */
 export function closestSide(rect: Rect, p: Point): Side {
   let best: Side = 'top';

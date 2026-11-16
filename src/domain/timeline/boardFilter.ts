@@ -17,7 +17,7 @@ export interface BoardFilter {
   /**
    * The sprints showing within `piId`. Empty means all of them, so "all"
    * has exactly one representation and a sprint added later is visible
-   * without anyone having to tick it.
+   * without anyone having to check it.
    */
   sprintIds: readonly string[];
 }
@@ -67,11 +67,11 @@ export function selectProgramIncrement(piId: string | null): BoardFilter {
 }
 
 /**
- * Tick or untick one sprint of the filtered program increment.
+ * Check or uncheck one sprint of the filtered program increment.
  *
- * From "all sprints", ticking one focuses on it alone - that is what someone
- * clicking a single sprint means, and ticking more then adds them. Unticking
- * the last one, or ticking every one, returns to "all sprints".
+ * From "all sprints", checking one focuses on it alone - that is what someone
+ * clicking a single sprint means, and checking more then adds them. Unchecking
+ * the last one, or checking every one, returns to "all sprints".
  */
 export function toggleSprint(
   filter: BoardFilter,

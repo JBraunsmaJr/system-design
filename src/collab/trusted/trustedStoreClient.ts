@@ -2,7 +2,7 @@
  * The editor's client for the store's workspace API (/v2).
  *
  * In this API the server decides access, so there is nothing here to seal,
- * wrap or enrol: a request carries the session cookie, and the store allows
+ * wrap or enroll: a request carries the session cookie, and the store allows
  * it or not from the signed-in person's role. See docs/trusted-store.md.
  *
  * Errors are StoreClientError, with a reason the editor can act on:

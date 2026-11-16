@@ -194,7 +194,7 @@ export function createPostgresStore(options: PostgresStoreOptions) {
       throw new StoreError(`Document ${docId} is deleted.`, 'deleted');
     if (opts.seenVersion !== undefined && Number(row.version) < opts.seenVersion) {
       throw new StoreError(
-        `The store returned version ${row.version} for ${docId}, but version ${opts.seenVersion} has already been seen. Refusing to go backwards.`,
+        `The store returned version ${row.version} for ${docId}, but version ${opts.seenVersion} has already been seen. Refusing to go backward.`,
         'stale-version',
       );
     }

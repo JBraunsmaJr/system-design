@@ -463,7 +463,7 @@ async function run() {
       (await placed('s2')).position.x === 0 && (await placed('s3')).position.x === 0,
       'the context menu aligns too',
     );
-    check((await p.locator('.canvas-context-menu').count()) === 0, 'and closes afterwards');
+    check((await p.locator('.canvas-context-menu').count()) === 0, 'and closes afterward');
   } finally {
     await browser?.close();
     servers?.stop();

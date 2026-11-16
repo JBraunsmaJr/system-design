@@ -261,7 +261,7 @@ export function useDiagramHoverDocumentation({
    * so a tap opens it. A mouse click is something else: it selects the
    * element, which puts the same description, properties and tags in the
    * Inspector. Opening the popup as well showed everything twice and
-   * covered the neighbouring nodes, so a mouse click closes it instead. It
+   * covered the neighboring nodes, so a mouse click closes it instead. It
    * comes back the next time the pointer enters the element.
    */
   const handleClick = useCallback(

@@ -295,7 +295,7 @@ console.log('Topping up a persisted collaborative document');
   assert(
     snap.itemTypes.some((t) => t.id === DECISION_ITEM_TYPE_ID) &&
       snap.relationshipTypes.some((t) => t.id === SUPERSEDES_RELATIONSHIP_TYPE_ID),
-    'and offers Decision, Addresses and Supersedes afterwards',
+    'and offers Decision, Addresses and Supersedes afterward',
   );
   assert(topUpBuiltInTypes(doc) === false, 'a second top-up is a no-op');
 

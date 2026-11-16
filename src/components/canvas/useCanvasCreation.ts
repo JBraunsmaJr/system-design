@@ -70,7 +70,7 @@ export function useCanvasCreation({
   }, []);
 
   /** Creates what a palette entry stands for at `position`. Returns false
-   * for a type or id nothing here recognises. */
+   * for a type or id nothing here recognizes. */
   const createFromPalette = useCallback(
     (mimeType: string, id: string, position: { x: number; y: number }): boolean => {
       if (!id) return false;

@@ -3,7 +3,7 @@
  *
  * Shown in place of WorkspacePanel when the store serves the workspace API
  * (docs/trusted-store.md). There are no keys here, so none of that panel's
- * states exist - no device to enrol, no code to compare, no one to wait
+ * states exist - no device to enroll, no code to compare, no one to wait
  * for. Someone signed in sees the workspaces their roles and groups give
  * them, at once, and can:
  *
@@ -149,12 +149,12 @@ export function TrustedWorkspacePanel(props: TrustedWorkspacePanelProps) {
   }, [client, currentDocId]);
 
   useEffect(() => {
-    let cancelled = false;
+    let canceled = false;
     void Promise.resolve().then(() => {
-      if (!cancelled) return load();
+      if (!canceled) return load();
     });
     return () => {
-      cancelled = true;
+      canceled = true;
     };
   }, [load]);
 
@@ -172,12 +172,12 @@ export function TrustedWorkspacePanel(props: TrustedWorkspacePanelProps) {
 
   useEffect(() => {
     if (!selectedId) return;
-    let cancelled = false;
+    let canceled = false;
     void Promise.resolve().then(() => {
-      if (!cancelled) return loadDocuments(selectedId);
+      if (!canceled) return loadDocuments(selectedId);
     });
     return () => {
-      cancelled = true;
+      canceled = true;
     };
   }, [selectedId, loadDocuments]);
 

@@ -122,20 +122,20 @@ export function useFileSaving(docId: string, deps: FileSavingDeps = {}): FileSav
   // queried here - asking needs a click.
   useEffect(() => {
     if (!supported) return;
-    let cancelled = false;
+    let canceled = false;
     void handles
       .get(docId)
       .then(async (stored) => {
-        if (cancelled || !stored) return;
+        if (canceled || !stored) return;
         setHandle(stored);
         const state = await autosave.attach(stored);
-        if (!cancelled) adopt(state);
+        if (!canceled) adopt(state);
       })
       .catch(() => {
         // An unreadable handle store is the same as no file.
       });
     return () => {
-      cancelled = true;
+      canceled = true;
     };
   }, [docId, supported, handles, autosave, adopt]);
 
@@ -146,7 +146,7 @@ export function useFileSaving(docId: string, deps: FileSavingDeps = {}): FileSav
       try {
         picked = await pickFile(suggestedName);
       } catch {
-        // Cancelled, or refused: nothing changes.
+        // Canceled, or refused: nothing changes.
         return;
       }
       setHandle(picked);

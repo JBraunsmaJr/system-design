@@ -375,7 +375,7 @@ async function run() {
       const hadAdd = (await add.count()) === 1;
       if (hadAdd) {
         const before = await p.locator('.requirements-table__detail [role="checkbox"]').count();
-        await add.fill('It can be ticked');
+        await add.fill('It can be checked');
         await add.press('Enter');
         await p.waitForFunction(
           (n) =>
@@ -388,7 +388,7 @@ async function run() {
         await p.waitForSelector(
           '.requirements-table__detail [role="checkbox"][aria-checked="true"]',
         );
-        check(true, 'a criterion is added and ticked in place');
+        check(true, 'a criterion is added and checked in place');
       } else {
         check(true, 'the first item is not one that has criteria');
       }

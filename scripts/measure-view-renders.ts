@@ -181,7 +181,7 @@ function buildDocument() {
 // The in-page hook
 // ---------------------------------------------------------------------------
 /* Runs in the page before any application script. Kept free of closures over
- * Node-side values: Playwright serialises it. */
+ * Node-side values: Playwright serializes it. */
 function installRenderHook() {
   // Fiber tags whose `type` is the user's component function or class.
   const COMPONENT_TAGS = new Set([0, 1, 11, 15]); // Function, Class, ForwardRef, SimpleMemo
@@ -515,7 +515,7 @@ async function runOnce(appUrl: string, docJson: string): Promise<Results> {
     const context = await browser.newContext({ viewport: { width: 1600, height: 1000 } });
     // tsx compiles this script with esbuild's keepNames, which wraps
     // functions in a `__name(...)` helper that does not exist in the page
-    // once Playwright serialises installRenderHook. Identity shim first.
+    // once Playwright serializes installRenderHook. Identity shim first.
     await context.addInitScript({ content: 'window.__name = (f) => f;' });
     await context.addInitScript(installRenderHook);
     const page = await context.newPage();

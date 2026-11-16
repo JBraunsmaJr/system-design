@@ -272,7 +272,7 @@ export function RequirementsView({
   const [isFilterBarOpen, setIsFilterBarOpen] = useState(false);
   // Selecting items for a bulk edit. Only the selected items that are
   // currently shown count (see bulkSelectedItems), so what a bulk change
-  // touches is always exactly what's ticked on screen.
+  // touches is always exactly what's checked on screen.
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [bulkSelectedIds, setBulkSelectedIds] = useState<ReadonlySet<string>>(
     () => new Set<string>(),
@@ -918,7 +918,7 @@ export function RequirementsView({
   );
 
   /** For each item someone else has their cursor in: their names, and the
-   * first one's colour for the dot on its table line. Rebuilt only when
+   * first one's color for the dot on its table line. Rebuilt only when
    * the people or what they are in changes, so table lines stay memoized. */
   const editorsKey = peers
     .filter((p) => p.focusedItemId)

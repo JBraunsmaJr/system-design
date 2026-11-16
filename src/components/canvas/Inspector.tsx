@@ -62,7 +62,7 @@ interface InspectorProps {
   /** The documents a node can link to - this browser's and the
    * workspace's - for the "Linked document" picker. Read when a node is
    * selected (and when the tab regains focus) rather than held as App
-   * state, so the catalogue costs nothing until someone actually looks at
+   * state, so the catalog costs nothing until someone actually looks at
    * a node. Without it the field isn't shown. */
   listDocuments?: () => Promise<LinkableDocumentList>;
   /** Every selected node and edge. When more than one thing is selected
@@ -863,7 +863,7 @@ function LinkedDocumentField({
   // focus - the usual way a document gets created or renamed is in another
   // tab, and the picker shouldn't need the node reselected to see it.
   useEffect(() => {
-    let cancelled = false;
+    let canceled = false;
     // Responses can arrive out of order (a slow workspace read, then a
     // quick one after a focus); only the latest request may land.
     let latest = 0;
@@ -871,10 +871,10 @@ function LinkedDocumentField({
       const request = ++latest;
       listDocuments().then(
         (next) => {
-          if (!cancelled && request === latest) setList(next);
+          if (!canceled && request === latest) setList(next);
         },
         () => {
-          if (!cancelled && request === latest)
+          if (!canceled && request === latest)
             setList({ documents: [], workspaceUnavailable: false });
         },
       );
@@ -886,7 +886,7 @@ function LinkedDocumentField({
     window.addEventListener('focus', load);
     document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
-      cancelled = true;
+      canceled = true;
       window.removeEventListener('focus', load);
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };

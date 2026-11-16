@@ -11,322 +11,98 @@ parts) and fails if there is none. Lines without a marker are still published. T
 markers are removed when the section becomes a release. See
 [docs/releasing.md](docs/releasing.md).
 
+This file becomes the GitHub release notes, so write it for people who use or
+deploy the notebook: what changed for them, in a line or two, grouped under a
+few headings per release. Tests, refactoring, tooling and fixes to things that
+were never released do not belong here; the commit history has those. One
+entry describes a feature as it ships, not each step that led to it. Use
+American English.
+
 ## [Unreleased]
 
-### Development
+### [MAJOR] Workspaces replace the encrypted workspace
 
-- CI now checks formatting, lint and types on every push. The 17 existing lint errors are fixed.
-- `TeamView` is split: the member card and the sprint capacity table are their own components.
-- Groundwork for the trusted store (see `docs/trusted-store.md`): workspace roles and permission rules, and storage
-  for workspaces, members and group mappings. Nothing uses them yet; the store's API is unchanged.
-- `npm test` now runs the store's own suites in `store/src`, which it had been skipping.
-
-### [MINOR] Store: workspace API
-
-- The store serves a second API under `/v2`, beside the existing one, in which the server decides access: workspaces,
-  members with viewer, editor and owner roles, identity-provider groups mapped to roles, and documents inside a
-  workspace. The editor does not use it yet. See `docs/trusted-store.md`.
-- `ADMIN_GROUPS` makes the members of an identity-provider group store administrators in that API.
-  `WORKSPACE_CREATION` sets who may create workspaces there.
-
-### Tests: a fast check of where edges attach
-
-- `scripts/verify-node-anchors.ts` reads the stylesheets and fails, naming the file, line and rule, if anything
-  positions or transforms a node's own box. Such a rule moves every edge end on the node by about a pixel, which until
-  now only showed up as two browsers disagreeing about an edge in the slow collaboration suite.
-- When that suite's edge comparison fails it now also prints each browser's zoom, level of detail and how its nodes
-  are positioned.
-
-### Tests: steadier on a first run and on Windows
-
-- `npm test` builds the dev server's dependency cache once before starting the browser suites. On a first run, or
-  after an install, several suites used to build it at the same moment and reload each other's pages mid-check, so
-  suites failed and then passed when run again.
-- The check of the container's start-up script finds Git for Windows' bash when it is not on the PATH, and says it was
-  skipped, instead of failing, on a machine with no bash at all.
-- Two waits that assumed a fixed time was enough (joining a session by link, a bend reaching the other browser) now
-  wait for the result.
-
-### Deployment: installs and the workspace proxy example fixed
-
-- `npm ci` failed, which broke every image build and every CI job: `typescript-eslint` had been lowered to `^8.36.0`,
-  a version that does not accept ESLint 10, and the lockfile pinned that pair. It and `vite-plugin-pwa` are back at
-  the ranges of the last release (`^8.70.0`, `^1.3.0`) with that release's lockfile.
-- The workspace example's `nginx.conf` did not match its `compose.yml`:
-  - the editor was proxied at `/editor/` while everything else (`APP_URL`, the address people land on after signing
-    in, the guide) says `/`, so the root address answered 404;
-  - the relay block had lost `proxy_http_version 1.1`, which WebSocket upgrades need;
-  - Keycloak was proxied to port 8001, but it listens on 8080;
-  - Keycloak's address was fixed in the file, so the proxy refused to start when Keycloak was not deployed, although
-    the comment said otherwise. It is now looked up per request.
-- The deployment check compares each example's proxy config with its compose file, so these cannot drift again.
-
-### Requirements: one menu style, and a dot on lines being edited
-
-- The bulk edit bar's Status, Sprint, Category, Assignee and Remove tag menus, and the toolbar's **Group by**, use the
-  same menu as the item pickers instead of the browser's own. The sprint menu groups sprints under their program
-  increment.
-- In a live session a table line shows a dot, in that person's colour, when someone else's cursor is in its item, so
-  you can tell before opening it. The tooltip names them.
-
-### Requirements: who else is editing an open item
-
-- In a live session, an item open in the table or the split view shows a badge for each other person whose cursor is
-  in it, with their names in the tooltip, and a bar down its left edge.
-- You count as editing an item while your cursor is anywhere in it (its title, its description, a criterion, a note),
-  not only while its description editor is open.
-
-### [MINOR] Requirements: an open item is edited in place
-
-- In the table and the split view an open item no longer switches between a reading layout and the old card with
-  **Edit** and **Done**. There is one layout, and every part of it is changed where it stands: the title is a text
-  box; type, category and tags use their pickers; the description opens in the editor from its pencil or a
-  double-click; criteria are ticked, added and removed in their list; relationships are added and removed in theirs;
-  a linked component can be created from **On the diagram**.
-- Status, priority, owner and target use the same menu as the other pickers instead of the browser's own.
-- In the split view an item's children are a list of rows that open, not cards, and a decision's sections are edited
-  on its page.
-- The card remains only in the **Cards** layout.
-
-### [MINOR] Requirements: priority, status, owner and target
-
-- Requirements and constraints (and items of your own descriptive types) have four values set from menus in the
-  table's open row and the split view's page: **Status** (Draft, In review, Approved, Implemented), **Priority** (Must,
-  Should, Could), **Owner** and **Target**.
-- Status is the requirement's own and is separate from a work item's To Do / In Progress / Done.
-- Owner is the stakeholder accountable for the requirement, not who works on it: a team member, or a typed name for
-  someone outside the team.
-- Target is one of the document's milestones.
-- Verification has a one-line note for what verifies it or where that stands.
-- The table has Priority and Status columns, and the Markdown export writes all of these beneath each item.
-- Existing documents need no change: an item with nothing set reads as a Draft with no priority, owner or target.
-
-### Requirements: a simpler toolbar
-
-- The toolbar reads left to right as find, then arrange, then add: search, Filter and Select on the left; **Group by**
-  (now one menu), the Table / Cards / Split buttons, the two manage buttons and **New Requirement** on the right.
-- Collapse all and Expand all appear only in the Cards layout, where there are cards to fold.
-
-### [MINOR] Requirements: the split view opens an item as a page
-
-- The split view's right-hand pane shows the selected item as a page: its id, kind and title with **Show on diagram**,
-  its statement, and a panel each for acceptance criteria, verification, the components it is on and its
-  relationships.
-- Criteria can be ticked and added in their panel, and verification set in its panel, without opening the editor.
-  **Edit** swaps in the full card for everything else. Decisions still open as their card.
-
-### [MINOR] Requirements: a table row opens for reading
-
-- Opening a line in the table shows the item laid out to read rather than as a form: its statement, its acceptance
-  criteria as boxes you can tick in place, its relationships, the components linked to it and how it is verified.
-  **Edit** swaps in the full card; a new item opens straight into it.
-- The table's columns are now ID, title, type, status, components and verification. Verification reads at a glance
-  ("Test passing", "Inspection", "Test failing", "No method"). Sprint and assignee moved into the open row.
-- Each group's heading shows how much of the group is verified.
-- The gap filters are buttons with counts at the right of the coverage line (Not on diagram, Not verified, No
-  acceptance criteria, No description); the coverage figures themselves now only report.
-
-### [MINOR] Requirements: verification and acceptance criteria
-
-- Requirements and constraints (and items of your own descriptive types) have a verification control in their header:
-  a status (Not verified, Verified, Failing) and how it is checked (Test, Demonstration, Inspection, Analysis).
-- Acceptance criteria are the task-list lines in an item's description (`- [ ] ...`, `- [x] ...`). The header shows
-  how many are ticked, or flags that there are none.
-- The table has a **Verification** column, the split view's outline shows the verification status as its dot, and the
-  coverage line gains **Acceptance criteria** and **Verified**, each of which filters to the items still to go.
-- The Markdown export writes each requirement's verification beneath its title.
-- Existing documents need no change: an item with no verification reads as Not verified.
-
-### Requirements: the split view's outline shows what is on the diagram
-
-- Each requirement, goal or other descriptive item in the split view's outline is marked as linked to a component or
-  flagged as not linked, matching the table and the coverage line. Decisions show their status dot as work items do.
-  A legend at the foot of the outline explains the marks.
-
-### [MINOR] Diagram: names stay readable when zoomed out
-
-- Below 60% zoom the canvas switches to an overview: each component shows only its name, drawn larger the further out
-  you are, and boundary names grow with it. Subtitles, property chips and badges, which can't be read at that size,
-  are hidden until you zoom back in. Nodes keep their size, so edges don't move.
-- Exported images are always drawn at full detail, whatever the editor's zoom. Presenting is unaffected.
-
-### [MINOR] Palette: rail, search and recently used
-
-- The palette is a narrow rail of buttons (search, System, Cloud, Shapes, Code, Git, Fragments) with the open palette's
-  list beside it. Clicking the open palette's button folds the list away and leaves the rail; this replaces the
-  dropdown and the separate hide control.
-- A search box at the top of the list looks through every palette at once (system, cloud, shapes, code, git,
-  boundaries and saved fragments) and shows where each result is filed. Press `/` to jump to it and `Escape` to clear
-  it. `Enter` adds the first match to the middle of the canvas; any match can also be dragged.
-- The last six things you added to a canvas are listed under **Recently used**, remembered in this browser.
-- Palette rows are slightly tighter.
-
-### [MINOR] Inspector: header and sections
-
-- Selecting a component or boundary shows its icon, name and type at the top of the Inspector, with **Open sub-diagram**
-  directly beneath instead of two thirds of the way down.
-- The rest is grouped into sections that fold: Requirements, Properties, Tags, Linked document, and Appearance and
-  order (icon, colour, arrange, lock). Each heading shows how many entries it holds. Appearance and order starts
-  folded; which sections you fold is remembered in this browser.
-
-### [MINOR] Diagram: quieter boundaries, minimap toggle, no popup on click
-
-- Boundaries (regions, VPCs, trust boundaries) no longer have a pale grey fill, which came from the canvas library's
-  defaults and grew paler where boundaries nest. A boundary's outline now sits on its real edge instead of 10px inside
-  it, so it is drawn where it adopts nodes.
-- The minimap is off until you turn it on with the new button in the canvas controls. The choice is remembered in this
-  browser.
-- Clicking a node or edge with a mouse no longer opens the description popup over the diagram: the click selects it and
-  the Inspector shows the same details. Hovering still opens the popup, and so does a tap on a touch screen.
-
-### [MINOR] Requirements: table and coverage
-
-- The Requirements view opens as a table: one line per item with its type, status, sprint, assignee, linked components
-  and relationship count. Click a line to open the item beneath it. The card list is still there as **Cards**, and
-  **Split** is unchanged. A layout you already chose for a document is kept.
-- A coverage line above the items counts how many descriptive items are linked to a component, how many items have a
-  description, and how much of the work is done. The first two filter to the items that are missing.
-
-### Store: API description
-
-- `store/openapi.json` describes every route the store serves, with the role each needs, its request and its
-  reply. A new test checks it against the store: it must list exactly the routes the store has, and every operation
-  is called and its reply compared with the description.
-- [PATCH] Appending an update and compacting a document now both reply with `{ document: { docId, version,
-updatedAt } }`. Compacting used to return the storage layer's whole record, including who placed a legal hold.
-
-### [MINOR] Toolbar: Share, one save status, readable buttons
-
-- **Collaborate** is now **Share**. For a document in a workspace, the panel says which workspace it is in and that
-  everyone who can edit it there joins its live session, and **Members of …** opens the workspace to add people.
-- [PATCH] The Share panel no longer offers a session link for a workspace document. That link carries the session's
-  key, so sending it to someone outside the workspace would have let them watch the document being edited wherever
-  the relay does not require tokens. A session you start yourself on a document of your own still has its link.
-- The toolbar shows one save status. The separate tick that said work was saved in the browser is removed; the save
-  indicator already says where your work is.
-- Filled buttons are darker (`--accent-fill`, #4a63e0), so their white text has a contrast of 5.1:1 instead of 3.7:1.
-  Links, outlines and marks keep the lighter accent, which is what reads on the dark background.
-
-### Store: storage no longer carries keys
-
-- Documents are created without wrapped keys, and the store no longer keeps sealed metadata or sign-in evidence. This
-  finishes the removal of the encrypted workspace.
-- A database that held the encrypted workspace upgrades in place: the schema lifts the requirement that every
-  document carry a wrapped key, and leaves the old columns, tables and documents untouched. A new test builds such a
-  database and upgrades it. `docs/trusted-store.md` lists the columns that can be dropped afterwards.
-
-### Documentation and example deployments
-
-- The guides describe workspaces as they now work. **Deployment with Workspaces** no longer has a recovery-key step
-  and ends with creating a workspace and giving a group a role. **Automatic Access from Groups** is replaced by
-  **Groups and Roles**. **Administering a Workspace** is now **Administering Workspaces** and is done from the editor,
-  with the API as an alternative. **Workspaces** and **How your work is protected** are rewritten for people using
-  the editor, and say plainly that the server and its administrators can read workspace documents.
-- The example deployments are updated to match: no recovery key or `keys` folder, `ADMIN_GROUPS` set so the first
-  person in can create a workspace, and `WORKSPACE_CREATION` and `OIDC_GROUPS_CLAIM` shown. The Keycloak realms
-  create a `notebook-admins` group, and in `docker/store` the `demo` account is in it.
-- [PATCH] Store: a group is now named in the request body (`PUT /v2/workspaces/:id/groups`) or the query (`DELETE
-…/groups?group=`) instead of the address. A name with a slash in it, which is every group Keycloak reports by full
-  path, was rewritten by a reverse proxy serving the store under a prefix and stored under the wrong name.
-
-### [MAJOR] The encrypted workspace is removed from the store
-
-- The store no longer serves the encrypted workspace: the `/v1` routes for documents, the workspace index, keys,
-  devices, recovery, join requests, access rules and administration answer 404. Workspaces and documents are served
-  under `/v2`. `/v1/health`, `/v1/auth/...` and `/v1/rooms/:room/token` are unchanged in address.
-- `/v1/health` no longer reports `cryptoMode` or `escrow`. `/v1/auth/providers` no longer reports `providerDetails`
-  or `autoAccess`, and `/v1/auth/session` no longer reports `hasEvidence` or `evidenceIat`.
-- `CRYPTO_MODE`, `RECOVERY_PUBLIC_KEY`, `RECOVERY_PUBLIC_KEY_FILE`, `AUTO_ACCESS` and `JOIN_EVIDENCE_RETENTION` are no
-  longer read. A store that still sets them starts normally and lists them at startup as safe to remove.
-- The retention sweep still runs on its timer. `POST /v1/admin/purge-due`, which ran it on demand, is removed;
-  administrators remove a single deleted document from the workspace panel.
-- **An existing database is not changed.** The tables and documents of the encrypted workspace are left as they are
-  and are no longer created in a new database. `docs/trusted-store.md` has the statements to remove them once nothing
-  in them is needed.
-- The store image no longer includes `src/crypto`. `store/openapi.yaml`, which described only the removed routes, is
-  deleted; the routes are listed in `docs/trusted-store.md`.
-
-### [MAJOR] The encrypted workspace is removed from the editor
-
-- The editor no longer works with a store from before workspaces. Documents in such a store were encrypted in the
-  browser with keys held by enrolled devices; none of that remains: no device enrolment, comparison codes, recovery
-  codes, key rotation, access requests or automatic access.
+- **Workspaces.** When the editor points at a store, **Workspaces** in the document manager lets you sign in, pick or
+  create a workspace, add a copy of the open document to it, and open or delete its documents. A workspace document
+  saves to the store as you edit. There are no keys, devices or approvals.
+- **Roles.** Each person is a viewer, an editor or an owner, set by the workspace's members and by identity-provider
+  groups mapped to a role. Owners manage both under **Members**. Viewers see a document and cannot change it; the
+  toolbar shows **View only**.
+- **Live editing without a link.** Everyone who can edit a workspace document is in one live session when they open
+  it, with each other's cursors and changes.
+- **Deleted documents.** **Deleted** in the workspace panel lists what was deleted and how long it is kept. Editors
+  and owners can restore a document; store administrators can hold one or remove it for good.
+- **Choosing a store.** **Store** in File > Documents shows which store this browser uses and lets you point the
+  editor at another by its address.
+- **The encrypted workspace is removed**, along with device enrollment, comparison codes, recovery codes, key rotation
+  and access requests. The store and its administrators can now read workspace documents.
 - **Before upgrading**, open each document you want to keep in the previous release and save it to a file (File >
   Save), then import it into a workspace on the upgraded store. There is no migration tool, and this release cannot
   read the old store.
-- An editor pointed at an outdated store says so in File > Documents and keeps working with documents in the browser.
-  A store that is merely unreachable is not reported as outdated.
-- The save indicator's "Save to workspace" is now "Add to a workspace...", which opens the workspace panel.
-- The "Linked document" picker lists the documents of every workspace you can see.
-- `scripts/recover-document.ts` and `scripts/generate-recovery-key.ts` are removed with the recovery feature.
+- **If you run a store:**
+  - Workspaces and documents are served under `/v2`. The `/v1` routes of the encrypted workspace answer 404; health,
+    sign-in and room tokens keep their addresses. `store/openapi.json` describes every route.
+  - `CRYPTO_MODE`, `RECOVERY_PUBLIC_KEY`, `RECOVERY_PUBLIC_KEY_FILE`, `AUTO_ACCESS` and `JOIN_EVIDENCE_RETENTION` are no
+    longer read. `ADMIN_GROUPS` names the group whose members administer the store, and `WORKSPACE_CREATION` sets who
+    may create workspaces.
+  - Set `RELAY_TOKEN_SECRET` on the store and the relay, so that someone removed from a workspace cannot rejoin a live
+    session.
+  - An existing database is upgraded in place and nothing in it is deleted. `docs/trusted-store.md` lists what can be
+    dropped afterward.
+  - The deployment guides and example deployments are rewritten for workspaces.
 
-### [MINOR] Workspaces on a trusted store
+### [MINOR] Requirements: a table, verification and requirement details
 
-- When the store it points at serves the workspace API, the editor shows **Workspaces** in the document manager: sign
-  in, pick a workspace, create one if you are allowed to, add a copy of the open document to it, and open or delete its
-  documents. A workspace document saves to the store as you edit and picks up other people's changes. There are no
-  keys, devices or approvals: your role comes from the workspace's members and your identity-provider groups.
-- Adding a document to a workspace makes a copy under a new id and opens the copy; the original stays in your browser.
-- Viewers see a workspace document and cannot change it. The toolbar shows **View only**, the title cannot be typed
-  into, nodes cannot be dragged or connected, and every other edit - from any view, the keyboard, or loading a file
-  over the document - is refused before it is made, with a notice saying why. A viewer's copy is always exactly what
-  the workspace holds.
-- **Members** in the workspace panel shows who is in a workspace and which identity-provider groups are mapped to a
-  role. Owners can add someone by name, map a group, change a role, remove either, and rename the workspace. People
-  can be found once they have signed in to the store for the first time. Everyone in a mapped group gets its role when
-  they sign in; no one approves them.
-- You are asked to confirm a change that would remove your own access or your ability to manage the workspace, or
-  that would leave it with no owner.
-- Store administrators can archive a workspace, which hides it from its members without deleting anything, and
-  restore it. Archived workspaces stay in an administrator's list, marked.
-- **Store** in File > Documents shows which store this browser uses and lets you point the editor at one by its
-  address. The address is checked before it is saved, and the page reloads once the store answers. A store chosen in
-  the browser is used in place of the one the site was set up with, and can be removed to go back. The store must list
-  the editor's origin in `ALLOWED_ORIGINS`.
-- After signing in you return to the page and document you were on, instead of the store's configured address. The
-  store accepts a `returnTo` address on its own origin or an allowed one and refuses any other.
-- **Deleted** in the workspace panel lists the documents deleted from a workspace and how long each is kept. Editors
-  and owners can restore one. Store administrators can place a hold with a reason, which keeps a document until the
-  hold is released, and remove a deleted document for good.
-- A document that comes back to a workspace while you have it open resumes saving when you return to the tab or open
-  the workspace panel.
-- [PATCH] Store: every reply now carries `Cache-Control: no-store`. A browser could keep an error reply, such as "that
-  document is deleted", and go on showing it after the document was restored.
-- Opening a workspace document puts everyone who can edit it in one live session, so you see each other's cursors
-  and changes as they happen, without sharing a link. Viewers are not in the session; changes reach them through the
-  store a few seconds later.
-- Store: `GET /v2/documents/:id/session` gives a document's relay room and key to people who may edit it, with a relay
-  token where `RELAY_TOKEN_SECRET` is set. The general room-token route refuses a document's room. Set
-  `RELAY_TOKEN_SECRET` on the store and the relay so that someone removed from a workspace cannot rejoin a session
-  they remember.
-- Against a store without the workspace API, nothing changes.
-- Store: compacting a document through `/v2` must name the version it read, and is refused if the document has moved
-  on, so a concurrent edit can no longer be erased by a compaction. The id `local` is refused for workspace documents.
+- **Table.** The Requirements view opens as a table, one line per item. Click a line to open the item beneath it.
+  **Cards** and **Split** are still there, and a layout you already chose for a document is kept.
+- **Edit in place.** An open item, in the table or as a page in the split view, has no edit mode: change the title,
+  type, tags, description, criteria and relationships where they stand.
+- **Verification.** Requirements and constraints have a verification status (Not verified, Verified, Failing), a
+  method (Test, Demonstration, Inspection, Analysis) and a short note.
+- **Acceptance criteria.** Task-list lines in an item's description (`- [ ] ...`) are its acceptance criteria. Check,
+  add and remove them from the open item.
+- **Priority, status, owner and target.** Requirements have a priority (Must, Should, Could), a status of their own
+  (Draft, In review, Approved, Implemented), an owner (the accountable stakeholder: a team member or a typed name) and
+  a target milestone.
+- **Coverage.** A line above the items shows how many are on the diagram, described, covered by acceptance criteria
+  and verified, with buttons that filter to the ones that are not.
+- **Who is editing.** In a live session, a table line shows a dot when someone else is working in that item, and the
+  open item shows who.
+- The toolbar is rearranged as find, arrange, add, and every menu in the view has the same look.
+- The Markdown export includes all of the above. Existing documents need no change.
+
+### [MINOR] Diagram: palette, Inspector and zooming out
+
+- **Palette.** The palette is a rail of buttons with the open palette's list beside it. A search box looks through
+  every palette at once (`/` jumps to it, `Enter` adds the first match), and the last six things you added are listed
+  under **Recently used**.
+- **Inspector.** A selected component shows its icon, name and type at the top with **Open sub-diagram** directly
+  beneath. The rest is in sections that fold and remember whether you folded them.
+- **Zoomed out.** Below 60% zoom each component shows only its name, drawn larger the further out you are. Exported
+  images are always drawn at full detail.
+- **Boundaries** no longer have a pale gray fill that grew paler where they nest, and their outline sits on their real
+  edge.
+- **Minimap.** Off until you turn it on from the canvas controls.
+- Clicking a node or edge with a mouse selects it without opening the description popup. Hovering, or a tap on a
+  touch screen, still opens it.
 
 ### [MINOR] Plan tab
 
-- Timeline, Team and Skill Tree are now one **Plan** tab with four sections: **Board**, **Gantt**, **Dependencies** and
-  **Team**. The Board/Gantt toggle that used to sit in the Timeline toolbar is two of those sections. The Plan tab
-  reopens on the section you last used.
-- **Skill Tree** is renamed **Dependencies**, which is what it shows.
-- The backlog is a column on the left of the board instead of a strip above it, so cards are dragged a short distance
-  rather than up and down the page. Its header arrow folds it to a narrow rail; dropping a card on it, folded or not,
-  unschedules the card. It is shown even when empty, so there is always somewhere to drop a card to unschedule it.
-- **Show** in the board toolbar narrows the board to one program increment, and then to any sprints within it: one
-  sprint, several side by side, or all. Only the board's columns change; capacity totals and the Gantt chart still
-  cover every sprint.
-- Sprint names and dates are folded under **Edit sprints** on each program increment by default, so the board starts
-  higher on the page.
-- The sprint selection and whether the backlog is folded are remembered per document in your browser and are not
-  shared with collaborators.
-- Capacity reads as one line and one bar. Each sprint shows "8 of 45 pts", then what is reserved and how many working
-  days it has; each program increment shows what is planned, reserved and left. Click a sprint's capacity for the
-  breakdown by person, as before. It is now a real button, so it works from the keyboard.
-- Markers are a strip of chips above the board instead of a block of cards. Click a chip to open the marker.
-- In the Gantt chart, each blocked or at-risk item says why on its own row, under its title. The list of warnings
-  above the chart is folded to its count by default; click it for the full sentences. The item column is wider, so
-  fewer titles are cut off.
-- The Team section's heading and four summary cards are one line: people, points a day, and how holidays are counted.
+- Timeline, Team and Skill Tree are one **Plan** tab with four sections: **Board**, **Gantt**, **Dependencies**
+  (formerly Skill Tree) and **Team**.
+- The backlog is a column on the left of the board that folds to a rail. Drop a card on it to unschedule the card.
+- **Show** narrows the board to one program increment and to any of its sprints.
+- Capacity reads as one line and one bar per sprint and per program increment. Click a sprint's capacity for the
+  breakdown by person.
+- Markers are a strip of chips above the board.
+- In the Gantt chart, each blocked or at-risk item says why on its own row.
+
+### [MINOR] Toolbar: Share and one save status
+
+- **Collaborate** is now **Share**. For a workspace document it says which workspace the document is in and opens its
+  members; it no longer offers a session link, which could have let someone outside the workspace watch the document.
+- The toolbar shows one save status, which says where your work is.
+- Filled buttons are darker, so their white text is easier to read.
 
 ## [0.98.2] - 2026-10-13
 
@@ -370,7 +146,7 @@ Tweak to release pipeline
   - A bar appears to set status, sprint, category, or assignee, or to add or remove a tag
   - Each change is a single undo step, and in a shared session the whole change arrives together
   - Status, sprint, and assignee only apply to work items, matching what the cards show
-  - Only ticked items that are currently shown are changed
+  - Only checked items that are currently shown are changed
 
 ## [0.97.0] - 2026-10-12
 

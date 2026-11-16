@@ -165,9 +165,9 @@ export function useTrustedWorkspaceSync(options: TrustedWorkspaceSyncOptions) {
 
   useEffect(() => {
     if (!client) return;
-    let cancelled = false;
+    let canceled = false;
     void Promise.resolve().then(() => {
-      if (!cancelled) return check();
+      if (!canceled) return check();
     });
     const onChanged = () => void check();
     globalThis.addEventListener?.(WORKSPACE_CHANGED_EVENT, onChanged);
@@ -182,7 +182,7 @@ export function useTrustedWorkspaceSync(options: TrustedWorkspaceSyncOptions) {
     globalThis.addEventListener?.('focus', onReturn);
     document.addEventListener?.('visibilitychange', onReturn);
     return () => {
-      cancelled = true;
+      canceled = true;
       globalThis.removeEventListener?.(WORKSPACE_CHANGED_EVENT, onChanged);
       globalThis.removeEventListener?.('focus', onReturn);
       document.removeEventListener?.('visibilitychange', onReturn);
@@ -200,10 +200,10 @@ export function useTrustedWorkspaceSync(options: TrustedWorkspaceSyncOptions) {
   const title = options.title;
   useEffect(() => {
     if (!client) return;
-    let cancelled = false;
+    let canceled = false;
     let timer: ReturnType<typeof setTimeout>;
     const attempt = async (): Promise<void> => {
-      if (cancelled) return;
+      if (canceled) return;
       if (!sync.current || storedTitle.current === null) {
         // Not attached yet. Look again shortly.
         timer = setTimeout(() => void attempt(), 2000);
@@ -214,12 +214,12 @@ export function useTrustedWorkspaceSync(options: TrustedWorkspaceSyncOptions) {
         storedTitle.current = (await client.retitleDocument(docId, title)).title;
       } catch (error) {
         console.warn('Could not update the document title in the workspace:', error);
-        if (!cancelled) timer = setTimeout(() => void attempt(), 5000);
+        if (!canceled) timer = setTimeout(() => void attempt(), 5000);
       }
     };
     timer = setTimeout(() => void attempt(), 1000);
     return () => {
-      cancelled = true;
+      canceled = true;
       clearTimeout(timer);
     };
   }, [client, docId, title]);

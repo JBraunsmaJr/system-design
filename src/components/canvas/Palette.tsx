@@ -567,7 +567,7 @@ function PaletteRow({
         event.dataTransfer.setData(entry.mimeType, entry.id);
         event.dataTransfer.effectAllowed = 'move';
       }}
-      // dropEffect is "none" when the drag was cancelled or let go
+      // dropEffect is "none" when the drag was canceled or let go
       // somewhere that doesn't take it.
       onDragEnd={(event: DragEvent) => {
         if (event.dataTransfer.dropEffect !== 'none') onUsed(entry.key);

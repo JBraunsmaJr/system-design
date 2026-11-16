@@ -9,7 +9,7 @@
  *   - the editor finds out the store is trusted and shows its own panel,
  *     with the notice that the server can read documents;
  *   - an administrator signs in, creates a workspace and puts the open
- *     document in it, with nothing to enrol and nobody to approve;
+ *     document in it, with nothing to enroll and nobody to approve;
  *   - someone in a mapped group signs in and is simply in: they open the
  *     document and its content arrives;
  *   - an edit by one reaches the other, and the title reaches the list;
@@ -220,7 +220,7 @@ async function run() {
     check(
       (await ada.getAttribute('.trusted-workspace', 'data-phase')) === 'ready' &&
         (await ada.locator('.workspace-panel__who').textContent()) === 'Ada',
-      'after signing in the panel is ready at once: nothing to enrol, nobody to wait for',
+      'after signing in the panel is ready at once: nothing to enroll, nobody to wait for',
     );
     check(
       /not in any workspace yet/.test((await ada.textContent('.trusted-workspace')) ?? ''),

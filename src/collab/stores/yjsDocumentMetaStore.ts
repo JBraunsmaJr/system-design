@@ -18,7 +18,7 @@
  * types. Two peers editing different scenarios at the same moment therefore
  * resolve last-writer-wins for the whole list. That is a deliberate first step:
  * scenarios were not collaborative at all before, the list is small, and
- * modelling steps as shared types is a schema decision worth making on its
+ * modeling steps as shared types is a schema decision worth making on its
  * own. Every write replaces the value atomically, so a peer never observes a
  * half-applied list.
  */

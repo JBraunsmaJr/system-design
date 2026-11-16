@@ -470,7 +470,7 @@ export function getShapePaletteIcon(shapeId: string, customIconId?: string): str
   return customIconId || DEFAULT_SHAPE_PALETTE_ICONS[shapeId] || 'Square';
 }
 
-// Export backwards-compatible SHAPE_TYPES and getShapeType
+// Export backward-compatible SHAPE_TYPES and getShapeType
 export const SHAPE_TYPES: ShapeTypeDefinition[] = BUILTIN_SHAPES.map((s) => ({
   id: s.id,
   label: s.name,

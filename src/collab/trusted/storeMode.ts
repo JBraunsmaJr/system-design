@@ -8,7 +8,7 @@
  * request.
  *
  * The answer decides how the editor is wired, so it is resolved once,
- * before the first render (main.tsx), and read synchronously afterwards.
+ * before the first render (main.tsx), and read synchronously afterward.
  * To keep that from delaying every start:
  *
  *   - no store configured: nothing to ask;

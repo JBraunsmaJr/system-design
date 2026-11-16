@@ -4,7 +4,7 @@
  * different parts of the tree and share no parent that knows about either's
  * internals, so the request goes through this one small channel instead of
  * a chain of props through App. The canvas subscribes while it is mounted
- * and places the item at the centre of what is on screen.
+ * and places the item at the center of what is on screen.
  */
 export interface PaletteAddRequest {
   /** One of the palette's drag types - see Palette.tsx. */

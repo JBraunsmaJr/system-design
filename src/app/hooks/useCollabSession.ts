@@ -184,18 +184,18 @@ export function useCollabSession({
   // inherits the previous one's confirmed state.
   useEffect(() => {
     if (!activeSession) return;
-    let cancelled = false;
+    let canceled = false;
     const { persistence } = activeSession.session;
     const owner = activeSession.session;
     void persistence.whenSynced.then(() => {
-      if (cancelled) return;
+      if (canceled) return;
       // whenSynced resolves even when the database could not be opened - the
       // provider reports that by never having stored anything - so this is the
       // point where the state becomes known either way.
       setSessionPersistence({ session: owner, state: 'active' });
     });
     return () => {
-      cancelled = true;
+      canceled = true;
     };
   }, [activeSession]);
 

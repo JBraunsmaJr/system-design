@@ -70,7 +70,7 @@ Select any component or edge to open the **Inspector Panel** on the right:
 - **Visual Styling**: Customize node accent colors, border styles, and Z-index layering.
 - **Custom Properties & Tags**: Attach arbitrary key-value metadata and tags for categorizing systems.
 - **Requirement Linking**: Bi-directionally link diagram elements directly to engineering requirements for traceability.
-- **Locking**: Tick **Locked** to pin a node in place - it can't be dragged, nudged, resized or deleted until it's
+- **Locking**: Check **Locked** to pin a node in place - it can't be dragged, nudged, resized or deleted until it's
   unlocked. Locked nodes show a small padlock.
 
 ### Editing Many Items at Once

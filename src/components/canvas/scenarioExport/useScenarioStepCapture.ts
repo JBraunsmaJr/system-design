@@ -32,7 +32,7 @@ const EMPTY_MAP = new Map<never, never>();
 
 export class ExportCancelledError extends Error {
   constructor() {
-    super('Export cancelled');
+    super('Export canceled');
     this.name = 'ExportCancelledError';
   }
 }

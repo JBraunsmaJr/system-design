@@ -263,7 +263,7 @@ function stopServer(child: ChildProcess | null): void {
  * servers. Developers had been supplying one through the environment, so this
  * only failed where nobody had: CI. The harness now starts its own on a
  * private port, hands it to the page as runtime config, and stops it
- * afterwards - no ambient configuration, and no traffic leaving the machine.
+ * afterward - no ambient configuration, and no traffic leaving the machine.
  */
 async function startRelay(port: number): Promise<{ process: ChildProcess; url: string }> {
   console.log(`📡 Starting signaling relay on port ${port}...`);

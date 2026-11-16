@@ -12,7 +12,7 @@ async function run() {
   try {
     // Shared with verify-document-browser.ts: refuses a port that is already
     // serving (a leftover run would otherwise be tested instead of this
-    // checkout) and stops the whole process tree afterwards.
+    // checkout) and stops the whole process tree afterward.
     servers = await startDevServers({ vitePort: VITE_PORT, signalingPort: SIGNALING_PORT });
     console.log(`Signaling server on :${SIGNALING_PORT}, vite on :${VITE_PORT}`);
 

@@ -110,7 +110,7 @@ jobs:
             if health=$(curl -sf http://localhost:4444/health); then
               echo "$health"
               # With a secret set, the published relay must say it requires
-              # one - the check that the image honours RELAY_TOKEN_SECRET.
+              # one - the check that the image honors RELAY_TOKEN_SECRET.
               echo "$health" | grep -q '"authentication":"required"' && exit 0
               echo "The relay started but does not require a token with RELAY_TOKEN_SECRET set."
               exit 1

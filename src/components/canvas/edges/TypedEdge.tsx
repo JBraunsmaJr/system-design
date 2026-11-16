@@ -594,7 +594,7 @@ export function TypedEdge({
   /**
    * Arrowheads drawn per edge, in the line's own color and scaled to its
    * thickness. React Flow's shared markers come from DEFAULT_EDGE_OPTIONS
-   * with one fixed grey, so a recolored edge used to keep grey arrowheads -
+   * with one fixed gray, so a recolored edge used to keep gray arrowheads -
    * which read as the color override not working. Only drawn where React
    * Flow would have drawn one (it hands over markerEnd/markerStart), so
    * an edge configured without arrowheads still has none.

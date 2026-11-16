@@ -215,7 +215,7 @@ try {
     });
     check(
       returning.userId === 'u-old' && returning.displayName === 'Ada Lovelace',
-      'someone who signed in before is the same person afterwards',
+      'someone who signed in before is the same person afterward',
     );
 
     const sessions = createPostgresSessionStore(pool);

@@ -250,7 +250,7 @@ try {
       check(attempt.cookie === null, `${description} is refused, with no session created`);
     }
     idp.misbehave('none');
-    check((await signIn('oidc')).cookie !== null, 'and a good sign-in still works afterwards');
+    check((await signIn('oidc')).cookie !== null, 'and a good sign-in still works afterward');
   }
 
   console.log('\n=== Signing in with GitHub ===');

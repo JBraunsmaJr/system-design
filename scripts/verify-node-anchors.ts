@@ -33,15 +33,15 @@ function check(condition: boolean, message: string) {
 const CONTAINING =
   /(^|;|\{)\s*(position\s*:\s*(relative|absolute|fixed|sticky)|transform\s*:(?!\s*none)|filter\s*:(?!\s*none)|backdrop-filter\s*:(?!\s*none)|perspective\s*:(?!\s*none)|contain\s*:\s*[^;]*(layout|paint|strict|content)|will-change\s*:\s*[^;]*(transform|filter|perspective)|container-type\s*:(?!\s*normal))/;
 
-interface Offence {
+interface Offense {
   file: string;
   line: number;
   selector: string;
   declaration: string;
 }
 
-function offencesIn(file: string, css: string): Offence[] {
-  const offences: Offence[] = [];
+function offensesIn(file: string, css: string): Offense[] {
+  const offenses: Offense[] = [];
   // Comments out, keeping line numbers.
   const text = css.replace(/\/\*[\s\S]*?\*\//g, (comment) => comment.replace(/[^\n]/g, ' '));
   for (const match of text.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
@@ -55,24 +55,24 @@ function offencesIn(file: string, css: string): Offence[] {
     if (!subjectIsNode) continue;
     const found = CONTAINING.exec(match[2]);
     if (!found) continue;
-    offences.push({
+    offenses.push({
       file,
       line: text.slice(0, match.index + match[0].indexOf('{')).split('\n').length,
       selector: selectors.join(', '),
       declaration: found[2].trim(),
     });
   }
-  return offences;
+  return offenses;
 }
 
 console.log('=== Nothing makes a node its own handles’ containing block ===');
 const dir = join('src', 'styles');
-const offences = readdirSync(dir)
+const offenses = readdirSync(dir)
   .filter((name) => name.endsWith('.css'))
-  .flatMap((name) => offencesIn(join(dir, name), readFileSync(join(dir, name), 'utf8')));
+  .flatMap((name) => offensesIn(join(dir, name), readFileSync(join(dir, name), 'utf8')));
 
-check(offences.length === 0, 'no rule positions or transforms .typed-node itself');
-for (const o of offences) {
+check(offenses.length === 0, 'no rule positions or transforms .typed-node itself');
+for (const o of offenses) {
   console.log(
     `    ${o.file}:${o.line}  ${o.selector} { ${o.declaration} }\n` +
       '      Delete this declaration (the whole rule, if it is the only one in it). It moves\n' +
@@ -82,7 +82,7 @@ for (const o of offences) {
 
 console.log('\n=== The check itself ===');
 {
-  const sample = (css: string) => offencesIn('x.css', css).length;
+  const sample = (css: string) => offensesIn('x.css', css).length;
   check(
     sample(".canvas[data-lod='overview'] .typed-node {\n  position: relative;\n}") === 1,
     'it catches a positioned node',

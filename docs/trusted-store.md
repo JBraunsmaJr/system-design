@@ -9,7 +9,7 @@ The store was built so the server could not read documents: every document was e
 - a new member waited until an existing member's browser was online to hand them the key,
 - an administrator could not see or manage what the store held,
 - every person on a store shared one workspace and one key, so teams could not be separated,
-- each person had device enrolment and a recovery code to manage.
+- each person had device enrollment and a recovery code to manage.
 
 The teams using the store run it themselves, inside their own network, for one organization. For them the threat is traffic being read in transit, which TLS covers. The server is theirs, and they want it to behave like one.
 
@@ -119,7 +119,7 @@ A document's workspace comes from the store's catalog (`store/src/documentCatalo
    - **Done: live sessions.** Opening a workspace document puts everyone who may edit it in one session through the relay, so they see each other's cursors and changes as they happen. Viewers are not in it and follow through the store.
    - **Done: the rest of the editor.** A viewer cannot change a workspace document; the toolbar has one save status and **Share** in place of Collaborate, which for a workspace document says who it is shared with instead of offering a session link.
 4. **In progress: removal.**
-   - **Done: the editor.** The encrypted mode is gone from the editor: `src/crypto` (except what the store still imports until the next step), device enrolment, the comparison code, recovery, key rotation, automatic access, the key-based store client, and their panels and tests. An editor pointed at a store without `/v2` works on its own and says the store needs upgrading.
+   - **Done: the editor.** The encrypted mode is gone from the editor: `src/crypto` (except what the store still imports until the next step), device enrollment, the comparison code, recovery, key rotation, automatic access, the key-based store client, and their panels and tests. An editor pointed at a store without `/v2` works on its own and says the store needs upgrading.
    - **Done: the store's API.** The `/v1` document, index, key, device, recovery, join-request, access-rule and administration routes are gone, with the modules behind them. What `/v1` still serves is about the person, not their documents: health, sign-in, and relay tokens for sessions started by link. `CRYPTO_MODE`, `RECOVERY_PUBLIC_KEY`, `RECOVERY_PUBLIC_KEY_FILE`, `AUTO_ACCESS` and `JOIN_EVIDENCE_RETENTION` are no longer read; a store that still sets them starts, and names them at startup.
    - **Done: the store's storage.** Documents carry no keys or sealed metadata, and sign-in keeps no evidence. A database from the encrypted workspace required a wrapped key on every document; the schema lifts that requirement where it finds it, and `scripts/verify-store-upgrade.ts` upgrades such a database and checks the old data is untouched.
 

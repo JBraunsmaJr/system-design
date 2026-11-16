@@ -52,7 +52,7 @@ function samePoint(a: Point, b: Point): boolean {
   return a.x === b.x && a.y === b.y;
 }
 
-/** The point `dist` along the way from `from` towards `to`. */
+/** The point `dist` along the way from `from` toward `to`. */
 function pointTowards(from: Point, to: Point, dist: number): Point {
   const length = distance(from, to);
   if (length === 0) return { x: from.x, y: from.y };
@@ -408,7 +408,7 @@ export interface CubicSegment {
  * A smooth curve passing THROUGH every anchor (source, each bend, target) -
  * a Catmull-Rom spline converted to cubic Bezier segments, so a bend the
  * person dragged is a point the line actually visits rather than a control
- * point it only bends towards.
+ * point it only bends toward.
  *
  * The two ends leave and arrive along their handles' own directions, the
  * way React Flow's getBezierPath does for an unbent edge, so adding the

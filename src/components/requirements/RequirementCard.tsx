@@ -328,7 +328,7 @@ function RequirementCardImpl({
               title={
                 criteria.total === 0
                   ? 'No acceptance criteria. Add task-list lines to the description: "- [ ] what must hold".'
-                  : `${criteria.met} of ${criteria.total} acceptance criteria ticked in the description`
+                  : `${criteria.met} of ${criteria.total} acceptance criteria checked in the description`
               }
             >
               <ListChecks size={11} aria-hidden />

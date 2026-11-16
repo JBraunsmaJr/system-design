@@ -77,7 +77,7 @@ interface RequirementItemViewProps {
 /**
  * An item, opened. One layout for reading and for editing: every part is
  * changed where it stands - the title is a text box, the pickers are the
- * same ones used everywhere else, criteria tick and are added and removed
+ * same ones used everywhere else, criteria are checked, added and removed
  * in their list, relationships are added and removed in theirs, and the
  * statement turns into the Markdown editor when you click its pencil or
  * double-click it. There is no separate edit mode to enter or leave.

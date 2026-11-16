@@ -133,7 +133,7 @@ export function createDocumentService<Tx>(options: DocumentServiceOptions<Tx>) {
     if (opts.seenVersion !== undefined && row.record.version < opts.seenVersion) {
       throw new StoreError(
         `The store returned version ${row.record.version} for ${docId}, but version ${opts.seenVersion} has already been seen. ` +
-          `Refusing to go backwards.`,
+          `Refusing to go backward.`,
         'stale-version',
       );
     }

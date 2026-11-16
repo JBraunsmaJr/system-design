@@ -627,7 +627,7 @@ function App() {
   );
 
   const getDocumentState = useCallback(() => Y.encodeStateAsUpdate(openDoc.doc), [openDoc.doc]);
-  // The Inspector's "Linked document" picker reads the catalogue on demand:
+  // The Inspector's "Linked document" picker reads the catalog on demand:
   // this browser's documents and, where there is a store, the workspaces'
   // (see linkableDocuments.ts). Either source failing leaves the other's
   // documents available - the field is a convenience, and the Documents

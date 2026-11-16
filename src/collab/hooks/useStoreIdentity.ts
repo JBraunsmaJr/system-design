@@ -6,7 +6,7 @@
  * on which document is open, or on whether it is in the workspace at all
  * - someone signed in with nothing shared still belongs on their cursor
  * by name - and asking early means the name is known before any session
- * starts, rather than arriving afterwards and having to be republished.
+ * starts, rather than arriving afterward and having to be republished.
  */
 import { useEffect, useState } from 'react';
 import { createStoreSessionClient } from '../access/storeSessionClient';
@@ -33,12 +33,12 @@ export function useStoreAuth(storeUrl: string | null): StoreAuthInfo {
   useEffect(() => {
     if (!storeUrl) return;
     const setAuth = (auth: StoreAuthInfo) => setAnswer({ storeUrl, auth });
-    let cancelled = false;
+    let canceled = false;
     const client = createStoreSessionClient({ baseUrl: storeUrl });
     const ask = async () => {
       try {
         const session = await client.session();
-        if (cancelled) return;
+        if (canceled) return;
         if (session) {
           setAuth({
             identity: { displayName: session.displayName, subject: session.subject },
@@ -46,12 +46,12 @@ export function useStoreAuth(storeUrl: string | null): StoreAuthInfo {
           });
         } else {
           const provs = await client.providers().catch(() => []);
-          if (!cancelled) {
+          if (!canceled) {
             setAuth({ identity: null, providers: provs });
           }
         }
       } catch {
-        if (!cancelled) {
+        if (!canceled) {
           setAuth({ identity: null, providers: [] });
         }
       }
@@ -63,7 +63,7 @@ export function useStoreAuth(storeUrl: string | null): StoreAuthInfo {
     const onFocus = () => void ask();
     globalThis.addEventListener?.('focus', onFocus);
     return () => {
-      cancelled = true;
+      canceled = true;
       globalThis.removeEventListener?.('focus', onFocus);
     };
   }, [storeUrl]);

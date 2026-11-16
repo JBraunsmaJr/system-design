@@ -204,7 +204,7 @@ export function findMilestonesForItem(milestones: Milestone[], itemId: string): 
 }
 
 /**
- * Returns all milestones that reference a given workable item ID (FR-007, Section 13, backwards-compatible alias).
+ * Returns all milestones that reference a given workable item ID (FR-007, Section 13, backward-compatible alias).
  */
 export function findMilestonesForWorkableItem(
   milestones: Milestone[],

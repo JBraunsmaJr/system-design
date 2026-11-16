@@ -55,12 +55,12 @@ export function DeletedDocuments({
   }, [client, workspaceId]);
 
   useEffect(() => {
-    let cancelled = false;
+    let canceled = false;
     void Promise.resolve().then(() => {
-      if (!cancelled) return load();
+      if (!canceled) return load();
     });
     return () => {
-      cancelled = true;
+      canceled = true;
     };
   }, [load]);
 
@@ -171,7 +171,7 @@ export function DeletedDocuments({
                 <div className="workspace-access__confirm" role="alertdialog" aria-label="Confirm">
                   <span>
                     Remove <strong>{document.title}</strong> for good? It cannot be restored
-                    afterwards, by anyone.
+                    afterward, by anyone.
                   </span>
                   <Button
                     variant="danger-outline"

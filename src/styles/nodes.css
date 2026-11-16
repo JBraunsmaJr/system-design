@@ -62,7 +62,7 @@
    No visible connector dots. Two kinds of handle, both invisible:
 
    .edge-anchor - where edges attach. Kept at the exact size the old
-   visible dots were (8px + 2px border, centred on the border) because an
+   visible dots were (8px + 2px border, centered on the border) because an
    edge's endpoint is derived from its handle's box - changing the size
    would shift every existing edge's endpoint. React Flow's base CSS
    already gives non-connectable handles pointer-events: none.
@@ -236,7 +236,7 @@
      changed nothing). */
   pointer-events: none !important;
   /* React Flow's stylesheet gives its built-in `group` node type a light
-     grey fill, a grey border and 10px of padding. This node type shares the
+     gray fill, a gray border and 10px of padding. This node type shares the
      name but draws its own boundary (.group-node), so all three have to go:
      the fill turned every boundary into a pale slab on the dark canvas,
      twice as pale where boundaries nest, and the padding drew the boundary
@@ -294,7 +294,7 @@
 /* A boundary's border does two jobs, split across its thickness: the
    OUTER half (a grab strip, see EdgeHandles.tsx) starts a connection, the
    INNER half (these strips) selects/drags the boundary. They used to
-   overlap - both centred on the border - and whichever painted last won
+   overlap - both centered on the border - and whichever painted last won
    every press. Cursors differ (crosshair vs. move) so the split is
    discoverable. */
 .react-flow__node-group {
@@ -1180,7 +1180,7 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
-  /* Centred vertically: the box is the node's own, the text one or two lines. */
+  /* Centered vertically: the box is the node's own, the text one or two lines. */
   align-content: center;
   padding: 0 10px;
   font-weight: 600;

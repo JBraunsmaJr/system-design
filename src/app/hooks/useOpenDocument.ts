@@ -21,7 +21,7 @@ import {
 
 /**
  * Which document this tab has open, the open document itself, and the
- * catalogue of stored documents (WS1-R1, WS2-R3). Moved unchanged from
+ * catalog of stored documents (WS1-R1, WS2-R3). Moved unchanged from
  * App.tsx.
  *
  * Performance contract (see src/app/README.md): this hook runs inside App's
@@ -70,7 +70,7 @@ export function useOpenDocument() {
     }
   }, [openDocId]);
 
-  /** The catalogue of stored documents and their snapshots (WS2-R3). */
+  /** The catalog of stored documents and their snapshots (WS2-R3). */
   const [documentStore] = useState(() => createDocumentStore(createIndexedDbBackend()));
   const [documentLibrary] = useState(() =>
     createDocumentLibrary(
@@ -110,7 +110,7 @@ export function useOpenDocument() {
   });
   // The document exists from the first render; this only has to release it.
   //
-  // The close is deferred by a task, and cancelled if the effect runs again
+  // The close is deferred by a task, and canceled if the effect runs again
   // first. StrictMode (dev only) runs this cleanup and the effect back to back
   // at mount while keeping the same state - so an immediate close destroyed
   // the stores of a document the app went on using, and no local edit ever

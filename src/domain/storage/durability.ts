@@ -259,7 +259,7 @@ function describeReplicas(base: string, replicaCount?: number): string {
  * must be warned before disconnecting (WS13-R11).
  *
  * Separate from the indicator because it gates an action rather than a
- * display, and because getting it backwards - warning everyone, or no one -
+ * display, and because getting it backward - warning everyone, or no one -
  * both defeat the purpose.
  */
 export function isSoleReplicaHolder(signals: DurabilitySignals): boolean {

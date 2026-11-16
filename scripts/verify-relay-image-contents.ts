@@ -13,7 +13,7 @@
  *    first run for want of exactly this);
  *  - every package it imports is a dependency of the image;
  *  - and, assembled the way the Dockerfile assembles it, it starts,
- *    serves /health, and honours the secret.
+ *    serves /health, and honors the secret.
  */
 import { spawn } from 'child_process';
 import { builtinModules } from 'module';

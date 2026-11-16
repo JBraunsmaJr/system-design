@@ -106,12 +106,12 @@ export function WorkspaceAccess({
   }, [client, workspaceId]);
 
   useEffect(() => {
-    let cancelled = false;
+    let canceled = false;
     void Promise.resolve().then(() => {
-      if (!cancelled) return load();
+      if (!canceled) return load();
     });
     return () => {
-      cancelled = true;
+      canceled = true;
     };
   }, [load]);
 
@@ -120,19 +120,19 @@ export function WorkspaceAccess({
   const trimmedQuery = query.trim();
   useEffect(() => {
     if (!canManage || trimmedQuery.length < 2) return;
-    let cancelled = false;
+    let canceled = false;
     const timer = setTimeout(() => {
       client
         .findPeople(workspaceId, trimmedQuery)
         .then((people) => {
-          if (!cancelled) setFound(people);
+          if (!canceled) setFound(people);
         })
         .catch((cause) => {
-          if (!cancelled) setError(messageOf(cause));
+          if (!canceled) setError(messageOf(cause));
         });
     }, 250);
     return () => {
-      cancelled = true;
+      canceled = true;
       clearTimeout(timer);
     };
   }, [canManage, client, workspaceId, trimmedQuery]);

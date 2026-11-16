@@ -170,7 +170,7 @@ export const panScenario: ScenarioDefinition = {
     await setupFixture(page, 'large');
     await resetCounters(page);
 
-    // Drag canvas background. Verified afterwards: a pan that silently
+    // Drag canvas background. Verified afterward: a pan that silently
     // delivers fewer steps renders less and reads as an improvement.
     // Must start on empty pane: a drag beginning on a node drags the node,
     // which is what this scenario was silently doing before.

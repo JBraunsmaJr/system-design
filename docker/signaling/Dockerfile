@@ -13,7 +13,7 @@
 # requiring membership, and with that image setting it did nothing at all -
 # the one outcome worse than a missing control is one that appears to be
 # on. scripts/relay-server.ts speaks the same protocol (CI runs y-webrtc's
-# protocol checks against both) and honours the secret; without one it
+# protocol checks against both) and honors the secret; without one it
 # behaves exactly as the old image did, so existing deployments are
 # unaffected.
 FROM node:26.7.0-alpine

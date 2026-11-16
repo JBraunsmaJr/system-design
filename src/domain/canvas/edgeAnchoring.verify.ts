@@ -50,7 +50,7 @@ assert(closestSide(wide, { x: 100, y: -4 }) === 'top', 'just outside the top bor
 assert(closestSide(wide, { x: 204, y: 30 }) === 'right', 'just outside the right border -> right');
 assert(
   closestSide(wide, { x: 30, y: 30 }) === 'top',
-  'dead centre vertically on a wide node ties top/bottom -> deterministic top',
+  'dead center vertically on a wide node ties top/bottom -> deterministic top',
 );
 
 // --- rule 1: released on a border -> that side ------------------------------

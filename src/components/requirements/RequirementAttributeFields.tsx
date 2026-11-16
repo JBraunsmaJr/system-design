@@ -31,7 +31,7 @@ const PRIORITY_OPTIONS: MenuOption[] = [
 
 /**
  * The four values set on a requirement - status, priority, owner, target -
- * as a row of labelled menus, each written the moment it changes.
+ * as a row of labeled menus, each written the moment it changes.
  *
  * Owner is a team member or, for a stakeholder outside the team, a typed
  * name: "Someone else..." puts a text box beside the menu.

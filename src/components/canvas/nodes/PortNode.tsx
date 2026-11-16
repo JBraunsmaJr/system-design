@@ -13,7 +13,7 @@ type PortNodeType = Node<BoundaryPortNodeData, 'port'>;
  * Laid out like an Unreal collapsed-graph tunnel: inbound ports sit in a
  * column on the left with their pin facing in, outbound ports on the
  * right with their pin facing in from the other side. The pin is the only
- * side that connects, so a wire can only ever leave towards the inside.
+ * side that connects, so a wire can only ever leave toward the inside.
  *
  * The handle ids follow EdgeHandles' scheme (`source-<side>`,
  * `target-<side>`, `grab-<side>`) so the anchoring and release

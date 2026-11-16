@@ -116,7 +116,7 @@ export function useDocumentPersistence({
     // The perf harness measures editing, not autosave - see
     // isPerfAutosaveSuppressed. Always false outside instrumented builds.
     if (isPerfAutosaveSuppressed()) return;
-    let cancelled = false;
+    let canceled = false;
     const timer = setTimeout(() => {
       // Export boundary: built once per debounced write, not once per change.
       const tree = unflattenToSubDiagram(diagramSnapshot.nodes, diagramSnapshot.edges);
@@ -155,7 +155,7 @@ export function useDocumentPersistence({
         void flushWorkspace();
       }
       void documentStore.writeDocument(activeDocId, file, origin).then((result) => {
-        if (cancelled) return;
+        if (canceled) return;
         // Set from the confirmed outcome, never the attempt (NFR-10).
         if (result.ok) {
           setHasAutosaved(true);
@@ -172,7 +172,7 @@ export function useDocumentPersistence({
       });
     }, 1000);
     return () => {
-      cancelled = true;
+      canceled = true;
       clearTimeout(timer);
     };
   }, [
@@ -203,9 +203,9 @@ export function useDocumentPersistence({
     null,
   );
   useEffect(() => {
-    let cancelled = false;
+    let canceled = false;
     void documentStore.listDocuments().then((listed) => {
-      if (cancelled || !listed.ok) return;
+      if (canceled || !listed.ok) return;
       const entry = listed.value.find((e) => e.docId === openDocId);
       setResumableSession(
         entry?.sessionRoom && entry.sessionKey
@@ -214,7 +214,7 @@ export function useDocumentPersistence({
       );
     });
     return () => {
-      cancelled = true;
+      canceled = true;
     };
     // Re-read when a session ends, which is when a room first becomes resumable.
   }, [documentStore, openDocId, activeRoom]);

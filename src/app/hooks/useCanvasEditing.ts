@@ -506,7 +506,7 @@ export function useCanvasEditing({
    * Deletes the wires a change is about to orphan (boundaryPorts.ts), in the
    * same handler as the change so both land in one undo step and undoing
    * brings the wires back with it. `simulate` describes the document as it
-   * will be afterwards; nothing is read back from the store mid-change.
+   * will be afterward; nothing is read back from the store mid-change.
    */
   const deleteOrphanedWires = useCallback(
     (

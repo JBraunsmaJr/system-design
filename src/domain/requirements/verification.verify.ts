@@ -50,11 +50,11 @@ console.log('=== Acceptance criteria ===');
   );
   assert(
     count('- [ ] one\n- [x] two\n- [X] three') === '2/3',
-    'task-list lines are, ticked or not',
+    'task-list lines are, checked or not',
   );
   assert(count('* [ ] star\n+ [x] plus\n1. [x] numbered') === '2/3', 'with any list marker');
   assert(count('Intro\n  - [x] indented\n    - [ ] nested') === '1/2', 'indented and nested too');
-  assert(count('- [] no space\n- [y] not a tick\n- [ ]') === '0/0', 'a malformed box is not one');
+  assert(count('- [] no space\n- [y] not a check\n- [ ]') === '0/0', 'a malformed box is not one');
   assert(
     count('- [x] real\n```\n- [ ] in a code block\n```\n- [ ] also real') === '1/2',
     'a line inside a fenced code block is text',
@@ -91,11 +91,14 @@ console.log('\n=== Statement and criteria ===');
     'a sentence that merely mentions them is kept',
   );
 
-  const ticked = toggleAcceptanceCriterion(body, 1);
-  assert(ticked.includes('- [x] Second thing'), 'ticking a criterion marks its box');
-  assert(ticked.replace('- [x] Second', '- [ ] Second') === body, 'and changes nothing else');
-  assert(toggleAcceptanceCriterion(ticked, 1) === body, 'unticking restores it');
-  assert(toggleAcceptanceCriterion(body, 0).includes('- [ ] First thing'), 'a ticked one unticks');
+  const checked = toggleAcceptanceCriterion(body, 1);
+  assert(checked.includes('- [x] Second thing'), 'checking a criterion marks its box');
+  assert(checked.replace('- [x] Second', '- [ ] Second') === body, 'and changes nothing else');
+  assert(toggleAcceptanceCriterion(checked, 1) === body, 'unchecking restores it');
+  assert(
+    toggleAcceptanceCriterion(body, 0).includes('- [ ] First thing'),
+    'a checked one unchecks',
+  );
   assert(toggleAcceptanceCriterion(body, 7) === body, 'an index past the end changes nothing');
   const fenced = '```\n- [ ] not one\n```\n- [ ] real';
   assert(

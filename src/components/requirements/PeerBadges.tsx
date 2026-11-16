@@ -2,7 +2,7 @@ import type { PresenceInfo } from '../../collab/sync/session';
 
 /**
  * Who else in a collaborative session is editing an item right now: one
- * coloured initial each, with their names in the tooltip. Renders nothing
+ * colored initial each, with their names in the tooltip. Renders nothing
  * outside a session or when nobody else is on the item. Shared by the card
  * and the open item in the table and split view.
  */

@@ -180,7 +180,7 @@ administrator removing it, until the hold is released. Holds and removal are
 for administrators; see [Administering Workspaces](/deployment/administration).
 
 Set the period your records schedule requires before the first document is
-stored; changing it later affects only documents deleted afterwards.
+stored; changing it later affects only documents deleted afterward.
 
 ## Running more than one instance
 

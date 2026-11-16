@@ -7,7 +7,7 @@ import { usePositionedDropdown } from '../../common/hooks/usePositionedDropdown'
 export interface MenuOption {
   id: string;
   label: string;
-  /** Colours the option and, when chosen, the trigger. */
+  /** Colors the option and, when chosen, the trigger. */
   color?: string;
   /** Shown as the option's tooltip. */
   description?: string;

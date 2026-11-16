@@ -324,7 +324,7 @@ console.log('\n=== WS4-R6: rebase shrinks a churned document, same content, new 
     assert(after.meta.title === 'Churned', 'keeping its name');
     const listed = await library.list();
     const original = listed.ok ? listed.value.find((e) => e.docId === 'churned') : undefined;
-    assert(original?.title === 'Churned (before rebase)', 'the original is kept, relabelled');
+    assert(original?.title === 'Churned (before rebase)', 'the original is kept, relabeled');
   }
 }
 

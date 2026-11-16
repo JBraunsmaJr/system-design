@@ -93,7 +93,7 @@ console.log('\n=== While read-only ===');
     "the workspace's changes still apply: only this browser's edits are stopped",
   );
 
-  console.log('\n=== Afterwards ===');
+  console.log('\n=== Afterward ===');
   undo.setReadOnly(false);
   undo.setReadOnly(false);
   check(availabilityChanges === 2, 'clearing it is announced once');
