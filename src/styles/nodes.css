@@ -1197,3 +1197,12 @@
   top: calc(-11px * var(--lod-scale, 1));
   padding: calc(2px * var(--lod-scale, 1)) calc(10px * var(--lod-scale, 1));
 }
+
+/* A node's box is never positioned, at any level of detail: its connection
+   handles are placed against React Flow's wrapper, and positioning the box
+   moves every edge end by a pixel. Stated outright, last, so that it also
+   wins over any earlier rule that says otherwise
+   (scripts/verify-node-anchors.ts reports such a rule). */
+.canvas .react-flow__node > .typed-node {
+  position: static;
+}

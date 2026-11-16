@@ -535,6 +535,30 @@ async function run() {
           // points differently; a different bend means the update was lost.
           console.log(`    A draws: ${aPath}`);
           console.log(`    B draws: ${bPath}`);
+          // What each browser's canvas is doing with its nodes: ends that
+          // differ by a pixel come from one browser positioning a node's
+          // handles against a different box (scripts/verify-node-anchors.ts
+          // names the style rule responsible).
+          for (const [name, page] of [
+            ['A', a],
+            ['B', b],
+          ] as const) {
+            const state = await page.evaluate(() => {
+              const canvas = document.querySelector<HTMLElement>('.canvas');
+              const node = document.querySelector('.react-flow__node .typed-node');
+              const style = node ? getComputedStyle(node) : null;
+              return {
+                levelOfDetail: canvas?.dataset.lod,
+                zoom: document
+                  .querySelector<HTMLElement>('.react-flow__viewport')
+                  ?.style.transform.match(/scale\(([^)]+)\)/)?.[1],
+                nodePosition: style?.position,
+                nodeTransform: style?.transform,
+                nodeContain: style?.contain,
+              };
+            });
+            console.log(`    ${name}: ${JSON.stringify(state)}`);
+          }
         }
       } else {
         check(false, 'the insertion handle is on screen for the peer check');

@@ -29,6 +29,14 @@ markers are removed when the section becomes a release. See
 - `ADMIN_GROUPS` makes the members of an identity-provider group store administrators in that API.
   `WORKSPACE_CREATION` sets who may create workspaces there.
 
+### Tests: a fast check of where edges attach
+
+- `scripts/verify-node-anchors.ts` reads the stylesheets and fails, naming the file, line and rule, if anything
+  positions or transforms a node's own box. Such a rule moves every edge end on the node by about a pixel, which until
+  now only showed up as two browsers disagreeing about an edge in the slow collaboration suite.
+- When that suite's edge comparison fails it now also prints each browser's zoom, level of detail and how its nodes
+  are positioned.
+
 ### Tests: steadier on a first run and on Windows
 
 - `npm test` builds the dev server's dependency cache once before starting the browser suites. On a first run, or
