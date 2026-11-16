@@ -607,6 +607,97 @@ async function run() {
         timeout: 10_000,
       });
       check(true, 'and returns when A clicks back into it');
+
+      // What A writes in the open item reaches B's copy of it and B's table.
+      const bRow = b.locator('.requirements-table__row', { hasText: 'Seen by both' });
+      const bCriteria = async () =>
+        (await bRow.locator('.requirements-table__criteria').count()) > 0
+          ? ((await bRow.locator('.requirements-table__criteria').first().textContent()) ?? '')
+          : '';
+      const settles = async (read: () => Promise<string>, want: string) => {
+        let got = await read();
+        for (let i = 0; i < 40 && got !== want; i++) {
+          await sleep(250);
+          got = await read();
+        }
+        return got;
+      };
+      const aDetail = a.locator('.requirements-table__detail');
+      const bDetail = b.locator('.requirements-table__detail');
+      await aDetail.locator('.requirement-detail__add input').fill('It answers in under a second');
+      await a.keyboard.press('Enter');
+      let got = await settles(bCriteria, '0/1');
+      check(got === '0/1', `a criterion A adds is counted on B's line (${got || 'nothing'})`);
+      await aDetail.locator('.requirement-detail__criterion').first().click();
+      got = await settles(bCriteria, '1/1');
+      check(got === '1/1', `and counted as met on B's line once A checks it (${got || 'nothing'})`);
+
+      await aDetail.locator('.requirement-detail__note').fill('Load suite, nightly');
+      await a.keyboard.press('Enter');
+      got = await settles(
+        () => bDetail.locator('.requirement-detail__note').inputValue(),
+        'Load suite, nightly',
+      );
+      check(
+        got === 'Load suite, nightly',
+        `A's verification note shows in B's open item (${got || 'nothing'})`,
+      );
+
+      await aDetail.locator('.status-picker__trigger[aria-label^="Owner"]').click();
+      await a.click('.status-picker__dropdown .status-picker__option:has-text("Someone else")');
+      await aDetail.locator('.requirement-attributes__owner-name').fill('Compliance office');
+      await a.keyboard.press('Enter');
+      got = await settles(
+        async () =>
+          (await bDetail.locator('.requirement-attributes__owner-name').count()) > 0
+            ? bDetail.locator('.requirement-attributes__owner-name').inputValue()
+            : '',
+        'Compliance office',
+      );
+      check(got === 'Compliance office', `and so does an owner A typed in (${got || 'nothing'})`);
+
+      // The same with B's line closed, and for what the table adds up.
+      await bRow.locator('.requirements-table__title').click();
+      await bDetail.waitFor({ state: 'detached' });
+      await aDetail.locator('.requirement-detail__criterion').first().click();
+      got = await settles(bCriteria, '0/1');
+      check(got === '0/1', `B's closed line follows a criterion A unchecks (${got || 'nothing'})`);
+      const bVerified = async () =>
+        (
+          (await b
+            .locator('.requirements-coverage__measure', { hasText: 'Verified' })
+            .locator('.requirements-coverage__numbers')
+            .textContent()) ?? ''
+        ).replace(/\s+/g, '');
+      const before = await bVerified();
+      await aDetail.locator('.status-picker__trigger', { hasText: 'Not verified' }).click();
+      await a
+        .locator('.status-picker__dropdown .status-picker__option', { hasText: /^Verified/ })
+        .click();
+      let after = await bVerified();
+      for (let i = 0; i < 40 && after === before; i++) {
+        await sleep(250);
+        after = await bVerified();
+      }
+      check(
+        after !== before,
+        `B's coverage line follows A marking it verified (${before} -> ${after})`,
+      );
+      got = await settles(
+        async () =>
+          ((await bRow.locator('.requirements-table__verification').textContent()) ?? '').trim(),
+        'Verified0/1',
+      );
+      check(got === 'Verified0/1', `and so does B's line (${got})`);
+      const bSection = async () =>
+        (await b.locator('.requirements-table__section-progress').count()) > 0
+          ? ((await b.locator('.requirements-table__section-progress').first().textContent()) ?? '')
+          : 'no section heading';
+      got = await bSection();
+      check(
+        got === 'no section heading' || /^[1-9]\d*% verified/.test(got),
+        `and the section's share verified, where sections are shown (${got})`,
+      );
       await a.click('button[title="Diagram"]');
       await b.click('button[title="Diagram"]');
     }

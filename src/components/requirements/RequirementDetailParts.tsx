@@ -1,4 +1,5 @@
 import { type FormEvent, useState } from 'react';
+import { useFollowingDraft } from '../../common/hooks/useFollowingDraft';
 import { Check, Plus, X } from 'lucide-react';
 import type { RequirementItem } from '../../domain/requirements/requirementsTypes';
 import {
@@ -100,9 +101,10 @@ export function VerificationNote({
   item: RequirementItem;
   onUpdateItem: UpdateItem;
 }) {
-  const [draft, setDraft] = useState(item.verificationNote ?? '');
+  const [draft, setDraft] = useFollowingDraft(item.verificationNote ?? '');
   const commit = () => {
     const note = draft.trim();
+    setDraft(note);
     if (note !== (item.verificationNote ?? '')) {
       onUpdateItem(item.id, { verificationNote: note || undefined });
     }

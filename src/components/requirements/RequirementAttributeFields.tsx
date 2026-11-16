@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useFollowingDraft } from '../../common/hooks/useFollowingDraft';
 import type { RequirementItem } from '../../domain/requirements/requirementsTypes';
 import {
   getLifecycleMeta,
@@ -45,9 +46,10 @@ export function RequirementAttributeFields({
   // Typing a name for someone outside the team: on when one is stored, or
   // when "Someone else..." was just chosen and nothing is typed yet.
   const [isNamingOwner, setIsNamingOwner] = useState(false);
-  const [ownerDraft, setOwnerDraft] = useState(item.ownerName ?? '');
+  const [ownerDraft, setOwnerDraft] = useFollowingDraft(item.ownerName ?? '');
   const namingOwner = isNamingOwner || (item.ownerName !== undefined && !item.ownerId);
   const commitOwnerName = () => {
+    setOwnerDraft(ownerDraft.trim());
     if (ownerDraft.trim() !== (item.ownerName ?? '')) {
       onUpdateItem(item.id, ownerNamePatch(ownerDraft));
     }
