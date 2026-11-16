@@ -29,6 +29,16 @@ markers are removed when the section becomes a release. See
 - `ADMIN_GROUPS` makes the members of an identity-provider group store administrators in that API.
   `WORKSPACE_CREATION` sets who may create workspaces there.
 
+### Tests: steadier on a first run and on Windows
+
+- `npm test` builds the dev server's dependency cache once before starting the browser suites. On a first run, or
+  after an install, several suites used to build it at the same moment and reload each other's pages mid-check, so
+  suites failed and then passed when run again.
+- The check of the container's start-up script finds Git for Windows' bash when it is not on the PATH, and says it was
+  skipped, instead of failing, on a machine with no bash at all.
+- Two waits that assumed a fixed time was enough (joining a session by link, a bend reaching the other browser) now
+  wait for the result.
+
 ### Deployment: installs and the workspace proxy example fixed
 
 - `npm ci` failed, which broke every image build and every CI job: `typescript-eslint` had been lowered to `^8.36.0`,

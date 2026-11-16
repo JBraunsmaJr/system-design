@@ -1,5 +1,43 @@
-import { execFileSync } from 'child_process';
-import { readFileSync, rmSync } from 'fs';
+import { execFileSync, spawnSync } from 'child_process';
+import { existsSync, readFileSync, rmSync } from 'fs';
+import { join } from 'path';
+
+/**
+ * The shell these checks run the container's start-up script with.
+ *
+ * `bash` on the PATH where there is one. On Windows it usually is not -
+ * Git for Windows installs it without adding it - so its usual places are
+ * tried as well. Where there is no bash at all the script cannot be run on
+ * this machine, and the suite says so and stops rather than failing: the
+ * script only ever runs inside the Linux container, and CI checks it there.
+ */
+function findBash(): string | null {
+  const candidates = ['bash'];
+  if (process.platform === 'win32') {
+    for (const root of [
+      process.env.ProgramFiles,
+      process.env['ProgramFiles(x86)'],
+      process.env.LOCALAPPDATA && join(process.env.LOCALAPPDATA, 'Programs'),
+    ]) {
+      if (root) candidates.push(join(root, 'Git', 'bin', 'bash.exe'));
+    }
+  }
+  for (const candidate of candidates) {
+    if (candidate !== 'bash' && !existsSync(candidate)) continue;
+    const probe = spawnSync(candidate, ['-c', 'exit 0'], { stdio: 'ignore' });
+    if (!probe.error && probe.status === 0) return candidate;
+  }
+  return null;
+}
+
+const BASH = findBash();
+if (BASH === null) {
+  console.log(
+    'SKIPPED: no bash on this machine, so the container start-up script cannot be run here.\n' +
+      'Install Git for Windows (which includes bash) to run these checks locally; CI runs them on Linux.',
+  );
+  process.exit(0);
+}
 import vm from 'vm';
 
 function assert(condition: boolean, message: string) {
@@ -29,7 +67,7 @@ function runScript(env: Record<string, string>): {
 
   try {
     const cmd = `${exportStatements ? exportStatements + '; ' : ''}TARGET_FILE='${targetFile}' bash docker/docker-entrypoint.d/40-env-config.sh`;
-    const stdout = execFileSync('bash', ['-c', cmd], {
+    const stdout = execFileSync(BASH as string, ['-c', cmd], {
       cwd: process.cwd(),
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],

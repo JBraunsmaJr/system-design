@@ -519,8 +519,23 @@ async function run() {
           "B sees A's new bend while A is still dragging it",
         );
         await a.mouse.up();
-        await sleep(1000);
-        check((await pathOf(b)) === (await pathOf(a)), 'and the same bend once A releases');
+        // The release is one more update for B to receive; give it time
+        // rather than assuming a second is always enough.
+        let aPath = await pathOf(a);
+        let bPath = await pathOf(b);
+        for (let i = 0; i < 40 && aPath !== bPath; i++) {
+          await sleep(250);
+          aPath = await pathOf(a);
+          bPath = await pathOf(b);
+        }
+        check(aPath === bPath, 'and the same bend once A releases');
+        if (aPath !== bPath) {
+          // The two paths, so a failure says how they differ: ends a pixel
+          // apart mean the two browsers measured a node's connection
+          // points differently; a different bend means the update was lost.
+          console.log(`    A draws: ${aPath}`);
+          console.log(`    B draws: ${bPath}`);
+        }
       } else {
         check(false, 'the insertion handle is on screen for the peer check');
       }

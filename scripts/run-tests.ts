@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'fs';
 import { availableParallelism } from 'os';
 import { join, relative, resolve } from 'path';
-import { spawn } from 'child_process';
+import { spawn, spawnSync } from 'child_process';
 
 function findFiles(dir: string, pattern: RegExp): string[] {
   const results: string[] = [];
@@ -102,6 +102,43 @@ const suites: Suite[] = allTestFiles.map((file) => {
 
 // Start the slow browser suites first so they are not the long tail at the end.
 suites.sort((a, b) => Number(b.lanes.includes('browser')) - Number(a.lanes.includes('browser')));
+
+/**
+ * Builds Vite's dependency cache once, before any browser suite starts.
+ *
+ * Every browser suite starts its own dev server, and they all share one
+ * cache (node_modules/.vite). On a first run, or after an install, that
+ * cache is empty - so several servers build it at the same moment, and each
+ * tells its page to reload when the dependencies under it change. A suite
+ * that was mid-check then fails, and passes when run again because by then
+ * the cache exists. Building it here, once, removes the race.
+ *
+ * VITE_PERF_INSTRUMENTATION must match what startDevServers gives its
+ * servers (scripts/lib/devServers.ts): it is part of the config Vite keys
+ * the cache on, and a cache built without it is discarded.
+ */
+function warmViteCache(): void {
+  const started = Date.now();
+  const result = spawnSync(process.execPath, ['node_modules/vite/bin/vite.js', 'optimize'], {
+    cwd: rootDir,
+    env: { ...process.env, VITE_PERF_INSTRUMENTATION: '1' },
+    encoding: 'utf8',
+  });
+  if (result.status === 0) {
+    console.log(
+      `Prepared the dev server's dependency cache (${((Date.now() - started) / 1000).toFixed(1)}s).`,
+    );
+  } else {
+    // Not fatal: the suites build the cache themselves, as they always did.
+    console.warn(
+      "Could not prepare the dev server's dependency cache; browser suites may be flaky on this first run.",
+    );
+    const detail = (result.stderr || result.error?.message || '').trim();
+    if (detail) console.warn(detail.split('\n').slice(-3).join('\n'));
+  }
+}
+
+if (suites.some((suite) => suite.lanes.includes('browser'))) warmViteCache();
 
 console.log(
   `\nRunning ${suites.length} test suite(s) with up to ${JOBS} in parallel` +
