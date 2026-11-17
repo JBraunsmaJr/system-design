@@ -129,7 +129,10 @@ export default defineConfig({
       workbox: {
         navigateFallbackDenylist: [/\/docs(\/|$)/],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
-        globPatterns: ['**/*.{js,css,html,png,jpg,jpeg,gif,svg,ico}'],
+        // mjs: the PDF preview's worker. Left out, it is fetched from the
+        // network every time, so the preview fails offline and for a tab
+        // still running the previous build after a deploy.
+        globPatterns: ['**/*.{js,mjs,css,html,png,jpg,jpeg,gif,svg,ico}'],
       },
     }),
   ],

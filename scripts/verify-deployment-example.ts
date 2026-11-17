@@ -414,6 +414,29 @@ for (const example of ['workspace', 'core']) {
   }
 }
 
+console.log('\n=== The editor image serves every script as a script ===');
+{
+  // nginx's stock list of types has no .mjs, and a browser will not run a
+  // module served as application/octet-stream. The PDF preview's worker is
+  // an .mjs file, and so is anything else Vite emits from an .mjs source.
+  const conf = readFileSync('docker/nginx.conf', 'utf8').replace(/#.*$/gm, '');
+  const typesBlock = /\btypes\s*\{([^}]*)\}/.exec(conf)?.[1] ?? '';
+  check(
+    /\b(application|text)\/javascript\s+[^;]*\bmjs\b/.test(typesBlock),
+    'docker/nginx.conf serves .mjs as JavaScript',
+  );
+  check(
+    /\binclude\s+\/etc\/nginx\/mime\.types\s*;/.test(conf),
+    'and keeps every other type: a types block alone would replace the whole list',
+  );
+  const vite = readFileSync('vite.config.ts', 'utf8');
+  const cached = /globPatterns:\s*\[\s*'\*\*\/\*\.\{([^}]*)\}'/.exec(vite)?.[1].split(',') ?? [];
+  check(
+    cached.includes('mjs') && cached.includes('js'),
+    'the offline cache keeps .mjs files too, so the PDF preview works offline and after an update',
+  );
+}
+
 if (failures > 0) {
   console.error(`\n${failures} check(s) failed`);
   process.exit(1);
