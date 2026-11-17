@@ -20,7 +20,7 @@ American English.
 
 ## [Unreleased]
 
-- Fixed CSS issue
+- [PATCH] Fixed CSS issue
 
 ## [1.0.0] - 2026-11-17
 
