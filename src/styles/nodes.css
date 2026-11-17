@@ -1164,10 +1164,6 @@
   --lod-scale: 1;
 }
 
-.canvas[data-lod='overview'] .typed-node {
-  position: relative;
-}
-
 .canvas[data-lod='overview'] .typed-node > :not(.react-flow__handle):not(.edge-grab) {
   visibility: hidden;
 }
