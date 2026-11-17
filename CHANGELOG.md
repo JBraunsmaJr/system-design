@@ -20,6 +20,8 @@ American English.
 
 ## [Unreleased]
 
+- Fixed CSS issue
+
 ## [1.0.0] - 2026-11-17
 
 ### Workspaces replace the encrypted workspace
