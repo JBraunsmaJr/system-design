@@ -86,6 +86,11 @@ export interface UseCollabSessionOptions {
   signedInName: string | null;
   /** Must be stable (App's showToast is a useCallback with no deps). */
   showToast: (message: string, type?: ToastType, description?: string) => void;
+  /**
+   * A relay token for a workspace document's room on a trusted store; see
+   * RelayAccessOptions.tokenForRoom. Must be stable.
+   */
+  relayTokenFor?: (room: string) => Promise<string | null | undefined>;
 }
 
 /**
@@ -105,6 +110,7 @@ export function useCollabSession({
   storeUrl,
   signedInName,
   showToast,
+  relayTokenFor,
 }: UseCollabSessionOptions) {
   // --- Collaborative sessions -----------------------------------------------
   //
@@ -178,18 +184,18 @@ export function useCollabSession({
   // inherits the previous one's confirmed state.
   useEffect(() => {
     if (!activeSession) return;
-    let cancelled = false;
+    let canceled = false;
     const { persistence } = activeSession.session;
     const owner = activeSession.session;
     void persistence.whenSynced.then(() => {
-      if (cancelled) return;
+      if (canceled) return;
       // whenSynced resolves even when the database could not be opened - the
       // provider reports that by never having stored anything - so this is the
       // point where the state becomes known either way.
       setSessionPersistence({ session: owner, state: 'active' });
     });
     return () => {
-      cancelled = true;
+      canceled = true;
     };
   }, [activeSession]);
 
@@ -414,7 +420,12 @@ export function useCollabSession({
       // Where the relay requires membership, the store issues a token for
       // this room first (WS10-R6). Untouched where it does not, which is
       // every deployment that has no store.
-      const relay = await authorizeRelayUrls({ storeUrl, room: roomName, urls: signalingUrls });
+      const relay = await authorizeRelayUrls({
+        storeUrl,
+        room: roomName,
+        urls: signalingUrls,
+        tokenForRoom: relayTokenFor,
+      });
       if (relay.note) showToast(relay.note);
       const session = startCollabSession(doc, roomName, {
         signalingUrls: relay.urls,
@@ -477,6 +488,7 @@ export function useCollabSession({
       presenceName,
       showToast,
       storeUrl,
+      relayTokenFor,
     ],
   );
 

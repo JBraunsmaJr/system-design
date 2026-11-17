@@ -185,6 +185,8 @@ class MockDOMNode {
     }
 
     const path: MockDOMNode[] = [];
+    // Walks up from this node; the alias is the loop cursor, not a captured `this`.
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
     let curr: MockDOMNode | null = this;
     while (curr) {
       path.push(curr);

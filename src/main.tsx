@@ -13,9 +13,16 @@ import '@fontsource/jetbrains-mono/400.css';
 import '@fontsource/jetbrains-mono/500.css';
 import './index.css';
 import App from './App.tsx';
+import { getStoreUrl } from './domain/storage/storeConfig.ts';
+import { resolveStoreMode } from './collab/trusted/storeMode.ts';
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-);
+// Which API the store speaks decides how the editor is wired, so it is
+// settled before the first render (see storeMode.ts). With no store
+// configured, or a store asked on an earlier visit, this does not wait.
+void resolveStoreMode(getStoreUrl()).then(() => {
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  );
+});

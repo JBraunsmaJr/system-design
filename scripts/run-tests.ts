@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'fs';
 import { availableParallelism } from 'os';
 import { join, relative, resolve } from 'path';
-import { spawn } from 'child_process';
+import { spawn, spawnSync } from 'child_process';
 
 function findFiles(dir: string, pattern: RegExp): string[] {
   const results: string[] = [];
@@ -58,9 +58,12 @@ const TSX_CLI = join(rootDir, 'node_modules', 'tsx', 'dist', 'cli.mjs');
 const testPattern = /\.(verify|test|spec)\.(ts|tsx|js|jsx|mjs)$/;
 const srcFiles = findFiles(join(rootDir, 'src'), testPattern);
 const scriptFiles = findFiles(join(rootDir, 'scripts'), /^verify-.*\.(ts|js)$/);
+// The store's own suites (store/src/*.verify.ts). They sat outside src/ and
+// scripts/, so for a time nothing ran them.
+const storeFiles = findFiles(join(rootDir, 'store'), testPattern);
 const rootTestFiles = findFiles(rootDir, /^test-.*\.(mjs|js|ts)$/);
 
-let allTestFiles = [...srcFiles, ...scriptFiles, ...rootTestFiles].sort();
+let allTestFiles = [...srcFiles, ...storeFiles, ...scriptFiles, ...rootTestFiles].sort();
 
 if (filterArg) {
   allTestFiles = allTestFiles.filter((f) => f.toLowerCase().includes(filterArg.toLowerCase()));
@@ -91,12 +94,51 @@ const suites: Suite[] = allTestFiles.map((file) => {
   const source = readFileSync(file, 'utf-8');
   const lanes: Lane[] = [];
   if (/from ['"]playwright['"]|startDevServers/.test(source)) lanes.push('browser');
-  if (/DATABASE_URL/.test(source)) lanes.push('postgres');
+  // Suites built on lib/joinHarness.ts reach PostgreSQL through it, without
+  // naming DATABASE_URL themselves.
+  if (/DATABASE_URL|joinHarness/.test(source)) lanes.push('postgres');
   return { file, relPath: relative(rootDir, file), lanes };
 });
 
 // Start the slow browser suites first so they are not the long tail at the end.
 suites.sort((a, b) => Number(b.lanes.includes('browser')) - Number(a.lanes.includes('browser')));
+
+/**
+ * Builds Vite's dependency cache once, before any browser suite starts.
+ *
+ * Every browser suite starts its own dev server, and they all share one
+ * cache (node_modules/.vite). On a first run, or after an install, that
+ * cache is empty - so several servers build it at the same moment, and each
+ * tells its page to reload when the dependencies under it change. A suite
+ * that was mid-check then fails, and passes when run again because by then
+ * the cache exists. Building it here, once, removes the race.
+ *
+ * VITE_PERF_INSTRUMENTATION must match what startDevServers gives its
+ * servers (scripts/lib/devServers.ts): it is part of the config Vite keys
+ * the cache on, and a cache built without it is discarded.
+ */
+function warmViteCache(): void {
+  const started = Date.now();
+  const result = spawnSync(process.execPath, ['node_modules/vite/bin/vite.js', 'optimize'], {
+    cwd: rootDir,
+    env: { ...process.env, VITE_PERF_INSTRUMENTATION: '1' },
+    encoding: 'utf8',
+  });
+  if (result.status === 0) {
+    console.log(
+      `Prepared the dev server's dependency cache (${((Date.now() - started) / 1000).toFixed(1)}s).`,
+    );
+  } else {
+    // Not fatal: the suites build the cache themselves, as they always did.
+    console.warn(
+      "Could not prepare the dev server's dependency cache; browser suites may be flaky on this first run.",
+    );
+    const detail = (result.stderr || result.error?.message || '').trim();
+    if (detail) console.warn(detail.split('\n').slice(-3).join('\n'));
+  }
+}
+
+if (suites.some((suite) => suite.lanes.includes('browser'))) warmViteCache();
 
 console.log(
   `\nRunning ${suites.length} test suite(s) with up to ${JOBS} in parallel` +

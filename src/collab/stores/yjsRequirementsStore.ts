@@ -1,5 +1,5 @@
 import * as Y from 'yjs';
-import {orderIdSet, pushIfAbsent} from '../sync/seedGuards.ts';
+import { orderIdSet, pushIfAbsent } from '../sync/seedGuards.ts';
 import type {
   RelationshipType,
   RequirementCategory,
@@ -20,8 +20,8 @@ import {
   PARENT_OF_RELATIONSHIP_TYPE_ID,
   updateItemReferencesInText,
 } from '../../domain/requirements/requirementsRegistry';
-import {mergedPatches, type RequirementsStore} from './requirementsStore';
-import {normalizeTags} from '../../domain/requirements/requirementTags';
+import { mergedPatches, type RequirementsStore } from './requirementsStore';
+import { normalizeTags } from '../../domain/requirements/requirementTags';
 
 /** Item storage keys are purely internal - never displayed, never
  * referenced by anything outside this file (see this file's top doc
@@ -32,12 +32,22 @@ function collisionResistantId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
-/** The item fields an architecture decision adds (see RequirementItem). */
-const DECISION_ITEM_FIELDS = [
+/** The item fields only some items carry: an architecture decision's
+ * sections, and a requirement's verification and attributes (see
+ * RequirementItem). */
+const OPTIONAL_ITEM_FIELDS = [
   'decisionStatus',
   'decisionOptions',
   'decisionOutcome',
   'decisionConsequences',
+  'verificationMethod',
+  'verificationStatus',
+  'verificationNote',
+  'priority',
+  'lifecycle',
+  'ownerId',
+  'ownerName',
+  'targetMilestoneId',
 ] as const satisfies readonly (keyof RequirementItem)[];
 
 /**
@@ -118,9 +128,9 @@ export function seedYjsRequirementsDoc(doc: Y.Doc, initial: RequirementsDocument
       m.set('assigneeId', item.assigneeId);
       m.set('points', item.points);
       m.set('status', item.status);
-      // Decision fields only when present, so seeding an ordinary item
-      // writes exactly the keys it always has.
-      for (const field of DECISION_ITEM_FIELDS) {
+      // Only when present, so seeding an ordinary item writes exactly the
+      // keys it always has.
+      for (const field of OPTIONAL_ITEM_FIELDS) {
         if (item[field] !== undefined) m.set(field, item[field]);
       }
       // Same: only when the item has tags.
@@ -173,7 +183,7 @@ export function topUpBuiltInTypes(doc: Y.Doc): boolean {
   }));
   const missingItemTypes = builtInTypesToAdd(existing);
   const missingRelationshipTypes = BUILT_IN_RELATIONSHIP_TYPES.filter(
-      (t) => !relationshipTypes.has(t.id),
+    (t) => !relationshipTypes.has(t.id),
   );
   if (missingItemTypes.length === 0 && missingRelationshipTypes.length === 0) return false;
 
@@ -324,6 +334,14 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
       decisionOptions: m.get('decisionOptions') as string | undefined,
       decisionOutcome: m.get('decisionOutcome') as string | undefined,
       decisionConsequences: m.get('decisionConsequences') as string | undefined,
+      verificationMethod: m.get('verificationMethod') as RequirementItem['verificationMethod'],
+      verificationStatus: m.get('verificationStatus') as RequirementItem['verificationStatus'],
+      verificationNote: m.get('verificationNote') as string | undefined,
+      priority: m.get('priority') as RequirementItem['priority'],
+      lifecycle: m.get('lifecycle') as RequirementItem['lifecycle'],
+      ownerId: m.get('ownerId') as string | undefined,
+      ownerName: m.get('ownerName') as string | undefined,
+      targetMilestoneId: m.get('targetMilestoneId') as string | undefined,
     };
     // Only present when the item has tags, so an untagged item's snapshot
     // has exactly the keys it always had. Normalized on the way out: tags
@@ -928,7 +946,7 @@ export function createYjsRequirementsStore(doc: Y.Doc): RequirementsStore {
             const text = itemMap.get(field) as string | undefined;
             if (!text) continue;
             let updated = text;
-              for (const {oldId, newId} of conversions) {
+            for (const { oldId, newId } of conversions) {
               if (updated.includes(`#${oldId}`) || updated.includes(`#ref:${oldId}`)) {
                 updated = updateItemReferencesInText(updated, oldId, newId);
               }

@@ -47,7 +47,6 @@ async function rejects(work: () => Promise<unknown>, reason: string, message: st
 
 const bytes = (value: string) => new TextEncoder().encode(value);
 const readable = (value: Uint8Array) => new TextDecoder().decode(value);
-const KEYS = { wrappedForWorkspace: 'd29ya3NwYWNl', wrappedForRecovery: 'cmVjb3Zlcnk=' };
 
 /**
  * The suite runs against every backend configured, and the same checks must
@@ -117,13 +116,13 @@ async function runContract() {
   console.log('=== Documents and opaque blobs (WS8-R1) ===');
   {
     const { service } = await newService();
-    const created = await service.create({ docId: 'doc-a', keys: KEYS });
+    const created = await service.create({ docId: 'doc-a' });
     check(
       created.version === 1 && created.blobs.length === 0,
       'a new document starts at version 1 with no blobs',
     );
     await rejects(
-      () => service.create({ docId: 'doc-a', keys: KEYS }),
+      () => service.create({ docId: 'doc-a' }),
       'conflict',
       'creating it twice is a conflict',
     );
@@ -142,16 +141,13 @@ async function runContract() {
         read.blobs[0].bytes.length === sealed.length,
       'a blob comes back byte for byte, including bytes that are not valid text',
     );
-    check(
-      read.record.keys.wrappedForRecovery === KEYS.wrappedForRecovery,
-      'the wrapped keys are stored and returned unchanged',
-    );
+    check(!('keys' in read.record), 'and a document carries no keys: its updates are all there is');
   }
 
   console.log('\n=== Versions only ever move forward (WS8-R15) ===');
   {
     const { service } = await newService();
-    await service.create({ docId: 'doc-v', keys: KEYS });
+    await service.create({ docId: 'doc-v' });
     const first = await service.append({ docId: 'doc-v', kind: 'update', bytes: bytes('one') });
     const second = await service.append({ docId: 'doc-v', kind: 'update', bytes: bytes('two') });
     check(
@@ -189,7 +185,7 @@ async function runContract() {
   console.log('\n=== A failed write leaves nothing behind (WS8-R16) ===');
   {
     const { blobs, service } = await newService();
-    await service.create({ docId: 'doc-f', keys: KEYS });
+    await service.create({ docId: 'doc-f' });
     await service.append({ docId: 'doc-f', kind: 'update', bytes: bytes('kept') });
     const before = await service.head('doc-f');
     const bytesBefore = await blobs.totalBytes();
@@ -241,7 +237,7 @@ async function runContract() {
   console.log('\n=== Compaction, delete, restore, purge ===');
   {
     const { blobs, service } = await newService();
-    await service.create({ docId: 'doc-c', keys: KEYS });
+    await service.create({ docId: 'doc-c' });
     for (let i = 0; i < 20; i++)
       await service.append({ docId: 'doc-c', kind: 'update', bytes: bytes(`update ${i}`) });
     const before = await service.head('doc-c');
@@ -306,7 +302,7 @@ async function runContract() {
     // first-call costs: it made listing 10 documents look slower than 500.
     {
       const { service } = await newService();
-      await service.create({ docId: 'warm', keys: KEYS });
+      await service.create({ docId: 'warm' });
       await service.append({ docId: 'warm', kind: 'update', bytes: sealedUpdate });
       await service.read('warm');
       await service.list();
@@ -329,7 +325,7 @@ async function runContract() {
     let openWorst = 0;
     for (const blobCount of [10, 100, 1000]) {
       const { blobs, service } = await newService();
-      await service.create({ docId: 'doc-n', keys: KEYS });
+      await service.create({ docId: 'doc-n' });
       let appendTotal = 0;
       for (let i = 0; i < blobCount; i++) {
         const [, ms] = await timed(
@@ -352,7 +348,7 @@ async function runContract() {
     for (const documentCount of [10, 500]) {
       const { service } = await newService();
       for (let i = 0; i < documentCount; i++) {
-        await service.create({ docId: `doc-${i}`, keys: KEYS });
+        await service.create({ docId: `doc-${i}` });
         await service.append({ docId: `doc-${i}`, kind: 'snapshot', bytes: snapshot });
       }
       const [listed, listMs] = await timed(() => service.list());

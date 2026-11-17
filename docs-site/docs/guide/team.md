@@ -14,7 +14,7 @@ Building an accurate capacity model starts with maintaining your engineering ros
 
 ### Adding Team Members
 
-1. In the **Team** view, navigate to the **Members** tab and click **+ Member**.
+1. Open the **Plan** tab and choose **Team**. On the **Members** tab, click **+ Member**.
 2. **Name & Role**: Enter the member's full name and optional engineering role (e.g., _Frontend Engineer_, _Staff Architect_, _QA Lead_).
 3. **Avatar Color**: Choose a distinct avatar accent color from the palette for easy visual identification across ticket cards and presence indicators.
 4. **Daily Points Override**:

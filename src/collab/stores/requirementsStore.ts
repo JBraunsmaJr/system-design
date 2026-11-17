@@ -3,7 +3,7 @@ import type {
   RequirementItemType,
   RequirementsDocument,
 } from '../../domain/requirements/requirementsTypes';
-import {EMPTY_REQUIREMENTS_DOCUMENT} from '../../domain/requirements/requirementsTypes';
+import { EMPTY_REQUIREMENTS_DOCUMENT } from '../../domain/requirements/requirementsTypes';
 import {
   addRelationship as addRelationshipPure,
   buildChildItemParts,
@@ -20,10 +20,10 @@ import {
 /** updateItems' input as one patch per id - later entries for the same id
  * win field by field, as calling updateItem for each in order would. */
 export function mergedPatches(
-    updates: { id: string; patch: Partial<RequirementItem> }[],
+  updates: { id: string; patch: Partial<RequirementItem> }[],
 ): Map<string, Partial<RequirementItem>> {
   const byId = new Map<string, Partial<RequirementItem>>();
-  for (const {id, patch} of updates) byId.set(id, {...byId.get(id), ...patch});
+  for (const { id, patch } of updates) byId.set(id, { ...byId.get(id), ...patch });
   return byId;
 }
 
@@ -71,7 +71,7 @@ export interface RequirementsStore {
    * single change notification - for bulk edits from the Requirements
    * view. Ids that don't exist are skipped. */
   updateItems(
-      updates: { id: string; patch: Partial<Omit<RequirementItem, 'id' | 'typeId'>> }[],
+    updates: { id: string; patch: Partial<Omit<RequirementItem, 'id' | 'typeId'>> }[],
   ): void;
   /** Converts an existing item to a different type, adjusting its ID and workable fields as needed, retroactively updating all references */
   convertItemType(id: string, newTypeId: string): string | undefined;
@@ -205,7 +205,7 @@ export function createLocalRequirementsStore(
         ...doc,
         items: doc.items.map((i) => {
           const patch = patchById.get(i.id);
-          return patch ? {...i, ...patch} : i;
+          return patch ? { ...i, ...patch } : i;
         }),
       };
       notify();
@@ -409,7 +409,7 @@ export function createLocalRequirementsStore(
  * A RequirementsStore that owns no state of its own - same purpose and
  * reasoning as createAdapterTeamStore in teamStore.ts. Requirements is
  * mutated by THREE separate views today (RequirementsView, TimelineView,
- * SkillTreeView), each with its own inline transforms - this adapter
+ * DependenciesView), each with its own inline transforms - this adapter
  * gives all three a single, shared, named-operation interface instead,
  * constructed once in App.tsx and passed to all three, while
  * `requirements` itself stays exactly where it already lives in the
@@ -472,7 +472,7 @@ export function createAdapterRequirementsStore(
         ...prev,
         items: prev.items.map((i) => {
           const patch = patchById.get(i.id);
-          return patch ? {...i, ...patch} : i;
+          return patch ? { ...i, ...patch } : i;
         }),
       }));
     },

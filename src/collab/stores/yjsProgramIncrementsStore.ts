@@ -1,5 +1,5 @@
 import * as Y from 'yjs';
-import {orderIdSet, pushIfAbsent} from '../sync/seedGuards.ts';
+import { orderIdSet, pushIfAbsent } from '../sync/seedGuards.ts';
 import type {
   CapacityReservation,
   PlanningDetails,
@@ -13,7 +13,7 @@ import {
   PLANNING_DETAIL_KEYS,
   updateSprintEndDate,
 } from '../../domain/timeline/programIncrements';
-import type {ProgramIncrementsStore} from './programIncrementsStore';
+import type { ProgramIncrementsStore } from './programIncrementsStore';
 
 /** PI and sprint ids are purely internal (never displayed - see
  * programIncrementsStore.ts's doc comment), so there's no reason not to

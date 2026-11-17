@@ -12,10 +12,10 @@ export type Mixed<T> = T | typeof MIXED;
  * there's no value to show for nothing.
  */
 export function sharedValue<T, V>(items: readonly T[], read: (item: T) => V): Mixed<V> {
-    if (items.length === 0) return MIXED;
-    const first = read(items[0]);
-    for (let i = 1; i < items.length; i++) {
-        if (read(items[i]) !== first) return MIXED;
-    }
-    return first;
+  if (items.length === 0) return MIXED;
+  const first = read(items[0]);
+  for (let i = 1; i < items.length; i++) {
+    if (read(items[i]) !== first) return MIXED;
+  }
+  return first;
 }

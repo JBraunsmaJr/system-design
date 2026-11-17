@@ -1,11 +1,11 @@
-import {type Node, type NodeProps, NodeResizer, useReactFlow} from '@xyflow/react';
+import { type Node, type NodeProps, NodeResizer, useReactFlow } from '@xyflow/react';
 import * as Icons from 'lucide-react';
-import {getGroupType} from '../../../domain/canvas/groupRegistry';
-import {EdgeHandles} from './EdgeHandles';
-import type {ArchNodeData} from '../../../domain/canvas/types';
-import {useCanvasContext} from '../CanvasContext';
-import {recordNodeRender} from '../../../perf/instrumentation';
-import {LinkedDocumentBadge} from './LinkedDocumentBadge';
+import { getGroupType } from '../../../domain/canvas/groupRegistry';
+import { EdgeHandles } from './EdgeHandles';
+import type { ArchNodeData } from '../../../domain/canvas/types';
+import { useCanvasContext } from '../CanvasContext';
+import { recordNodeRender } from '../../../perf/instrumentation';
+import { LinkedDocumentBadge } from './LinkedDocumentBadge';
 
 type GroupNodeType = Node<ArchNodeData, 'group'>;
 
@@ -76,7 +76,7 @@ export function GroupNode({
           click-through. Same reasoning applies to EdgeHandles just
           below it. */}
       <NodeResizer
-          isVisible={selected && !data.locked}
+        isVisible={selected && !data.locked}
         minWidth={220}
         minHeight={140}
         lineClassName="node-resize-line"
@@ -137,7 +137,7 @@ export function GroupNode({
         <div className="group-node__label" style={{ borderColor, color: accent }}>
           <IconComponent size={12} />
           <span>{data.label}</span>
-            <LinkedDocumentBadge value={data.linkedDocument} className="group-node__doc-link"/>
+          <LinkedDocumentBadge value={data.linkedDocument} className="group-node__doc-link" />
         </div>
       </div>
     </>

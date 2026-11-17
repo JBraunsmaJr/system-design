@@ -1,21 +1,26 @@
 import {
-    type MouseEvent as ReactMouseEvent,
-    type RefObject,
-    useCallback,
-    useEffect,
-    useLayoutEffect,
-    useMemo,
-    useRef,
-    useState,
+  type MouseEvent as ReactMouseEvent,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
 } from 'react';
-import {type Edge, type Node} from '@xyflow/react';
-import {getEdgeType} from '../../domain/canvas/edgeRegistry';
-import {defaultNodeColor, defaultNodeIcon, nodeColorOverride, nodeColorPatch,} from '../../domain/canvas/nodeDefaults';
-import type {CopiedStyle} from '../../domain/canvas/styleClipboard';
-import type {ArrangeCommand} from '../../domain/canvas/arrange';
-import type {ArchEdgeData, ArchEdgeDataPatch, ArchNodeData} from '../../domain/canvas/types';
-import type {RequirementsDocument} from '../../domain/requirements/requirementsTypes';
-import type {CanvasProps} from './Canvas';
+import { type Edge, type Node } from '@xyflow/react';
+import { getEdgeType } from '../../domain/canvas/edgeRegistry';
+import {
+  defaultNodeColor,
+  defaultNodeIcon,
+  nodeColorOverride,
+  nodeColorPatch,
+} from '../../domain/canvas/nodeDefaults';
+import type { CopiedStyle } from '../../domain/canvas/styleClipboard';
+import type { ArrangeCommand } from '../../domain/canvas/arrange';
+import type { ArchEdgeData, ArchEdgeDataPatch, ArchNodeData } from '../../domain/canvas/types';
+import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
+import type { CanvasProps } from './Canvas';
 
 // Clamped so the menu and submenus never open partly off-screen. The height
 // is only the first guess - CanvasContextMenu measures itself once open and
@@ -29,23 +34,23 @@ export const CONTEXT_MENU_HEIGHT = 240;
  * without it the menu shows only what it always did.
  */
 export interface CanvasContextActions {
-    onUpdateNodes: (updates: { id: string; patch: Partial<ArchNodeData> }[]) => void;
-    onUpdateEdges: (updates: { id: string; patch: ArchEdgeDataPatch }[]) => void;
-    onDuplicate: (nodeIds: string[]) => void;
-    /** Saves the nodes (and what copying them brings along) as a reusable
-     * fragment in the palette. Optional: without it the command isn't offered. */
-    onSaveFragment?: (nodeIds: string[], name: string) => void;
-    onGroup: (nodeIds: string[]) => void;
-    onUngroup: (nodeIds: string[]) => void;
-    onSetLocked: (nodeIds: string[], locked: boolean) => void;
-    onCopyStyle: (nodeIds: string[], edgeIds: string[]) => void;
-    onPasteStyle: (nodeIds: string[], edgeIds: string[]) => void;
-    /** What "Paste style" would apply, or null when nothing's been copied. */
-    copiedStyle: CopiedStyle | null;
-    /** For "Link requirement". */
-    requirements: RequirementsDocument;
-    /** Align / distribute / match size - see domain/canvas/arrange.ts. */
-    onArrange: (command: ArrangeCommand, nodeIds: string[]) => void;
+  onUpdateNodes: (updates: { id: string; patch: Partial<ArchNodeData> }[]) => void;
+  onUpdateEdges: (updates: { id: string; patch: ArchEdgeDataPatch }[]) => void;
+  onDuplicate: (nodeIds: string[]) => void;
+  /** Saves the nodes (and what copying them brings along) as a reusable
+   * fragment in the palette. Optional: without it the command isn't offered. */
+  onSaveFragment?: (nodeIds: string[], name: string) => void;
+  onGroup: (nodeIds: string[]) => void;
+  onUngroup: (nodeIds: string[]) => void;
+  onSetLocked: (nodeIds: string[], locked: boolean) => void;
+  onCopyStyle: (nodeIds: string[], edgeIds: string[]) => void;
+  onPasteStyle: (nodeIds: string[], edgeIds: string[]) => void;
+  /** What "Paste style" would apply, or null when nothing's been copied. */
+  copiedStyle: CopiedStyle | null;
+  /** For "Link requirement". */
+  requirements: RequirementsDocument;
+  /** Align / distribute / match size - see domain/canvas/arrange.ts. */
+  onArrange: (command: ArrangeCommand, nodeIds: string[]) => void;
 }
 
 export type ContextSubmenu = 'color' | 'icon' | 'requirements' | 'arrange' | 'fragment';
@@ -64,22 +69,22 @@ export type ContextSubmenu = 'color' | 'icon' | 'requirements' | 'arrange' | 'fr
 export function useCanvasContextMenu({
   isPresenting,
   nodes,
-                                         edges,
+  edges,
   nodesRef,
   onUpdateNode,
-                                         onUpdateEdge,
-                                         contextActions,
-                                     }: Pick<CanvasProps, 'nodes' | 'edges' | 'onUpdateNode' | 'onUpdateEdge' | 'contextActions'> & {
+  onUpdateEdge,
+  contextActions,
+}: Pick<CanvasProps, 'nodes' | 'edges' | 'onUpdateNode' | 'onUpdateEdge' | 'contextActions'> & {
   isPresenting: boolean;
   nodesRef: RefObject<Node<ArchNodeData>[]>;
 }) {
-    // Read at call time by openEdgeContextMenu, which goes to React Flow and
-    // from there to every edge - depending on `edges` directly would give it
-    // a new identity on every change and re-render all of them.
-    const edgesRef = useRef(edges);
-    useLayoutEffect(() => {
-        edgesRef.current = edges;
-    }, [edges]);
+  // Read at call time by openEdgeContextMenu, which goes to React Flow and
+  // from there to every edge - depending on `edges` directly would give it
+  // a new identity on every change and re-render all of them.
+  const edgesRef = useRef(edges);
+  useLayoutEffect(() => {
+    edgesRef.current = edges;
+  }, [edges]);
 
   /**
    * Right-click menu state. Position is in VIEWPORT coordinates (the menu
@@ -90,13 +95,13 @@ export function useCanvasContextMenu({
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
-      /** Nodes the menu acts on. */
+    /** Nodes the menu acts on. */
     targetIds: string[];
-      /** Edges it acts on - the selected ones when right-clicking inside a
-       * selection, or the one edge right-clicked. */
-      targetEdgeIds: string[];
+    /** Edges it acts on - the selected ones when right-clicking inside a
+     * selection, or the one edge right-clicked. */
+    targetEdgeIds: string[];
   } | null>(null);
-    const [activeSubmenu, setActiveSubmenu] = useState<ContextSubmenu | null>(null);
+  const [activeSubmenu, setActiveSubmenu] = useState<ContextSubmenu | null>(null);
 
   const closeContextMenu = useCallback(() => {
     setContextMenu(null);
@@ -104,66 +109,66 @@ export function useCanvasContextMenu({
   }, []);
 
   const openContextMenu = useCallback(
-      (event: ReactMouseEvent, nodeId: string | null, edgeId: string | null = null) => {
+    (event: ReactMouseEvent, nodeId: string | null, edgeId: string | null = null) => {
       if (isPresenting) return; // the locked slideshow view has nothing to arrange
       event.preventDefault();
 
       const selectedIds = nodesRef.current.filter((n) => n.selected).map((n) => n.id);
-          const selectedEdgeIds = edgesRef.current.filter((e) => e.selected).map((e) => e.id);
+      const selectedEdgeIds = edgesRef.current.filter((e) => e.selected).map((e) => e.id);
       // Right-clicking inside a multi-selection acts on the whole
-          // selection; right-clicking a node or edge outside it acts on just
-          // that one, which is what every other editor does and avoids silently
+      // selection; right-clicking a node or edge outside it acts on just
+      // that one, which is what every other editor does and avoids silently
       // reordering something off-screen.
-          const insideSelection =
-              (nodeId === null && edgeId === null) ||
-              (nodeId !== null && selectedIds.includes(nodeId)) ||
-              (edgeId !== null && selectedEdgeIds.includes(edgeId));
-          const targetIds = insideSelection ? selectedIds : nodeId !== null ? [nodeId] : [];
-          const targetEdgeIds = insideSelection ? selectedEdgeIds : edgeId !== null ? [edgeId] : [];
-          if (targetIds.length === 0 && targetEdgeIds.length === 0) return;
+      const insideSelection =
+        (nodeId === null && edgeId === null) ||
+        (nodeId !== null && selectedIds.includes(nodeId)) ||
+        (edgeId !== null && selectedEdgeIds.includes(edgeId));
+      const targetIds = insideSelection ? selectedIds : nodeId !== null ? [nodeId] : [];
+      const targetEdgeIds = insideSelection ? selectedEdgeIds : edgeId !== null ? [edgeId] : [];
+      if (targetIds.length === 0 && targetEdgeIds.length === 0) return;
 
       // Clamped so the menu never opens partly off-screen.
       const left = Math.min(event.clientX, window.innerWidth - CONTEXT_MENU_WIDTH - 8);
       const top = Math.min(event.clientY, window.innerHeight - CONTEXT_MENU_HEIGHT - 8);
       setActiveSubmenu(null);
-          setContextMenu({x: Math.max(8, left), y: Math.max(8, top), targetIds, targetEdgeIds});
+      setContextMenu({ x: Math.max(8, left), y: Math.max(8, top), targetIds, targetEdgeIds });
     },
     [isPresenting, nodesRef],
   );
 
-    /** Applied to every target in one transaction where App supplies the
-     * batch actions (one undo step), one write per target where it doesn't. */
+  /** Applied to every target in one transaction where App supplies the
+   * batch actions (one undo step), one write per target where it doesn't. */
   const handleColorChange = useCallback(
     (color: string | undefined) => {
       if (!contextMenu) return;
-        const nodeUpdates = contextMenu.targetIds.flatMap((id) => {
+      const nodeUpdates = contextMenu.targetIds.flatMap((id) => {
         const node = nodesRef.current.find((n) => n.id === id);
-            return node ? [{id, patch: nodeColorPatch(node, color)}] : [];
-        });
-        const edgeUpdates = contextMenu.targetEdgeIds.map((id) => ({id, patch: {color}}));
-        if (contextActions) {
-            contextActions.onUpdateNodes(nodeUpdates);
-            contextActions.onUpdateEdges(edgeUpdates);
-        } else {
-            for (const u of nodeUpdates) onUpdateNode(u.id, u.patch);
-            for (const u of edgeUpdates) onUpdateEdge(u.id, u.patch);
+        return node ? [{ id, patch: nodeColorPatch(node, color) }] : [];
+      });
+      const edgeUpdates = contextMenu.targetEdgeIds.map((id) => ({ id, patch: { color } }));
+      if (contextActions) {
+        contextActions.onUpdateNodes(nodeUpdates);
+        contextActions.onUpdateEdges(edgeUpdates);
+      } else {
+        for (const u of nodeUpdates) onUpdateNode(u.id, u.patch);
+        for (const u of edgeUpdates) onUpdateEdge(u.id, u.patch);
       }
       closeContextMenu();
     },
-        [contextMenu, contextActions, onUpdateNode, onUpdateEdge, closeContextMenu, nodesRef],
+    [contextMenu, contextActions, onUpdateNode, onUpdateEdge, closeContextMenu, nodesRef],
   );
 
   const handleIconChange = useCallback(
     (icon: string | undefined) => {
       if (!contextMenu) return;
-        if (contextActions) {
-            contextActions.onUpdateNodes(contextMenu.targetIds.map((id) => ({id, patch: {icon}})));
-        } else {
-            for (const id of contextMenu.targetIds) onUpdateNode(id, {icon});
+      if (contextActions) {
+        contextActions.onUpdateNodes(contextMenu.targetIds.map((id) => ({ id, patch: { icon } })));
+      } else {
+        for (const id of contextMenu.targetIds) onUpdateNode(id, { icon });
       }
       closeContextMenu();
     },
-      [contextMenu, contextActions, onUpdateNode, closeContextMenu],
+    [contextMenu, contextActions, onUpdateNode, closeContextMenu],
   );
 
   const targetPrimaryNode = useMemo(() => {
@@ -171,22 +176,22 @@ export function useCanvasContextMenu({
     return nodes.find((n) => n.id === contextMenu.targetIds[0]);
   }, [contextMenu, nodes]);
 
-    // An edge-only target (right-clicking a line) reads its color from the
-    // first edge instead - see targetEdgeIds.
-    const targetPrimaryEdge = useMemo(() => {
-        if (!contextMenu || targetPrimaryNode || contextMenu.targetEdgeIds.length === 0)
-            return undefined;
-        return edges.find((e) => e.id === contextMenu.targetEdgeIds[0]);
-    }, [contextMenu, targetPrimaryNode, edges]);
+  // An edge-only target (right-clicking a line) reads its color from the
+  // first edge instead - see targetEdgeIds.
+  const targetPrimaryEdge = useMemo(() => {
+    if (!contextMenu || targetPrimaryNode || contextMenu.targetEdgeIds.length === 0)
+      return undefined;
+    return edges.find((e) => e.id === contextMenu.targetEdgeIds[0]);
+  }, [contextMenu, targetPrimaryNode, edges]);
 
   const targetCurrentColor = useMemo(() => {
-      if (targetPrimaryNode) return nodeColorOverride(targetPrimaryNode);
-      return targetPrimaryEdge?.data?.color;
+    if (targetPrimaryNode) return nodeColorOverride(targetPrimaryNode);
+    return targetPrimaryEdge?.data?.color;
   }, [targetPrimaryNode, targetPrimaryEdge]);
 
   const targetDefaultColor = useMemo(() => {
-      if (targetPrimaryNode) return defaultNodeColor(targetPrimaryNode);
-      if (targetPrimaryEdge) return getEdgeType(targetPrimaryEdge.data?.edgeType ?? 'generic').color;
+    if (targetPrimaryNode) return defaultNodeColor(targetPrimaryNode);
+    if (targetPrimaryEdge) return getEdgeType(targetPrimaryEdge.data?.edgeType ?? 'generic').color;
     return '#5B7CFA';
   }, [targetPrimaryNode, targetPrimaryEdge]);
 
@@ -197,7 +202,7 @@ export function useCanvasContextMenu({
 
   const targetDefaultIcon = useMemo(() => {
     if (!targetPrimaryNode) return undefined;
-      return defaultNodeIcon(targetPrimaryNode);
+    return defaultNodeIcon(targetPrimaryNode);
   }, [targetPrimaryNode]);
 
   /**
@@ -217,10 +222,10 @@ export function useCanvasContextMenu({
     (event: ReactMouseEvent) => openContextMenu(event, null),
     [openContextMenu],
   );
-    const onEdgeContextMenu = useCallback(
-        (event: ReactMouseEvent, edge: Edge<ArchEdgeData>) => openContextMenu(event, null, edge.id),
-        [openContextMenu],
-    );
+  const onEdgeContextMenu = useCallback(
+    (event: ReactMouseEvent, edge: Edge<ArchEdgeData>) => openContextMenu(event, null, edge.id),
+    [openContextMenu],
+  );
 
   useEffect(() => {
     if (!contextMenu) return;
@@ -250,6 +255,6 @@ export function useCanvasContextMenu({
     targetDefaultIcon,
     onNodeContextMenu,
     onSelectionContextMenu,
-      onEdgeContextMenu,
+    onEdgeContextMenu,
   };
 }

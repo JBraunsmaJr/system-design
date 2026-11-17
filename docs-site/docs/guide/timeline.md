@@ -4,6 +4,17 @@ The **Timeline** module provides a collaborative Program Increment (PI) planning
 
 ![Timeline Overview](../images/timeline/overview.png)
 
+Planning lives under the **Plan** tab, which has four sections:
+
+| Section          | What it is for                                                                         |
+| ---------------- | -------------------------------------------------------------------------------------- |
+| **Board**        | Program increments, sprint columns and the backlog. This page.                         |
+| **Gantt**        | The same work laid out across sprints. See [Board and Gantt](#_5-board-and-gantt).     |
+| **Dependencies** | Which items are done, ready or blocked. See [Dependencies](#_6-dependencies-blockers). |
+| **Team**         | People, time off and capacity. See [Team & Capacity](/guide/team).                     |
+
+The Plan tab reopens on whichever section you last used.
+
 ---
 
 ## 1. Program Increments & Sprints
@@ -12,14 +23,15 @@ Program Increments (PIs) provide multi-sprint planning intervals (typically 8–
 
 ### Adding a Program Increment
 
-1. In the Timeline toolbar, click **+ Program Increment** (or **+ PI**).
+1. On the **Board**, click **+ Program Increment** in the toolbar.
 2. The editor automatically initializes a new planning interval (e.g., `PI 1`, `PI 2`) starting seamlessly on the day following the previous PI's conclusion.
 3. Sprints within the PI default to standard two-week (14-day) durations.
 
 ### Sprint Management & Cascading Dates
 
-- **Adding Sprints**: Click **+ Sprint** on any PI to add subsequent sprints.
-- **Adjusting Durations**: Modify a sprint's end date directly from the sprint header date picker.
+- **Edit sprints**: Sprint names and dates are folded away under **Edit sprints** on each PI, since they are set up once and rarely change. Click it to open the list.
+- **Adding Sprints**: Click **+ Sprint** at the bottom of that list to add subsequent sprints.
+- **Adjusting Durations**: Modify a sprint's end date from its row in the list.
 - **Automatic Cascading**: Start and end dates for subsequent sprints automatically adjust when an earlier sprint is lengthened or shortened, keeping the timeline perfectly contiguous without manual re-calculation.
 
 ### Goals & Notes
@@ -58,15 +70,28 @@ Milestones appear as distinctive colored point-in-time indicators on sprint head
 
 ## 3. Workable Item Assignment & Scheduling
 
-The timeline board features a backlog drawer for scheduling unassigned actionable items (_Tickets_, _Workable Requirements_, etc.) into target sprints.
+The board has a backlog column on the left for scheduling unassigned actionable items (_Tickets_, _Workable Requirements_, etc.) into target sprints. It stays beside the sprints however far the board scrolls.
 
 ![Assignment](../images/timeline/assignment.png)
 
 ### Scheduling Items
 
-- **Backlog Drawer**: Open the **Backlog** drawer on the left to view all unassigned workable items.
-- **Drag-and-Drop**: Drag tickets directly from the backlog into any sprint column, or drag items between sprints to re-sequence work.
+- **Backlog column**: Lists every unassigned workable item, with a search box for long backlogs. Click the arrow in its header to fold it down to a narrow rail when you want the width for sprints; the rail still shows how many items are waiting.
+- **Drag-and-Drop**: Drag tickets directly from the backlog into any sprint column, or drag items between sprints to re-sequence work. Drop a card on the backlog, folded or not, to take it out of its sprint.
 - **Inline Editing**: Set story point estimates, update status (`To Do`, `In Progress`, `Done`), and assign team members directly on the sprint card.
+
+### Choosing which sprints to show
+
+The board shows every program increment and every sprint by default. To narrow it:
+
+1. Pick a program increment from **Show** in the toolbar. Only that PI is shown.
+2. Its sprints appear as buttons next to it. Click one to focus on that sprint alone, then click others to put them
+   beside it. Click a selected sprint again to hide it.
+3. **All sprints** shows the whole PI again; **All program increments** shows everything.
+
+This suits teams that plan one sprint at a time as well as teams that plan several ahead. The choice is yours alone:
+it is remembered per document in your browser, is not shared with collaborators, and only changes which columns the
+board draws - capacity totals and the Gantt chart still cover every sprint.
 
 ### Real-Time Impact Preview
 
@@ -104,15 +129,15 @@ Every sprint column displays a live capacity gauge comparing planned story point
 
 ---
 
-## 5. Board View vs. Gantt Chart View
+## 5. Board and Gantt
 
-The timeline provides dual viewing modes tailored for sprint-level execution and executive roadmapping.
+The Plan tab provides two views of the same schedule, tailored for sprint-level execution and executive roadmapping.
 
 ![Swap to Gantt Chart](../images/timeline/swap-to-gantt-chart.png)
 
 ### Switching Modes
 
-Click the view toggle in the toolbar to switch between:
+Click **Board** or **Gantt** in the Plan tab's section links to switch between:
 
 - **Board View**: Columnar view organized by Program Increment and Sprint, optimized for backlog grooming and card dragging.
 - **Gantt Chart**: Horizontal timeline visualizing work streams, epics, and milestone deadlines across months and quarters.
@@ -128,16 +153,23 @@ The Gantt chart automatically computes start and end spans for high-level Epics 
 
 ---
 
-## 6. Dependency & Blocker Visualization
+## 6. Dependencies & Blockers
 
 Scheduling mistakes, such as scheduling a dependent ticket before its prerequisite is completed, are flagged automatically.
 
 ![Visualize Blockers](../images/timeline/visualize-blockers.png)
 
 - **Schedule Conflict Warnings**: If Ticket B depends on Ticket A, but Ticket B is placed in an earlier sprint than Ticket A, the system flags the conflict with a visual warning badge (`⚠️`).
+- **On the Gantt chart**: a blocked or at-risk item says why under its title in the item column, for example _Blocked by TICKET-26, not finished until 2026-11-15_. The banner above the chart counts them; click it for the full explanations and a link to each blocker.
 - **Risk Indicators**: Hovering over conflict badges displays the exact relationship chain and recommends re-scheduling adjustments.
 
 ![Visualize Risks](../images/timeline/visualize-risks.png)
+
+### The Dependencies section
+
+The **Dependencies** section of the Plan tab draws every workable item as a card, linked to the items it depends on
+and laid out left to right in the order work can happen. Each card shows whether the item is done, in progress, ready
+to start, or still waiting on something else, so it answers "what can we pick up next?" directly.
 
 ---
 

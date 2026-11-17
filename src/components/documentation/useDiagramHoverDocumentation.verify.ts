@@ -10,6 +10,7 @@ import {
   DEFAULT_HOVER_DELAY,
   DEFAULT_LEAVE_DELAY,
 } from '../../domain/canvas/diagramDocumentation';
+import { isTouchClick } from './useDiagramHoverDocumentation';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {
@@ -132,6 +133,21 @@ assert(DEFAULT_LEAVE_DELAY === 150, 'DEFAULT_LEAVE_DELAY is 150ms');
 
   const emptyDoc = extractNodeDocumentation(emptyNode);
   assert(!hasDocumentation(emptyDoc.documentation), 'Empty node documentation is not meaningful');
+}
+
+// === A click opens the popup only on a touch screen ===
+{
+  const click = (pointerType?: string) =>
+    ({ nativeEvent: pointerType === undefined ? {} : { pointerType } }) as unknown as Parameters<
+      typeof isTouchClick
+    >[0];
+  assert(isTouchClick(click('touch')), 'a tap counts as touch');
+  assert(isTouchClick(click('pen')), 'so does a pen');
+  assert(
+    !isTouchClick(click('mouse')),
+    'a mouse click does not: it selects, and the Inspector shows the rest',
+  );
+  assert(!isTouchClick(click()), 'a click with no pointer type reads as a mouse');
 }
 
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);

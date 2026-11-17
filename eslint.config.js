@@ -20,6 +20,17 @@ export default defineConfig([
       globals: globals.browser,
     },
     rules: {
+      // A leading underscore marks a parameter or binding that is required
+      // by a signature but deliberately unused.
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+          destructuredArrayIgnorePattern: '^_',
+        },
+      ],
       // WS6-R1: all encryption goes through StorageCrypto, so the algorithms,
       // the envelope, and the authenticated context are decided in one place.
       // src/crypto/storageCrypto.ts is the only exception, below.

@@ -329,7 +329,9 @@
 }
 
 .status-picker__dropdown {
-  z-index: 200;
+  /* Above dialogs (BaseModal is 1100) and the store administration page
+     (1150): these menus are used inside both. */
+  z-index: 1200;
   display: flex;
   flex-direction: column;
   gap: 1px;
@@ -361,6 +363,28 @@
 .status-picker__option.is-selected {
   background: var(--chrome-bg);
   font-weight: 700;
+}
+
+/* A second value shown in the trigger (a verification's method). */
+.status-picker__detail {
+  padding-left: 6px;
+  border-left: 1px solid currentColor;
+  color: var(--chrome-text-dim);
+  font-weight: 500;
+}
+
+/* A label between two lists in one menu. */
+.status-picker__heading {
+  margin-top: 4px;
+  padding: 7px 8px 3px;
+  border-top: 1px solid var(--chrome-border);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  color: var(--chrome-text-dim);
+}
+
+.status-picker__heading ~ .status-picker__option {
+  color: var(--chrome-text);
 }
 
 /* ---------- Type Picker (Requirements & Modals) ---------- */
@@ -513,7 +537,9 @@
 }
 
 .status-picker__dropdown {
-  z-index: 200;
+  /* Above dialogs (BaseModal is 1100) and the store administration page
+     (1150): these menus are used inside both. */
+  z-index: 1200;
   display: flex;
   flex-direction: column;
   gap: 1px;

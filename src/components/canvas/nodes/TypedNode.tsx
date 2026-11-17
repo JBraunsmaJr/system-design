@@ -1,12 +1,12 @@
-import {type Node, type NodeProps} from '@xyflow/react';
-import {Maximize2, Unplug} from 'lucide-react';
-import {CATEGORY_LABELS, getNodeType} from '../../../domain/canvas/nodeRegistry';
-import {EdgeHandles} from './EdgeHandles';
-import {IconRenderer} from '../IconRenderer';
-import type {ArchNodeData} from '../../../domain/canvas/types';
-import {useCanvasContext} from '../CanvasContext';
-import {recordNodeRender} from '../../../perf/instrumentation';
-import {LinkedDocumentBadge} from './LinkedDocumentBadge';
+import { type Node, type NodeProps } from '@xyflow/react';
+import { Maximize2, Unplug } from 'lucide-react';
+import { CATEGORY_LABELS, getNodeType } from '../../../domain/canvas/nodeRegistry';
+import { EdgeHandles } from './EdgeHandles';
+import { IconRenderer } from '../IconRenderer';
+import type { ArchNodeData } from '../../../domain/canvas/types';
+import { useCanvasContext } from '../CanvasContext';
+import { recordNodeRender } from '../../../perf/instrumentation';
+import { LinkedDocumentBadge } from './LinkedDocumentBadge';
 
 type TypedNodeType = Node<ArchNodeData, 'typed'>;
 
@@ -44,6 +44,9 @@ export function TypedNode({ id, data, selected, onDrillInto: propOnDrillInto }: 
   return (
     <div
       className={`typed-node${selected ? ' is-selected' : ''}`}
+      // Drawn large over the node when the canvas is zoomed out to its
+      // overview level - see levelOfDetail.ts and nodes.css.
+      data-label={data.label}
       style={{ borderLeftColor: accent }}
     >
       <EdgeHandles />
@@ -89,23 +92,23 @@ export function TypedNode({ id, data, selected, onDrillInto: propOnDrillInto }: 
         </div>
       )}
 
-        <LinkedDocumentBadge value={data.linkedDocument} className="typed-node__doc-link"/>
+      <LinkedDocumentBadge value={data.linkedDocument} className="typed-node__doc-link" />
 
       {unwired > 0 && (
-          <button
-              type="button"
-              className="typed-node__unwired nodrag"
-              onClick={(event) => {
-                  event.stopPropagation();
-                  onDrillInto?.(id);
-              }}
-              disabled={!onDrillInto}
-              title={`${unwired} connection${unwired === 1 ? '' : 's'} not wired inside the sub-diagram${onDrillInto ? ' - open it to wire them up' : ''}`}
-              aria-label={`${unwired} unwired connection${unwired === 1 ? '' : 's'}`}
-          >
-              <Unplug size={10}/>
-              {unwired}
-          </button>
+        <button
+          type="button"
+          className="typed-node__unwired nodrag"
+          onClick={(event) => {
+            event.stopPropagation();
+            onDrillInto?.(id);
+          }}
+          disabled={!onDrillInto}
+          title={`${unwired} connection${unwired === 1 ? '' : 's'} not wired inside the sub-diagram${onDrillInto ? ' - open it to wire them up' : ''}`}
+          aria-label={`${unwired} unwired connection${unwired === 1 ? '' : 's'}`}
+        >
+          <Unplug size={10} />
+          {unwired}
+        </button>
       )}
 
       {onDrillInto && (

@@ -6,9 +6,9 @@
  * is the property an object store cannot give us for free, and the reason the
  * bytes live here until WS8-R17's measurements say otherwise.
  *
- * Every value the store holds for a document is opaque: sealed blobs and
- * wrapped keys. Nothing here interprets them, and a database dump reveals no
- * document content.
+ * A document's updates are stored as the editor sent them. Nothing here
+ * interprets them, but they are not encrypted: a database dump contains
+ * every document.
  */
 import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
@@ -16,7 +16,6 @@ import { fileURLToPath } from 'url';
 import pg from 'pg';
 import type { BlobRef, BlobStore } from './blobStore.ts';
 import { parseRetentionPeriod, purgeDueAt, type RetentionPeriod } from './retention.ts';
-import { IndexError, type WorkspaceIndexStore } from './workspaceIndex.ts';
 import {
   StoreError,
   type AppendRequest,
@@ -93,8 +92,6 @@ interface DocumentRow {
   purge_after: Date | null;
   legal_hold: boolean;
   legal_hold_reason: string | null;
-  wrapped_for_workspace: Buffer;
-  wrapped_for_recovery: Buffer | null;
 }
 
 interface BlobRow {
@@ -122,12 +119,6 @@ const toRecord = (row: DocumentRow, blobs: StoredBlobMeta[]): DocumentRecord => 
   legalHold: row.legal_hold
     ? { reason: row.legal_hold_reason ?? '', placedBy: '', placedAt: row.updated_at.toISOString() }
     : null,
-  keys: {
-    wrappedForWorkspace: row.wrapped_for_workspace.toString('base64'),
-    ...(row.wrapped_for_recovery
-      ? { wrappedForRecovery: row.wrapped_for_recovery.toString('base64') }
-      : {}),
-  },
   blobs,
 });
 
@@ -203,7 +194,7 @@ export function createPostgresStore(options: PostgresStoreOptions) {
       throw new StoreError(`Document ${docId} is deleted.`, 'deleted');
     if (opts.seenVersion !== undefined && Number(row.version) < opts.seenVersion) {
       throw new StoreError(
-        `The store returned version ${row.version} for ${docId}, but version ${opts.seenVersion} has already been seen. Refusing to go backwards.`,
+        `The store returned version ${row.version} for ${docId}, but version ${opts.seenVersion} has already been seen. Refusing to go backward.`,
         'stale-version',
       );
     }
@@ -224,16 +215,9 @@ export function createPostgresStore(options: PostgresStoreOptions) {
       const at = now();
       try {
         const result = await pool.query<DocumentRow>(
-          `INSERT INTO documents (doc_id, version, created_at, updated_at, wrapped_for_workspace, wrapped_for_recovery)
-           VALUES ($1, 1, $2, $2, $3, $4) RETURNING *`,
-          [
-            request.docId,
-            at,
-            Buffer.from(request.keys.wrappedForWorkspace, 'base64'),
-            request.keys.wrappedForRecovery
-              ? Buffer.from(request.keys.wrappedForRecovery, 'base64')
-              : null,
-          ],
+          `INSERT INTO documents (doc_id, version, created_at, updated_at)
+           VALUES ($1, 1, $2, $2) RETURNING *`,
+          [request.docId, at],
         );
         return toRecord(result.rows[0], []);
       } catch (error) {
@@ -338,42 +322,6 @@ export function createPostgresStore(options: PostgresStoreOptions) {
       };
     },
 
-    async getMeta(docId: string, opts: ReadOptions = {}): Promise<Uint8Array | null> {
-      await requireRow(docId, opts);
-      const result = await pool.query<{ sealed_meta: Buffer | null }>(
-        `SELECT sealed_meta FROM documents WHERE doc_id = $1`,
-        [docId],
-      );
-      const sealed = result.rows[0]?.sealed_meta;
-      return sealed ? new Uint8Array(sealed) : null;
-    },
-
-    /** WS7-R7: the document key re-wrapped under a new workspace key. The
-     * content is untouched; only the wrap changes. */
-    async setWorkspaceWrap(docId: string, wrappedForWorkspace: string): Promise<DocumentRecord> {
-      return inTransaction(async (tx) => {
-        const row = await lockDocument(tx, docId, { includeDeleted: true });
-        const updated = await tx.query<DocumentRow>(
-          `UPDATE documents SET wrapped_for_workspace = $2 WHERE doc_id = $1 RETURNING *`,
-          [row.doc_id, Buffer.from(wrappedForWorkspace, 'base64')],
-        );
-        return toRecord(updated.rows[0], await blobsOf(docId, tx));
-      });
-    },
-
-    async setMeta(docId: string, sealed: Uint8Array): Promise<DocumentRecord> {
-      return inTransaction(async (tx) => {
-        const row = await lockDocument(tx, docId);
-        const at = now();
-        const version = Number(row.version) + 1;
-        const updated = await tx.query<DocumentRow>(
-          `UPDATE documents SET sealed_meta = $2, version = $3, updated_at = $4 WHERE doc_id = $1 RETURNING *`,
-          [docId, Buffer.from(sealed), version, at],
-        );
-        return toRecord(updated.rows[0], await blobsOf(docId, tx));
-      });
-    },
-
     async head(docId: string, opts: ReadOptions = {}): Promise<DocumentRecord> {
       return toRecord(await requireRow(docId, opts), await blobsOf(docId));
     },
@@ -475,12 +423,24 @@ export function createPostgresStore(options: PostgresStoreOptions) {
       });
     },
 
+    /** See documentService.ts: `expectedVersion` guards against erasing
+     * updates appended since the snapshot was made. Checked under the
+     * document's row lock, so the check and the replacement are one step. */
     async compact(
       docId: string,
-      snapshot: { kind: string; bytes: Uint8Array },
+      snapshot: { kind: string; bytes: Uint8Array; expectedVersion?: number },
     ): Promise<DocumentRecord> {
       return inTransaction(async (tx) => {
         const row = await lockDocument(tx, docId);
+        if (
+          snapshot.expectedVersion !== undefined &&
+          snapshot.expectedVersion !== Number(row.version)
+        ) {
+          throw new StoreError(
+            `Expected version ${snapshot.expectedVersion}, but ${docId} is at ${Number(row.version)}.`,
+            'conflict',
+          );
+        }
         const at = now();
         const version = Number(row.version) + 1;
         const blobId = `b${(++blobCounter).toString(36)}${Date.now().toString(36)}`;
@@ -536,82 +496,3 @@ export function createPostgresStore(options: PostgresStoreOptions) {
 }
 
 export type PostgresStore = ReturnType<typeof createPostgresStore>;
-
-/**
- * The workspace index over PostgreSQL (WS9-R1, R3). One row, conditionally
- * updated: the UPDATE matches on the version the client read, so a second
- * writer that read the same version changes nothing and is told so.
- */
-export function createPostgresWorkspaceIndex(pool: pg.Pool): WorkspaceIndexStore {
-  return {
-    async get(workspaceId) {
-      const result = await pool.query<{
-        sealed: Buffer;
-        version: string;
-        updated_at: Date;
-        generation: number;
-      }>(
-        `SELECT sealed, version, updated_at, generation FROM workspace_index WHERE workspace_id = $1`,
-        [workspaceId],
-      );
-      const row = result.rows[0];
-      return row
-        ? {
-            sealed: row.sealed.toString('base64'),
-            version: Number(row.version),
-            updatedAt: row.updated_at.toISOString(),
-            generation: row.generation,
-          }
-        : null;
-    },
-
-    async put(workspaceId, sealed, expectedVersion, generation) {
-      const bytes = Buffer.from(sealed, 'base64');
-      if (expectedVersion === null) {
-        const inserted = await pool.query<{
-          version: string;
-          updated_at: Date;
-          generation: number;
-        }>(
-          `INSERT INTO workspace_index (workspace_id, sealed, version, generation) VALUES ($1, $2, 1, $3)
-           ON CONFLICT (workspace_id) DO NOTHING RETURNING version, updated_at, generation`,
-          [workspaceId, bytes, generation ?? 1],
-        );
-        if (inserted.rows[0]) {
-          return {
-            sealed,
-            version: Number(inserted.rows[0].version),
-            updatedAt: inserted.rows[0].updated_at.toISOString(),
-            generation: inserted.rows[0].generation,
-          };
-        }
-        const current = await this.get(workspaceId);
-        throw new IndexError(
-          `There is already an index for ${workspaceId} (version ${current?.version}). Re-read it and apply your change again.`,
-          'conflict',
-          current?.version,
-        );
-      }
-      const updated = await pool.query<{ version: string; updated_at: Date; generation: number }>(
-        `UPDATE workspace_index SET sealed = $2, version = version + 1, updated_at = now(),
-                generation = COALESCE($4, generation)
-          WHERE workspace_id = $1 AND version = $3 RETURNING version, updated_at, generation`,
-        [workspaceId, bytes, expectedVersion, generation ?? null],
-      );
-      if (!updated.rows[0]) {
-        const current = await this.get(workspaceId);
-        throw new IndexError(
-          `The workspace index has moved on: you wrote against version ${expectedVersion}, and it is at ${current?.version ?? 'none'}. Re-read it and apply your change again.`,
-          'conflict',
-          current?.version,
-        );
-      }
-      return {
-        sealed,
-        version: Number(updated.rows[0].version),
-        updatedAt: updated.rows[0].updated_at.toISOString(),
-        generation: updated.rows[0].generation,
-      };
-    },
-  };
-}

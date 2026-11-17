@@ -1,4 +1,4 @@
-import { sanitizeFileName } from './string';
+import { initials, sanitizeFileName } from './string';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {
@@ -32,6 +32,13 @@ assert(
   sanitizeFileName('###!@#', 'diagram') === 'diagram',
   'Uses fallback when no alphanumerics remain',
 );
+
+// 5. Avatar initials
+assert(initials('Priya Natarajan') === 'PN', 'First letters of the first two words');
+assert(initials('  dana   kim  ') === 'DK', 'Ignores extra spaces and upper-cases');
+assert(initials('Cher') === 'C', 'A single name gives one letter');
+assert(initials('Mary Jane Watson') === 'MJ', 'At most two letters');
+assert(initials('') === '' && initials('   ') === '', 'An empty or blank name gives nothing');
 
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILURE(S)`);
 if (failures > 0) throw new Error(`${failures} test(s) failed`);

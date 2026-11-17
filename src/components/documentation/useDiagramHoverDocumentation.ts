@@ -24,6 +24,13 @@ export interface UseDiagramHoverDocumentationOptions {
   disabled?: boolean;
 }
 
+/** Whether a click came from a finger or pen rather than a mouse. Browsers
+ * dispatch click as a PointerEvent; where one doesn't, it reads as a mouse. */
+export function isTouchClick(event: Pick<React.MouseEvent, 'nativeEvent'>): boolean {
+  const pointerType = (event.nativeEvent as Partial<PointerEvent> | undefined)?.pointerType;
+  return pointerType === 'touch' || pointerType === 'pen';
+}
+
 export function useDiagramHoverDocumentation({
   nodes,
   edges,
@@ -63,6 +70,9 @@ export function useDiagramHoverDocumentation({
   // Close documentation and clear timers when disabled (e.g. presentation starts)
   useEffect(() => {
     if (disabled) {
+      // Closing also cancels the hover and leave timers, so this is cleanup
+      // of something outside React, not state derived from a prop.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       closeDocumentation();
     }
   }, [disabled, closeDocumentation]);
@@ -107,6 +117,9 @@ export function useDiagramHoverDocumentation({
   // If active target no longer has documentation, hide popup
   useEffect(() => {
     if (isOpen && activeTarget && !currentDoc) {
+      // The target's documentation was removed while its popup was open (an
+      // edit, possibly a collaborator's): close the popup that describes it.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsOpen(false);
       setActiveTarget(null);
     }
@@ -243,19 +256,26 @@ export function useDiagramHoverDocumentation({
     [disabled, isOpen, leaveDelay, clearHoverTimer, clearLeaveTimer, closeDocumentation],
   );
 
-  // Touch handlers (FR-013, 6.3) & Click handlers
-  const handleNodeClick = useCallback(
-    (event: React.MouseEvent, node: Node<ArchNodeData>) => {
+  /*
+   * A tap is the only way to ask for the popup on a touch screen (FR-013),
+   * so a tap opens it. A mouse click is something else: it selects the
+   * element, which puts the same description, properties and tags in the
+   * Inspector. Opening the popup as well showed everything twice and
+   * covered the neighboring nodes, so a mouse click closes it instead. It
+   * comes back the next time the pointer enters the element.
+   */
+  const handleClick = useCallback(
+    (
+      event: React.MouseEvent,
+      type: 'node' | 'edge',
+      id: string,
+      documentation: DiagramDocumentation,
+    ) => {
       if (disabled) return;
-      const extracted = extractNodeDocumentation(node);
-      if (hasDocumentation(extracted.documentation)) {
-        clearHoverTimer();
-        clearLeaveTimer();
-        setActiveTarget({
-          type: 'node',
-          id: node.id,
-          anchor: { x: event.clientX, y: event.clientY },
-        });
+      clearHoverTimer();
+      clearLeaveTimer();
+      if (isTouchClick(event) && hasDocumentation(documentation)) {
+        setActiveTarget({ type, id, anchor: { x: event.clientX, y: event.clientY } });
         setIsOpen(true);
       } else if (isOpen) {
         closeDocumentation();
@@ -264,24 +284,16 @@ export function useDiagramHoverDocumentation({
     [disabled, isOpen, clearHoverTimer, clearLeaveTimer, closeDocumentation],
   );
 
+  const handleNodeClick = useCallback(
+    (event: React.MouseEvent, node: Node<ArchNodeData>) =>
+      handleClick(event, 'node', node.id, extractNodeDocumentation(node).documentation),
+    [handleClick],
+  );
+
   const handleEdgeClick = useCallback(
-    (event: React.MouseEvent, edge: Edge<ArchEdgeData>) => {
-      if (disabled) return;
-      const extracted = extractEdgeDocumentation(edge);
-      if (hasDocumentation(extracted.documentation)) {
-        clearHoverTimer();
-        clearLeaveTimer();
-        setActiveTarget({
-          type: 'edge',
-          id: edge.id,
-          anchor: { x: event.clientX, y: event.clientY },
-        });
-        setIsOpen(true);
-      } else if (isOpen) {
-        closeDocumentation();
-      }
-    },
-    [disabled, isOpen, clearHoverTimer, clearLeaveTimer, closeDocumentation],
+    (event: React.MouseEvent, edge: Edge<ArchEdgeData>) =>
+      handleClick(event, 'edge', edge.id, extractEdgeDocumentation(edge).documentation),
+    [handleClick],
   );
 
   // Keyboard accessibility helper (FR-012)

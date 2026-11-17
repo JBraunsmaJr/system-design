@@ -199,7 +199,7 @@ export function RequirementDetailModal({
                 if (onConvertItemType) {
                   onConvertItemType(item.id, newTypeId);
                 } else {
-                  onUpdateItem(item.id, { typeId: newTypeId } as any);
+                  onUpdateItem(item.id, { typeId: newTypeId });
                 }
               }}
             />

@@ -73,6 +73,11 @@ export interface DurabilityState {
   action?: 'export' | 'retry' | 'choose-file' | 'resume-file' | 'resolve-conflict';
   /** True when the user should not be able to dismiss this away. */
   persistent: boolean;
+  /** Work is in flight (changes on their way to the workspace). The label
+   * stays what it is at rest and only the icon moves: sync starts and
+   * finishes with every pause in typing, and text that swapped each time
+   * flickered in the toolbar. */
+  busy?: boolean;
 }
 
 /**
@@ -157,9 +162,10 @@ export function deriveDurability(signals: DurabilitySignals): DurabilityState {
     return {
       level: 'synced',
       tone: 'ok',
-      label: 'Syncing',
+      label: 'In workspace',
       detail: 'Sending recent changes to the workspace.',
       persistent: false,
+      busy: true,
     };
   }
 
@@ -259,7 +265,7 @@ function describeReplicas(base: string, replicaCount?: number): string {
  * must be warned before disconnecting (WS13-R11).
  *
  * Separate from the indicator because it gates an action rather than a
- * display, and because getting it backwards - warning everyone, or no one -
+ * display, and because getting it backward - warning everyone, or no one -
  * both defeat the purpose.
  */
 export function isSoleReplicaHolder(signals: DurabilitySignals): boolean {

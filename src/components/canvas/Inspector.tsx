@@ -1,35 +1,45 @@
-import {type KeyboardEvent, useEffect, useState} from 'react';
-import {ExternalLink, FileText, X} from 'lucide-react';
-import type {Edge, Node} from '@xyflow/react';
-import {getNodeType} from '../../domain/canvas/nodeRegistry';
-import {getGroupType} from '../../domain/canvas/groupRegistry';
-import {getShapeType, globalShapeRegistry} from '../../domain/canvas/shapeRegistry';
-import {CODE_LANGUAGES} from '../../domain/canvas/codeRegistry';
-import {EDGE_TYPES, resolveEdgeRouting, resolveEdgeStrokeWidth,} from '../../domain/canvas/edgeRegistry';
-import {IconPicker} from './IconPicker';
+import { type KeyboardEvent, useEffect, useState } from 'react';
+import { ArrowRight, ExternalLink, FileText, X } from 'lucide-react';
+import { IconRenderer } from './IconRenderer';
 import {
-    ColorField,
-    EdgeRoutingField,
-    EdgeStrokeWidthField,
-    EdgeTypeSelect,
-    Field,
-    LockField,
-    ZOrderControls,
+  loadCollapsedInspectorSections,
+  saveCollapsedInspectorSections,
+} from '../../domain/canvas/canvasPrefs';
+import type { Edge, Node } from '@xyflow/react';
+import { getNodeType } from '../../domain/canvas/nodeRegistry';
+import { getGroupType } from '../../domain/canvas/groupRegistry';
+import { getShapeType, globalShapeRegistry } from '../../domain/canvas/shapeRegistry';
+import { CODE_LANGUAGES } from '../../domain/canvas/codeRegistry';
+import {
+  EDGE_TYPES,
+  resolveEdgeRouting,
+  resolveEdgeStrokeWidth,
+} from '../../domain/canvas/edgeRegistry';
+import { IconPicker } from './IconPicker';
+import {
+  ColorField,
+  EdgeRoutingField,
+  EdgeStrokeWidthField,
+  EdgeTypeSelect,
+  Field,
+  InspectorSection,
+  LockField,
+  ZOrderControls,
 } from './InspectorFields';
-import {type MultiSelectionActions, MultiSelectionInspector} from './MultiSelectionInspector';
-import {RequirementLinker} from '../requirements/RequirementLinker';
-import type {ArchEdgeData, ArchEdgeDataPatch, ArchNodeData} from '../../domain/canvas/types';
-import type {ZOrderCommand} from '../../domain/canvas/zOrder';
-import type {RequirementsDocument} from '../../domain/requirements/requirementsTypes';
-import {getDecisionStatusMeta, isDecisionItem} from '../../domain/requirements/decisionRecords';
-import {markdownExcerpt} from '../../common/utils/markdownExcerpt';
+import { type MultiSelectionActions, MultiSelectionInspector } from './MultiSelectionInspector';
+import { RequirementLinker } from '../requirements/RequirementLinker';
+import type { ArchEdgeData, ArchEdgeDataPatch, ArchNodeData } from '../../domain/canvas/types';
+import type { ZOrderCommand } from '../../domain/canvas/zOrder';
+import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
+import { getDecisionStatusMeta, isDecisionItem } from '../../domain/requirements/decisionRecords';
+import { markdownExcerpt } from '../../common/utils/markdownExcerpt';
 import {
-    linkedDocumentHref,
-    normalizeLinkedDocument,
-    parseDocumentIdInput,
-    resolveLinkedDocument,
+  linkedDocumentHref,
+  normalizeLinkedDocument,
+  parseDocumentIdInput,
+  resolveLinkedDocument,
 } from '../../domain/canvas/documentLinks';
-import type {LinkableDocumentList} from '../../collab/sync/linkableDocuments';
+import type { LinkableDocumentList } from '../../collab/sync/linkableDocuments';
 
 interface InspectorProps {
   selectedNode: Node<ArchNodeData> | null;
@@ -47,20 +57,20 @@ interface InspectorProps {
   requirements: RequirementsDocument;
   onNavigateToRequirement: (itemId: string) => void;
   onZOrderCommand: (command: ZOrderCommand) => void;
-    /** The document open in this tab - never offered as a link target. */
-    currentDocId?: string;
-    /** The documents a node can link to - this browser's and the
-     * workspace's - for the "Linked document" picker. Read when a node is
-     * selected (and when the tab regains focus) rather than held as App
-     * state, so the catalogue costs nothing until someone actually looks at
-     * a node. Without it the field isn't shown. */
-    listDocuments?: () => Promise<LinkableDocumentList>;
-    /** Every selected node and edge. When more than one thing is selected
-     * and `multiSelection` is given, the Inspector edits all of them at
-     * once instead of showing only the first. */
-    selectedNodes?: Node<ArchNodeData>[];
-    selectedEdges?: Edge<ArchEdgeData>[];
-    multiSelection?: MultiSelectionActions;
+  /** The document open in this tab - never offered as a link target. */
+  currentDocId?: string;
+  /** The documents a node can link to - this browser's and the
+   * workspace's - for the "Linked document" picker. Read when a node is
+   * selected (and when the tab regains focus) rather than held as App
+   * state, so the catalog costs nothing until someone actually looks at
+   * a node. Without it the field isn't shown. */
+  listDocuments?: () => Promise<LinkableDocumentList>;
+  /** Every selected node and edge. When more than one thing is selected
+   * and `multiSelection` is given, the Inspector edits all of them at
+   * once instead of showing only the first. */
+  selectedNodes?: Node<ArchNodeData>[];
+  selectedEdges?: Edge<ArchEdgeData>[];
+  multiSelection?: MultiSelectionActions;
 }
 
 export function Inspector({
@@ -76,25 +86,34 @@ export function Inspector({
   requirements,
   onNavigateToRequirement,
   onZOrderCommand,
-                              currentDocId,
-                              listDocuments,
-                              selectedNodes,
-                              selectedEdges,
-                              multiSelection,
+  currentDocId,
+  listDocuments,
+  selectedNodes,
+  selectedEdges,
+  multiSelection,
 }: InspectorProps) {
-    const selectionCount = (selectedNodes?.length ?? 0) + (selectedEdges?.length ?? 0);
-    if (multiSelection && selectionCount > 1) {
-        return (
-            <MultiSelectionInspector
-                nodes={selectedNodes ?? []}
-                edges={selectedEdges ?? []}
-                actions={multiSelection}
-                requirements={requirements}
-                onNavigateToRequirement={onNavigateToRequirement}
-                onZOrderCommand={onZOrderCommand}
-            />
-        );
-    }
+  const [collapsedSections, setCollapsedSections] = useState(loadCollapsedInspectorSections);
+  const toggleSection = (id: string) =>
+    setCollapsedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      saveCollapsedInspectorSections(next);
+      return next;
+    });
+  const selectionCount = (selectedNodes?.length ?? 0) + (selectedEdges?.length ?? 0);
+  if (multiSelection && selectionCount > 1) {
+    return (
+      <MultiSelectionInspector
+        nodes={selectedNodes ?? []}
+        edges={selectedEdges ?? []}
+        actions={multiSelection}
+        requirements={requirements}
+        onNavigateToRequirement={onNavigateToRequirement}
+        onZOrderCommand={onZOrderCommand}
+      />
+    );
+  }
 
   if (!selectedNode && !selectedEdge) {
     return (
@@ -159,7 +178,7 @@ export function Inspector({
           />
 
           <ZOrderControls onCommand={onZOrderCommand} />
-            <NodeLockField node={selectedNode} onUpdateNode={onUpdateNode}/>
+          <NodeLockField node={selectedNode} onUpdateNode={onUpdateNode} />
 
           <button
             type="button"
@@ -295,18 +314,18 @@ export function Inspector({
             onNavigateToRequirement={onNavigateToRequirement}
           />
 
-            {listDocuments && (
-                <LinkedDocumentField
-                    nodeId={selectedNode.id}
-                    linkedDocument={data.linkedDocument}
-                    onUpdateNode={onUpdateNode}
-                    currentDocId={currentDocId}
-                    listDocuments={listDocuments}
-                />
-            )}
+          {listDocuments && (
+            <LinkedDocumentField
+              nodeId={selectedNode.id}
+              linkedDocument={data.linkedDocument}
+              onUpdateNode={onUpdateNode}
+              currentDocId={currentDocId}
+              listDocuments={listDocuments}
+            />
+          )}
 
           <ZOrderControls onCommand={onZOrderCommand} />
-            <NodeLockField node={selectedNode} onUpdateNode={onUpdateNode}/>
+          <NodeLockField node={selectedNode} onUpdateNode={onUpdateNode} />
 
           <button
             type="button"
@@ -367,7 +386,7 @@ export function Inspector({
           />
 
           <ZOrderControls onCommand={onZOrderCommand} />
-            <NodeLockField node={selectedNode} onUpdateNode={onUpdateNode}/>
+          <NodeLockField node={selectedNode} onUpdateNode={onUpdateNode} />
 
           <button
             type="button"
@@ -390,9 +409,58 @@ export function Inspector({
     const subCount = data.subDiagramNodeCount ?? data.subDiagram?.nodes.length ?? 0;
     const hasSubDiagram = data.hasSubDiagram ?? subCount > 0;
 
+    const iconName =
+      data.icon ?? (isGroup ? groupDef?.icon : nodeDef?.icon) ?? (isGroup ? 'SquareDashed' : 'Box');
+    const accent = data.color ?? defaultColor;
+    const section = (id: string) => ({
+      id,
+      collapsed: collapsedSections.has(id),
+      onToggle: toggleSection,
+    });
+
     return (
       <aside className="inspector">
-        <div className="panel-header">{headerLabel}</div>
+        {/* What is selected, and the one thing people come here to do with
+            it besides editing: go inside. The sub-diagram button used to sit
+            two thirds of the way down, between tags and requirements. */}
+        <header className="inspector__identity">
+          <span
+            className="inspector__identity-icon"
+            style={{
+              color: accent,
+              background: `color-mix(in srgb, ${accent} 14%, transparent)`,
+            }}
+          >
+            <IconRenderer icon={iconName} size={17} />
+          </span>
+          <span className="inspector__identity-text">
+            <span className="inspector__identity-name">{data.label || 'Untitled'}</span>
+            <span className="inspector__identity-type">{headerLabel}</span>
+          </span>
+        </header>
+
+        {!isGroup && (
+          <button
+            type="button"
+            className="inspector__drill"
+            onClick={() => onDrillInto(selectedNode.id)}
+          >
+            {subCount > 0
+              ? `Open sub-diagram (${subCount})`
+              : hasSubDiagram
+                ? 'Open sub-diagram'
+                : 'Create sub-diagram'}
+            <ArrowRight size={13} aria-hidden />
+          </button>
+        )}
+
+        {!isGroup && (data.unwiredPortCount ?? 0) > 0 && (
+          <p className="inspector__hint inspector__hint--warning">
+            {data.unwiredPortCount} connection{data.unwiredPortCount === 1 ? '' : 's'} to this node{' '}
+            {data.unwiredPortCount === 1 ? "isn't" : "aren't"} wired to anything inside its
+            sub-diagram. Open it and drag from the port on its edge to the node that handles it.
+          </p>
+        )}
 
         <Field label="Label">
           <input
@@ -409,82 +477,86 @@ export function Inspector({
           />
         </Field>
 
-        {/* Boundaries carry an icon in their label chip just as typed
-            nodes do, so they get the same override. The fallback differs
-            per kind: SquareDashed matches GroupNode's own final fallback,
-            so clearing the override lands back on exactly what the node
-            renders rather than on a different default. */}
-        <IconPicker
-          value={data.icon}
-          defaultValue={
-            (isGroup ? groupDef?.icon : nodeDef?.icon) ?? (isGroup ? 'SquareDashed' : 'Box')
-          }
-          onChange={(icon) => onUpdateNode(selectedNode.id, { icon })}
-        />
+        <InspectorSection
+          {...section('requirements')}
+          title="Requirements"
+          count={data.linkedRequirementIds?.length}
+          singleField
+        >
+          <LinkedRequirementsField
+            nodeId={selectedNode.id}
+            linkedRequirementIds={data.linkedRequirementIds}
+            onUpdateNode={onUpdateNode}
+            requirements={requirements}
+            onNavigateToRequirement={onNavigateToRequirement}
+          />
+        </InspectorSection>
 
-        <ColorField
-          value={data.color}
-          defaultValue={defaultColor}
-          onChange={(color) => onUpdateNode(selectedNode.id, { color })}
-        />
+        <InspectorSection
+          {...section('properties')}
+          title="Properties"
+          count={Object.keys(data.properties ?? {}).length}
+          singleField
+        >
+          <PropertyEditor
+            properties={data.properties}
+            onChange={(properties) => onUpdateNode(selectedNode.id, { properties })}
+          />
+        </InspectorSection>
 
-        <PropertyEditor
-          properties={data.properties}
-          onChange={(properties) => onUpdateNode(selectedNode.id, { properties })}
-        />
+        <InspectorSection {...section('tags')} title="Tags" count={data.tags?.length} singleField>
+          <TagEditor
+            tags={data.tags}
+            onChange={(tags) => onUpdateNode(selectedNode.id, { tags })}
+          />
+        </InspectorSection>
 
-        <TagEditor tags={data.tags} onChange={(tags) => onUpdateNode(selectedNode.id, { tags })} />
-
-        {!isGroup && (
-          <button
-            type="button"
-            style={{ marginBottom: '16px' }}
-            className="inspector__drill"
-            onClick={() => onDrillInto(selectedNode.id)}
+        {listDocuments && (
+          <InspectorSection
+            {...section('document')}
+            title="Linked document"
+            count={data.linkedDocument ? 1 : 0}
+            singleField
           >
-            {subCount > 0
-              ? `Open sub-diagram (${subCount})`
-              : hasSubDiagram
-                ? 'Open sub-diagram'
-                : 'Create sub-diagram'}{' '}
-            →
-          </button>
+            <LinkedDocumentField
+              nodeId={selectedNode.id}
+              linkedDocument={data.linkedDocument}
+              onUpdateNode={onUpdateNode}
+              currentDocId={currentDocId}
+              listDocuments={listDocuments}
+            />
+          </InspectorSection>
         )}
 
-          {!isGroup && (data.unwiredPortCount ?? 0) > 0 && (
-              <p className="inspector__hint inspector__hint--warning">
-                  {data.unwiredPortCount} connection{data.unwiredPortCount === 1 ? '' : 's'} to this node{' '}
-                  {data.unwiredPortCount === 1 ? "isn't" : "aren't"} wired to anything inside its
-                  sub-diagram. Open it and drag from the port on its edge to the node that handles it.
-              </p>
-          )}
+        <InspectorSection {...section('appearance')} title="Appearance and order">
+          {/* Boundaries carry an icon in their label chip just as typed
+              nodes do, so they get the same override. The fallback differs
+              per kind: SquareDashed matches GroupNode's own final fallback,
+              so clearing the override lands back on exactly what the node
+              renders rather than on a different default. */}
+          <IconPicker
+            value={data.icon}
+            defaultValue={
+              (isGroup ? groupDef?.icon : nodeDef?.icon) ?? (isGroup ? 'SquareDashed' : 'Box')
+            }
+            onChange={(icon) => onUpdateNode(selectedNode.id, { icon })}
+          />
 
-        <LinkedRequirementsField
-          nodeId={selectedNode.id}
-          linkedRequirementIds={data.linkedRequirementIds}
-          onUpdateNode={onUpdateNode}
-          requirements={requirements}
-          onNavigateToRequirement={onNavigateToRequirement}
-        />
+          <ColorField
+            value={data.color}
+            defaultValue={defaultColor}
+            onChange={(color) => onUpdateNode(selectedNode.id, { color })}
+          />
 
-          {listDocuments && (
-              <LinkedDocumentField
-                  nodeId={selectedNode.id}
-                  linkedDocument={data.linkedDocument}
-                  onUpdateNode={onUpdateNode}
-                  currentDocId={currentDocId}
-                  listDocuments={listDocuments}
-              />
-          )}
-
-        <ZOrderControls onCommand={onZOrderCommand} />
-          <NodeLockField node={selectedNode} onUpdateNode={onUpdateNode}/>
+          <ZOrderControls onCommand={onZOrderCommand} />
+          <NodeLockField node={selectedNode} onUpdateNode={onUpdateNode} />
+        </InspectorSection>
 
         <button
           type="button"
           className="inspector__delete"
           disabled={data.locked === true}
-          title={data.locked ? 'Unlock to delete' : undefined}
+          title={data.locked ? 'Unlock it under Appearance and order to delete it' : undefined}
           onClick={() => onDeleteNode(selectedNode.id)}
         >
           {isGroup ? 'Delete boundary' : 'Delete node'}
@@ -512,10 +584,10 @@ export function Inspector({
       <div className="panel-header">Edge</div>
 
       <Field label="Type">
-          <EdgeTypeSelect
+        <EdgeTypeSelect
           value={data.edgeType}
-          onChange={(edgeType) => onUpdateEdge(edge.id, {edgeType})}
-          />
+          onChange={(edgeType) => onUpdateEdge(edge.id, { edgeType })}
+        />
       </Field>
 
       <ColorField
@@ -524,15 +596,15 @@ export function Inspector({
         onChange={(color) => onUpdateEdge(edge.id, { color })}
       />
 
-        <EdgeStrokeWidthField
-            value={resolveEdgeStrokeWidth(data.strokeWidth)}
-            onChange={(strokeWidth) => onUpdateEdge(edge.id, {strokeWidth})}
-        />
+      <EdgeStrokeWidthField
+        value={resolveEdgeStrokeWidth(data.strokeWidth)}
+        onChange={(strokeWidth) => onUpdateEdge(edge.id, { strokeWidth })}
+      />
 
-        <EdgeRoutingField
-            value={resolveEdgeRouting(data.routing)}
-            onChange={(routing) => onUpdateEdge(edge.id, {routing})}
-        />
+      <EdgeRoutingField
+        value={resolveEdgeRouting(data.routing)}
+        onChange={(routing) => onUpdateEdge(edge.id, { routing })}
+      />
 
       <Field label="Direction">
         <select
@@ -641,18 +713,18 @@ export function Inspector({
 }
 
 function NodeLockField({
-                           node,
-                           onUpdateNode,
-                       }: {
-    node: Node<ArchNodeData>;
-    onUpdateNode: (id: string, patch: Partial<ArchNodeData>) => void;
+  node,
+  onUpdateNode,
+}: {
+  node: Node<ArchNodeData>;
+  onUpdateNode: (id: string, patch: Partial<ArchNodeData>) => void;
 }) {
   return (
-      <LockField
-          locked={node.data.locked === true}
-          // Absent rather than false when unlocked - see onSetLocked.
-          onChange={(locked) => onUpdateNode(node.id, {locked: locked ? true : undefined})}
-      />
+    <LockField
+      locked={node.data.locked === true}
+      // Absent rather than false when unlocked - see onSetLocked.
+      onChange={(locked) => onUpdateNode(node.id, { locked: locked ? true : undefined })}
+    />
   );
 }
 
@@ -675,26 +747,26 @@ function LinkedRequirementsField({
 }) {
   const linkedIds = linkedRequirementIds ?? [];
   return (
-      <>
-          <Field label="Linked requirements">
-              <RequirementLinker
-                  linkedIds={linkedIds}
-                  doc={requirements}
-                  onLink={(itemId) =>
-                      onUpdateNode(nodeId, {linkedRequirementIds: [...linkedIds, itemId]})
-                  }
-                  onUnlink={(itemId) =>
-                      onUpdateNode(nodeId, {linkedRequirementIds: linkedIds.filter((id) => id !== itemId)})
-                  }
-                  onNavigate={onNavigateToRequirement}
-              />
-          </Field>
-          <LinkedDecisionsSummary
-              linkedIds={linkedIds}
-              requirements={requirements}
-              onNavigateToRequirement={onNavigateToRequirement}
-          />
-      </>
+    <>
+      <Field label="Linked requirements">
+        <RequirementLinker
+          linkedIds={linkedIds}
+          doc={requirements}
+          onLink={(itemId) =>
+            onUpdateNode(nodeId, { linkedRequirementIds: [...linkedIds, itemId] })
+          }
+          onUnlink={(itemId) =>
+            onUpdateNode(nodeId, { linkedRequirementIds: linkedIds.filter((id) => id !== itemId) })
+          }
+          onNavigate={onNavigateToRequirement}
+        />
+      </Field>
+      <LinkedDecisionsSummary
+        linkedIds={linkedIds}
+        requirements={requirements}
+        onNavigateToRequirement={onNavigateToRequirement}
+      />
+    </>
   );
 }
 
@@ -707,56 +779,56 @@ function LinkedRequirementsField({
  * finding, but not the reason the node looks the way it does today.
  */
 function LinkedDecisionsSummary({
-                                    linkedIds,
-                                    requirements,
-                                    onNavigateToRequirement,
-                                }: {
-    linkedIds: string[];
-    requirements: RequirementsDocument;
-    onNavigateToRequirement: (itemId: string) => void;
+  linkedIds,
+  requirements,
+  onNavigateToRequirement,
+}: {
+  linkedIds: string[];
+  requirements: RequirementsDocument;
+  onNavigateToRequirement: (itemId: string) => void;
 }) {
-    const decisions = linkedIds
-        .map((id) => requirements.items.find((i) => i.id === id))
-        .filter((item): item is NonNullable<typeof item> => !!item && isDecisionItem(item));
-    if (decisions.length === 0) return null;
-    const typeColor =
-        requirements.itemTypes.find((t) => t.id === decisions[0].typeId)?.color ?? undefined;
-    const isHistory = (status: string) => status === 'rejected' || status === 'superseded';
-    const ordered = [...decisions].sort(
-        (a, b) =>
-            Number(isHistory(getDecisionStatusMeta(a.decisionStatus).id)) -
-            Number(isHistory(getDecisionStatusMeta(b.decisionStatus).id)),
-    );
-    return (
-        <div className="inspector__decisions">
-            <span className="inspector__decisions-title">Why it's built this way</span>
-            {ordered.map((item) => {
-                const status = getDecisionStatusMeta(item.decisionStatus);
-                const summary = markdownExcerpt(item.decisionOutcome?.trim() || item.body, 140);
-                return (
-                    <button
-                        key={item.id}
-                        type="button"
-                        className={`inspector__decision${isHistory(status.id) ? ' is-history' : ''}`}
-                        style={{borderLeftColor: typeColor}}
-                        onClick={() => onNavigateToRequirement(item.id)}
-                        title={`Go to ${item.id}`}
-                    >
+  const decisions = linkedIds
+    .map((id) => requirements.items.find((i) => i.id === id))
+    .filter((item): item is NonNullable<typeof item> => !!item && isDecisionItem(item));
+  if (decisions.length === 0) return null;
+  const typeColor =
+    requirements.itemTypes.find((t) => t.id === decisions[0].typeId)?.color ?? undefined;
+  const isHistory = (status: string) => status === 'rejected' || status === 'superseded';
+  const ordered = [...decisions].sort(
+    (a, b) =>
+      Number(isHistory(getDecisionStatusMeta(a.decisionStatus).id)) -
+      Number(isHistory(getDecisionStatusMeta(b.decisionStatus).id)),
+  );
+  return (
+    <div className="inspector__decisions">
+      <span className="inspector__decisions-title">Why it's built this way</span>
+      {ordered.map((item) => {
+        const status = getDecisionStatusMeta(item.decisionStatus);
+        const summary = markdownExcerpt(item.decisionOutcome?.trim() || item.body, 140);
+        return (
+          <button
+            key={item.id}
+            type="button"
+            className={`inspector__decision${isHistory(status.id) ? ' is-history' : ''}`}
+            style={{ borderLeftColor: typeColor }}
+            onClick={() => onNavigateToRequirement(item.id)}
+            title={`Go to ${item.id}`}
+          >
             <span className="inspector__decision-head">
-              <span className="inspector__decision-id" style={{color: typeColor}}>
+              <span className="inspector__decision-id" style={{ color: typeColor }}>
                 {item.id}
               </span>
               <span className="inspector__decision-title">{item.title || 'Untitled'}</span>
-              <span className="inspector__decision-status" style={{color: status.color}}>
+              <span className="inspector__decision-status" style={{ color: status.color }}>
                 {status.label}
               </span>
             </span>
-                        {summary && <span className="inspector__decision-summary">{summary}</span>}
-                    </button>
-                );
-            })}
-        </div>
-    );
+            {summary && <span className="inspector__decision-summary">{summary}</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 /**
@@ -771,230 +843,230 @@ function LinkedDecisionsSummary({
  * opens: a document arrives by its id wherever it exists.
  */
 function LinkedDocumentField({
-                                 nodeId,
-                                 linkedDocument,
-                                 onUpdateNode,
-                                 currentDocId,
-                                 listDocuments,
-                             }: {
-    nodeId: string;
-    linkedDocument: unknown;
-    onUpdateNode: (id: string, patch: Partial<ArchNodeData>) => void;
-    currentDocId: string | undefined;
-    listDocuments: () => Promise<LinkableDocumentList>;
+  nodeId,
+  linkedDocument,
+  onUpdateNode,
+  currentDocId,
+  listDocuments,
+}: {
+  nodeId: string;
+  linkedDocument: unknown;
+  onUpdateNode: (id: string, patch: Partial<ArchNodeData>) => void;
+  currentDocId: string | undefined;
+  listDocuments: () => Promise<LinkableDocumentList>;
 }) {
-    const [list, setList] = useState<LinkableDocumentList | null>(null);
-    const [isEnteringId, setIsEnteringId] = useState(false);
-    const [idInput, setIdInput] = useState('');
+  const [list, setList] = useState<LinkableDocumentList | null>(null);
+  const [isEnteringId, setIsEnteringId] = useState(false);
+  const [idInput, setIdInput] = useState('');
 
-    // Loaded when a node is selected, and again whenever this tab regains
-    // focus - the usual way a document gets created or renamed is in another
-    // tab, and the picker shouldn't need the node reselected to see it.
-    useEffect(() => {
-        let cancelled = false;
-        // Responses can arrive out of order (a slow workspace read, then a
-        // quick one after a focus); only the latest request may land.
-        let latest = 0;
-        const load = () => {
-            const request = ++latest;
-            listDocuments().then(
-                (next) => {
-                    if (!cancelled && request === latest) setList(next);
-                },
-                () => {
-                    if (!cancelled && request === latest)
-                        setList({documents: [], workspaceUnavailable: false});
-                },
-            );
-        };
-        const onVisibilityChange = () => {
-            if (document.visibilityState === 'visible') load();
-        };
-        load();
-        window.addEventListener('focus', load);
-        document.addEventListener('visibilitychange', onVisibilityChange);
-        return () => {
-            cancelled = true;
-            window.removeEventListener('focus', load);
-            document.removeEventListener('visibilitychange', onVisibilityChange);
-        };
-    }, [listDocuments, nodeId]);
-
-    // Leaving a half-typed id behind when the selection moves on would
-    // offer it to the next node.
-    const [idFormNodeId, setIdFormNodeId] = useState(nodeId);
-    if (idFormNodeId !== nodeId) {
-        setIdFormNodeId(nodeId);
-        setIsEnteringId(false);
-        setIdInput('');
-    }
-
-    const documents = list?.documents ?? null;
-    const ref = normalizeLinkedDocument(linkedDocument);
-    const resolved = ref ? resolveLinkedDocument(ref, documents ?? []) : null;
-    const candidates = (documents ?? []).filter((d) => d.docId !== currentDocId);
-    const localCandidates = candidates.filter((d) => d.source !== 'workspace');
-    const workspaceCandidates = candidates.filter((d) => d.source === 'workspace');
-
-    const linkTo = (docId: string, title: string) =>
-        onUpdateNode(nodeId, {linkedDocument: {docId, title}});
-
-    const enteredId = parseDocumentIdInput(idInput);
-    const idError =
-        idInput.trim() === ''
-            ? null
-            : !enteredId
-                ? 'Not a document id or editor link.'
-                : enteredId === currentDocId
-                    ? "That's the document open here."
-                    : null;
-    const submitId = () => {
-        if (!enteredId || idError) return;
-        const known = documents?.find((d) => d.docId === enteredId);
-        linkTo(enteredId, known?.title ?? '');
-        setIsEnteringId(false);
-        setIdInput('');
+  // Loaded when a node is selected, and again whenever this tab regains
+  // focus - the usual way a document gets created or renamed is in another
+  // tab, and the picker shouldn't need the node reselected to see it.
+  useEffect(() => {
+    let canceled = false;
+    // Responses can arrive out of order (a slow workspace read, then a
+    // quick one after a focus); only the latest request may land.
+    let latest = 0;
+    const load = () => {
+      const request = ++latest;
+      listDocuments().then(
+        (next) => {
+          if (!canceled && request === latest) setList(next);
+        },
+        () => {
+          if (!canceled && request === latest)
+            setList({ documents: [], workspaceUnavailable: false });
+        },
+      );
     };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') load();
+    };
+    load();
+    window.addEventListener('focus', load);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      canceled = true;
+      window.removeEventListener('focus', load);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [listDocuments, nodeId]);
 
-    if (resolved) {
-        const href = linkedDocumentHref(window.location.href, resolved.ref.docId);
-        // A div rather than Field's <label>: a click anywhere in a label
-        // activates its first control, which here would be "Unlink".
-        return (
-            <div className="inspector__field">
-                <span>Linked document</span>
-                <div className="inspector__doc-link">
+  // Leaving a half-typed id behind when the selection moves on would
+  // offer it to the next node.
+  const [idFormNodeId, setIdFormNodeId] = useState(nodeId);
+  if (idFormNodeId !== nodeId) {
+    setIdFormNodeId(nodeId);
+    setIsEnteringId(false);
+    setIdInput('');
+  }
+
+  const documents = list?.documents ?? null;
+  const ref = normalizeLinkedDocument(linkedDocument);
+  const resolved = ref ? resolveLinkedDocument(ref, documents ?? []) : null;
+  const candidates = (documents ?? []).filter((d) => d.docId !== currentDocId);
+  const localCandidates = candidates.filter((d) => d.source !== 'workspace');
+  const workspaceCandidates = candidates.filter((d) => d.source === 'workspace');
+
+  const linkTo = (docId: string, title: string) =>
+    onUpdateNode(nodeId, { linkedDocument: { docId, title } });
+
+  const enteredId = parseDocumentIdInput(idInput);
+  const idError =
+    idInput.trim() === ''
+      ? null
+      : !enteredId
+        ? 'Not a document id or editor link.'
+        : enteredId === currentDocId
+          ? "That's the document open here."
+          : null;
+  const submitId = () => {
+    if (!enteredId || idError) return;
+    const known = documents?.find((d) => d.docId === enteredId);
+    linkTo(enteredId, known?.title ?? '');
+    setIsEnteringId(false);
+    setIdInput('');
+  };
+
+  if (resolved) {
+    const href = linkedDocumentHref(window.location.href, resolved.ref.docId);
+    // A div rather than Field's <label>: a click anywhere in a label
+    // activates its first control, which here would be "Unlink".
+    return (
+      <div className="inspector__field">
+        <span>Linked document</span>
+        <div className="inspector__doc-link">
           <span className="inspector__doc-link-pill">
-            <FileText size={12}/>
+            <FileText size={12} />
             <span className="inspector__doc-link-title" title={resolved.title}>
               {resolved.title}
             </span>
             <button
-                type="button"
-                className="inspector__doc-link-remove"
-                onClick={() => onUpdateNode(nodeId, {linkedDocument: undefined})}
-                aria-label="Unlink document"
-                title="Unlink document"
+              type="button"
+              className="inspector__doc-link-remove"
+              onClick={() => onUpdateNode(nodeId, { linkedDocument: undefined })}
+              aria-label="Unlink document"
+              title="Unlink document"
             >
-              <X size={10}/>
+              <X size={10} />
             </button>
           </span>
-                    {href && (
-                        <a
-                            className="inspector__doc-link-open"
-                            href={href}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                        >
-                            Open <ExternalLink size={11}/>
-                        </a>
-                    )}
-                </div>
-                {documents && !resolved.isKnownHere && (
-                    <p className="inspector__hint">
-                        {list?.workspaceUnavailable
-                            ? "Not in this browser, and the workspace can't be reached right now to check. It still opens wherever the document exists."
-                            : 'Neither this browser nor your workspace lists that document. It still opens wherever it exists - for example from a link someone shared.'}
-                    </p>
-                )}
-            </div>
-        );
-    }
-
-    return (
-        <div className="inspector__field">
-            <span>Linked document</span>
-            {isEnteringId ? (
-                <div className="inspector__doc-id">
-                    <input
-                        autoFocus
-                        aria-label="Document id or editor link"
-                        placeholder="Document id, or a link to it"
-                        value={idInput}
-                        onChange={(e) => setIdInput(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') submitId();
-                            if (e.key === 'Escape') {
-                                setIsEnteringId(false);
-                                setIdInput('');
-                            }
-                        }}
-                    />
-                    <div className="inspector__doc-id-actions">
-                        <button type="button" disabled={!enteredId || Boolean(idError)} onClick={submitId}>
-                            Link
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setIsEnteringId(false);
-                                setIdInput('');
-                            }}
-                        >
-                            Cancel
-                        </button>
-                    </div>
-                    {idError && <p className="inspector__hint">{idError}</p>}
-                </div>
-            ) : (
-                <>
-                    <select
-                        aria-label="Link to another document"
-                        value=""
-                        disabled={!documents || candidates.length === 0}
-                        onChange={(e) => {
-                            const target = candidates.find((d) => d.docId === e.target.value);
-                            if (target) linkTo(target.docId, target.title);
-                        }}
-                    >
-                        <option value="">
-                            {!documents
-                                ? 'Loading documents...'
-                                : candidates.length === 0
-                                    ? 'No other documents to link'
-                                    : 'Link to another document...'}
-                        </option>
-                        {workspaceCandidates.length > 0 ? (
-                            <>
-                                <optgroup label="In this browser">
-                                    {localCandidates.map((d) => (
-                                        <option key={d.docId} value={d.docId}>
-                                            {d.title || 'Untitled document'}
-                                        </option>
-                                    ))}
-                                </optgroup>
-                                <optgroup label="In your workspace">
-                                    {workspaceCandidates.map((d) => (
-                                        <option key={d.docId} value={d.docId}>
-                                            {d.title || 'Untitled document'}
-                                        </option>
-                                    ))}
-                                </optgroup>
-                            </>
-                        ) : (
-                            localCandidates.map((d) => (
-                                <option key={d.docId} value={d.docId}>
-                                    {d.title || 'Untitled document'}
-                                </option>
-                            ))
-                        )}
-                    </select>
-                    <button
-                        type="button"
-                        className="inspector__doc-id-toggle"
-                        onClick={() => setIsEnteringId(true)}
-                    >
-                        Enter a document id or link instead
-                    </button>
-                    {list?.workspaceUnavailable && (
-                        <p className="inspector__hint">
-                            Your workspace can't be reached right now, so only this browser's documents are
-                            listed.
-                        </p>
-                    )}
-                </>
-            )}
+          {href && (
+            <a
+              className="inspector__doc-link-open"
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Open <ExternalLink size={11} />
+            </a>
+          )}
         </div>
+        {documents && !resolved.isKnownHere && (
+          <p className="inspector__hint">
+            {list?.workspaceUnavailable
+              ? "Not in this browser, and the workspace can't be reached right now to check. It still opens wherever the document exists."
+              : 'Neither this browser nor your workspace lists that document. It still opens wherever it exists - for example from a link someone shared.'}
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="inspector__field">
+      <span>Linked document</span>
+      {isEnteringId ? (
+        <div className="inspector__doc-id">
+          <input
+            autoFocus
+            aria-label="Document id or editor link"
+            placeholder="Document id, or a link to it"
+            value={idInput}
+            onChange={(e) => setIdInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') submitId();
+              if (e.key === 'Escape') {
+                setIsEnteringId(false);
+                setIdInput('');
+              }
+            }}
+          />
+          <div className="inspector__doc-id-actions">
+            <button type="button" disabled={!enteredId || Boolean(idError)} onClick={submitId}>
+              Link
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsEnteringId(false);
+                setIdInput('');
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+          {idError && <p className="inspector__hint">{idError}</p>}
+        </div>
+      ) : (
+        <>
+          <select
+            aria-label="Link to another document"
+            value=""
+            disabled={!documents || candidates.length === 0}
+            onChange={(e) => {
+              const target = candidates.find((d) => d.docId === e.target.value);
+              if (target) linkTo(target.docId, target.title);
+            }}
+          >
+            <option value="">
+              {!documents
+                ? 'Loading documents...'
+                : candidates.length === 0
+                  ? 'No other documents to link'
+                  : 'Link to another document...'}
+            </option>
+            {workspaceCandidates.length > 0 ? (
+              <>
+                <optgroup label="In this browser">
+                  {localCandidates.map((d) => (
+                    <option key={d.docId} value={d.docId}>
+                      {d.title || 'Untitled document'}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="In your workspace">
+                  {workspaceCandidates.map((d) => (
+                    <option key={d.docId} value={d.docId}>
+                      {d.title || 'Untitled document'}
+                    </option>
+                  ))}
+                </optgroup>
+              </>
+            ) : (
+              localCandidates.map((d) => (
+                <option key={d.docId} value={d.docId}>
+                  {d.title || 'Untitled document'}
+                </option>
+              ))
+            )}
+          </select>
+          <button
+            type="button"
+            className="inspector__doc-id-toggle"
+            onClick={() => setIsEnteringId(true)}
+          >
+            Enter a document id or link instead
+          </button>
+          {list?.workspaceUnavailable && (
+            <p className="inspector__hint">
+              Your workspace can't be reached right now, so only this browser's documents are
+              listed.
+            </p>
+          )}
+        </>
+      )}
+    </div>
   );
 }
 

@@ -1,9 +1,18 @@
-# A complete deployment: the editor, the relay, the store, PostgreSQL, and
-# Keycloak as the identity provider (WS8-R9).
+# A complete deployment to try on one machine: the editor, the relay, the
+# store, PostgreSQL, and Keycloak as the identity provider.
+#
+#   docker compose -f docker/store/compose.yaml up --build
+#
+# Then open http://localhost:8088 and sign in as demo / demo, who is a store
+# administrator and can create a workspace. otter / otter and badger / badger
+# are in the groups /design-team-a and /design-team-b: map a group to a role
+# in a workspace's Members panel, typed with the leading slash, and they are
+# in it the next time they sign in.
 #
 # As written this runs on localhost over plain HTTP, which browsers treat as
-# secure enough for development. For anything else, put all four behind TLS
-# and change every URL below to https:// - a cross-origin editor needs a
+# secure enough for development, with placeholder passwords throughout. For
+# anything else, follow the deployment guide: put everything behind TLS and
+# change every URL below to https:// - a cross-origin editor needs a
 # SameSite=None cookie, and browsers only accept those over HTTPS. The store
 # refuses to start in that combination rather than failing silently later.
 services:
@@ -24,7 +33,7 @@ services:
 
   # The identity provider. A deployment that already has one (Keycloak,
   # Entra ID, Okta, Auth0) points the store at that instead and drops this
-  # service; see docs/store-deployment.md.
+  # service; see the deployment guide.
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
     # The command matters: this image does nothing useful without it.
@@ -55,6 +64,7 @@ services:
       start_period: 30s
 
   store:
+    image: ghcr.io/jbraunsmajr/system-design-store
     build:
       context: ../..
       dockerfile: docker/store/Dockerfile
@@ -83,41 +93,50 @@ services:
       OIDC_CLIENT_ID: system-design-store
       # Must match the client secret in keycloak/system-design-realm.json.
       OIDC_CLIENT_SECRET: change-me
-      # The ID-token claim holding group membership, for automatic access
-      # (docs: deployment/group-access). The example realm's mapper emits
-      # full group paths under this name. Default: groups.
+      # The ID-token claim that lists a person's groups. Workspace roles and
+      # ADMIN_GROUPS are matched against it. The example realm's mapper puts
+      # full group paths there, so a group is typed as /design-team-a, with
+      # the leading slash. Default: groups.
       OIDC_GROUPS_CLAIM: groups
-      # issuer#subject for each administrator: who may place legal holds and
-      # purge. With none set, those actions are refused to everyone.
+      # Who administers the store: they create workspaces, can manage every
+      # workspace, and decide what is kept. Members of these groups, read at
+      # each sign-in. The demo account is in this one.
+      ADMIN_GROUPS: /notebook-admins
+      # Administrators can also be named one by one, as issuer#subject. With
+      # neither set, nobody can create a workspace.
       ADMIN_SUBJECTS: ''
+      # admins: only administrators create workspaces. anyone: anyone signed in.
+      WORKSPACE_CREATION: admins
+      # Left out here, so the relay below admits anyone who knows a room.
+      # Anywhere real, set the same long random value on the store and the
+      # relay: the relay then admits only people this store has let into a
+      # session.
+      # RELAY_TOKEN_SECRET: <openssl rand -hex 32>
       # immediate | a duration (7d, 6m, 7y) | indefinite. Default 30d.
       RETENTION_PERIOD: 30d
-      # The organization's recovery PUBLIC key. Generate the pair with
-      # `docker run --rm -u $(id -u):$(id -g) -v ./keys:/keys ghcr.io/jbraunsmajr/system-design-store:latest generate-recovery-key --out /keys/recovery`
-      # (or scripts/generate-recovery-key.ts) and keep the private half offline;
-      # without this the store refuses every document (WS7-R4).
-      RECOVERY_PUBLIC_KEY_FILE: /run/secrets/recovery-public.pem
-    volumes:
-      - ./recovery-public.pem:/run/secrets/recovery-public.pem:ro
     ports:
       - '8080:8080'
 
   relay:
+    image: ghcr.io/jbraunsmajr/system-design-relay
     build:
       context: ../..
       dockerfile: docker/signaling/Dockerfile
+    # environment:
+    #   RELAY_TOKEN_SECRET: <the same value as the store's>
     ports:
       - '4444:4444'
 
   editor:
+    image: ghcr.io/jbraunsmajr/system-design
     build:
       context: ../..
       dockerfile: Dockerfile
     environment:
       APP_URL: http://localhost:8088
       RELAY: ws://localhost:4444
-      # Without this the editor has no workspace at all, and behaves exactly
-      # as it does with no store.
+      # Without this the editor has no workspaces, and behaves exactly as
+      # it does with no store.
       STORE_URL: http://localhost:8080
     ports:
       - '8088:80'

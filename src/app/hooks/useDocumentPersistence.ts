@@ -1,30 +1,34 @@
-import {useEffect, useMemo, useRef, useState} from 'react';
-import type {Edge, Node} from '@xyflow/react';
-import {unflattenToSubDiagram} from '../../collab/stores/diagramStore';
-import {countPersistedReplicas, type PresenceInfo} from '../../collab/sync/session';
-import {toDiagramFile} from '../../domain/canvas/serialization';
-import {clearLegacyAutosave, getAutosaveBlockedReason, hasLegacyAutosave,} from '../../domain/storage/autosave';
-import {sessionDocumentId} from '../../domain/storage/currentDocument';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { Edge, Node } from '@xyflow/react';
+import { unflattenToSubDiagram } from '../../collab/stores/diagramStore';
+import { countPersistedReplicas, type PresenceInfo } from '../../collab/sync/session';
+import { toDiagramFile } from '../../domain/canvas/serialization';
+import {
+  clearLegacyAutosave,
+  getAutosaveBlockedReason,
+  hasLegacyAutosave,
+} from '../../domain/storage/autosave';
+import { sessionDocumentId } from '../../domain/storage/currentDocument';
 import {
   type createDocumentStore,
   requestPersistentStorage,
   type StorageFailureReason,
 } from '../../domain/storage/documentStore';
-import {installUnloadGuard} from '../../domain/storage/unloadGuard';
-import type {DurabilitySignals} from '../../domain/storage/durability';
-import type {FileSaving} from '../../hooks/useFileSaving';
-import type {useWorkspaceSync} from '../../collab/hooks/useWorkspaceSync';
-import {isPerfAutosaveSuppressed} from '../../perf/instrumentation';
-import type {ArchEdgeData, ArchNodeData, Scenario} from '../../domain/canvas/types';
-import type {RequirementsDocument} from '../../domain/requirements/requirementsTypes';
-import type {ProgramIncrement} from '../../domain/timeline/programIncrements';
-import type {TeamDocument} from '../../domain/timeline/teamTypes';
-import type {Milestone} from '../../domain/timeline/milestones';
-import type {SrdDocumentState} from '../../domain/srd/srdTypes';
+import { installUnloadGuard } from '../../domain/storage/unloadGuard';
+import type { DurabilitySignals } from '../../domain/storage/durability';
+import type { FileSaving } from '../../hooks/useFileSaving';
+import type { useTrustedWorkspaceSync } from '../../collab/trusted/useTrustedWorkspaceSync';
+import { isPerfAutosaveSuppressed } from '../../perf/instrumentation';
+import type { ArchEdgeData, ArchNodeData, Scenario } from '../../domain/canvas/types';
+import type { RequirementsDocument } from '../../domain/requirements/requirementsTypes';
+import type { ProgramIncrement } from '../../domain/timeline/programIncrements';
+import type { TeamDocument } from '../../domain/timeline/teamTypes';
+import type { Milestone } from '../../domain/timeline/milestones';
+import type { SrdDocumentState } from '../../domain/srd/srdTypes';
 
 export interface UseDocumentPersistenceOptions {
   fileSaving: FileSaving;
-  workspaceSync: ReturnType<typeof useWorkspaceSync>;
+  workspaceSync: ReturnType<typeof useTrustedWorkspaceSync>;
   documentStore: ReturnType<typeof createDocumentStore>;
   activeSession: {
     session: object;
@@ -112,7 +116,7 @@ export function useDocumentPersistence({
     // The perf harness measures editing, not autosave - see
     // isPerfAutosaveSuppressed. Always false outside instrumented builds.
     if (isPerfAutosaveSuppressed()) return;
-    let cancelled = false;
+    let canceled = false;
     const timer = setTimeout(() => {
       // Export boundary: built once per debounced write, not once per change.
       const tree = unflattenToSubDiagram(diagramSnapshot.nodes, diagramSnapshot.edges);
@@ -143,7 +147,7 @@ export function useDocumentPersistence({
       // WS13-R1: the attached file belongs to the open local document, never
       // to a joined session's content.
       // The workspace receives the document's own CRDT updates as they
-      // happen (useWorkspaceSync), not a snapshot from here. Autosave
+      // happen (useTrustedWorkspaceSync), not a snapshot from here. Autosave
       // only pushes it along, so a pause in typing lands in the workspace
       // at the same moment it lands in the browser.
       if (activeDocId === openDocId) {
@@ -151,7 +155,7 @@ export function useDocumentPersistence({
         void flushWorkspace();
       }
       void documentStore.writeDocument(activeDocId, file, origin).then((result) => {
-        if (cancelled) return;
+        if (canceled) return;
         // Set from the confirmed outcome, never the attempt (NFR-10).
         if (result.ok) {
           setHasAutosaved(true);
@@ -168,7 +172,7 @@ export function useDocumentPersistence({
       });
     }, 1000);
     return () => {
-      cancelled = true;
+      canceled = true;
       clearTimeout(timer);
     };
   }, [
@@ -199,9 +203,9 @@ export function useDocumentPersistence({
     null,
   );
   useEffect(() => {
-    let cancelled = false;
+    let canceled = false;
     void documentStore.listDocuments().then((listed) => {
-      if (cancelled || !listed.ok) return;
+      if (canceled || !listed.ok) return;
       const entry = listed.value.find((e) => e.docId === openDocId);
       setResumableSession(
         entry?.sessionRoom && entry.sessionKey
@@ -210,7 +214,7 @@ export function useDocumentPersistence({
       );
     });
     return () => {
-      cancelled = true;
+      canceled = true;
     };
     // Re-read when a session ends, which is when a room first becomes resumable.
   }, [documentStore, openDocId, activeRoom]);
@@ -285,5 +289,5 @@ export function useDocumentPersistence({
     return () => guard.release();
   }, []);
 
-  return { hasAutosaved, durabilitySignals, resumableSession, activeDocId };
+  return { durabilitySignals, resumableSession, activeDocId };
 }

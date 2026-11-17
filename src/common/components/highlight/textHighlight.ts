@@ -227,13 +227,13 @@ export function computeTruncationWithHighlight(
   const halfBudget = remainingBudget / 2;
 
   let startIdx = matchStart;
-  // Step 1: Expand backwards from matchStart
+  // Step 1: Expand backward from matchStart
   while (startIdx > 0 && measureText(text.slice(startIdx - 1, matchStart)) <= halfBudget) {
     startIdx--;
   }
 
   let endIdx = matchEnd;
-  // Step 2: Expand forwards from matchEnd
+  // Step 2: Expand forward from matchEnd
   while (endIdx < text.length) {
     const testLeading = startIdx > 0 ? ellipsisWidth : 0;
     const testTrailing = endIdx + 1 < text.length ? ellipsisWidth : 0;
@@ -245,7 +245,7 @@ export function computeTruncationWithHighlight(
     }
   }
 
-  // Step 3: Reclaim any unused right space by expanding further backwards if startIdx > 0
+  // Step 3: Reclaim any unused right space by expanding further backward if startIdx > 0
   while (startIdx > 0) {
     const testLeading = startIdx - 1 > 0 ? ellipsisWidth : 0;
     const testTrailing = endIdx < text.length ? ellipsisWidth : 0;
@@ -257,7 +257,7 @@ export function computeTruncationWithHighlight(
     }
   }
 
-  // Step 4: Reclaim any remaining space by expanding forwards
+  // Step 4: Reclaim any remaining space by expanding forward
   while (endIdx < text.length) {
     const testLeading = startIdx > 0 ? ellipsisWidth : 0;
     const testTrailing = endIdx + 1 < text.length ? ellipsisWidth : 0;

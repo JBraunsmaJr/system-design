@@ -99,8 +99,11 @@ console.log('=== Ordinary states ===');
   );
   assert(
     deriveDurability({ ...base, serverSync: 'pending' }).level === 'synced' &&
-      deriveDurability({ ...base, serverSync: 'pending' }).label === 'Syncing',
-    'a syncing document reports synced level with Syncing label',
+      deriveDurability({ ...base, serverSync: 'pending' }).label ===
+        deriveDurability({ ...base, serverSync: 'synced' }).label &&
+      deriveDurability({ ...base, serverSync: 'pending' }).busy === true &&
+      !deriveDurability({ ...base, serverSync: 'synced' }).busy,
+    'a syncing document keeps the synced label and is only marked busy',
   );
   assert(
     deriveDurability({ ...base, serverSync: 'synced', fileBacked: true }).detail.includes(

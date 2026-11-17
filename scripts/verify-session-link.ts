@@ -12,7 +12,7 @@ async function run() {
   try {
     // Shared with verify-document-browser.ts: refuses a port that is already
     // serving (a leftover run would otherwise be tested instead of this
-    // checkout) and stops the whole process tree afterwards.
+    // checkout) and stops the whole process tree afterward.
     servers = await startDevServers({ vitePort: VITE_PORT, signalingPort: SIGNALING_PORT });
     console.log(`Signaling server on :${SIGNALING_PORT}, vite on :${VITE_PORT}`);
 
@@ -69,7 +69,9 @@ async function run() {
 
     // Verify toast notification appeared on page 1
     const toastVisible = await page1
-      .waitForSelector('.app-toast', { timeout: 2000 })
+      // Joining is a round trip through the relay; two seconds was not
+      // always enough on a busy machine.
+      .waitForSelector('.app-toast', { timeout: 15_000 })
       .then(() => true)
       .catch(() => false);
     if (!toastVisible) {
@@ -132,7 +134,9 @@ async function run() {
 
     // Verify toast notification appeared on page 3 indicating auto-join
     const page3Toast = await page3
-      .waitForSelector('.app-toast', { timeout: 2000 })
+      // Joining is a round trip through the relay; two seconds was not
+      // always enough on a busy machine.
+      .waitForSelector('.app-toast', { timeout: 15_000 })
       .then(() => true)
       .catch(() => false);
     if (!page3Toast) {

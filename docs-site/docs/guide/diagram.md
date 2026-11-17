@@ -14,7 +14,12 @@ The editor is designed for rapid, low-friction diagramming with zero configurati
 
 ### Adding Components & Shapes
 
-- **Palette**: Drag nodes and components directly from the left sidebar onto the canvas.
+- **Palette**: Drag nodes and components directly from the left sidebar onto the canvas. The buttons down its left
+  edge switch between palettes (System, Cloud, Shapes, Code, Git, Fragments); click the open one to fold the list away.
+- **Search**: Type in the box at the top of the palette (or press `/`) to search every palette at once; each result
+  shows where it is filed. Press `Enter` to add the first match to the middle of the canvas, or drag any match where
+  you want it. `Escape` clears the search.
+- **Recently used**: The last six things you dropped are listed at the top of the palette.
 - **Architectural Nodes**: Choose from pre-configured system components (Microservices, Databases, Caches, Gateways,
   Message Queues, Clients, and Compute nodes).
 - **Geometric Shapes**: Insert standard geometric shapes (Rectangles, Rounded Rectangles, Cylinders, Diamonds, Hexagons,
@@ -22,6 +27,11 @@ The editor is designed for rapid, low-friction diagramming with zero configurati
 - **Annotations & Snippets**: Add text callouts, sticky notes, and formatted code snippets to document decisions
   in-place.
 - **Fragments**: Your own reusable groups of nodes - see [Reusable Fragments](#reusable-fragments) below.
+
+### Zooming Out
+
+Below 60% zoom the canvas shows an overview: each component displays only its name, enlarged so it stays readable, and
+its subtitle, properties and badges are hidden until you zoom back in. Exported images always use full detail.
 
 ### Reusable Fragments
 
@@ -60,7 +70,7 @@ Select any component or edge to open the **Inspector Panel** on the right:
 - **Visual Styling**: Customize node accent colors, border styles, and Z-index layering.
 - **Custom Properties & Tags**: Attach arbitrary key-value metadata and tags for categorizing systems.
 - **Requirement Linking**: Bi-directionally link diagram elements directly to engineering requirements for traceability.
-- **Locking**: Tick **Locked** to pin a node in place - it can't be dragged, nudged, resized or deleted until it's
+- **Locking**: Check **Locked** to pin a node in place - it can't be dragged, nudged, resized or deleted until it's
   unlocked. Locked nodes show a small padlock.
 
 ### Editing Many Items at Once
@@ -91,7 +101,7 @@ exports, and each command is a single undo step.
 Right-click a node, an edge, or a selection for:
 
 | Command                         | Shortcut         | What it does                                                                                                                      |
-|---------------------------------|------------------|-----------------------------------------------------------------------------------------------------------------------------------|
+| ------------------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | Change color / icon             |                  | Recolor (nodes and edges) or re-icon everything targeted.                                                                         |
 | Align & distribute              |                  | Align, distribute or match the size of the selected nodes (see above).                                                            |
 | Duplicate                       | Ctrl/⌘+D         | Copies the nodes (with their sub-diagrams and the edges between them) next to the originals, without touching the clipboard.      |
@@ -218,7 +228,7 @@ Click **Export** next to **Present** to take a scenario outside the editor. Each
 Mode shows it (the same framing, dimming and highlights), on a hidden canvas, so your own view never moves.
 
 | Format           | What you get                                                                            | Best for                                  |
-|------------------|-----------------------------------------------------------------------------------------|-------------------------------------------|
+| ---------------- | --------------------------------------------------------------------------------------- | ----------------------------------------- |
 | **PDF slides**   | A 16:9 deck: an optional title slide listing the steps, then one slide per step         | Review meetings, attaching to a ticket    |
 | **PNG images**   | One 1920×1080 image per step, numbered in order (`01-…png`), in a single `.zip`         | Pasting individual steps into other tools |
 | **Animated GIF** | A 960×540 loop that plays the steps in order                                            | READMEs, wikis, Jira and Confluence pages |

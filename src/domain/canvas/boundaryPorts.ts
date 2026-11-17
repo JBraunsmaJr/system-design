@@ -1,7 +1,7 @@
-import type {Edge, Node} from '@xyflow/react';
-import type {ArchEdgeData, ArchNodeData} from './types';
-import {getEdgeType} from './edgeRegistry';
-import {sourceHandleId, targetHandleId} from './edgeAnchoring';
+import type { Edge, Node } from '@xyflow/react';
+import type { ArchEdgeData, ArchNodeData } from './types';
+import { getEdgeType } from './edgeRegistry';
+import { sourceHandleId, targetHandleId } from './edgeAnchoring';
 
 /**
  * Boundary ports: keeping a node's sub-diagram connected to the level
@@ -35,34 +35,34 @@ export type PortSide = 'in' | 'out';
 const PORT_PREFIX = 'port:';
 
 export function portId(edgeId: string, side: PortSide): string {
-    return `${PORT_PREFIX}${edgeId}:${side}`;
+  return `${PORT_PREFIX}${edgeId}:${side}`;
 }
 
 export function isPortId(id: string | null | undefined): boolean {
-    return typeof id === 'string' && id.startsWith(PORT_PREFIX);
+  return typeof id === 'string' && id.startsWith(PORT_PREFIX);
 }
 
 export function parsePortId(
-    id: string | null | undefined,
+  id: string | null | undefined,
 ): { edgeId: string; side: PortSide } | null {
-    if (!isPortId(id)) return null;
-    const rest = (id as string).slice(PORT_PREFIX.length);
-    const cut = rest.lastIndexOf(':');
-    if (cut <= 0) return null;
-    const side = rest.slice(cut + 1);
-    if (side !== 'in' && side !== 'out') return null;
-    return {edgeId: rest.slice(0, cut), side};
+  if (!isPortId(id)) return null;
+  const rest = (id as string).slice(PORT_PREFIX.length);
+  const cut = rest.lastIndexOf(':');
+  if (cut <= 0) return null;
+  const side = rest.slice(cut + 1);
+  if (side !== 'in' && side !== 'out') return null;
+  return { edgeId: rest.slice(0, cut), side };
 }
 
 type AnyEdge = Pick<Edge<ArchEdgeData>, 'id' | 'source' | 'target'> & { data?: ArchEdgeData };
 type AnyNode = Pick<Node<ArchNodeData>, 'id'> & { data: ArchNodeData };
 
 function parentPathOf(item: { data?: unknown }): string[] {
-    return ((item.data as { parentPath?: string[] } | undefined)?.parentPath ?? []) as string[];
+  return ((item.data as { parentPath?: string[] } | undefined)?.parentPath ?? []) as string[];
 }
 
 function levelKey(path: readonly string[]): string {
-    return path.join('\u0000');
+  return path.join('\u0000');
 }
 
 /**
@@ -70,111 +70,111 @@ function levelKey(path: readonly string[]): string {
  * per snapshot in O(nodes + edges).
  */
 export interface PortIndex {
-    /** False for a wire whose port no longer exists - its outer edge was
-     * deleted or moved off this node. Such a wire is an orphan: hidden on
-     * the canvas and cleaned up by the operation that orphaned it. Edges
-     * with no port endpoint are always valid. */
-    isValidEdge(edgeId: string): boolean;
+  /** False for a wire whose port no longer exists - its outer edge was
+   * deleted or moved off this node. Such a wire is an orphan: hidden on
+   * the canvas and cleaned up by the operation that orphaned it. Edges
+   * with no port endpoint are always valid. */
+  isValidEdge(edgeId: string): boolean;
 
-    /** Port ids that at least one valid wire is attached to. */
-    boundPortIds: ReadonlySet<string>;
-    edgesById: ReadonlyMap<string, AnyEdge>;
-    nodesById: ReadonlyMap<string, AnyNode>;
-    /** Valid edges per level (levelKey of their parentPath). */
-    validEdgesByLevel: ReadonlyMap<string, AnyEdge[]>;
+  /** Port ids that at least one valid wire is attached to. */
+  boundPortIds: ReadonlySet<string>;
+  edgesById: ReadonlyMap<string, AnyEdge>;
+  nodesById: ReadonlyMap<string, AnyNode>;
+  /** Valid edges per level (levelKey of their parentPath). */
+  validEdgesByLevel: ReadonlyMap<string, AnyEdge[]>;
 }
 
 export function buildPortIndex(nodes: readonly AnyNode[], edges: readonly AnyEdge[]): PortIndex {
-    const edgesById = new Map<string, AnyEdge>();
-    for (const e of edges) edgesById.set(e.id, e);
-    const nodesById = new Map<string, AnyNode>();
-    for (const n of nodes) nodesById.set(n.id, n);
+  const edgesById = new Map<string, AnyEdge>();
+  for (const e of edges) edgesById.set(e.id, e);
+  const nodesById = new Map<string, AnyNode>();
+  for (const n of nodes) nodesById.set(n.id, n);
 
-    const validity = new Map<string, boolean>();
+  const validity = new Map<string, boolean>();
 
-    function endpointValid(edge: AnyEdge, end: 'source' | 'target', depth: number): boolean {
-        const id = edge[end];
-        const port = parsePortId(id);
-        if (!port) return true;
-        // An inbound port can only feed the inside (be a source); an outbound
-        // port can only be fed (be a target).
-        if (port.side === 'in' && end !== 'source') return false;
-        if (port.side === 'out' && end !== 'target') return false;
-        const level = parentPathOf(edge);
-        if (level.length === 0) return false;
-        const container = level[level.length - 1];
-        const outer = edgesById.get(port.edgeId);
-        if (!outer) return false;
-        const outerLevel = parentPathOf(outer);
-        if (levelKey(outerLevel) !== levelKey(level.slice(0, -1))) return false;
-        if (port.side === 'in' ? outer.target !== container : outer.source !== container) return false;
-        return valid(outer, depth + 1);
-    }
+  function endpointValid(edge: AnyEdge, end: 'source' | 'target', depth: number): boolean {
+    const id = edge[end];
+    const port = parsePortId(id);
+    if (!port) return true;
+    // An inbound port can only feed the inside (be a source); an outbound
+    // port can only be fed (be a target).
+    if (port.side === 'in' && end !== 'source') return false;
+    if (port.side === 'out' && end !== 'target') return false;
+    const level = parentPathOf(edge);
+    if (level.length === 0) return false;
+    const container = level[level.length - 1];
+    const outer = edgesById.get(port.edgeId);
+    if (!outer) return false;
+    const outerLevel = parentPathOf(outer);
+    if (levelKey(outerLevel) !== levelKey(level.slice(0, -1))) return false;
+    if (port.side === 'in' ? outer.target !== container : outer.source !== container) return false;
+    return valid(outer, depth + 1);
+  }
 
-    function valid(edge: AnyEdge, depth = 0): boolean {
-        const cached = validity.get(edge.id);
-        if (cached !== undefined) return cached;
-        // Port chains follow the tree, so they can't be longer than the tree
-        // is deep; the cap only guards against a hand-edited file with a cycle.
-        const result =
-            depth < 256 && endpointValid(edge, 'source', depth) && endpointValid(edge, 'target', depth);
-        validity.set(edge.id, result);
-        return result;
-    }
+  function valid(edge: AnyEdge, depth = 0): boolean {
+    const cached = validity.get(edge.id);
+    if (cached !== undefined) return cached;
+    // Port chains follow the tree, so they can't be longer than the tree
+    // is deep; the cap only guards against a hand-edited file with a cycle.
+    const result =
+      depth < 256 && endpointValid(edge, 'source', depth) && endpointValid(edge, 'target', depth);
+    validity.set(edge.id, result);
+    return result;
+  }
 
-    const boundPortIds = new Set<string>();
-    const validEdgesByLevel = new Map<string, AnyEdge[]>();
-    for (const e of edges) {
-        if (!valid(e)) continue;
-        if (isPortId(e.source)) boundPortIds.add(e.source);
-        if (isPortId(e.target)) boundPortIds.add(e.target);
-        const key = levelKey(parentPathOf(e));
-        const list = validEdgesByLevel.get(key);
-        if (list) list.push(e);
-        else validEdgesByLevel.set(key, [e]);
-    }
+  const boundPortIds = new Set<string>();
+  const validEdgesByLevel = new Map<string, AnyEdge[]>();
+  for (const e of edges) {
+    if (!valid(e)) continue;
+    if (isPortId(e.source)) boundPortIds.add(e.source);
+    if (isPortId(e.target)) boundPortIds.add(e.target);
+    const key = levelKey(parentPathOf(e));
+    const list = validEdgesByLevel.get(key);
+    if (list) list.push(e);
+    else validEdgesByLevel.set(key, [e]);
+  }
 
-    return {
-        isValidEdge: (id) => {
-            const e = edgesById.get(id);
-            return e ? valid(e) : false;
-        },
-        boundPortIds,
-        edgesById,
-        nodesById,
-        validEdgesByLevel,
-    };
+  return {
+    isValidEdge: (id) => {
+      const e = edgesById.get(id);
+      return e ? valid(e) : false;
+    },
+    boundPortIds,
+    edgesById,
+    nodesById,
+    validEdgesByLevel,
+  };
 }
 
 export interface BoundaryPort {
-    id: string;
-    edgeId: string;
-    side: PortSide;
-    /** Label of the node at the far end of the connection, followed up
-     * through every level of ports until a real node is reached. */
-    peerLabel: string;
-    peerNodeId: string | null;
-    /** How many levels above this sub-diagram that node lives. 1 means the
-     * level directly above. */
-    peerDepth: number;
-    /** The outermost connection's own label, or its type's label. */
-    connectionLabel: string;
-    /** The outermost connection's type - a new wire from this port starts
-     * with the same type. */
-    edgeType: string;
-    color?: string;
-    bound: boolean;
-    /** Ids of other ports on this boundary that lead to the same peer node
-     * on the same side and were folded into this one, so the peer shows up
-     * once. Wires stored against them are drawn from this port instead. */
-    mergedPortIds: string[];
+  id: string;
+  edgeId: string;
+  side: PortSide;
+  /** Label of the node at the far end of the connection, followed up
+   * through every level of ports until a real node is reached. */
+  peerLabel: string;
+  peerNodeId: string | null;
+  /** How many levels above this sub-diagram that node lives. 1 means the
+   * level directly above. */
+  peerDepth: number;
+  /** The outermost connection's own label, or its type's label. */
+  connectionLabel: string;
+  /** The outermost connection's type - a new wire from this port starts
+   * with the same type. */
+  edgeType: string;
+  color?: string;
+  bound: boolean;
+  /** Ids of other ports on this boundary that lead to the same peer node
+   * on the same side and were folded into this one, so the peer shows up
+   * once. Wires stored against them are drawn from this port instead. */
+  mergedPortIds: string[];
 }
 
 /** Data carried by a boundary-port node on the canvas. It is an
  * ArchNodeData only so it can travel in the same array as document nodes;
  * nothing reads it as one. */
 export interface BoundaryPortNodeData extends ArchNodeData {
-    port: BoundaryPort;
+  port: BoundaryPort;
 }
 
 /**
@@ -182,30 +182,30 @@ export interface BoundaryPortNodeData extends ArchNodeData {
  * connection, and the outermost edge it started from.
  */
 export function resolvePortPeer(
-    index: PortIndex,
-    edge: AnyEdge,
-    side: PortSide,
+  index: PortIndex,
+  edge: AnyEdge,
+  side: PortSide,
 ): { peerNodeId: string | null; peerLabel: string; depth: number; outermost: AnyEdge } {
-    let current = edge;
-    let depth = 1;
-    for (let guard = 0; guard < 256; guard += 1) {
-        const peerId = side === 'in' ? current.source : current.target;
-        const port = parsePortId(peerId);
-        if (!port) {
-            const node = index.nodesById.get(peerId);
-            return {
-                peerNodeId: node ? peerId : null,
-                peerLabel: node?.data.label?.trim() || 'Untitled',
-                depth,
-                outermost: current,
-            };
-        }
-        const next = index.edgesById.get(port.edgeId);
-        if (!next) break;
-        current = next;
-        depth += 1;
+  let current = edge;
+  let depth = 1;
+  for (let guard = 0; guard < 256; guard += 1) {
+    const peerId = side === 'in' ? current.source : current.target;
+    const port = parsePortId(peerId);
+    if (!port) {
+      const node = index.nodesById.get(peerId);
+      return {
+        peerNodeId: node ? peerId : null,
+        peerLabel: node?.data.label?.trim() || 'Untitled',
+        depth,
+        outermost: current,
+      };
     }
-    return {peerNodeId: null, peerLabel: 'Unknown', depth, outermost: current};
+    const next = index.edgesById.get(port.edgeId);
+    if (!next) break;
+    current = next;
+    depth += 1;
+  }
+  return { peerNodeId: null, peerLabel: 'Unknown', depth, outermost: current };
 }
 
 /**
@@ -222,61 +222,61 @@ export function resolvePortPeer(
  * whose peer couldn't be resolved are never merged.
  */
 export function portsForLevel(index: PortIndex, path: readonly string[]): BoundaryPort[] {
-    if (path.length === 0) return [];
-    const container = path[path.length - 1];
-    const above = index.validEdgesByLevel.get(levelKey(path.slice(0, -1))) ?? [];
-    const inbound: BoundaryPort[] = [];
-    const outbound: BoundaryPort[] = [];
-    const byPeer = new Map<string, BoundaryPort>();
-    const labelsSeen = new Map<BoundaryPort, Set<string>>();
-    for (const edge of above) {
-        for (const side of ['in', 'out'] as const) {
-            if ((side === 'in' ? edge.target : edge.source) !== container) continue;
-            const id = portId(edge.id, side);
-            const peer = resolvePortPeer(index, edge, side);
-            const outerData = peer.outermost.data;
-            const edgeType = outerData?.edgeType ?? 'blank-solid';
-            const typeLabel = getEdgeType(edgeType).label;
-            const connectionLabel = outerData?.label?.trim() || typeLabel || '';
-            const bound = index.boundPortIds.has(id);
-            const peerKey = peer.peerNodeId === null ? null : `${side}\u0000${peer.peerNodeId}`;
-            const existing = peerKey === null ? undefined : byPeer.get(peerKey);
-            if (existing) {
-                existing.mergedPortIds.push(id);
-                existing.bound ||= bound;
-                // The nearest level wins a tie, so the depth shown is the
-                // shortest route to the peer.
-                existing.peerDepth = Math.min(existing.peerDepth, peer.depth);
-                const seen = labelsSeen.get(existing)!;
-                if (connectionLabel && !seen.has(connectionLabel)) {
-                    seen.add(connectionLabel);
-                    existing.connectionLabel = existing.connectionLabel
-                        ? `${existing.connectionLabel}, ${connectionLabel}`
-                        : connectionLabel;
-                }
-                continue;
-            }
-            const port: BoundaryPort = {
-                id,
-                edgeId: edge.id,
-                side,
-                peerLabel: peer.peerLabel,
-                peerNodeId: peer.peerNodeId,
-                peerDepth: peer.depth,
-                connectionLabel,
-                edgeType,
-                ...(outerData?.color ? {color: outerData.color} : {}),
-                bound,
-                mergedPortIds: [],
-            };
-            if (peerKey !== null) {
-                byPeer.set(peerKey, port);
-                labelsSeen.set(port, new Set(connectionLabel ? [connectionLabel] : []));
-            }
-            (side === 'in' ? inbound : outbound).push(port);
+  if (path.length === 0) return [];
+  const container = path[path.length - 1];
+  const above = index.validEdgesByLevel.get(levelKey(path.slice(0, -1))) ?? [];
+  const inbound: BoundaryPort[] = [];
+  const outbound: BoundaryPort[] = [];
+  const byPeer = new Map<string, BoundaryPort>();
+  const labelsSeen = new Map<BoundaryPort, Set<string>>();
+  for (const edge of above) {
+    for (const side of ['in', 'out'] as const) {
+      if ((side === 'in' ? edge.target : edge.source) !== container) continue;
+      const id = portId(edge.id, side);
+      const peer = resolvePortPeer(index, edge, side);
+      const outerData = peer.outermost.data;
+      const edgeType = outerData?.edgeType ?? 'blank-solid';
+      const typeLabel = getEdgeType(edgeType).label;
+      const connectionLabel = outerData?.label?.trim() || typeLabel || '';
+      const bound = index.boundPortIds.has(id);
+      const peerKey = peer.peerNodeId === null ? null : `${side}\u0000${peer.peerNodeId}`;
+      const existing = peerKey === null ? undefined : byPeer.get(peerKey);
+      if (existing) {
+        existing.mergedPortIds.push(id);
+        existing.bound ||= bound;
+        // The nearest level wins a tie, so the depth shown is the
+        // shortest route to the peer.
+        existing.peerDepth = Math.min(existing.peerDepth, peer.depth);
+        const seen = labelsSeen.get(existing)!;
+        if (connectionLabel && !seen.has(connectionLabel)) {
+          seen.add(connectionLabel);
+          existing.connectionLabel = existing.connectionLabel
+            ? `${existing.connectionLabel}, ${connectionLabel}`
+            : connectionLabel;
         }
+        continue;
+      }
+      const port: BoundaryPort = {
+        id,
+        edgeId: edge.id,
+        side,
+        peerLabel: peer.peerLabel,
+        peerNodeId: peer.peerNodeId,
+        peerDepth: peer.depth,
+        connectionLabel,
+        edgeType,
+        ...(outerData?.color ? { color: outerData.color } : {}),
+        bound,
+        mergedPortIds: [],
+      };
+      if (peerKey !== null) {
+        byPeer.set(peerKey, port);
+        labelsSeen.set(port, new Set(connectionLabel ? [connectionLabel] : []));
+      }
+      (side === 'in' ? inbound : outbound).push(port);
     }
-    return [...inbound, ...outbound];
+  }
+  return [...inbound, ...outbound];
 }
 
 /**
@@ -286,14 +286,14 @@ export function portsForLevel(index: PortIndex, path: readonly string[]): Bounda
  * it doesn't point at a node that isn't on the canvas.
  */
 export function portAliasesForLevel(
-    index: PortIndex,
-    path: readonly string[],
+  index: PortIndex,
+  path: readonly string[],
 ): ReadonlyMap<string, string> {
-    const aliases = new Map<string, string>();
-    for (const port of portsForLevel(index, path)) {
-        for (const merged of port.mergedPortIds) aliases.set(merged, port.id);
-    }
-    return aliases;
+  const aliases = new Map<string, string>();
+  for (const port of portsForLevel(index, path)) {
+    for (const merged of port.mergedPortIds) aliases.set(merged, port.id);
+  }
+  return aliases;
 }
 
 /**
@@ -306,30 +306,30 @@ export function portAliasesForLevel(
  * and a wire to any of them wires all of them.
  */
 export function unwiredPortCounts(
-    index: PortIndex,
-    path: readonly string[],
+  index: PortIndex,
+  path: readonly string[],
 ): ReadonlyMap<string, number> {
-    const ports = new Map<string, { container: string; bound: boolean }>();
-    const visit = (edge: AnyEdge, side: PortSide) => {
-        const container = side === 'in' ? edge.target : edge.source;
-        if (isPortId(container)) return;
-        const id = portId(edge.id, side);
-        const {peerNodeId} = resolvePortPeer(index, edge, side);
-        const key = peerNodeId === null ? id : `${container}\u0000${side}\u0000${peerNodeId}`;
-        const bound = index.boundPortIds.has(id);
-        const port = ports.get(key);
-        if (port) port.bound ||= bound;
-        else ports.set(key, {container, bound});
-    };
-    for (const edge of index.validEdgesByLevel.get(levelKey(path)) ?? []) {
-        visit(edge, 'in');
-        visit(edge, 'out');
-    }
-    const counts = new Map<string, number>();
-    for (const {container, bound} of ports.values()) {
-        if (!bound) counts.set(container, (counts.get(container) ?? 0) + 1);
-    }
-    return counts;
+  const ports = new Map<string, { container: string; bound: boolean }>();
+  const visit = (edge: AnyEdge, side: PortSide) => {
+    const container = side === 'in' ? edge.target : edge.source;
+    if (isPortId(container)) return;
+    const id = portId(edge.id, side);
+    const { peerNodeId } = resolvePortPeer(index, edge, side);
+    const key = peerNodeId === null ? id : `${container}\u0000${side}\u0000${peerNodeId}`;
+    const bound = index.boundPortIds.has(id);
+    const port = ports.get(key);
+    if (port) port.bound ||= bound;
+    else ports.set(key, { container, bound });
+  };
+  for (const edge of index.validEdgesByLevel.get(levelKey(path)) ?? []) {
+    visit(edge, 'in');
+    visit(edge, 'out');
+  }
+  const counts = new Map<string, number>();
+  for (const { container, bound } of ports.values()) {
+    if (!bound) counts.set(container, (counts.get(container) ?? 0) + 1);
+  }
+  return counts;
 }
 
 /**
@@ -339,24 +339,24 @@ export function unwiredPortCounts(
  * handler so the whole change is one undo step.
  */
 export function findOrphanedPortEdges(
-    nodes: readonly AnyNode[],
-    edges: readonly AnyEdge[],
+  nodes: readonly AnyNode[],
+  edges: readonly AnyEdge[],
 ): string[] {
-    const index = buildPortIndex(nodes, edges);
-    return edges.filter((e) => !index.isValidEdge(e.id)).map((e) => e.id);
+  const index = buildPortIndex(nodes, edges);
+  return edges.filter((e) => !index.isValidEdge(e.id)).map((e) => e.id);
 }
 
 export interface PortConnection {
-    source: string;
-    target: string;
-    sourceHandle?: string | null;
-    targetHandle?: string | null;
+  source: string;
+  target: string;
+  sourceHandle?: string | null;
+  targetHandle?: string | null;
 }
 
 function pointIdOf(handle: string | null | undefined): string | null {
-    if (!handle) return null;
-    const dash = handle.indexOf('-');
-    return dash === -1 ? handle : handle.slice(dash + 1);
+  if (!handle) return null;
+  const dash = handle.indexOf('-');
+  return dash === -1 ? handle : handle.slice(dash + 1);
 }
 
 /**
@@ -371,28 +371,28 @@ function pointIdOf(handle: string | null | undefined): string | null {
  * inbound ports, a port to itself).
  */
 export function orientPortConnection<T extends PortConnection>(conn: T): T | null {
-    const s = parsePortId(conn.source);
-    const t = parsePortId(conn.target);
-    if (!s && !t) return conn;
-    if (conn.source === conn.target) return null;
-    const okAsIs = (!s || s.side === 'in') && (!t || t.side === 'out');
-    if (okAsIs) return conn;
-    const flippedOk = (!t || t.side === 'in') && (!s || s.side === 'out');
-    if (!flippedOk) return null;
-    const sp = pointIdOf(conn.targetHandle);
-    const tp = pointIdOf(conn.sourceHandle);
-    return {
-        ...conn,
-        source: conn.target,
-        target: conn.source,
-        sourceHandle: sp ? sourceHandleId(sp) : null,
-        targetHandle: tp ? targetHandleId(tp) : null,
-    };
+  const s = parsePortId(conn.source);
+  const t = parsePortId(conn.target);
+  if (!s && !t) return conn;
+  if (conn.source === conn.target) return null;
+  const okAsIs = (!s || s.side === 'in') && (!t || t.side === 'out');
+  if (okAsIs) return conn;
+  const flippedOk = (!t || t.side === 'in') && (!s || s.side === 'out');
+  if (!flippedOk) return null;
+  const sp = pointIdOf(conn.targetHandle);
+  const tp = pointIdOf(conn.sourceHandle);
+  return {
+    ...conn,
+    source: conn.target,
+    target: conn.source,
+    sourceHandle: sp ? sourceHandleId(sp) : null,
+    targetHandle: tp ? targetHandleId(tp) : null,
+  };
 }
 
 /** True when a port endpoint sits on the end it's allowed on. */
 export function isPortOrientationValid(conn: PortConnection): boolean {
-    const s = parsePortId(conn.source);
-    const t = parsePortId(conn.target);
-    return (!s || s.side === 'in') && (!t || t.side === 'out') && conn.source !== conn.target;
+  const s = parsePortId(conn.source);
+  const t = parsePortId(conn.target);
+  return (!s || s.side === 'in') && (!t || t.side === 'out') && conn.source !== conn.target;
 }

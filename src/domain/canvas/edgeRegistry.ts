@@ -1,4 +1,4 @@
-import type {EdgeRouting, EdgeTypeDefinition} from './types';
+import type { EdgeRouting, EdgeTypeDefinition } from './types';
 
 /** What an edge is drawn at when it has no thickness of its own. */
 export const DEFAULT_EDGE_STROKE_WIDTH = 1.75;
@@ -6,24 +6,24 @@ export const DEFAULT_EDGE_STROKE_WIDTH = 1.75;
 /** The thicknesses the Inspector offers. Kept to a short ladder rather than
  * a free number so a diagram's lines stay visually consistent. */
 export const EDGE_STROKE_WIDTHS: { value: number; label: string }[] = [
-    {value: 1, label: 'Thin'},
-    {value: DEFAULT_EDGE_STROKE_WIDTH, label: 'Normal'},
-    {value: 2.5, label: 'Medium'},
-    {value: 3.5, label: 'Thick'},
-    {value: 5, label: 'Heavy'},
+  { value: 1, label: 'Thin' },
+  { value: DEFAULT_EDGE_STROKE_WIDTH, label: 'Normal' },
+  { value: 2.5, label: 'Medium' },
+  { value: 3.5, label: 'Thick' },
+  { value: 5, label: 'Heavy' },
 ];
 
 export const EDGE_ROUTINGS: { value: EdgeRouting; label: string }[] = [
-    {value: 'orthogonal', label: 'Orthogonal'},
-    {value: 'straight', label: 'Straight'},
-    {value: 'curved', label: 'Curved'},
+  { value: 'orthogonal', label: 'Orthogonal' },
+  { value: 'straight', label: 'Straight' },
+  { value: 'curved', label: 'Curved' },
 ];
 
 /** Reads an edge's thickness, tolerating whatever a file or peer sent. */
 export function resolveEdgeStrokeWidth(value: unknown): number {
-    return typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= 20
-        ? value
-        : DEFAULT_EDGE_STROKE_WIDTH;
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= 20
+    ? value
+    : DEFAULT_EDGE_STROKE_WIDTH;
 }
 
 /** Arrowhead size in flow units for a line of the given thickness. Grows
@@ -31,12 +31,12 @@ export function resolveEdgeStrokeWidth(value: unknown): number {
  * than the line itself so it doesn't balloon either. Matches React Flow's
  * own default marker (16 x stroke width) at the default thickness. */
 export function arrowheadSize(strokeWidth: number): number {
-    return Math.round(14 + strokeWidth * 8);
+  return Math.round(14 + strokeWidth * 8);
 }
 
 /** Reads an edge's routing, tolerating whatever a file or peer sent. */
 export function resolveEdgeRouting(value: unknown): EdgeRouting {
-    return value === 'straight' || value === 'curved' ? value : 'orthogonal';
+  return value === 'straight' || value === 'curved' ? value : 'orthogonal';
 }
 
 export const STYLE_GROUP_LABELS: Record<string, string> = {
@@ -52,14 +52,14 @@ export const STYLE_GROUP_LABELS: Record<string, string> = {
 
 /** The order the Inspector's type dropdown lists style groups in. */
 export const EDGE_STYLE_GROUP_ORDER = [
-    'sync',
-    'async',
-    'control',
-    'vcs',
-    'blank',
-    'data',
-    'file',
-    'generic',
+  'sync',
+  'async',
+  'control',
+  'vcs',
+  'blank',
+  'data',
+  'file',
+  'generic',
 ] as const;
 
 /** Starter traffic taxonomy - extend freely, same pattern as nodeRegistry. */

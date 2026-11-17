@@ -28,19 +28,25 @@
  * refactor should produce an identical census; --compare exits non-zero if
  * any count differs.
  */
-import {type ChildProcess, spawn} from 'child_process';
-import {build, loadConfigFromFile, type PluginOption} from 'vite';
-import {mkdtempSync, readFileSync, writeFileSync} from 'fs';
-import {fileURLToPath} from 'url';
-import {tmpdir} from 'os';
-import {join, resolve} from 'path';
-import {chromium, type Page} from 'playwright';
-import {waitForPort} from './lib/devServers';
-import {toDiagramFile} from '../src/domain/canvas/serialization';
-import type {RequirementItem, RequirementRelationship,} from '../src/domain/requirements/requirementsTypes';
-import {BUILT_IN_ITEM_TYPES, BUILT_IN_RELATIONSHIP_TYPES,} from '../src/domain/requirements/requirementsRegistry';
-import type {ProgramIncrement} from '../src/domain/timeline/programIncrements';
-import type {Milestone} from '../src/domain/timeline/milestones';
+import { type ChildProcess, spawn } from 'child_process';
+import { build, loadConfigFromFile, type PluginOption } from 'vite';
+import { mkdtempSync, readFileSync, writeFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { tmpdir } from 'os';
+import { join, resolve } from 'path';
+import { chromium, type Page } from 'playwright';
+import { waitForPort } from './lib/devServers';
+import { toDiagramFile } from '../src/domain/canvas/serialization';
+import type {
+  RequirementItem,
+  RequirementRelationship,
+} from '../src/domain/requirements/requirementsTypes';
+import {
+  BUILT_IN_ITEM_TYPES,
+  BUILT_IN_RELATIONSHIP_TYPES,
+} from '../src/domain/requirements/requirementsRegistry';
+import type { ProgramIncrement } from '../src/domain/timeline/programIncrements';
+import type { Milestone } from '../src/domain/timeline/milestones';
 
 // ---------------------------------------------------------------------------
 // Arguments
@@ -175,7 +181,7 @@ function buildDocument() {
 // The in-page hook
 // ---------------------------------------------------------------------------
 /* Runs in the page before any application script. Kept free of closures over
- * Node-side values: Playwright serialises it. */
+ * Node-side values: Playwright serializes it. */
 function installRenderHook() {
   // Fiber tags whose `type` is the user's component function or class.
   const COMPONENT_TAGS = new Set([0, 1, 11, 15]); // Function, Class, ForwardRef, SimpleMemo
@@ -390,14 +396,14 @@ const SCENARIOS: Scenario[] = [
   { id: 'req/collapse-all', run: (p) => p.click('button[aria-label="Collapse all cards"]') },
   { id: 'req/expand-all', run: (p) => p.click('button[aria-label="Expand all cards"]') },
   // --- Timeline view -----------------------------------------------------
-  { id: 'timeline/open', run: (p) => p.click('button[title="Timeline"]') },
+  { id: 'timeline/open', run: (p) => p.click('.toolbar__view-tabs button:has-text("Plan")') },
   {
     id: 'timeline/gantt',
-    run: (p) => p.click('.timeline-view__mode-toggle button:has-text("Gantt")'),
+    run: (p) => p.click('.plan-nav__item:has-text("Gantt")'),
   },
   {
     id: 'timeline/board',
-    run: (p) => p.click('.timeline-view__mode-toggle button:has-text("Board")'),
+    run: (p) => p.click('.plan-nav__item:has-text("Board")'),
   },
   {
     id: 'timeline/filter-epic',
@@ -509,7 +515,7 @@ async function runOnce(appUrl: string, docJson: string): Promise<Results> {
     const context = await browser.newContext({ viewport: { width: 1600, height: 1000 } });
     // tsx compiles this script with esbuild's keepNames, which wraps
     // functions in a `__name(...)` helper that does not exist in the page
-    // once Playwright serialises installRenderHook. Identity shim first.
+    // once Playwright serializes installRenderHook. Identity shim first.
     await context.addInitScript({ content: 'window.__name = (f) => f;' });
     await context.addInitScript(installRenderHook);
     const page = await context.newPage();

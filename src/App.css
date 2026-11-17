@@ -22,9 +22,11 @@
 @import './styles/gantt.css'; /* Gantt chart (incl. board/Gantt risk states) */
 @import './styles/team.css'; /* Team view, member & points pickers, sprint matrix, settings */
 @import './styles/capacity.css'; /* Sprint capacity bar, reservations & buffer allocation */
-@import './styles/skill-tree.css'; /* Skill tree */
+@import './styles/dependencies.css'; /* Dependencies */
+@import './styles/plan.css'; /* Plan tab: section links, board filter, backlog column */
 @import './styles/collab.css'; /* Collaborative session panel */
 @import './styles/milestones.css'; /* Milestones board and modals */
 @import './styles/documentation.css'; /* Diagram hover documentation */
 @import './styles/toasts.css'; /* Toast notifications */
 @import './styles/durability.css'; /* Durability indicator */
+@import './styles/administration.css'; /* Store administration page */

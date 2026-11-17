@@ -11,12 +11,21 @@
  * database as well as the index entry.
  */
 import * as Y from 'yjs';
-import type {DocumentIndexEntry, DocumentStore, StorageResult,} from '../../domain/storage/documentStore.ts';
-import {newDocumentId} from '../../domain/storage/documentStore.ts';
-import {type DiagramFile, toDiagramFile} from '../../domain/canvas/serialization.ts';
-import {openDocument, type OpenDocument, storageKeyForDocument} from './localDocument.ts';
-import {canRebase, readDocumentContents, rebaseDocument, type RebaseEligibility,} from './rebase.ts';
-import type {CompactionResult} from './persistence.ts';
+import type {
+  DocumentIndexEntry,
+  DocumentStore,
+  StorageResult,
+} from '../../domain/storage/documentStore.ts';
+import { newDocumentId } from '../../domain/storage/documentStore.ts';
+import { type DiagramFile, toDiagramFile } from '../../domain/canvas/serialization.ts';
+import { openDocument, type OpenDocument, storageKeyForDocument } from './localDocument.ts';
+import {
+  canRebase,
+  readDocumentContents,
+  rebaseDocument,
+  type RebaseEligibility,
+} from './rebase.ts';
+import type { CompactionResult } from './persistence.ts';
 
 export interface DocumentLibraryDeps {
   store: DocumentStore;
@@ -48,7 +57,7 @@ export interface DocumentLibrary {
   rebaseEligibility(entry: DocumentIndexEntry, now?: number): RebaseEligibility;
   /**
    * WS4-R6 rebase: a NEW document (new id, no history, no session identity)
-   * built from the current values. The original is kept, relabelled, so the
+   * built from the current values. The original is kept, relabeled, so the
    * operation loses nothing even when forced. Never compacts.
    */
   rebase(entry: DocumentIndexEntry): Promise<StorageResult<RebaseOutcome>>;
@@ -215,12 +224,12 @@ export function createDocumentLibrary(
       // one can sync with it.
       const written = await store.writeDocument(docId, file, { origin: 'local' });
       if (!written.ok) return written;
-      // The original stays, clearly labelled, rather than being deleted.
-      const relabelled = await library.rename(
+      // The original stays, clearly labeled, rather than being deleted.
+      const relabeled = await library.rename(
         entry,
         `${file.title || 'Untitled Diagram'} (before rebase)`,
       );
-      if (!relabelled.ok) return relabelled;
+      if (!relabeled.ok) return relabeled;
       return {
         ok: true,
         value: {

@@ -99,7 +99,7 @@
   padding: 6px 12px;
   border: 0;
   border-radius: var(--radius-sm);
-  background: var(--accent);
+  background: var(--accent-fill);
   color: var(--white);
   font: inherit;
   font-size: var(--text-xs);
@@ -139,8 +139,22 @@
   }
 }
 
+/* Changes on their way to the workspace: the icon breathes and the label
+   stays put. Sync starts and stops with every pause in typing, so anything
+   louder - swapping the text, a spinner - flickers. */
+.durability__icon--busy {
+  animation: durability-busy 1.4s ease-in-out infinite;
+}
+
+@keyframes durability-busy {
+  50% {
+    opacity: 0.35;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .durability__icon--spin {
+  .durability__icon--spin,
+  .durability__icon--busy {
     animation: none;
   }
 }

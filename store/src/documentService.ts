@@ -35,8 +35,6 @@ export interface DocumentRecord {
   purgeAfter: string | null;
   /** WS10-R8: prevents purge in every retention mode. */
   legalHold: { reason: string; placedBy: string; placedAt: string } | null;
-  /** Wrapped document keys, opaque to the store (WS7-R3, WS7-R4). */
-  keys: { wrappedForWorkspace: string; wrappedForRecovery?: string };
   blobs: StoredBlobMeta[];
 }
 
@@ -97,7 +95,6 @@ export interface DocumentServiceOptions<Tx> {
 
 export interface CreateRequest {
   docId: string;
-  keys: DocumentRecord['keys'];
 }
 
 export interface ReadOptions {
@@ -110,8 +107,6 @@ export interface ReadOptions {
 interface Row {
   record: DocumentRecord;
   blobIds: string[];
-  /** Sealed metadata (WS9-R1). Ciphertext to the store. */
-  meta?: Uint8Array;
 }
 
 let blobCounter = 0;
@@ -138,7 +133,7 @@ export function createDocumentService<Tx>(options: DocumentServiceOptions<Tx>) {
     if (opts.seenVersion !== undefined && row.record.version < opts.seenVersion) {
       throw new StoreError(
         `The store returned version ${row.record.version} for ${docId}, but version ${opts.seenVersion} has already been seen. ` +
-          `Refusing to go backwards.`,
+          `Refusing to go backward.`,
         'stale-version',
       );
     }
@@ -157,7 +152,6 @@ export function createDocumentService<Tx>(options: DocumentServiceOptions<Tx>) {
         deletedAt: null,
         purgeAfter: null,
         legalHold: null,
-        keys: request.keys,
         blobs: [],
       };
       rows.set(request.docId, { record, blobIds: [] });
@@ -223,29 +217,6 @@ export function createDocumentService<Tx>(options: DocumentServiceOptions<Tx>) {
         if (bytes) out.push({ meta, bytes });
       }
       return { record: structuredClone(row.record), blobs: out };
-    },
-
-    /** WS7-R7: the document key re-wrapped under a new workspace key. Only
-     * the wrap changes; no content is re-encrypted. Deleted documents are
-     * re-wrapped too, so they stay restorable (WS10-R4). */
-    async setWorkspaceWrap(docId: string, wrappedForWorkspace: string): Promise<DocumentRecord> {
-      const row = require(docId, { includeDeleted: true });
-      row.record.keys = { ...row.record.keys, wrappedForWorkspace };
-      return structuredClone(row.record);
-    },
-
-    /** WS8-R2, WS9-R1: sealed per-document metadata, opaque to the store. */
-    async getMeta(docId: string, opts: ReadOptions = {}): Promise<Uint8Array | null> {
-      const row = require(docId, opts);
-      return row.meta ? new Uint8Array(row.meta) : null;
-    },
-
-    async setMeta(docId: string, sealed: Uint8Array): Promise<DocumentRecord> {
-      const row = require(docId);
-      row.meta = new Uint8Array(sealed);
-      row.record.version += 1;
-      row.record.updatedAt = now().toISOString();
-      return structuredClone(row.record);
     },
 
     async read(
@@ -366,11 +337,25 @@ export function createDocumentService<Tx>(options: DocumentServiceOptions<Tx>) {
      * identity and version history are untouched; this is compaction, never
      * a rebase.
      */
+    /**
+     * Replaces the log with one snapshot. With `expectedVersion`, refused
+     * (`conflict`) when the document has moved on: a snapshot made from an
+     * older state would otherwise erase whatever was appended since.
+     */
     async compact(
       docId: string,
-      snapshot: { kind: string; bytes: Uint8Array },
+      snapshot: { kind: string; bytes: Uint8Array; expectedVersion?: number },
     ): Promise<DocumentRecord> {
       const row = require(docId);
+      if (
+        snapshot.expectedVersion !== undefined &&
+        snapshot.expectedVersion !== row.record.version
+      ) {
+        throw new StoreError(
+          `Expected version ${snapshot.expectedVersion}, but ${docId} is at ${row.record.version}.`,
+          'conflict',
+        );
+      }
       const blobId = `b${(++blobCounter).toString(36)}`;
       const superseded = row.blobIds.map((id) => ({ docId, blobId: id }));
       const tx = options.begin();

@@ -35,7 +35,7 @@ const SECTION_PATTERN = /^## /;
 const VERSION_HEADING_PATTERN = /^## \[(\d+\.\d+\.\d+)\]/;
 const SEMVER_PATTERN = /^(\d+)\.(\d+)\.(\d+)$/;
 
-const RANK: Record<Bump, number> = {patch: 1, minor: 2, major: 3};
+const RANK: Record<Bump, number> = { patch: 1, minor: 2, major: 3 };
 
 interface UnreleasedSection {
   /** Line index of the `## [Unreleased]` heading. */
@@ -63,13 +63,13 @@ function findUnreleased(all: string[]): UnreleasedSection {
   if (starts.length === 0) throw new Error(`CHANGELOG.md has no "${UNRELEASED_HEADING}" section.`);
   if (starts.length > 1) {
     throw new Error(
-        `CHANGELOG.md has ${starts.length} "${UNRELEASED_HEADING}" sections; expected one.`,
+      `CHANGELOG.md has ${starts.length} "${UNRELEASED_HEADING}" sections; expected one.`,
     );
   }
   const start = starts[0];
   let end = start + 1;
   while (end < all.length && !SECTION_PATTERN.test(all[end])) end++;
-  return {start, end, body: trimBlankEdges(all.slice(start + 1, end))};
+  return { start, end, body: trimBlankEdges(all.slice(start + 1, end)) };
 }
 
 /** The line items currently under `## [Unreleased]`, blank edges trimmed. */
@@ -144,7 +144,7 @@ export function cutRelease(text: string, currentVersion: string, date: string): 
   const bump = highestBump(section.body);
   if (!bump) {
     throw new Error(
-        `Nothing to release: no line under "${UNRELEASED_HEADING}" is marked [MAJOR], [MINOR] or [PATCH].`,
+      `Nothing to release: no line under "${UNRELEASED_HEADING}" is marked [MAJOR], [MINOR] or [PATCH].`,
     );
   }
   const version = bumpVersion(currentVersion, bump);
@@ -175,8 +175,8 @@ export function openUnreleased(text: string): string {
   const firstSection = all.findIndex((line) => SECTION_PATTERN.test(line));
   const at = firstSection === -1 ? all.length : firstSection;
   return [...all.slice(0, at), UNRELEASED_HEADING, '', ...all.slice(at)]
-      .join('\n')
-      .replace(/\n*$/, '\n');
+    .join('\n')
+    .replace(/\n*$/, '\n');
 }
 
 /**

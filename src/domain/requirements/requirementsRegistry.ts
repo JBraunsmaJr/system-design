@@ -244,7 +244,7 @@ export function withMissingBuiltInTypes(itemTypes: RequirementItemType[]): Requi
  * disagree about what a document should gain.
  */
 export function builtInTypesToAdd(
-    existing: readonly Pick<RequirementItemType, 'id' | 'prefix'>[],
+  existing: readonly Pick<RequirementItemType, 'id' | 'prefix'>[],
 ): RequirementItemType[] {
   const ids = new Set(existing.map((t) => t.id));
   const prefixes = new Set(existing.map((t) => (t.prefix ?? '').toUpperCase()));
@@ -527,7 +527,7 @@ export function updateItemReferencesInItems(
       const updated = updateItemReferencesInText(text, oldId, newId);
       if (updated !== text) (patch ??= {})[field] = updated;
     }
-      return patch ? {...item, ...patch} : item;
+    return patch ? { ...item, ...patch } : item;
   });
 }
 

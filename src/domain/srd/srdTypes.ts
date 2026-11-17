@@ -1,4 +1,4 @@
-import type {EpicInferredSchedule, RequirementStatus} from '../requirements/requirementsTypes';
+import type { EpicInferredSchedule, RequirementStatus } from '../requirements/requirementsTypes';
 
 export interface RequirementItemViewModel {
   id: string;
@@ -123,8 +123,8 @@ export interface SrdDataContext {
       piId: string;
       piName: string;
       name: string;
-        /** The sprint's goal, if one was set. */
-        goal?: string;
+      /** The sprint's goal, if one was set. */
+      goal?: string;
       startDate: string;
       endDate: string;
       assignedItems: string[];

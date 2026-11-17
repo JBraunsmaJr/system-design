@@ -1,12 +1,6 @@
 #!/bin/sh
 set -e
 
-if [ "$1" = "generate-recovery-key" ]; then
-  shift
-  exec node --experimental-strip-types /app/scripts/generate-recovery-key.ts "$@"
-elif [ "$1" = "recover-document" ]; then
-  shift
-  exec node --experimental-strip-types /app/scripts/recover-document.ts "$@"
-fi
-
+# Runs the image's command. Kept as the entry point so a deployment's
+# wrapper scripts, written when this dispatched to other tools, still work.
 exec "$@"

@@ -1,50 +1,62 @@
-import {lazy, Profiler, type ProfilerOnRenderCallback, Suspense, useCallback, useMemo, useRef, useState,} from 'react';
-import {ChevronLeft, ChevronRight} from 'lucide-react';
-import {ReactFlowProvider} from '@xyflow/react';
+import {
+  lazy,
+  Profiler,
+  type ProfilerOnRenderCallback,
+  Suspense,
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ReactFlowProvider } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import * as Y from 'yjs';
-import {Toolbar} from './components/canvas/Toolbar';
-import {CollabPanel} from './components/workspace/CollabPanel';
-import {Palette} from './components/canvas/Palette';
-import {Canvas} from './components/canvas/Canvas';
-import {Inspector} from './components/canvas/Inspector';
-import {ScenarioPanel} from './components/canvas/ScenarioPanel';
-import {LibraryManagerModal} from './components/workspace/LibraryManagerModal';
-import {RequirementsView} from './components/requirements/RequirementsView';
-import {TimelineView} from './components/timeline/TimelineView';
-import {TeamView} from './components/team/TeamView';
-import {SkillTreeView} from './components/skilltree/SkillTreeView';
-import {DocumentManager} from './components/workspace/DocumentManager';
-import {DurabilityIndicator} from './components/workspace/DurabilityIndicator';
-import {LeaveGuardDialog} from './components/workspace/LeaveGuardDialog';
-import {WorkspacePanel} from './components/workspace/WorkspacePanel';
-import {AccessRequestNotice} from './components/workspace/AccessRequestNotice';
-import {Toast, type ToastType} from './common/components/toast/Toast';
-import {useFileSaving} from './hooks/useFileSaving';
-import {useAccessRequests} from './collab/hooks/useAccessRequests';
-import {getStoreUrl} from './domain/storage/storeConfig';
-import {isSoleReplicaHolder} from './domain/storage/durability';
-import {isPerfInstrumentationActive, recordCommit} from './perf/instrumentation';
-import {useOpenDocument} from './app/hooks/useOpenDocument';
-import {useStoreSignIn} from './app/hooks/useStoreSignIn';
-import {useCollabSession} from './app/hooks/useCollabSession';
-import {useDocumentStores} from './app/hooks/useDocumentStores';
-import {useWorkspaceSession} from './app/hooks/useWorkspaceSession';
-import {useDocumentPersistence} from './app/hooks/useDocumentPersistence';
-import {useDiagramSelection} from './app/hooks/useDiagramSelection';
-import {useScenarios} from './app/hooks/useScenarios';
-import {useViewNavigation} from './app/hooks/useViewNavigation';
-import {useCanvasEditing} from './app/hooks/useCanvasEditing';
-import {useClipboard} from './app/hooks/useClipboard';
-import {useStyleClipboard} from './app/hooks/useStyleClipboard';
-import type {CanvasContextActions} from './components/canvas/useCanvasContextMenu';
-import type {MultiSelectionActions} from './components/canvas/MultiSelectionInspector';
-import {useKeyboardShortcuts} from './app/hooks/useKeyboardShortcuts';
-import {useFileActions} from './app/hooks/useFileActions';
-import {usePerfHarnessBridge} from './app/hooks/usePerfHarnessBridge';
-import {listLinkableDocuments, listWorkspaceDocuments} from './collab/sync/linkableDocuments';
-import {createStoreClient} from './collab/access/storeClient';
-import {createIndexedDbDeviceKeyStorage} from './collab/access/deviceIdentity';
+import { Toolbar } from './components/canvas/Toolbar';
+import { CollabPanel } from './components/workspace/CollabPanel';
+import { Palette } from './components/canvas/Palette';
+import { Canvas } from './components/canvas/Canvas';
+import { Inspector } from './components/canvas/Inspector';
+import { ScenarioPanel } from './components/canvas/ScenarioPanel';
+import { LibraryManagerModal } from './components/workspace/LibraryManagerModal';
+import { RequirementsView } from './components/requirements/RequirementsView';
+import { TimelineView } from './components/timeline/TimelineView';
+import { TeamView } from './components/team/TeamView';
+import { PlanNav } from './components/plan/PlanNav';
+import { planSectionFor } from './app/planNavigation';
+import { DependenciesView } from './components/dependencies/DependenciesView';
+import { DocumentManager } from './components/workspace/DocumentManager';
+import { DurabilityIndicator } from './components/workspace/DurabilityIndicator';
+import { LeaveGuardDialog } from './components/workspace/LeaveGuardDialog';
+import { TrustedWorkspacePanel } from './components/workspace/TrustedWorkspacePanel';
+import { useTrustedWorkspaceSync } from './collab/trusted/useTrustedWorkspaceSync';
+import { getStoreMode } from './collab/trusted/storeMode';
+import { StoreConnection } from './components/workspace/StoreConnection';
+import { Toast, type ToastType } from './common/components/toast/Toast';
+import { useFileSaving } from './hooks/useFileSaving';
+import { getStoreUrl } from './domain/storage/storeConfig';
+import { isSoleReplicaHolder } from './domain/storage/durability';
+import { isPerfInstrumentationActive, recordCommit } from './perf/instrumentation';
+import { useOpenDocument } from './app/hooks/useOpenDocument';
+import { useStoreSignIn } from './app/hooks/useStoreSignIn';
+import { useViewOnly } from './app/hooks/useViewOnly';
+import { useCollabSession } from './app/hooks/useCollabSession';
+import { useDocumentStores } from './app/hooks/useDocumentStores';
+import { useDocumentSessionJoin } from './app/hooks/useDocumentSessionJoin';
+import { useDocumentPersistence } from './app/hooks/useDocumentPersistence';
+import { useDiagramSelection } from './app/hooks/useDiagramSelection';
+import { useScenarios } from './app/hooks/useScenarios';
+import { useViewNavigation } from './app/hooks/useViewNavigation';
+import { useCanvasEditing } from './app/hooks/useCanvasEditing';
+import { useClipboard } from './app/hooks/useClipboard';
+import { useStyleClipboard } from './app/hooks/useStyleClipboard';
+import type { CanvasContextActions } from './components/canvas/useCanvasContextMenu';
+import type { MultiSelectionActions } from './components/canvas/MultiSelectionInspector';
+import { useKeyboardShortcuts } from './app/hooks/useKeyboardShortcuts';
+import { useFileActions } from './app/hooks/useFileActions';
+import { usePerfHarnessBridge } from './app/hooks/usePerfHarnessBridge';
+import { listLinkableDocuments, listWorkspaceDocuments } from './collab/sync/linkableDocuments';
+import { createTrustedStoreClient } from './collab/trusted/trustedStoreClient';
 import './App.css';
 
 // Loaded on first visit: the SRD view carries the PDF exporter, which no
@@ -53,7 +65,7 @@ const SrdView = lazy(() => import('./components/srd/SrdViewEntry'));
 // Loaded when a scenario is first exported: its encoders (react-pdf, gifenc,
 // Mediabunny) load later still, each only for its own format.
 const ScenarioExportDialog = lazy(
-    () => import('./components/canvas/scenarioExport/ScenarioExportDialog'),
+  () => import('./components/canvas/scenarioExport/ScenarioExportDialog'),
 );
 
 /**
@@ -87,6 +99,13 @@ function App() {
   /** Where the workspace is, if this deployment has one. Absent means the
    * editor behaves exactly as it does with no store at all. */
   const [storeUrl] = useState(() => getStoreUrl());
+  /**
+   * Whether that store is one this editor can use, settled before the
+   * first render (see storeMode.ts). A store that predates workspaces is
+   * not: the editor then works on its own, and File > Documents says why.
+   */
+  const [storeMode] = useState(() => getStoreMode(storeUrl));
+  const trustedStoreUrl = storeMode === 'trusted' ? storeUrl : null;
 
   const [toast, setToast] = useState<{
     id?: number;
@@ -104,10 +123,18 @@ function App() {
 
   // --- Workspace sign-in and collaboration --------------------------------
   const { storeIdentity, isOidcAvailable, handleLoginOidc, signedInName } =
-    useStoreSignIn(storeUrl);
-  /** People waiting to be let into the workspace, noticed from here rather
-   * than only from inside File > Documents (WS7-R8). */
-  const accessRequests = useAccessRequests({ storeUrl });
+    useStoreSignIn(trustedStoreUrl);
+
+  /**
+   * A relay token for the open document's room, where a trusted store
+   * gives them out with the document. Filled in further down, once the
+   * hook that knows the document's session has run; stable, so the session
+   * code can hold on to it.
+   */
+  const documentRelayToken = useRef<((room: string) => Promise<string | null | undefined>) | null>(
+    null,
+  );
+  const relayTokenFor = useCallback(async (room: string) => documentRelayToken.current?.(room), []);
 
   const {
     activeSession,
@@ -134,7 +161,13 @@ function App() {
     startNewSession,
     joinSession,
     leaveSession,
-  } = useCollabSession({ openDoc, storeUrl, signedInName, showToast });
+  } = useCollabSession({
+    openDoc,
+    storeUrl: trustedStoreUrl,
+    signedInName,
+    showToast,
+    relayTokenFor,
+  });
 
   const appVersion = useMemo(
     () => (import.meta.env.VITE_APP_VERSION as string | undefined) ?? 'Development',
@@ -165,37 +198,49 @@ function App() {
     milestonesSnapshot,
   } = useDocumentStores({ activeSession, openDoc });
 
-  const { workspaceSync, handleSaveToWorkspace, isSavingToWorkspace } = useWorkspaceSession({
-    storeUrl,
-    openDocId,
-    openDoc,
+  const workspaceSync = useTrustedWorkspaceSync({
+    storeUrl: trustedStoreUrl,
+    docId: openDocId,
+    doc: openDoc.doc,
     title,
-    showToast,
+  });
+  // The workspace this document is in, when this person may read it but
+  // not change it. Edits are then refused at the document (useViewOnly),
+  // and the toolbar and canvas stop offering the obvious ones.
+  const viewOnlyIn = workspaceSync.readOnly
+    ? (workspaceSync.workspace?.name ?? 'this workspace')
+    : null;
+  useViewOnly({ doc: openDoc.doc, viewOnlyIn, showToast });
+  useDocumentSessionJoin({
+    session: workspaceSync.session,
+    // The session code is set up before the hook above runs, so it
+    // reaches that hook's answer through this ref.
+    relayTokenRef: documentRelayToken,
+    relayTokenProvider: trustedStoreUrl ? workspaceSync.relayTokenFor : null,
+    openDocId,
     signalingUrls,
     activeSessionRef,
     autoJoinedRoomRef: autoJoinedRoom,
     startNewSession,
   });
 
-  const { hasAutosaved, durabilitySignals, resumableSession, activeDocId } = useDocumentPersistence(
-    {
-      fileSaving,
-      workspaceSync,
-      documentStore,
-      activeSession,
-      openDocId,
-      title,
-      scenarios,
-      diagramSnapshot,
-      requirementsSnapshot,
-      programIncrementsSnapshot,
-      teamSnapshot,
-      milestonesSnapshot,
-      srdSnapshot,
-      sessionPersistence,
-      presencePeers,
-    },
-  );
+  const { durabilitySignals, resumableSession, activeDocId } = useDocumentPersistence({
+    fileSaving,
+    workspaceSync,
+    documentStore,
+    activeSession,
+    openDocId,
+    title,
+    scenarios,
+    diagramSnapshot,
+    requirementsSnapshot,
+    programIncrementsSnapshot,
+    teamSnapshot,
+    milestonesSnapshot,
+    srdSnapshot,
+    sessionPersistence,
+    presencePeers,
+  });
 
   // --- Diagram level, selection, scenarios and views ----------------------
   const {
@@ -249,6 +294,9 @@ function App() {
   const {
     viewMode,
     setViewMode,
+    planChartMode,
+    openPlan,
+    openPlanSection,
     diagramTree,
     setFocusedItemId,
     pendingRequirementFocus,
@@ -332,7 +380,7 @@ function App() {
     setActiveStepId,
   });
 
-  const {onCopy, onPaste, onDuplicate, onSaveFragment, onInsertFragment} = useClipboard({
+  const { onCopy, onPaste, onDuplicate, onSaveFragment, onInsertFragment } = useClipboard({
     nodes,
     edges,
     selectedNodeIds,
@@ -345,20 +393,20 @@ function App() {
   // Saving a fragment says where it went, since nothing on the canvas
   // changes; read only by the right-click menu, like onDuplicate.
   const onSaveFragmentWithToast = useCallback(
-      (nodeIds: string[], name: string) => {
-        const result = onSaveFragment(nodeIds, name);
-        if (result.ok) {
-          showToast(`Saved "${result.fragment.name}" to Fragments in the palette`);
-        } else if (result.reason === 'too-large') {
-          showToast('That selection is too large to save as a fragment', 'error');
-        } else if (result.reason === 'storage') {
-          showToast('The fragment could not be saved in this browser', 'error');
-        }
-      },
-      [onSaveFragment, showToast],
+    (nodeIds: string[], name: string) => {
+      const result = onSaveFragment(nodeIds, name);
+      if (result.ok) {
+        showToast(`Saved "${result.fragment.name}" to Fragments in the palette`);
+      } else if (result.reason === 'too-large') {
+        showToast('That selection is too large to save as a fragment', 'error');
+      } else if (result.reason === 'storage') {
+        showToast('The fragment could not be saved in this browser', 'error');
+      }
+    },
+    [onSaveFragment, showToast],
   );
 
-  const {copiedStyle, onCopyStyle, onPasteStyle} = useStyleClipboard({
+  const { copiedStyle, onCopyStyle, onPasteStyle } = useStyleClipboard({
     nodes,
     edges,
     onUpdateNodes,
@@ -467,56 +515,56 @@ function App() {
   // out when there's more than one, which is the only time it's read.
   const isMultiSelection = selectedNodeIds.length + selectedEdgeIds.length > 1;
   const selectedNodes = useMemo(
-      () => (isMultiSelection ? nodes.filter((n) => selectedNodeIds.includes(n.id)) : []),
-      [isMultiSelection, nodes, selectedNodeIds],
+    () => (isMultiSelection ? nodes.filter((n) => selectedNodeIds.includes(n.id)) : []),
+    [isMultiSelection, nodes, selectedNodeIds],
   );
   const selectedEdges = useMemo(
-      () => (isMultiSelection ? edges.filter((e) => selectedEdgeIds.includes(e.id)) : []),
-      [isMultiSelection, edges, selectedEdgeIds],
+    () => (isMultiSelection ? edges.filter((e) => selectedEdgeIds.includes(e.id)) : []),
+    [isMultiSelection, edges, selectedEdgeIds],
   );
   const multiSelectionActions = useMemo<MultiSelectionActions>(
-      () => ({
-        onUpdateNodes,
-        onUpdateEdges,
-        onSetLocked,
-        onGroup,
-        onUngroup,
-        onDeleteSelection,
-        onArrange,
-      }),
-      [onUpdateNodes, onUpdateEdges, onSetLocked, onGroup, onUngroup, onDeleteSelection, onArrange],
+    () => ({
+      onUpdateNodes,
+      onUpdateEdges,
+      onSetLocked,
+      onGroup,
+      onUngroup,
+      onDeleteSelection,
+      onArrange,
+    }),
+    [onUpdateNodes, onUpdateEdges, onSetLocked, onGroup, onUngroup, onDeleteSelection, onArrange],
   );
   // Only ever read by the right-click menu, which Canvas renders while it's
   // open - so this changing identity never reaches a node or edge.
   const canvasContextActions = useMemo<CanvasContextActions>(
-      () => ({
-        onUpdateNodes,
-        onUpdateEdges,
-        onDuplicate,
-        onSaveFragment: onSaveFragmentWithToast,
-        onGroup,
-        onUngroup,
-        onSetLocked,
-        onCopyStyle,
-        onPasteStyle,
-        copiedStyle,
-        requirements: requirementsSnapshot,
-        onArrange,
-      }),
-      [
-        onUpdateNodes,
-        onUpdateEdges,
-        onDuplicate,
-        onSaveFragmentWithToast,
-        onGroup,
-        onUngroup,
-        onSetLocked,
-        onCopyStyle,
-        onPasteStyle,
-        copiedStyle,
-        requirementsSnapshot,
-        onArrange,
-      ],
+    () => ({
+      onUpdateNodes,
+      onUpdateEdges,
+      onDuplicate,
+      onSaveFragment: onSaveFragmentWithToast,
+      onGroup,
+      onUngroup,
+      onSetLocked,
+      onCopyStyle,
+      onPasteStyle,
+      copiedStyle,
+      requirements: requirementsSnapshot,
+      onArrange,
+    }),
+    [
+      onUpdateNodes,
+      onUpdateEdges,
+      onDuplicate,
+      onSaveFragmentWithToast,
+      onGroup,
+      onUngroup,
+      onSetLocked,
+      onCopyStyle,
+      onPasteStyle,
+      copiedStyle,
+      requirementsSnapshot,
+      onArrange,
+    ],
   );
   const onCanvasProfilerRender: ProfilerOnRenderCallback = useCallback(
     (_id, _phase, actualDuration) => {
@@ -561,6 +609,7 @@ function App() {
       onAdoptIntoGroup={onAdoptIntoGroup}
       onZOrderCommand={onZOrderCommand}
       presentation={presentation}
+      viewOnly={viewOnlyIn !== null}
       previewFocus={previewFocus}
       focusNodeId={pendingNodeFocus}
       onFocusHandled={onFocusNodeHandled}
@@ -578,32 +627,26 @@ function App() {
   );
 
   const getDocumentState = useCallback(() => Y.encodeStateAsUpdate(openDoc.doc), [openDoc.doc]);
-  // The Inspector's "Linked document" picker reads the catalogue on demand:
-  // this browser's documents and, where there is a store, the workspace's
+  // The Inspector's "Linked document" picker reads the catalog on demand:
+  // this browser's documents and, where there is a store, the workspaces'
   // (see linkableDocuments.ts). Either source failing leaves the other's
   // documents available - the field is a convenience, and the Documents
-  // dialog is where storage problems are reported. Client and key storage
-  // are created once, and only the first time a node is inspected.
-  const workspaceReader = useRef<{
-    client: ReturnType<typeof createStoreClient>;
-    storage: ReturnType<typeof createIndexedDbDeviceKeyStorage>;
-  } | null>(null);
+  // dialog is where storage problems are reported. The client is created
+  // once, and only the first time a node is inspected.
+  const workspaceReader = useRef<ReturnType<typeof createTrustedStoreClient> | null>(null);
   const listStoredDocuments = useCallback(
-      () =>
-          listLinkableDocuments({
-            listLocal: () =>
-                documentStore.listDocuments().then((result) => (result.ok ? result.value : [])),
-            listWorkspace: storeUrl
-                ? () => {
-                  workspaceReader.current ??= {
-                    client: createStoreClient({baseUrl: storeUrl}),
-                    storage: createIndexedDbDeviceKeyStorage(),
-                  };
-                  return listWorkspaceDocuments(workspaceReader.current);
-                }
-                : undefined,
-          }),
-      [documentStore, storeUrl],
+    () =>
+      listLinkableDocuments({
+        listLocal: () =>
+          documentStore.listDocuments().then((result) => (result.ok ? result.value : [])),
+        listWorkspace: trustedStoreUrl
+          ? () => {
+              workspaceReader.current ??= createTrustedStoreClient({ baseUrl: trustedStoreUrl });
+              return listWorkspaceDocuments(workspaceReader.current);
+            }
+          : undefined,
+      }),
+    [documentStore, trustedStoreUrl],
   );
   const handleOpenWorkspaceDocument = useCallback(
     (docId: string) => {
@@ -613,6 +656,8 @@ function App() {
     [openDocumentInTab],
   );
 
+  const planSection = planSectionFor(viewMode, planChartMode);
+
   return (
     <div className="app">
       {appVersion && <div className="app-version">{appVersion}</div>}
@@ -620,6 +665,7 @@ function App() {
         <Toolbar
           title={title}
           onTitleChange={setTitle}
+          viewOnlyIn={viewOnlyIn}
           onNew={onNew}
           onOpenDocuments={() => setIsDocumentManagerOpen(true)}
           onSave={onSave}
@@ -636,10 +682,10 @@ function App() {
           canRedo={canRedo}
           viewMode={viewMode}
           onSetViewMode={setViewMode}
+          onOpenPlan={openPlan}
           onExportRequirementsMarkdown={onExportRequirementsMarkdown}
           canExportRequirements={requirementsSnapshot.items.length > 0}
           onManageLibraries={() => setIsLibraryModalOpen(true)}
-          hasAutosaved={hasAutosaved}
           durabilityIndicator={
             <DurabilityIndicator
               signals={durabilitySignals}
@@ -657,10 +703,11 @@ function App() {
               isOidcAvailable={isOidcAvailable}
               onLoginOidc={!storeIdentity && isOidcAvailable ? handleLoginOidc : undefined}
               isLoggedIn={storeIdentity !== null}
-              onSaveToWorkspace={
-                storeUrl && storeIdentity !== null ? handleSaveToWorkspace : undefined
+              onAddToWorkspace={
+                trustedStoreUrl && storeIdentity !== null && !workspaceSync.active
+                  ? () => setIsDocumentManagerOpen(true)
+                  : undefined
               }
-              isSavingToWorkspace={isSavingToWorkspace}
             />
           }
           // A workspace session does not lock the document: see
@@ -683,6 +730,14 @@ function App() {
                       isSynced: () => activeSession.session.isSynced(),
                       relayConnected,
                       peers: presencePeers,
+                    }
+                  : null
+              }
+              workspace={
+                workspaceSync.workspace
+                  ? {
+                      name: workspaceSync.workspace.name,
+                      onManage: () => setIsDocumentManagerOpen(true),
                     }
                   : null
               }
@@ -718,37 +773,10 @@ function App() {
               <div
                 className={`app__sidebar-wrap app__sidebar-wrap--left${isPaletteCollapsed ? ' is-collapsed' : ''}`}
               >
-                {!isPaletteCollapsed && <Palette />}
-                <button
-                  type="button"
-                  className="app__sidebar-toggle app__sidebar-toggle--left"
-                  onClick={() => setIsPaletteCollapsed((v) => !v)}
-                  title={isPaletteCollapsed ? 'Show component palette' : 'Hide component palette'}
-                  aria-label={
-                    isPaletteCollapsed ? 'Show component palette' : 'Hide component palette'
-                  }
-                >
-                  {isPaletteCollapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
-                </button>
+                <Palette collapsed={isPaletteCollapsed} onCollapsedChange={setIsPaletteCollapsed} />
               </div>
             )}
             <div className="app__canvas-column" style={{ position: 'relative' }}>
-              {/* Someone waiting to be let in, shown where the person who
-                  can let them in is working (WS7-R8). */}
-              <AccessRequestNotice
-                requests={accessRequests.requests}
-                granting={accessRequests.granting}
-                onGrant={(userId) => {
-                  void accessRequests.grant(userId).then(
-                    () =>
-                      showToast('Access given. They will see the workspace within a few seconds.'),
-                    () => showToast('Could not give access. Try again from File > Documents.'),
-                  );
-                }}
-                autoGranted={accessRequests.autoGranted}
-                onDismissAutoGranted={accessRequests.dismissAutoGranted}
-                rotating={accessRequests.rotating}
-              />
               <ReactFlowProvider>
                 {isPerfInstrumentationActive() ? (
                   <Profiler id="CanvasProfiler" onRender={onCanvasProfilerRender}>
@@ -841,6 +869,7 @@ function App() {
             requirementsStore={requirementsStore}
             programIncrements={programIncrementsSnapshot}
             team={teamSnapshot}
+            milestones={milestonesSnapshot}
             diagramRoot={diagramTree}
             onNavigateToNode={onNavigateToNode}
             onCreateLinkedNode={onCreateLinkedNode}
@@ -851,26 +880,47 @@ function App() {
             documentId={activeDocId}
           />
         )}
-        {viewMode === 'timeline' && (
-          <TimelineView
-            programIncrementsStore={programIncrementsStore}
-            requirementsStore={requirementsStore}
-            milestonesStore={milestonesStore}
-            team={teamSnapshot}
-            diagramRoot={diagramTree}
-            onNavigateToNode={onNavigateToNode}
-            onCreateLinkedNode={onCreateLinkedNode}
-            onNavigateToRequirement={onNavigateToRequirement}
-            peers={activeSession ? presencePeers.filter((p) => p.viewMode === 'timeline') : []}
-            onFocusedItemChange={setFocusedItemId}
-          />
-        )}
-        {viewMode === 'team' && (
-          <TeamView
-            teamStore={teamStore}
-            programIncrementsStore={programIncrementsStore}
-            requirements={requirementsSnapshot}
-          />
+        {planSection && (
+          // One column for the whole Plan tab: its section links, then
+          // whichever section is showing. The sections are unchanged
+          // children; only the wrapper is new.
+          <div className="plan-view">
+            <PlanNav section={planSection} onSelect={openPlanSection} />
+            {viewMode === 'timeline' && (
+              <TimelineView
+                programIncrementsStore={programIncrementsStore}
+                requirementsStore={requirementsStore}
+                milestonesStore={milestonesStore}
+                team={teamSnapshot}
+                diagramRoot={diagramTree}
+                onNavigateToNode={onNavigateToNode}
+                onCreateLinkedNode={onCreateLinkedNode}
+                onNavigateToRequirement={onNavigateToRequirement}
+                peers={activeSession ? presencePeers.filter((p) => p.viewMode === 'timeline') : []}
+                onFocusedItemChange={setFocusedItemId}
+                chartMode={planChartMode}
+                documentId={activeDocId}
+              />
+            )}
+            {viewMode === 'team' && (
+              <TeamView
+                teamStore={teamStore}
+                programIncrementsStore={programIncrementsStore}
+                requirements={requirementsSnapshot}
+              />
+            )}
+            {viewMode === 'dependencies' && (
+              <DependenciesView
+                requirementsStore={requirementsStore}
+                programIncrements={programIncrementsSnapshot}
+                team={teamSnapshot}
+                diagramRoot={diagramTree}
+                onNavigateToNode={onNavigateToNode}
+                onCreateLinkedNode={onCreateLinkedNode}
+                onNavigateToRequirement={onNavigateToRequirement}
+              />
+            )}
+          </div>
         )}
         {viewMode === 'srd' && (
           <Suspense fallback={null}>
@@ -884,17 +934,6 @@ function App() {
               teamSnapshot={teamSnapshot}
             />
           </Suspense>
-        )}
-        {viewMode === 'skill-tree' && (
-          <SkillTreeView
-            requirementsStore={requirementsStore}
-            programIncrements={programIncrementsSnapshot}
-            team={teamSnapshot}
-            diagramRoot={diagramTree}
-            onNavigateToNode={onNavigateToNode}
-            onCreateLinkedNode={onCreateLinkedNode}
-            onNavigateToRequirement={onNavigateToRequirement}
-          />
         )}
       </div>
       <LeaveGuardDialog
@@ -919,18 +958,19 @@ function App() {
         timedCopies={timedCopies}
         onTimedCopiesChange={setTimedCopies}
         workspace={
-          storeUrl ? (
-            <WorkspacePanel
-              storeUrl={storeUrl}
-              currentDocId={openDocId}
-              currentTitle={title}
-              // What a workspace document holds: this document's CRDT
-              // state, so the workspace copy merges with everyone else's
-              // rather than replacing it (WS8-R2).
-              getDocumentState={getDocumentState}
-              onOpenDocument={handleOpenWorkspaceDocument}
-            />
-          ) : undefined
+          <>
+            <StoreConnection storeUrl={storeUrl} unsupported={storeMode === 'outdated'} />
+            {trustedStoreUrl ? (
+              <TrustedWorkspacePanel
+                storeUrl={trustedStoreUrl}
+                currentDocId={openDocId}
+                currentTitle={title}
+                onOpenDocument={handleOpenWorkspaceDocument}
+                getDocumentState={getDocumentState}
+                onSignIn={isOidcAvailable ? handleLoginOidc : undefined}
+              />
+            ) : null}
+          </>
         }
         onOpenDocument={openDocumentInTab}
         onNewDocument={onNew}
@@ -940,19 +980,19 @@ function App() {
         onClose={() => setIsLibraryModalOpen(false)}
       />
       {exportScenarioId &&
-          (() => {
-            const scenario = scenarios.find((sc) => sc.id === exportScenarioId);
-            return scenario ? (
-                <Suspense fallback={null}>
-                  <ScenarioExportDialog
-                      scenario={scenario}
-                      diagramSnapshot={diagramSnapshot}
-                      documentTitle={title}
-                      onClose={closeScenarioExport}
-                  />
-                </Suspense>
-            ) : null;
-          })()}
+        (() => {
+          const scenario = scenarios.find((sc) => sc.id === exportScenarioId);
+          return scenario ? (
+            <Suspense fallback={null}>
+              <ScenarioExportDialog
+                scenario={scenario}
+                diagramSnapshot={diagramSnapshot}
+                documentTitle={title}
+                onClose={closeScenarioExport}
+              />
+            </Suspense>
+          ) : null;
+        })()}
       {toast && (
         <Toast
           key={toast.id}

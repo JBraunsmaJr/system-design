@@ -1,7 +1,7 @@
 /**
  * WS1 Step 2 — opening a document.
  *
- * The ordering under test is load-then-decide-then-seed. Getting it backwards
+ * The ordering under test is load-then-decide-then-seed. Getting it backward
  * seeds on top of content persistence is about to restore, and the sub-diagram
  * hierarchy is the part most likely to be quietly flattened on the way in.
  */

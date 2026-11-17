@@ -16,9 +16,6 @@ RUN npm ci --omit=dev && \
     rm -rf /root/.npm /root/.cache
 
 COPY store ./store
-COPY src/crypto ./src/crypto
-COPY scripts/generate-recovery-key.ts ./scripts/generate-recovery-key.ts
-COPY scripts/recover-document.ts ./scripts/recover-document.ts
 
 COPY docker/store/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh && chmod +x /usr/local/bin/docker-entrypoint.sh

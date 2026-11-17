@@ -69,6 +69,9 @@ export function useLibraryManager({ isOpen }: Pick<LibraryManagerModalProps, 'is
 
   useEffect(() => {
     if (isOpen) {
+      // Reads the libraries from the asset manager, which lives outside
+      // React, each time the dialog opens.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       refreshLibraries();
     }
   }, [isOpen]);

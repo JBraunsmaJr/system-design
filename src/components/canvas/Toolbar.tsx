@@ -1,30 +1,32 @@
-import type {ReactNode} from 'react';
+import type { ReactNode } from 'react';
 import {
-    BookOpen,
-    CalendarRange,
-    Check,
-    FileDown,
-    FileText,
-    ListChecks,
-    Network,
-    Package,
-    Redo2,
-    Route,
-    Save,
-    Undo2,
-    Users,
-    Workflow,
+  BookOpen,
+  CalendarRange,
+  Eye,
+  FileDown,
+  FileText,
+  ListChecks,
+  Package,
+  Redo2,
+  Route,
+  Save,
+  Undo2,
+  Workflow,
 } from 'lucide-react';
-import type {ViewMode} from '../../app/hooks/useViewNavigation';
-import {ExportMenu} from '../workspace/ExportMenu';
-import {getDocsUrl} from '../../domain/network/docsLocation';
-import {FileMenu} from '../workspace/FileMenu';
-import {faGithub} from '@fortawesome/free-brands-svg-icons';
-import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
+import type { ViewMode } from '../../app/hooks/useViewNavigation';
+import { isPlanView } from '../../app/planNavigation';
+import { ExportMenu } from '../workspace/ExportMenu';
+import { getDocsUrl } from '../../domain/network/docsLocation';
+import { FileMenu } from '../workspace/FileMenu';
+import { faGithub } from '@fortawesome/free-brands-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
 interface ToolbarProps {
   title: string;
   onTitleChange: (title: string) => void;
+  /** The workspace this document is in, when it can be read here but not
+   * changed. */
+  viewOnlyIn?: string | null;
   onNew: () => void;
   onOpenDocuments?: () => void;
   onSave: () => void;
@@ -41,10 +43,11 @@ interface ToolbarProps {
   canRedo: boolean;
   viewMode: ViewMode;
   onSetViewMode: (mode: ViewMode) => void;
+  /** Opens the Plan tab on whichever of its sections was showing last. */
+  onOpenPlan: () => void;
   onExportRequirementsMarkdown: () => void;
   canExportRequirements: boolean;
   onManageLibraries?: () => void;
-  hasAutosaved: boolean;
   /** Whether a collaborative session is currently active - disables
    * Open (loading a file replaces the LOCAL, frozen state, which
    * wouldn't even be visible until the session ends, since the
@@ -73,6 +76,7 @@ function navigateToGithubSource() {
 export function Toolbar({
   title,
   onTitleChange,
+  viewOnlyIn = null,
   onNew,
   onOpenDocuments,
   onSave,
@@ -89,10 +93,10 @@ export function Toolbar({
   canRedo,
   viewMode,
   onSetViewMode,
+  onOpenPlan,
   onExportRequirementsMarkdown,
   canExportRequirements,
   onManageLibraries,
-  hasAutosaved,
   isInSession,
   collabPanel,
   durabilityIndicator,
@@ -108,14 +112,16 @@ export function Toolbar({
           className="toolbar__title"
           value={title}
           onChange={(e) => onTitleChange(e.target.value)}
+          readOnly={viewOnlyIn !== null}
           aria-label="Diagram title"
         />
-        {hasAutosaved && (
+        {viewOnlyIn !== null && (
           <span
-            className="toolbar__autosave-indicator"
-            title="Your work is automatically saved in this browser"
+            className="toolbar__view-only"
+            title={`You can open documents in ${viewOnlyIn} but not change them. An owner of the workspace can make you an editor.`}
           >
-            <Check size={14} />
+            <Eye size={13} aria-hidden="true" />
+            View only
           </span>
         )}
         <div className="toolbar__actions">
@@ -234,30 +240,12 @@ export function Toolbar({
           </button>
           <button
             type="button"
-            className={viewMode === 'timeline' ? 'active' : undefined}
-            onClick={() => onSetViewMode('timeline')}
-            title="Timeline"
+            className={isPlanView(viewMode) ? 'active' : undefined}
+            onClick={onOpenPlan}
+            title="Plan - sprints, Gantt, dependencies and team capacity"
           >
             <CalendarRange size={13} />
-            <span className="toolbar__label">Timeline</span>
-          </button>
-          <button
-            type="button"
-            className={viewMode === 'team' ? 'active' : undefined}
-            onClick={() => onSetViewMode('team')}
-            title="Team & Capacity"
-          >
-            <Users size={13} />
-            <span className="toolbar__label">Team</span>
-          </button>
-          <button
-            type="button"
-            className={viewMode === 'skill-tree' ? 'active' : undefined}
-            onClick={() => onSetViewMode('skill-tree')}
-            title="Skill Tree - see what's ready to work on"
-          >
-            <Network size={13} />
-            <span className="toolbar__label">Skill Tree</span>
+            <span className="toolbar__label">Plan</span>
           </button>
           <button
             type="button"

@@ -48,7 +48,7 @@ console.log('=== DurabilityIndicator OIDC and Workspace Persistence ===');
   assert(html.includes('Export a copy'), 'renders Export a copy action');
 }
 
-// 3. Logged in user in at-risk state sees Save to workspace option
+// 3. Someone signed in, in an at-risk state, is offered a workspace
 {
   const atRiskSignals: DurabilitySignals = {
     localPersistence: 'unavailable',
@@ -58,11 +58,14 @@ console.log('=== DurabilityIndicator OIDC and Workspace Persistence ===');
       signals={atRiskSignals}
       onExport={() => {}}
       isLoggedIn={true}
-      onSaveToWorkspace={() => {}}
+      onAddToWorkspace={() => {}}
     />,
   );
   assert(html.includes('durability__detail'), 'renders detail popup');
-  assert(html.includes('Save to workspace'), 'renders Save to workspace button when logged in');
+  assert(
+    html.includes('Add to a workspace'),
+    'offers adding the document to a workspace when signed in',
+  );
   assert(!html.includes('Sign in with OIDC'), 'does not render Sign in with OIDC when logged in');
 }
 
@@ -89,9 +92,8 @@ console.log('=== DurabilityIndicator OIDC and Workspace Persistence ===');
 
 if (failures > 0) {
   console.error(`\n${failures} test(s) failed`);
-  (globalThis as unknown as { process: { exitCode: number } }).process?.exitCode
-    ? ((globalThis as unknown as { process: { exitCode: number } }).process.exitCode = 1)
-    : undefined;
+  // run-tests.ts reads the exit status.
+  (globalThis as unknown as { process: { exitCode: number } }).process.exitCode = 1;
   throw new Error(`${failures} test(s) failed`);
 } else {
   console.log('\nAll DurabilityIndicator verification checks passed.');

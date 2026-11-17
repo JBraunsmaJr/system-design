@@ -6,10 +6,10 @@
  * on which document is open, or on whether it is in the workspace at all
  * - someone signed in with nothing shared still belongs on their cursor
  * by name - and asking early means the name is known before any session
- * starts, rather than arriving afterwards and having to be republished.
+ * starts, rather than arriving afterward and having to be republished.
  */
 import { useEffect, useState } from 'react';
-import { createStoreClient } from '../access/storeClient';
+import { createStoreSessionClient } from '../access/storeSessionClient';
 
 export interface StoreIdentity {
   displayName?: string;
@@ -21,20 +21,24 @@ export interface StoreAuthInfo {
   providers: string[];
 }
 
+const SIGNED_OUT: StoreAuthInfo = { identity: null, providers: [] };
+
 export function useStoreAuth(storeUrl: string | null): StoreAuthInfo {
-  const [auth, setAuth] = useState<StoreAuthInfo>({ identity: null, providers: [] });
+  // What was learned, and from which store. Keeping the two together means
+  // an answer is only ever shown for the store it came from: with no store,
+  // or after pointing at a different one, this reads as signed out until
+  // the new store answers - without an effect having to reset anything.
+  const [answer, setAnswer] = useState<{ storeUrl: string; auth: StoreAuthInfo } | null>(null);
 
   useEffect(() => {
-    if (!storeUrl) {
-      setAuth({ identity: null, providers: [] });
-      return;
-    }
-    let cancelled = false;
-    const client = createStoreClient({ baseUrl: storeUrl });
+    if (!storeUrl) return;
+    const setAuth = (auth: StoreAuthInfo) => setAnswer({ storeUrl, auth });
+    let canceled = false;
+    const client = createStoreSessionClient({ baseUrl: storeUrl });
     const ask = async () => {
       try {
         const session = await client.session();
-        if (cancelled) return;
+        if (canceled) return;
         if (session) {
           setAuth({
             identity: { displayName: session.displayName, subject: session.subject },
@@ -42,12 +46,12 @@ export function useStoreAuth(storeUrl: string | null): StoreAuthInfo {
           });
         } else {
           const provs = await client.providers().catch(() => []);
-          if (!cancelled) {
+          if (!canceled) {
             setAuth({ identity: null, providers: provs });
           }
         }
       } catch {
-        if (!cancelled) {
+        if (!canceled) {
           setAuth({ identity: null, providers: [] });
         }
       }
@@ -59,12 +63,12 @@ export function useStoreAuth(storeUrl: string | null): StoreAuthInfo {
     const onFocus = () => void ask();
     globalThis.addEventListener?.('focus', onFocus);
     return () => {
-      cancelled = true;
+      canceled = true;
       globalThis.removeEventListener?.('focus', onFocus);
     };
   }, [storeUrl]);
 
-  return auth;
+  return answer && answer.storeUrl === storeUrl ? answer.auth : SIGNED_OUT;
 }
 
 export function useStoreIdentity(storeUrl: string | null): StoreIdentity | null {

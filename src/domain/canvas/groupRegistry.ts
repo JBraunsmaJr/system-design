@@ -27,9 +27,9 @@ export const GROUP_TYPES: GroupTypeDefinition[] = [
     borderStyle: 'double',
   },
   { id: 'team', label: 'Team Ownership', icon: 'Users', color: '#FAB005' },
-    // Plain grouping with no architectural meaning of its own - what the
-    // context menu's "Group" wraps a selection in (domain/canvas/grouping.ts).
-    {id: 'group', label: 'Group', icon: 'Group', color: '#98A2B3'},
+  // Plain grouping with no architectural meaning of its own - what the
+  // context menu's "Group" wraps a selection in (domain/canvas/grouping.ts).
+  { id: 'group', label: 'Group', icon: 'Group', color: '#98A2B3' },
 ];
 
 /** The boundary kind "Group selection" creates. */

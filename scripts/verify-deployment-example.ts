@@ -1,6 +1,6 @@
 /**
- * The deployment example, checked for the mistakes that only appear when
- * someone runs it (WS8-R9, WS10-R1).
+ * The deployment examples, checked for the mistakes that only appear when
+ * someone runs them.
  *
  * The compose file, the Keycloak realm it imports, and the store's own
  * configuration rules have to agree. They are three files that drift
@@ -105,13 +105,13 @@ console.log("=== The store's own settings are valid ===");
   // The same validation the store applies at startup, so the example
   // cannot ship a configuration the store would refuse.
   try {
-    const config = loadStoreConfig({
-      ...store,
-      RECOVERY_PUBLIC_KEY_FILE: undefined,
-      RECOVERY_PUBLIC_KEY: '-----BEGIN PUBLIC KEY-----\nx\n-----END PUBLIC KEY-----',
-    });
+    const config = loadStoreConfig(store);
     check(config.providers[0]?.id === 'oidc', 'the example configures sign-in');
     check(config.allowedOrigins.length > 0, "and names the editor's origin");
+    check(
+      config.retiredSettings.length === 0,
+      `and sets nothing the store no longer reads (${config.retiredSettings.join(', ') || 'none'})`,
+    );
   } catch (error) {
     check(
       false,
@@ -172,12 +172,8 @@ check(
   `the store waits for its dependencies (${compose.services.store.dependsOn.join(', ')})`,
 );
 check(
-  compose.services.store.volumes.some((volume) => volume.includes('recovery-public.pem')),
-  'the recovery public key is mounted, or the store would refuse every document (WS7-R4)',
-);
-check(
-  compose.services.store.volumes.every((volume) => !volume.includes('private')),
-  'and the private half is nowhere near the store',
+  compose.services.store.volumes.every((volume) => !/recovery|\.pem/.test(volume)),
+  'the store mounts no key files: it has none to read',
 );
 for (const user of realm.users ?? []) {
   check(
@@ -189,8 +185,234 @@ for (const user of realm.users ?? []) {
     `and nothing it must do first (${user.username})`,
   );
 }
-const ignored = readFileSync('.gitignore', 'utf8');
-check(/-private\.pem/.test(ignored), 'a private recovery key cannot be committed by accident');
+
+console.log('\n=== Someone can use it once it is up ===');
+{
+  // With nobody able to create a workspace the example starts, signs
+  // people in, and then offers them nothing to do.
+  const groupsMapper = (
+    realm.clients[0] as unknown as {
+      protocolMappers?: { protocolMapper: string; config: Record<string, string> }[];
+    }
+  ).protocolMappers?.find((mapper) => mapper.protocolMapper === 'oidc-group-membership-mapper');
+  check(
+    groupsMapper?.config['claim.name'] === (store.OIDC_GROUPS_CLAIM ?? 'groups') &&
+      groupsMapper?.config['id.token.claim'] === 'true',
+    'the realm puts groups in the ID token, under the claim the store reads',
+  );
+  const fullPath = groupsMapper?.config['full.path'] === 'true';
+  const asInToken = (path: string) => (fullPath ? path : path.replace(/^.*\//, ''));
+  const adminGroups = (store.ADMIN_GROUPS ?? '')
+    .split(',')
+    .map((group) => group.trim())
+    .filter(Boolean);
+  const realmGroups = ((realm as unknown as { groups?: { name: string }[] }).groups ?? []).map(
+    (group) => asInToken(`/${group.name}`),
+  );
+  check(
+    adminGroups.length > 0 && adminGroups.every((group) => realmGroups.includes(group)),
+    `the administrators' group exists in the realm, spelled as the token will carry it (${adminGroups.join(', ') || 'none set'})`,
+  );
+  const admins = (realm.users ?? []).filter((user) =>
+    ((user as unknown as { groups?: string[] }).groups ?? []).some((group) =>
+      adminGroups.includes(asInToken(group)),
+    ),
+  );
+  check(
+    admins.length > 0,
+    `and at least one account is in it, so a workspace can be created (${admins.map((user) => user.username).join(', ') || 'nobody'})`,
+  );
+}
+
+console.log('\n=== The published example (docs-site/docs/files/workspace) ===');
+{
+  const published = readComposeExample(
+    readFileSync('docs-site/docs/files/workspace/compose.yml', 'utf8'),
+  );
+  const env = readFileSync('docs-site/docs/files/workspace/workspace.env', 'utf8');
+  const defaults: Record<string, string> = {
+    DOMAIN: 'design.example.gov',
+    POSTGRES_PASSWORD: 'p'.repeat(64),
+    RELAY_TOKEN_SECRET: 'r'.repeat(64),
+    OIDC_CLIENT_SECRET: 's'.repeat(64),
+  };
+  for (const line of env.split('\n')) {
+    const match = /^([A-Z_]+)=(.*)$/.exec(line.trim());
+    if (match && match[2] !== '') defaults[match[1]] = match[2];
+  }
+  // ${NAME}, ${NAME:-fallback} and ${NAME:?message}, as Compose reads them.
+  const resolve = (value: string) =>
+    value.replace(/\$\{([A-Z_]+)(?::[-?]([^}]*))?\}/g, (_all, name: string, rest?: string) =>
+      defaults[name] !== undefined ? defaults[name] : (rest ?? ''),
+    );
+  const resolved = (service: string) =>
+    Object.fromEntries(
+      Object.entries(published.services[service].environment).map(([key, value]) => [
+        key,
+        resolve(value),
+      ]),
+    );
+  const publishedStore = resolved('store');
+  try {
+    const config = loadStoreConfig(publishedStore);
+    check(
+      config.providers[0]?.id === 'oidc' && config.retiredSettings.length === 0,
+      'the store would start with it, and it sets nothing the store no longer reads',
+    );
+    check(
+      config.adminGroups.length > 0 || config.admins.length > 0,
+      'as shipped it names administrators, so someone can create the first workspace',
+    );
+  } catch (error) {
+    check(
+      false,
+      `the store would start with these settings (${error instanceof ConfigError ? error.message : String(error)})`,
+    );
+  }
+  check(
+    resolved('relay').RELAY_TOKEN_SECRET === publishedStore.RELAY_TOKEN_SECRET &&
+      !!publishedStore.RELAY_TOKEN_SECRET,
+    'the relay and the store are given the same token secret',
+  );
+  check(
+    resolved('editor').STORE_URL === publishedStore.PUBLIC_URL,
+    "the editor points at the store's public address",
+  );
+  check(
+    published.services.store.volumes.every((volume) => !/recovery|keys/.test(volume)),
+    'and no key files are mounted',
+  );
+  const publishedRealm = JSON.parse(
+    readFileSync('docs-site/docs/files/workspace/keycloak-realm.json', 'utf8'),
+  ) as {
+    groups?: { name: string }[];
+    clients: {
+      redirectUris: string[];
+      protocolMappers?: { protocolMapper: string; config: Record<string, string> }[];
+    }[];
+  };
+  check(
+    publishedRealm.clients[0].redirectUris.includes('https://${DOMAIN}/store/v1/auth/callback'),
+    "its Keycloak realm's redirect URI is the store's callback",
+  );
+  const mapper = publishedRealm.clients[0].protocolMappers?.find(
+    (candidate) => candidate.protocolMapper === 'oidc-group-membership-mapper',
+  );
+  check(
+    (publishedRealm.groups ?? []).some(
+      (group) =>
+        (mapper?.config['full.path'] === 'true' ? `/${group.name}` : group.name) ===
+        defaults.ADMIN_GROUPS,
+    ),
+    `and that realm creates the administrators' group the settings name (${defaults.ADMIN_GROUPS})`,
+  );
+  const documented = [
+    'docs-site/docs/deployment/with-workspaces.md',
+    'docs-site/docs/deployment/workspace-store.md',
+    'README.md',
+  ].filter((path) =>
+    /generate-recovery-key|recover-document|recovery-public\.pem|recovery-private/.test(
+      readFileSync(path, 'utf8'),
+    ),
+  );
+  check(
+    documented.length === 0,
+    `the guides that go with it no longer tell anyone to create a recovery key${documented.length ? `: ${documented.join(', ')}` : ''}`,
+  );
+}
+
+/**
+ * The proxy config that goes with a compose example: where each public
+ * path is sent. Read with a pattern rather than a parser because the
+ * example is kept to plain `location <path> { ... proxy_pass <target>; }`
+ * blocks; the syntax itself is nginx's to check.
+ */
+function readProxyLocations(text: string) {
+  const withoutComments = text.replace(/#[^\n]*/g, '');
+  const locations: Record<string, { target: string; body: string }> = {};
+  for (const match of withoutComments.matchAll(/location\s+(\S+)\s*\{([^}]*)\}/g)) {
+    const body = match[2];
+    const setVariables = Object.fromEntries(
+      [...body.matchAll(/set\s+(\$\w+)\s+([^;\s]+)\s*;/g)].map((m) => [m[1], m[2]]),
+    );
+    const raw = /proxy_pass\s+"?([^";\s]+)"?\s*;/.exec(body)?.[1] ?? '';
+    locations[match[1]] = { target: setVariables[raw] ?? raw, body };
+  }
+  return locations;
+}
+
+/** The path part of a URL written with compose placeholders in its host. */
+function pathOf(url: string): string {
+  return url.replace(/^[a-z]+:\/\/[^/]+/, '') || '/';
+}
+
+console.log('\n=== The proxy sends each address where compose says it lives ===');
+for (const example of ['workspace', 'core']) {
+  const dir = `docs-site/docs/files/${example}`;
+  if (!existsSync(`${dir}/nginx.conf`)) continue;
+  const locations = readProxyLocations(readFileSync(`${dir}/nginx.conf`, 'utf8'));
+  const services = readComposeExample(readFileSync(`${dir}/compose.yml`, 'utf8')).services;
+  const env = services.editor.environment;
+
+  // The editor: served where APP_URL says people open it.
+  const appPath = pathOf(env.APP_URL);
+  check(
+    locations[appPath]?.target.startsWith('http://editor:80') === true,
+    `${example}: the editor is proxied at ${appPath}, where APP_URL says it is`,
+  );
+
+  // The relay: RELAY's path, with the prefix stripped (both sides end in
+  // a slash) and the WebSocket upgrade passed on.
+  const relayPath = pathOf(env.RELAY);
+  const relay = locations[relayPath];
+  check(
+    relay?.target === 'http://relay:4444/' && relayPath.endsWith('/'),
+    `${example}: the relay is proxied at ${relayPath}, where RELAY points, with the prefix removed`,
+  );
+  check(
+    /proxy_http_version\s+1\.1\s*;/.test(relay?.body ?? '') &&
+      /proxy_set_header\s+Upgrade\s+\$http_upgrade\s*;/.test(relay?.body ?? '') &&
+      /proxy_set_header\s+Connection\s+\$connection_upgrade\s*;/.test(relay?.body ?? ''),
+    `${example}: and WebSocket upgrades reach it (HTTP/1.1 with the Upgrade and Connection headers)`,
+  );
+
+  if (env.STORE_URL) {
+    // The store: STORE_URL's path plus a slash, stripped, so /store/v1/...
+    // arrives as /v1/....
+    const storePath = `${pathOf(env.STORE_URL)}/`;
+    check(
+      locations[storePath]?.target === 'http://store:8080/',
+      `${example}: the store is proxied at ${storePath}, where STORE_URL points, with the prefix removed`,
+    );
+    check(
+      pathOf(services.store.environment.PUBLIC_URL) === pathOf(env.STORE_URL),
+      `${example}: and the store is told the same public address`,
+    );
+    check(
+      pathOf(services.store.environment.AFTER_LOGIN_URL) === appPath,
+      `${example}: people land back on the editor after signing in`,
+    );
+  }
+
+  const overlayPath = `${dir}/compose.keycloak.yml`;
+  if (existsSync(overlayPath)) {
+    const keycloakEnv = readComposeExample(readFileSync(overlayPath, 'utf8')).services.keycloak
+      .environment;
+    const authPath = `${keycloakEnv.KC_HTTP_RELATIVE_PATH}/`;
+    const auth = locations[authPath];
+    // Keycloak's port unless the overlay moves it.
+    const port = keycloakEnv.KC_HTTP_PORT ?? '8080';
+    check(
+      auth?.target === `http://keycloak:${port}`,
+      `${example}: Keycloak is proxied at ${authPath} on the port it listens on (${port}), path unchanged`,
+    );
+    check(
+      /proxy_pass\s+\$\w+\s*;/.test(auth?.body ?? '') &&
+        /resolver\s+127\.0\.0\.11/.test(auth?.body ?? ''),
+      `${example}: and is looked up per request, so the proxy still starts when Keycloak is not deployed`,
+    );
+  }
+}
 
 if (failures > 0) {
   console.error(`\n${failures} check(s) failed`);

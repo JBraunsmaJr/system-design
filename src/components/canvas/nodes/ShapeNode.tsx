@@ -1,12 +1,12 @@
-import {useEffect, useRef} from 'react';
-import {type Node, type NodeProps, NodeResizer} from '@xyflow/react';
-import {type ConnectionPoint, globalShapeRegistry} from '../../../domain/canvas/shapeRegistry';
-import {EdgeHandles} from './EdgeHandles';
-import {SvgShapeRenderer} from './SvgShapeRenderer';
-import type {ArchNodeData} from '../../../domain/canvas/types';
-import {useCanvasContext} from '../CanvasContext';
-import {recordNodeRender} from '../../../perf/instrumentation';
-import {LinkedDocumentBadge} from './LinkedDocumentBadge';
+import { useEffect, useRef } from 'react';
+import { type Node, type NodeProps, NodeResizer } from '@xyflow/react';
+import { type ConnectionPoint, globalShapeRegistry } from '../../../domain/canvas/shapeRegistry';
+import { EdgeHandles } from './EdgeHandles';
+import { SvgShapeRenderer } from './SvgShapeRenderer';
+import type { ArchNodeData } from '../../../domain/canvas/types';
+import { useCanvasContext } from '../CanvasContext';
+import { recordNodeRender } from '../../../perf/instrumentation';
+import { LinkedDocumentBadge } from './LinkedDocumentBadge';
 
 type ShapeNodeType = Node<ArchNodeData, 'shape'>;
 
@@ -59,7 +59,7 @@ export function ShapeNode({
   return (
     <>
       <NodeResizer
-          isVisible={!!selected && !isEditing && !data.locked}
+        isVisible={!!selected && !isEditing && !data.locked}
         minWidth={minWidth}
         minHeight={minHeight}
         keepAspectRatio={keepAspectRatio}
@@ -154,9 +154,9 @@ export function ShapeNode({
             )
           )}
         </div>
-          {!isEditing && (
-              <LinkedDocumentBadge value={data.linkedDocument} className="shape-node__doc-link"/>
-          )}
+        {!isEditing && (
+          <LinkedDocumentBadge value={data.linkedDocument} className="shape-node__doc-link" />
+        )}
       </div>
     </>
   );

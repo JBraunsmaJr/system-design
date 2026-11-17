@@ -79,14 +79,14 @@
 
 /* Variants */
 .btn--primary {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--accent-fill);
+  border-color: var(--accent-fill);
   color: var(--accent-text);
 }
 
 .btn--primary:hover:not(:disabled) {
   filter: brightness(1.08);
-  background: var(--accent);
+  background: var(--accent-fill);
 }
 
 .btn--primary:active:not(:disabled) {

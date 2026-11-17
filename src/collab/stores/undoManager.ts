@@ -85,6 +85,26 @@ export interface UndoController {
   /** WS3-R4: clears history at a document boundary, so undo cannot cross from
    * one document into another's past. */
   clear(): void;
+  /**
+   * Stops local edits, for someone who may read this document but not
+   * change it. While set, `transact` does not run what it is given, and
+   * undo and redo do nothing.
+   *
+   * It is done here because this is the one place every local edit passes
+   * through (see `undoableStore`): the canvas, the requirements, the plan,
+   * the keyboard, a paste. Refusing the edit before it reaches the document
+   * is also the only sound way to do it. A change taken back after the
+   * fact is still a change this browser made, and when it touches a value
+   * someone else then changes, the two are concurrent and either can win -
+   * leaving a viewer looking at something the workspace no longer holds.
+   */
+  setReadOnly(readOnly: boolean): void;
+  isReadOnly(): boolean;
+  /** True, and tells the listeners, when the document is read-only. For an
+   * edit that does not go through `transact`. */
+  refuseIfReadOnly(): boolean;
+  /** Fires each time an edit is refused. Returns an unsubscribe function. */
+  onRefused(listener: () => void): () => void;
   destroy(): void;
 }
 
@@ -125,6 +145,14 @@ export function createUndoController(
     for (const listener of listeners) listener();
   };
 
+  let readOnly = false;
+  const refusedListeners = new Set<() => void>();
+  const refuseIfReadOnly = () => {
+    if (!readOnly) return false;
+    for (const listener of refusedListeners) listener();
+    return true;
+  };
+
   manager.on('stack-item-added', notify);
   manager.on('stack-item-popped', notify);
   manager.on('stack-cleared', notify);
@@ -132,18 +160,22 @@ export function createUndoController(
   return {
     origin,
     transact<T>(fn: () => T): T {
+      // Nothing is run, so nothing is written. Edits return nothing useful
+      // to wait for; the few that return a value return undefined here.
+      if (refuseIfReadOnly()) return undefined as T;
       // A store method's own doc.transact nests inside this one and inherits
       // its origin, which is what makes wrapping at the seam sufficient.
       return doc.transact(fn, origin);
     },
     undo() {
-      manager.undo();
+      // Undoing is an edit too.
+      if (!refuseIfReadOnly()) manager.undo();
     },
     redo() {
-      manager.redo();
+      if (!refuseIfReadOnly()) manager.redo();
     },
-    canUndo: () => manager.undoStack.length > 0,
-    canRedo: () => manager.redoStack.length > 0,
+    canUndo: () => !readOnly && manager.undoStack.length > 0,
+    canRedo: () => !readOnly && manager.redoStack.length > 0,
     subscribe(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);
@@ -152,7 +184,20 @@ export function createUndoController(
       manager.clear();
       notify();
     },
+    setReadOnly(value) {
+      if (readOnly === value) return;
+      readOnly = value;
+      // Undo and redo availability follow.
+      notify();
+    },
+    isReadOnly: () => readOnly,
+    refuseIfReadOnly,
+    onRefused(listener) {
+      refusedListeners.add(listener);
+      return () => refusedListeners.delete(listener);
+    },
     destroy() {
+      refusedListeners.clear();
       manager.off('stack-item-added', notify);
       manager.off('stack-item-popped', notify);
       manager.off('stack-cleared', notify);
@@ -163,12 +208,16 @@ export function createUndoController(
 }
 
 /**
- * Methods that are not local edits, and so are never wrapped.
+ * Methods that are not local edits, and so are never run under
+ * `undo.transact`.
  *
  * `replaceAll` is a whole-document replacement - a file load or a perf fixture
  * - which is a document boundary (WS3-R4), not something to undo back across.
+ * It still changes the document, so it is refused when that is read-only.
  */
 const NOT_EDITS = new Set(['getSnapshot', 'subscribe', 'destroy', 'replaceAll']);
+/** Of those, the ones that write. */
+const UNDOLESS_WRITES = new Set(['replaceAll']);
 
 /**
  * Returns `store` with every mutating method run under `undo.transact`.
@@ -184,15 +233,21 @@ const NOT_EDITS = new Set(['getSnapshot', 'subscribe', 'destroy', 'replaceAll'])
  */
 export function undoableStore<S extends object>(
   store: S,
-  undo: Pick<UndoController, 'transact'>,
+  undo: Pick<UndoController, 'transact'> & Partial<Pick<UndoController, 'refuseIfReadOnly'>>,
 ): S {
   const wrapped = {} as Record<string, unknown>;
   for (const [key, value] of Object.entries(store)) {
-    wrapped[key] =
-      typeof value === 'function' && !NOT_EDITS.has(key)
-        ? (...args: unknown[]) =>
-            undo.transact(() => (value as (...a: unknown[]) => unknown)(...args))
-        : value;
+    if (typeof value !== 'function') {
+      wrapped[key] = value;
+    } else if (UNDOLESS_WRITES.has(key)) {
+      wrapped[key] = (...args: unknown[]) =>
+        undo.refuseIfReadOnly?.() ? undefined : (value as (...a: unknown[]) => unknown)(...args);
+    } else if (NOT_EDITS.has(key)) {
+      wrapped[key] = value;
+    } else {
+      wrapped[key] = (...args: unknown[]) =>
+        undo.transact(() => (value as (...a: unknown[]) => unknown)(...args));
+    }
   }
   return wrapped as S;
 }

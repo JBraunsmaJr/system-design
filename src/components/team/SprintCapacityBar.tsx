@@ -1,17 +1,10 @@
 import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import {
-  Users,
-  ChevronDown,
-  ChevronUp,
-  AlertTriangle,
-  CheckCircle2,
-  Calendar,
-  ShieldAlert,
-} from 'lucide-react';
+import { ChevronDown, ChevronUp, ShieldAlert } from 'lucide-react';
 import { useOutsideClick } from '../../common/hooks/useOutsideClick';
 import { usePositionedDropdown } from '../../common/hooks/usePositionedDropdown';
 import type { SprintCapacitySummary } from '../../domain/timeline/teamTypes';
+import { initials } from '../../common/utils/string';
 
 interface SprintCapacityBarProps {
   summary: SprintCapacitySummary;
@@ -37,7 +30,7 @@ interface SprintCapacityBarProps {
  */
 export function SprintCapacityBar({ summary, compact = false }: SprintCapacityBarProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const triggerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const breakdownRef = useRef<HTMLDivElement>(null);
 
   const close = () => setIsExpanded(false);
@@ -77,87 +70,75 @@ export function SprintCapacityBar({ summary, compact = false }: SprintCapacityBa
     barColorClass = 'sprint-capacity-bar__fill--warning';
   }
 
-  const getInitials = (name: string) => {
-    return name
-      .trim()
-      .split(/\s+/)
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
+  const daysLabel = `${sprintBusinessDays} ${sprintBusinessDays === 1 ? 'day' : 'days'}`;
+  const summaryTitle = [
+    hasCapacity
+      ? isOverCapacity
+        ? `Over capacity by ${Math.abs(remainingCapacityPoints)} pts`
+        : `${remainingCapacityPoints} pts available`
+      : 'No capacity defined',
+    totalReservedPoints > 0
+      ? `${grossCapacityPoints} pts gross, ${totalReservedPoints} reserved`
+      : null,
+    `${sprintBusinessDays} working ${sprintBusinessDays === 1 ? 'day' : 'days'} in this sprint`,
+    'Click for the breakdown by person',
+  ]
+    .filter(Boolean)
+    .join(' \u2022 ');
 
   return (
     <div className={`sprint-capacity-bar${compact ? ' sprint-capacity-bar--compact' : ''}`}>
-      <div
+      {/* One bar and one line: planned against what the team can take on
+          after reservations. Everything else (available, gross, per person)
+          is in the tooltip and the breakdown. */}
+      <button
         ref={triggerRef}
+        type="button"
         className="sprint-capacity-bar__header"
         onClick={() => setIsExpanded((prev) => !prev)}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            setIsExpanded((prev) => !prev);
-          }
-        }}
-        title="Click to toggle team capacity breakdown"
+        aria-expanded={isExpanded}
+        title={summaryTitle}
       >
-        <div className="sprint-capacity-bar__stats">
-          <div className="sprint-capacity-bar__title-row">
-            <span className="sprint-capacity-bar__label">
-              <Users size={12} />
-              <span>Team Capacity</span>
-            </span>
-            <span className="sprint-capacity-bar__points">
-              <strong>{totalAssignedPoints}</strong> / {totalCapacityPoints} pts
-              {totalReservedPoints > 0 && (
-                <span
-                  className="sprint-capacity-bar__reserved-pill"
-                  title={`Gross: ${grossCapacityPoints} pts, Reserved: ${totalReservedPoints} pts`}
-                >
-                  <ShieldAlert size={10} /> -{totalReservedPoints} res
-                </span>
-              )}
-            </span>
-          </div>
-
-          <div className="sprint-capacity-bar__track">
-            <div
-              className={`sprint-capacity-bar__fill ${barColorClass}`}
-              style={{ width: `${Math.min(100, percent)}%` }}
-            />
-          </div>
-
-          <div className="sprint-capacity-bar__meta-row">
-            <span className="sprint-capacity-bar__status">
-              {isOverCapacity ? (
-                <span className="sprint-capacity-bar__danger-text">
-                  <AlertTriangle size={11} /> Over by {Math.abs(remainingCapacityPoints)} pts
-                </span>
-              ) : hasCapacity ? (
-                <span className="sprint-capacity-bar__available-text">
-                  <CheckCircle2 size={11} /> {remainingCapacityPoints} pts available
-                </span>
-              ) : (
-                <span className="sprint-capacity-bar__dim-text">No capacity defined</span>
-              )}
-            </span>
-            <span className="sprint-capacity-bar__days-badge">
-              <Calendar size={12} />{' '}
-              <span className="sprint-capacity-bar__b-days">{sprintBusinessDays} b-days</span>
-            </span>
-          </div>
-        </div>
-
-        <button
-          type="button"
-          className="sprint-capacity-bar__toggle-btn"
-          aria-label={isExpanded ? 'Collapse member breakdown' : 'Expand member breakdown'}
-        >
-          {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-        </button>
-      </div>
+        <span className="sprint-capacity-bar__track">
+          <span
+            className={`sprint-capacity-bar__fill ${barColorClass}`}
+            style={{ width: `${Math.min(100, percent)}%` }}
+          />
+        </span>
+        <span className="sprint-capacity-bar__summary">
+          <span className="sprint-capacity-bar__points">
+            {hasCapacity ? (
+              <>
+                <strong>{totalAssignedPoints}</strong> of {totalCapacityPoints} pts
+                {isOverCapacity && (
+                  <span className="sprint-capacity-bar__danger-text">
+                    {' '}
+                    &middot; over by {Math.abs(remainingCapacityPoints)}
+                  </span>
+                )}
+              </>
+            ) : (
+              <>
+                <strong>{totalAssignedPoints}</strong> pts
+                <span className="sprint-capacity-bar__dim-text"> &middot; no capacity defined</span>
+              </>
+            )}
+          </span>
+          <span className="sprint-capacity-bar__context">
+            {totalReservedPoints > 0 && (
+              <span className="sprint-capacity-bar__reserved">
+                {totalReservedPoints} reserved &middot;{' '}
+              </span>
+            )}
+            {daysLabel}
+          </span>
+          {isExpanded ? (
+            <ChevronUp size={13} className="sprint-capacity-bar__chevron" />
+          ) : (
+            <ChevronDown size={13} className="sprint-capacity-bar__chevron" />
+          )}
+        </span>
+      </button>
 
       {isExpanded &&
         createPortal(
@@ -214,7 +195,7 @@ export function SprintCapacityBar({ summary, compact = false }: SprintCapacityBa
                             className="sprint-capacity-bar__member-avatar"
                             style={{ backgroundColor: m.avatarColor ?? '#5b7cfa' }}
                           >
-                            {getInitials(m.memberName)}
+                            {initials(m.memberName)}
                           </span>
                           <div className="sprint-capacity-bar__member-names">
                             <span className="sprint-capacity-bar__member-name">{m.memberName}</span>

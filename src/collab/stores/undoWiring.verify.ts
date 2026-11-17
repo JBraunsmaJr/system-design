@@ -22,13 +22,20 @@ import {
   type UndoController,
   undoControllerFor,
 } from './undoManager.ts';
-import {createYjsDocumentMetaStore, DEFAULT_DOCUMENT_TITLE, seedYjsDocumentMeta,} from './yjsDocumentMetaStore.ts';
-import {rebaseDocument} from '../sync/rebase.ts';
-import {type DiagramFile, SCHEMA_VERSION} from '../../domain/canvas/serialization.ts';
-import {EMPTY_REQUIREMENTS_DOCUMENT} from '../../domain/requirements/requirementsTypes.ts';
-import {BUILT_IN_ITEM_TYPES, BUILT_IN_RELATIONSHIP_TYPES,} from '../../domain/requirements/requirementsRegistry.ts';
-import {EMPTY_TEAM_DOCUMENT} from '../../domain/timeline/teamTypes.ts';
-import type {Scenario} from '../../domain/canvas/types.ts';
+import {
+  createYjsDocumentMetaStore,
+  DEFAULT_DOCUMENT_TITLE,
+  seedYjsDocumentMeta,
+} from './yjsDocumentMetaStore.ts';
+import { rebaseDocument } from '../sync/rebase.ts';
+import { type DiagramFile, SCHEMA_VERSION } from '../../domain/canvas/serialization.ts';
+import { EMPTY_REQUIREMENTS_DOCUMENT } from '../../domain/requirements/requirementsTypes.ts';
+import {
+  BUILT_IN_ITEM_TYPES,
+  BUILT_IN_RELATIONSHIP_TYPES,
+} from '../../domain/requirements/requirementsRegistry.ts';
+import { EMPTY_TEAM_DOCUMENT } from '../../domain/timeline/teamTypes.ts';
+import type { Scenario } from '../../domain/canvas/types.ts';
 
 let failures = 0;
 function assert(condition: boolean, message: string) {
@@ -94,7 +101,11 @@ function wrapAll(stores: OpenDocumentStores, undo: UndoController): OpenDocument
   ) as unknown as OpenDocumentStores;
 }
 
-const EXEMPT = new Set(['getSnapshot', 'subscribe', 'destroy', 'replaceAll']);
+// Passed through untouched. `replaceAll` is no longer one of them: it is not
+// run under undo, but it is a write, so it is wrapped to be refused on a
+// read-only document (undoReadOnly.verify.ts).
+const EXEMPT = new Set(['getSnapshot', 'subscribe', 'destroy']);
+const NOT_UNDOABLE = new Set(['replaceAll']);
 
 console.log('=== Every mutating method of every store is wrapped ===');
 {
@@ -107,10 +118,25 @@ console.log('=== Every mutating method of every store is wrapped ===');
       ([, v]) => typeof v === 'function',
     );
     const unwrapped = entries.filter(([k, v]) => !EXEMPT.has(k) && w[k] === v).map(([k]) => k);
+    // A whole-document replacement must still stay out of undo history.
+    for (const [k] of entries.filter(([key]) => NOT_UNDOABLE.has(key))) {
+      let underUndo = false;
+      const probe = undoableStore(
+        { [k]: () => undefined },
+        {
+          transact: (fn) => {
+            underUndo = true;
+            return fn();
+          },
+        },
+      ) as Record<string, () => void>;
+      probe[k]();
+      assert(!underUndo, `${name}.${k} is wrapped, but not run under undo`);
+    }
     const rewrapped = entries.filter(([k, v]) => EXEMPT.has(k) && w[k] !== v).map(([k]) => k);
     assert(
       unwrapped.length === 0 && rewrapped.length === 0 && entries.length === Object.keys(w).length,
-      `${name}: ${entries.filter(([k]) => !EXEMPT.has(k)).length} edits wrapped, read/lifecycle methods passed through by identity`,
+      `${name}: ${entries.filter(([k]) => !EXEMPT.has(k) && !NOT_UNDOABLE.has(k)).length} edits wrapped, read/lifecycle methods passed through by identity`,
     );
   }
   destroyDocumentStores(raw);
@@ -234,7 +260,7 @@ console.log('\n=== Document boundaries stay out of history (WS3-R4) ===');
   );
   assert(
     JSON.stringify(reopened.stores.meta.getSnapshot().scenarios[0].steps[0].path) === '[]',
-      'scenario steps without a path are normalized to the root at import',
+    'scenario steps without a path are normalized to the root at import',
   );
   undo.destroy();
   await reopened.close();

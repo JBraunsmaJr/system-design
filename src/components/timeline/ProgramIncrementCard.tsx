@@ -1,21 +1,24 @@
-import {useMemo, useState} from 'react';
-import {CalendarRange, ChevronDown, ChevronRight, Plus, ShieldAlert, Trash2} from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { CalendarRange, ChevronDown, ChevronRight, Plus, ShieldAlert, Trash2 } from 'lucide-react';
 import {
   computeSprintDateRanges,
   type PlanningDetailsPatch,
   type ProgramIncrement,
 } from '../../domain/timeline/programIncrements';
-import {isItemWorkable} from '../../domain/requirements/requirementsRegistry';
-import type {ScheduleConflictSeverity} from '../../domain/timeline/scheduleConflicts';
-import type {RequirementItem, RequirementsDocument,} from '../../domain/requirements/requirementsTypes';
-import type {ProgramIncrementsStore} from '../../collab/stores/programIncrementsStore';
-import type {Milestone} from '../../domain/timeline/milestones';
-import type {TeamDocument} from '../../domain/timeline/teamTypes';
-import {computePICapacities} from '../../domain/timeline/teamCapacity';
-import {ManageReservationsModal} from './ManageReservationsModal';
-import {SprintRow} from './SprintRow';
-import {SprintBoardColumn} from './SprintBoardColumn';
-import {PlanningDetailsFields} from './PlanningDetailsFields';
+import { isItemWorkable } from '../../domain/requirements/requirementsRegistry';
+import type { ScheduleConflictSeverity } from '../../domain/timeline/scheduleConflicts';
+import type {
+  RequirementItem,
+  RequirementsDocument,
+} from '../../domain/requirements/requirementsTypes';
+import type { ProgramIncrementsStore } from '../../collab/stores/programIncrementsStore';
+import type { Milestone } from '../../domain/timeline/milestones';
+import type { TeamDocument } from '../../domain/timeline/teamTypes';
+import { computePICapacities } from '../../domain/timeline/teamCapacity';
+import { ManageReservationsModal } from './ManageReservationsModal';
+import { SprintRow } from './SprintRow';
+import { SprintBoardColumn } from './SprintBoardColumn';
+import { PlanningDetailsFields } from './PlanningDetailsFields';
 
 interface ProgramIncrementCardProps {
   pi: ProgramIncrement;
@@ -41,15 +44,19 @@ interface ProgramIncrementCardProps {
   onUpdateItem: (id: string, patch: Partial<RequirementItem>) => void;
   onUpdateName: (name: string) => void;
   onUpdateStart: (startDate: string) => void;
-    onUpdateDetails: (patch: PlanningDetailsPatch) => void;
+  onUpdateDetails: (patch: PlanningDetailsPatch) => void;
   onDelete: () => void;
   onAddSprint: () => void;
   onUpdateSprintName: (sprintId: string, name: string) => void;
   onUpdateSprintEnd: (sprintId: string, endDate: string) => void;
-    onUpdateSprintDetails: (sprintId: string, patch: PlanningDetailsPatch) => void;
+  onUpdateSprintDetails: (sprintId: string, patch: PlanningDetailsPatch) => void;
   onDeleteSprint: (sprintId: string) => void;
   onMoveSprint: (sprintId: string, direction: 'up' | 'down') => void;
   programIncrementsStore: ProgramIncrementsStore;
+  /** The sprint columns to show on the board, or null/undefined for all -
+   * see boardFilter.ts. Only the board is narrowed: the sprint list under
+   * "Edit sprints" and the PI's capacity totals always cover every sprint. */
+  visibleSprintIds?: Set<string> | null;
 }
 
 /**
@@ -79,21 +86,27 @@ export function ProgramIncrementCard({
   onUpdateItem,
   onUpdateName,
   onUpdateStart,
-                                         onUpdateDetails,
+  onUpdateDetails,
   onDelete,
   onAddSprint,
   onUpdateSprintName,
   onUpdateSprintEnd,
-                                         onUpdateSprintDetails,
+  onUpdateSprintDetails,
   onDeleteSprint,
   onMoveSprint,
   programIncrementsStore,
+  visibleSprintIds,
 }: ProgramIncrementCardProps) {
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
-  const [isSprintListCollapsed, setIsSprintListCollapsed] = useState(false);
+  // Folded by default: sprint names and dates are set up once per PI, and
+  // open they push the board itself most of a screen down the page.
+  const [isSprintListCollapsed, setIsSprintListCollapsed] = useState(true);
   const [isManagingReservations, setIsManagingReservations] = useState(false);
   const ranges = computeSprintDateRanges(pi);
   const rangeBySprintId = new Map(ranges.map((r) => [r.sprintId, r]));
+  const boardSprints = visibleSprintIds
+    ? pi.sprints.filter((s) => visibleSprintIds.has(s.id))
+    : pi.sprints;
 
   const reservationsCount = pi.reservations?.length ?? 0;
 
@@ -161,66 +174,45 @@ export function ProgramIncrementCard({
         </label>
 
         {team && piCapacityTotals && (
+          // One line and one bar for the whole PI: what is planned against
+          // what the team can take on once reservations are set aside.
           <div
-            className="pi-card__capacity-totals"
-            title={`PI Capacity: ${piCapacityTotals.totalAssignedPoints} used / ${piCapacityTotals.totalCapacityPoints} total available (${piCapacityTotals.totalReservedPoints} reserved, ${piCapacityTotals.grossCapacityPoints} gross)`}
+            className="pi-card__capacity"
+            title={`${piCapacityTotals.totalAssignedPoints} pts planned of ${piCapacityTotals.totalCapacityPoints} available (${piCapacityTotals.grossCapacityPoints} gross, ${piCapacityTotals.totalReservedPoints} reserved)`}
           >
-            <div
-              className="pi-card__cap-pill pi-card__cap-pill--used"
-              title={`Used Capacity: ${piCapacityTotals.totalAssignedPoints} points`}
-            >
-              <span className="pi-card__cap-label">Used:</span>
-              <strong className="pi-card__cap-val">{piCapacityTotals.totalAssignedPoints}</strong>
-              <span className="pi-card__cap-unit">pts</span>
-            </div>
-
-            <div
-              className="pi-card__cap-pill pi-card__cap-pill--total"
-              title={`Total Available Capacity: ${piCapacityTotals.totalCapacityPoints} points (Gross: ${piCapacityTotals.grossCapacityPoints} pts)`}
-            >
-              <span className="pi-card__cap-label">Total:</span>
-              <strong className="pi-card__cap-val">{piCapacityTotals.totalCapacityPoints}</strong>
-              <span className="pi-card__cap-unit">pts</span>
-            </div>
-
-            <div
-              className={`pi-card__cap-pill pi-card__cap-pill--reserved${piCapacityTotals.totalReservedPoints === 0 ? ' is-zero' : ''}`}
-              title={
-                piCapacityTotals.totalReservedPoints > 0
-                  ? `Reserved Capacity: ${piCapacityTotals.totalReservedPoints} points`
-                  : 'No capacity reserved'
-              }
-            >
-              {piCapacityTotals.totalReservedPoints > 0 && <ShieldAlert size={12} />}
-              <span className="pi-card__cap-label">Reserved:</span>
-              <strong className="pi-card__cap-val">{piCapacityTotals.totalReservedPoints}</strong>
-              <span className="pi-card__cap-unit">pts</span>
-            </div>
-
-            {piCapacityTotals.hasCapacity && (
-              <div
-                className="pi-card__cap-progress-wrap"
-                title={`${piCapacityTotals.percent}% committed (${piCapacityTotals.remainingCapacityPoints} pts available)`}
-              >
-                <div className="pi-card__cap-progress-bar">
-                  <div
-                    className={`pi-card__cap-progress-fill${
-                      piCapacityTotals.isOverCapacity
-                        ? ' is-danger'
-                        : piCapacityTotals.percent >= 90
-                          ? ' is-warning'
-                          : ' is-normal'
-                    }`}
-                    style={{ width: `${Math.min(100, piCapacityTotals.percent)}%` }}
-                  />
-                </div>
+            <div className="pi-card__capacity-line">
+              <span className="pi-card__capacity-planned">
+                <strong>{piCapacityTotals.totalAssignedPoints}</strong> of{' '}
+                {piCapacityTotals.totalCapacityPoints} pts planned
+              </span>
+              {piCapacityTotals.totalReservedPoints > 0 && (
+                <span className="pi-card__capacity-reserved">
+                  <ShieldAlert size={11} />
+                  {piCapacityTotals.totalReservedPoints} reserved
+                </span>
+              )}
+              {piCapacityTotals.hasCapacity && (
                 <span
-                  className={`pi-card__cap-progress-text${piCapacityTotals.isOverCapacity ? ' is-danger' : ''}`}
+                  className={`pi-card__capacity-left${piCapacityTotals.isOverCapacity ? ' is-danger' : ''}`}
                 >
                   {piCapacityTotals.isOverCapacity
-                    ? `+${Math.abs(piCapacityTotals.remainingCapacityPoints)} over`
+                    ? `${Math.abs(piCapacityTotals.remainingCapacityPoints)} over`
                     : `${piCapacityTotals.remainingCapacityPoints} left`}
                 </span>
+              )}
+            </div>
+            {piCapacityTotals.hasCapacity && (
+              <div className="pi-card__capacity-bar">
+                <div
+                  className={`pi-card__capacity-fill${
+                    piCapacityTotals.isOverCapacity
+                      ? ' is-danger'
+                      : piCapacityTotals.percent >= 90
+                        ? ' is-warning'
+                        : ' is-normal'
+                  }`}
+                  style={{ width: `${Math.min(100, piCapacityTotals.percent)}%` }}
+                />
               </div>
             )}
           </div>
@@ -265,17 +257,21 @@ export function ProgramIncrementCard({
         )}
       </div>
 
-        <div className="pi-card__details">
-            <PlanningDetailsFields details={pi} scope="PI" onChange={onUpdateDetails}/>
-        </div>
+      <div className="pi-card__details">
+        <PlanningDetailsFields details={pi} scope="PI" onChange={onUpdateDetails} />
+      </div>
 
       <button
         type="button"
         className="pi-card__sprints-toggle"
         onClick={() => setIsSprintListCollapsed(!isSprintListCollapsed)}
+        aria-expanded={!isSprintListCollapsed}
       >
         {isSprintListCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
-        Edit sprint dates
+        Edit sprints
+        <span className="pi-card__sprints-toggle-count">
+          {pi.sprints.length} sprint{pi.sprints.length === 1 ? '' : 's'}
+        </span>
       </button>
 
       {!isSprintListCollapsed && (
@@ -312,9 +308,18 @@ export function ProgramIncrementCard({
         <div className="pi-card__board">
           <div className="pi-card__board-header">
             <span className="pi-card__board-title">Sprint Timeline Board</span>
+            {boardSprints.length < pi.sprints.length && (
+              <span className="pi-card__board-filter-note">
+                Showing {boardSprints.length} of {pi.sprints.length} sprints
+              </span>
+            )}
           </div>
-          <div className="pi-card__board-columns">
-            {pi.sprints.map((sprint) => (
+          <div
+            className={`pi-card__board-columns${
+              boardSprints.length < pi.sprints.length ? ' pi-card__board-columns--filtered' : ''
+            }`}
+          >
+            {boardSprints.map((sprint) => (
               <SprintBoardColumn
                 key={sprint.id}
                 sprint={sprint}

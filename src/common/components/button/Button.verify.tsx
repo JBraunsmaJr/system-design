@@ -26,7 +26,7 @@ function assert(condition: boolean, message: string) {
 {
   const primary = renderToStaticMarkup(<Button variant="primary">Primary</Button>);
   assert(primary.includes('btn--primary'), 'Primary variant class is set');
-  assert(primary.includes('primary'), 'Backwards-compatible primary class is set');
+  assert(primary.includes('primary'), 'Backward-compatible primary class is set');
 
   const ghost = renderToStaticMarkup(<Button variant="ghost">Ghost</Button>);
   assert(ghost.includes('btn--ghost'), 'Ghost variant class is set');

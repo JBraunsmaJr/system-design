@@ -2,7 +2,7 @@
  * Verification for edge manipulation - endpoint reconnection and
  * waypoints (bends) - across all three DiagramStore implementations.
  *
- * The interesting half of this file is Part 3 onwards. Waypoints are the
+ * The interesting half of this file is Part 3 onward. Waypoints are the
  * first list in the diagram schema that several people can be editing
  * DIFFERENT PARTS OF at the same time, which is exactly the case a plain
  * array value silently gets wrong: whoever writes second replaces the

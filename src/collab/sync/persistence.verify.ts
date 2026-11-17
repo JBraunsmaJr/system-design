@@ -3,7 +3,7 @@
  *
  * The ordering under test is the whole point: persistence must finish
  * replaying stored updates BEFORE anything decides whether to seed. Get it
- * backwards and a restored document is seeded on top of itself, which - before
+ * backward and a restored document is seeded on top of itself, which - before
  * WS1-R6 - silently duplicated every node, requirement and milestone.
  */
 import 'fake-indexeddb/auto';

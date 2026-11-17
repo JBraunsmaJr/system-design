@@ -1,211 +1,118 @@
 # How your work is protected
 
-This page describes what is encrypted, what the server can see, and what
-happens when someone loses a device. It is written for the people using the
-editor and for anyone reviewing it before a deployment.
+This page describes where your documents are, who can read them, and what
+protects them on the way. It is written for the people using the editor and
+for anyone reviewing it before a deployment.
 
-<style>
-.kd { width: 100%; height: auto; }
-.kd .box { fill: var(--vp-c-bg-soft); stroke: var(--vp-c-divider); stroke-width: 1; }
-.kd .held { fill: var(--vp-c-bg-soft); stroke: var(--vp-c-brand-1); stroke-width: 1; }
-.kd .zone { fill: none; stroke: var(--vp-c-divider); stroke-width: 1; stroke-dasharray: 5 4; }
-.kd .t { fill: var(--vp-c-text-1); font-size: 14px; font-family: var(--vp-font-family-base); }
-.kd .ts { fill: var(--vp-c-text-2); font-size: 12px; font-family: var(--vp-font-family-base); }
-.kd .arr { stroke: var(--vp-c-text-3); stroke-width: 1.2; fill: none; }
-.kd .pair { stroke: var(--vp-c-text-3); stroke-width: 1; stroke-dasharray: 4 4; }
-</style>
+The short version: **without a workspace, your documents never leave your
+browser. With one, they are kept on your organization's server, and whoever
+runs that server can read them.**
 
-## The chain of keys
+## Three places a document can be
 
-Each key opens the next. Only the first one is held by your browser; the
-rest are recovered by unwrapping, every time you open a document.
+| Where              | Who can read it                                                                   |
+| :----------------- | :-------------------------------------------------------------------------------- |
+| **Your browser**   | You, and anyone with access to that browser profile.                              |
+| **A live session** | The people in it. It passes between their browsers, encrypted with a session key. |
+| **A workspace**    | The workspace's members, the store's administrators, and whoever runs the server. |
 
-<svg class="kd" viewBox="0 0 680 560" role="img" aria-label="Key hierarchy: the device key unwraps the user key, which unwraps the workspace key, which unwraps the document key, from which the storage key is derived to open sealed document content.">
-  <defs>
-    <marker id="kdarrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-    </marker>
-  </defs>
+### In your browser
 
-  <rect class="zone" x="20" y="20" width="300" height="440" rx="16"/>
-  <text class="t" x="170" y="46" text-anchor="middle">Held in your browser</text>
-  <text class="ts" x="170" y="64" text-anchor="middle">Unwrapped in memory, never sent</text>
+A document you have not put in a workspace is stored only in the browser
+you made it in. Nothing is sent anywhere. Clearing that browser's data
+removes it, which is why the editor can also keep a file on disk up to date
+for you.
 
-  <rect class="zone" x="360" y="20" width="300" height="440" rx="16"/>
-  <text class="t" x="510" y="46" text-anchor="middle">Held by the workspace</text>
-  <text class="ts" x="510" y="64" text-anchor="middle">Wrapped or sealed only</text>
+### In a live session
 
-  <rect class="held" x="40" y="86" width="260" height="52" rx="8"/>
-  <text class="t" x="170" y="108" text-anchor="middle" dominant-baseline="central">Device key</text>
-  <text class="ts" x="170" y="126" text-anchor="middle" dominant-baseline="central">RSA-OAEP 3072, non-extractable</text>
-  <line class="arr" x1="170" y1="138" x2="170" y2="158" marker-end="url(#kdarrow)"/>
+A session connects browsers to each other so people can edit together. What
+they send is encrypted with a key that only the people in the session have:
 
-  <rect class="held" x="40" y="162" width="260" height="52" rx="8"/>
-  <text class="t" x="170" y="184" text-anchor="middle" dominant-baseline="central">Your user key</text>
-  <text class="ts" x="170" y="202" text-anchor="middle" dominant-baseline="central">RSA-OAEP 3072, one per person</text>
-  <line class="arr" x1="170" y1="214" x2="170" y2="234" marker-end="url(#kdarrow)"/>
+- for a session you **start yourself**, the key is in the link you share,
+  after the `#`. Browsers do not send that part of an address to any server,
+  so the relay that introduces the browsers to each other never has it.
+  Anyone you send the link to can join, so send it as you would the
+  document;
+- for a **workspace document**, the store gives the key to people who may
+  edit that document.
 
-  <rect class="held" x="40" y="238" width="260" height="52" rx="8"/>
-  <text class="t" x="170" y="260" text-anchor="middle" dominant-baseline="central">Workspace key</text>
-  <text class="ts" x="170" y="278" text-anchor="middle" dominant-baseline="central">AES-KW 256, one per workspace</text>
-  <line class="arr" x1="170" y1="290" x2="170" y2="310" marker-end="url(#kdarrow)"/>
+The relay only passes messages along. It cannot read them, and it keeps
+nothing.
 
-  <rect class="held" x="40" y="314" width="260" height="52" rx="8"/>
-  <text class="t" x="170" y="336" text-anchor="middle" dominant-baseline="central">Document key</text>
-  <text class="ts" x="170" y="354" text-anchor="middle" dominant-baseline="central">128 bits, also carried by a link</text>
-  <line class="arr" x1="170" y1="366" x2="170" y2="386" marker-end="url(#kdarrow)"/>
+### In a workspace
 
-  <rect class="held" x="40" y="390" width="260" height="52" rx="8"/>
-  <text class="t" x="170" y="412" text-anchor="middle" dominant-baseline="central">Storage key</text>
-  <text class="ts" x="170" y="430" text-anchor="middle" dominant-baseline="central">AES-GCM 256, derived not stored</text>
+A workspace keeps documents on your organization's server so a team can
+share them. They are stored **as they are**, not encrypted by your browser
+first. That means:
 
-  <rect class="box" x="380" y="86" width="260" height="52" rx="8"/>
-  <text class="t" x="510" y="108" text-anchor="middle" dominant-baseline="central">Your user key, wrapped</text>
-  <text class="ts" x="510" y="126" text-anchor="middle" dominant-baseline="central">One row per approved browser</text>
-  <line class="pair" x1="304" y1="112" x2="376" y2="112"/>
+- the workspace's **members** can open them, according to their role;
+- the store's **administrators** can open every workspace;
+- **anyone who runs the server**, or can reach its database or its backups,
+  can read every document in it.
 
-  <rect class="box" x="380" y="162" width="260" height="52" rx="8"/>
-  <text class="t" x="510" y="184" text-anchor="middle" dominant-baseline="central">Workspace key, wrapped</text>
-  <text class="ts" x="510" y="202" text-anchor="middle" dominant-baseline="central">Per member, per generation</text>
-  <line class="pair" x1="304" y1="188" x2="376" y2="188"/>
+The editor says this wherever it shows workspaces, and it cannot be
+dismissed:
 
-  <rect class="box" x="380" y="238" width="260" height="52" rx="8"/>
-  <text class="t" x="510" y="260" text-anchor="middle" dominant-baseline="central">Sealed document list</text>
-  <text class="ts" x="510" y="278" text-anchor="middle" dominant-baseline="central">Titles and wrapped document keys</text>
-  <line class="pair" x1="304" y1="264" x2="376" y2="264"/>
+> Documents in a workspace are stored on your organization's server, and its
+> administrators can read them.
 
-  <rect class="box" x="380" y="314" width="260" height="52" rx="8"/>
-  <text class="t" x="510" y="336" text-anchor="middle" dominant-baseline="central">Sealed changes</text>
-  <text class="ts" x="510" y="354" text-anchor="middle" dominant-baseline="central">Each bound to its document</text>
-  <line class="pair" x1="304" y1="340" x2="376" y2="340"/>
+If a document should not be readable by the people who run your server, keep
+it out of a workspace. It stays in your browser, and you can still share it
+in a session by link.
 
-  <rect class="box" x="380" y="390" width="260" height="52" rx="8"/>
-  <text class="t" x="510" y="412" text-anchor="middle" dominant-baseline="central">Recovery wrap</text>
-  <text class="ts" x="510" y="430" text-anchor="middle" dominant-baseline="central">Required on every document</text>
-  <line class="pair" x1="304" y1="416" x2="376" y2="416"/>
+## What protects a workspace
 
-  <rect class="box" x="380" y="482" width="260" height="52" rx="8"/>
-  <text class="t" x="510" y="504" text-anchor="middle" dominant-baseline="central">organization's recovery key</text>
-  <text class="ts" x="510" y="522" text-anchor="middle" dominant-baseline="central">Private half kept off the server</text>
-  <line class="arr" x1="510" y1="446" x2="510" y2="478" marker-end="url(#kdarrow)"/>
-</svg>
+**Sign-in.** The store accepts nobody it has not signed in through your
+organization's identity provider. It never sees your password; the provider
+tells it who you are and which groups you are in.
 
-Reading the rows across: every key on the left exists on the right only in a
-form that needs the key above it to open. The dashed lines are that pairing,
-not data moving.
+**Roles.** What you may do in a workspace is decided by the store, for every
+request, from your role there: viewer, editor or owner. Someone with no role
+in a workspace cannot tell it exists. Roles come from being added by name or
+from a group; see [Workspaces](/guide/workspaces#which-workspaces-you-have).
 
-Three things this arrangement buys:
+**The connection.** Everything between your browser and the store travels
+over HTTPS, so it cannot be read or changed on the way.
 
-- **The device key never leaves the browser.** It is generated as
-  non-extractable, so even the application's own code cannot read it out -
-  only ask the browser to use it.
-- **Each sealed change is bound to its place.** A document's id, the kind of
-  change, and its version are authenticated alongside the ciphertext, so a
-  change cannot be moved into another document or replayed as a later
-  version. It fails to open rather than opening into something plausible.
-- **The storage key is derived, never stored.** It comes from the document
-  key by HKDF at the moment a document is opened.
+**Where it runs.** The store is meant to run inside your organization's own
+network, by your organization. It is not a service shared with anyone else.
 
-## What the workspace can and cannot see
+**A record.** The store records every request: who made it, what it was, and
+whether it was allowed. Administrators can review it.
 
-::: info Default mode
-It holds ciphertext and wrapped keys. A database dump yields no titles, no
-diagram content, and no key that can open any of it.
-:::
-
-It **does** see, by design, and records in its audit log:
-
-- document identifiers, sizes and timestamps
-- who signed in, from which provider, and when
-- which documents each person read or changed, and who granted access to whom
-
-A deployment can be configured to store documents unencrypted - for local
-development, or where an organization has decided the server should read
-content. When it is, **the editor shows a warning that cannot be dismissed**,
-because you should never have to check a configuration file to know whether
-your work is readable.
-
-The relay that carries live sessions holds no key at all. A session's room
-name is a hash of the document key, and its traffic is encrypted with that
-key, so the relay sees opaque rooms and opaque bytes. It cannot tell which
-document, workspace, or even which deployment a session belongs to.
-
-## Three ways back in
-
-Losing a device must not mean losing documents, and must not mean anyone
-else can read them either.
-
-<svg class="kd" viewBox="0 0 680 270" role="img" aria-label="Three recovery routes: another approved browser, your recovery code, or the organization's offline key - each leading back to readable documents.">
-  <rect class="box" x="30" y="24" width="190" height="56" rx="8"/>
-  <text class="t" x="125" y="46" text-anchor="middle" dominant-baseline="central">Another browser</text>
-  <text class="ts" x="125" y="64" text-anchor="middle" dominant-baseline="central">Codes compared, then approved</text>
-
-  <rect class="box" x="245" y="24" width="190" height="56" rx="8"/>
-  <text class="t" x="340" y="46" text-anchor="middle" dominant-baseline="central">Your recovery code</text>
-  <text class="ts" x="340" y="64" text-anchor="middle" dominant-baseline="central">Unseals your own keys</text>
-
-  <rect class="box" x="460" y="24" width="190" height="56" rx="8"/>
-  <text class="t" x="555" y="46" text-anchor="middle" dominant-baseline="central">Offline recovery key</text>
-  <text class="ts" x="555" y="64" text-anchor="middle" dominant-baseline="central">Held by the organization</text>
-
-  <line class="arr" x1="125" y1="80" x2="285" y2="166" marker-end="url(#kdarrow)"/>
-  <line class="arr" x1="340" y1="80" x2="340" y2="166" marker-end="url(#kdarrow)"/>
-  <line class="arr" x1="555" y1="80" x2="395" y2="166" marker-end="url(#kdarrow)"/>
-
-  <rect class="held" x="200" y="170" width="280" height="56" rx="8"/>
-  <text class="t" x="340" y="192" text-anchor="middle" dominant-baseline="central">Documents readable again</text>
-  <text class="ts" x="340" y="210" text-anchor="middle" dominant-baseline="central">Content is never re-encrypted</text>
-</svg>
-
-They differ in who they need:
-
-| Route                | Needs                          | Typical use                         |
-| -------------------- | ------------------------------ | ----------------------------------- |
-| Another browser      | Someone with a working browser | A new laptop, a colleague joining   |
-| Recovery code        | Only you                       | Every browser gone                  |
-| Offline recovery key | The organization, not you      | Someone has left; a records request |
-
-The offline key is why **every document must carry a recovery wrap**. A
-workspace that accepted documents without one would accumulate content that
-nobody - including the organization that owns it - could ever recover. The
-store refuses them rather than let that happen.
-
-## Automatic access
-
-A workspace can let in everyone in a group without anyone pressing **Give
-access**. The key is still handed over by a member's browser, never by the
-server. That browser checks your identity provider's signature on the
-newcomer's sign-in, checks the sign-in names the exact key it is handing the
-workspace key to, and checks the group against a rule kept in the sealed
-document list. The server can delay a join, but cannot make one. See
-[How a grant is checked](/deployment/group-access#how-a-grant-is-checked).
-
-This does mean anyone who can add people to that group at your identity
-provider can add them to the workspace.
-
-## Replacing a key
-
-Revoking a browser stops the workspace serving it, but that browser still
-holds the workspace key it already had. **Rotating** the key replaces it:
-each document key is re-wrapped under the new one and the document list is
-re-sealed. No content is re-encrypted, nothing is lost, and documents that
-are deleted but still within their retention period are re-wrapped too, so
-they stay restorable.
-
-Anyone holding the old key can still read what they could read before -
-copies already made cannot be recalled - but nothing saved afterwards.
+**Retention.** A deleted document is kept for a period your organization
+sets, so a mistake can be undone, and then removed. An administrator can
+place a hold that keeps one longer.
 
 ## What this does not protect against
 
 Stated plainly, because a security page that only lists strengths is not
 much use:
 
+- **The people who run the server.** They can read workspace documents. So
+  can anyone who obtains a copy of the database or a backup. Protecting
+  those is your organization's job, as it is for any file server.
 - **A compromised browser.** Anything your browser can open, malware running
   in it can open too.
-- **Someone you gave access to.** Access is a person deciding to trust
-  another person. Revocation stops future reads, not copies already taken.
-- **Traffic analysis.** The workspace sees sizes, times and who touched what,
-  even though it cannot read content.
-- **A lost recovery code with no devices left.** That is an administrator
-  re-grant, and the documents written under the old keys stay unreadable
-  unless the organization's offline key recovers them.
+- **Someone you gave access to.** Removing someone stops them opening
+  documents from then on. It does not recall copies they already have.
+- **A session after someone is removed.** Where the relay is not set up to
+  require a token from the store, someone removed from a workspace who had
+  kept a live session's details could rejoin that session and watch edits
+  being made. They could not open or change anything in the store.
+  Administrators prevent this with one setting; see
+  [Workspace Store](/deployment/workspace-store#sessions-and-the-relay).
+- **A long sign-in.** Your groups are read when you sign in. If you are
+  taken out of a group, the access it gave you ends when your sign-in does,
+  which can be up to eight hours later.
+
+## An earlier design
+
+Earlier releases encrypted workspace documents in the browser, with keys
+held by each enrolled device, so that the server could not read them. It
+was removed: enrolling devices, comparing codes, keeping recovery codes and
+waiting to be let in made shared workspaces hard to use, for deployments
+that already run inside a protected network and trust the people operating
+it. If your organization needs documents the server cannot read, workspaces
+are not the place for them; documents kept in the browser and shared by
+session link still never reach a server in readable form.

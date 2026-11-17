@@ -53,6 +53,8 @@ function render(props: Partial<React.ComponentProps<typeof RequirementsView>> = 
       requirementsStore: createLocalRequirementsStore(testDoc),
       programIncrements: [],
       initialGroupBy: 'epic',
+      // These are checks of the card list; the table has its own.
+      initialLayout: 'list',
       ...props,
     }),
   );

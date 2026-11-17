@@ -6,9 +6,12 @@
  *   npx tsx src/collab/programIncrementsStore.verify.ts
  */
 import * as Y from 'yjs';
-import type {ProgramIncrementsStore} from './programIncrementsStore';
-import {createLocalProgramIncrementsStore} from './programIncrementsStore';
-import {createYjsProgramIncrementsStore, seedYjsProgramIncrementsDoc,} from './yjsProgramIncrementsStore';
+import type { ProgramIncrementsStore } from './programIncrementsStore';
+import { createLocalProgramIncrementsStore } from './programIncrementsStore';
+import {
+  createYjsProgramIncrementsStore,
+  seedYjsProgramIncrementsDoc,
+} from './yjsProgramIncrementsStore';
 
 let failures = 0;
 function assert(cond: boolean, msg: string) {
@@ -352,35 +355,35 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: ProgramIncrementsStore
   function runDetails(store: ProgramIncrementsStore) {
     const piId = store.addPI();
     const sprintId = store.getSnapshot().find((pi) => pi.id === piId)!.sprints[0].id;
-      store.updatePIDetails(piId, {goal: 'Ship checkout v2', notes: 'Payments team on loan'});
-      store.updateSprintDetails(piId, sprintId, {goal: 'Card flow end-to-end'});
-      store.updateSprintDetails(piId, sprintId, {notes: 'Demo Friday'});
+    store.updatePIDetails(piId, { goal: 'Ship checkout v2', notes: 'Payments team on loan' });
+    store.updateSprintDetails(piId, sprintId, { goal: 'Card flow end-to-end' });
+    store.updateSprintDetails(piId, sprintId, { notes: 'Demo Friday' });
     // A patch that only touches notes must not clear the goal.
-      store.updatePIDetails(piId, {notes: 'Payments team on loan until S3'});
-      return {piId, sprintId};
+    store.updatePIDetails(piId, { notes: 'Payments team on loan until S3' });
+    return { piId, sprintId };
   }
 
   for (const [label, store] of [
     ['local', createLocalProgramIncrementsStore()],
     ['Yjs', createYjsProgramIncrementsStore(new Y.Doc())],
   ] as const) {
-      const {piId, sprintId} = runDetails(store);
+    const { piId, sprintId } = runDetails(store);
     const pi = store.getSnapshot().find((p) => p.id === piId)!;
     const sprint = pi.sprints.find((s) => s.id === sprintId)!;
     assert(
-        pi.goal === 'Ship checkout v2' && pi.notes === 'Payments team on loan until S3',
-        `${label} store: PI goal and notes are set independently`,
+      pi.goal === 'Ship checkout v2' && pi.notes === 'Payments team on loan until S3',
+      `${label} store: PI goal and notes are set independently`,
     );
     assert(
-        sprint.goal === 'Card flow end-to-end' && sprint.notes === 'Demo Friday',
-        `${label} store: sprint goal and notes are set independently`,
+      sprint.goal === 'Card flow end-to-end' && sprint.notes === 'Demo Friday',
+      `${label} store: sprint goal and notes are set independently`,
     );
 
-      store.updateSprintDetails(piId, sprintId, {goal: '   '});
+    store.updateSprintDetails(piId, sprintId, { goal: '   ' });
     const cleared = store.getSnapshot().find((p) => p.id === piId)!.sprints[0];
     assert(
-        !('goal' in cleared) && cleared.notes === 'Demo Friday',
-        `${label} store: a blank goal is removed rather than stored as an empty string`,
+      !('goal' in cleared) && cleared.notes === 'Demo Friday',
+      `${label} store: a blank goal is removed rather than stored as an empty string`,
     );
   }
 
@@ -390,22 +393,22 @@ function forkPeer(sourceDoc: Y.Doc): { doc: Y.Doc; store: ProgramIncrementsStore
   const piId = storeA.addPI();
   const sprintId = storeA.getSnapshot()[0].sprints[0].id;
   const peerB = forkPeer(docA);
-    storeA.updateSprintDetails(piId, sprintId, {goal: 'Goal from A'});
-    peerB.store.updateSprintDetails(piId, sprintId, {notes: 'Notes from B'});
+  storeA.updateSprintDetails(piId, sprintId, { goal: 'Goal from A' });
+  peerB.store.updateSprintDetails(piId, sprintId, { notes: 'Notes from B' });
   sync(docA, peerB.doc);
   const merged = storeA.getSnapshot()[0].sprints[0];
   assert(
-      merged.goal === 'Goal from A' && merged.notes === 'Notes from B',
-      'Yjs store: concurrent goal and notes edits on the same sprint both survive a merge',
+    merged.goal === 'Goal from A' && merged.notes === 'Notes from B',
+    'Yjs store: concurrent goal and notes edits on the same sprint both survive a merge',
   );
 
   // Seeding preserves goal/notes exactly.
   const seededDoc = new Y.Doc();
   seedYjsProgramIncrementsDoc(seededDoc, storeA.getSnapshot());
   assert(
-      canonicalJSON(createYjsProgramIncrementsStore(seededDoc).getSnapshot()) ===
+    canonicalJSON(createYjsProgramIncrementsStore(seededDoc).getSnapshot()) ===
       canonicalJSON(storeA.getSnapshot()),
-      'seeding a Y.Doc preserves PI and sprint goal/notes',
+    'seeding a Y.Doc preserves PI and sprint goal/notes',
   );
 }
 

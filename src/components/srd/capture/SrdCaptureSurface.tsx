@@ -1,12 +1,19 @@
-import {type RefObject, useEffect, useRef} from 'react';
-import {type Edge, type Node, ReactFlow, ReactFlowProvider, useNodesInitialized, useReactFlow,} from '@xyflow/react';
+import { type RefObject, useEffect, useRef } from 'react';
+import {
+  type Edge,
+  type Node,
+  ReactFlow,
+  ReactFlowProvider,
+  useNodesInitialized,
+  useReactFlow,
+} from '@xyflow/react';
 import {
   CANVAS_EDGE_TYPES,
   CANVAS_NODE_TYPES,
   DEFAULT_EDGE_OPTIONS,
   PRO_OPTIONS,
 } from '../../canvas/canvasElementTypes';
-import type {ArchEdgeData, ArchNodeData} from '../../../domain/canvas/types';
+import type { ArchEdgeData, ArchNodeData } from '../../../domain/canvas/types';
 
 /** One diagram level to render. `key` changes whenever its content does, and
  * stays the same across snapshots of the same level, so those share a render. */
@@ -29,10 +36,10 @@ export interface RenderedLevel {
 export interface SrdCaptureSurfaceProps {
   level: CaptureLevel | null;
   onRendered: (rendered: RenderedLevel) => void;
-    /** The class that keeps the surface offscreen and sizes it. The scenario
-     * exporter renders on this same surface outside the SRD view, where the
-     * SRD's stylesheet is not loaded, so it brings its own. */
-    className?: string;
+  /** The class that keeps the surface offscreen and sizes it. The scenario
+   * exporter renders on this same surface outside the SRD view, where the
+   * SRD's stylesheet is not loaded, so it brings its own. */
+  className?: string;
 }
 
 /**
@@ -47,13 +54,13 @@ export interface SrdCaptureSurfaceProps {
  * styles, so `display: none` or `visibility: hidden` would capture nothing.
  */
 export function SrdCaptureSurface({
-                                      level,
-                                      onRendered,
-                                      className = 'srd-capture-surface',
-                                  }: SrdCaptureSurfaceProps) {
+  level,
+  onRendered,
+  className = 'srd-capture-surface',
+}: SrdCaptureSurfaceProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   return (
-      <div ref={rootRef} className={className} aria-hidden="true" inert>
+    <div ref={rootRef} className={className} aria-hidden="true" inert>
       {level && (
         // Keyed by level, so each level starts from a fresh store and never
         // inherits measurements from the previous one. Uncontrolled

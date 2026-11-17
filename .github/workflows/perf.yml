@@ -13,7 +13,7 @@ permissions:
 jobs:
   perf-test:
     name: Layer 2 Containerized Performance Harness
-    # Run on release, workflow_dispatch, or PRs labeled with 'perf' / 'perf-check' (or all PRs if unlabelled)
+    # Run on release, workflow_dispatch, or PRs labeled with 'perf' / 'perf-check' (or all PRs if unlabeled)
     if: |
       github.event_name == 'workflow_dispatch' ||
       github.event_name == 'release' ||

@@ -1,5 +1,5 @@
-import type {Edge, Node} from '@xyflow/react';
-import type {LinkedDocumentRef} from './documentLinks';
+import type { Edge, Node } from '@xyflow/react';
+import type { LinkedDocumentRef } from './documentLinks';
 
 // Core domain types for the system-design editor.
 // These mirror the taxonomy described in the project's Requirements & Software
@@ -80,11 +80,11 @@ export interface ArchNodeData extends Record<string, unknown> {
   /** Number of nodes in this node's sub-diagram - computed fresh by App.tsx
    * on every render from the flat diagram store's own data. */
   subDiagramNodeCount?: number;
-    /** How many of this node's connections at its own level aren't wired to
-     * anything inside its sub-diagram - see domain/canvas/boundaryPorts.ts.
-     * Computed per render like hasSubDiagram, never stored, and only set
-     * on nodes with a populated sub-diagram. */
-    unwiredPortCount?: number;
+  /** How many of this node's connections at its own level aren't wired to
+   * anything inside its sub-diagram - see domain/canvas/boundaryPorts.ts.
+   * Computed per render like hasSubDiagram, never stored, and only set
+   * on nodes with a populated sub-diagram. */
+  unwiredPortCount?: number;
   /** An explicit stacking override set with the Inspector's z-order
    * controls. Undefined means "order me automatically by area" - see
    * domain/zOrder.ts for why the automatic rule is what it is. */
@@ -121,11 +121,11 @@ export interface ArchNodeData extends Record<string, unknown> {
    * through normalizeLinkedDocument, never directly: it comes from files
    * and peers like everything else here. */
   linkedDocument?: LinkedDocumentRef;
-    /** Pinned in place: a locked node can't be dragged, nudged, resized or
-     * deleted until it's unlocked again (context menu or Inspector). Purely
-     * an editing guard - it changes nothing about how the node is drawn
-     * beyond a small lock badge. Undefined and false both mean unlocked. */
-    locked?: boolean;
+  /** Pinned in place: a locked node can't be dragged, nudged, resized or
+   * deleted until it's unlocked again (context menu or Inspector). Purely
+   * an editing guard - it changes nothing about how the node is drawn
+   * beyond a small lock badge. Undefined and false both mean unlocked. */
+  locked?: boolean;
 }
 
 /**
@@ -178,11 +178,11 @@ export interface ArchEdgeData extends Record<string, unknown> {
   hideLabel?: boolean;
   /** Per-instance color override - overrides the edge type's own default stroke/label color. Undefined means "use the type default". */
   color?: string;
-    /** Line thickness in pixels. Undefined means the default
-     * (DEFAULT_EDGE_STROKE_WIDTH in edgeRegistry.ts). */
-    strokeWidth?: number;
-    /** Straight, orthogonal or curved - see EdgeRouting. */
-    routing?: EdgeRouting;
+  /** Line thickness in pixels. Undefined means the default
+   * (DEFAULT_EDGE_STROKE_WIDTH in edgeRegistry.ts). */
+  strokeWidth?: number;
+  /** Straight, orthogonal or curved - see EdgeRouting. */
+  routing?: EdgeRouting;
   /**
    * Where the label sits, expressed relative to the edge's OWN path
    * geometry rather than a raw pixel position - this is what keeps it
@@ -245,8 +245,8 @@ export interface ArchEdgeDataPatch {
   direction?: 'forward' | 'reverse' | 'both';
   hideLabel?: boolean;
   color?: string;
-    strokeWidth?: number;
-    routing?: EdgeRouting;
+  strokeWidth?: number;
+  routing?: EdgeRouting;
   labelAnchorT?: number;
   labelOffsetX?: number;
   labelOffsetY?: number;

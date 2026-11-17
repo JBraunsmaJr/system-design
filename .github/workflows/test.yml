@@ -11,6 +11,32 @@ permissions:
   contents: read
 
 jobs:
+  static-checks:
+    name: Lint, format and types
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check formatting
+        run: npm run format:check
+
+      # Warnings are allowed; errors fail the job.
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check
+        run: npm run typecheck
+
   test:
     name: Run tests
     runs-on: ubuntu-latest
@@ -99,23 +125,23 @@ jobs:
         env:
           DATABASE_URL: postgresql://store:store@localhost:5432/store
 
-      - name: Run device enrollment against PostgreSQL
-        run: npx tsx scripts/verify-store-devices.ts
-        env:
-          DATABASE_URL: postgresql://store:store@localhost:5432/store
-
       - name: Run retention and legal hold against PostgreSQL
         run: npx tsx scripts/verify-store-retention.ts
         env:
           DATABASE_URL: postgresql://store:store@localhost:5432/store
 
-      - name: Run the workspace index against PostgreSQL
-        run: npx tsx scripts/verify-store-index.ts
+      - name: Run the workspace store contract against PostgreSQL
+        run: npx tsx scripts/verify-workspaces-contract.ts
         env:
           DATABASE_URL: postgresql://store:store@localhost:5432/store
 
-      - name: Run the store client against PostgreSQL
-        run: npx tsx scripts/verify-store-client.ts
+      - name: Upgrade a database from the encrypted workspace
+        run: npx tsx scripts/verify-store-upgrade.ts
+        env:
+          DATABASE_URL: postgresql://store:store@localhost:5432/store
+
+      - name: Run the workspace API against PostgreSQL
+        run: npx tsx scripts/verify-store-v2.ts
         env:
           DATABASE_URL: postgresql://store:store@localhost:5432/store
 
@@ -127,23 +153,8 @@ jobs:
         env:
           DATABASE_URL: postgresql://store:store@localhost:5432/store
 
-      - name: Merge concurrent workspace edits against PostgreSQL
-        run: npx tsx scripts/verify-workspace-merge.ts
-        env:
-          DATABASE_URL: postgresql://store:store@localhost:5432/store
-
-      - name: Rotate a workspace key against PostgreSQL
-        run: npx tsx scripts/verify-workspace-rotation.ts
-        env:
-          DATABASE_URL: postgresql://store:store@localhost:5432/store
-
       - name: Start the store as a process against PostgreSQL
         run: npx tsx scripts/verify-store-startup.ts
-        env:
-          DATABASE_URL: postgresql://store:store@localhost:5432/store
-
-      - name: Run device identity against PostgreSQL
-        run: npx tsx scripts/verify-device-identity.ts
         env:
           DATABASE_URL: postgresql://store:store@localhost:5432/store
 

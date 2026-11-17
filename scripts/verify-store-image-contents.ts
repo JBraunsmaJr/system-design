@@ -76,28 +76,33 @@ check(
   'the image runs the entry point this was checked against',
 );
 
-console.log('\n=== Recovery CLI tools packaged in the store image ===');
-for (const cliScript of ['scripts/generate-recovery-key.ts', 'scripts/recover-document.ts']) {
-  const cliReachable = importGraph(cliScript);
-  const cliMissing = cliReachable.filter(
-    (file) => !copied.some((source) => file === source || file.startsWith(`${source}/`)),
-  );
-  check(
-    cliMissing.length === 0,
-    `${cliScript} and its dependencies (${cliReachable.join(', ')}) are copied into the image`,
-  );
-}
-
+console.log('\n=== The entry point ===');
 check(
   /ENTRYPOINT\s+\[.*docker-entrypoint\.sh.*\]/.test(dockerfile),
   'the image configures docker-entrypoint.sh as its ENTRYPOINT',
 );
 
 const entrypointContent = readFileSync('docker/store/docker-entrypoint.sh', 'utf8');
+const dispatched = [...entrypointContent.matchAll(/\/app\/(scripts\/[\w.-]+)/g)].map((m) => m[1]);
+const absent = dispatched.filter(
+  (script) =>
+    !existsSync(script) ||
+    !copied.some((source) => script === source || script.startsWith(`${source}/`)),
+);
 check(
-  entrypointContent.includes('generate-recovery-key') &&
-    entrypointContent.includes('recover-document'),
-  'docker-entrypoint.sh dispatches generate-recovery-key and recover-document',
+  absent.length === 0,
+  absent.length === 0
+    ? 'docker-entrypoint.sh runs nothing that is not in the image'
+    : `docker-entrypoint.sh runs scripts that are missing or not copied: ${absent.join(', ')}`,
+);
+// A COPY of a file that does not exist fails the build, which nothing else
+// here would notice.
+const missingSources = copied.filter((source) => !existsSync(source));
+check(
+  missingSources.length === 0,
+  missingSources.length === 0
+    ? 'every path the Dockerfile copies exists'
+    : `the Dockerfile copies paths that do not exist: ${missingSources.join(', ')}`,
 );
 
 if (failures > 0) {

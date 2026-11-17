@@ -7,14 +7,14 @@ import {
   useMemo,
   useRef,
 } from 'react';
-import {type Node, type NodeProps, NodeResizer} from '@xyflow/react';
+import { type Node, type NodeProps, NodeResizer } from '@xyflow/react';
 import * as Icons from 'lucide-react';
-import {getCodeLanguage} from '../../../domain/canvas/codeRegistry';
-import {highlightCode} from '../../../common/utils/prismSetup';
-import {EdgeHandles} from './EdgeHandles';
-import type {ArchNodeData} from '../../../domain/canvas/types';
-import {useCanvasContext} from '../CanvasContext';
-import {recordNodeRender} from '../../../perf/instrumentation';
+import { getCodeLanguage } from '../../../domain/canvas/codeRegistry';
+import { highlightCode } from '../../../common/utils/prismSetup';
+import { EdgeHandles } from './EdgeHandles';
+import type { ArchNodeData } from '../../../domain/canvas/types';
+import { useCanvasContext } from '../CanvasContext';
+import { recordNodeRender } from '../../../perf/instrumentation';
 
 type CodeNodeType = Node<ArchNodeData, 'code'>;
 
@@ -121,7 +121,7 @@ export function CodeNode({
   return (
     <>
       <NodeResizer
-          isVisible={!!selected && !isEditing && !data.locked}
+        isVisible={!!selected && !isEditing && !data.locked}
         minWidth={200}
         minHeight={120}
         lineClassName="node-resize-line"

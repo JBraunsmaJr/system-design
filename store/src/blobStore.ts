@@ -2,7 +2,8 @@
  * Where blob bytes live (WS8-R16).
  *
  * Deliberately narrow: put, get, deleteMany. Everything else about a document
- * - its version, its key wraps, its index entry, its audit trail - is
+ * - its version, its retention state, which workspace it is in, its audit
+ * trail - is
  * relational data and stays in PostgreSQL. Keeping the bytes behind this
  * interface is what lets an S3/MinIO implementation arrive later without
  * touching a route handler, once WS8-R17's measurements say it is warranted.

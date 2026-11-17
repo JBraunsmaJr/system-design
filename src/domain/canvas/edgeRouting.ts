@@ -1,5 +1,5 @@
-import {Position} from '@xyflow/react';
-import type {EdgeWaypoint} from './types';
+import { Position } from '@xyflow/react';
+import type { EdgeWaypoint } from './types';
 
 /**
  * Orthogonal routing through user-placed waypoints - the geometry half
@@ -52,7 +52,7 @@ function samePoint(a: Point, b: Point): boolean {
   return a.x === b.x && a.y === b.y;
 }
 
-/** The point `dist` along the way from `from` towards `to`. */
+/** The point `dist` along the way from `from` toward `to`. */
 function pointTowards(from: Point, to: Point, dist: number): Point {
   const length = distance(from, to);
   if (length === 0) return { x: from.x, y: from.y };
@@ -376,101 +376,101 @@ function fmt(value: number): number {
 
 /** Unit vector pointing out of a node through the given handle side. */
 function outwardDirection(position: Position): Point {
-    switch (position) {
-        case Position.Left:
-            return {x: -1, y: 0};
-        case Position.Right:
-            return {x: 1, y: 0};
-        case Position.Top:
-            return {x: 0, y: -1};
-        default:
-            return {x: 0, y: 1};
-    }
+  switch (position) {
+    case Position.Left:
+      return { x: -1, y: 0 };
+    case Position.Right:
+      return { x: 1, y: 0 };
+    case Position.Top:
+      return { x: 0, y: -1 };
+    default:
+      return { x: 0, y: 1 };
+  }
 }
 
 /** Sharp-cornered polyline through every anchor, in order. */
 export function straightPolylinePath(points: readonly Point[]): string {
-    if (points.length === 0) return '';
-    let d = `M ${fmt(points[0].x)},${fmt(points[0].y)}`;
-    for (let i = 1; i < points.length; i++) d += ` L ${fmt(points[i].x)},${fmt(points[i].y)}`;
-    return d;
+  if (points.length === 0) return '';
+  let d = `M ${fmt(points[0].x)},${fmt(points[0].y)}`;
+  for (let i = 1; i < points.length; i++) d += ` L ${fmt(points[i].x)},${fmt(points[i].y)}`;
+  return d;
 }
 
 /** One cubic Bezier segment: start, two controls, end. */
 export interface CubicSegment {
-    from: Point;
-    c1: Point;
-    c2: Point;
-    to: Point;
+  from: Point;
+  c1: Point;
+  c2: Point;
+  to: Point;
 }
 
 /**
  * A smooth curve passing THROUGH every anchor (source, each bend, target) -
  * a Catmull-Rom spline converted to cubic Bezier segments, so a bend the
  * person dragged is a point the line actually visits rather than a control
- * point it only bends towards.
+ * point it only bends toward.
  *
  * The two ends leave and arrive along their handles' own directions, the
  * way React Flow's getBezierPath does for an unbent edge, so adding the
  * first bend to a curved edge doesn't change how it meets its nodes.
  */
 export function buildCurvedSegments(
-    source: Point,
-    sourcePosition: Position,
-    waypoints: readonly Point[],
-    target: Point,
-    targetPosition: Position,
+  source: Point,
+  sourcePosition: Position,
+  waypoints: readonly Point[],
+  target: Point,
+  targetPosition: Position,
 ): CubicSegment[] {
-    const anchors: Point[] = [source, ...waypoints.map((w) => ({x: w.x, y: w.y})), target];
-    const n = anchors.length;
-    if (n < 2) return [];
-    const out = outwardDirection(sourcePosition);
-    const into = outwardDirection(targetPosition);
-    const tangents: Point[] = anchors.map((_, i) => {
-        if (i === 0) {
-            const d = distance(anchors[0], anchors[1]);
-            return {x: out.x * d, y: out.y * d};
-        }
-        if (i === n - 1) {
-            // Arriving INTO the target's handle - the opposite of pointing out of it.
-            const d = distance(anchors[n - 2], anchors[n - 1]);
-            return {x: -into.x * d, y: -into.y * d};
-        }
-        return {
-            x: (anchors[i + 1].x - anchors[i - 1].x) / 2,
-            y: (anchors[i + 1].y - anchors[i - 1].y) / 2,
-        };
-    });
-    const segments: CubicSegment[] = [];
-    for (let i = 0; i < n - 1; i++) {
-        const from = anchors[i];
-        const to = anchors[i + 1];
-        segments.push({
-            from,
-            c1: {x: from.x + tangents[i].x / 3, y: from.y + tangents[i].y / 3},
-            c2: {x: to.x - tangents[i + 1].x / 3, y: to.y - tangents[i + 1].y / 3},
-            to,
-        });
+  const anchors: Point[] = [source, ...waypoints.map((w) => ({ x: w.x, y: w.y })), target];
+  const n = anchors.length;
+  if (n < 2) return [];
+  const out = outwardDirection(sourcePosition);
+  const into = outwardDirection(targetPosition);
+  const tangents: Point[] = anchors.map((_, i) => {
+    if (i === 0) {
+      const d = distance(anchors[0], anchors[1]);
+      return { x: out.x * d, y: out.y * d };
     }
-    return segments;
+    if (i === n - 1) {
+      // Arriving INTO the target's handle - the opposite of pointing out of it.
+      const d = distance(anchors[n - 2], anchors[n - 1]);
+      return { x: -into.x * d, y: -into.y * d };
+    }
+    return {
+      x: (anchors[i + 1].x - anchors[i - 1].x) / 2,
+      y: (anchors[i + 1].y - anchors[i - 1].y) / 2,
+    };
+  });
+  const segments: CubicSegment[] = [];
+  for (let i = 0; i < n - 1; i++) {
+    const from = anchors[i];
+    const to = anchors[i + 1];
+    segments.push({
+      from,
+      c1: { x: from.x + tangents[i].x / 3, y: from.y + tangents[i].y / 3 },
+      c2: { x: to.x - tangents[i + 1].x / 3, y: to.y - tangents[i + 1].y / 3 },
+      to,
+    });
+  }
+  return segments;
 }
 
 export function curvedSegmentsPath(segments: readonly CubicSegment[]): string {
-    if (segments.length === 0) return '';
-    let d = `M ${fmt(segments[0].from.x)},${fmt(segments[0].from.y)}`;
-    for (const s of segments) {
-        d += ` C ${fmt(s.c1.x)},${fmt(s.c1.y)} ${fmt(s.c2.x)},${fmt(s.c2.y)} ${fmt(s.to.x)},${fmt(s.to.y)}`;
-    }
-    return d;
+  if (segments.length === 0) return '';
+  let d = `M ${fmt(segments[0].from.x)},${fmt(segments[0].from.y)}`;
+  for (const s of segments) {
+    d += ` C ${fmt(s.c1.x)},${fmt(s.c1.y)} ${fmt(s.c2.x)},${fmt(s.c2.y)} ${fmt(s.to.x)},${fmt(s.to.y)}`;
+  }
+  return d;
 }
 
 /** The point at t=0.5 on a cubic segment. Not exactly half its arc length,
  * but on the line, which is what an insertion handle needs. */
 export function cubicMidpoint(s: CubicSegment): Point {
-    return {
-        x: (s.from.x + 3 * s.c1.x + 3 * s.c2.x + s.to.x) / 8,
-        y: (s.from.y + 3 * s.c1.y + 3 * s.c2.y + s.to.y) / 8,
-    };
+  return {
+    x: (s.from.x + 3 * s.c1.x + 3 * s.c2.x + s.to.x) / 8,
+    y: (s.from.y + 3 * s.c1.y + 3 * s.c2.y + s.to.y) / 8,
+  };
 }
 
 /**
@@ -478,43 +478,43 @@ export function cubicMidpoint(s: CubicSegment): Point {
  * without waypoints never comes through here - see TypedEdge.
  */
 export function getRoutedWaypointPath(
-    routing: 'orthogonal' | 'straight' | 'curved',
-    source: Point,
-    sourcePosition: Position,
-    waypoints: readonly Point[],
-    target: Point,
-    targetPosition: Position,
+  routing: 'orthogonal' | 'straight' | 'curved',
+  source: Point,
+  sourcePosition: Position,
+  waypoints: readonly Point[],
+  target: Point,
+  targetPosition: Position,
 ): string {
-    if (routing === 'straight') return straightPolylinePath([source, ...waypoints, target]);
-    if (routing === 'curved')
-        return curvedSegmentsPath(
-            buildCurvedSegments(source, sourcePosition, waypoints, target, targetPosition),
-        );
-    return getWaypointPath(source, sourcePosition, waypoints, target, targetPosition);
+  if (routing === 'straight') return straightPolylinePath([source, ...waypoints, target]);
+  if (routing === 'curved')
+    return curvedSegmentsPath(
+      buildCurvedSegments(source, sourcePosition, waypoints, target, targetPosition),
+    );
+  return getWaypointPath(source, sourcePosition, waypoints, target, targetPosition);
 }
 
 /** getSegmentInsertions for any routing: one "add a bend" handle per gap
  * between anchors, placed on the line as that routing draws it. */
 export function getRoutedSegmentInsertions(
-    routing: 'orthogonal' | 'straight' | 'curved',
-    source: Point,
-    sourcePosition: Position,
-    waypoints: readonly Point[],
-    target: Point,
-    targetPosition: Position,
+  routing: 'orthogonal' | 'straight' | 'curved',
+  source: Point,
+  sourcePosition: Position,
+  waypoints: readonly Point[],
+  target: Point,
+  targetPosition: Position,
 ): WaypointInsertion[] {
-    if (routing === 'straight') {
-        const anchors = [source, ...waypoints, target];
-        return anchors.slice(0, -1).map((a, i) => ({
-            index: i,
-            x: (a.x + anchors[i + 1].x) / 2,
-            y: (a.y + anchors[i + 1].y) / 2,
-        }));
-    }
-    if (routing === 'curved') {
-        return buildCurvedSegments(source, sourcePosition, waypoints, target, targetPosition).map(
-            (s, i) => ({index: i, ...cubicMidpoint(s)}),
-        );
-    }
-    return getSegmentInsertions(source, sourcePosition, waypoints, target, targetPosition);
+  if (routing === 'straight') {
+    const anchors = [source, ...waypoints, target];
+    return anchors.slice(0, -1).map((a, i) => ({
+      index: i,
+      x: (a.x + anchors[i + 1].x) / 2,
+      y: (a.y + anchors[i + 1].y) / 2,
+    }));
+  }
+  if (routing === 'curved') {
+    return buildCurvedSegments(source, sourcePosition, waypoints, target, targetPosition).map(
+      (s, i) => ({ index: i, ...cubicMidpoint(s) }),
+    );
+  }
+  return getSegmentInsertions(source, sourcePosition, waypoints, target, targetPosition);
 }

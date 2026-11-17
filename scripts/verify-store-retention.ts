@@ -34,7 +34,6 @@ async function rejects(work: () => Promise<unknown>, reason: string, message: st
 }
 
 const bytes = new TextEncoder().encode('sealed content');
-const KEYS = { wrappedForWorkspace: 'd29ya3NwYWNl' };
 const DATABASE_URL = process.env.DATABASE_URL ?? '';
 const DAY = 86_400_000;
 
@@ -77,6 +76,15 @@ async function postgres(): Promise<Backend> {
       return store as unknown as Service;
     },
     async dispose() {
+      // Leave nothing behind: a held document left in the shared database
+      // makes the next suite's own clean-up fail when it tries to purge it.
+      const last = stores[stores.length - 1] as unknown as Service | undefined;
+      if (last) {
+        for (const record of await last.list({ includeDeleted: true })) {
+          await last.setLegalHold(record.docId, null).catch(() => {});
+          await last.purge(record.docId).catch(() => {});
+        }
+      }
       for (const store of stores) await store.close();
     },
   };
@@ -87,7 +95,7 @@ async function run(backend: Backend) {
   let clock = new Date('2026-09-17T12:00:00Z');
   const now = () => clock;
   const seed = async (service: Service, docId: string) => {
-    await service.create({ docId, keys: KEYS });
+    await service.create({ docId });
     await service.append({ docId, kind: 'snapshot', bytes });
   };
 

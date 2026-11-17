@@ -116,7 +116,7 @@ export function findLinkedNodes(root: SubDiagram, itemId: string): LinkedNodeRef
  * itself - with N items and a diagram of M total nodes across every
  * nested sub-diagram, that's O(N*M) work just to render the list once,
  * repeated on every diagram change. RequirementDetailModal (the
- * single-item detail modal used by Timeline and the Skill Tree) still
+ * single-item detail modal used by Timeline and the Dependencies view) still
  * calls findLinkedNodes directly and correctly - it only ever shows one
  * item at a time, so there's no list-wide cost to batch away there; this
  * function is specifically for list views with many items.

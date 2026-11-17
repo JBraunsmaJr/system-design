@@ -1,12 +1,21 @@
--- The store's schema (WS8-R16).
+-- The store's schema.
 --
--- Everything the service reasons about is relational: document versions,
--- wrapped keys, retention state, and audit. Blob bytes live in `blob_data`
--- for now; an object-store implementation would replace that one table with a
--- pointer column and leave the rest untouched (WS8-R17 decides when).
+-- Everything the service reasons about is relational: workspaces and who is
+-- in them, which document is where, document versions, retention state, and
+-- audit. Blob bytes live in `blob_data` for now; an object-store
+-- implementation would replace that one table with a pointer column and
+-- leave the rest untouched.
 --
--- The service never reads blob contents. Every `bytea` here is ciphertext or
--- a wrapped key, opaque to PostgreSQL and to anyone with a database dump.
+-- Document content is stored as the editor sends it. Anyone with this
+-- database, or a dump of it, can read every document: protect it as you
+-- would the documents themselves.
+--
+-- Applied in full at every startup, so every statement must be safe to
+-- repeat. Tables that an earlier version created for the encrypted
+-- workspace (devices, workspace_keys, workspace_index, user_recovery,
+-- workspace_access_rules, join_requests, workspace_memberships) are neither
+-- created nor touched here. An existing database keeps them until they are
+-- dropped by hand; see docs/trusted-store.md.
 
 CREATE TABLE IF NOT EXISTS documents (
     doc_id                  TEXT PRIMARY KEY,
@@ -20,13 +29,7 @@ CREATE TABLE IF NOT EXISTS documents (
     purge_after             TIMESTAMPTZ,
     -- WS10-R8: a hold prevents purge in every retention mode.
     legal_hold              BOOLEAN     NOT NULL DEFAULT FALSE,
-    legal_hold_reason       TEXT,
-    -- WS7-R3 and R4, opaque to the store.
-    wrapped_for_workspace   BYTEA       NOT NULL,
-    wrapped_for_recovery    BYTEA,
-    -- WS9-R1: sealed per-document metadata (the title among it). The store
-    -- cannot enumerate titles; this is ciphertext to it.
-    sealed_meta             BYTEA
+    legal_hold_reason       TEXT
 );
 
 -- Purge sweeps and the deleted-items view (WS9-R6) both read this.
@@ -63,70 +66,16 @@ CREATE TABLE IF NOT EXISTS blob_data (
     FOREIGN KEY (doc_id, blob_id) REFERENCES blobs (doc_id, blob_id) ON DELETE CASCADE
 );
 
--- WS7-R8: the workspace key, wrapped once per member; and each member's user
--- key, wrapped once per device. The store holds only wraps.
+-- Everyone who has signed in. A person is (issuer, subject), never an
+-- email address.
 CREATE TABLE IF NOT EXISTS users (
     user_id      TEXT PRIMARY KEY,
-    -- WS10-R1: identity is (issuer, subject), never an email address.
     issuer       TEXT        NOT NULL,
     subject      TEXT        NOT NULL,
     display_name TEXT,
-    -- WS7-R8: the member's public user key, so an administrator or another
-    -- member can wrap the workspace key to them. Public by nature.
-    user_public_key BYTEA,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
     disabled_at  TIMESTAMPTZ,
     UNIQUE (issuer, subject)
-);
-
-CREATE TABLE IF NOT EXISTS devices (
-    device_id      TEXT PRIMARY KEY,
-    user_id        TEXT        NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
-    label          TEXT,
-    public_key     BYTEA       NOT NULL,
-    -- The user's private key, wrapped to this device (WS7-R8): the sealed
-    -- body and the one-off key wrapped to this device's public key. Present
-    -- only once another device has approved this one (WS7-R11).
-    wrapped_user_key_body BYTEA,
-    wrapped_user_key_wrap BYTEA,
-    created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
-    approved_at    TIMESTAMPTZ,
-    revoked_at     TIMESTAMPTZ
-);
-
-CREATE INDEX IF NOT EXISTS devices_user_idx ON devices (user_id) WHERE revoked_at IS NULL;
-
-CREATE TABLE IF NOT EXISTS workspace_keys (
-    user_id     TEXT        NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
-    generation  INTEGER     NOT NULL,
-    wrapped_key BYTEA       NOT NULL,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    PRIMARY KEY (user_id, generation)
-);
-
--- WS9-R1: one sealed index blob per workspace, holding {docId,
--- wrappedDocKey, encryptedTitle, updatedAt} per document. Ciphertext to the
--- store, which is why it cannot enumerate titles (WS9-R5). `version` makes
--- writes conditional, so two clients cannot silently overwrite each other
--- (WS9-R3).
-CREATE TABLE IF NOT EXISTS workspace_index (
-    workspace_id TEXT PRIMARY KEY,
-    sealed       BYTEA       NOT NULL,
-    version      BIGINT      NOT NULL DEFAULT 1,
-    -- Which workspace key generation sealed this index (WS7-R7). A reader
-    -- that holds an older generation knows to fetch the newer key rather
-    -- than conclude the index is corrupt.
-    generation   INTEGER     NOT NULL DEFAULT 1,
-    updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
--- WS7-R12: the user's private key, sealed under a key derived from their
--- recovery code. The code itself is never stored, in any form.
-CREATE TABLE IF NOT EXISTS user_recovery (
-    user_id         TEXT PRIMARY KEY REFERENCES users (user_id) ON DELETE CASCADE,
-    salt            BYTEA       NOT NULL,
-    sealed_user_key BYTEA       NOT NULL,
-    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- WS10-R1: sessions, so a restart does not sign everyone out and a second
@@ -173,90 +122,104 @@ CREATE TABLE IF NOT EXISTS audit_log (
 CREATE INDEX IF NOT EXISTS audit_at_idx ON audit_log (at DESC);
 CREATE INDEX IF NOT EXISTS audit_doc_idx ON audit_log (doc_id, at DESC);
 
--- WS14: automatic access from identity-provider groups. None of this decides
--- a grant - a member's browser does, from the sealed rule and the provider's
--- own signature. These rows route requests to those browsers, carry the
--- evidence they check, and remember how each member was let in.
+-- Changes for a database that an earlier version created. Applied at every
+-- startup, so an existing database catches up without a separate migration
+-- step; every statement is safe to repeat and does nothing to a new one.
 
--- WS14-R10: the store's routing copy of each workspace's sealed rule. Used to
--- list who is waiting and to find members who no longer match; never read
--- in a grant decision (WS14-R11).
-CREATE TABLE IF NOT EXISTS workspace_access_rules (
-    workspace_id             TEXT PRIMARY KEY,
-    rule_version             INTEGER     NOT NULL,
-    enabled                  BOOLEAN     NOT NULL,
-    claim                    TEXT        NOT NULL,
-    groups                   TEXT[]      NOT NULL,
-    evidence_max_age_seconds INTEGER     NOT NULL,
-    rotation_required        BOOLEAN     NOT NULL DEFAULT FALSE,
-    updated_at               TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
--- WS14-R14 to R19. One open request per (workspace, user); the raw ID token
--- is dropped as soon as the request closes or ages out (WS14-R18).
-CREATE TABLE IF NOT EXISTS join_requests (
-    workspace_id      TEXT        NOT NULL,
-    user_id           TEXT        NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
-    id_token          TEXT,
-    evidence_hash     TEXT        NOT NULL,
-    salt              TEXT        NOT NULL,
-    public_key        TEXT        NOT NULL,
-    iat               BIGINT      NOT NULL,
-    status            TEXT        NOT NULL,
-    last_rejection    TEXT,
-    last_rejection_at TIMESTAMPTZ,
-    created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
-    PRIMARY KEY (workspace_id, user_id)
-);
-
-CREATE INDEX IF NOT EXISTS join_requests_evidence_idx
-    ON join_requests (iat) WHERE id_token IS NOT NULL;
-
--- WS14-R30: how each member was let in, so a group change removes only the
--- people a group admitted.
-CREATE TABLE IF NOT EXISTS workspace_memberships (
-    workspace_id  TEXT        NOT NULL,
-    user_id       TEXT        NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
-    source        TEXT        NOT NULL,
-    matched_group TEXT,
-    granted_by    TEXT,
-    granted_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-    removed_at    TIMESTAMPTZ,
-    PRIMARY KEY (workspace_id, user_id)
-);
-
--- Columns added after a deployment may already have created these tables.
--- Applied every startup, so an existing database catches up without a
--- separate migration step. A real migration tool arrives with WS8-R9.
-ALTER TABLE documents ADD COLUMN IF NOT EXISTS sealed_meta BYTEA;
-ALTER TABLE documents DROP COLUMN IF EXISTS sealed_title;
-ALTER TABLE devices   ADD COLUMN IF NOT EXISTS wrapped_user_key_body BYTEA;
-ALTER TABLE devices   ADD COLUMN IF NOT EXISTS wrapped_user_key_wrap BYTEA;
-ALTER TABLE devices   DROP COLUMN IF EXISTS wrapped_user_key;
-ALTER TABLE users     ADD COLUMN IF NOT EXISTS user_public_key BYTEA;
-ALTER TABLE workspace_index ADD COLUMN IF NOT EXISTS generation INTEGER NOT NULL DEFAULT 1;
--- WS14: evidence on a session that signed in with a key commitment
--- (WS14-R4), the groups it carried (R6), and last-seen groups (R32).
-ALTER TABLE sessions       ADD COLUMN IF NOT EXISTS id_token       TEXT;
-ALTER TABLE sessions       ADD COLUMN IF NOT EXISTS commitment     TEXT;
-ALTER TABLE sessions       ADD COLUMN IF NOT EXISTS evidence_iat   BIGINT;
+-- The groups a sign-in carried, for workspace roles.
 ALTER TABLE sessions       ADD COLUMN IF NOT EXISTS groups         TEXT[];
 ALTER TABLE sessions       ADD COLUMN IF NOT EXISTS groups_overage BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE pending_logins ADD COLUMN IF NOT EXISTS has_commitment BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE users          ADD COLUMN IF NOT EXISTS last_groups    TEXT[];
-ALTER TABLE users          ADD COLUMN IF NOT EXISTS last_groups_at TIMESTAMPTZ;
 
--- WS14-R30 backfill: everyone who already holds a workspace key was let in
--- by hand, so no group change can ever remove them (WS14-R35).
-INSERT INTO workspace_memberships (workspace_id, user_id, source)
-SELECT DISTINCT 'default', user_id, 'manual' FROM workspace_keys
-ON CONFLICT (workspace_id, user_id) DO NOTHING;
+-- A database from the encrypted workspace required every document to carry
+-- a wrapped key. Documents no longer have one, so the column - where it
+-- exists - must accept nothing. It is otherwise left alone, with the other
+-- columns of that time (documents.wrapped_for_recovery and sealed_meta,
+-- sessions.id_token, commitment and evidence_iat, and
+-- pending_logins.has_commitment): nothing reads or writes them.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_schema = current_schema()
+       AND table_name = 'documents'
+       AND column_name = 'wrapped_for_workspace'
+       AND is_nullable = 'NO'
+  ) THEN
+    ALTER TABLE documents ALTER COLUMN wrapped_for_workspace DROP NOT NULL;
+  END IF;
+END
+$$;
 
--- WS14-R34: after a removal, exactly one browser replaces the key. It takes a
--- short lease first; the lease and the flag clear when the index moves to a
--- newer key generation.
-ALTER TABLE workspace_access_rules ADD COLUMN IF NOT EXISTS rotation_lease_holder TEXT;
-ALTER TABLE workspace_access_rules ADD COLUMN IF NOT EXISTS rotation_lease_until  TIMESTAMPTZ;
+-- Where the editor asked to be sent after signing in, when it is not the
+-- configured address. Checked against the trusted origins before it is kept.
+ALTER TABLE pending_logins ADD COLUMN IF NOT EXISTS return_to TEXT;
 
--- WS14-R40: why a member was removed: sign-in, rule-change or by-member.
-ALTER TABLE workspace_memberships ADD COLUMN IF NOT EXISTS removed_cause TEXT;
+-- ---------------------------------------------------------------------------
+-- Workspaces, members and group mappings.
+--
+-- The server decides access (store/src/permissions.ts). A person's role in
+-- a workspace is the highest of their individual role here, the role of any
+-- identity-provider group of theirs mapped here, and owner if they are a
+-- store administrator. Group membership itself is never stored: it is read
+-- from each sign-in.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS workspaces (
+    workspace_id TEXT PRIMARY KEY,
+    name         TEXT        NOT NULL,
+    -- Kept when the creator's account is removed; the workspace outlives them.
+    created_by   TEXT        REFERENCES users (user_id) ON DELETE SET NULL,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- Hidden from members and read-only while set.
+    archived_at  TIMESTAMPTZ
+);
+
+-- Two workspaces must not look the same in a list.
+CREATE UNIQUE INDEX IF NOT EXISTS workspaces_name_idx ON workspaces (lower(name));
+
+-- People added individually. Someone who is in only through a group has no
+-- row here.
+CREATE TABLE IF NOT EXISTS workspace_members (
+    workspace_id TEXT        NOT NULL REFERENCES workspaces (workspace_id) ON DELETE CASCADE,
+    user_id      TEXT        NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
+    role         TEXT        NOT NULL CHECK (role IN ('viewer', 'editor', 'owner')),
+    -- NULL when the store added them itself (the creator of a workspace).
+    added_by     TEXT        REFERENCES users (user_id) ON DELETE SET NULL,
+    added_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (workspace_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS workspace_members_user_idx ON workspace_members (user_id);
+
+-- Identity-provider group -> role. The group is stored exactly as the
+-- provider issues it and matched exactly, case included.
+CREATE TABLE IF NOT EXISTS workspace_group_roles (
+    workspace_id TEXT        NOT NULL REFERENCES workspaces (workspace_id) ON DELETE CASCADE,
+    group_name   TEXT        NOT NULL,
+    role         TEXT        NOT NULL CHECK (role IN ('viewer', 'editor', 'owner')),
+    added_by     TEXT        REFERENCES users (user_id) ON DELETE SET NULL,
+    added_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (workspace_id, group_name)
+);
+
+-- Which workspace each document is in, and its title (documentCatalog.ts).
+-- The workspace decides who may touch the document; the title is plain text
+-- so a workspace's documents can be listed without opening them. A document
+-- with no row here is not reachable through the workspace API.
+CREATE TABLE IF NOT EXISTS workspace_documents (
+    -- Purging a document removes its catalog row with it.
+    doc_id       TEXT PRIMARY KEY REFERENCES documents (doc_id) ON DELETE CASCADE,
+    -- Workspaces are archived, never deleted, so a document cannot lose its
+    -- workspace from under it.
+    workspace_id TEXT        NOT NULL REFERENCES workspaces (workspace_id) ON DELETE RESTRICT,
+    title        TEXT        NOT NULL,
+    created_by   TEXT        REFERENCES users (user_id) ON DELETE SET NULL,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- What a document's live session (its relay room and the key that encrypts
+-- it between browsers) is derived from. Made the first time an editor asks.
+ALTER TABLE workspace_documents ADD COLUMN IF NOT EXISTS session_secret TEXT;
+
+CREATE INDEX IF NOT EXISTS workspace_documents_workspace_idx
+    ON workspace_documents (workspace_id);

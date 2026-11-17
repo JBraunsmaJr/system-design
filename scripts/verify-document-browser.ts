@@ -15,10 +15,10 @@
  *    clear history (WS3-R4);
  *  - New clears the canvas.
  */
-import {type Browser, chromium, type Page} from 'playwright';
-import {readFileSync} from 'fs';
-import {join, resolve} from 'path';
-import {type DevServers, startDevServers} from './lib/devServers';
+import { type Browser, chromium, type Page } from 'playwright';
+import { readFileSync } from 'fs';
+import { join, resolve } from 'path';
+import { type DevServers, startDevServers } from './lib/devServers';
 
 const FIXTURE = resolve(join('fixtures', 'schema-0.7.json'));
 const fixture = JSON.parse(readFileSync(FIXTURE, 'utf8')) as {
@@ -105,8 +105,8 @@ async function run() {
     // short when the whole suite loads the machine.
     await a
       .waitForFunction(
-          ([n, sel]) => document.querySelectorAll(sel).length === n,
-          [NESTED.data.subDiagram!.nodes.length, DOC_NODE] as const,
+        ([n, sel]) => document.querySelectorAll(sel).length === n,
+        [NESTED.data.subDiagram!.nodes.length, DOC_NODE] as const,
         { timeout: 5000 },
       )
       .catch(() => {});
@@ -117,8 +117,8 @@ async function run() {
     await a.evaluate(`window.__PERF__.setPath([])`);
     await a
       .waitForFunction(
-          ([n, sel]) => document.querySelectorAll(sel).length === n,
-          [fixture.nodes.length, DOC_NODE] as const,
+        ([n, sel]) => document.querySelectorAll(sel).length === n,
+        [fixture.nodes.length, DOC_NODE] as const,
         { timeout: 5000 },
       )
       .catch(() => {});
@@ -519,8 +519,47 @@ async function run() {
           "B sees A's new bend while A is still dragging it",
         );
         await a.mouse.up();
-        await sleep(1000);
-        check((await pathOf(b)) === (await pathOf(a)), 'and the same bend once A releases');
+        // The release is one more update for B to receive; give it time
+        // rather than assuming a second is always enough.
+        let aPath = await pathOf(a);
+        let bPath = await pathOf(b);
+        for (let i = 0; i < 40 && aPath !== bPath; i++) {
+          await sleep(250);
+          aPath = await pathOf(a);
+          bPath = await pathOf(b);
+        }
+        check(aPath === bPath, 'and the same bend once A releases');
+        if (aPath !== bPath) {
+          // The two paths, so a failure says how they differ: ends a pixel
+          // apart mean the two browsers measured a node's connection
+          // points differently; a different bend means the update was lost.
+          console.log(`    A draws: ${aPath}`);
+          console.log(`    B draws: ${bPath}`);
+          // What each browser's canvas is doing with its nodes: ends that
+          // differ by a pixel come from one browser positioning a node's
+          // handles against a different box (scripts/verify-node-anchors.ts
+          // names the style rule responsible).
+          for (const [name, page] of [
+            ['A', a],
+            ['B', b],
+          ] as const) {
+            const state = await page.evaluate(() => {
+              const canvas = document.querySelector<HTMLElement>('.canvas');
+              const node = document.querySelector('.react-flow__node .typed-node');
+              const style = node ? getComputedStyle(node) : null;
+              return {
+                levelOfDetail: canvas?.dataset.lod,
+                zoom: document
+                  .querySelector<HTMLElement>('.react-flow__viewport')
+                  ?.style.transform.match(/scale\(([^)]+)\)/)?.[1],
+                nodePosition: style?.position,
+                nodeTransform: style?.transform,
+                nodeContain: style?.contain,
+              };
+            });
+            console.log(`    ${name}: ${JSON.stringify(state)}`);
+          }
+        }
       } else {
         check(false, 'the insertion handle is on screen for the peer check');
       }
@@ -531,6 +570,137 @@ async function run() {
       (await titleOf(a)) === 'Renamed by B' && (await titleOf(b)) === 'Renamed by B',
       "B's rename survives A's undo",
     );
+
+    console.log('\n=== Who is editing a requirement ===');
+    {
+      await a.click('button[title="Requirements"]');
+      await b.click('button[title="Requirements"]');
+      // A adds a requirement; it opens with the cursor in its title.
+      await a.click('.add-item-dropdown__primary-btn');
+      await a.waitForSelector('.requirements-table__detail .requirement-item__title:focus');
+      await a.keyboard.type('Seen by both');
+      // B opens the same line and sees that A is in it.
+      const line = b.locator('.requirements-table__title', { hasText: 'Seen by both' });
+      await line.waitFor({ timeout: 10_000 });
+      await b.waitForSelector('.requirements-table__row .requirements-table__editing', {
+        timeout: 10_000,
+      });
+      check(true, "B's table shows a dot on the line A is editing, before opening it");
+      await line.click();
+      await b.waitForSelector('.requirements-table__detail .requirement-card__peers', {
+        timeout: 10_000,
+      });
+      check(
+        (await b.locator('.requirements-table__detail .requirement-card__peer-dot').count()) === 1,
+        "B's open row shows a badge for A while A's cursor is in the item",
+      );
+      // A clicks away from the item; the badge goes.
+      await a.click('.requirements-coverage__total');
+      await b.waitForSelector('.requirements-table__detail .requirement-card__peers', {
+        state: 'detached',
+        timeout: 10_000,
+      });
+      check(true, 'and it goes when A leaves the item');
+      // A comes back to it by clicking into a field.
+      await a.click('.requirements-table__detail .requirement-item__title');
+      await b.waitForSelector('.requirements-table__detail .requirement-card__peers', {
+        timeout: 10_000,
+      });
+      check(true, 'and returns when A clicks back into it');
+
+      // What A writes in the open item reaches B's copy of it and B's table.
+      const bRow = b.locator('.requirements-table__row', { hasText: 'Seen by both' });
+      const bCriteria = async () =>
+        (await bRow.locator('.requirements-table__criteria').count()) > 0
+          ? ((await bRow.locator('.requirements-table__criteria').first().textContent()) ?? '')
+          : '';
+      const settles = async (read: () => Promise<string>, want: string) => {
+        let got = await read();
+        for (let i = 0; i < 40 && got !== want; i++) {
+          await sleep(250);
+          got = await read();
+        }
+        return got;
+      };
+      const aDetail = a.locator('.requirements-table__detail');
+      const bDetail = b.locator('.requirements-table__detail');
+      await aDetail.locator('.requirement-detail__add input').fill('It answers in under a second');
+      await a.keyboard.press('Enter');
+      let got = await settles(bCriteria, '0/1');
+      check(got === '0/1', `a criterion A adds is counted on B's line (${got || 'nothing'})`);
+      await aDetail.locator('.requirement-detail__criterion').first().click();
+      got = await settles(bCriteria, '1/1');
+      check(got === '1/1', `and counted as met on B's line once A checks it (${got || 'nothing'})`);
+
+      await aDetail.locator('.requirement-detail__note').fill('Load suite, nightly');
+      await a.keyboard.press('Enter');
+      got = await settles(
+        () => bDetail.locator('.requirement-detail__note').inputValue(),
+        'Load suite, nightly',
+      );
+      check(
+        got === 'Load suite, nightly',
+        `A's verification note shows in B's open item (${got || 'nothing'})`,
+      );
+
+      await aDetail.locator('.status-picker__trigger[aria-label^="Owner"]').click();
+      await a.click('.status-picker__dropdown .status-picker__option:has-text("Someone else")');
+      await aDetail.locator('.requirement-attributes__owner-name').fill('Compliance office');
+      await a.keyboard.press('Enter');
+      got = await settles(
+        async () =>
+          (await bDetail.locator('.requirement-attributes__owner-name').count()) > 0
+            ? bDetail.locator('.requirement-attributes__owner-name').inputValue()
+            : '',
+        'Compliance office',
+      );
+      check(got === 'Compliance office', `and so does an owner A typed in (${got || 'nothing'})`);
+
+      // The same with B's line closed, and for what the table adds up.
+      await bRow.locator('.requirements-table__title').click();
+      await bDetail.waitFor({ state: 'detached' });
+      await aDetail.locator('.requirement-detail__criterion').first().click();
+      got = await settles(bCriteria, '0/1');
+      check(got === '0/1', `B's closed line follows a criterion A unchecks (${got || 'nothing'})`);
+      const bVerified = async () =>
+        (
+          (await b
+            .locator('.requirements-coverage__measure', { hasText: 'Verified' })
+            .locator('.requirements-coverage__numbers')
+            .textContent()) ?? ''
+        ).replace(/\s+/g, '');
+      const before = await bVerified();
+      await aDetail.locator('.status-picker__trigger', { hasText: 'Not verified' }).click();
+      await a
+        .locator('.status-picker__dropdown .status-picker__option', { hasText: /^Verified/ })
+        .click();
+      let after = await bVerified();
+      for (let i = 0; i < 40 && after === before; i++) {
+        await sleep(250);
+        after = await bVerified();
+      }
+      check(
+        after !== before,
+        `B's coverage line follows A marking it verified (${before} -> ${after})`,
+      );
+      got = await settles(
+        async () =>
+          ((await bRow.locator('.requirements-table__verification').textContent()) ?? '').trim(),
+        'Verified0/1',
+      );
+      check(got === 'Verified0/1', `and so does B's line (${got})`);
+      const bSection = async () =>
+        (await b.locator('.requirements-table__section-progress').count()) > 0
+          ? ((await b.locator('.requirements-table__section-progress').first().textContent()) ?? '')
+          : 'no section heading';
+      got = await bSection();
+      check(
+        got === 'no section heading' || /^[1-9]\d*% verified/.test(got),
+        `and the section's share verified, where sections are shown (${got})`,
+      );
+      await a.click('button[title="Diagram"]');
+      await b.click('button[title="Diagram"]');
+    }
 
     console.log('\n=== Leaving and New ===');
     await b.click('.collab-panel__trigger');

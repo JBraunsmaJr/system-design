@@ -16,9 +16,9 @@ import type {
  * this blocker be finished before my sprint starts?" has no answer that
  * could ever become yes.
  *
- * This mirrors the rule computeSkillTree already applies, where an edge
+ * This mirrors the rule computeDependencyGraph already applies, where an edge
  * only counts when both ends are workable. The two were meant to agree
- * and didn't: the skill tree quietly ignored these edges while the
+ * and didn't: the dependencies view quietly ignored these edges while the
  * scheduling side treated them as hard blocks, which is why a ticket
  * could be locked out of every sprint by a blocker that was never
  * schedulable in the first place.
@@ -105,7 +105,7 @@ export function findScheduleConflicts(
     const item = itemById.get(itemId);
     const blocker = itemById.get(blockerId);
     if (!item || !blocker) continue;
-    // Both ends must be workable, exactly as computeSkillTree requires.
+    // Both ends must be workable, exactly as computeDependencyGraph requires.
     if (!workableIds.has(blocker.typeId) || !workableIds.has(item.typeId)) continue;
 
     const itemRange = sprintRangesByItemId.get(itemId);
@@ -268,4 +268,21 @@ export function findBlockingItemIds(
   }
 
   return blockers;
+}
+
+/**
+ * One line saying what is wrong with a conflicted item, short enough to sit
+ * under its title in a list (the Gantt's item column). The longer sentence,
+ * with both titles and a suggestion, stays with whoever renders the full
+ * list of conflicts.
+ */
+export function describeConflictBriefly(
+  conflict: Pick<ScheduleConflict, 'severity' | 'blocker' | 'blockerRange'>,
+): string {
+  if (conflict.severity === 'risk') {
+    return `At risk: same sprint as its blocker ${conflict.blocker.id}`;
+  }
+  return conflict.blockerRange
+    ? `Blocked by ${conflict.blocker.id}, not finished until ${conflict.blockerRange.endDate}`
+    : `Blocked by ${conflict.blocker.id}, which is not scheduled`;
 }

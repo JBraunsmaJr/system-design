@@ -17,7 +17,11 @@
  *
  * Pure: no React, no storage.
  */
-import {isValidDocumentId, readDocumentParam, withDocumentParam,} from '../storage/currentDocument';
+import {
+  isValidDocumentId,
+  readDocumentParam,
+  withDocumentParam,
+} from '../storage/currentDocument';
 
 export interface LinkedDocumentRef {
   docId: string;
@@ -38,10 +42,10 @@ const MAX_TITLE_LENGTH = 200;
  */
 export function normalizeLinkedDocument(value: unknown): LinkedDocumentRef | undefined {
   if (!value || typeof value !== 'object') return undefined;
-    const {docId, title} = value as { docId?: unknown; title?: unknown };
+  const { docId, title } = value as { docId?: unknown; title?: unknown };
   if (!isValidDocumentId(docId)) return undefined;
   const cleanTitle = typeof title === 'string' ? title.trim().slice(0, MAX_TITLE_LENGTH) : '';
-    return {docId, title: cleanTitle};
+  return { docId, title: cleanTitle };
 }
 
 /** What a link reads as when nothing better is known. */
@@ -78,8 +82,8 @@ export interface ResolvedLinkedDocument {
 }
 
 export function resolveLinkedDocument(
-    ref: LinkedDocumentRef,
-    known: readonly { docId: string; title: string }[],
+  ref: LinkedDocumentRef,
+  known: readonly { docId: string; title: string }[],
 ): ResolvedLinkedDocument {
   const entry = known.find((e) => e.docId === ref.docId);
   return {

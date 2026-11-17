@@ -3,8 +3,12 @@
  * two categories with snapshots, pills, links and bodies. Shared so the
  * section, parity and visual tests all exercise the same document.
  */
-import {DEFAULT_SRD_TEMPLATE} from '../../../domain/srd/srdTemplatePresets';
-import type {RequirementItemViewModel, SrdDataContext, SrdTemplateConfig,} from '../../../domain/srd/srdTypes';
+import { DEFAULT_SRD_TEMPLATE } from '../../../domain/srd/srdTemplatePresets';
+import type {
+  RequirementItemViewModel,
+  SrdDataContext,
+  SrdTemplateConfig,
+} from '../../../domain/srd/srdTypes';
 
 /**
  * The placeholder for every diagram and snapshot: a 2x2 neutral gray, the
@@ -113,11 +117,11 @@ export function richData(counts = { components: 6, items: 8 }): SrdDataContext {
           description: 'First customers',
         },
       ],
-        programIncrements: [{id: 'pi-7', name: 'PI-7', startDate: '2026-10-05', sprintCount: 1}],
+      programIncrements: [{ id: 'pi-7', name: 'PI-7', startDate: '2026-10-05', sprintCount: 1 }],
       sprints: [
         {
           id: 's1',
-            piId: 'pi-7',
+          piId: 'pi-7',
           piName: 'PI-7',
           name: 'Sprint 1',
           startDate: '2026-10-05',

@@ -16,7 +16,7 @@ it should move the version:
 ```
 
 | Highest marker present | 0.97.3 becomes |
-|------------------------|----------------|
+| ---------------------- | -------------- |
 | `[MAJOR]`              | 1.0.0          |
 | `[MINOR]`              | 0.98.0         |
 | `[PATCH]`              | 0.97.4         |
@@ -46,7 +46,7 @@ lines, list items or subheadings) has a marker.
 
 ## Cutting a release
 
-Run **Actions → Release → Run workflow** on `main`. Tick **dry_run** first to see the
+Run **Actions → Release → Run workflow** on `main`. Check **dry_run** first to see the
 version and notes in the run summary without changing anything.
 
 A real run:

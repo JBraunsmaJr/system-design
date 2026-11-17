@@ -97,7 +97,7 @@
 .collab-panel__primary-action {
   width: 100%;
   padding: 8px 12px;
-  background: var(--accent);
+  background: var(--accent-fill);
   border: none;
   border-radius: var(--radius-sm);
   color: var(--white);
@@ -476,4 +476,17 @@
   color: var(--chrome-text-dim);
   margin-bottom: 12px;
   cursor: pointer;
+}
+
+/* A workspace document: who it is shared with is the workspace's members. */
+.collab-panel__workspace {
+  margin-bottom: 4px;
+}
+
+.collab-panel__workspace strong {
+  color: var(--chrome-text);
+}
+
+.collab-panel__or {
+  margin-top: 12px;
 }

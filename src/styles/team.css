@@ -273,9 +273,9 @@
 }
 
 .points-picker__preset-btn.is-active {
-  background: var(--accent);
+  background: var(--accent-fill);
   color: var(--accent-text);
-  border-color: var(--accent);
+  border-color: var(--accent-fill);
 }
 
 .points-picker__custom {
@@ -306,9 +306,9 @@
 }
 
 .points-picker__custom button:hover {
-  background: var(--accent);
+  background: var(--accent-fill);
   color: var(--accent-text);
-  border-color: var(--accent);
+  border-color: var(--accent-fill);
 }
 
 /* Card footer integration for Sprint board and backlog */
@@ -330,59 +330,41 @@
   flex-direction: column;
   overflow-y: auto;
   background: var(--canvas-bg);
-  padding: 24px 32px;
-  gap: 20px;
+  padding: 18px 24px;
+  gap: 14px;
 }
 
 .team-view__header {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  align-items: baseline;
+  gap: 4px 14px;
   flex-wrap: wrap;
 }
 
-.team-view__title-group {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.team-view__icon-box {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-md);
-  background: linear-gradient(135deg, var(--accent), var(--violet));
-  color: var(--white);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
 .team-view__title {
-  font-size: var(--text-xl-plus);
+  font-size: var(--text-lg);
   font-weight: 700;
   color: var(--chrome-text);
   margin: 0;
 }
 
-.team-view__subtitle {
-  font-size: var(--text-xs-plus);
+/* The figures that used to be four cards: people, rate, holidays. */
+.team-view__summary {
+  flex: 1 1 240px;
+  font-size: var(--text-sm);
   color: var(--chrome-text-dim);
-  margin: 2px 0 0;
+  margin: 0;
 }
 
-.team-view__header-actions {
-  display: flex;
-  gap: 8px;
+.team-view__header-action {
+  align-self: center;
 }
 
 .team-view__primary-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: var(--accent);
+  background: var(--accent-fill);
   color: var(--accent-text);
   border: 1px solid var(--accent);
   border-radius: var(--radius-sm);
@@ -413,43 +395,6 @@
 
 .team-view__secondary-btn:hover {
   background: var(--chrome-bg);
-}
-
-/* Metric Cards */
-
-.team-view__metrics-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 14px;
-}
-
-.team-metric-card {
-  background: var(--chrome-bg-raised);
-  border: 1px solid var(--chrome-border);
-  border-radius: var(--radius-sm);
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.team-metric-card__label {
-  font-size: var(--text-2xs);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-weight: 600;
-  color: var(--chrome-text-dim);
-}
-
-.team-metric-card__value {
-  font-size: var(--text-xl-plus);
-  font-weight: 700;
-  color: var(--chrome-text);
-}
-
-.team-metric-card__hint {
-  font-size: var(--text-2xs);
-  color: var(--chrome-text-dim);
 }
 
 /* Tabs */

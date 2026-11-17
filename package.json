@@ -9,6 +9,7 @@
     "build:docs": "npm --prefix docs-site run build",
     "build": "npm run build:app && npm run build:docs",
     "lint": "eslint .",
+    "typecheck": "tsc -b",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "preview": "vite preview",

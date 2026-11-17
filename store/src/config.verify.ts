@@ -47,7 +47,6 @@ console.log('=== A working configuration ===');
     'the identity provider is configured',
   );
   assert(config.retention.kind === 'duration', 'retention defaults to a duration (30d)');
-  assert(config.cryptoMode === 'webcrypto', 'and encryption is on by default');
   const described = describeConfig(config).join('\n');
   assert(
     /PostgreSQL/.test(described) && /keycloak|oidc/i.test(described),
@@ -122,7 +121,6 @@ refuses(
   /Unrecognized retention period/,
   'a retention period it cannot parse',
 );
-refuses({ ...WORKING, CRYPTO_MODE: 'aes' }, /CRYPTO_MODE must be/, 'an unknown crypto mode');
 refuses({ ...WORKING, MAX_BLOB_BYTES: '-1' }, /must be a positive number/, 'a negative limit');
 refuses(
   { ...WORKING, AFTER_LOGIN_URL: 'https://elsewhere.example.com/' },
@@ -171,7 +169,6 @@ console.log('\n=== Retention and limits ===');
   const strict = loadStoreConfig({
     ...WORKING,
     RETENTION_PERIOD: '7y',
-    CRYPTO_MODE: 'passthrough',
     ADMIN_SUBJECTS: 'https://idp#alice, https://idp#bob',
   });
   assert(
@@ -179,8 +176,32 @@ console.log('\n=== Retention and limits ===');
     'a records schedule and administrators are read',
   );
   assert(
-    /PASSTHROUGH/.test(describeConfig(strict).join('\n')),
-    'and passthrough is announced loudly',
+    strict.adminGroups.length === 0 && strict.workspaceCreation === 'admins',
+    'with nothing set there are no administrator groups, and only administrators create workspaces',
+  );
+  const grouped = loadStoreConfig({
+    ...WORKING,
+    ADMIN_GROUPS: 'notebook-admin, platform-leads',
+    WORKSPACE_CREATION: 'Anyone',
+  });
+  assert(
+    grouped.adminGroups.join('|') === 'notebook-admin|platform-leads' &&
+      grouped.workspaceCreation === 'anyone',
+    'administrator groups and the workspace creation policy are read',
+  );
+  assert(
+    /members of notebook-admin, platform-leads/.test(describeConfig(grouped).join('\n')) &&
+      /anyone signed in can create one/.test(describeConfig(grouped).join('\n')),
+    'and both are announced at startup',
+  );
+  refuses(
+    { ...WORKING, WORKSPACE_CREATION: 'nobody' },
+    /WORKSPACE_CREATION must be "admins" or "anyone"/,
+    'an unknown workspace creation policy is refused',
+  );
+  assert(
+    /administrators can read them/.test(describeConfig(strict).join('\n')),
+    'startup says plainly that this server can read documents',
   );
   assert(
     loadStoreConfig({
@@ -191,42 +212,19 @@ console.log('\n=== Retention and limits ===');
   );
 }
 
-console.log('\n=== WS14: automatic access ===');
+console.log('\n=== Groups ===');
 {
   const plain = loadStoreConfig(WORKING);
-  assert(plain.autoAccess === true, 'automatic access is on by default');
-  assert(
-    plain.joinEvidenceRetentionMs === 7 * 86_400_000,
-    'evidence is kept at most 7 days by default',
-  );
   assert(plain.providers[0].groupsClaim === 'groups', 'groups are read from "groups" by default');
-  assert(/Automatic access: on/.test(describeConfig(plain).join('\n')), 'and startup says so');
-  const tuned = loadStoreConfig({
-    ...WORKING,
-    AUTO_ACCESS: 'off',
-    JOIN_EVIDENCE_RETENTION: '12h',
-    OIDC_GROUPS_CLAIM: 'roles',
-  });
-  assert(tuned.autoAccess === false, 'AUTO_ACCESS=off turns it off');
-  assert(tuned.joinEvidenceRetentionMs === 12 * 3_600_000, 'JOIN_EVIDENCE_RETENTION takes hours');
-  assert(tuned.providers[0].groupsClaim === 'roles', 'OIDC_GROUPS_CLAIM names another claim');
-  assert(/Automatic access: OFF/.test(describeConfig(tuned).join('\n')), 'and off is announced');
-  refuses(
-    { ...WORKING, AUTO_ACCESS: 'maybe' },
-    /AUTO_ACCESS/,
-    'refuses an AUTO_ACCESS that is not on or off',
+  assert(
+    /Groups: read from the "groups" claim/.test(describeConfig(plain).join('\n')),
+    'and startup says so',
   );
-  refuses(
-    { ...WORKING, JOIN_EVIDENCE_RETENTION: '31d' },
-    /at most 30d/,
-    'refuses evidence kept past 30 days',
+  assert(
+    loadStoreConfig({ ...WORKING, OIDC_GROUPS_CLAIM: 'roles' }).providers[0].groupsClaim ===
+      'roles',
+    'OIDC_GROUPS_CLAIM names another claim',
   );
-  refuses(
-    { ...WORKING, JOIN_EVIDENCE_RETENTION: 'forever' },
-    /JOIN_EVIDENCE_RETENTION/,
-    'refuses a retention that is not a duration',
-  );
-  refuses({ ...WORKING, JOIN_EVIDENCE_RETENTION: '0d' }, /JOIN_EVIDENCE_RETENTION/, 'refuses zero');
   const github = loadStoreConfig({
     PUBLIC_URL: 'https://store.example.gov',
     AUTH_PROVIDERS: 'github',
@@ -234,8 +232,8 @@ console.log('\n=== WS14: automatic access ===');
     GITHUB_CLIENT_SECRET: 'y',
   });
   assert(
-    /unavailable - it needs OIDC/.test(describeConfig(github).join('\n')),
-    'a GitHub-only store says automatic access is unavailable',
+    !/Groups:/.test(describeConfig(github).join('\n')),
+    'a GitHub-only store, which has no groups, does not mention them',
   );
   assert(
     plain.providers[0].groupsClaimAbsent === 'no-groups',
@@ -254,6 +252,33 @@ console.log('\n=== WS14: automatic access ===');
     { ...WORKING, OIDC_GROUPS_CLAIM_ABSENT: 'empty' },
     /OIDC_GROUPS_CLAIM_ABSENT/,
     'refuses any other value',
+  );
+}
+
+console.log('\n=== Settings of the encrypted workspace ===');
+{
+  const plain = loadStoreConfig(WORKING);
+  assert(
+    plain.retiredSettings.length === 0 && !/No longer used/.test(describeConfig(plain).join('\n')),
+    'a configuration without them says nothing about them',
+  );
+  const old = loadStoreConfig({
+    ...WORKING,
+    CRYPTO_MODE: 'passthrough',
+    RECOVERY_PUBLIC_KEY_FILE: '/keys/recovery.pub',
+    AUTO_ACCESS: 'off',
+    JOIN_EVIDENCE_RETENTION: 'forever',
+  });
+  assert(
+    old.retiredSettings.join(',') ===
+      'CRYPTO_MODE,RECOVERY_PUBLIC_KEY_FILE,AUTO_ACCESS,JOIN_EVIDENCE_RETENTION',
+    'one that still sets them starts anyway, whatever their values, without reading the key file',
+  );
+  assert(
+    /No longer used, and safe to remove: CRYPTO_MODE, RECOVERY_PUBLIC_KEY_FILE, AUTO_ACCESS, JOIN_EVIDENCE_RETENTION/.test(
+      describeConfig(old).join('\n'),
+    ),
+    'and startup names each one as no longer used',
   );
 }
 

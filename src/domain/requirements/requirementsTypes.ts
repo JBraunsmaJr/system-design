@@ -86,6 +86,19 @@ export type RequirementStatus = 'todo' | 'in-progress' | 'done';
  * defines (Nygard's original set, plus "rejected" for an option that was
  * written up and turned down), not a workflow anyone needs to customize.
  * Only meaningful on a Decision item - see RequirementItem.decisionStatus. */
+/** How much a requirement matters - see requirementAttributes.ts. */
+export type RequirementPriority = 'must' | 'should' | 'could';
+
+/** Where a requirement stands, from written to built. Separate from a work
+ * item's RequirementStatus. */
+export type RequirementLifecycle = 'draft' | 'in-review' | 'approved' | 'implemented';
+
+/** How a requirement is checked - see verification.ts. */
+export type VerificationMethod = 'test' | 'demonstration' | 'inspection' | 'analysis';
+
+/** Where that check stands. */
+export type VerificationStatus = 'not-verified' | 'passing' | 'failing';
+
 export type DecisionStatus = 'proposed' | 'accepted' | 'rejected' | 'deprecated' | 'superseded';
 
 export interface RequirementItem {
@@ -116,13 +129,13 @@ export interface RequirementItem {
    * field existed doesn't need a migration to remain valid - display code
    * treats a missing status on a workable item as "todo". */
   status?: RequirementStatus;
-    /** Free-form labels ("security", "tech-debt", "q3") for filtering -
-     * orthogonal to both type and category, and any number per item. Kept
-     * normalized (trimmed, no duplicates ignoring case) by
-     * requirementTags.ts; undefined and [] both mean untagged. Written as one
-     * value, so two people retagging the same item at the same moment end
-     * with whichever tag set landed last - the same as categoryId. */
-    tags?: string[];
+  /** Free-form labels ("security", "tech-debt", "q3") for filtering -
+   * orthogonal to both type and category, and any number per item. Kept
+   * normalized (trimmed, no duplicates ignoring case) by
+   * requirementTags.ts; undefined and [] both mean untagged. Written as one
+   * value, so two people retagging the same item at the same moment end
+   * with whichever tag set landed last - the same as categoryId. */
+  tags?: string[];
 
   /*
    * Architecture decision record fields - only shown and exported for an
@@ -149,6 +162,34 @@ export interface RequirementItem {
   decisionOutcome?: string;
   /** Markdown: what follows from the decision - good, bad and neutral. */
   decisionConsequences?: string;
+
+  /*
+   * Verification - see verification.ts. Only meaningful on a verifiable
+   * item (a requirement, a constraint). Flat and optional for the same
+   * reasons as the decision fields above. Acceptance criteria are not here:
+   * they are the task-list lines of `body`.
+   */
+  /** How this is checked. Undefined until someone chooses. */
+  verificationMethod?: VerificationMethod;
+  /** Undefined reads as "not verified". */
+  verificationStatus?: VerificationStatus;
+  /** One line on what verifies it or where that stands: a suite's name, a
+   * link, "failed at 640 orders per second". */
+  verificationNote?: string;
+
+  /*
+   * What is set on a requirement - see requirementAttributes.ts. Only
+   * meaningful on the items verification applies to.
+   */
+  priority?: RequirementPriority;
+  /** Undefined reads as "draft". */
+  lifecycle?: RequirementLifecycle;
+  /** The accountable stakeholder, as a team member... */
+  ownerId?: string;
+  /** ...or, for someone outside the team, by name. Only one is set. */
+  ownerName?: string;
+  /** The milestone this is due for. */
+  targetMilestoneId?: string;
 }
 
 export interface RequirementsDocument {

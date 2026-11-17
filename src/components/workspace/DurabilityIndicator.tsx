@@ -58,10 +58,9 @@ export interface DurabilityIndicatorProps {
   isOidcAvailable?: boolean;
   /** Whether the user is signed in to the workspace store. */
   isLoggedIn?: boolean;
-  /** Persists the open document to the workspace. */
-  onSaveToWorkspace?: () => void | Promise<void>;
-  /** Whether saving to the workspace is currently in flight. */
-  isSavingToWorkspace?: boolean;
+  /** Opens the place where the open document can be added to a workspace.
+   * Given only when it is not in one already. */
+  onAddToWorkspace?: () => void;
 }
 
 export function DurabilityIndicator({
@@ -77,8 +76,7 @@ export function DurabilityIndicator({
   onLoginOidc,
   isOidcAvailable,
   isLoggedIn,
-  onSaveToWorkspace,
-  isSavingToWorkspace,
+  onAddToWorkspace,
 }: DurabilityIndicatorProps) {
   const state = deriveDurability(signals);
   const [open, setOpen] = useState(false);
@@ -201,7 +199,7 @@ export function DurabilityIndicator({
 
   const hasActions =
     Boolean(actionLabel && handler) ||
-    Boolean(isLoggedIn && onSaveToWorkspace) ||
+    Boolean(isLoggedIn && onAddToWorkspace) ||
     Boolean(!isLoggedIn && (onLoginOidc || isOidcAvailable) && onLoginOidc) ||
     state.action === 'resolve-conflict' ||
     Boolean(onStopFile && (state.level === 'file' || signals.fileBacked));
@@ -235,18 +233,17 @@ export function DurabilityIndicator({
               <span>{actionLabel}</span>
             </button>
           )}
-          {isLoggedIn && onSaveToWorkspace && (
+          {isLoggedIn && onAddToWorkspace && (
             <button
               type="button"
               className="durability__action durability__action--workspace"
               onClick={() => {
-                void onSaveToWorkspace();
-                if (!state.persistent) closeDropdown();
+                onAddToWorkspace();
+                closeDropdown();
               }}
-              disabled={isSavingToWorkspace}
             >
               <Upload size={12} />
-              <span>Save to workspace</span>
+              <span>Add to a workspace...</span>
             </button>
           )}
           {!isLoggedIn && (onLoginOidc || isOidcAvailable) && onLoginOidc && (
@@ -311,7 +308,8 @@ export function DurabilityIndicator({
         className="durability__chip"
         aria-expanded={expanded}
         aria-describedby={expanded ? detailId : undefined}
-        title={state.label}
+        title={state.busy ? `${state.label} - ${state.detail}` : state.label}
+        aria-busy={state.busy || undefined}
         onClick={() => {
           if (open) {
             closeDropdown();
@@ -323,7 +321,13 @@ export function DurabilityIndicator({
         <Icon
           size={14}
           aria-hidden="true"
-          className={state.level === 'loading' ? 'durability__icon--spin' : undefined}
+          className={
+            state.level === 'loading'
+              ? 'durability__icon--spin'
+              : state.busy
+                ? 'durability__icon--busy'
+                : undefined
+          }
         />
         <span className="toolbar__label">{state.label}</span>
       </button>

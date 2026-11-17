@@ -80,10 +80,83 @@ Organize large requirement catalogs into functional domains and toggle view layo
 
 ### Grouping Views
 
-Toggle between two organization modes using the toolbar controls:
+Choose how items are grouped with **Group by** in the toolbar:
 
-- **Group by Type**: Groups items by their artifact type (_Requirements_, _Goals_, _Tickets_, etc.).
-- **Group by Category**: Groups items by assigned functional category, with an _Uncategorized_ section for unsorted items.
+- **Type**: by artifact type (_Requirements_, _Goals_, _Tickets_, etc.).
+- **Category**: by assigned functional category, with an _Uncategorized_ section for unsorted items.
+- **Epic**: each epic with its children nested beneath it, and a _No epic_ section for the rest.
+
+### Layouts
+
+The **Table / Cards / Split** buttons in the toolbar choose how the items are laid out:
+
+- **Table** (the default): one line per item with its type, priority, status, the components linked to it and how
+  it is verified. Each group's heading shows how much of it is verified. Click a line to open the item beneath it;
+  click the line again to close it. When grouping by epic, children are indented under their epic and the count beside
+  an epic's title folds them away.
+- **Cards**: every item as a full card in one scrolling column.
+- **Split**: an outline on the left and the open item as a page on the right, with its children listed below; click
+  a child to open it. Outline rows show whether a descriptive item is on the diagram, and the status of work items,
+  decisions and verification.
+
+Your layout is remembered for each document in this browser.
+
+### Editing an Open Item
+
+In the table and the split view an open item is edited where it stands; there is no edit mode to enter or leave.
+
+- **Title**: type in it.
+- **Type, category, tags**: the pickers at the top. The bin beside them deletes the item.
+- **Description**: click the pencil beside **Statement**, or double-click the text. Click away when you are done.
+- **Acceptance criteria**: click one to check it, hover it and click the cross to remove it, or type a new one in the
+  box beneath and press Enter.
+- **Relationships**: **Add relationship** adds one; the cross on a relationship removes it.
+- **On the diagram**: click a component to go to it. **New component** adds one to the diagram, linked to the item.
+- **Verification**, and a requirement's **status, priority, owner and target**: their menus.
+
+### Coverage
+
+The line above the items shows how complete the document is:
+
+- **On the diagram**: how many requirements, goals and other descriptive items have a component linked to them. Work
+  items and epics are not counted, since they aren't expected on the diagram.
+- **Acceptance criteria**: how many requirements and constraints have at least one acceptance criterion.
+- **Verified**: how many requirements and constraints are marked verified.
+- **Work done**: how many work items are done.
+
+At the right of that line is a button for each gap that exists, with how many items have it: **Not on diagram**,
+**Not verified**, **No acceptance criteria** and **No description**. Click one to show only those items, and again to
+show everything. In the table, a descriptive item with no component reads **Not linked**.
+
+### Status, Priority, Owner and Target
+
+Requirements and constraints, and items of any descriptive type you add yourself, carry four values. Set them from
+the menus under an open item's title:
+
+- **Status**: _Draft_, _In review_, _Approved_ or _Implemented_. This is the requirement's own status. A ticket's
+  _To Do / In Progress / Done_ is separate.
+- **Priority**: _Must_, _Should_ or _Could_.
+- **Owner**: the stakeholder accountable for the requirement, who says whether it is right and whether it has been
+  met. Choose a team member, or **Someone else...** to type the name of a person or team outside it. Who does the work
+  is the assignee on a ticket.
+- **Target**: the milestone the requirement is due for. Milestones are created on the Plan tab.
+
+### Verification and Acceptance Criteria
+
+Requirements and constraints, and items of any descriptive type you add yourself, can be verified. Goals, risks,
+assumptions, decisions, epics and work items are not.
+
+- **Acceptance criteria** are task-list lines in the description. Write `- [ ] Checkout completes without an account`
+  for each thing that must hold, or add them from the open item's **Acceptance criteria** list. Check one by clicking
+  it there, or by changing `[ ]` to `[x]` in the description. The item's header shows how many are checked, or **No criteria** when there are none.
+- **Verification** is the control beside the type in the item's header. Choose where it stands (**Not verified**,
+  **Verified** or **Failing**) and how it is checked (**Test**, **Demonstration**, **Inspection** or **Analysis**).
+
+- A **note** under the verification control holds one line on what verifies it: a suite's name, a
+  link, or the last result.
+
+The table's **Verification** column shows the method and status for every item, and the Markdown export includes each
+item's verification and its note.
 
 ### Tags
 
@@ -117,7 +190,7 @@ a second one to select everything in between, or use **Select all**. Then, in th
 - **Add tag** and **Remove tag…** change tags on every selected item.
 
 Each change applies to all of them at once and is a single undo step. Only selected items that are currently shown are
-changed, so what's ticked on screen is exactly what changes. Click **×** or **Select** again to finish.
+changed, so what's checked on screen is exactly what changes. Click **×** or **Select** again to finish.
 
 ---
 

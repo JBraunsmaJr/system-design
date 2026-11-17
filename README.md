@@ -19,7 +19,7 @@ It is built for teams that can't put their designs in someone else's cloud. The 
   slides, PNG images, an animated GIF or an MP4 video.
 - **Real-time collaboration**: edit together, peer to peer. Document data flows directly between browsers.
 - **Offline and installable**: works as a PWA, with documents stored locally in the browser.
-- **Optional team store**: an end-to-end encrypted document store with single sign-on, for teams that want shared workspaces that outlive any one browser.
+- **Optional team store**: a self-hosted document store with single sign-on, for teams that want shared workspaces that outlive any one browser. Groups from your identity provider give whole teams their workspaces, with viewer, editor and owner roles.
 
 ## How it fits together
 
@@ -32,7 +32,7 @@ flowchart LR
     end
     E <-- "peer-to-peer<br/>(document data)" --> E2[Other editors]
     E -. "handshake only" .-> R[Relay<br/>optional]
-    E -. "encrypted documents" .-> S[Store<br/>optional]
+    E -. "workspace documents" .-> S[Store<br/>optional]
     S --> DB[(PostgreSQL)]
     S --> IdP[OIDC provider<br/>Keycloak, Entra ID, Okta, GitHub…]
 ```
@@ -41,9 +41,9 @@ flowchart LR
 | ---------- | ----------------------------- | --------------------------------------------------------------------------------- |
 | **Editor** | Everything                    | Your documents, in your browser only                                              |
 | **Relay**  | Real-time collaboration       | Only the initial handshake between browsers; it is out of the path once connected |
-| **Store**  | Shared, persistent workspaces | Encrypted blobs it cannot read, plus who is signed in                             |
+| **Store**  | Shared, persistent workspaces | The documents people put in workspaces, and who is signed in                      |
 
-With no relay configured, collaboration is disabled. With no store configured, nothing leaves the browser.
+With no relay configured, collaboration is disabled. With no store configured, nothing leaves the browser. A store keeps workspace documents as the editor sends them, so the server and its administrators can read them: run it inside your own network.
 
 ## Quick start
 
@@ -70,7 +70,7 @@ Start a relay:
 docker run -d -p 4444:4444 ghcr.io/jbraunsmajr/system-design-relay:latest
 ```
 
-Then either set **Collaborate → Relay Server URL** to `ws://localhost:4444` in the editor, or bake in a default at build time:
+Then either set **Share → Settings → Relay server URL** to `ws://localhost:4444` in the editor, or bake in a default at build time:
 
 ```bash
 VITE_SIGNALING_URL="wss://relay.example.com" npm run build
@@ -83,16 +83,12 @@ VITE_SIGNALING_URL="wss://relay.example.com" npm run build
 A complete example with the editor, relay, store, PostgreSQL, and Keycloak:
 
 ```bash
-cd docker/store
-docker run --rm -u $(id -u):$(id -g) -v ./keys:/keys \
-  ghcr.io/jbraunsmajr/system-design-store:latest \
-  generate-recovery-key --out /keys/recovery
-docker compose -f compose.yaml up --build
+docker compose -f docker/store/compose.yaml up --build
 ```
 
-Open <http://localhost:8088> and sign in as `demo` / `demo`.
+Open <http://localhost:8088>, then **File → Documents**, and sign in as `demo` / `demo`. That account is a store administrator: choose **New workspace**, then **Add a copy to …** to put the open diagram in it. `otter` / `otter` is in the group `/design-team-a`; give that group a role under **Members** and Otter has the workspace at their next sign-in.
 
-> This demo uses a placeholder client secret, a demo account, a throwaway database password, and plain HTTP. Read [docs/store-deployment.md](docs/store-deployment.md) before deploying it for real, including how to handle the recovery key.
+> This demo uses a placeholder client secret, demo accounts, a throwaway database password, an open relay, and plain HTTP. Read [docs/store-deployment.md](docs/store-deployment.md) before deploying it for real.
 
 ## Published images
 
@@ -100,7 +96,7 @@ Open <http://localhost:8088> and sign in as `demo` / `demo`.
 | ----------------------------------------- | -------------------------- |
 | `ghcr.io/jbraunsmajr/system-design`       | The editor (nginx, static) |
 | `ghcr.io/jbraunsmajr/system-design-relay` | Collaboration relay        |
-| `ghcr.io/jbraunsmajr/system-design-store` | Encrypted workspace store  |
+| `ghcr.io/jbraunsmajr/system-design-store` | Workspace store            |
 
 ## Development
 
@@ -111,6 +107,14 @@ npm install
 npm run dev        # editor at http://localhost:5173/system-design/
 npm run build      # editor + docs site, output in dist/
 npm run preview    # serve the production build locally
+```
+
+Before pushing, run the checks CI runs on every push:
+
+```bash
+npm run format:check   # Prettier; fix with `npm run format`
+npm run lint           # ESLint; warnings are allowed, errors are not
+npm run typecheck      # TypeScript, no emit
 ```
 
 Pushing to `main` builds and deploys to GitHub Pages. For a first-time setup on a fork, set **Settings → Pages → Source** to **GitHub Actions**. The Vite `base` in `vite.config.ts` is `/system-design/` to match the repo name; update it if you rename the repo.
@@ -125,15 +129,15 @@ Pushing to `main` builds and deploys to GitHub Pages. For a first-time setup on 
 
 ### Repository layout
 
-| Path                      | Contents                                                           |
-| ------------------------- | ------------------------------------------------------------------ |
-| `src/`                    | The editor                                                         |
-| `store/`                  | The optional store: service, schema (`schema.sql`), `openapi.yaml` |
-| `docker/`                 | Images, nginx config, and the full-stack Compose example           |
-| `docs/`                   | Operator docs kept in the repo                                     |
-| `docs-site/`              | The published documentation site                                   |
-| `scripts/`                | Test runner, verification suites, and operational tools            |
-| `fixtures/`, `baselines/` | Performance test workloads and their baselines                     |
+| Path                      | Contents                                                  |
+| ------------------------- | --------------------------------------------------------- |
+| `src/`                    | The editor                                                |
+| `store/`                  | The optional store: service, `schema.sql`, `openapi.json` |
+| `docker/`                 | Images, nginx config, and the full-stack Compose example  |
+| `docs/`                   | Operator docs kept in the repo                            |
+| `docs-site/`              | The published documentation site                          |
+| `scripts/`                | Test runner, verification suites, and operational tools   |
+| `fixtures/`, `baselines/` | Performance test workloads and their baselines            |
 
 ## Testing
 

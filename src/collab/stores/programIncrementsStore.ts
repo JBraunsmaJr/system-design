@@ -166,14 +166,14 @@ export function createLocalProgramIncrementsStore(
 
     updateSprintDetails: (piId, sprintId, patch) => {
       pis = pis.map((pi) =>
-          pi.id === piId
-              ? {
-                  ...pi,
-                  sprints: pi.sprints.map((s) =>
-                      s.id === sprintId ? applyPlanningDetails(s, patch) : s,
-                  ),
-              }
-              : pi,
+        pi.id === piId
+          ? {
+              ...pi,
+              sprints: pi.sprints.map((s) =>
+                s.id === sprintId ? applyPlanningDetails(s, patch) : s,
+              ),
+            }
+          : pi,
       );
       notify();
     },
@@ -286,7 +286,7 @@ export function createAdapterProgramIncrementsStore(
 
     updatePIDetails: (piId, patch) => {
       setSnapshot((prev) =>
-          prev.map((pi) => (pi.id === piId ? applyPlanningDetails(pi, patch) : pi)),
+        prev.map((pi) => (pi.id === piId ? applyPlanningDetails(pi, patch) : pi)),
       );
     },
 
@@ -322,16 +322,16 @@ export function createAdapterProgramIncrementsStore(
 
     updateSprintDetails: (piId, sprintId, patch) => {
       setSnapshot((prev) =>
-          prev.map((pi) =>
-              pi.id === piId
-                  ? {
-                      ...pi,
-                      sprints: pi.sprints.map((s) =>
-                          s.id === sprintId ? applyPlanningDetails(s, patch) : s,
-                      ),
-                  }
-                  : pi,
-          ),
+        prev.map((pi) =>
+          pi.id === piId
+            ? {
+                ...pi,
+                sprints: pi.sprints.map((s) =>
+                  s.id === sprintId ? applyPlanningDetails(s, patch) : s,
+                ),
+              }
+            : pi,
+        ),
       );
     },
 

@@ -17,10 +17,10 @@ export interface CapacityReservation {
  * optional and omitted (not stored as '') when empty, so documents written
  * before these fields existed round-trip unchanged. */
 export interface PlanningDetails {
-    /** One-line statement of what this sprint/PI is meant to achieve. */
-    goal?: string;
-    /** Longer free-form notes: context, risks, decisions, retro points. */
-    notes?: string;
+  /** One-line statement of what this sprint/PI is meant to achieve. */
+  goal?: string;
+  /** Longer free-form notes: context, risks, decisions, retro points. */
+  notes?: string;
 }
 
 /** A patch to PlanningDetails. A key that is absent leaves that field
@@ -32,17 +32,17 @@ export const PLANNING_DETAIL_KEYS: readonly (keyof PlanningDetails)[] = ['goal',
 /** Applies a PlanningDetailsPatch to any object carrying PlanningDetails,
  * dropping cleared fields rather than storing empty strings. Pure. */
 export function applyPlanningDetails<T extends PlanningDetails>(
-    target: T,
-    patch: PlanningDetailsPatch,
+  target: T,
+  patch: PlanningDetailsPatch,
 ): T {
-    const next: T = {...target};
-    for (const key of PLANNING_DETAIL_KEYS) {
-        if (!(key in patch)) continue;
-        const value = patch[key];
-        if (typeof value === 'string' && value.trim() !== '') next[key] = value;
-        else delete next[key];
-    }
-    return next;
+  const next: T = { ...target };
+  for (const key of PLANNING_DETAIL_KEYS) {
+    if (!(key in patch)) continue;
+    const value = patch[key];
+    if (typeof value === 'string' && value.trim() !== '') next[key] = value;
+    else delete next[key];
+  }
+  return next;
 }
 
 export interface Sprint extends PlanningDetails {

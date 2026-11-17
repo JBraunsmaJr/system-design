@@ -72,18 +72,12 @@ jobs:
         run: npx tsx scripts/verify-store-http.ts
       - name: Sessions
         run: npx tsx scripts/verify-sessions.ts
-      - name: Devices and recovery
-        run: npx tsx scripts/verify-store-devices.ts && npx tsx scripts/verify-device-identity.ts
       - name: Retention and legal hold
         run: npx tsx scripts/verify-store-retention.ts
-      - name: Workspace index, merge and rotation
+      - name: Workspaces and the workspace API
         run: |
-          npx tsx scripts/verify-store-index.ts
-          npx tsx scripts/verify-store-client.ts
-          npx tsx scripts/verify-workspace-merge.ts
-          npx tsx scripts/verify-workspace-rotation.ts
-      - name: The administration guide, performed
-        run: npx tsx scripts/verify-admin-docs.ts
+          npx tsx scripts/verify-workspaces-contract.ts
+          npx tsx scripts/verify-store-v2.ts
       - name: The store as a process
         run: npx tsx scripts/verify-store-startup.ts
 

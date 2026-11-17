@@ -4,6 +4,7 @@ import { User, UserX, Check, ChevronDown } from 'lucide-react';
 import type { TeamDocument } from '../../domain/timeline/teamTypes';
 import { useOutsideClick } from '../../common/hooks/useOutsideClick';
 import { usePositionedDropdown } from '../../common/hooks/usePositionedDropdown';
+import { initials } from '../../common/utils/string';
 
 interface MemberPickerProps {
   team: TeamDocument;
@@ -47,16 +48,6 @@ export function MemberPicker({
     onClose: close,
   });
 
-  const getInitials = (name: string) => {
-    return name
-      .trim()
-      .split(/\s+/)
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
-
   return (
     <div className="member-picker" onClick={(e) => e.stopPropagation()}>
       <button
@@ -77,7 +68,7 @@ export function MemberPicker({
                 backgroundColor: assignedMember.avatarColor ?? '#5b7cfa',
               }}
             >
-              {getInitials(assignedMember.name)}
+              {initials(assignedMember.name)}
             </span>
             {!compact && <span className="member-picker__name">{assignedMember.name}</span>}
           </>
@@ -139,7 +130,7 @@ export function MemberPicker({
                           backgroundColor: member.avatarColor ?? '#5b7cfa',
                         }}
                       >
-                        {getInitials(member.name)}
+                        {initials(member.name)}
                       </span>
                       <div className="member-picker__option-info">
                         <span className="member-picker__option-name">{member.name}</span>

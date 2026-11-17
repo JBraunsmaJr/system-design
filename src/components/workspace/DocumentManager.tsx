@@ -88,17 +88,17 @@ export function DocumentManager({
 
   useEffect(() => {
     if (!isOpen) return;
-    let cancelled = false;
+    let canceled = false;
     void (async () => {
       const listed = await library.list();
       const storage = await requestPersistentStorage();
-      if (cancelled) return;
+      if (canceled) return;
       if (listed.ok) setEntries(listed.value);
       else setError(listed.message);
       setHealth(storage);
     })();
     return () => {
-      cancelled = true;
+      canceled = true;
     };
   }, [isOpen, library]);
 

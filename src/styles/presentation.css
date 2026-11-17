@@ -80,7 +80,7 @@
 }
 
 .presentation-bottombar__nav button {
-  background: var(--accent);
+  background: var(--accent-fill);
   border: none;
   color: var(--white);
   border-radius: var(--radius-sm);

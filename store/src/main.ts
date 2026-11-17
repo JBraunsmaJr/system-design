@@ -1,5 +1,5 @@
 /**
- * The store, as a process (WS8-R9).
+ * The store, as a process.
  *
  *   node --experimental-strip-types store/src/main.ts
  *
@@ -9,17 +9,19 @@
  */
 import { createMemoryBlobStore, type MemoryTx } from './blobStore.ts';
 import { createDocumentService } from './documentService.ts';
-import { createPostgresStore, createPostgresWorkspaceIndex } from './postgresStore.ts';
+import { createPostgresStore } from './postgresStore.ts';
 import { createPostgresUserDirectory } from './postgresUserDirectory.ts';
 import { createMemoryUserDirectory } from './userDirectory.ts';
-import { createMemoryWorkspaceIndex } from './workspaceIndex.ts';
-import { createMemoryAccessStore, type AccessStore } from './access.ts';
-import { createPostgresAccessStore } from './postgresAccess.ts';
 import { createHttpService, createMemoryAuditSink, type StoreBackend } from './httpService.ts';
 import { createSessionStore } from './auth/sessions.ts';
 import { createPostgresSessionStore } from './auth/postgresSessions.ts';
 import { createProvider } from './auth/providers.ts';
 import { ConfigError, describeConfig, loadStoreConfig } from './config.ts';
+import { createMemoryWorkspaceStore, type WorkspaceStore } from './workspaces.ts';
+import { createPostgresWorkspaceStore } from './postgresWorkspaces.ts';
+import { createMemoryDocumentCatalog, type DocumentCatalog } from './documentCatalog.ts';
+import { createPostgresDocumentCatalog } from './postgresDocumentCatalog.ts';
+import { createV2Api } from './v2/api.ts';
 import pg from 'pg';
 
 async function main() {
@@ -40,10 +42,10 @@ async function main() {
 
   let store: StoreBackend;
   let directory;
-  let index;
   let audit;
   let sessions;
-  let access: AccessStore;
+  let workspaces: WorkspaceStore;
+  let catalog: DocumentCatalog;
   let close = async () => {};
 
   if (config.databaseUrl) {
@@ -58,12 +60,12 @@ async function main() {
     const pool = new pg.Pool({ connectionString: config.databaseUrl });
     store = postgres as unknown as StoreBackend;
     directory = createPostgresUserDirectory(pool);
-    index = createPostgresWorkspaceIndex(pool);
     audit = postgres.audit;
     // Sessions in the database, so a restart or a second instance does not
-    // sign everyone out (WS10-R1).
+    // sign everyone out.
     sessions = createPostgresSessionStore(pool);
-    access = createPostgresAccessStore(pool);
+    workspaces = createPostgresWorkspaceStore(pool);
+    catalog = createPostgresDocumentCatalog(pool);
     close = async () => {
       await pool.end();
       await postgres.close();
@@ -81,17 +83,28 @@ async function main() {
       maxTotalBytes: config.maxTotalBytes,
     }) as unknown as StoreBackend;
     directory = createMemoryUserDirectory();
-    index = createMemoryWorkspaceIndex();
     audit = createMemoryAuditSink();
     sessions = createSessionStore();
-    access = createMemoryAccessStore();
+    // PostgreSQL enforces these two with foreign keys; in memory they are
+    // checked against the directory and the workspace store.
+    const memoryDirectory = directory;
+    const memoryWorkspaces = createMemoryWorkspaceStore({
+      userExists: (userId) =>
+        memoryDirectory.getUser(userId).then(
+          () => true,
+          () => false,
+        ),
+    });
+    workspaces = memoryWorkspaces;
+    catalog = createMemoryDocumentCatalog({
+      workspaceExists: async (id) => (await memoryWorkspaces.getWorkspace(id)) !== null,
+    });
   }
 
   const admins = new Set(config.admins);
+  const adminGroups = new Set(config.adminGroups);
   const server = createHttpService({
-    store,
     directory,
-    workspaceIndex: index,
     audit,
     sessions,
     providers: config.providers.map((provider) => createProvider(provider)),
@@ -99,16 +112,27 @@ async function main() {
     allowedOrigins: config.allowedOrigins,
     afterLoginUrl: config.afterLoginUrl,
     allowUnauthenticated: config.allowUnauthenticated,
-    cryptoMode: config.cryptoMode,
-    recoveryPublicKeyPem: config.recoveryPublicKeyPem,
     relayTokenSecret: config.relayTokenSecret,
-    isAdmin: (subject) => admins.has(subject),
-    access,
-    autoAccess: config.autoAccess,
+    v2: createV2Api({
+      relayTokenSecret: config.relayTokenSecret,
+      workspaces,
+      catalog,
+      documents: store,
+      directory,
+      // An administrator is someone listed in ADMIN_SUBJECTS, or in one of
+      // ADMIN_GROUPS at their last sign-in.
+      isAdmin: ({ issuer, subject, groups }) =>
+        admins.has(`${issuer}#${subject}`) || groups.some((group) => adminGroups.has(group)),
+      workspaceCreation: config.workspaceCreation,
+      allowUnauthenticated: config.allowUnauthenticated,
+      publicUrl: () => config.publicUrl,
+      allowedOrigins: config.allowedOrigins,
+    }),
   });
 
-  // The purge sweep (WS10-R4). Held documents and anything still inside its
-  // retention are left alone; see WS10-R8.
+  // The retention sweep: deleted documents past their retention are
+  // removed. Held documents, and anything still inside its retention, are
+  // left alone.
   const sweep = setInterval(() => {
     void (store as unknown as { purgeDue?: () => Promise<string[]> })
       .purgeDue?.()
@@ -117,13 +141,6 @@ async function main() {
           console.log(`Purged ${purged.length} document(s) past their retention.`);
       })
       .catch((error) => console.error('Purge sweep failed:', error));
-    // WS14-R18: raw ID tokens are dropped once past their retention.
-    void access
-      .expireEvidence(new Date(Date.now() - config.joinEvidenceRetentionMs))
-      .then((expired) => {
-        if (expired > 0) console.log(`Dropped sign-in evidence from ${expired} join request(s).`);
-      })
-      .catch((error) => console.error('Evidence sweep failed:', error));
   }, config.purgeIntervalMs);
 
   server.listen(config.port, () => console.log(`Ready on port ${config.port}.`));
