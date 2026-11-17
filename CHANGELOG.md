@@ -18,6 +18,8 @@ were never released do not belong here; the commit history has those. One
 entry describes a feature as it ships, not each step that led to it. Use
 American English.
 
+## [Unreleased]
+
 ## [1.0.1] - 2026-11-17
 
 - Fixed CSS issue
