@@ -18,9 +18,9 @@ were never released do not belong here; the commit history has those. One
 entry describes a feature as it ships, not each step that led to it. Use
 American English.
 
-## [Unreleased]
+## [1.0.0] - 2026-11-17
 
-### [MAJOR] Workspaces replace the encrypted workspace
+### Workspaces replace the encrypted workspace
 
 - **Workspaces.** When the editor points at a store, **Workspaces** in the document manager lets you sign in, pick or
   create a workspace, add a copy of the open document to it, and open or delete its documents. A workspace document
@@ -54,7 +54,7 @@ American English.
     dropped afterward.
   - The deployment guides and example deployments are rewritten for workspaces.
 
-### [MINOR] Requirements: a table, verification and requirement details
+### Requirements: a table, verification and requirement details
 
 - **Table.** The Requirements view opens as a table, one line per item. Click a line to open the item beneath it.
   **Cards** and **Split** are still there, and a layout you already chose for a document is kept.
@@ -74,7 +74,7 @@ American English.
 - The toolbar is rearranged as find, arrange, add, and every menu in the view has the same look.
 - The Markdown export includes all of the above. Existing documents need no change.
 
-### [MINOR] Diagram: palette, Inspector and zooming out
+### Diagram: palette, Inspector and zooming out
 
 - **Palette.** The palette is a rail of buttons with the open palette's list beside it. A search box looks through
   every palette at once (`/` jumps to it, `Enter` adds the first match), and the last six things you added are listed
@@ -89,7 +89,7 @@ American English.
 - Clicking a node or edge with a mouse selects it without opening the description popup. Hovering, or a tap on a
   touch screen, still opens it.
 
-### [MINOR] Plan tab
+### Plan tab
 
 - Timeline, Team and Skill Tree are one **Plan** tab with four sections: **Board**, **Gantt**, **Dependencies**
   (formerly Skill Tree) and **Team**.
@@ -100,7 +100,7 @@ American English.
 - Markers are a strip of chips above the board.
 - In the Gantt chart, each blocked or at-risk item says why on its own row.
 
-### [MINOR] Toolbar: Share and one save status
+### Toolbar: Share and one save status
 
 - **Collaborate** is now **Share**. For a workspace document it says which workspace the document is in and opens its
   members; it no longer offers a session link, which could have let someone outside the workspace watch the document.
