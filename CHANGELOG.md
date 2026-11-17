@@ -20,6 +20,8 @@ American English.
 
 ## [Unreleased]
 
+- [PATCH] Fixed vite configuration not serving `mjs` file in production environment.
+
 ## [1.0.1] - 2026-11-17
 
 - Fixed CSS issue
